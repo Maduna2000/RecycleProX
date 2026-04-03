@@ -1,0 +1,126 @@
+'use client'
+
+import { useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { CreateCustomerSchema, type CreateCustomerInput, type CreateCustomerFormInput } from '@/lib/schemas/customer'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Loader2 } from 'lucide-react'
+import { toast } from 'sonner'
+import { validateSaId } from '@/lib/utils/saId'
+import Link from 'next/link'
+
+export function CreateCustomerModal({ open, onClose, onSuccess }: { open: boolean; onClose: () => void; onSuccess: () => void }) {
+  const [loading, setLoading] = useState(false)
+  const [duplicate, setDuplicate] = useState<{ id: string } | null>(null)
+
+  const { register, handleSubmit, setValue, watch, reset, formState: { errors } } = useForm<CreateCustomerFormInput, unknown, CreateCustomerInput>({
+    resolver: zodResolver(CreateCustomerSchema),
+    defaultValues: { customerType: 'casual' },
+  })
+
+  const idNumber = watch('idNumber', '')
+  const idValidation = idNumber?.length === 13 ? validateSaId(idNumber) : null
+
+  async function onSubmit(data: CreateCustomerInput) {
+    setLoading(true)
+    setDuplicate(null)
+    const res = await fetch('/api/customers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
+    setLoading(false)
+
+    if (res.status === 409) {
+      const json = await res.json()
+      setDuplicate({ id: json.existingCustomerId })
+      return
+    }
+    if (!res.ok) {
+      const json = await res.json()
+      toast.error(json.error ?? 'Failed to create customer')
+      return
+    }
+    toast.success('Customer created')
+    reset()
+    onSuccess()
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o) { reset(); setDuplicate(null); onClose() } }}>
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader><DialogTitle>Add Customer</DialogTitle></DialogHeader>
+
+        {duplicate && (
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+            A customer with this ID already exists.{' '}
+            <Link href={`/app/customers/${duplicate.id}`} className="underline font-medium" onClick={onClose}>View existing record →</Link>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-2">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>Customer Type</Label>
+              <Select onValueChange={(v) => setValue('customerType', v as 'casual' | 'account')} defaultValue="casual">
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="casual">Casual</SelectItem>
+                  <SelectItem value="account">Account</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>SA ID Number</Label>
+              <Input {...register('idNumber')} className="mt-1" placeholder="13 digits" disabled={loading} />
+              {idNumber?.length === 13 && idValidation && (
+                <p className={`text-xs mt-1 ${idValidation.valid ? 'text-green-600' : 'text-red-600'}`}>
+                  {idValidation.valid ? `✓ ${idValidation.gender}` : `✗ ${idValidation.error}`}
+                </p>
+              )}
+              {errors.idNumber && <p className="text-xs text-red-600 mt-1">{errors.idNumber.message}</p>}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>First Name</Label>
+              <Input {...register('firstName')} className="mt-1" disabled={loading} />
+              {errors.firstName && <p className="text-xs text-red-600 mt-1">{errors.firstName.message}</p>}
+            </div>
+            <div>
+              <Label>Last Name</Label>
+              <Input {...register('lastName')} className="mt-1" disabled={loading} />
+              {errors.lastName && <p className="text-xs text-red-600 mt-1">{errors.lastName.message}</p>}
+            </div>
+          </div>
+
+          <div>
+            <Label>Phone</Label>
+            <Input {...register('phone')} className="mt-1" placeholder="071 234 5678" disabled={loading} />
+            {errors.phone && <p className="text-xs text-red-600 mt-1">{errors.phone.message}</p>}
+          </div>
+
+          <div>
+            <Label>Email <span className="text-gray-400 font-normal">(optional)</span></Label>
+            <Input {...register('email')} type="email" className="mt-1" disabled={loading} />
+            {errors.email && <p className="text-xs text-red-600 mt-1">{errors.email.message}</p>}
+          </div>
+
+          <div>
+            <Label>Physical Address <span className="text-gray-400 font-normal">(optional)</span></Label>
+            <Input {...register('physicalAddress')} className="mt-1" disabled={loading} />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
+            <Button type="submit" className="bg-green-600 hover:bg-green-700" disabled={loading}>
+              {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Creating...</> : 'Create Customer'}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}

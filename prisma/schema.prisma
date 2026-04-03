@@ -115,8 +115,36 @@ model AuditLog {
 }
 
 model SystemSettings {
-  id                  String   @id @default(uuid())
-  key                 String   @unique
-  value               String
-  updatedAt           DateTime @updatedAt
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model Customer {
+  id               String       @id @default(uuid())
+  customerType     CustomerType @default(casual)
+  idNumber         String       @unique
+  firstName        String
+  lastName         String
+  companyName      String?
+  phone            String
+  email            String?
+  physicalAddress  String?
+  postalAddress    String?
+  vatNumber        String?
+  idPhotoR2Key     String?
+  priceGroupId     String?
+  isActive         Boolean      @default(true)
+  blacklisted      Boolean      @default(false)
+  blacklistReason  String?
+  blacklistedAt    DateTime?
+  blacklistedById  String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  createdByUserId  String?
+
+  @@index([idNumber])
+  @@index([phone])
+  @@index([lastName])
 }
