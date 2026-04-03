@@ -21,7 +21,7 @@ export const CreateUserSchema = z.object({
     .regex(/[0-9]/, 'Password must contain at least one number')
     .regex(/[^a-zA-Z0-9]/, 'Password must contain at least one special character'),
   role: z.enum(['admin', 'manager', 'cashier']),
-  isActive: z.boolean().default(true),
+  isActive: z.boolean().default(true).optional(),
 })
 
 export const ChangePasswordSchema = z

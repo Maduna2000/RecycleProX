@@ -3,7 +3,8 @@
     "allow": [
       "Bash(node -e \"console.log\\(require\\('crypto'\\).randomBytes\\(32\\).toString\\('base64'\\)\\)\")",
       "Bash(npm install:*)",
-      "Bash(npx prisma:*)"
+      "Bash(npx prisma:*)",
+      "Bash(npx shadcn@latest add dialog form input label select badge table dropdown-menu toast --yes)"
     ]
   }
 }
