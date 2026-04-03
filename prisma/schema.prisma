@@ -76,3 +76,47 @@ enum AuditAction {
   EXPORT
   ADJUSTMENT
 }
+
+// ─── Models ───────────────────────────────────────────────────────────────────
+
+model User {
+  id                   String    @id @default(uuid())
+  fullName             String
+  username             String    @unique
+  passwordHash         String
+  pinHash              String?
+  role                 UserRole
+  isActive             Boolean   @default(true)
+  forcePasswordChange  Boolean   @default(true)
+  failedAttempts       Int       @default(0)
+  lockedAt             DateTime?
+  lastLoginAt          DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  createdByUserId      String?
+}
+
+model AuditLog {
+  id          BigInt      @id @default(autoincrement())
+  tableName   String
+  recordId    String
+  action      AuditAction
+  oldValues   Json?
+  newValues   Json?
+  changedById String?
+  ipAddress   String?
+  userAgent   String?
+  rowHash     String
+  createdAt   DateTime    @default(now())
+
+  @@index([tableName, recordId])
+  @@index([changedById])
+  @@index([createdAt])
+}
+
+model SystemSettings {
+  id                  String   @id @default(uuid())
+  key                 String   @unique
+  value               String
+  updatedAt           DateTime @updatedAt
+}
