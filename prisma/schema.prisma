@@ -1,0 +1,78 @@
+// RecycleProX Basic — Prisma Schema
+// All monetary values: Decimal(18,2) — HARD RULE
+// All IDs: UUID — never auto-increment for business records
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  admin
+  manager
+  cashier
+}
+
+enum CustomerType {
+  casual
+  account
+}
+
+enum TxStatus {
+  pending
+  completed
+  voided
+}
+
+enum PaymentMethod {
+  cash
+  eft
+  cheque
+}
+
+enum ProductCategory {
+  ferrous
+  non_ferrous
+  copper
+  aluminium
+  plastic
+  paper
+  e_waste
+  other
+}
+
+enum UnitOfMeasure {
+  kg
+  ton
+  each
+}
+
+enum StockDirection {
+  in
+  out
+}
+
+enum CaptureType {
+  product_photo
+  id_scan
+  signature
+  document
+}
+
+enum AuditAction {
+  INSERT
+  UPDATE
+  DELETE
+  VOID
+  LOGIN
+  LOGOUT
+  PRINT
+  EXPORT
+  ADJUSTMENT
+}
