@@ -1,0 +1,6 @@
+{
+    "chat.hookFilesLocations": {
+        "\"terminal.integrated.windowsUseConptyDll\"": true,
+        "\"terminal.integrated.windowsEnableConpty\"": true
+    }
+}
