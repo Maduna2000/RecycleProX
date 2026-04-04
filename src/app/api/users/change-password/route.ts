@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
-import { changePassword } from '@/lib/services/authService'
+import { changePassword, InvalidCurrentPasswordError } from '@/lib/services/authService'
 import { ChangePasswordSchema } from '@/lib/schemas/auth'
 import logger from '@/lib/logger'
 
@@ -18,7 +18,14 @@ export async function POST(req: NextRequest) {
     await changePassword(session.user.id, parsed.data.currentPassword, parsed.data.newPassword)
     return NextResponse.json({ success: true })
   } catch (err) {
+    if (err instanceof InvalidCurrentPasswordError) {
+      return NextResponse.json({ error: 'Current password is incorrect' }, { status: 400 })
+    }
+    const msg = err instanceof Error ? err.message : String(err)
     logger.error({ err }, 'POST change-password failed')
-    return NextResponse.json({ error: 'Failed to change password' }, { status: 500 })
+    return NextResponse.json(
+      { error: process.env.NODE_ENV === 'development' ? msg : 'Failed to change password' },
+      { status: 500 }
+    )
   }
 }
