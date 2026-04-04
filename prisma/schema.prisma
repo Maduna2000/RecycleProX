@@ -169,6 +169,7 @@ model Product {
   priceOverrides   PriceGroupProductOverride[]
   priceHistory     PriceHistory[]
   purchaseLines    PurchaseLine[]
+  saleLines        SaleLine[]
 
   @@index([category])
   @@index([isActive])
@@ -257,5 +258,48 @@ model PurchaseLine {
   createdAt    DateTime @default(now())
 
   @@index([purchaseId])
+  @@index([productId])
+}
+
+// ─── Sales (M6) ───────────────────────────────────────────────────────────────
+
+model Sale {
+  id              String        @id @default(uuid())
+  refNumber       String        @unique
+  buyerId         String?
+  buyerName       String?
+  buyerIdNumber   String?
+  buyerPhone      String?
+  status          TxStatus      @default(completed)
+  totalAmount     Decimal       @db.Decimal(18, 2)
+  paymentMethod   PaymentMethod @default(cash)
+  notes           String?
+  voidedAt        DateTime?
+  voidedById      String?
+  voidReason      String?
+  createdByUserId String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  lines           SaleLine[]
+
+  @@index([buyerId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([refNumber])
+}
+
+model SaleLine {
+  id          String   @id @default(uuid())
+  saleId      String
+  sale        Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id])
+  quantity    Decimal  @db.Decimal(18, 3)
+  unitPrice   Decimal  @db.Decimal(18, 2)
+  lineTotal   Decimal  @db.Decimal(18, 2)
+  createdAt   DateTime @default(now())
+
+  @@index([saleId])
   @@index([productId])
 }
