@@ -136,6 +136,7 @@ model Customer {
   idPhotoR2Key     String?
   priceGroupId     String?
   priceGroup       PriceGroup?  @relation(fields: [priceGroupId], references: [id])
+  purchases        Purchase[]
   isActive         Boolean      @default(true)
   blacklisted      Boolean      @default(false)
   blacklistReason  String?
@@ -167,6 +168,7 @@ model Product {
 
   priceOverrides   PriceGroupProductOverride[]
   priceHistory     PriceHistory[]
+  purchaseLines    PurchaseLine[]
 
   @@index([category])
   @@index([isActive])
@@ -202,16 +204,58 @@ model PriceGroupProductOverride {
 }
 
 model PriceHistory {
-  id         String   @id @default(uuid())
-  productId  String
-  buyPrice   Decimal  @db.Decimal(18, 2)
-  sellPrice  Decimal  @db.Decimal(18, 2)
+  id          String   @id @default(uuid())
+  productId   String
+  buyPrice    Decimal  @db.Decimal(18, 2)
+  sellPrice   Decimal  @db.Decimal(18, 2)
   changedById String?
-  reason     String?
-  createdAt  DateTime @default(now())
+  reason      String?
+  createdAt   DateTime @default(now())
 
-  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([productId])
   @@index([createdAt])
+}
+
+// ─── Purchases (M5) ───────────────────────────────────────────────────────────
+
+model Purchase {
+  id              String        @id @default(uuid())
+  refNumber       String        @unique
+  customerId      String
+  customer        Customer      @relation(fields: [customerId], references: [id])
+  status          TxStatus      @default(completed)
+  totalAmount     Decimal       @db.Decimal(18, 2)
+  paymentMethod   PaymentMethod @default(cash)
+  notes           String?
+  voidedAt        DateTime?
+  voidedById      String?
+  voidReason      String?
+  createdByUserId String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  lines           PurchaseLine[]
+
+  @@index([customerId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([refNumber])
+}
+
+model PurchaseLine {
+  id           String   @id @default(uuid())
+  purchaseId   String
+  purchase     Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  productId    String
+  product      Product  @relation(fields: [productId], references: [id])
+  quantity     Decimal  @db.Decimal(18, 3)
+  unitPrice    Decimal  @db.Decimal(18, 2)
+  lineTotal    Decimal  @db.Decimal(18, 2)
+  priceSource  String   @default("default")
+  createdAt    DateTime @default(now())
+
+  @@index([purchaseId])
+  @@index([productId])
 }

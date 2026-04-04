@@ -10,6 +10,7 @@ import { QuickCreateModal } from '@/components/customers/QuickCreateModal'
 type Customer = {
   id: string; firstName: string; lastName: string; idNumber: string
   phone: string; customerType: string; blacklisted: boolean; blacklistReason?: string | null
+  priceGroupId?: string | null
 }
 
 interface Props {
