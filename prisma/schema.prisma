@@ -137,6 +137,7 @@ model Customer {
   priceGroupId     String?
   priceGroup       PriceGroup?  @relation(fields: [priceGroupId], references: [id])
   purchases        Purchase[]
+  payments         Payment[]
   isActive         Boolean      @default(true)
   blacklisted      Boolean      @default(false)
   blacklistReason  String?
@@ -302,4 +303,27 @@ model SaleLine {
 
   @@index([saleId])
   @@index([productId])
+}
+
+// ─── Payments (M7) ────────────────────────────────────────────────────────────
+// Payments made OUT to account customers settling their purchase balance.
+
+model Payment {
+  id              String        @id @default(uuid())
+  refNumber       String        @unique
+  customerId      String
+  customer        Customer      @relation(fields: [customerId], references: [id])
+  amount          Decimal       @db.Decimal(18, 2)
+  paymentMethod   PaymentMethod @default(cash)
+  notes           String?
+  voidedAt        DateTime?
+  voidedById      String?
+  voidReason      String?
+  createdByUserId String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([customerId])
+  @@index([createdAt])
+  @@index([refNumber])
 }
