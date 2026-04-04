@@ -2,8 +2,10 @@ import NextAuth from 'next-auth'
 import Credentials from 'next-auth/providers/credentials'
 import { login } from '@/lib/services/authService'
 import { LoginSchema } from '@/lib/schemas/auth'
+import { authConfig } from '@/auth.config'
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  ...authConfig,
   providers: [
     Credentials({
       credentials: {
@@ -34,36 +36,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       },
     }),
   ],
-
-  callbacks: {
-    jwt({ token, user }) {
-      if (user) {
-        token.id = user.id as string
-        token.role = (user as { role: string }).role
-        token.forcePasswordChange = (user as { forcePasswordChange: boolean }).forcePasswordChange
-        token.fullName = (user as { fullName: string }).fullName
-        token.username = (user as { username: string }).username
-      }
-      return token
-    },
-    session({ session, token }) {
-      session.user.id = token.id as string
-      session.user.role = token.role as string
-      session.user.forcePasswordChange = token.forcePasswordChange as boolean
-      session.user.fullName = token.fullName as string
-      session.user.username = token.username as string
-      return session
-    },
-  },
-
-  session: {
-    strategy: 'jwt',
-    maxAge: 12 * 60 * 60, // 12h default; cashier gets 8h (enforced via check)
-  },
-
-  pages: {
-    signIn: '/login',
-  },
 })
 
 // Extend next-auth types

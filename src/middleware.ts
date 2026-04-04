@@ -1,17 +1,24 @@
-import { auth } from '@/auth'
+/**
+ * Edge-compatible middleware — uses authConfig only (no Prisma, no bcrypt).
+ * Route protection and redirect logic only — no DB calls.
+ */
+import NextAuth from 'next-auth'
+import { authConfig } from '@/auth.config'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+
+const { auth } = NextAuth(authConfig)
 
 export default auth((req: NextRequest & { auth: { user?: { role?: string; forcePasswordChange?: boolean } } | null }) => {
   const { pathname } = req.nextUrl
   const session = req.auth
 
-  // Public routes
+  // Public routes — always allow
   if (pathname.startsWith('/login') || pathname.startsWith('/police')) {
     return NextResponse.next()
   }
 
-  // API routes — 401 if no session
+  // API routes — 401 if no session (individual routes do full role checks)
   if (pathname.startsWith('/api/') && !pathname.startsWith('/api/auth')) {
     if (!session) {
       return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
@@ -38,17 +45,4 @@ export default auth((req: NextRequest & { auth: { user?: { role?: string; forceP
 
 export const config = {
   matcher: ['/app/:path*', '/api/:path*'],
-}
-
-// ─── Role check helper ────────────────────────────────────────────────────────
-
-import { ForbiddenError } from '@/lib/services/authService'
-
-export function requireRole(
-  role: string | undefined,
-  allowed: string[],
-) {
-  if (!role || !allowed.includes(role)) {
-    throw new ForbiddenError(`Role '${role}' is not authorised for this action`)
-  }
 }
