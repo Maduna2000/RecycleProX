@@ -8,10 +8,11 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { ArrowLeft, Ban, Loader2, Printer } from 'lucide-react'
+import { ArrowLeft, Ban, Loader2, Printer, Camera } from 'lucide-react'
 import { toast } from 'sonner'
 import { useSession } from 'next-auth/react'
 import { format } from '@/lib/utils/format'
+import { PhotoUploader, PhotoViewer } from '@/components/PhotoUploader'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -36,6 +37,7 @@ type Purchase = {
   createdAt: string
   updatedAt: string
   createdByUserId?: string
+  photoR2Keys?: string[]
   customer: {
     id: string; firstName: string; lastName: string; idNumber: string; phone: string
   }
@@ -143,6 +145,17 @@ export default function PurchaseDetailPage() {
         </table>
       </div>
 
+      {/* Photos */}
+      {purchase.status !== 'voided' && (
+        <div className="bg-white rounded-xl border p-5 mb-4">
+          <div className="flex items-center gap-2 mb-4">
+            <Camera className="w-4 h-4 text-green-600" />
+            <h2 className="font-semibold text-gray-900">Product Photos</h2>
+          </div>
+          <PurchasePhotos purchaseId={purchase.id} />
+        </div>
+      )}
+
       {/* Actions */}
       <div className="flex justify-between pb-6">
         <Button variant="outline" onClick={() => window.print()}>
@@ -169,6 +182,52 @@ export default function PurchaseDetailPage() {
           }}
         />
       )}
+    </div>
+  )
+}
+
+// ─── Purchase Photos ─────────────────────────────────────────────────────────
+function PurchasePhotos({ purchaseId }: { purchaseId: string }) {
+  const { data: session } = useSession()
+  const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
+
+  // Store keys locally — in a full M9 these would be persisted on the Purchase record
+  // For now we use local state (resets on page reload); a future migration adds photoR2Keys[]
+  const [keys, setKeys] = useState<string[]>([])
+
+  function handleUploaded(key: string) {
+    setKeys((prev) => [...prev, key])
+  }
+
+  async function handleDelete(key: string) {
+    const res = await fetch('/api/r2/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key }),
+    })
+    if (res.ok) {
+      setKeys((prev) => prev.filter((k) => k !== key))
+      toast.success('Photo deleted')
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      {keys.map((k) => (
+        <PhotoViewer
+          key={k}
+          r2Key={k}
+          alt="Purchase photo"
+          canDelete={isManager}
+          onDelete={() => handleDelete(k)}
+        />
+      ))}
+      <PhotoUploader
+        context="purchase_photo"
+        referenceId={purchaseId}
+        label="Add Product Photo"
+        onUploaded={handleUploaded}
+      />
     </div>
   )
 }

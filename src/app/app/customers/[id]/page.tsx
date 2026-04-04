@@ -9,7 +9,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { AlertTriangle, ArrowLeft, ShieldBan, ShieldCheck, Pencil, Loader2 } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, ShieldBan, ShieldCheck, Pencil, Loader2, Camera } from 'lucide-react'
+import { PhotoUploader, PhotoViewer } from '@/components/PhotoUploader'
+import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -109,7 +111,7 @@ export default function CustomerDetailPage() {
       {/* Tab content */}
       {tab === 'Overview' && <OverviewTab customer={customer} />}
       {tab === 'Transactions' && <TransactionsTab customerId={id} />}
-      {tab === 'Documents' && <DocumentsTab customer={customer} />}
+      {tab === 'Documents' && <DocumentsTab customer={customer} onPhotoSaved={() => mutate(`/api/customers/${id}`)} />}
       {tab === 'Blacklist' && (
         <BlacklistTab
           customer={customer}
@@ -192,18 +194,53 @@ function TransactionsTab({ customerId }: { customerId: string }) {
 }
 
 // ─── Documents Tab ────────────────────────────────────────────────────────────
-function DocumentsTab({ customer }: { customer: Customer }) {
+function DocumentsTab({ customer, onPhotoSaved }: { customer: Customer; onPhotoSaved: () => void }) {
+  const { data: session } = useSession()
+  const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
+
+  async function savePhotoKey(key: string) {
+    const res = await fetch(`/api/customers/${customer.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idPhotoR2Key: key }),
+    })
+    if (res.ok) { onPhotoSaved() }
+    else { const j = await res.json(); toast.error(j.error ?? 'Failed to save photo reference') }
+  }
+
+  async function handlePhotoDeleted() {
+    const res = await fetch(`/api/customers/${customer.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idPhotoR2Key: null }),
+    })
+    if (res.ok) { onPhotoSaved() }
+  }
+
   return (
     <div className="bg-white rounded-xl border p-6">
+      <div className="flex items-center gap-2 mb-4">
+        <Camera className="w-4 h-4 text-green-600" />
+        <h3 className="font-semibold text-gray-900">ID Document</h3>
+      </div>
+
       {customer.idPhotoR2Key ? (
-        <div>
-          <p className="text-sm font-medium text-gray-700 mb-2">ID Photo</p>
-          <div className="w-32 h-32 bg-gray-100 rounded border flex items-center justify-center text-gray-400 text-xs">
-            Photo stored in R2
-          </div>
-        </div>
+        <PhotoViewer
+          r2Key={customer.idPhotoR2Key}
+          alt={`${customer.firstName} ${customer.lastName} ID`}
+          canDelete={isManager}
+          onDelete={handlePhotoDeleted}
+        />
       ) : (
-        <p className="text-gray-400 text-sm">No documents uploaded yet</p>
+        <div className="space-y-3">
+          <p className="text-sm text-gray-500">No ID photo uploaded yet</p>
+          <PhotoUploader
+            context="customer_id"
+            referenceId={customer.id}
+            label="Upload ID Photo"
+            onUploaded={savePhotoKey}
+          />
+        </div>
       )}
     </div>
   )
