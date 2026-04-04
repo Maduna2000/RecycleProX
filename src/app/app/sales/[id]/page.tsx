@@ -140,7 +140,10 @@ export default function SaleDetailPage() {
 
       {/* Actions */}
       <div className="flex justify-between pb-6">
-        <Button variant="outline" onClick={() => window.print()}>
+        <Button
+          variant="outline"
+          onClick={() => window.open(`/api/sales/${sale.id}/receipt?format=pdf`, '_blank')}
+        >
           <Printer className="w-4 h-4 mr-2" /> Print Receipt
         </Button>
         {isManager && sale.status !== 'voided' && (
