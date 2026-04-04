@@ -171,6 +171,7 @@ model Product {
   priceHistory     PriceHistory[]
   purchaseLines    PurchaseLine[]
   saleLines        SaleLine[]
+  stockMovements   StockMovement[]
 
   @@index([category])
   @@index([isActive])
@@ -303,6 +304,26 @@ model SaleLine {
 
   @@index([saleId])
   @@index([productId])
+}
+
+// ─── Stock (M8) ───────────────────────────────────────────────────────────────
+
+model StockMovement {
+  id              String         @id @default(uuid())
+  productId       String
+  product         Product        @relation(fields: [productId], references: [id])
+  direction       StockDirection
+  quantity        Decimal        @db.Decimal(18, 3)
+  source          String         // 'purchase' | 'sale' | 'manual_adjustment' | 'void_reversal'
+  sourceId        String?        // purchaseId / saleId for traceability
+  notes           String?
+  createdByUserId String?
+  createdAt       DateTime       @default(now())
+
+  @@index([productId])
+  @@index([direction])
+  @@index([source])
+  @@index([createdAt])
 }
 
 // ─── Payments (M7) ────────────────────────────────────────────────────────────

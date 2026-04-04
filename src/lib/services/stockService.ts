@@ -1,0 +1,185 @@
+import { prisma } from '@/lib/db/prisma'
+import logger from '@/lib/logger'
+import Decimal from 'decimal.js'
+
+// ─── Typed Errors ─────────────────────────────────────────────────────────────
+
+export class ProductNotFoundError extends Error {
+  constructor(id: string) { super(`Product "${id}" not found`); this.name = 'ProductNotFoundError' }
+}
+
+// ─── Record a stock movement (called inside transactions) ─────────────────────
+
+export async function recordMovement(
+  tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
+  opts: {
+    productId: string
+    direction: 'in' | 'out'
+    quantity: Decimal
+    source: 'purchase' | 'sale' | 'manual_adjustment' | 'void_reversal'
+    sourceId?: string
+    notes?: string
+    createdByUserId?: string
+  }
+) {
+  return tx.stockMovement.create({
+    data: {
+      productId: opts.productId,
+      direction: opts.direction,
+      quantity: opts.quantity,
+      source: opts.source,
+      sourceId: opts.sourceId,
+      notes: opts.notes,
+      createdByUserId: opts.createdByUserId,
+    },
+  })
+}
+
+// ─── Stock on hand per product ────────────────────────────────────────────────
+
+export async function getStockOnHand(productId?: string) {
+  // Aggregate IN movements
+  const inAgg = await prisma.stockMovement.groupBy({
+    by: ['productId'],
+    where: {
+      direction: 'in',
+      ...(productId && { productId }),
+    },
+    _sum: { quantity: true },
+  })
+
+  // Aggregate OUT movements
+  const outAgg = await prisma.stockMovement.groupBy({
+    by: ['productId'],
+    where: {
+      direction: 'out',
+      ...(productId && { productId }),
+    },
+    _sum: { quantity: true },
+  })
+
+  const inMap = new Map(inAgg.map((r) => [r.productId, new Decimal(r._sum.quantity?.toString() ?? '0')]))
+  const outMap = new Map(outAgg.map((r) => [r.productId, new Decimal(r._sum.quantity?.toString() ?? '0')]))
+
+  // All product IDs that have any movement
+  const allIds = new Set([...Array.from(inMap.keys()), ...Array.from(outMap.keys())])
+
+  const products = await prisma.product.findMany({
+    where: {
+      isActive: true,
+      ...(productId ? { id: productId } : {}),
+    },
+    orderBy: [{ category: 'asc' }, { name: 'asc' }],
+  })
+
+  return products.map((p) => {
+    const totalIn = inMap.get(p.id) ?? new Decimal(0)
+    const totalOut = outMap.get(p.id) ?? new Decimal(0)
+    const onHand = totalIn.minus(totalOut)
+    return {
+      product: p,
+      totalIn: totalIn.toFixed(3),
+      totalOut: totalOut.toFixed(3),
+      onHand: onHand.toFixed(3),
+      hasMovements: allIds.has(p.id),
+    }
+  })
+}
+
+// ─── Manual stock adjustment ──────────────────────────────────────────────────
+
+export async function manualAdjustment(opts: {
+  productId: string
+  direction: 'in' | 'out'
+  quantity: string
+  notes: string
+  createdByUserId?: string
+}) {
+  const product = await prisma.product.findUnique({ where: { id: opts.productId } })
+  if (!product) throw new ProductNotFoundError(opts.productId)
+
+  const movement = await prisma.$transaction(async (tx) => {
+    return recordMovement(tx, {
+      productId: opts.productId,
+      direction: opts.direction,
+      quantity: new Decimal(opts.quantity),
+      source: 'manual_adjustment',
+      notes: opts.notes,
+      createdByUserId: opts.createdByUserId,
+    })
+  })
+
+  logger.info({
+    movementId: movement.id,
+    productId: opts.productId,
+    direction: opts.direction,
+    quantity: opts.quantity,
+    createdByUserId: opts.createdByUserId,
+  }, 'stock.manualAdjustment')
+
+  return movement
+}
+
+// ─── List movements (with pagination) ────────────────────────────────────────
+
+export async function listMovements(opts?: {
+  productId?: string
+  direction?: 'in' | 'out'
+  source?: string
+  from?: Date
+  to?: Date
+  page?: number
+  pageSize?: number
+}) {
+  const page = opts?.page ?? 1
+  const pageSize = opts?.pageSize ?? 100
+  const skip = (page - 1) * pageSize
+
+  const where = {
+    ...(opts?.productId && { productId: opts.productId }),
+    ...(opts?.direction && { direction: opts.direction }),
+    ...(opts?.source && { source: opts.source }),
+    ...(opts?.from || opts?.to ? {
+      createdAt: {
+        ...(opts?.from && { gte: opts.from }),
+        ...(opts?.to && { lte: opts.to }),
+      },
+    } : {}),
+  }
+
+  const [movements, total] = await Promise.all([
+    prisma.stockMovement.findMany({
+      where,
+      include: { product: { select: { id: true, code: true, name: true, unit: true, category: true } } },
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take: pageSize,
+    }),
+    prisma.stockMovement.count({ where }),
+  ])
+
+  return { movements, total, page, pageSize }
+}
+
+// ─── Void reversal — called when purchase or sale is voided ──────────────────
+
+export async function recordVoidReversal(
+  tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
+  opts: {
+    originalMovements: { productId: string; direction: 'in' | 'out'; quantity: Decimal }[]
+    sourceId: string
+    createdByUserId?: string
+  }
+) {
+  for (const m of opts.originalMovements) {
+    await recordMovement(tx, {
+      productId: m.productId,
+      direction: m.direction === 'in' ? 'out' : 'in', // reverse direction
+      quantity: m.quantity,
+      source: 'void_reversal',
+      sourceId: opts.sourceId,
+      notes: `Void reversal for ${opts.sourceId}`,
+      createdByUserId: opts.createdByUserId,
+    })
+  }
+}

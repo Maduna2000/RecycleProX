@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/db/prisma'
 import logger from '@/lib/logger'
 import Decimal from 'decimal.js'
+import { recordMovement, recordVoidReversal } from '@/lib/services/stockService'
 import type { CreateSaleInput, VoidSaleInput } from '@/lib/schemas/sale'
 
 // ─── Typed Errors ─────────────────────────────────────────────────────────────
@@ -53,7 +54,7 @@ export async function createSale(data: CreateSaleInput, createdByUserId?: string
   const refNumber = await generateRefNumber()
 
   const sale = await prisma.$transaction(async (tx) => {
-    return tx.sale.create({
+    const s = await tx.sale.create({
       data: {
         refNumber,
         buyerId: data.buyerId,
@@ -76,6 +77,20 @@ export async function createSale(data: CreateSaleInput, createdByUserId?: string
       },
       include: { lines: { include: { product: true } } },
     })
+
+    // Stock OUT: yard sold material to buyer
+    for (const line of resolvedLines) {
+      await recordMovement(tx, {
+        productId: line.productId,
+        direction: 'out',
+        quantity: line.quantity,
+        source: 'sale',
+        sourceId: s.id,
+        createdByUserId,
+      })
+    }
+
+    return s
   })
 
   logger.info({ saleId: sale.id, refNumber, totalAmount: totalAmount.toFixed(2), createdByUserId }, 'sale.created')
@@ -85,14 +100,29 @@ export async function createSale(data: CreateSaleInput, createdByUserId?: string
 // ─── Void Sale ────────────────────────────────────────────────────────────────
 
 export async function voidSale(id: string, data: VoidSaleInput, voidedById?: string) {
-  const sale = await prisma.sale.findUnique({ where: { id } })
+  const sale = await prisma.sale.findUnique({ where: { id }, include: { lines: true } })
   if (!sale) throw new SaleNotFoundError(id)
   if (sale.status === 'voided') throw new SaleAlreadyVoidedError(sale.refNumber)
 
-  const updated = await prisma.sale.update({
-    where: { id },
-    data: { status: 'voided', voidedAt: new Date(), voidedById, voidReason: data.reason },
-    include: { lines: { include: { product: true } } },
+  const updated = await prisma.$transaction(async (tx) => {
+    const s = await tx.sale.update({
+      where: { id },
+      data: { status: 'voided', voidedAt: new Date(), voidedById, voidReason: data.reason },
+      include: { lines: { include: { product: true } } },
+    })
+
+    // Reverse the stock OUT movements from this sale
+    await recordVoidReversal(tx, {
+      originalMovements: sale.lines.map((l) => ({
+        productId: l.productId,
+        direction: 'out' as const,
+        quantity: new Decimal(l.quantity.toString()),
+      })),
+      sourceId: id,
+      createdByUserId: voidedById,
+    })
+
+    return s
   })
 
   logger.info({ saleId: id, refNumber: sale.refNumber, voidedById }, 'sale.voided')

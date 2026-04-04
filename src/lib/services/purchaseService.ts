@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db/prisma'
 import logger from '@/lib/logger'
 import Decimal from 'decimal.js'
 import { resolvePrice } from '@/lib/services/productService'
+import { recordMovement, recordVoidReversal } from '@/lib/services/stockService'
 import type { CreatePurchaseInput, VoidPurchaseInput } from '@/lib/schemas/purchase'
 
 // ─── Typed Errors ─────────────────────────────────────────────────────────────
@@ -94,6 +95,19 @@ export async function createPurchase(data: CreatePurchaseInput, createdByUserId?
       },
       include: { lines: { include: { product: true } }, customer: true },
     })
+
+    // Stock IN: yard received material from customer
+    for (const line of resolvedLines) {
+      await recordMovement(tx, {
+        productId: line.productId,
+        direction: 'in',
+        quantity: line.quantity,
+        source: 'purchase',
+        sourceId: p.id,
+        createdByUserId,
+      })
+    }
+
     return p
   })
 
@@ -104,19 +118,32 @@ export async function createPurchase(data: CreatePurchaseInput, createdByUserId?
 // ─── Void Purchase ────────────────────────────────────────────────────────────
 
 export async function voidPurchase(id: string, data: VoidPurchaseInput, voidedById?: string) {
-  const purchase = await prisma.purchase.findUnique({ where: { id } })
+  const purchase = await prisma.purchase.findUnique({
+    where: { id },
+    include: { lines: true },
+  })
   if (!purchase) throw new PurchaseNotFoundError(id)
   if (purchase.status === 'voided') throw new PurchaseAlreadyVoidedError(purchase.refNumber)
 
-  const updated = await prisma.purchase.update({
-    where: { id },
-    data: {
-      status: 'voided',
-      voidedAt: new Date(),
-      voidedById,
-      voidReason: data.reason,
-    },
-    include: { lines: { include: { product: true } }, customer: true },
+  const updated = await prisma.$transaction(async (tx) => {
+    const p = await tx.purchase.update({
+      where: { id },
+      data: { status: 'voided', voidedAt: new Date(), voidedById, voidReason: data.reason },
+      include: { lines: { include: { product: true } }, customer: true },
+    })
+
+    // Reverse stock: remove the IN movements that came from this purchase
+    await recordVoidReversal(tx, {
+      originalMovements: purchase.lines.map((l) => ({
+        productId: l.productId,
+        direction: 'in' as const,
+        quantity: new Decimal(l.quantity.toString()),
+      })),
+      sourceId: id,
+      createdByUserId: voidedById,
+    })
+
+    return p
   })
 
   logger.info({ purchaseId: id, refNumber: purchase.refNumber, voidedById }, 'purchase.voided')
