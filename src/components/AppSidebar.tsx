@@ -6,7 +6,7 @@ import { signOut } from 'next-auth/react'
 import {
   LayoutDashboard, ShoppingCart, TrendingUp, Users,
   Package, BarChart2, Settings, LogOut, Recycle,
-  Warehouse, DollarSign, Tag, Banknote, ShieldCheck,
+  Warehouse, DollarSign, Tag, Banknote, ShieldCheck, ShieldAlert,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -30,12 +30,13 @@ const managerExtra: NavItem[] = [
 ]
 
 const adminExtra: NavItem[] = [
-  { label: 'Products', href: '/app/products', icon: Package },
-  { label: 'Price Groups', href: '/app/price-groups', icon: Tag },
-  { label: 'Settings', href: '/app/settings/users', icon: Settings },
+  { label: 'Products',    href: '/app/products',       icon: Package },
+  { label: 'Price Groups',href: '/app/price-groups',   icon: Tag },
+  { label: 'Audit Log',   href: '/app/audit-log',      icon: ShieldAlert },
+  { label: 'Settings',    href: '/app/settings/users', icon: Settings },
 ]
 
-export function AppSidebar({ role, fullName, username }: { role: string; fullName: string; username: string }) {
+export function AppSidebar({ role, fullName }: { role: string; fullName: string; username?: string }) {
   const pathname = usePathname()
 
   const navItems: NavItem[] = [
