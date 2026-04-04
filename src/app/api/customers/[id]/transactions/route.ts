@@ -7,8 +7,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   if (!session) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
   const page = parseInt(req.nextUrl.searchParams.get('page') ?? '1')
-  const limit = parseInt(req.nextUrl.searchParams.get('limit') ?? '20')
 
-  const result = await getTransactionHistory(params.id, page, limit)
+  const result = await getTransactionHistory(params.id, page)
   return NextResponse.json(result)
 }

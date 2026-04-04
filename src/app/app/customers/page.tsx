@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Plus, Search, AlertTriangle } from 'lucide-react'
 import { CreateCustomerModal } from '@/components/customers/CreateCustomerModal'
-import { toast } from 'sonner'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 

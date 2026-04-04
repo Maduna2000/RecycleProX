@@ -7,7 +7,6 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Plus, Search, Eye } from 'lucide-react'
-import { useSession } from 'next-auth/react'
 import { format } from '@/lib/utils/format'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
@@ -25,7 +24,6 @@ type Purchase = {
 
 export default function PurchasesPage() {
   const router = useRouter()
-  const { data: session } = useSession()
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('')
 

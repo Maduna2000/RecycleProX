@@ -127,8 +127,7 @@ export async function unblacklistCustomer(id: string, userId: string, userRole: 
   return customer
 }
 
-export async function getTransactionHistory(id: string, page = 1, limit = 20) {
-  // Will be populated once M5/M6 Purchase/Sale models exist
-  // Returns empty for now — joined in later modules
+export async function getTransactionHistory(id: string, page = 1) {
+  // Stub — transaction history is served directly from /api/customers/[id]/transactions
   return { transactions: [], total: 0, page, totalPages: 0 }
 }

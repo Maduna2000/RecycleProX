@@ -6,7 +6,6 @@ import { useSession } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
 import { ChevronLeft, ChevronRight, ShieldAlert, Loader2 } from 'lucide-react'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())

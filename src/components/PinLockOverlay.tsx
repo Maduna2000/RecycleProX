@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useCallback } from 'react'
+import { useEffect, useCallback, useState } from 'react'
 import { signOut, useSession } from 'next-auth/react'
 import { usePinLockStore } from '@/stores/pinLockStore'
 import { Lock, Delete } from 'lucide-react'
@@ -84,13 +84,6 @@ export function PinLockOverlay({ children }: { children: React.ReactNode }) {
 }
 
 function PinPad({ onSubmit }: { onSubmit: (pin: string) => void }) {
-  const [pin, setPin] = [
-    typeof window !== 'undefined' ? (window as { __pin?: string }).__pin ?? '' : '',
-    (v: string) => { if (typeof window !== 'undefined') (window as { __pin?: string }).__pin = v },
-  ]
-
-  // Use local state properly
-  const { useState } = require('react') as typeof import('react')
   const [localPin, setLocalPin] = useState('')
 
   function press(d: string) {

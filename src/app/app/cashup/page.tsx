@@ -189,7 +189,7 @@ export default function CashUpPage() {
         <div className="bg-white rounded-xl border p-8 text-center">
           <Clock className="w-10 h-10 text-gray-300 mx-auto mb-3" />
           <p className="text-gray-600 font-medium mb-1">No session open for today</p>
-          <p className="text-sm text-gray-400 mb-5">Open a session to begin tracking today's cash.</p>
+          <p className="text-sm text-gray-400 mb-5">Open a session to begin tracking today&apos;s cash.</p>
           <Button onClick={handleOpen} disabled={opening}>
             {opening ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Opening...</> : 'Open Session'}
           </Button>
@@ -329,7 +329,7 @@ export default function CashUpPage() {
               </div>
 
               {cashUp.notes && (
-                <p className="mt-3 text-sm text-gray-500 italic">"{cashUp.notes}"</p>
+                <p className="mt-3 text-sm text-gray-500 italic">&quot;{cashUp.notes}&quot;</p>
               )}
 
               {isManager && (
@@ -362,7 +362,7 @@ export default function CashUpPage() {
                 )}
               </div>
               {cashUp.notes && (
-                <p className="mt-3 text-sm text-gray-500 italic">"{cashUp.notes}"</p>
+                <p className="mt-3 text-sm text-gray-500 italic">&quot;{cashUp.notes}&quot;</p>
               )}
             </div>
           )}

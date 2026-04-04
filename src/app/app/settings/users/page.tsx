@@ -41,13 +41,14 @@ export default function UsersPage() {
   const [editUser, setEditUser] = useState<User | null>(null)
   const [resetUser, setResetUser] = useState<User | null>(null)
 
-  if (session?.user?.role !== 'admin') {
+  const isAdmin = session?.user?.role === 'admin'
+  const query = new URLSearchParams({ ...(search && { search }), ...(roleFilter && { role: roleFilter }) })
+  const { data } = useSWR<{ users: User[] }>(isAdmin ? `/api/users?${query}` : null, fetcher)
+
+  if (!isAdmin) {
     router.replace('/app/dashboard')
     return null
   }
-
-  const query = new URLSearchParams({ ...(search && { search }), ...(roleFilter && { role: roleFilter }) })
-  const { data } = useSWR<{ users: User[] }>(`/api/users?${query}`, fetcher)
 
   async function handleToggleActive(user: User) {
     const res = await fetch(`/api/users/${user.id}/toggle-active`, { method: 'POST' })

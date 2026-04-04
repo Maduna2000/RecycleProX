@@ -12,7 +12,7 @@ import { Plus, Search, Pencil, TrendingUp, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { CreateProductSchema, UpdateProductSchema, BulkPriceUpdateSchema, type CreateProductInput, type CreateProductFormInput, type UpdateProductInput, type BulkPriceUpdateInput } from '@/lib/schemas/product'
+import { CreateProductSchema, UpdateProductSchema, BulkPriceUpdateSchema, type CreateProductInput, type CreateProductFormInput, type UpdateProductInput } from '@/lib/schemas/product'
 import { useSession } from 'next-auth/react'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
