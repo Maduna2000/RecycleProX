@@ -6,7 +6,7 @@ import { signOut } from 'next-auth/react'
 import {
   LayoutDashboard, ShoppingCart, TrendingUp, Users,
   Package, BarChart2, Settings, LogOut, Recycle,
-  Warehouse, DollarSign, Tag, Banknote,
+  Warehouse, DollarSign, Tag, Banknote, ShieldCheck,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -22,10 +22,11 @@ const cashierNav: NavItem[] = [
 ]
 
 const managerExtra: NavItem[] = [
-  { label: 'Payments', href: '/app/payments', icon: Banknote },
-  { label: 'Stock', href: '/app/stock', icon: Warehouse },
-  { label: 'Cash-up', href: '/app/cashup', icon: DollarSign },
-  { label: 'Reports', href: '/app/reports', icon: BarChart2 },
+  { label: 'Payments',        href: '/app/payments',        icon: Banknote },
+  { label: 'Stock',           href: '/app/stock',           icon: Warehouse },
+  { label: 'Cash-up',         href: '/app/cashup',          icon: DollarSign },
+  { label: 'Police Register', href: '/app/police-register', icon: ShieldCheck },
+  { label: 'Reports',         href: '/app/reports',         icon: BarChart2 },
 ]
 
 const adminExtra: NavItem[] = [
