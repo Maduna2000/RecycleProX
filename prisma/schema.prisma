@@ -348,3 +348,44 @@ model Payment {
   @@index([createdAt])
   @@index([refNumber])
 }
+
+// ─── Cash-up (M10) ────────────────────────────────────────────────────────────
+
+enum CashUpStatus {
+  open
+  submitted
+  approved
+}
+
+model CashUp {
+  id                  String        @id @default(uuid())
+  sessionDate         DateTime      @db.Date
+  openedByUserId      String
+  openedAt            DateTime      @default(now())
+  closedByUserId      String?
+  closedAt            DateTime?
+  approvedByUserId    String?
+  approvedAt          DateTime?
+  status              CashUpStatus  @default(open)
+
+  // System-calculated totals (from DB at close time)
+  systemCashSales     Decimal       @db.Decimal(18, 2) @default(0)
+  systemCashPurchases Decimal       @db.Decimal(18, 2) @default(0)
+  systemCashPayments  Decimal       @db.Decimal(18, 2) @default(0)
+  systemCashExpected  Decimal       @db.Decimal(18, 2) @default(0)
+
+  // Cashier-declared physical count
+  declaredCash        Decimal?      @db.Decimal(18, 2)
+  variance            Decimal?      @db.Decimal(18, 2)
+  notes               String?
+
+  // Denomination breakdown (JSON: { "200": 3, "100": 5, ... })
+  denominations       Json?
+
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  @@index([sessionDate])
+  @@index([status])
+  @@index([openedByUserId])
+}
