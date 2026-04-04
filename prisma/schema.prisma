@@ -135,6 +135,7 @@ model Customer {
   vatNumber        String?
   idPhotoR2Key     String?
   priceGroupId     String?
+  priceGroup       PriceGroup?  @relation(fields: [priceGroupId], references: [id])
   isActive         Boolean      @default(true)
   blacklisted      Boolean      @default(false)
   blacklistReason  String?
@@ -147,4 +148,70 @@ model Customer {
   @@index([idNumber])
   @@index([phone])
   @@index([lastName])
+}
+
+// ─── Products & Pricing ───────────────────────────────────────────────────────
+
+model Product {
+  id               String          @id @default(uuid())
+  code             String          @unique
+  name             String
+  category         ProductCategory
+  unit             UnitOfMeasure   @default(kg)
+  defaultBuyPrice  Decimal         @db.Decimal(18, 2)
+  defaultSellPrice Decimal         @db.Decimal(18, 2)
+  isActive         Boolean         @default(true)
+  sortOrder        Int             @default(0)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  priceOverrides   PriceGroupProductOverride[]
+  priceHistory     PriceHistory[]
+
+  @@index([category])
+  @@index([isActive])
+}
+
+model PriceGroup {
+  id          String    @id @default(uuid())
+  name        String    @unique
+  description String?
+  isDefault   Boolean   @default(false)
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  customers   Customer[]
+  overrides   PriceGroupProductOverride[]
+}
+
+model PriceGroupProductOverride {
+  id           String     @id @default(uuid())
+  priceGroupId String
+  productId    String
+  buyPrice     Decimal    @db.Decimal(18, 2)
+  sellPrice    Decimal    @db.Decimal(18, 2)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  priceGroup   PriceGroup @relation(fields: [priceGroupId], references: [id], onDelete: Cascade)
+  product      Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([priceGroupId, productId])
+  @@index([productId])
+}
+
+model PriceHistory {
+  id         String   @id @default(uuid())
+  productId  String
+  buyPrice   Decimal  @db.Decimal(18, 2)
+  sellPrice  Decimal  @db.Decimal(18, 2)
+  changedById String?
+  reason     String?
+  createdAt  DateTime @default(now())
+
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@index([createdAt])
 }

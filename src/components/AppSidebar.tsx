@@ -6,7 +6,7 @@ import { signOut } from 'next-auth/react'
 import {
   LayoutDashboard, ShoppingCart, TrendingUp, Users,
   Package, BarChart2, Settings, LogOut, Recycle,
-  Warehouse, DollarSign,
+  Warehouse, DollarSign, Tag,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -29,6 +29,7 @@ const managerExtra: NavItem[] = [
 
 const adminExtra: NavItem[] = [
   { label: 'Products', href: '/app/products', icon: Package },
+  { label: 'Price Groups', href: '/app/price-groups', icon: Tag },
   { label: 'Settings', href: '/app/settings/users', icon: Settings },
 ]
 

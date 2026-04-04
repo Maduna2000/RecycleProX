@@ -1,0 +1,44 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { auth } from '@/auth'
+import logger from '@/lib/logger'
+import { UpdatePriceGroupSchema } from '@/lib/schemas/product'
+import {
+  getPriceGroupWithOverrides, updatePriceGroup,
+  PriceGroupNotFoundError, DuplicatePriceGroupNameError,
+} from '@/lib/services/productService'
+
+export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+  const session = await auth()
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  try {
+    const group = await getPriceGroupWithOverrides(params.id)
+    return NextResponse.json(group)
+  } catch (err) {
+    if (err instanceof PriceGroupNotFoundError) return NextResponse.json({ error: err.message }, { status: 404 })
+    logger.error({ err }, 'GET /api/price-groups/[id] failed')
+    return NextResponse.json({ error: 'Failed to fetch price group' }, { status: 500 })
+  }
+}
+
+export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+  const session = await auth()
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!['admin', 'manager'].includes(session.user.role)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  const body = await req.json()
+  const parsed = UpdatePriceGroupSchema.safeParse(body)
+  if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
+
+  try {
+    const group = await updatePriceGroup(params.id, parsed.data, session.user.id)
+    return NextResponse.json(group)
+  } catch (err) {
+    if (err instanceof PriceGroupNotFoundError) return NextResponse.json({ error: err.message }, { status: 404 })
+    if (err instanceof DuplicatePriceGroupNameError) return NextResponse.json({ error: err.message }, { status: 409 })
+    logger.error({ err }, 'PUT /api/price-groups/[id] failed')
+    return NextResponse.json({ error: 'Failed to update price group' }, { status: 500 })
+  }
+}
