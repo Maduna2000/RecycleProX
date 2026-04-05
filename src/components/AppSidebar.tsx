@@ -35,10 +35,11 @@ const managerExtra: NavItem[] = [
 ]
 
 const adminExtra: NavItem[] = [
-  { label: 'Products',    href: '/app/products',       icon: Package },
-  { label: 'Price Groups',href: '/app/price-groups',   icon: Tag },
-  { label: 'Audit Log',   href: '/app/audit-log',      icon: ShieldAlert },
-  { label: 'Settings',    href: '/app/settings/users', icon: Settings },
+  { label: 'Products',    href: '/app/products',     icon: Package },
+  { label: 'Price Groups',href: '/app/price-groups', icon: Tag },
+  { label: 'Audit Log',   href: '/app/audit-log',    icon: ShieldAlert },
+  { label: 'Users',       href: '/app/settings/users', icon: Users },
+  { label: 'Settings',    href: '/app/settings',     icon: Settings },
 ]
 
 export function AppSidebar({ role, fullName }: { role: string; fullName: string; username?: string }) {
@@ -68,7 +69,10 @@ export function AppSidebar({ role, fullName }: { role: string; fullName: string;
       {/* Nav */}
       <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
         {navItems.map((item) => {
-          const active = pathname.startsWith(item.href)
+          // Exact match for leaf routes that are prefixes of deeper routes
+          const active = item.href === '/app/settings' || item.href === '/app/purchases'
+            ? pathname === item.href || pathname === item.href + '/'
+            : pathname.startsWith(item.href)
           return (
             <Link
               key={item.href}

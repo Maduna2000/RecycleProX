@@ -1,16 +1,18 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { ArrowLeft, Plus, Trash2, Loader2, User, AlertTriangle } from 'lucide-react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { ArrowLeft, Plus, Trash2, Loader2, User, AlertTriangle, PenLine, FileText } from 'lucide-react'
 import { toast } from 'sonner'
 import useSWR from 'swr'
 import { CustomerLookupWidget } from '@/components/CustomerLookupWidget'
+import { SignatureCanvas, SignatureCanvasHandle } from '@/components/SignatureCanvas'
 import Decimal from 'decimal.js'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
@@ -46,6 +48,7 @@ export default function NewPurchasePage() {
   const [notes, setNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [keyCounter, setKeyCounter] = useState(2)
+  const [sigDialog, setSigDialog] = useState<{ purchaseId: string; refNumber: string } | null>(null)
 
   const { data: productsData } = useSWR<{ products: Product[] }>('/api/products?active=true', fetcher)
   const products = productsData?.products ?? []
@@ -135,8 +138,8 @@ export default function NewPurchasePage() {
         toast.success(`Purchase ${data.refNumber} saved as unpaid`)
         router.push('/app/purchases/unpaid')
       } else {
-        toast.success(`Purchase ${data.refNumber} created`)
-        router.push(`/app/purchases/${data.id}`)
+        // Show signature capture before redirect
+        setSigDialog({ purchaseId: data.id, refNumber: data.refNumber })
       }
     } else {
       const j = await res.json()
@@ -304,6 +307,14 @@ export default function NewPurchasePage() {
           </div>
         </div>
 
+      {sigDialog && (
+        <SignatureDialog
+          purchaseId={sigDialog.purchaseId}
+          refNumber={sigDialog.refNumber}
+          onDone={() => router.push(`/app/purchases/${sigDialog.purchaseId}`)}
+        />
+      )}
+
         {/* Warning if blacklisted (should not happen due to lookup, but defensive) */}
         {customer?.blacklisted && (
           <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700">
@@ -337,5 +348,114 @@ export default function NewPurchasePage() {
         </div>
       </div>
     </div>
+  )
+}
+
+// ─── Signature Dialog ─────────────────────────────────────────────────────────
+function SignatureDialog({
+  purchaseId,
+  refNumber,
+  onDone,
+}: {
+  purchaseId: string
+  refNumber:  string
+  onDone:     () => void
+}) {
+  const sigRef  = useRef<SignatureCanvasHandle>(null)
+  const [saving, setSaving] = useState(false)
+
+  async function handleConfirm() {
+    const blob = await sigRef.current?.getBlob()
+    if (!blob) {
+      // Skip — no signature drawn, just navigate
+      onDone()
+      return
+    }
+
+    setSaving(true)
+    try {
+      // 1. Get presigned R2 upload URL
+      const key = `purchases/${purchaseId}/signature.png`
+      const urlRes = await fetch(`/api/r2/upload-url?key=${encodeURIComponent(key)}&contentType=image/png`)
+      if (!urlRes.ok) throw new Error('Failed to get upload URL')
+      const { url } = await urlRes.json() as { url: string }
+
+      // 2. Upload signature to R2
+      const uploadRes = await fetch(url, {
+        method: 'PUT',
+        body: blob,
+        headers: { 'Content-Type': 'image/png' },
+      })
+      if (!uploadRes.ok) throw new Error('Failed to upload signature')
+
+      // 3. Save R2 key back to the purchase
+      const patchRes = await fetch(`/api/purchases/${purchaseId}/signature`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ signatureR2Key: key }),
+      })
+      if (!patchRes.ok) throw new Error('Failed to save signature reference')
+
+      toast.success('Signature captured')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Signature upload failed')
+    } finally {
+      setSaving(false)
+      onDone()
+    }
+  }
+
+  return (
+    <Dialog open>
+      <DialogContent className="sm:max-w-md" onInteractOutside={(e) => e.preventDefault()}>
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <PenLine className="w-5 h-5 text-green-600" />
+            Seller Signature — {refNumber}
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4 mt-2">
+          <p className="text-sm text-gray-600">
+            Please ask the seller to sign below to confirm the sale of goods.
+            This signature will appear on the VAT264 declaration.
+          </p>
+
+          <SignatureCanvas ref={sigRef} width={450} height={130} />
+
+          <div className="flex justify-between items-center pt-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => sigRef.current?.clear()}
+              disabled={saving}
+            >
+              Clear
+            </Button>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onDone}
+                disabled={saving}
+              >
+                Skip
+              </Button>
+              <Button
+                type="button"
+                className="bg-green-600 hover:bg-green-700"
+                onClick={handleConfirm}
+                disabled={saving}
+              >
+                {saving
+                  ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving…</>
+                  : <><FileText className="w-4 h-4 mr-2" />Confirm & View Purchase</>}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }

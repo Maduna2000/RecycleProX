@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { ArrowLeft, Ban, Loader2, Printer, Camera } from 'lucide-react'
+import { ArrowLeft, Ban, Loader2, Printer, Camera, FileText } from 'lucide-react'
 import { toast } from 'sonner'
 import { useSession } from 'next-auth/react'
 import { format } from '@/lib/utils/format'
@@ -37,6 +37,7 @@ type Purchase = {
   createdAt: string
   updatedAt: string
   createdByUserId?: string
+  signatureR2Key?: string
   photoR2Keys?: string[]
   customer: {
     id: string; firstName: string; lastName: string; idNumber: string; phone: string
@@ -158,12 +159,21 @@ export default function PurchaseDetailPage() {
 
       {/* Actions */}
       <div className="flex justify-between pb-6">
-        <Button
-          variant="outline"
-          onClick={() => window.open(`/api/purchases/${purchase.id}/receipt?format=pdf`, '_blank')}
-        >
-          <Printer className="w-4 h-4 mr-2" /> Print Receipt
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => window.open(`/api/purchases/${purchase.id}/receipt?format=pdf`, '_blank')}
+          >
+            <Printer className="w-4 h-4 mr-2" /> Print Receipt
+          </Button>
+          <Button
+            variant="outline"
+            className="border-blue-200 text-blue-700 hover:bg-blue-50"
+            onClick={() => window.open(`/api/purchases/${purchase.id}/vat264`, '_blank')}
+          >
+            <FileText className="w-4 h-4 mr-2" /> Download VAT264
+          </Button>
+        </div>
         {isManager && purchase.status !== 'voided' && (
           <Button
             variant="outline"

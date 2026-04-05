@@ -51,6 +51,7 @@ enum UnitOfMeasure {
   kg
   ton
   each
+  litre
 }
 
 enum StockDirection {
@@ -163,6 +164,7 @@ model Customer {
   priceGroupId     String?
   priceGroup       PriceGroup?     @relation(fields: [priceGroupId], references: [id])
   purchases        Purchase[]
+  sales            Sale[]     @relation("SaleCustomer")
   payments         Payment[]
   isActive         Boolean         @default(true)
   blacklisted      Boolean         @default(false)
@@ -189,6 +191,7 @@ model Product {
   unit             UnitOfMeasure   @default(kg)
   defaultBuyPrice  Decimal         @db.Decimal(18, 2)
   defaultSellPrice Decimal         @db.Decimal(18, 2)
+  minStockLevel    Decimal?        @db.Decimal(18, 3)
   isActive         Boolean         @default(true)
   sortOrder        Int             @default(0)
   createdAt        DateTime        @default(now())
@@ -259,6 +262,8 @@ model Purchase {
   totalAmount     Decimal       @db.Decimal(18, 2)
   paymentMethod   PaymentMethod @default(cash)
   notes           String?
+  signatureR2Key  String?
+  vat264R2Key     String?
   voidedAt        DateTime?
   voidedById      String?
   voidReason      String?
@@ -299,6 +304,8 @@ model Sale {
   buyerName       String?
   buyerIdNumber   String?
   buyerPhone      String?
+  customerId      String?
+  customer        Customer?     @relation("SaleCustomer", fields: [customerId], references: [id])
   status          TxStatus      @default(completed)
   totalAmount     Decimal       @db.Decimal(18, 2)
   paymentMethod   PaymentMethod @default(cash)
@@ -313,6 +320,7 @@ model Sale {
   lines           SaleLine[]
 
   @@index([buyerId])
+  @@index([customerId])
   @@index([status])
   @@index([createdAt])
   @@index([refNumber])

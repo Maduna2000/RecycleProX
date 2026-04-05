@@ -1,0 +1,84 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { auth } from '@/auth'
+import { prisma } from '@/lib/db/prisma'
+import logger from '@/lib/logger'
+import { getPurchase } from '@/lib/services/purchaseService'
+import { generateVat264 } from '@/lib/pdf/vat264'
+
+export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+  const session = await auth()
+  if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  try {
+    const purchase = await getPurchase(params.id)
+
+    // Load yard settings
+    const settingsRows = await prisma.systemSettings.findMany({
+      where: { key: { in: ['yardName', 'yardAddress', 'vatNumber', 'dealerPhone'] } },
+    })
+    const settings: Record<string, string> = {}
+    for (const row of settingsRows) settings[row.key] = row.value
+
+    // Load signature bytes if stored in R2
+    let signatureBytes: Uint8Array | undefined
+    if (purchase.signatureR2Key) {
+      try {
+        const urlRes = await fetch(
+          `${process.env.NEXTAUTH_URL ?? ''}/api/r2/view-url?key=${encodeURIComponent(purchase.signatureR2Key)}`,
+          { headers: { cookie: `authjs.session-token=${session.user.id}` } }
+        )
+        if (urlRes.ok) {
+          const { url } = await urlRes.json() as { url: string }
+          const imgRes = await fetch(url)
+          if (imgRes.ok) {
+            signatureBytes = new Uint8Array(await imgRes.arrayBuffer())
+          }
+        }
+      } catch {
+        // Proceed without signature — non-fatal
+      }
+    }
+
+    // Map purchase lines
+    const lines = purchase.lines.map((l: {
+      product: { name: string; unit: string }
+      quantity: string | number | { toString(): string }
+      unitPrice: string | number | { toString(): string }
+      lineTotal: string | number | { toString(): string }
+    }) => ({
+      description: l.product.name,
+      quantity:    l.quantity.toString(),
+      unit:        l.product.unit,
+      unitPrice:   l.unitPrice.toString(),
+      lineTotal:   l.lineTotal.toString(),
+    }))
+
+    const pdfBytes = await generateVat264({
+      dealerName:    settings.yardName    ?? 'RecycleProX',
+      dealerAddress: settings.yardAddress ?? 'Pretoria, South Africa',
+      dealerVatNo:   settings.vatNumber   ?? '',
+      dealerPhone:   settings.dealerPhone,
+      refNumber:     purchase.refNumber,
+      date:          new Date(purchase.createdAt),
+      sellerName:    `${purchase.customer.firstName} ${purchase.customer.lastName}`,
+      sellerIdNumber: purchase.customer.idNumber,
+      sellerAddress: purchase.customer.physicalAddress ?? undefined,
+      sellerPhone:   purchase.customer.phone,
+      lines,
+      totalAmount:   purchase.totalAmount.toString(),
+      paymentMethod: purchase.paymentMethod,
+      signatureBytes,
+    })
+
+    return new NextResponse(pdfBytes, {
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `inline; filename="vat264-${purchase.refNumber}.pdf"`,
+        'Content-Length': String(pdfBytes.length),
+      },
+    })
+  } catch (err) {
+    logger.error({ err, id: params.id }, 'GET /api/purchases/[id]/vat264 failed')
+    return NextResponse.json({ error: 'Failed to generate VAT264' }, { status: 500 })
+  }
+}
