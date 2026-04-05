@@ -17,10 +17,11 @@ export const PurchaseLineSchema = z.object({
 })
 
 export const CreatePurchaseSchema = z.object({
-  customerId: z.string().uuid('Invalid customer'),
+  customerId:    z.string().uuid('Invalid customer'),
   paymentMethod: z.enum(['cash', 'eft', 'cheque']).default('cash'),
-  notes: z.string().max(500).optional(),
-  lines: z.array(PurchaseLineSchema).min(1, 'At least one product line is required'),
+  status:        z.enum(['completed', 'pending']).default('completed'),
+  notes:         z.string().max(500).optional(),
+  lines:         z.array(PurchaseLineSchema).min(1, 'At least one product line is required'),
 })
 
 export const VoidPurchaseSchema = z.object({

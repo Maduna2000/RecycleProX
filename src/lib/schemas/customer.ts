@@ -26,30 +26,57 @@ const idNumberSchema = z
     }
   })
 
+// Optional date string (from <input type="date">) → Date | undefined
+const optionalDateSchema = z
+  .string()
+  .optional()
+  .or(z.literal(''))
+  .transform((v) => (v ? new Date(v) : undefined))
+
+// Optional positive number (from text input) → number | undefined
+const optionalPositiveNumber = z.preprocess(
+  (v) => (v === '' || v === undefined || v === null ? undefined : parseFloat(String(v))),
+  z.number().positive('Must be a positive amount').optional(),
+)
+
 export const CreateCustomerSchema = z.object({
-  customerType: z.enum(['casual', 'account']),
-  idNumber: idNumberSchema,
-  firstName: z.string().min(1, 'First name is required'),
-  lastName: z.string().min(1, 'Last name is required'),
-  companyName: z.string().optional(),
-  phone: phoneSchema,
-  email: z.string().email('Invalid email address').optional().or(z.literal('')).transform(v => v || undefined),
-  physicalAddress: z.string().optional(),
-  postalAddress: z.string().optional(),
-  vatNumber: z
+  customerType:     z.enum(['casual', 'account']),
+  primaryFunction:  z.enum(['customer', 'supplier', 'both']).default('supplier'),
+  idNumber:         idNumberSchema,
+  firstName:        z.string().min(1, 'First name is required'),
+  lastName:         z.string().min(1, 'Last name is required'),
+  dateOfBirth:      optionalDateSchema,
+  gender:           z.enum(['male', 'female', 'other']).optional(),
+  nationality:      z.string().optional(),
+  companyName:      z.string().optional(),
+  contactPerson:    z.string().optional(),
+  phone:            phoneSchema,
+  email:            z.string().email('Invalid email address').optional().or(z.literal('')).transform(v => v || undefined),
+  physicalAddress:  z.string().optional(),
+  postalAddress:    z.string().optional(),
+  vatNumber:        z
     .string()
     .regex(/^4\d{9}$/, 'VAT number must be 10 digits starting with 4')
     .optional()
     .or(z.literal(''))
     .transform(v => v || undefined),
-  priceGroupId: z.string().uuid().optional(),
+  bankName:         z.string().optional(),
+  bankAccountNo:    z.string().optional(),
+  bankBranchCode:   z.string().optional(),
+  creditLimit:      optionalPositiveNumber,
+  policeRegisterNo: z.string().optional(),
+  licenseNumber:    z.string().optional(),
+  licenseExpiry:    optionalDateSchema,
+  tradeCommodities: z.array(z.string()).optional(),
+  customerNotes:    z.string().optional(),
+  priceGroupId:     z.string().uuid().optional(),
 })
 
 export const QuickCreateSchema = z.object({
-  idNumber: idNumberSchema,
+  idNumber:  idNumberSchema,
   firstName: z.string().min(1, 'First name is required'),
-  lastName: z.string().min(1, 'Last name is required'),
-  phone: phoneSchema,
+  lastName:  z.string().min(1, 'Last name is required'),
+  phone:     phoneSchema,
 })
 
 export const BlacklistSchema = z.object({
@@ -58,9 +85,9 @@ export const BlacklistSchema = z.object({
 
 export const UpdateCustomerSchema = CreateCustomerSchema.partial().omit({ idNumber: true })
 
-export type CreateCustomerInput = z.infer<typeof CreateCustomerSchema>
+export type CreateCustomerInput     = z.infer<typeof CreateCustomerSchema>
 export type CreateCustomerFormInput = z.input<typeof CreateCustomerSchema>
-export type QuickCreateInput = z.infer<typeof QuickCreateSchema>
-export type BlacklistInput = z.infer<typeof BlacklistSchema>
-export type UpdateCustomerInput = z.infer<typeof UpdateCustomerSchema>
+export type QuickCreateInput        = z.infer<typeof QuickCreateSchema>
+export type BlacklistInput          = z.infer<typeof BlacklistSchema>
+export type UpdateCustomerInput     = z.infer<typeof UpdateCustomerSchema>
 export type UpdateCustomerFormInput = z.input<typeof UpdateCustomerSchema>

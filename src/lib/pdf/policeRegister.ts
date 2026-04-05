@@ -14,14 +14,16 @@ import Decimal from 'decimal.js'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface RegisterEntry {
-  rowNumber:    number
-  createdAt:    Date
-  refNumber:    string
-  supplierName: string
-  idNumber:     string
-  address:      string
-  items:        string   // comma-joined product list
-  totalAmount:  string   // Decimal string
+  rowNumber:       number
+  createdAt:       Date
+  refNumber:       string
+  supplierName:    string
+  idNumber:        string
+  dateOfBirth?:    Date | null
+  policeRegNo?:    string | null
+  address:         string
+  items:           string   // comma-joined product list
+  totalAmount:     string   // Decimal string
 }
 
 export interface PoliceRegisterData {
@@ -48,14 +50,15 @@ const RED       = rgb(0.75, 0.1, 0.1)
 
 // Column widths as fractions of COL_W
 const COLS = {
-  num:      0.04,
-  time:     0.07,
-  ref:      0.10,
-  name:     0.17,
-  idno:     0.12,
-  address:  0.20,
-  items:    0.19,
-  total:    0.11,
+  num:     0.04,
+  time:    0.06,
+  ref:     0.09,
+  name:    0.15,
+  idno:    0.11,
+  dob:     0.09,
+  address: 0.17,
+  items:   0.18,
+  total:   0.11,
 }
 
 function colX(key: keyof typeof COLS): number {
@@ -130,6 +133,7 @@ export async function generatePoliceRegister(data: PoliceRegisterData): Promise<
       ['ref',     'Ref No.'],
       ['name',    'Supplier Name'],
       ['idno',    'ID Number'],
+      ['dob',     'Date of Birth'],
       ['address', 'Address'],
       ['items',   'Items Purchased'],
       ['total',   'Amount (R)'],
@@ -148,14 +152,18 @@ export async function generatePoliceRegister(data: PoliceRegisterData): Promise<
       page.drawRectangle({ x: MARGIN, y: y - 3, width: COL_W, height: 14, color: bg })
 
       const timeStr = entry.createdAt.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' })
+      const dobStr = entry.dateOfBirth
+        ? entry.dateOfBirth.toLocaleDateString('en-ZA', { day: '2-digit', month: '2-digit', year: 'numeric' })
+        : '—'
       const cells: [keyof typeof COLS, string][] = [
         ['num',     String(entry.rowNumber)],
         ['time',    timeStr],
         ['ref',     entry.refNumber],
-        ['name',    truncate(entry.supplierName, 24)],
+        ['name',    truncate(entry.supplierName, 22)],
         ['idno',    entry.idNumber],
-        ['address', truncate(entry.address, 28)],
-        ['items',   truncate(entry.items, 28)],
+        ['dob',     dobStr],
+        ['address', truncate(entry.address, 24)],
+        ['items',   truncate(entry.items, 26)],
         ['total',   `R ${new Decimal(entry.totalAmount).toFixed(2)}`],
       ]
 

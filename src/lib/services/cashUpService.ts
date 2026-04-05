@@ -2,6 +2,8 @@ import Decimal from 'decimal.js'
 import { prisma } from '@/lib/db/prisma'
 import logger from '@/lib/logger'
 import { SubmitCashUpInput, ApproveCashUpInput } from '@/lib/schemas/cashup'
+import { getFloatForDate } from './floatService'
+import { getExpenseTotalsForDate } from './expenseService'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -31,11 +33,18 @@ export async function openCashUp(openedByUserId: string, sessionDateStr?: string
     return existing
   }
 
+  // Pull opening balance from today's float record
+  const floatRecord = await getFloatForDate(sessionDate)
+  const openingBalance = floatRecord
+    ? new Decimal(floatRecord.openingAmount.toString())
+    : new Decimal(0)
+
   const cashUp = await prisma.cashUp.create({
     data: {
       sessionDate,
       openedByUserId,
       status: 'open',
+      openingBalance: openingBalance.toFixed(2),
     },
   })
 
@@ -55,48 +64,43 @@ export async function getOpenSession(sessionDateStr?: string) {
 }
 
 // ─── Calculate system totals for a date ──────────────────────────────────────
-// Sums completed cash transactions for the session date (midnight to midnight).
-async function calcSystemTotals(sessionDate: Date) {
+// Sums completed transactions for the session date (midnight to midnight).
+async function calcSystemTotals(sessionDate: Date, drawingsReceived = new Decimal(0), loansTotal = new Decimal(0)) {
   const start = new Date(sessionDate)
   start.setHours(0, 0, 0, 0)
   const end = new Date(sessionDate)
   end.setHours(23, 59, 59, 999)
 
-  const [salesAgg, purchasesAgg, paymentsAgg] = await Promise.all([
+  const [salesCashAgg, salesEftAgg, purchasesAgg, paymentsAgg] = await Promise.all([
     prisma.sale.aggregate({
       _sum: { totalAmount: true },
-      where: {
-        paymentMethod: 'cash',
-        status: 'completed',
-        createdAt: { gte: start, lte: end },
-      },
+      where: { paymentMethod: 'cash', status: 'completed', createdAt: { gte: start, lte: end } },
+    }),
+    prisma.sale.aggregate({
+      _sum: { totalAmount: true },
+      where: { paymentMethod: { in: ['eft', 'cheque'] }, status: 'completed', createdAt: { gte: start, lte: end } },
     }),
     prisma.purchase.aggregate({
       _sum: { totalAmount: true },
-      where: {
-        paymentMethod: 'cash',
-        status: 'completed',
-        createdAt: { gte: start, lte: end },
-      },
+      where: { paymentMethod: 'cash', status: 'completed', createdAt: { gte: start, lte: end } },
     }),
     prisma.payment.aggregate({
       _sum: { amount: true },
-      where: {
-        paymentMethod: 'cash',
-        voidedAt: null,
-        createdAt: { gte: start, lte: end },
-      },
+      where: { paymentMethod: 'cash', voidedAt: null, createdAt: { gte: start, lte: end } },
     }),
   ])
 
-  const cashSales     = new Decimal(salesAgg._sum.totalAmount?.toString() ?? '0')
-  const cashPurchases = new Decimal(purchasesAgg._sum.totalAmount?.toString() ?? '0')
-  const cashPayments  = new Decimal(paymentsAgg._sum.amount?.toString() ?? '0')
+  const cashSales       = new Decimal(salesCashAgg._sum.totalAmount?.toString() ?? '0')
+  const cardPayments    = new Decimal(salesEftAgg._sum.totalAmount?.toString() ?? '0')
+  const cashPurchases   = new Decimal(purchasesAgg._sum.totalAmount?.toString() ?? '0')
+  const cashPayments    = new Decimal(paymentsAgg._sum.amount?.toString() ?? '0')
+  const expensesTotal   = await getExpenseTotalsForDate(sessionDate)
 
-  // Expected float = sales received - purchases paid out - payments paid out
-  const cashExpected  = cashSales.minus(cashPurchases).minus(cashPayments)
+  // Expected in drawer = opening + cash sales - cash purchases - cash payments - expenses - drawings + loans
+  // openingBalance is stored on the cashUp record; here we return the variable components
+  const cashExpected = cashSales.minus(cashPurchases).minus(cashPayments).minus(expensesTotal).minus(drawingsReceived).plus(loansTotal)
 
-  return { cashSales, cashPurchases, cashPayments, cashExpected }
+  return { cashSales, cashPurchases, cashPayments, cashExpected, cardPayments, expensesTotal }
 }
 
 // ─── Submit (cashier declares cash) ──────────────────────────────────────────
@@ -111,9 +115,15 @@ export async function submitCashUp(
     throw new Error(`Cannot submit cash-up with status "${cashUp.status}"`)
   }
 
-  const totals = await calcSystemTotals(cashUp.sessionDate)
-  const declared = new Decimal(input.declaredCash)
-  const variance = declared.minus(totals.cashExpected)
+  const drawingsReceived = new Decimal(input.drawingsReceived ?? 0)
+  const loansTotal       = new Decimal(input.loansTotal ?? 0)
+  const totals = await calcSystemTotals(cashUp.sessionDate, drawingsReceived, loansTotal)
+
+  const openingBalance = new Decimal(cashUp.openingBalance.toString())
+  const declared  = new Decimal(input.declaredCash)
+  // Full expected = opening + operational net
+  const fullExpected = openingBalance.plus(totals.cashExpected)
+  const variance = declared.minus(fullExpected)
 
   const updated = await prisma.cashUp.update({
     where: { id: cashUpId },
@@ -124,7 +134,11 @@ export async function submitCashUp(
       systemCashSales:     totals.cashSales,
       systemCashPurchases: totals.cashPurchases,
       systemCashPayments:  totals.cashPayments,
-      systemCashExpected:  totals.cashExpected,
+      systemCashExpected:  fullExpected,
+      expensesTotal:       totals.expensesTotal,
+      cardPaymentsTotal:   totals.cardPayments,
+      drawingsReceived,
+      loansTotal,
       declaredCash:        declared,
       variance,
       denominations:       input.denominations ?? {},

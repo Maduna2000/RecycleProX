@@ -4,7 +4,10 @@
       "Bash(node -e \"console.log\\(require\\('crypto'\\).randomBytes\\(32\\).toString\\('base64'\\)\\)\")",
       "Bash(npm install:*)",
       "Bash(npx prisma:*)",
-      "Bash(npx shadcn@latest add dialog form input label select badge table dropdown-menu toast --yes)"
+      "Bash(npx shadcn@latest add dialog form input label select badge table dropdown-menu toast --yes)",
+      "Bash(mkdir -p \"c:\\\\Users\\\\MD TECH SOLUTION\\\\RecycleProX\\\\src\\\\app\\\\api\\\\expenses\\\\[id]\")",
+      "Bash(mkdir -p \"c:\\\\Users\\\\MD TECH SOLUTION\\\\RecycleProX\\\\src\\\\app\\\\api\\\\expenses\\\\[id]\\\\approve\")",
+      "Bash(npx next:*)"
     ]
   }
 }

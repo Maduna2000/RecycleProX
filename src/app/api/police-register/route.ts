@@ -48,6 +48,8 @@ export async function GET(req: NextRequest) {
       refNumber:    p.refNumber,
       supplierName: `${p.customer.firstName} ${p.customer.lastName}`,
       idNumber:     p.customer.idNumber,
+      dateOfBirth:  p.customer.dateOfBirth,
+      policeRegNo:  p.customer.policeRegisterNo,
       address:      p.customer.physicalAddress ?? p.customer.postalAddress ?? '—',
       items:        p.lines.map((l) => `${l.product.name} (${l.quantity}${l.product.unit})`).join(', '),
       totalAmount:  p.totalAmount.toString(),

@@ -100,7 +100,7 @@ export default function NewPurchasePage() {
     setCustomer(c)
   }, [])
 
-  async function onSubmit() {
+  async function submitPurchase(status: 'completed' | 'pending') {
     if (!customer) { toast.error('Please select a customer'); return }
 
     const validLines = lines.filter((l) => l.productId && l.quantity && l.unitPrice)
@@ -118,6 +118,7 @@ export default function NewPurchasePage() {
       body: JSON.stringify({
         customerId: customer.id,
         paymentMethod,
+        status,
         notes: notes || undefined,
         lines: validLines.map((l) => ({
           productId: l.productId,
@@ -130,13 +131,20 @@ export default function NewPurchasePage() {
 
     if (res.ok) {
       const data = await res.json()
-      toast.success(`Purchase ${data.refNumber} created`)
-      router.push(`/app/purchases/${data.id}`)
+      if (status === 'pending') {
+        toast.success(`Purchase ${data.refNumber} saved as unpaid`)
+        router.push('/app/purchases/unpaid')
+      } else {
+        toast.success(`Purchase ${data.refNumber} created`)
+        router.push(`/app/purchases/${data.id}`)
+      }
     } else {
       const j = await res.json()
       toast.error(j.error ?? 'Failed to create purchase')
     }
   }
+
+  function onSubmit() { return submitPurchase('completed') }
 
   return (
     <div className="max-w-4xl">
@@ -310,7 +318,15 @@ export default function NewPurchasePage() {
             Cancel
           </Button>
           <Button
-            className="bg-green-600 hover:bg-green-700 min-w-[140px]"
+            variant="outline"
+            className="border-orange-300 text-orange-700 hover:bg-orange-50 min-w-[130px]"
+            onClick={() => submitPurchase('pending')}
+            disabled={submitting || !customer || customer.blacklisted}
+          >
+            {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : `Save as Unpaid`}
+          </Button>
+          <Button
+            className="bg-green-600 hover:bg-green-700 min-w-[160px]"
             onClick={onSubmit}
             disabled={submitting || !customer || customer.blacklisted}
           >

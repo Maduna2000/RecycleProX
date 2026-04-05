@@ -7,7 +7,7 @@ import Decimal from 'decimal.js'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { BarChart2, Loader2, TrendingUp, ShoppingCart, Users, ArrowRightLeft } from 'lucide-react'
+import { BarChart2, Loader2, TrendingUp, ShoppingCart, Users, ArrowRightLeft, Receipt, Download } from 'lucide-react'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -18,6 +18,7 @@ type ReportData = {
   payments: { total: string }
   netFlow:  string
   newCustomers: number
+  expenses: { total: string; byCategory: { name: string; total: string }[] }
   topProducts: { productId: string; productName: string; unit: string; totalValue: string }[]
   cashUp:   { totalVariance: string; totalDeclared: string }
 }
@@ -75,6 +76,43 @@ export default function ReportsPage() {
     setQuery(`from=${from}&to=${to}`)
   }
 
+  function exportCSV() {
+    if (!data) return
+    const rows = [
+      ['Metric', 'Value'],
+      ['Period', `${data.range.from} to ${data.range.to}`],
+      ['', ''],
+      ['Sales Revenue', data.sales.total],
+      ['Sales Count', String(data.sales.count)],
+      ['Average Sale', data.sales.average],
+      ['', ''],
+      ['Purchases Paid Out', data.purchases.total],
+      ['Purchases Count', String(data.purchases.count)],
+      ['Average Purchase', data.purchases.average],
+      ['', ''],
+      ['Account Payments', data.payments.total],
+      ['Total Expenses', data.expenses?.total ?? '0'],
+      ['Net Flow', data.netFlow],
+      ['', ''],
+      ['New Customers', String(data.newCustomers)],
+      ['Cash-Up Variance', data.cashUp.totalVariance],
+      ['', ''],
+      ['--- Expenses by Category ---', ''],
+      ...(data.expenses?.byCategory ?? []).map((e) => [e.name, e.total]),
+      ['', ''],
+      ['--- Top Products ---', ''],
+      ...data.topProducts.map((p, i) => [`${i + 1}. ${p.productName}`, p.totalValue]),
+    ]
+    const csv = rows.map((r) => r.map((c) => `"${c}"`).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url  = URL.createObjectURL(blob)
+    const a    = document.createElement('a')
+    a.href = url
+    a.download = `report-${data.range.from}-to-${data.range.to}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div className="max-w-3xl space-y-6">
       {/* Header */}
@@ -96,6 +134,11 @@ export default function ReportsPage() {
         <Button onClick={handleRun} disabled={isLoading}>
           {isLoading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Loading...</> : 'Run Report'}
         </Button>
+        {data && (
+          <Button variant="outline" onClick={exportCSV}>
+            <Download className="w-4 h-4 mr-2" /> Export CSV
+          </Button>
+        )}
         {/* Quick presets */}
         <div className="flex gap-2 flex-wrap">
           {[
@@ -158,6 +201,7 @@ export default function ReportsPage() {
               <SummaryRow label="Sales Revenue"     value={fmt(data.sales.total)}    positive />
               <SummaryRow label="Purchases Paid"    value={fmt(data.purchases.total)} negative />
               <SummaryRow label="Account Payments"  value={fmt(data.payments.total)} negative />
+              <SummaryRow label="Expenses"          value={fmt(data.expenses?.total ?? '0')} negative />
               <SummaryRow
                 label="Net Flow"
                 value={fmt(data.netFlow)}
@@ -179,6 +223,35 @@ export default function ReportsPage() {
               />
             </div>
           </div>
+
+          {/* Expenses by category */}
+          {data.expenses?.byCategory?.length > 0 && (
+            <div className="bg-white rounded-xl border p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <Receipt className="w-4 h-4 text-orange-600" />
+                <h2 className="font-semibold text-gray-900">Expenses by Category</h2>
+                <span className="ml-auto font-mono font-semibold text-sm text-orange-700">
+                  Total: {fmt(data.expenses.total)}
+                </span>
+              </div>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs text-gray-400 border-b">
+                    <th className="pb-2 font-medium">Category</th>
+                    <th className="pb-2 font-medium text-right">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.expenses.byCategory.map((e) => (
+                    <tr key={e.name} className="border-b last:border-0">
+                      <td className="py-2 text-gray-900">{e.name}</td>
+                      <td className="py-2 text-right font-mono text-orange-700">{fmt(e.total)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
 
           {/* Top products */}
           {data.topProducts.length > 0 && (

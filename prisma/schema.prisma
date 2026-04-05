@@ -65,6 +65,18 @@ enum CaptureType {
   document
 }
 
+enum PrimaryFunction {
+  customer
+  supplier
+  both
+}
+
+enum Gender {
+  male
+  female
+  other
+}
+
 enum AuditAction {
   INSERT
   UPDATE
@@ -122,34 +134,49 @@ model SystemSettings {
 }
 
 model Customer {
-  id               String       @id @default(uuid())
-  customerType     CustomerType @default(casual)
-  idNumber         String       @unique
+  id               String          @id @default(uuid())
+  customerType     CustomerType    @default(casual)
+  primaryFunction  PrimaryFunction @default(supplier)
+  idNumber         String          @unique
   firstName        String
   lastName         String
+  dateOfBirth      DateTime?
+  gender           Gender?
+  nationality      String?
   companyName      String?
+  contactPerson    String?
   phone            String
   email            String?
   physicalAddress  String?
   postalAddress    String?
   vatNumber        String?
+  bankName         String?
+  bankAccountNo    String?
+  bankBranchCode   String?
+  creditLimit      Decimal?        @db.Decimal(18, 2)
+  policeRegisterNo String?
+  licenseNumber    String?
+  licenseExpiry    DateTime?
+  tradeCommodities Json?           // String[] e.g. ["Copper","Aluminium","Steel"]
+  customerNotes    String?
   idPhotoR2Key     String?
   priceGroupId     String?
-  priceGroup       PriceGroup?  @relation(fields: [priceGroupId], references: [id])
+  priceGroup       PriceGroup?     @relation(fields: [priceGroupId], references: [id])
   purchases        Purchase[]
   payments         Payment[]
-  isActive         Boolean      @default(true)
-  blacklisted      Boolean      @default(false)
+  isActive         Boolean         @default(true)
+  blacklisted      Boolean         @default(false)
   blacklistReason  String?
   blacklistedAt    DateTime?
   blacklistedById  String?
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
   createdByUserId  String?
 
   @@index([idNumber])
   @@index([phone])
   @@index([lastName])
+  @@index([customerType])
 }
 
 // ─── Products & Pricing ───────────────────────────────────────────────────────
@@ -349,6 +376,69 @@ model Payment {
   @@index([refNumber])
 }
 
+// ─── Expenses (M15) ───────────────────────────────────────────────────────────
+
+enum ExpenseStatus {
+  pending
+  approved
+  voided
+}
+
+model ExpenseType {
+  id        String        @id @default(uuid())
+  name      String        @unique
+  parentId  String?
+  parent    ExpenseType?  @relation("children", fields: [parentId], references: [id])
+  children  ExpenseType[] @relation("children")
+  isActive  Boolean       @default(true)
+  sortOrder Int           @default(0)
+  createdAt DateTime      @default(now())
+
+  expenses  Expense[]
+
+  @@index([parentId])
+}
+
+model Expense {
+  id              String        @id @default(uuid())
+  refNumber       String        @unique
+  expenseTypeId   String
+  expenseType     ExpenseType   @relation(fields: [expenseTypeId], references: [id])
+  description     String
+  amount          Decimal       @db.Decimal(18, 2)
+  vatAmount       Decimal       @db.Decimal(18, 2) @default(0)
+  includesVat     Boolean       @default(false)
+  paymentMethod   PaymentMethod @default(cash)
+  chequeNo        String?
+  status          ExpenseStatus @default(pending)
+  approvedById    String?
+  approvedAt      DateTime?
+  cashUpId        String?
+  createdByUserId String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([expenseTypeId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// ─── Float (M16) ──────────────────────────────────────────────────────────────
+
+model CashFloat {
+  id              String   @id @default(uuid())
+  floatDate       DateTime @db.Date
+  openingAmount   Decimal  @db.Decimal(18, 2)
+  closingAmount   Decimal? @db.Decimal(18, 2)
+  notes           String?
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([floatDate])
+  @@index([floatDate])
+}
+
 // ─── Cash-up (M10) ────────────────────────────────────────────────────────────
 
 enum CashUpStatus {
@@ -373,6 +463,14 @@ model CashUp {
   systemCashPurchases Decimal       @db.Decimal(18, 2) @default(0)
   systemCashPayments  Decimal       @db.Decimal(18, 2) @default(0)
   systemCashExpected  Decimal       @db.Decimal(18, 2) @default(0)
+
+  // Financial reconciliation fields (Phase 4)
+  openingBalance      Decimal       @db.Decimal(18, 2) @default(0)
+  drawingsReceived    Decimal       @db.Decimal(18, 2) @default(0)
+  expensesTotal       Decimal       @db.Decimal(18, 2) @default(0)
+  cardPaymentsTotal   Decimal       @db.Decimal(18, 2) @default(0)
+  loansTotal          Decimal       @db.Decimal(18, 2) @default(0)
+  finPeriodCumulative Decimal       @db.Decimal(18, 2) @default(0)
 
   // Cashier-declared physical count
   declaredCash        Decimal?      @db.Decimal(18, 2)

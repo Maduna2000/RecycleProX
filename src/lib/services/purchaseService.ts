@@ -78,7 +78,7 @@ export async function createPurchase(data: CreatePurchaseInput, createdByUserId?
       data: {
         refNumber,
         customerId: data.customerId,
-        status: 'completed',
+        status: data.status ?? 'completed',
         totalAmount,
         paymentMethod: data.paymentMethod ?? 'cash',
         notes: data.notes,

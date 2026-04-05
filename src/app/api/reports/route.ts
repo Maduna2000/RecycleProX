@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { prisma } from '@/lib/db/prisma'
 import Decimal from 'decimal.js'
+import { getExpensesByCategory } from '@/lib/services/expenseService'
 
 /**
  * GET /api/reports?from=YYYY-MM-DD&to=YYYY-MM-DD
@@ -43,6 +44,8 @@ export async function GET(req: NextRequest) {
       newCustomers,
       topProducts,
       cashUpAgg,
+      expensesAgg,
+      expensesByCategory,
     ] = await Promise.all([
       // Sales totals
       prisma.sale.aggregate({
@@ -81,6 +84,13 @@ export async function GET(req: NextRequest) {
         _sum: { variance: true, declaredCash: true },
         where: { status: 'approved', sessionDate: { gte: from, lte: to } },
       }),
+      // Expenses total
+      prisma.expense.aggregate({
+        _sum: { amount: true },
+        where: { status: 'approved', createdAt: { gte: from, lte: to } },
+      }),
+      // Expenses by category
+      getExpensesByCategory(from, to),
     ])
 
     // Resolve product names for top products
@@ -94,7 +104,8 @@ export async function GET(req: NextRequest) {
     const totalSales     = new Decimal(salesAgg._sum.totalAmount?.toString()     ?? '0')
     const totalPurchases = new Decimal(purchasesAgg._sum.totalAmount?.toString() ?? '0')
     const totalPayments  = new Decimal(paymentsAgg._sum.amount?.toString()       ?? '0')
-    const netFlow        = totalSales.minus(totalPurchases)
+    const totalExpenses  = new Decimal(expensesAgg._sum.amount?.toString()       ?? '0')
+    const netFlow        = totalSales.minus(totalPurchases).minus(totalExpenses)
 
     return NextResponse.json({
       range: { from: fromParam, to: toParam },
@@ -113,6 +124,10 @@ export async function GET(req: NextRequest) {
       },
       netFlow:      netFlow.toFixed(2),
       newCustomers,
+      expenses: {
+        total:      totalExpenses.toFixed(2),
+        byCategory: expensesByCategory,
+      },
       topProducts: topProducts.map((p) => ({
         productId:   p.productId,
         productName: productMap.get(p.productId)?.name ?? 'Unknown',
