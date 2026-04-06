@@ -22,8 +22,9 @@ export interface RegisterEntry {
   dateOfBirth?:    Date | null
   policeRegNo?:    string | null
   address:         string
-  items:           string   // comma-joined product list
-  totalAmount:     string   // Decimal string
+  items:           string          // comma-joined product list
+  totalAmount:     string          // Decimal string
+  idPhotoBytes?:   Uint8Array | null
 }
 
 export interface PoliceRegisterData {
@@ -56,9 +57,10 @@ const COLS = {
   name:    0.15,
   idno:    0.11,
   dob:     0.09,
-  address: 0.17,
-  items:   0.18,
-  total:   0.11,
+  address: 0.14,
+  items:   0.15,
+  total:   0.09,
+  photo:   0.08,   // ID photo thumbnail
 }
 
 function colX(key: keyof typeof COLS): number {
@@ -137,6 +139,7 @@ export async function generatePoliceRegister(data: PoliceRegisterData): Promise<
       ['address', 'Address'],
       ['items',   'Items Purchased'],
       ['total',   'Amount (R)'],
+      ['photo',   'ID Photo'],
     ]
 
     for (const [key, label] of headers) {
@@ -147,9 +150,11 @@ export async function generatePoliceRegister(data: PoliceRegisterData): Promise<
     y -= 20
 
     // ── Data rows ────────────────────────────────────────────────────────────
-    rows.forEach((entry, i) => {
+    for (let i = 0; i < rows.length; i++) {
+      const entry = rows[i]!
       const bg = i % 2 === 0 ? WHITE : LGRAY
-      page.drawRectangle({ x: MARGIN, y: y - 3, width: COL_W, height: 14, color: bg })
+      const ROW_H = 16
+      page.drawRectangle({ x: MARGIN, y: y - 3, width: COL_W, height: ROW_H, color: bg })
 
       const timeStr = entry.createdAt.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' })
       const dobStr = entry.dateOfBirth
@@ -162,8 +167,8 @@ export async function generatePoliceRegister(data: PoliceRegisterData): Promise<
         ['name',    truncate(entry.supplierName, 22)],
         ['idno',    entry.idNumber],
         ['dob',     dobStr],
-        ['address', truncate(entry.address, 24)],
-        ['items',   truncate(entry.items, 26)],
+        ['address', truncate(entry.address, 20)],
+        ['items',   truncate(entry.items, 22)],
         ['total',   `R ${new Decimal(entry.totalAmount).toFixed(2)}`],
       ]
 
@@ -172,16 +177,41 @@ export async function generatePoliceRegister(data: PoliceRegisterData): Promise<
           x: colX(key) + 2, y, size: 7, font: reg, color: DARK,
         })
       }
-      y -= 15
-    })
 
-    // Empty rows (SA regulation — fill to 20 rows)
+      // Embed ID photo thumbnail if available
+      if (entry.idPhotoBytes && entry.idPhotoBytes.length > 0) {
+        try {
+          let embeddedImg
+          try { embeddedImg = await doc.embedPng(entry.idPhotoBytes) }
+          catch { embeddedImg = await doc.embedJpg(entry.idPhotoBytes) }
+          const photoColX = colX('photo')
+          const photoColW = COLS.photo * COL_W - 2
+          const imgH = ROW_H - 2
+          const imgW = Math.min(photoColW, embeddedImg.width * (imgH / embeddedImg.height))
+          page.drawImage(embeddedImg, {
+            x: photoColX + 2,
+            y: y - 2,
+            width: imgW,
+            height: imgH,
+          })
+        } catch {
+          // Photo embed failed — skip silently
+        }
+      } else {
+        page.drawText('—', { x: colX('photo') + 2, y, size: 7, font: reg, color: GRAY })
+      }
+
+      y -= ROW_H
+    }
+
+    // Empty rows (SA regulation — fill to ROWS_PER_PAGE rows)
     const emptyRows = ROWS_PER_PAGE - rows.length
+    const ROW_H = 16
     for (let e = 0; e < emptyRows; e++) {
       const i = rows.length + e
       const bg = i % 2 === 0 ? WHITE : LGRAY
-      page.drawRectangle({ x: MARGIN, y: y - 3, width: COL_W, height: 14, color: bg })
-      y -= 15
+      page.drawRectangle({ x: MARGIN, y: y - 3, width: COL_W, height: ROW_H, color: bg })
+      y -= ROW_H
     }
 
     // ── Bottom rule ──────────────────────────────────────────────────────────

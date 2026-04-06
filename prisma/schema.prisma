@@ -59,12 +59,6 @@ enum StockDirection {
   out
 }
 
-enum CaptureType {
-  product_photo
-  id_scan
-  signature
-  document
-}
 
 enum PrimaryFunction {
   customer

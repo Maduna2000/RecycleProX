@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { prisma } from '@/lib/db/prisma'
 import { generatePoliceRegister, type RegisterEntry } from '@/lib/pdf/policeRegister'
+import { fetchR2Bytes } from '@/lib/r2'
 
 /**
  * GET /api/police-register?date=YYYY-MM-DD
@@ -42,6 +43,17 @@ export async function GET(req: NextRequest) {
       orderBy: { createdAt: 'asc' },
     })
 
+    // Fetch customer ID photos from R2 in parallel (best-effort)
+    const photoMap = new Map<string, Uint8Array | null>()
+    await Promise.all(
+      purchases
+        .filter((p) => p.customer.idPhotoR2Key)
+        .map(async (p) => {
+          const bytes = await fetchR2Bytes(p.customer.idPhotoR2Key!)
+          photoMap.set(p.customer.id, bytes)
+        })
+    )
+
     const entries: RegisterEntry[] = purchases.map((p, i) => ({
       rowNumber:    i + 1,
       createdAt:    p.createdAt,
@@ -53,18 +65,22 @@ export async function GET(req: NextRequest) {
       address:      p.customer.physicalAddress ?? p.customer.postalAddress ?? '—',
       items:        p.lines.map((l) => `${l.product.name} (${l.quantity}${l.product.unit})`).join(', '),
       totalAmount:  p.totalAmount.toString(),
+      idPhotoBytes: photoMap.get(p.customer.id) ?? null,
     }))
+
+    const settings = await prisma.systemSettings.findMany()
+    const settingsMap = Object.fromEntries(settings.map((s) => [s.key, s.value]))
 
     const pdfBytes = await generatePoliceRegister({
       date:          start,
       entries,
-      dealerName:    'Lariat Technologies — RecycleProX',
-      dealerAddress: 'Pretoria, Gauteng, South Africa',
+      dealerName:    settingsMap['yardName']    ?? 'RecycleProX',
+      dealerAddress: settingsMap['yardAddress'] ?? 'Pretoria, Gauteng, South Africa',
       generatedAt:   new Date(),
     })
 
     const filename = `police-register-${dateParam}.pdf`
-    return new NextResponse(pdfBytes.buffer as ArrayBuffer, {
+    return new NextResponse(Buffer.from(pdfBytes), {
       headers: {
         'Content-Type':        'application/pdf',
         'Content-Disposition': `attachment; filename="${filename}"`,

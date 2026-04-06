@@ -49,6 +49,28 @@ export async function deleteR2Object(key: string): Promise<void> {
   await client.send(new DeleteObjectCommand({ Bucket: R2_BUCKET, Key: key }))
 }
 
+// ─── Fetch raw bytes from R2 ─────────────────────────────────────────────────
+
+export async function fetchR2Bytes(key: string): Promise<Uint8Array | null> {
+  try {
+    const client = getR2Client()
+    const cmd = new GetObjectCommand({ Bucket: R2_BUCKET, Key: key })
+    const res = await client.send(cmd)
+    if (!res.Body) return null
+    const chunks: Uint8Array[] = []
+    for await (const chunk of res.Body as AsyncIterable<Uint8Array>) {
+      chunks.push(chunk)
+    }
+    const total = chunks.reduce((acc, c) => acc + c.length, 0)
+    const buf = new Uint8Array(total)
+    let offset = 0
+    for (const chunk of chunks) { buf.set(chunk, offset); offset += chunk.length }
+    return buf
+  } catch {
+    return null
+  }
+}
+
 // ─── MIME → extension ────────────────────────────────────────────────────────
 
 export function mimeToExt(mimeType: string): string {

@@ -258,4 +258,6 @@ export default function StocktakeDetailPage() {
           </table>
         )}
       </div>
- 
+    </div>
+  )
+}
