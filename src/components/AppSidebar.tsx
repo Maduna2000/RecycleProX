@@ -30,6 +30,7 @@ const managerExtra: NavItem[] = [
   { label: 'Cash Float',        href: '/app/float',             icon: Coins },
   { label: 'Casual Details',    href: '/app/casual',            icon: UserCheck },
   { label: 'Unpaid Purchases',  href: '/app/purchases/unpaid',  icon: ClipboardList },
+  { label: 'Stocktake',         href: '/app/stocktake',         icon: Package },
   { label: 'Police Register',   href: '/app/police-register',   icon: ShieldCheck },
   { label: 'Reports',           href: '/app/reports',           icon: BarChart2 },
 ]

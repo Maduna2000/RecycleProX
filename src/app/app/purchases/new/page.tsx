@@ -13,6 +13,7 @@ import { toast } from 'sonner'
 import useSWR from 'swr'
 import { CustomerLookupWidget } from '@/components/CustomerLookupWidget'
 import { SignatureCanvas, SignatureCanvasHandle } from '@/components/SignatureCanvas'
+import { PrintResultModal } from '@/components/PrintResultModal'
 import Decimal from 'decimal.js'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
@@ -48,7 +49,8 @@ export default function NewPurchasePage() {
   const [notes, setNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [keyCounter, setKeyCounter] = useState(2)
-  const [sigDialog, setSigDialog] = useState<{ purchaseId: string; refNumber: string } | null>(null)
+  const [sigDialog,    setSigDialog]    = useState<{ purchaseId: string; refNumber: string } | null>(null)
+  const [printDialog,  setPrintDialog]  = useState<{ id: string; refNumber: string } | null>(null)
 
   const { data: productsData } = useSWR<{ products: Product[] }>('/api/products?active=true', fetcher)
   const products = productsData?.products ?? []
@@ -311,7 +313,22 @@ export default function NewPurchasePage() {
         <SignatureDialog
           purchaseId={sigDialog.purchaseId}
           refNumber={sigDialog.refNumber}
-          onDone={() => router.push(`/app/purchases/${sigDialog.purchaseId}`)}
+          onDone={() => {
+            const { purchaseId, refNumber } = sigDialog
+            setSigDialog(null)
+            setPrintDialog({ id: purchaseId, refNumber })
+          }}
+        />
+      )}
+
+      {printDialog && (
+        <PrintResultModal
+          type="purchase"
+          id={printDialog.id}
+          refNumber={printDialog.refNumber}
+          onClose={() => {
+            router.push(`/app/purchases/${printDialog.id}`)
+          }}
         />
       )}
 
@@ -407,7 +424,7 @@ function SignatureDialog({
 
   return (
     <Dialog open>
-      <DialogContent className="sm:max-w-md" onInteractOutside={(e) => e.preventDefault()}>
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <PenLine className="w-5 h-5 text-green-600" />

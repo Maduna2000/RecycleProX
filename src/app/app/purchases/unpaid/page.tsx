@@ -9,6 +9,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { toast } from 'sonner'
 import { Loader2, ArrowLeft, CreditCard } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import Decimal from 'decimal.js'
+import { PrintResultModal } from '@/components/PrintResultModal'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -27,7 +29,8 @@ export default function UnpaidPurchasesPage() {
   const router = useRouter()
   const KEY = '/api/purchases?status=pending&limit=200&include=customer,lines'
   const { data, isLoading } = useSWR<{ purchases: Purchase[] }>(KEY, fetcher)
-  const [payTarget, setPayTarget] = useState<{ id: string; ref: string; amount: string } | null>(null)
+  const [payTarget,   setPayTarget]   = useState<{ id: string; ref: string; amount: string } | null>(null)
+  const [printDialog, setPrintDialog] = useState<{ id: string; refNumber: string } | null>(null)
 
   // Group by customer
   const groups: GroupedCustomer[] = []
@@ -47,7 +50,7 @@ export default function UnpaidPurchasesPage() {
     }
     const g = seen.get(cid)!
     g.purchases.push(p)
-    g.total += parseFloat(p.totalAmount)
+    g.total = new Decimal(g.total).plus(p.totalAmount).toNumber()
   }
 
   const grandTotal = groups.reduce((acc, g) => acc + g.total, 0)
@@ -127,7 +130,7 @@ export default function UnpaidPurchasesPage() {
                       {p.lines.length} line item{p.lines.length !== 1 ? 's' : ''}
                     </td>
                     <td className="px-4 py-2.5 font-semibold text-gray-900">
-                      R {parseFloat(p.totalAmount).toFixed(2)}
+                      R {new Decimal(p.totalAmount).toFixed(2)}
                     </td>
                     <td className="px-4 py-2.5 text-xs text-gray-400 whitespace-nowrap">
                       {new Date(p.createdAt).toLocaleDateString('en-ZA')}
@@ -155,7 +158,20 @@ export default function UnpaidPurchasesPage() {
         <MarkPaidModal
           purchase={payTarget}
           onClose={() => setPayTarget(null)}
-          onSuccess={() => { mutate(KEY); setPayTarget(null) }}
+          onSuccess={(id, ref) => {
+            mutate(KEY)
+            setPayTarget(null)
+            setPrintDialog({ id, refNumber: ref })
+          }}
+        />
+      )}
+
+      {printDialog && (
+        <PrintResultModal
+          type="purchase"
+          id={printDialog.id}
+          refNumber={printDialog.refNumber}
+          onClose={() => setPrintDialog(null)}
         />
       )}
     </div>
@@ -166,7 +182,11 @@ function MarkPaidModal({
   purchase,
   onClose,
   onSuccess,
-}: { purchase: { id: string; ref: string; amount: string }; onClose: () => void; onSuccess: () => void }) {
+}: {
+  purchase: { id: string; ref: string; amount: string }
+  onClose: () => void
+  onSuccess: (id: string, ref: string) => void
+}) {
   const [method, setMethod] = useState<'cash' | 'eft' | 'cheque'>('cash')
   const [loading, setLoading] = useState(false)
 
@@ -178,7 +198,7 @@ function MarkPaidModal({
       body: JSON.stringify({ paymentMethod: method }),
     })
     setLoading(false)
-    if (res.ok) { toast.success(`${purchase.ref} marked as paid`); onSuccess() }
+    if (res.ok) { toast.success(`${purchase.ref} marked as paid`); onSuccess(purchase.id, purchase.ref) }
     else { const j = await res.json(); toast.error(j.error ?? 'Failed to mark as paid') }
   }
 
@@ -189,7 +209,7 @@ function MarkPaidModal({
         <div className="space-y-4 mt-2">
           <div className="p-3 bg-gray-50 rounded-lg text-sm">
             <p className="font-medium text-gray-700">{purchase.ref}</p>
-            <p className="text-gray-500">Amount: <strong>R {parseFloat(purchase.amount).toFixed(2)}</strong></p>
+            <p className="text-gray-500">Amount: <strong>R {new Decimal(purchase.amount).toFixed(2)}</strong></p>
           </div>
           <div>
             <label className="text-sm font-medium text-gray-700 block mb-1">Payment Method</label>

@@ -2,7 +2,7 @@ import Decimal from 'decimal.js'
 import { prisma } from '@/lib/db/prisma'
 import logger from '@/lib/logger'
 import { SubmitCashUpInput, ApproveCashUpInput } from '@/lib/schemas/cashup'
-import { getFloatForDate } from './floatService'
+import { getFloatForDate, updateClosingAmount } from './floatService'
 import { getExpenseTotalsForDate } from './expenseService'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -174,6 +174,14 @@ export async function approveCashUp(
       notes:           input.notes !== undefined ? input.notes : cashUp.notes,
     },
   })
+
+  // Write declaredCash as closing amount on the float record for this day
+  if (cashUp.declaredCash) {
+    await updateClosingAmount(
+      cashUp.sessionDate,
+      new Decimal(cashUp.declaredCash.toString())
+    )
+  }
 
   logger.info({ cashUpId, userId: approvedByUserId }, 'Cash-up approved')
   return updated

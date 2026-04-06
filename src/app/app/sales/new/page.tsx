@@ -10,6 +10,7 @@ import { ArrowLeft, Plus, Trash2, Loader2, User } from 'lucide-react'
 import { toast } from 'sonner'
 import useSWR from 'swr'
 import Decimal from 'decimal.js'
+import { PrintResultModal } from '@/components/PrintResultModal'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -42,8 +43,9 @@ export default function NewSalePage() {
   const [lines, setLines] = useState<LineItem[]>([{ key: 1, productId: '', product: null, quantity: '', unitPrice: '' }])
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'eft' | 'cheque'>('cash')
   const [notes, setNotes] = useState('')
-  const [submitting, setSubmitting] = useState(false)
-  const [keyCounter, setKeyCounter] = useState(2)
+  const [submitting,   setSubmitting]   = useState(false)
+  const [keyCounter,   setKeyCounter]   = useState(2)
+  const [printDialog,  setPrintDialog]  = useState<{ id: string; refNumber: string } | null>(null)
 
   const { data: productsData } = useSWR<{ products: Product[] }>('/api/products?active=true', fetcher)
   const products = productsData?.products ?? []
@@ -112,7 +114,7 @@ export default function NewSalePage() {
     if (res.ok) {
       const data = await res.json()
       toast.success(`Sale ${data.refNumber} created`)
-      router.push(`/app/sales/${data.id}`)
+      setPrintDialog({ id: data.id, refNumber: data.refNumber })
     } else {
       const j = await res.json()
       toast.error(j.error ?? 'Failed to create sale')
@@ -285,6 +287,15 @@ export default function NewSalePage() {
           </Button>
         </div>
       </div>
+
+      {printDialog && (
+        <PrintResultModal
+          type="sale"
+          id={printDialog.id}
+          refNumber={printDialog.refNumber}
+          onClose={() => router.push(`/app/sales/${printDialog.id}`)}
+        />
+      )}
     </div>
   )
 }

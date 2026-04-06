@@ -34,9 +34,20 @@ export async function listExpenseTypes() {
 export async function createExpense(data: CreateExpenseInput, userId: string) {
   const refNumber = await nextRef()
   const amount = new Decimal(data.amount)
+
+  // Read VAT rate from SystemSettings; fall back to 15%
+  const vatSetting = await prisma.systemSettings.findUnique({ where: { key: 'vatRate' } })
+  const vatRate = vatSetting ? new Decimal(vatSetting.value).div(100) : new Decimal('0.15')
   const vatAmount = data.includesVat
-    ? amount.times(new Decimal('0.15').div(new Decimal('1.15'))).toDecimalPlaces(2)
+    ? amount.times(vatRate.div(vatRate.plus(1))).toDecimalPlaces(2)
     : new Decimal(0)
+
+  // Link to today's open/submitted cash-up session if one exists
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const openSession = await prisma.cashUp.findFirst({
+    where: { sessionDate: today, status: { in: ['open', 'submitted'] } },
+  })
 
   const expense = await prisma.expense.create({
     data: {
@@ -48,11 +59,12 @@ export async function createExpense(data: CreateExpenseInput, userId: string) {
       includesVat:     data.includesVat ?? false,
       paymentMethod:   data.paymentMethod ?? 'cash',
       chequeNo:        data.chequeNo,
+      cashUpId:        openSession?.id ?? null,
       createdByUserId: userId,
     },
     include: { expenseType: true },
   })
-  logger.info({ expenseId: expense.id, userId }, 'Expense created')
+  logger.info({ expenseId: expense.id, userId, cashUpId: openSession?.id }, 'Expense created')
   return expense
 }
 

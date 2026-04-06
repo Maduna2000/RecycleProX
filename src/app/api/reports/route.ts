@@ -46,30 +46,32 @@ export async function GET(req: NextRequest) {
       cashUpAgg,
       expensesAgg,
       expensesByCategory,
+      topSaleProductsRaw,
     ] = await Promise.all([
-      // Sales totals
+      // 0 — Sales totals
       prisma.sale.aggregate({
         _sum: { totalAmount: true },
         _avg: { totalAmount: true },
         where: { status: 'completed', createdAt: { gte: from, lte: to } },
       }),
-      // Purchase totals
+      // 1 — Purchase totals
       prisma.purchase.aggregate({
         _sum: { totalAmount: true },
         _avg: { totalAmount: true },
         where: { status: 'completed', createdAt: { gte: from, lte: to } },
       }),
-      // Payment totals (account payments received)
+      // 2 — Payment totals (account payments received)
       prisma.payment.aggregate({
         _sum: { amount: true },
         where: { voidedAt: null, createdAt: { gte: from, lte: to } },
       }),
-      // Transaction counts
+      // 3 — Sales count
       prisma.sale.count({ where: { status: 'completed', createdAt: { gte: from, lte: to } } }),
+      // 4 — Purchases count
       prisma.purchase.count({ where: { status: 'completed', createdAt: { gte: from, lte: to } } }),
-      // New customers
+      // 5 — New customers
       prisma.customer.count({ where: { createdAt: { gte: from, lte: to } } }),
-      // Top 10 products by purchase value
+      // 6 — Top 10 products by purchase value
       prisma.purchaseLine.groupBy({
         by: ['productId'],
         _sum: { lineTotal: true },
@@ -79,24 +81,37 @@ export async function GET(req: NextRequest) {
         orderBy: { _sum: { lineTotal: 'desc' } },
         take: 10,
       }),
-      // Cash-up variance for range
+      // 7 — Cash-up variance for range
       prisma.cashUp.aggregate({
         _sum: { variance: true, declaredCash: true },
         where: { status: 'approved', sessionDate: { gte: from, lte: to } },
       }),
-      // Expenses total
+      // 8 — Expenses total
       prisma.expense.aggregate({
         _sum: { amount: true },
         where: { status: 'approved', createdAt: { gte: from, lte: to } },
       }),
-      // Expenses by category
+      // 9 — Expenses by category
       getExpensesByCategory(from, to),
+      // 10 — Top 10 products by sale revenue
+      prisma.saleLine.groupBy({
+        by: ['productId'],
+        _sum: { lineTotal: true },
+        where: {
+          sale: { status: 'completed', createdAt: { gte: from, lte: to } },
+        },
+        orderBy: { _sum: { lineTotal: 'desc' } },
+        take: 10,
+      }),
     ])
 
-    // Resolve product names for top products
-    const productIds = topProducts.map((p) => p.productId)
-    const products   = await prisma.product.findMany({
-      where: { id: { in: productIds } },
+    // Resolve product names for top purchase + sale products
+    const allProductIds = [
+      ...topProducts.map((p) => p.productId),
+      ...topSaleProductsRaw.map((p) => p.productId),
+    ]
+    const products = await prisma.product.findMany({
+      where: { id: { in: allProductIds } },
       select: { id: true, name: true, unit: true },
     })
     const productMap = new Map(products.map((p) => [p.id, p]))
@@ -129,6 +144,12 @@ export async function GET(req: NextRequest) {
         byCategory: expensesByCategory,
       },
       topProducts: topProducts.map((p) => ({
+        productId:   p.productId,
+        productName: productMap.get(p.productId)?.name ?? 'Unknown',
+        unit:        productMap.get(p.productId)?.unit ?? '',
+        totalValue:  new Decimal(p._sum.lineTotal?.toString() ?? '0').toFixed(2),
+      })),
+      topSaleProducts: topSaleProductsRaw.map((p) => ({
         productId:   p.productId,
         productName: productMap.get(p.productId)?.name ?? 'Unknown',
         unit:        productMap.get(p.productId)?.unit ?? '',

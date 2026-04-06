@@ -42,3 +42,22 @@ export async function listFloats(limit = 30) {
     take: limit,
   })
 }
+
+/**
+ * Write the closing amount on the CashFloat record for the given date.
+ * Called by cashUpService.approveCashUp to record the declared cash as the closing balance.
+ */
+export async function updateClosingAmount(date: Date, amount: Decimal) {
+  const d = new Date(date)
+  d.setHours(0, 0, 0, 0)
+
+  // Only update if a float record exists for this date
+  const existing = await prisma.cashFloat.findUnique({ where: { floatDate: d } })
+  if (!existing) return
+
+  await prisma.cashFloat.update({
+    where: { floatDate: d },
+    data:  { closingAmount: amount.toFixed(2) },
+  })
+  logger.info({ floatDate: d.toISOString(), closingAmount: amount.toFixed(2) }, 'CashFloat closing amount updated')
+}

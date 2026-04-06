@@ -107,6 +107,8 @@ model User {
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
   createdByUserId      String?
+
+  stocktakes           Stocktake[] @relation("StocktakeCreatedBy")
 }
 
 model AuditLog {
@@ -197,11 +199,12 @@ model Product {
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
 
-  priceOverrides   PriceGroupProductOverride[]
-  priceHistory     PriceHistory[]
-  purchaseLines    PurchaseLine[]
-  saleLines        SaleLine[]
-  stockMovements   StockMovement[]
+  priceOverrides      PriceGroupProductOverride[]
+  priceHistory        PriceHistory[]
+  purchaseLines       PurchaseLine[]
+  saleLines           SaleLine[]
+  stockMovements      StockMovement[]
+  stocktakeEntries    StocktakeEntry[]
 
   @@index([category])
   @@index([isActive])
@@ -453,6 +456,47 @@ enum CashUpStatus {
   open
   submitted
   approved
+}
+
+// ─── Stocktake (M6 / Phase 6) ────────────────────────────────────────────────
+
+enum StocktakeStatus {
+  open
+  completed
+}
+
+model Stocktake {
+  id              String          @id @default(uuid())
+  refNumber       String          @unique
+  status          StocktakeStatus @default(open)
+  notes           String?
+  createdByUserId String
+  createdBy       User            @relation("StocktakeCreatedBy", fields: [createdByUserId], references: [id])
+  completedAt     DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  entries         StocktakeEntry[]
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+model StocktakeEntry {
+  id           String    @id @default(uuid())
+  stocktakeId  String
+  stocktake    Stocktake @relation(fields: [stocktakeId], references: [id], onDelete: Cascade)
+  productId    String
+  product      Product   @relation(fields: [productId], references: [id])
+  systemQty    Decimal   @db.Decimal(18, 4)
+  countedQty   Decimal   @db.Decimal(18, 4)
+  variance     Decimal   @db.Decimal(18, 4)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([stocktakeId, productId])
+  @@index([stocktakeId])
+  @@index([productId])
 }
 
 model CashUp {

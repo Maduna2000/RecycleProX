@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { SlidersHorizontal, Loader2, TrendingUp, TrendingDown, Minus } from 'lucide-react'
+import { SlidersHorizontal, Loader2, TrendingUp, TrendingDown, Minus, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
 import { useSession } from 'next-auth/react'
 import { format } from '@/lib/utils/format'
@@ -17,7 +17,7 @@ import { format } from '@/lib/utils/format'
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 type StockEntry = {
-  product: { id: string; code: string; name: string; category: string; unit: string }
+  product: { id: string; code: string; name: string; category: string; unit: string; minStockLevel?: string | null }
   totalIn: string; totalOut: string; onHand: string; hasMovements: boolean
 }
 
@@ -65,6 +65,10 @@ export default function StockPage() {
   // Totals
   const totalProducts = stock.filter((s) => parseFloat(s.onHand) > 0).length
   const lowStock = stock.filter((s) => parseFloat(s.onHand) < 0).length
+  const reorderCount = stock.filter((s) => {
+    const min = s.product.minStockLevel ? parseFloat(s.product.minStockLevel) : null
+    return min !== null && parseFloat(s.onHand) < min
+  }).length
 
   return (
     <div>
@@ -74,6 +78,7 @@ export default function StockPage() {
           <p className="text-sm text-gray-500 mt-0.5">
             {totalProducts} products in stock
             {lowStock > 0 && <span className="text-red-500 ml-2">· {lowStock} negative balance</span>}
+            {reorderCount > 0 && <span className="text-orange-500 ml-2">· {reorderCount} below reorder level</span>}
           </p>
         </div>
         {isManager && (
@@ -128,11 +133,22 @@ export default function StockPage() {
                 <tbody className="divide-y">
                   {stock.map(({ product: p, totalIn, totalOut, onHand }) => {
                     const qty = parseFloat(onHand)
+                    const minLevel = p.minStockLevel ? parseFloat(p.minStockLevel) : null
+                    const belowReorder = minLevel !== null && qty < minLevel
                     return (
-                      <tr key={p.id} className={qty < 0 ? 'bg-red-50' : qty === 0 ? 'opacity-60' : ''}>
+                      <tr key={p.id} className={qty < 0 ? 'bg-red-50' : belowReorder ? 'bg-orange-50' : qty === 0 ? 'opacity-60' : ''}>
                         <td className="px-4 py-3">
-                          <p className="font-medium text-gray-900">{p.name}</p>
-                          <p className="text-xs text-gray-400 font-mono">{p.code}</p>
+                          <div className="flex items-center gap-2">
+                            <div>
+                              <p className="font-medium text-gray-900">{p.name}</p>
+                              <p className="text-xs text-gray-400 font-mono">{p.code}</p>
+                            </div>
+                            {belowReorder && (
+                              <span title={`Below reorder level (min: ${minLevel?.toFixed(3)} ${p.unit})`}>
+                                <AlertTriangle className="w-4 h-4 text-orange-500 shrink-0" />
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-4 py-3">
                           <Badge variant="secondary" className="text-xs">{CATEGORY_LABELS[p.category] ?? p.category}</Badge>

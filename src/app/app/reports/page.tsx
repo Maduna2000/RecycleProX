@@ -19,7 +19,8 @@ type ReportData = {
   netFlow:  string
   newCustomers: number
   expenses: { total: string; byCategory: { name: string; total: string }[] }
-  topProducts: { productId: string; productName: string; unit: string; totalValue: string }[]
+  topProducts:     { productId: string; productName: string; unit: string; totalValue: string }[]
+  topSaleProducts: { productId: string; productName: string; unit: string; totalValue: string }[]
   cashUp:   { totalVariance: string; totalDeclared: string }
 }
 
@@ -142,9 +143,10 @@ export default function ReportsPage() {
         {/* Quick presets */}
         <div className="flex gap-2 flex-wrap">
           {[
-            { label: 'Today',      from: today,      to: today },
-            { label: 'This week',  from: (() => { const d = new Date(); d.setDate(d.getDate() - d.getDay()); return d.toISOString().split('T')[0]! })(), to: today },
-            { label: 'This month', from: monthStart, to: today },
+            { label: 'Today',       from: today,      to: today },
+            { label: 'Last 7 days', from: (() => { const d = new Date(); d.setDate(d.getDate() - 6); return d.toISOString().split('T')[0]! })(), to: today },
+            { label: 'This week',   from: (() => { const d = new Date(); d.setDate(d.getDate() - d.getDay()); return d.toISOString().split('T')[0]! })(), to: today },
+            { label: 'This month',  from: monthStart, to: today },
           ].map((p) => (
             <button
               key={p.label}
@@ -253,7 +255,7 @@ export default function ReportsPage() {
             </div>
           )}
 
-          {/* Top products */}
+          {/* Top products by purchase value */}
           {data.topProducts.length > 0 && (
             <div className="bg-white rounded-xl border p-5">
               <h2 className="font-semibold text-gray-900 mb-3">Top Products by Purchase Value</h2>
@@ -271,6 +273,31 @@ export default function ReportsPage() {
                       <td className="py-2 text-gray-400">{i + 1}</td>
                       <td className="py-2 text-gray-900">{p.productName}</td>
                       <td className="py-2 text-right font-mono text-red-700">{fmt(p.totalValue)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Top products by sale revenue */}
+          {data.topSaleProducts?.length > 0 && (
+            <div className="bg-white rounded-xl border p-5">
+              <h2 className="font-semibold text-gray-900 mb-3">Top Products by Sale Revenue</h2>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs text-gray-400 border-b">
+                    <th className="pb-2 font-medium">#</th>
+                    <th className="pb-2 font-medium">Product</th>
+                    <th className="pb-2 font-medium text-right">Total Revenue</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.topSaleProducts.map((p, i) => (
+                    <tr key={p.productId} className="border-b last:border-0">
+                      <td className="py-2 text-gray-400">{i + 1}</td>
+                      <td className="py-2 text-gray-900">{p.productName}</td>
+                      <td className="py-2 text-right font-mono text-green-700">{fmt(p.totalValue)}</td>
                     </tr>
                   ))}
                 </tbody>
