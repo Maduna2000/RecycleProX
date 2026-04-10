@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Decimal from 'decimal.js'
 import useSWR, { mutate } from 'swr'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -57,7 +58,7 @@ export default function ExpensesPage() {
 
   const totalApproved = (data?.expenses ?? [])
     .filter((e) => e.status === 'approved')
-    .reduce((acc, e) => acc + parseFloat(e.amount), 0)
+    .reduce((acc, e) => acc.plus(new Decimal(e.amount)), new Decimal(0))
 
   return (
     <div>

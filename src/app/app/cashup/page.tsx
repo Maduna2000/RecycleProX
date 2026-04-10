@@ -119,8 +119,8 @@ export default function CashUpPage() {
       body: JSON.stringify({
         denominations:    denoms,
         declaredCash:     declaredCash.toNumber(),
-        drawingsReceived: parseFloat(drawings) || 0,
-        loansTotal:       parseFloat(loans) || 0,
+        drawingsReceived: new Decimal(drawings || '0').toFixed(2),
+        loansTotal:       new Decimal(loans    || '0').toFixed(2),
         notes:            notes || undefined,
       }),
     })

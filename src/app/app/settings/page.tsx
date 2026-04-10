@@ -61,7 +61,7 @@ function ScaleRow({
         <div className="flex-1 max-w-[180px]">
           <Select
             value={type}
-            onValueChange={(v) => set(scaleKey(n, 'type'), v)}
+            onValueChange={(v) => set(scaleKey(n, 'type'), v ?? '')}
           >
             <SelectTrigger className="h-8 text-sm">
               <SelectValue />
@@ -113,7 +113,7 @@ function ScaleRow({
             <Label className="text-xs">Baud Rate</Label>
             <Select
               value={form[scaleKey(n, 'baudRate')] ?? '9600'}
-              onValueChange={(v) => set(scaleKey(n, 'baudRate'), v)}
+              onValueChange={(v) => set(scaleKey(n, 'baudRate'), v ?? '')}
             >
               <SelectTrigger className="mt-1 h-8 text-sm">
                 <SelectValue />

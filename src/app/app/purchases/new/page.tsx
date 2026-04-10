@@ -93,9 +93,9 @@ export default function NewPurchasePage() {
   }, {})
 
   const total = lines.reduce((sum, l) => {
-    const qty   = parseFloat(l.quantity) || 0
-    const price = parseFloat(l.unitPrice) || 0
-    return sum.plus(new Decimal(qty).times(price))
+    const qty   = new Decimal(l.quantity   || '0')
+    const price = new Decimal(l.unitPrice  || '0')
+    return sum.plus(qty.times(price))
   }, new Decimal(0))
 
   function addLine() {
@@ -263,9 +263,9 @@ export default function NewPurchasePage() {
 
           <div className="space-y-2">
             {lines.map((line) => {
-              const qty        = parseFloat(line.quantity) || 0
-              const price      = parseFloat(line.unitPrice) || 0
-              const lineTotal  = new Decimal(qty).times(price)
+              const qty        = new Decimal(line.quantity  || '0')
+              const price      = new Decimal(line.unitPrice || '0')
+              const lineTotal  = qty.times(price)
               const busyGross  = line.weighingGross
               const busyTare   = line.weighingTare
 
@@ -307,7 +307,7 @@ export default function NewPurchasePage() {
 
                     {/* Line total */}
                     <p className="font-mono text-sm text-gray-700 text-right">
-                      {qty > 0 && price > 0 ? `R ${lineTotal.toFixed(2)}` : '—'}
+                      {qty.gt(0) && price.gt(0) ? `R ${lineTotal.toFixed(2)}` : '—'}
                     </p>
 
                     {/* Weigh toggle */}
