@@ -8,7 +8,10 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { ArrowLeft, Plus, Trash2, Loader2, User, AlertTriangle, PenLine, FileText } from 'lucide-react'
+import {
+  ArrowLeft, Plus, Trash2, Loader2, User, AlertTriangle,
+  PenLine, FileText, Scale, RefreshCw,
+} from 'lucide-react'
 import { toast } from 'sonner'
 import useSWR from 'swr'
 import { CustomerLookupWidget } from '@/components/CustomerLookupWidget'
@@ -32,8 +35,14 @@ type LineItem = {
   key: number
   productId: string
   product: Product | null
-  quantity: string
+  quantity: string      // net (what gets submitted)
+  grossQty: string
+  tareQty: string
   unitPrice: string
+  weighMode: boolean    // show gross/tare row
+  selectedScale: '1' | '2' | '3'
+  weighingGross: boolean
+  weighingTare: boolean
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -41,21 +50,42 @@ const CATEGORY_LABELS: Record<string, string> = {
   aluminium: 'Aluminium', plastic: 'Plastic', paper: 'Paper', e_waste: 'E-Waste', other: 'Other',
 }
 
+const emptyLine = (key: number): LineItem => ({
+  key, productId: '', product: null, quantity: '', grossQty: '', tareQty: '',
+  unitPrice: '', weighMode: false, selectedScale: '1',
+  weighingGross: false, weighingTare: false,
+})
+
+// ─── useScaleRead hook ────────────────────────────────────────────────────────
+
+function useScaleRead() {
+  return async (scaleNumber: '1' | '2' | '3'): Promise<string> => {
+    const res = await fetch(`/api/scales/${scaleNumber}/read`)
+    if (!res.ok) {
+      const j = await res.json() as { error?: string }
+      throw new Error(j.error ?? 'Scale error')
+    }
+    const j = await res.json() as { weight: string }
+    return j.weight
+  }
+}
+
 export default function NewPurchasePage() {
   const router = useRouter()
+  const readScale = useScaleRead()
+
   const [customer, setCustomer] = useState<SelectedCustomer | null>(null)
-  const [lines, setLines] = useState<LineItem[]>([{ key: 1, productId: '', product: null, quantity: '', unitPrice: '' }])
+  const [lines, setLines] = useState<LineItem[]>([emptyLine(1)])
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'eft' | 'cheque'>('cash')
   const [notes, setNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [keyCounter, setKeyCounter] = useState(2)
-  const [sigDialog,    setSigDialog]    = useState<{ purchaseId: string; refNumber: string } | null>(null)
-  const [printDialog,  setPrintDialog]  = useState<{ id: string; refNumber: string } | null>(null)
+  const [sigDialog,   setSigDialog]   = useState<{ purchaseId: string; refNumber: string } | null>(null)
+  const [printDialog, setPrintDialog] = useState<{ id: string; refNumber: string } | null>(null)
 
   const { data: productsData } = useSWR<{ products: Product[] }>('/api/products?active=true', fetcher)
   const products = productsData?.products ?? []
 
-  // Group products by category for the dropdown
   const productsByCategory = products.reduce<Record<string, Product[]>>((acc, p) => {
     acc[p.category] = acc[p.category] ?? []
     acc[p.category]!.push(p)
@@ -63,13 +93,13 @@ export default function NewPurchasePage() {
   }, {})
 
   const total = lines.reduce((sum, l) => {
-    const qty = parseFloat(l.quantity) || 0
+    const qty   = parseFloat(l.quantity) || 0
     const price = parseFloat(l.unitPrice) || 0
     return sum.plus(new Decimal(qty).times(price))
   }, new Decimal(0))
 
   function addLine() {
-    setLines((prev) => [...prev, { key: keyCounter, productId: '', product: null, quantity: '', unitPrice: '' }])
+    setLines((prev) => [...prev, emptyLine(keyCounter)])
     setKeyCounter((k) => k + 1)
   }
 
@@ -77,33 +107,60 @@ export default function NewPurchasePage() {
     setLines((prev) => prev.filter((l) => l.key !== key))
   }
 
+  function patchLine(key: number, patch: Partial<LineItem>) {
+    setLines((prev) => prev.map((l) => l.key === key ? { ...l, ...patch } : l))
+  }
+
+  /** Recompute net quantity from gross - tare and write to quantity field */
+  function recomputeNet(key: number, grossStr: string, tareStr: string) {
+    const gross = new Decimal(grossStr || '0')
+    const tare  = new Decimal(tareStr  || '0')
+    const net   = Decimal.max(gross.minus(tare), new Decimal('0'))
+    patchLine(key, { quantity: net.toFixed(3), grossQty: grossStr, tareQty: tareStr })
+  }
+
   async function onProductSelect(key: number, productId: string) {
     const product = products.find((p) => p.id === productId) ?? null
-
-    // Resolve price for this customer's price group
-    let unitPrice = product ? Number(product.defaultBuyPrice).toFixed(2) : ''
+    let unitPrice = product ? new Decimal(product.defaultBuyPrice).toFixed(2) : ''
     if (product && customer?.priceGroupId) {
       try {
         const res = await fetch(`/api/products/${productId}?priceGroupId=${customer.priceGroupId}`)
         if (res.ok) {
-          const data = await res.json()
-          unitPrice = Number(data.defaultBuyPrice).toFixed(2)
+          const data = await res.json() as { defaultBuyPrice: string }
+          unitPrice = new Decimal(data.defaultBuyPrice).toFixed(2)
         }
       } catch { /* use default */ }
     }
-
-    setLines((prev) =>
-      prev.map((l) => l.key === key ? { ...l, productId, product, unitPrice } : l)
-    )
+    patchLine(key, { productId, product, unitPrice })
   }
 
-  function updateLine(key: number, field: 'quantity' | 'unitPrice', value: string) {
-    setLines((prev) => prev.map((l) => l.key === key ? { ...l, [field]: value } : l))
+  async function handleWeighGross(line: LineItem) {
+    patchLine(line.key, { weighingGross: true })
+    try {
+      const weight = await readScale(line.selectedScale)
+      recomputeNet(line.key, weight, line.tareQty)
+      toast.success(`Gross: ${weight} kg`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Scale not responding')
+    } finally {
+      patchLine(line.key, { weighingGross: false })
+    }
   }
 
-  const handleCustomerSelect = useCallback((c: SelectedCustomer) => {
-    setCustomer(c)
-  }, [])
+  async function handleWeighTare(line: LineItem) {
+    patchLine(line.key, { weighingTare: true })
+    try {
+      const weight = await readScale(line.selectedScale)
+      recomputeNet(line.key, line.grossQty, weight)
+      toast.success(`Tare: ${weight} kg`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Scale not responding')
+    } finally {
+      patchLine(line.key, { weighingTare: false })
+    }
+  }
+
+  const handleCustomerSelect = useCallback((c: SelectedCustomer) => setCustomer(c), [])
 
   async function submitPurchase(status: 'completed' | 'pending') {
     if (!customer) { toast.error('Please select a customer'); return }
@@ -113,7 +170,7 @@ export default function NewPurchasePage() {
 
     for (const l of validLines) {
       if (parseFloat(l.quantity) <= 0) { toast.error('Quantity must be greater than 0'); return }
-      if (parseFloat(l.unitPrice) < 0) { toast.error('Unit price cannot be negative'); return }
+      if (parseFloat(l.unitPrice) < 0)  { toast.error('Unit price cannot be negative'); return }
     }
 
     setSubmitting(true)
@@ -127,29 +184,28 @@ export default function NewPurchasePage() {
         notes: notes || undefined,
         lines: validLines.map((l) => ({
           productId: l.productId,
-          quantity: l.quantity,
+          quantity:  l.quantity,
           unitPrice: l.unitPrice,
+          ...(l.grossQty ? { grossQty: l.grossQty } : {}),
+          ...(l.tareQty  ? { tareQty:  l.tareQty  } : {}),
         })),
       }),
     })
     setSubmitting(false)
 
     if (res.ok) {
-      const data = await res.json()
+      const data = await res.json() as { id: string; refNumber: string }
       if (status === 'pending') {
         toast.success(`Purchase ${data.refNumber} saved as unpaid`)
         router.push('/app/purchases/unpaid')
       } else {
-        // Show signature capture before redirect
         setSigDialog({ purchaseId: data.id, refNumber: data.refNumber })
       }
     } else {
-      const j = await res.json()
+      const j = await res.json() as { error?: string }
       toast.error(j.error ?? 'Failed to create purchase')
     }
   }
-
-  function onSubmit() { return submitPurchase('completed') }
 
   return (
     <div className="max-w-4xl">
@@ -165,12 +221,11 @@ export default function NewPurchasePage() {
       </div>
 
       <div className="space-y-5">
-        {/* Customer Selection */}
+        {/* Customer */}
         <div className="bg-white rounded-xl border p-5">
           <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
             <User className="w-4 h-4 text-green-600" /> Customer
           </h2>
-
           {!customer ? (
             <CustomerLookupWidget onSelect={handleCustomerSelect} />
           ) : (
@@ -180,12 +235,8 @@ export default function NewPurchasePage() {
                 <p className="text-sm text-gray-500 font-mono">{customer.idNumber} · {customer.phone}</p>
               </div>
               <div className="flex items-center gap-2">
-                {customer.priceGroupId && (
-                  <Badge className="bg-blue-100 text-blue-700">Custom Pricing</Badge>
-                )}
-                <Button variant="outline" size="sm" onClick={() => setCustomer(null)}>
-                  Change
-                </Button>
+                {customer.priceGroupId && <Badge className="bg-blue-100 text-blue-700">Custom Pricing</Badge>}
+                <Button variant="outline" size="sm" onClick={() => setCustomer(null)}>Change</Button>
               </div>
             </div>
           )}
@@ -200,72 +251,168 @@ export default function NewPurchasePage() {
             </Button>
           </div>
 
-          <div className="space-y-3">
-            {/* Column headers */}
-            <div className="grid grid-cols-[1fr_120px_130px_100px_32px] gap-3 px-1">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Product</p>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Qty</p>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Buy Price (R)</p>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Line Total</p>
-              <span />
-            </div>
+          {/* Column headers */}
+          <div className="grid grid-cols-[1fr_140px_120px_100px_40px_32px] gap-2 px-1 mb-1">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Product</p>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Net Qty (kg)</p>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Buy Price (R)</p>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Line Total</p>
+            <span />
+            <span />
+          </div>
 
+          <div className="space-y-2">
             {lines.map((line) => {
-              const qty = parseFloat(line.quantity) || 0
-              const price = parseFloat(line.unitPrice) || 0
-              const lineTotal = new Decimal(qty).times(price)
+              const qty        = parseFloat(line.quantity) || 0
+              const price      = parseFloat(line.unitPrice) || 0
+              const lineTotal  = new Decimal(qty).times(price)
+              const busyGross  = line.weighingGross
+              const busyTare   = line.weighingTare
 
               return (
-                <div key={line.key} className="grid grid-cols-[1fr_120px_130px_100px_32px] gap-3 items-center">
-                  {/* Product selector */}
-                  <select
-                    className="border rounded-md px-3 py-2 text-sm bg-white w-full"
-                    value={line.productId}
-                    onChange={(e) => onProductSelect(line.key, e.target.value)}
-                  >
-                    <option value="">Select product...</option>
-                    {Object.entries(productsByCategory).map(([cat, prods]) => (
-                      <optgroup key={cat} label={CATEGORY_LABELS[cat] ?? cat}>
-                        {prods.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.name} ({p.unit})
-                          </option>
-                        ))}
-                      </optgroup>
-                    ))}
-                  </select>
+                <div key={line.key} className="rounded-lg border border-gray-100 bg-gray-50/40">
+                  {/* Main row */}
+                  <div className="grid grid-cols-[1fr_140px_120px_100px_40px_32px] gap-2 items-center p-2">
+                    {/* Product selector */}
+                    <select
+                      className="border rounded-md px-3 py-2 text-sm bg-white w-full"
+                      value={line.productId}
+                      onChange={(e) => onProductSelect(line.key, e.target.value)}
+                    >
+                      <option value="">Select product...</option>
+                      {Object.entries(productsByCategory).map(([cat, prods]) => (
+                        <optgroup key={cat} label={CATEGORY_LABELS[cat] ?? cat}>
+                          {prods.map((p) => (
+                            <option key={p.id} value={p.id}>{p.name} ({p.unit})</option>
+                          ))}
+                        </optgroup>
+                      ))}
+                    </select>
 
-                  {/* Quantity */}
-                  <Input
-                    placeholder="0.000"
-                    value={line.quantity}
-                    onChange={(e) => updateLine(line.key, 'quantity', e.target.value)}
-                    className="font-mono text-sm"
-                  />
+                    {/* Net Qty */}
+                    <Input
+                      placeholder="0.000"
+                      value={line.quantity}
+                      onChange={(e) => patchLine(line.key, { quantity: e.target.value })}
+                      className="font-mono text-sm"
+                    />
 
-                  {/* Unit Price */}
-                  <Input
-                    placeholder="0.00"
-                    value={line.unitPrice}
-                    onChange={(e) => updateLine(line.key, 'unitPrice', e.target.value)}
-                    className="font-mono text-sm"
-                  />
+                    {/* Unit Price */}
+                    <Input
+                      placeholder="0.00"
+                      value={line.unitPrice}
+                      onChange={(e) => patchLine(line.key, { unitPrice: e.target.value })}
+                      className="font-mono text-sm"
+                    />
 
-                  {/* Line total */}
-                  <p className="font-mono text-sm text-gray-700 text-right">
-                    {qty > 0 && price > 0 ? `R ${lineTotal.toFixed(2)}` : '—'}
-                  </p>
+                    {/* Line total */}
+                    <p className="font-mono text-sm text-gray-700 text-right">
+                      {qty > 0 && price > 0 ? `R ${lineTotal.toFixed(2)}` : '—'}
+                    </p>
 
-                  {/* Remove */}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-gray-400 hover:text-red-500 p-1 h-8 w-8"
-                    onClick={() => removeLine(line.key)}
-                    disabled={lines.length === 1}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
+                    {/* Weigh toggle */}
+                    <Button
+                      variant={line.weighMode ? 'default' : 'outline'}
+                      size="sm"
+                      className={`h-8 w-8 p-0 ${line.weighMode ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'text-gray-500'}`}
+                      title="Toggle scale weighing mode"
+                      onClick={() => patchLine(line.key, { weighMode: !line.weighMode })}
+                    >
+                      <Scale className="w-3.5 h-3.5" />
+                    </Button>
+
+                    {/* Remove */}
+                    <Button
+                      variant="ghost" size="sm"
+                      className="text-gray-400 hover:text-red-500 p-1 h-8 w-8"
+                      onClick={() => removeLine(line.key)}
+                      disabled={lines.length === 1}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+
+                  {/* Weigh mode sub-row */}
+                  {line.weighMode && (
+                    <div className="px-3 pb-3 pt-0 border-t border-blue-100 bg-blue-50/40">
+                      <div className="flex items-end gap-3 mt-2 flex-wrap">
+                        {/* Scale selector */}
+                        <div className="flex flex-col gap-1">
+                          <Label className="text-xs text-gray-500">Scale</Label>
+                          <Select
+                            value={line.selectedScale}
+                            onValueChange={(v) => patchLine(line.key, { selectedScale: v as '1' | '2' | '3' })}
+                          >
+                            <SelectTrigger className="h-8 w-28 text-sm">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="1">Scale 1</SelectItem>
+                              <SelectItem value="2">Scale 2</SelectItem>
+                              <SelectItem value="3">Scale 3</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {/* Gross */}
+                        <div className="flex flex-col gap-1">
+                          <Label className="text-xs text-gray-500">Gross (kg)</Label>
+                          <div className="flex gap-1.5">
+                            <Input
+                              placeholder="0.000"
+                              value={line.grossQty}
+                              onChange={(e) => recomputeNet(line.key, e.target.value, line.tareQty)}
+                              className="h-8 w-24 font-mono text-sm"
+                            />
+                            <Button
+                              size="sm"
+                              className="h-8 px-2 bg-blue-600 hover:bg-blue-700 text-white shrink-0"
+                              disabled={busyGross}
+                              onClick={() => handleWeighGross(line)}
+                              title="Read gross weight from scale"
+                            >
+                              {busyGross
+                                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                : <RefreshCw className="w-3.5 h-3.5" />}
+                            </Button>
+                          </div>
+                        </div>
+
+                        {/* Tare */}
+                        <div className="flex flex-col gap-1">
+                          <Label className="text-xs text-gray-500">Tare (kg)</Label>
+                          <div className="flex gap-1.5">
+                            <Input
+                              placeholder="0.000"
+                              value={line.tareQty}
+                              onChange={(e) => recomputeNet(line.key, line.grossQty, e.target.value)}
+                              className="h-8 w-24 font-mono text-sm"
+                            />
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 px-2 shrink-0"
+                              disabled={busyTare}
+                              onClick={() => handleWeighTare(line)}
+                              title="Read tare weight from scale"
+                            >
+                              {busyTare
+                                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                : <RefreshCw className="w-3.5 h-3.5" />}
+                            </Button>
+                          </div>
+                        </div>
+
+                        {/* Net display */}
+                        <div className="flex flex-col gap-1">
+                          <Label className="text-xs text-gray-500">Net (kg)</Label>
+                          <div className="h-8 flex items-center px-3 rounded-md border bg-white font-mono text-sm font-semibold text-green-700 min-w-[72px]">
+                            {line.quantity || '0.000'}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )
             })}
@@ -282,14 +429,12 @@ export default function NewPurchasePage() {
 
         {/* Payment & Notes */}
         <div className="bg-white rounded-xl border p-5">
-          <h2 className="font-semibold text-gray-900 mb-4">Payment & Notes</h2>
+          <h2 className="font-semibold text-gray-900 mb-4">Payment &amp; Notes</h2>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>Payment Method</Label>
               <Select value={paymentMethod} onValueChange={(v) => setPaymentMethod(v as typeof paymentMethod)}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue />
-                </SelectTrigger>
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="cash">Cash</SelectItem>
                   <SelectItem value="eft">EFT</SelectItem>
@@ -309,30 +454,27 @@ export default function NewPurchasePage() {
           </div>
         </div>
 
-      {sigDialog && (
-        <SignatureDialog
-          purchaseId={sigDialog.purchaseId}
-          refNumber={sigDialog.refNumber}
-          onDone={() => {
-            const { purchaseId, refNumber } = sigDialog
-            setSigDialog(null)
-            setPrintDialog({ id: purchaseId, refNumber })
-          }}
-        />
-      )}
+        {sigDialog && (
+          <SignatureDialog
+            purchaseId={sigDialog.purchaseId}
+            refNumber={sigDialog.refNumber}
+            onDone={() => {
+              const { purchaseId, refNumber } = sigDialog
+              setSigDialog(null)
+              setPrintDialog({ id: purchaseId, refNumber })
+            }}
+          />
+        )}
 
-      {printDialog && (
-        <PrintResultModal
-          type="purchase"
-          id={printDialog.id}
-          refNumber={printDialog.refNumber}
-          onClose={() => {
-            router.push(`/app/purchases/${printDialog.id}`)
-          }}
-        />
-      )}
+        {printDialog && (
+          <PrintResultModal
+            type="purchase"
+            id={printDialog.id}
+            refNumber={printDialog.refNumber}
+            onClose={() => router.push(`/app/purchases/${printDialog.id}`)}
+          />
+        )}
 
-        {/* Warning if blacklisted (should not happen due to lookup, but defensive) */}
         {customer?.blacklisted && (
           <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700">
             <AlertTriangle className="w-5 h-5 shrink-0" />
@@ -342,20 +484,18 @@ export default function NewPurchasePage() {
 
         {/* Submit */}
         <div className="flex justify-end gap-3 pb-6">
-          <Button variant="outline" onClick={() => router.back()} disabled={submitting}>
-            Cancel
-          </Button>
+          <Button variant="outline" onClick={() => router.back()} disabled={submitting}>Cancel</Button>
           <Button
             variant="outline"
             className="border-orange-300 text-orange-700 hover:bg-orange-50 min-w-[130px]"
             onClick={() => submitPurchase('pending')}
             disabled={submitting || !customer || customer.blacklisted}
           >
-            {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : `Save as Unpaid`}
+            {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save as Unpaid'}
           </Button>
           <Button
             className="bg-green-600 hover:bg-green-700 min-w-[160px]"
-            onClick={onSubmit}
+            onClick={() => submitPurchase('completed')}
             disabled={submitting || !customer || customer.blacklisted}
           >
             {submitting
@@ -370,49 +510,31 @@ export default function NewPurchasePage() {
 
 // ─── Signature Dialog ─────────────────────────────────────────────────────────
 function SignatureDialog({
-  purchaseId,
-  refNumber,
-  onDone,
-}: {
-  purchaseId: string
-  refNumber:  string
-  onDone:     () => void
-}) {
+  purchaseId, refNumber, onDone,
+}: { purchaseId: string; refNumber: string; onDone: () => void }) {
   const sigRef  = useRef<SignatureCanvasHandle>(null)
   const [saving, setSaving] = useState(false)
 
   async function handleConfirm() {
     const blob = await sigRef.current?.getBlob()
-    if (!blob) {
-      // Skip — no signature drawn, just navigate
-      onDone()
-      return
-    }
+    if (!blob) { onDone(); return }
 
     setSaving(true)
     try {
-      // 1. Get presigned R2 upload URL
-      const key = `purchases/${purchaseId}/signature.png`
+      const key    = `purchases/${purchaseId}/signature.png`
       const urlRes = await fetch(`/api/r2/upload-url?key=${encodeURIComponent(key)}&contentType=image/png`)
       if (!urlRes.ok) throw new Error('Failed to get upload URL')
       const { url } = await urlRes.json() as { url: string }
 
-      // 2. Upload signature to R2
-      const uploadRes = await fetch(url, {
-        method: 'PUT',
-        body: blob,
-        headers: { 'Content-Type': 'image/png' },
-      })
+      const uploadRes = await fetch(url, { method: 'PUT', body: blob, headers: { 'Content-Type': 'image/png' } })
       if (!uploadRes.ok) throw new Error('Failed to upload signature')
 
-      // 3. Save R2 key back to the purchase
       const patchRes = await fetch(`/api/purchases/${purchaseId}/signature`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ signatureR2Key: key }),
       })
       if (!patchRes.ok) throw new Error('Failed to save signature reference')
-
       toast.success('Signature captured')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Signature upload failed')
@@ -431,43 +553,20 @@ function SignatureDialog({
             Seller Signature — {refNumber}
           </DialogTitle>
         </DialogHeader>
-
         <div className="space-y-4 mt-2">
           <p className="text-sm text-gray-600">
             Please ask the seller to sign below to confirm the sale of goods.
             This signature will appear on the VAT264 declaration.
           </p>
-
           <SignatureCanvas ref={sigRef} width={450} height={130} />
-
           <div className="flex justify-between items-center pt-1">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => sigRef.current?.clear()}
-              disabled={saving}
-            >
-              Clear
-            </Button>
+            <Button type="button" variant="ghost" size="sm" onClick={() => sigRef.current?.clear()} disabled={saving}>Clear</Button>
             <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={onDone}
-                disabled={saving}
-              >
-                Skip
-              </Button>
-              <Button
-                type="button"
-                className="bg-green-600 hover:bg-green-700"
-                onClick={handleConfirm}
-                disabled={saving}
-              >
+              <Button type="button" variant="outline" onClick={onDone} disabled={saving}>Skip</Button>
+              <Button type="button" className="bg-green-600 hover:bg-green-700" onClick={handleConfirm} disabled={saving}>
                 {saving
                   ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving…</>
-                  : <><FileText className="w-4 h-4 mr-2" />Confirm & View Purchase</>}
+                  : <><FileText className="w-4 h-4 mr-2" />Confirm &amp; View Purchase</>}
               </Button>
             </div>
           </div>

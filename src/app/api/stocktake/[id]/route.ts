@@ -4,11 +4,15 @@ import logger from '@/lib/logger'
 import { getStocktake, upsertEntry, completeStocktake } from '@/lib/services/stocktakeService'
 import { z } from 'zod'
 
+const nonNegNum = z.string().refine((v) => !isNaN(parseFloat(v)) && parseFloat(v) >= 0, {
+  message: 'Must be a non-negative number',
+})
+
 const entrySchema = z.object({
-  productId: z.string().uuid(),
-  countedQty: z.string().refine((v) => !isNaN(parseFloat(v)) && parseFloat(v) >= 0, {
-    message: 'countedQty must be a non-negative number',
-  }),
+  productId:  z.string().uuid(),
+  countedQty: nonNegNum,
+  grossQty:   nonNegNum.optional(),
+  tareQty:    nonNegNum.optional(),
 })
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
@@ -41,7 +45,12 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid input' }, { status: 400 })
     }
-    const entry = await upsertEntry(params.id, parsed.data.productId, parsed.data.countedQty)
+    const entry = await upsertEntry(
+      params.id,
+      parsed.data.productId,
+      parsed.data.countedQty,
+      { grossQty: parsed.data.grossQty, tareQty: parsed.data.tareQty }
+    )
     return NextResponse.json(entry)
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Failed to add entry'

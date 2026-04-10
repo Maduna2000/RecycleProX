@@ -61,31 +61,38 @@ export async function getStocktake(id: string) {
 export async function upsertEntry(
   stocktakeId: string,
   productId: string,
-  countedQty: string
+  countedQty: string,
+  opts?: { grossQty?: string; tareQty?: string }
 ) {
   const stocktake = await prisma.stocktake.findUniqueOrThrow({ where: { id: stocktakeId } })
   if (stocktake.status !== 'open') throw new Error('Stocktake is not open')
 
-  // Look up system on-hand for this product
   const stockRows = await getStockOnHand(productId)
   const systemRow = stockRows.find((r) => r.product.id === productId)
   const systemQty = new Decimal(systemRow?.onHand ?? '0')
-  const counted = new Decimal(countedQty)
-  const variance = counted.minus(systemQty)
+  const counted   = new Decimal(countedQty)
+  const variance  = counted.minus(systemQty)
+
+  const scaleData = {
+    grossQty: opts?.grossQty ? new Decimal(opts.grossQty).toFixed(4) : undefined,
+    tareQty:  opts?.tareQty  ? new Decimal(opts.tareQty).toFixed(4)  : undefined,
+  }
 
   const entry = await prisma.stocktakeEntry.upsert({
     where: { stocktakeId_productId: { stocktakeId, productId } },
     create: {
       stocktakeId,
       productId,
-      systemQty: systemQty.toFixed(4),
+      systemQty:  systemQty.toFixed(4),
       countedQty: counted.toFixed(4),
-      variance: variance.toFixed(4),
+      variance:   variance.toFixed(4),
+      ...scaleData,
     },
     update: {
-      systemQty: systemQty.toFixed(4),
+      systemQty:  systemQty.toFixed(4),
       countedQty: counted.toFixed(4),
-      variance: variance.toFixed(4),
+      variance:   variance.toFixed(4),
+      ...scaleData,
     },
     include: { product: true },
   })

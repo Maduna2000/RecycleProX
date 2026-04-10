@@ -61,8 +61,10 @@ export async function createPurchase(data: CreatePurchaseInput, createdByUserId?
       const lineTotal = unitPrice.times(quantity)
 
       return {
-        productId: line.productId,
+        productId:  line.productId,
         quantity,
+        grossQty:   line.grossQty ? new Decimal(line.grossQty) : undefined,
+        tareQty:    line.tareQty  ? new Decimal(line.tareQty)  : undefined,
         unitPrice,
         lineTotal,
         priceSource: resolved.source,
@@ -85,10 +87,12 @@ export async function createPurchase(data: CreatePurchaseInput, createdByUserId?
         createdByUserId,
         lines: {
           create: resolvedLines.map((l) => ({
-            productId: l.productId,
-            quantity: l.quantity,
-            unitPrice: l.unitPrice,
-            lineTotal: l.lineTotal,
+            productId:  l.productId,
+            quantity:   l.quantity,
+            grossQty:   l.grossQty,
+            tareQty:    l.tareQty,
+            unitPrice:  l.unitPrice,
+            lineTotal:  l.lineTotal,
             priceSource: l.priceSource,
           })),
         },

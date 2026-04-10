@@ -6,9 +6,16 @@ const positiveQuantity = z
   .regex(/^\d+(\.\d{1,3})?$/, 'Must be a valid quantity (e.g. 12.500)')
   .refine((v) => parseFloat(v) > 0, 'Quantity must be greater than 0')
 
+const optionalQty = z
+  .string()
+  .regex(/^\d+(\.\d{1,3})?$/, 'Must be a valid quantity')
+  .optional()
+
 export const PurchaseLineSchema = z.object({
   productId: z.string().uuid('Invalid product'),
   quantity: positiveQuantity,
+  grossQty: optionalQty,
+  tareQty:  optionalQty,
   unitPrice: z
     .string()
     .min(1, 'Required')

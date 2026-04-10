@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Loader2, CheckCircle, AlertTriangle } from 'lucide-react'
+import { Loader2, CheckCircle, AlertTriangle, Scale, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import Decimal from 'decimal.js'
 import { format } from '@/lib/utils/format'
@@ -23,6 +23,8 @@ type StocktakeEntry = {
   product: Product
   systemQty: string
   countedQty: string
+  grossQty: string | null
+  tareQty: string | null
   variance: string
 }
 type Stocktake = {
@@ -41,6 +43,19 @@ const CATEGORY_LABELS: Record<string, string> = {
   aluminium: 'Aluminium', plastic: 'Plastic', paper: 'Paper', e_waste: 'E-Waste', other: 'Other',
 }
 
+// ─── Per-entry weigh state (local UI only) ────────────────────────────────────
+type EntryWeighState = {
+  weighMode: boolean
+  selectedScale: '1' | '2' | '3'
+  grossQty: string
+  tareQty: string
+  weighingGross: boolean
+  weighingTare: boolean
+}
+function defaultWeigh(): EntryWeighState {
+  return { weighMode: false, selectedScale: '1', grossQty: '', tareQty: '', weighingGross: false, weighingTare: false }
+}
+
 export default function StocktakeDetailPage() {
   const { id } = useParams<{ id: string }>()
   const { data: session } = useSession()
@@ -56,36 +71,130 @@ export default function StocktakeDetailPage() {
   )
 
   const [productId, setProductId] = useState('')
+  // Manual entry count qty
   const [countedQty, setCountedQty] = useState('')
+  // Add-entry scale state
+  const [addWeigh, setAddWeigh] = useState<EntryWeighState>(defaultWeigh())
   const [saving, setSaving] = useState(false)
   const [completing, setCompleting] = useState(false)
 
+  // Per-existing-entry weigh state (keyed by entry.id)
+  const [entryWeigh, setEntryWeigh] = useState<Record<string, EntryWeighState>>({})
+
+  function getEntryWeigh(entryId: string): EntryWeighState {
+    return entryWeigh[entryId] ?? defaultWeigh()
+  }
+  function patchEntryWeigh(entryId: string, patch: Partial<EntryWeighState>) {
+    setEntryWeigh((prev) => ({ ...prev, [entryId]: { ...getEntryWeigh(entryId), ...patch } }))
+  }
+
   if (!isManager) {
-    return (
-      <div className="flex items-center justify-center h-64 text-sm text-gray-400">
-        Access restricted to managers and administrators.
-      </div>
-    )
+    return <div className="flex items-center justify-center h-64 text-sm text-gray-400">Access restricted to managers and administrators.</div>
+  }
+
+  // ── Scale read helper ─────────────────────────────────────────────────────
+
+  async function readScale(scaleNumber: '1' | '2' | '3'): Promise<string> {
+    const res = await fetch(`/api/scales/${scaleNumber}/read`)
+    if (!res.ok) {
+      const j = await res.json() as { error?: string }
+      throw new Error(j.error ?? 'Scale error')
+    }
+    const j = await res.json() as { weight: string }
+    return j.weight
+  }
+
+  function recomputeAddNet(gross: string, tare: string) {
+    const g = new Decimal(gross || '0')
+    const t = new Decimal(tare  || '0')
+    const net = Decimal.max(g.minus(t), new Decimal('0'))
+    setCountedQty(net.toFixed(3))
+    setAddWeigh((prev) => ({ ...prev, grossQty: gross, tareQty: tare }))
+  }
+
+  async function handleAddWeighGross() {
+    setAddWeigh((p) => ({ ...p, weighingGross: true }))
+    try {
+      const w = await readScale(addWeigh.selectedScale)
+      recomputeAddNet(w, addWeigh.tareQty)
+      toast.success(`Gross: ${w} kg`)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Scale not responding')
+    } finally {
+      setAddWeigh((p) => ({ ...p, weighingGross: false }))
+    }
+  }
+
+  async function handleAddWeighTare() {
+    setAddWeigh((p) => ({ ...p, weighingTare: true }))
+    try {
+      const w = await readScale(addWeigh.selectedScale)
+      recomputeAddNet(addWeigh.grossQty, w)
+      toast.success(`Tare: ${w} kg`)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Scale not responding')
+    } finally {
+      setAddWeigh((p) => ({ ...p, weighingTare: false }))
+    }
+  }
+
+  // ── Re-weigh an existing entry ───────────────────────────────────────────
+
+  async function handleReweighEntry(entry: StocktakeEntry, type: 'gross' | 'tare') {
+    const ew = getEntryWeigh(entry.id)
+    patchEntryWeigh(entry.id, type === 'gross' ? { weighingGross: true } : { weighingTare: true })
+    try {
+      const w = await readScale(ew.selectedScale)
+      const newGross = type === 'gross' ? w : (ew.grossQty || entry.grossQty || '0')
+      const newTare  = type === 'tare'  ? w : (ew.tareQty  || entry.tareQty  || '0')
+      const net = Decimal.max(new Decimal(newGross).minus(new Decimal(newTare)), new Decimal('0'))
+      patchEntryWeigh(entry.id, { grossQty: newGross, tareQty: newTare })
+      toast.success(`${type === 'gross' ? 'Gross' : 'Tare'}: ${w} kg — Net: ${net.toFixed(3)} kg`)
+      // Auto-save the re-weighed entry
+      await saveEntry(entry.productId, net.toFixed(3), { grossQty: newGross, tareQty: newTare })
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Scale not responding')
+    } finally {
+      patchEntryWeigh(entry.id, type === 'gross' ? { weighingGross: false } : { weighingTare: false })
+    }
+  }
+
+  // ── Save entry ────────────────────────────────────────────────────────────
+
+  async function saveEntry(
+    pid: string,
+    qty: string,
+    opts?: { grossQty?: string; tareQty?: string }
+  ) {
+    const res = await fetch(`/api/stocktake/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ productId: pid, countedQty: qty, ...opts }),
+    })
+    if (!res.ok) {
+      const j = await res.json() as { error?: string }
+      throw new Error(j.error ?? 'Failed to save')
+    }
+    mutate(`/api/stocktake/${id}`)
   }
 
   async function handleAddEntry() {
     if (!productId) { toast.error('Select a product'); return }
     if (!countedQty || parseFloat(countedQty) < 0) { toast.error('Enter a valid quantity (0 or more)'); return }
     setSaving(true)
-    const res = await fetch(`/api/stocktake/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ productId, countedQty }),
-    })
-    setSaving(false)
-    if (res.ok) {
+    try {
+      await saveEntry(productId, countedQty, {
+        grossQty: addWeigh.grossQty || undefined,
+        tareQty:  addWeigh.tareQty  || undefined,
+      })
       toast.success('Entry saved')
-      mutate(`/api/stocktake/${id}`)
       setProductId('')
       setCountedQty('')
-    } else {
-      const j = await res.json()
-      toast.error(j.error ?? 'Failed to save entry')
+      setAddWeigh(defaultWeigh())
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Failed to save entry')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -94,32 +203,18 @@ export default function StocktakeDetailPage() {
     setCompleting(true)
     const res = await fetch(`/api/stocktake/${id}`, { method: 'POST' })
     setCompleting(false)
-    if (res.ok) {
-      toast.success('Stocktake completed')
-      mutate(`/api/stocktake/${id}`)
-    } else {
-      const j = await res.json()
-      toast.error(j.error ?? 'Failed to complete')
-    }
+    if (res.ok) { toast.success('Stocktake completed'); mutate(`/api/stocktake/${id}`) }
+    else { const j = await res.json() as { error?: string }; toast.error(j.error ?? 'Failed to complete') }
   }
 
   const products = productsData?.products ?? []
-  const entries = stocktake?.entries ?? []
-  const isOpen = stocktake?.status === 'open'
-
-  // Products not yet counted
+  const entries  = stocktake?.entries ?? []
+  const isOpen   = stocktake?.status === 'open'
   const countedIds = new Set(entries.map((e) => e.productId))
-  const remainingProducts = products.filter((p) => !countedIds.has(p.id))
+  const variances  = entries.filter((e) => new Decimal(e.variance).abs().gt(0))
 
-  if (isLoading) {
-    return <div className="flex items-center justify-center h-64"><Loader2 className="w-6 h-6 animate-spin text-gray-400" /></div>
-  }
-
-  if (!stocktake) {
-    return <div className="p-10 text-center text-gray-400">Stocktake not found</div>
-  }
-
-  const variances = entries.filter((e) => new Decimal(e.variance).abs().gt(0))
+  if (isLoading) return <div className="flex items-center justify-center h-64"><Loader2 className="w-6 h-6 animate-spin text-gray-400" /></div>
+  if (!stocktake) return <div className="p-10 text-center text-gray-400">Stocktake not found</div>
 
   return (
     <div className="max-w-4xl space-y-6">
@@ -139,12 +234,10 @@ export default function StocktakeDetailPage() {
           {stocktake.notes && <p className="text-sm text-gray-600 mt-1">{stocktake.notes}</p>}
         </div>
         {isOpen && (
-          <Button
-            onClick={handleComplete}
-            disabled={completing || entries.length === 0}
-            className="bg-green-600 hover:bg-green-700"
-          >
-            {completing ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Completing...</> : <><CheckCircle className="w-4 h-4 mr-2" />Complete Stocktake</>}
+          <Button onClick={handleComplete} disabled={completing || entries.length === 0} className="bg-green-600 hover:bg-green-700">
+            {completing
+              ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Completing...</>
+              : <><CheckCircle className="w-4 h-4 mr-2" />Complete Stocktake</>}
           </Button>
         )}
       </div>
@@ -161,7 +254,7 @@ export default function StocktakeDetailPage() {
             <p className="text-xs text-gray-500 mt-1">Variances Found</p>
           </div>
           <div className="bg-white rounded-xl border p-4 text-center">
-            <p className="text-2xl font-bold text-gray-900">{remainingProducts.length}</p>
+            <p className="text-2xl font-bold text-gray-900">{products.length - countedIds.size}</p>
             <p className="text-xs text-gray-500 mt-1">Products Remaining</p>
           </div>
         </div>
@@ -171,8 +264,9 @@ export default function StocktakeDetailPage() {
       {isOpen && (
         <div className="bg-white rounded-xl border p-5">
           <h2 className="font-semibold text-gray-900 mb-4">Add Count Entry</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
-            <div className="sm:col-span-2">
+
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_160px_40px] gap-3 items-end">
+            <div>
               <Label>Product</Label>
               <Select value={productId} onValueChange={(v) => setProductId(v ?? '')}>
                 <SelectTrigger className="mt-1">
@@ -189,8 +283,12 @@ export default function StocktakeDetailPage() {
                 </SelectContent>
               </Select>
             </div>
+
             <div>
-              <Label>Counted Qty {productId && products.find(p => p.id === productId) && <span className="text-gray-400 font-normal">({products.find(p => p.id === productId)?.unit})</span>}</Label>
+              <Label>
+                Net Qty{' '}
+                {productId && <span className="text-gray-400 font-normal">({products.find((p) => p.id === productId)?.unit})</span>}
+              </Label>
               <Input
                 value={countedQty}
                 onChange={(e) => setCountedQty(e.target.value)}
@@ -199,7 +297,79 @@ export default function StocktakeDetailPage() {
                 disabled={saving}
               />
             </div>
+
+            {/* Scale toggle for add form */}
+            <div className="pb-0.5">
+              <Label className="opacity-0 select-none">.</Label>
+              <Button
+                variant={addWeigh.weighMode ? 'default' : 'outline'}
+                size="sm"
+                className={`mt-1 h-9 w-9 p-0 ${addWeigh.weighMode ? 'bg-blue-600 hover:bg-blue-700' : ''}`}
+                title="Toggle scale mode"
+                onClick={() => setAddWeigh((p) => ({ ...p, weighMode: !p.weighMode }))}
+              >
+                <Scale className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
+
+          {/* Scale panel for add form */}
+          {addWeigh.weighMode && (
+            <div className="mt-3 p-3 rounded-lg bg-blue-50 border border-blue-100 flex items-end gap-3 flex-wrap">
+              <div className="flex flex-col gap-1">
+                <Label className="text-xs text-gray-500">Scale</Label>
+                <Select
+                  value={addWeigh.selectedScale}
+                  onValueChange={(v) => setAddWeigh((p) => ({ ...p, selectedScale: v as '1' | '2' | '3' }))}
+                >
+                  <SelectTrigger className="h-8 w-28 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">Scale 1</SelectItem>
+                    <SelectItem value="2">Scale 2</SelectItem>
+                    <SelectItem value="3">Scale 3</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <Label className="text-xs text-gray-500">Gross (kg)</Label>
+                <div className="flex gap-1.5">
+                  <Input
+                    value={addWeigh.grossQty}
+                    onChange={(e) => recomputeAddNet(e.target.value, addWeigh.tareQty)}
+                    placeholder="0.000"
+                    className="h-8 w-24 font-mono text-sm"
+                  />
+                  <Button size="sm" className="h-8 px-2 bg-blue-600 hover:bg-blue-700 text-white" disabled={addWeigh.weighingGross} onClick={handleAddWeighGross}>
+                    {addWeigh.weighingGross ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                  </Button>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <Label className="text-xs text-gray-500">Tare (kg)</Label>
+                <div className="flex gap-1.5">
+                  <Input
+                    value={addWeigh.tareQty}
+                    onChange={(e) => recomputeAddNet(addWeigh.grossQty, e.target.value)}
+                    placeholder="0.000"
+                    className="h-8 w-24 font-mono text-sm"
+                  />
+                  <Button size="sm" variant="outline" className="h-8 px-2" disabled={addWeigh.weighingTare} onClick={handleAddWeighTare}>
+                    {addWeigh.weighingTare ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                  </Button>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <Label className="text-xs text-gray-500">Net (kg)</Label>
+                <div className="h-8 flex items-center px-3 rounded-md border bg-white font-mono text-sm font-semibold text-green-700 min-w-[72px]">
+                  {countedQty || '0.000'}
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="mt-4 flex justify-end">
             <Button onClick={handleAddEntry} disabled={saving} className="bg-green-600 hover:bg-green-700">
               {saving ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving...</> : 'Save Entry'}
@@ -219,15 +389,16 @@ export default function StocktakeDetailPage() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b">
               <tr>
-                {['Product', 'Category', 'System Qty', 'Counted Qty', 'Variance', ''].map((h) => (
+                {['Product', 'Category', 'System Qty', 'Gross / Tare', 'Net Counted', 'Variance', ''].map((h) => (
                   <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y">
               {entries.map((e) => {
-                const variance = new Decimal(e.variance)
+                const variance    = new Decimal(e.variance)
                 const hasVariance = variance.abs().gt(0)
+                const ew          = getEntryWeigh(e.id)
                 return (
                   <tr key={e.id} className={hasVariance ? 'bg-orange-50' : ''}>
                     <td className="px-4 py-3">
@@ -237,12 +408,37 @@ export default function StocktakeDetailPage() {
                     <td className="px-4 py-3">
                       <Badge variant="secondary" className="text-xs">{CATEGORY_LABELS[e.product.category] ?? e.product.category}</Badge>
                     </td>
-                    <td className="px-4 py-3 font-mono text-gray-700">
-                      {Number(e.systemQty).toFixed(3)} {e.product.unit}
+                    <td className="px-4 py-3 font-mono text-gray-700">{Number(e.systemQty).toFixed(3)} {e.product.unit}</td>
+                    <td className="px-4 py-3">
+                      {(e.grossQty || e.tareQty) ? (
+                        <span className="font-mono text-xs text-gray-500">
+                          G:{Number(e.grossQty ?? 0).toFixed(3)} T:{Number(e.tareQty ?? 0).toFixed(3)}
+                        </span>
+                      ) : <span className="text-gray-300">—</span>}
+                      {/* Re-weigh buttons for open stocktakes */}
+                      {isOpen && (
+                        <div className="flex items-center gap-1 mt-1">
+                          <Select
+                            value={ew.selectedScale}
+                            onValueChange={(v) => patchEntryWeigh(e.id, { selectedScale: v as '1' | '2' | '3' })}
+                          >
+                            <SelectTrigger className="h-6 w-20 text-xs px-1"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="1">Scale 1</SelectItem>
+                              <SelectItem value="2">Scale 2</SelectItem>
+                              <SelectItem value="3">Scale 3</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Button size="sm" className="h-6 px-1.5 text-xs bg-blue-600 hover:bg-blue-700" disabled={ew.weighingGross} onClick={() => handleReweighEntry(e, 'gross')} title="Re-weigh gross">
+                            {ew.weighingGross ? <Loader2 className="w-3 h-3 animate-spin" /> : 'G'}
+                          </Button>
+                          <Button size="sm" variant="outline" className="h-6 px-1.5 text-xs" disabled={ew.weighingTare} onClick={() => handleReweighEntry(e, 'tare')} title="Re-weigh tare">
+                            {ew.weighingTare ? <Loader2 className="w-3 h-3 animate-spin" /> : 'T'}
+                          </Button>
+                        </div>
+                      )}
                     </td>
-                    <td className="px-4 py-3 font-mono text-gray-700">
-                      {Number(e.countedQty).toFixed(3)} {e.product.unit}
-                    </td>
+                    <td className="px-4 py-3 font-mono text-gray-700">{Number(e.countedQty).toFixed(3)} {e.product.unit}</td>
                     <td className="px-4 py-3">
                       <span className={`font-mono font-semibold ${variance.gt(0) ? 'text-green-700' : variance.lt(0) ? 'text-red-700' : 'text-gray-400'}`}>
                         {variance.gt(0) ? '+' : ''}{Number(e.variance).toFixed(3)} {e.product.unit}

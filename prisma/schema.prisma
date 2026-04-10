@@ -282,7 +282,9 @@ model PurchaseLine {
   purchase     Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
   productId    String
   product      Product  @relation(fields: [productId], references: [id])
-  quantity     Decimal  @db.Decimal(18, 3)
+  quantity     Decimal  @db.Decimal(18, 3)   // net weight (gross - tare)
+  grossQty     Decimal? @db.Decimal(18, 3)   // raw scale reading
+  tareQty      Decimal? @db.Decimal(18, 3)   // tare deduction
   unitPrice    Decimal  @db.Decimal(18, 2)
   lineTotal    Decimal  @db.Decimal(18, 2)
   priceSource  String   @default("default")
@@ -483,7 +485,9 @@ model StocktakeEntry {
   productId    String
   product      Product   @relation(fields: [productId], references: [id])
   systemQty    Decimal   @db.Decimal(18, 4)
-  countedQty   Decimal   @db.Decimal(18, 4)
+  countedQty   Decimal   @db.Decimal(18, 4)  // net (gross - tare)
+  grossQty     Decimal?  @db.Decimal(18, 4)  // raw scale reading
+  tareQty      Decimal?  @db.Decimal(18, 4)  // tare deduction
   variance     Decimal   @db.Decimal(18, 4)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
