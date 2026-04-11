@@ -70,7 +70,7 @@ export default function PaymentsPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Payments</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Account customer payouts</p>
+          <p className="text-sm text-gray-500 mt-0.5">Customer payouts</p>
         </div>
         <Button className="bg-green-600 hover:bg-green-700" onClick={() => setNewPaymentOpen(true)}>
           <Plus className="w-4 h-4 mr-2" /> Record Payment
@@ -283,7 +283,7 @@ function NewPaymentModal({ onClose, onSuccess }: { onClose: () => void; onSucces
         <div className="space-y-4 mt-2">
           {/* Customer */}
           <div>
-            <Label className="mb-2 block">Account Customer</Label>
+            <Label className="mb-2 block">Customer</Label>
             {!customer ? (
               <CustomerLookupWidget onSelect={(c) => setCustomer(c)} />
             ) : (

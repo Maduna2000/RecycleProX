@@ -17,10 +17,6 @@ export class CustomerNotFoundError extends Error {
   constructor(id: string) { super(`Customer "${id}" not found`); this.name = 'CustomerNotFoundError' }
 }
 
-export class CustomerNotAccountTypeError extends Error {
-  constructor() { super('Only account-type customers can receive payments'); this.name = 'CustomerNotAccountTypeError' }
-}
-
 // ─── Reference generator ─────────────────────────────────────────────────────
 
 async function generateRefNumber(): Promise<string> {
@@ -75,7 +71,6 @@ export async function createPayment(data: CreatePaymentInput, createdByUserId?: 
     select: { id: true, customerType: true, blacklisted: true, isActive: true },
   })
   if (!customer) throw new CustomerNotFoundError(data.customerId)
-  if (customer.customerType !== 'account') throw new CustomerNotAccountTypeError()
 
   const refNumber = await generateRefNumber()
 
@@ -179,11 +174,11 @@ export async function listPayments(opts?: {
   return { payments, total, page, pageSize, pageCount: Math.ceil(total / pageSize) }
 }
 
-// ─── List Account Customers with Balances ────────────────────────────────────
+// ─── List Customers with Balances ────────────────────────────────────────────
 
-export async function listAccountBalances() {
+export async function listCustomerBalances() {
   const accountCustomers = await prisma.customer.findMany({
-    where: { customerType: 'account', isActive: true },
+    where: { isActive: true },
     select: { id: true, firstName: true, lastName: true, idNumber: true, phone: true },
     orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
   })

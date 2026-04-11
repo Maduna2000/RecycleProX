@@ -4,7 +4,7 @@ import logger from '@/lib/logger'
 import { CreatePaymentSchema } from '@/lib/schemas/payment'
 import {
   createPayment, listPayments,
-  CustomerNotFoundError, CustomerNotAccountTypeError,
+  CustomerNotFoundError,
 } from '@/lib/services/paymentService'
 
 export async function GET(req: NextRequest) {
@@ -42,7 +42,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(payment, { status: 201 })
   } catch (err) {
     if (err instanceof CustomerNotFoundError) return NextResponse.json({ error: err.message }, { status: 404 })
-    if (err instanceof CustomerNotAccountTypeError) return NextResponse.json({ error: err.message }, { status: 422 })
     logger.error({ err }, 'POST /api/payments failed')
     return NextResponse.json({ error: 'Failed to create payment' }, { status: 500 })
   }
