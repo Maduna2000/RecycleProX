@@ -1,7 +1,6 @@
 'use client'
 
 import { useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react'
-import { Button } from '@/components/ui/button'
 
 export interface SignatureCanvasHandle {
   /** Returns PNG blob of the signature, or null if canvas is blank */

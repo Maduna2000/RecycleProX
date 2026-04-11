@@ -108,6 +108,7 @@ describe('readScale — TCP timeout', () => {
     ])
 
     const fakeSocket = {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       connect: vi.fn((_port: number, _ip: string, _cb: () => void) => fakeSocket),
       write:   vi.fn(),
       destroy: vi.fn(),

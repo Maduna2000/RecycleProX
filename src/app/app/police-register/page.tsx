@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import useSWR, { mutate } from 'swr'
 import { Button } from '@/components/ui/button'
@@ -49,7 +49,6 @@ export default function PoliceRegisterPage() {
   // After generate — show signature pad
   const [pendingVisitId, setPendingVisitId]   = useState<string | null>(null)
   const [sigDialogOpen, setSigDialogOpen]     = useState(false)
-  const [sigSaving, setSigSaving]             = useState(false)
 
   const { data: visitsData, isLoading: visitsLoading } =
     useSWR<{ visits: PoliceVisit[]; total: number }>(

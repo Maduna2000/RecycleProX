@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { prisma } from '@/lib/db/prisma'
-import { Prisma } from '@prisma/client'
+import { Prisma, ProductCategory } from '@prisma/client'
 import Decimal from 'decimal.js'
 
 /**
@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
 
     const productWhere: Prisma.ProductWhereInput = {
       isActive: true,
-      ...(category ? { category } : undefined),
+      ...(category ? { category: category as ProductCategory } : undefined),
     }
 
     const [products, movements] = await Promise.all([

@@ -39,7 +39,7 @@ function PhotoCard({
   onClick: () => void
 }) {
   const isPdf = photo.r2Key.endsWith('.pdf')
-  const Icon  = TYPE_ICONS[photo.type] ?? Images
+  void (TYPE_ICONS[photo.type] ?? Images) // type icon unused in current layout
 
   return (
     <div className="group relative bg-white rounded-xl border overflow-hidden hover:shadow-md transition-shadow cursor-pointer" onClick={onClick}>

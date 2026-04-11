@@ -109,7 +109,9 @@ export default function DashboardPage() {
   const [draft, setDraft]       = useState<string[]>(savedShortcuts)
 
   // Sync draft whenever saved shortcuts change
-  useEffect(() => { setDraft(savedShortcuts) }, [JSON.stringify(savedShortcuts)])
+  const savedShortcutsStr = JSON.stringify(savedShortcuts)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { setDraft(savedShortcuts) }, [savedShortcutsStr])
 
   async function saveShortcuts(newShortcuts: string[]) {
     if (!shortcutKey) return
