@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import useSWR, { mutate } from 'swr'
 import { useParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Loader2, CheckCircle, AlertTriangle, Scale, RefreshCw } from 'lucide-react'
+import { Loader2, CheckCircle, AlertTriangle, Scale, RefreshCw, Camera, ExternalLink } from 'lucide-react'
 import { toast } from 'sonner'
 import Decimal from 'decimal.js'
 import { format } from '@/lib/utils/format'
@@ -26,6 +26,7 @@ type StocktakeEntry = {
   grossQty: string | null
   tareQty: string | null
   variance: string
+  photoR2Key: string | null
 }
 type Stocktake = {
   id: string
@@ -80,6 +81,11 @@ export default function StocktakeDetailPage() {
 
   // Per-existing-entry weigh state (keyed by entry.id)
   const [entryWeigh, setEntryWeigh] = useState<Record<string, EntryWeighState>>({})
+
+  // Per-entry photo uploading state (keyed by entry.productId)
+  const [uploadingPhoto, setUploadingPhoto] = useState<Record<string, boolean>>({})
+  const photoInputRef = useRef<HTMLInputElement>(null)
+  const pendingPhotoEntryRef = useRef<string | null>(null) // productId of entry being photographed
 
   function getEntryWeigh(entryId: string): EntryWeighState {
     return entryWeigh[entryId] ?? defaultWeigh()
@@ -176,6 +182,59 @@ export default function StocktakeDetailPage() {
       throw new Error(j.error ?? 'Failed to save')
     }
     mutate(`/api/stocktake/${id}`)
+  }
+
+  // ── Photo upload per entry ────────────────────────────────────────────────
+
+  function triggerPhotoUpload(productId: string) {
+    pendingPhotoEntryRef.current = productId
+    photoInputRef.current?.click()
+  }
+
+  async function handlePhotoSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    const pid  = pendingPhotoEntryRef.current
+    if (!file || !pid) return
+    e.target.value = '' // reset for re-use
+
+    setUploadingPhoto((prev) => ({ ...prev, [pid]: true }))
+    try {
+      // Get presigned upload URL
+      const urlRes = await fetch('/api/r2/upload-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ context: 'stocktake_entry', referenceId: id, contentType: file.type, fileSize: file.size }),
+      })
+      if (!urlRes.ok) throw new Error('Failed to get upload URL')
+      const { uploadUrl, key } = await urlRes.json() as { uploadUrl: string; key: string }
+
+      // Upload to R2
+      const uploadRes = await fetch(uploadUrl, { method: 'PUT', body: file, headers: { 'Content-Type': file.type } })
+      if (!uploadRes.ok) throw new Error('Upload failed')
+
+      // Save the key on the entry
+      const patchRes = await fetch(`/api/stocktake/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productId: pid, photoR2Key: key }),
+      })
+      if (!patchRes.ok) throw new Error('Failed to save photo key')
+
+      toast.success('Photo saved')
+      mutate(`/api/stocktake/${id}`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Photo upload failed')
+    } finally {
+      setUploadingPhoto((prev) => ({ ...prev, [pid]: false }))
+      pendingPhotoEntryRef.current = null
+    }
+  }
+
+  async function viewPhoto(key: string) {
+    const res = await fetch(`/api/r2/view-url?key=${encodeURIComponent(key)}`)
+    if (!res.ok) { toast.error('Failed to get photo URL'); return }
+    const { url } = await res.json() as { url: string }
+    window.open(url, '_blank', 'noopener,noreferrer')
   }
 
   async function handleAddEntry() {
@@ -389,7 +448,7 @@ export default function StocktakeDetailPage() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b">
               <tr>
-                {['Product', 'Category', 'System Qty', 'Gross / Tare', 'Net Counted', 'Variance', ''].map((h) => (
+                {['Product', 'Category', 'System Qty', 'Gross / Tare', 'Net Counted', 'Variance', 'Photo', ''].map((h) => (
                   <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
                 ))}
               </tr>
@@ -445,6 +504,32 @@ export default function StocktakeDetailPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3">
+                      <div className="flex items-center gap-1">
+                        {e.photoR2Key ? (
+                          <button
+                            onClick={() => viewPhoto(e.photoR2Key!)}
+                            className="flex items-center gap-1 text-xs text-blue-600 hover:underline"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" /> View
+                          </button>
+                        ) : (
+                          <span className="text-xs text-gray-300">—</span>
+                        )}
+                        {isOpen && (
+                          <button
+                            onClick={() => triggerPhotoUpload(e.productId)}
+                            disabled={uploadingPhoto[e.productId]}
+                            className="ml-1 text-gray-400 hover:text-blue-600 transition-colors disabled:opacity-50"
+                            title="Upload photo"
+                          >
+                            {uploadingPhoto[e.productId]
+                              ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              : <Camera className="w-3.5 h-3.5" />}
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
                       {hasVariance && <AlertTriangle className="w-4 h-4 text-orange-500" />}
                     </td>
                   </tr>
@@ -454,6 +539,14 @@ export default function StocktakeDetailPage() {
           </table>
         )}
       </div>
+      {/* Hidden file input for photo uploads */}
+      <input
+        ref={photoInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        className="hidden"
+        onChange={handlePhotoSelected}
+      />
     </div>
   )
 }

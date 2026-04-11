@@ -14,8 +14,20 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { CreateProductSchema, UpdateProductSchema, BulkPriceUpdateSchema, type CreateProductInput, type CreateProductFormInput, type UpdateProductInput } from '@/lib/schemas/product'
 import { useSession } from 'next-auth/react'
+import Decimal from 'decimal.js'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
+
+function calcMargin(buy: string, sell: string): { pct: string; color: string } {
+  const b = new Decimal(buy  || '0')
+  const s = new Decimal(sell || '0')
+  if (b.isZero()) return { pct: '—', color: 'text-gray-400' }
+  const pct = s.minus(b).dividedBy(b).times(100)
+  const formatted = pct.toFixed(1) + '%'
+  if (pct.gte(20)) return { pct: formatted, color: 'text-green-700 font-semibold' }
+  if (pct.gte(10)) return { pct: formatted, color: 'text-yellow-700' }
+  return { pct: formatted, color: 'text-red-600' }
+}
 
 const CATEGORIES = [
   { value: 'ferrous', label: 'Ferrous' },
@@ -122,7 +134,7 @@ export default function ProductsPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr>
-                    {['Code', 'Name', 'Unit', 'Buy Price', 'Sell Price', 'Status', ...(isManager ? [''] : [])].map((h) => (
+                    {['Code', 'Name', 'Unit', 'Buy Price', 'Sell Price', 'Margin %', 'Status', ...(isManager ? [''] : [])].map((h) => (
                       <th key={h} className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
                     ))}
                   </tr>
@@ -135,6 +147,9 @@ export default function ProductsPage() {
                       <td className="px-4 py-3 text-gray-500 uppercase text-xs">{p.unit}</td>
                       <td className="px-4 py-3 font-mono text-green-700">R {Number(p.defaultBuyPrice).toFixed(2)}</td>
                       <td className="px-4 py-3 font-mono text-blue-700">R {Number(p.defaultSellPrice).toFixed(2)}</td>
+                      <td className={`px-4 py-3 font-mono text-sm ${calcMargin(p.defaultBuyPrice, p.defaultSellPrice).color}`}>
+                        {calcMargin(p.defaultBuyPrice, p.defaultSellPrice).pct}
+                      </td>
                       <td className="px-4 py-3">
                         {p.isActive
                           ? <Badge className="bg-green-100 text-green-700 hover:bg-green-100">Active</Badge>

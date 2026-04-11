@@ -6,10 +6,11 @@ import {
   getUploadUrl, customerIdPhotoKey, purchasePhotoKey,
   mimeToExt, ALLOWED_PHOTO_TYPES, MAX_PHOTO_BYTES,
 } from '@/lib/r2'
+import { randomUUID } from 'crypto'
 
 const Schema = z.object({
-  context: z.enum(['customer_id', 'purchase_photo']),
-  referenceId: z.string().uuid(),      // customerId or purchaseId
+  context: z.enum(['customer_id', 'purchase_photo', 'police_signature', 'stocktake_entry']),
+  referenceId: z.string().uuid(),      // customerId, purchaseId, policeVisitId, or stocktakeId
   contentType: z.string(),
   fileSize: z.number().int().positive(),
 })
@@ -35,7 +36,11 @@ export async function POST(req: NextRequest) {
     const ext = mimeToExt(contentType)
     const key = context === 'customer_id'
       ? customerIdPhotoKey(referenceId, ext)
-      : purchasePhotoKey(referenceId, ext)
+      : context === 'police_signature'
+        ? `police-visits/${referenceId}/signature-${randomUUID()}.${ext}`
+        : context === 'stocktake_entry'
+          ? `stocktakes/${referenceId}/photo-${randomUUID()}.${ext}`
+          : purchasePhotoKey(referenceId, ext)
 
     const uploadUrl = await getUploadUrl({ key, contentType, maxBytes: fileSize })
 

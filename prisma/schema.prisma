@@ -34,6 +34,7 @@ enum PaymentMethod {
   cash
   eft
   cheque
+  amplopay
 }
 
 enum ProductCategory {
@@ -162,6 +163,8 @@ model Customer {
   purchases        Purchase[]
   sales            Sale[]     @relation("SaleCustomer")
   payments         Payment[]
+  loans            Loan[]
+  loanRepayments   LoanRepayment[]
   isActive         Boolean         @default(true)
   blacklisted      Boolean         @default(false)
   blacklistReason  String?
@@ -187,6 +190,7 @@ model Product {
   unit             UnitOfMeasure   @default(kg)
   defaultBuyPrice  Decimal         @db.Decimal(18, 2)
   defaultSellPrice Decimal         @db.Decimal(18, 2)
+  buyMarginPct     Decimal?        @db.Decimal(8, 4)    // display-only margin %
   minStockLevel    Decimal?        @db.Decimal(18, 3)
   isActive         Boolean         @default(true)
   sortOrder        Int             @default(0)
@@ -285,6 +289,7 @@ model PurchaseLine {
   quantity     Decimal  @db.Decimal(18, 3)   // net weight (gross - tare)
   grossQty     Decimal? @db.Decimal(18, 3)   // raw scale reading
   tareQty      Decimal? @db.Decimal(18, 3)   // tare deduction
+  tareReason   String?                        // e.g. "Bag", "Pallet", "Container"
   unitPrice    Decimal  @db.Decimal(18, 2)
   lineTotal    Decimal  @db.Decimal(18, 2)
   priceSource  String   @default("default")
@@ -309,6 +314,7 @@ model Sale {
   totalAmount     Decimal       @db.Decimal(18, 2)
   paymentMethod   PaymentMethod @default(cash)
   notes           String?
+  photoR2Key      String?       // optional camera capture during sale
   voidedAt        DateTime?
   voidedById      String?
   voidReason      String?
@@ -488,6 +494,7 @@ model StocktakeEntry {
   countedQty   Decimal   @db.Decimal(18, 4)  // net (gross - tare)
   grossQty     Decimal?  @db.Decimal(18, 4)  // raw scale reading
   tareQty      Decimal?  @db.Decimal(18, 4)  // tare deduction
+  photoR2Key   String?                        // scale snapshot photo
   variance     Decimal   @db.Decimal(18, 4)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
@@ -536,4 +543,72 @@ model CashUp {
   @@index([sessionDate])
   @@index([status])
   @@index([openedByUserId])
+}
+
+// ─── Loans (Feature 10) ───────────────────────────────────────────────────────
+
+enum LoanStatus {
+  active
+  settled
+  voided
+}
+
+model Loan {
+  id              String        @id @default(uuid())
+  refNumber       String        @unique
+  customerId      String
+  customer        Customer      @relation(fields: [customerId], references: [id])
+  principalAmount Decimal       @db.Decimal(18, 2)
+  balanceAmount   Decimal       @db.Decimal(18, 2)
+  paymentMethod   PaymentMethod @default(cash)
+  notes           String?
+  status          LoanStatus    @default(active)
+  voidedAt        DateTime?
+  voidedById      String?
+  voidReason      String?
+  createdByUserId String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  repayments      LoanRepayment[]
+
+  @@index([customerId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model LoanRepayment {
+  id              String        @id @default(uuid())
+  refNumber       String        @unique
+  loanId          String
+  loan            Loan          @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  customerId      String
+  customer        Customer      @relation(fields: [customerId], references: [id])
+  amount          Decimal       @db.Decimal(18, 2)
+  paymentMethod   PaymentMethod @default(cash)
+  notes           String?
+  createdByUserId String?
+  createdAt       DateTime      @default(now())
+
+  @@index([loanId])
+  @@index([customerId])
+  @@index([createdAt])
+}
+
+// ─── Police Visits (Feature 8) ────────────────────────────────────────────────
+
+model PoliceVisit {
+  id              String    @id @default(uuid())
+  visitDate       DateTime  @db.Date
+  officerName     String
+  badgeNumber     String?
+  stationName     String?
+  registerR2Key   String?
+  signatureR2Key  String?
+  notes           String?
+  createdByUserId String?
+  createdAt       DateTime  @default(now())
+
+  @@index([visitDate])
+  @@index([createdAt])
 }

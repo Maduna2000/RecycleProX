@@ -41,7 +41,7 @@ export default function NewSalePage() {
   const [buyerPhone, setBuyerPhone] = useState('')
 
   const [lines, setLines] = useState<LineItem[]>([{ key: 1, productId: '', product: null, quantity: '', unitPrice: '' }])
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'eft' | 'cheque'>('cash')
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'eft' | 'cheque' | 'amplopay'>('cash')
   const [notes, setNotes] = useState('')
   const [submitting,   setSubmitting]   = useState(false)
   const [keyCounter,   setKeyCounter]   = useState(2)
@@ -263,6 +263,7 @@ export default function NewSalePage() {
                   <SelectItem value="cash">Cash</SelectItem>
                   <SelectItem value="eft">EFT</SelectItem>
                   <SelectItem value="cheque">Cheque</SelectItem>
+                  <SelectItem value="amplopay">AmploPay</SelectItem>
                 </SelectContent>
               </Select>
             </div>

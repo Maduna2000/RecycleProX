@@ -38,6 +38,7 @@ type LineItem = {
   quantity: string      // net (what gets submitted)
   grossQty: string
   tareQty: string
+  tareReason: string
   unitPrice: string
   weighMode: boolean    // show gross/tare row
   selectedScale: '1' | '2' | '3'
@@ -52,7 +53,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 const emptyLine = (key: number): LineItem => ({
   key, productId: '', product: null, quantity: '', grossQty: '', tareQty: '',
-  unitPrice: '', weighMode: false, selectedScale: '1',
+  tareReason: '', unitPrice: '', weighMode: false, selectedScale: '1',
   weighingGross: false, weighingTare: false,
 })
 
@@ -76,7 +77,7 @@ export default function NewPurchasePage() {
 
   const [customer, setCustomer] = useState<SelectedCustomer | null>(null)
   const [lines, setLines] = useState<LineItem[]>([emptyLine(1)])
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'eft' | 'cheque'>('cash')
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'eft' | 'cheque' | 'amplopay'>('cash')
   const [notes, setNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [keyCounter, setKeyCounter] = useState(2)
@@ -85,6 +86,13 @@ export default function NewPurchasePage() {
 
   const { data: productsData } = useSWR<{ products: Product[] }>('/api/products?active=true', fetcher)
   const products = productsData?.products ?? []
+
+  const { data: loanData } = useSWR<{ summary: { outstanding: string; hasOutstanding: boolean } }>(
+    customer ? `/api/customers/${customer.id}/loans?pageSize=1` : null,
+    fetcher
+  )
+  const hasOutstandingLoan = loanData?.summary?.hasOutstanding ?? false
+  const outstandingLoanAmount = loanData?.summary?.outstanding ?? '0'
 
   const productsByCategory = products.reduce<Record<string, Product[]>>((acc, p) => {
     acc[p.category] = acc[p.category] ?? []
@@ -183,11 +191,12 @@ export default function NewPurchasePage() {
         status,
         notes: notes || undefined,
         lines: validLines.map((l) => ({
-          productId: l.productId,
-          quantity:  l.quantity,
-          unitPrice: l.unitPrice,
-          ...(l.grossQty ? { grossQty: l.grossQty } : {}),
-          ...(l.tareQty  ? { tareQty:  l.tareQty  } : {}),
+          productId:  l.productId,
+          quantity:   l.quantity,
+          unitPrice:  l.unitPrice,
+          ...(l.grossQty   ? { grossQty:   l.grossQty   } : {}),
+          ...(l.tareQty    ? { tareQty:    l.tareQty    } : {}),
+          ...(l.tareReason ? { tareReason: l.tareReason } : {}),
         })),
       }),
     })
@@ -241,6 +250,19 @@ export default function NewPurchasePage() {
             </div>
           )}
         </div>
+
+        {/* Outstanding loan banner */}
+        {customer && hasOutstandingLoan && (
+          <div className="flex items-center gap-3 bg-yellow-50 border border-yellow-200 rounded-xl px-4 py-3 text-sm text-yellow-800">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            <span>
+              This customer has an outstanding loan of <strong>R {new Decimal(outstandingLoanAmount).toFixed(2)}</strong>.
+            </span>
+            <a href="/app/loans" className="ml-auto font-semibold underline-offset-2 hover:underline text-yellow-900 shrink-0">
+              View Loans →
+            </a>
+          </div>
+        )}
 
         {/* Product Lines */}
         <div className="bg-white rounded-xl border p-5">
@@ -410,6 +432,19 @@ export default function NewPurchasePage() {
                             {line.quantity || '0.000'}
                           </div>
                         </div>
+
+                        {/* Tare reason — only show when tare is entered */}
+                        {line.tareQty && parseFloat(line.tareQty) > 0 && (
+                          <div className="flex flex-col gap-1">
+                            <Label className="text-xs text-gray-500">Tare Reason</Label>
+                            <Input
+                              placeholder="e.g. Bag, Pallet…"
+                              value={line.tareReason}
+                              onChange={(e) => patchLine(line.key, { tareReason: e.target.value })}
+                              className="h-8 text-sm w-32"
+                            />
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -439,6 +474,7 @@ export default function NewPurchasePage() {
                   <SelectItem value="cash">Cash</SelectItem>
                   <SelectItem value="eft">EFT</SelectItem>
                   <SelectItem value="cheque">Cheque</SelectItem>
+                  <SelectItem value="amplopay">AmploPay</SelectItem>
                 </SelectContent>
               </Select>
             </div>

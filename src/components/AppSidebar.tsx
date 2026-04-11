@@ -7,7 +7,7 @@ import {
   LayoutDashboard, ShoppingCart, TrendingUp, Users,
   Package, BarChart2, Settings, LogOut, Recycle,
   Warehouse, DollarSign, Tag, Banknote, ShieldCheck, ShieldAlert,
-  Receipt, Coins, UserCheck, ClipboardList,
+  Receipt, Coins, UserCheck, ClipboardList, HandCoins, Images,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -24,6 +24,7 @@ const cashierNav: NavItem[] = [
 
 const managerExtra: NavItem[] = [
   { label: 'Payments',          href: '/app/payments',          icon: Banknote },
+  { label: 'Loans',             href: '/app/loans',             icon: HandCoins },
   { label: 'Stock',             href: '/app/stock',             icon: Warehouse },
   { label: 'Cash-up',           href: '/app/cashup',            icon: DollarSign },
   { label: 'Expenses',          href: '/app/expenses',          icon: Receipt },
@@ -32,6 +33,7 @@ const managerExtra: NavItem[] = [
   { label: 'Unpaid Purchases',  href: '/app/purchases/unpaid',  icon: ClipboardList },
   { label: 'Stocktake',         href: '/app/stocktake',         icon: Package },
   { label: 'Police Register',   href: '/app/police-register',   icon: ShieldCheck },
+  { label: 'Photos',            href: '/app/photos',            icon: Images },
   { label: 'Reports',           href: '/app/reports',           icon: BarChart2 },
 ]
 

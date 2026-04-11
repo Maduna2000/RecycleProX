@@ -260,7 +260,7 @@ function AddExpenseModal({ onClose, onSuccess }: { onClose: () => void; onSucces
             <div>
               <Label>Payment Method</Label>
               <Select
-                onValueChange={(v) => setValue('paymentMethod', v as 'cash' | 'eft' | 'cheque')}
+                onValueChange={(v) => setValue('paymentMethod', v as 'cash' | 'eft' | 'cheque' | 'amplopay')}
                 defaultValue="cash"
               >
                 <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
@@ -268,6 +268,7 @@ function AddExpenseModal({ onClose, onSuccess }: { onClose: () => void; onSucces
                   <SelectItem value="cash">Cash</SelectItem>
                   <SelectItem value="eft">EFT</SelectItem>
                   <SelectItem value="cheque">Cheque</SelectItem>
+                  <SelectItem value="amplopay">AmploPay</SelectItem>
                 </SelectContent>
               </Select>
             </div>

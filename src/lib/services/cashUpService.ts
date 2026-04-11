@@ -4,6 +4,7 @@ import logger from '@/lib/logger'
 import { SubmitCashUpInput, ApproveCashUpInput } from '@/lib/schemas/cashup'
 import { getFloatForDate, updateClosingAmount } from './floatService'
 import { getExpenseTotalsForDate } from './expenseService'
+import { getLoanTotalsForDate } from './loanService'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -116,7 +117,16 @@ export async function submitCashUp(
   }
 
   const drawingsReceived = new Decimal(input.drawingsReceived ?? 0)
-  const loansTotal       = new Decimal(input.loansTotal ?? 0)
+  // Auto-calculate net loan cash impact for the session date from Loan records.
+  // If the user manually provides a value (legacy), use that; otherwise derive from DB.
+  let loansTotal: Decimal
+  if (input.loansTotal !== undefined && input.loansTotal !== null) {
+    loansTotal = new Decimal(input.loansTotal)
+  } else {
+    const loanTotals = await getLoanTotalsForDate(cashUp.sessionDate)
+    // netCashOut is positive = cash went out as advances (reduces drawer), so we subtract it
+    loansTotal = new Decimal(loanTotals.netCashOut).negated()
+  }
   const totals = await calcSystemTotals(cashUp.sessionDate, drawingsReceived, loansTotal)
 
   const openingBalance = new Decimal(cashUp.openingBalance.toString())

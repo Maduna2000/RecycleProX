@@ -9,16 +9,23 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { SlidersHorizontal, Loader2, TrendingUp, TrendingDown, Minus, AlertTriangle } from 'lucide-react'
+import { SlidersHorizontal, Loader2, TrendingUp, TrendingDown, Minus, AlertTriangle, Download, Grid3X3 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useSession } from 'next-auth/react'
 import { format } from '@/lib/utils/format'
+import Decimal from 'decimal.js'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 type StockEntry = {
   product: { id: string; code: string; name: string; category: string; unit: string; minStockLevel?: string | null }
   totalIn: string; totalOut: string; onHand: string; hasMovements: boolean
+}
+
+type GridRow = {
+  productId: string; code: string; name: string; category: string; unit: string
+  openingQty: string; purchasedQty: string; soldQty: string; adjustedQty: string
+  closingQty: string; closingValue: string; buyPrice: string
 }
 
 type Movement = {
@@ -48,10 +55,35 @@ export default function StockPage() {
   const [categoryFilter, setCategoryFilter] = useState('')
   const [showZero, setShowZero] = useState(true)
 
+  // Stock Grid state
+  const today = new Date().toISOString().slice(0, 10)
+  const [gridPeriod, setGridPeriod]     = useState<'daily' | 'weekly' | 'mtd'>('mtd')
+  const [gridDate, setGridDate]         = useState(today)
+  const [gridCategory, setGridCategory] = useState('')
+  const [exporting, setExporting]       = useState(false)
+
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
 
   const { data: stockData } = useSWR<{ stock: StockEntry[] }>('/api/stock/on-hand', fetcher)
   const { data: movementsData } = useSWR<{ movements: Movement[]; total: number }>('/api/stock/movements?pageSize=200', fetcher)
+
+  const gridKey = `/api/stock/grid?period=${gridPeriod}&date=${gridDate}${gridCategory ? `&category=${gridCategory}` : ''}`
+  const { data: gridData, isLoading: gridLoading } = useSWR<{ grid: GridRow[] }>(gridKey, fetcher)
+
+  async function handleExport() {
+    setExporting(true)
+    const exportUrl = `/api/stock/grid/export?period=${gridPeriod}&date=${gridDate}${gridCategory ? `&category=${gridCategory}` : ''}`
+    const res = await fetch(exportUrl)
+    setExporting(false)
+    if (!res.ok) { toast.error('Export failed'); return }
+    const blob = await res.blob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `stock-grid-${gridPeriod}-${gridDate}.xlsx`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 
   const allStock = stockData?.stock ?? []
   const stock = allStock.filter((s) => {
@@ -92,6 +124,7 @@ export default function StockPage() {
         <TabsList className="mb-4">
           <TabsTrigger value="onhand">Stock On Hand</TabsTrigger>
           <TabsTrigger value="movements">Movement History</TabsTrigger>
+          <TabsTrigger value="grid"><Grid3X3 className="w-3.5 h-3.5 mr-1.5 inline" />Stock Grid</TabsTrigger>
         </TabsList>
 
         {/* ── On-Hand Tab ── */}
@@ -216,6 +249,96 @@ export default function StockPage() {
                       <td className="px-4 py-3 text-gray-500 text-xs">{format.datetime(m.createdAt)}</td>
                     </tr>
                   ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </TabsContent>
+        {/* ── Stock Grid Tab ── */}
+        <TabsContent value="grid">
+          {/* Filters */}
+          <div className="flex flex-wrap gap-3 mb-4 items-end">
+            <div>
+              <Label className="text-xs mb-1 block">Period</Label>
+              <Select value={gridPeriod} onValueChange={(v) => setGridPeriod(v as 'daily' | 'weekly' | 'mtd')}>
+                <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="daily">Daily</SelectItem>
+                  <SelectItem value="weekly">Weekly</SelectItem>
+                  <SelectItem value="mtd">Month to Date</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs mb-1 block">Date</Label>
+              <Input type="date" value={gridDate} max={today} onChange={(e) => setGridDate(e.target.value)} className="w-40" />
+            </div>
+            <div>
+              <Label className="text-xs mb-1 block">Category</Label>
+              <select
+                className="border rounded-md px-3 py-2 text-sm bg-white h-10"
+                value={gridCategory}
+                onChange={(e) => setGridCategory(e.target.value)}
+              >
+                <option value="">All Categories</option>
+                {Object.entries(CATEGORY_LABELS).map(([v, l]) => (
+                  <option key={v} value={v}>{l}</option>
+                ))}
+              </select>
+            </div>
+            <Button variant="outline" onClick={handleExport} disabled={exporting} className="ml-auto">
+              {exporting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Exporting...</> : <><Download className="w-4 h-4 mr-2" />Export Excel</>}
+            </Button>
+          </div>
+
+          <div className="bg-white rounded-xl border overflow-hidden overflow-x-auto">
+            {gridLoading ? (
+              <div className="flex items-center justify-center p-10 text-gray-400">
+                <Loader2 className="w-5 h-5 animate-spin mr-2" /> Building grid...
+              </div>
+            ) : !gridData?.grid?.length ? (
+              <div className="text-center p-10 text-gray-400">No data for selected period</div>
+            ) : (
+              <table className="w-full text-sm whitespace-nowrap">
+                <thead className="bg-gray-50 border-b">
+                  <tr>
+                    {['Product', 'Cat', 'Unit', 'Opening', 'Purchased', 'Sold', 'Adjusted', 'Closing', 'Value (R)'].map((h) => (
+                      <th key={h} className="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {gridData.grid.map((row) => {
+                    const closingNum = new Decimal(row.closingQty)
+                    return (
+                      <tr key={row.productId} className={closingNum.isNegative() ? 'bg-red-50' : closingNum.isZero() ? 'opacity-60' : ''}>
+                        <td className="px-3 py-2">
+                          <p className="font-medium text-gray-900">{row.name}</p>
+                          <p className="text-xs text-gray-400 font-mono">{row.code}</p>
+                        </td>
+                        <td className="px-3 py-2 text-xs text-gray-500">{CATEGORY_LABELS[row.category] ?? row.category}</td>
+                        <td className="px-3 py-2 text-xs text-gray-500">{row.unit}</td>
+                        <td className="px-3 py-2 font-mono text-xs">{row.openingQty}</td>
+                        <td className="px-3 py-2 font-mono text-xs text-green-700">{row.purchasedQty}</td>
+                        <td className="px-3 py-2 font-mono text-xs text-red-600">{row.soldQty}</td>
+                        <td className="px-3 py-2 font-mono text-xs text-blue-600">{row.adjustedQty}</td>
+                        <td className={`px-3 py-2 font-mono text-xs font-semibold ${closingNum.isNegative() ? 'text-red-600' : 'text-gray-900'}`}>
+                          {row.closingQty}
+                        </td>
+                        <td className="px-3 py-2 font-mono text-xs text-gray-700">R {row.closingValue}</td>
+                      </tr>
+                    )
+                  })}
+                  {/* Totals row */}
+                  {(() => {
+                    const total = gridData.grid.reduce((acc, r) => acc.plus(new Decimal(r.closingValue)), new Decimal(0))
+                    return (
+                      <tr className="bg-gray-50 font-semibold">
+                        <td colSpan={8} className="px-3 py-2 text-right text-xs text-gray-600">Total Closing Value</td>
+                        <td className="px-3 py-2 font-mono text-xs text-gray-900">R {total.toFixed(2)}</td>
+                      </tr>
+                    )
+                  })()}
                 </tbody>
               </table>
             )}

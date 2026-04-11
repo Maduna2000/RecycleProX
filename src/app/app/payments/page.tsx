@@ -9,7 +9,8 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Plus, Search, Ban, Loader2, TrendingDown, AlertCircle } from 'lucide-react'
+import { Plus, Search, Ban, Loader2, TrendingDown, AlertCircle, HandCoins } from 'lucide-react'
+import Decimal from 'decimal.js'
 import { toast } from 'sonner'
 import { useSession } from 'next-auth/react'
 import { format } from '@/lib/utils/format'
@@ -237,7 +238,7 @@ export default function PaymentsPage() {
 function NewPaymentModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
   const [customer, setCustomer] = useState<SelectedCustomer | null>(null)
   const [amount, setAmount] = useState('')
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'eft' | 'cheque'>('cash')
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'eft' | 'cheque' | 'amplopay'>('cash')
   const [notes, setNotes] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -245,6 +246,13 @@ function NewPaymentModal({ onClose, onSuccess }: { onClose: () => void; onSucces
     customer ? `/api/customers/${customer.id}/balance` : null,
     fetcher
   )
+
+  const { data: loanData } = useSWR<{ summary: { outstanding: string; hasOutstanding: boolean } }>(
+    customer ? `/api/customers/${customer.id}/loans?pageSize=1` : null,
+    fetcher
+  )
+  const hasOutstandingLoan  = loanData?.summary?.hasOutstanding ?? false
+  const outstandingLoanAmt  = loanData?.summary?.outstanding ?? '0'
 
   async function onSubmit() {
     if (!customer) { toast.error('Select a customer'); return }
@@ -296,6 +304,19 @@ function NewPaymentModal({ onClose, onSuccess }: { onClose: () => void; onSucces
             )}
           </div>
 
+          {/* Outstanding loan banner */}
+          {customer && hasOutstandingLoan && (
+            <div className="flex items-center gap-2 bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2 text-xs text-yellow-800">
+              <HandCoins className="w-4 h-4 shrink-0" />
+              <span>
+                Outstanding loan: <strong>R {new Decimal(outstandingLoanAmt).toFixed(2)}</strong>
+              </span>
+              <a href="/app/loans" className="ml-auto font-semibold underline-offset-2 hover:underline shrink-0">
+                View →
+              </a>
+            </div>
+          )}
+
           {/* Amount */}
           <div>
             <Label>Amount (R)</Label>
@@ -326,6 +347,7 @@ function NewPaymentModal({ onClose, onSuccess }: { onClose: () => void; onSucces
                 <SelectItem value="cash">Cash</SelectItem>
                 <SelectItem value="eft">EFT</SelectItem>
                 <SelectItem value="cheque">Cheque</SelectItem>
+                <SelectItem value="amplopay">AmploPay</SelectItem>
               </SelectContent>
             </Select>
           </div>

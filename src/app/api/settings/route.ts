@@ -26,6 +26,45 @@ export async function GET() {
 }
 
 /**
+ * PATCH /api/settings
+ * Body: { [key: string]: string }  — upserts each key-value pair.
+ * Any authenticated user may update keys prefixed with "user:{userId}:".
+ */
+export async function PATCH(req: NextRequest) {
+  const session = await auth()
+  if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  try {
+    const body = await req.json() as Record<string, string>
+    if (typeof body !== 'object' || Array.isArray(body)) {
+      return NextResponse.json({ error: 'Body must be a key-value object' }, { status: 400 })
+    }
+
+    const prefix = `user:${session.user.id}:`
+    const allowed = Object.entries(body).filter(([key]) => key.startsWith(prefix))
+    if (allowed.length === 0) {
+      return NextResponse.json({ error: 'No allowed keys provided' }, { status: 400 })
+    }
+
+    await prisma.$transaction(
+      allowed.map(([key, value]) =>
+        prisma.systemSettings.upsert({
+          where: { key },
+          update: { value: String(value) },
+          create: { key, value: String(value) },
+        })
+      )
+    )
+
+    logger.info({ userId: session.user.id, keys: allowed.map(([k]) => k) }, 'user-settings.updated')
+    return NextResponse.json({ ok: true })
+  } catch (err) {
+    logger.error({ err }, 'PATCH /api/settings failed')
+    return NextResponse.json({ error: 'Failed to save settings' }, { status: 500 })
+  }
+}
+
+/**
  * PUT /api/settings
  * Body: { [key: string]: string }  — upserts each key-value pair.
  * Admin only.

@@ -6,9 +6,10 @@ import useSWR, { mutate } from 'swr'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { ArrowLeft, Star, Save, Loader2, RotateCcw } from 'lucide-react'
+import { ArrowLeft, Star, Save, Loader2, RotateCcw, Copy } from 'lucide-react'
 import { toast } from 'sonner'
 import { useSession } from 'next-auth/react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -51,6 +52,8 @@ export default function PriceGroupDetailPage() {
   const [overrides, setOverrides] = useState<Record<string, { buy: string; sell: string; enabled: boolean }>>({})
   const [saving, setSaving] = useState(false)
   const [dirty, setDirty] = useState(false)
+  const [copying, setCopying] = useState(false)
+  const [copyConfirmOpen, setCopyConfirmOpen] = useState(false)
 
   // Initialise from group data
   useEffect(() => {
@@ -89,6 +92,24 @@ export default function PriceGroupDetailPage() {
     } else {
       const j = await res.json()
       toast.error(j.error ?? 'Failed to save overrides')
+    }
+  }
+
+  async function onCopyFromDefaults() {
+    setCopying(true)
+    setCopyConfirmOpen(false)
+    try {
+      const res = await fetch(`/api/price-groups/${id}/copy-from-defaults`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+      if (res.ok) {
+        const j = await res.json() as { upserted: number }
+        toast.success(`Copied default prices for ${j.upserted} products`)
+        mutate(`/api/price-groups/${id}`)
+      } else {
+        const j = await res.json() as { error?: string }
+        toast.error(j.error ?? 'Failed to copy prices')
+      }
+    } finally {
+      setCopying(false)
     }
   }
 
@@ -157,6 +178,9 @@ export default function PriceGroupDetailPage() {
               )}
               <Button className="bg-green-600 hover:bg-green-700" size="sm" onClick={onSave} disabled={saving || !dirty}>
                 {saving ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />Saving...</> : <><Save className="w-3.5 h-3.5 mr-1.5" />Save</>}
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setCopyConfirmOpen(true)} disabled={copying}>
+                {copying ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />Copying...</> : <><Copy className="w-3.5 h-3.5 mr-1.5" />Copy Defaults</>}
               </Button>
             </div>
           )}
@@ -238,6 +262,24 @@ export default function PriceGroupDetailPage() {
           </table>
         </div>
       </div>
+
+      {/* Copy Defaults Confirmation Dialog */}
+      <Dialog open={copyConfirmOpen} onOpenChange={setCopyConfirmOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Copy Default Prices to This Group?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-gray-600 mt-1">
+            This will overwrite all existing price overrides in <strong>{group.name}</strong> with the current default prices for every active product. This cannot be undone.
+          </p>
+          <div className="flex justify-end gap-2 pt-4">
+            <Button variant="outline" onClick={() => setCopyConfirmOpen(false)} disabled={copying}>Cancel</Button>
+            <Button className="bg-green-600 hover:bg-green-700" onClick={onCopyFromDefaults} disabled={copying}>
+              {copying ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Copying...</> : 'Yes, Copy Defaults'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

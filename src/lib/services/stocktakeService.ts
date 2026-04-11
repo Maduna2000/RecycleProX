@@ -62,7 +62,7 @@ export async function upsertEntry(
   stocktakeId: string,
   productId: string,
   countedQty: string,
-  opts?: { grossQty?: string; tareQty?: string }
+  opts?: { grossQty?: string; tareQty?: string; photoR2Key?: string }
 ) {
   const stocktake = await prisma.stocktake.findUniqueOrThrow({ where: { id: stocktakeId } })
   if (stocktake.status !== 'open') throw new Error('Stocktake is not open')
@@ -87,16 +87,37 @@ export async function upsertEntry(
       countedQty: counted.toFixed(4),
       variance:   variance.toFixed(4),
       ...scaleData,
+      ...(opts?.photoR2Key ? { photoR2Key: opts.photoR2Key } : {}),
     },
     update: {
       systemQty:  systemQty.toFixed(4),
       countedQty: counted.toFixed(4),
       variance:   variance.toFixed(4),
       ...scaleData,
+      ...(opts?.photoR2Key ? { photoR2Key: opts.photoR2Key } : {}),
     },
     include: { product: true },
   })
   logger.info({ stocktakeId, productId, variance: variance.toFixed(4) }, 'Stocktake entry upserted')
+  return entry
+}
+
+// ─── Update photo on an existing entry ───────────────────────────────────────
+
+export async function updateEntryPhoto(
+  stocktakeId: string,
+  productId: string,
+  photoR2Key: string
+) {
+  const stocktake = await prisma.stocktake.findUniqueOrThrow({ where: { id: stocktakeId } })
+  if (stocktake.status !== 'open') throw new Error('Stocktake is not open')
+
+  const entry = await prisma.stocktakeEntry.update({
+    where: { stocktakeId_productId: { stocktakeId, productId } },
+    data: { photoR2Key },
+    include: { product: true },
+  })
+  logger.info({ stocktakeId, productId, photoR2Key }, 'stocktake.entry.photo-updated')
   return entry
 }
 
