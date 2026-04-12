@@ -100,7 +100,8 @@ export default function DashboardPage() {
   const netIsPos  = netFlow?.gte(0) ?? true
 
   return (
-    <div className="space-y-5">
+    <div className="flex-1 min-h-0 overflow-y-auto">
+    <div className="space-y-5 pb-4">
 
       {/* Welcome */}
       <div>
@@ -298,6 +299,7 @@ export default function DashboardPage() {
           </DialogContent>
         </Dialog>
       )}
+    </div>
     </div>
   )
 }

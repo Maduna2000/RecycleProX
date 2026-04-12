@@ -351,8 +351,7 @@ export function AppShell({
 
       {/* ── ZONE 3: Content Area ── */}
       <main
-        className="flex-1 overflow-auto bg-white"
-        style={{ padding: '24px 20px 20px' }}
+        className="flex-1 min-h-0 flex flex-col overflow-hidden bg-[#F8F9FA] px-5 pt-6 pb-5"
       >
         {children}
       </main>
