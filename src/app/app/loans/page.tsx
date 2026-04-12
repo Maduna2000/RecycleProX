@@ -2,17 +2,18 @@
 
 import { useState } from 'react'
 import useSWR, { mutate } from 'swr'
-import { Badge } from '@/components/ui/badge'
+import { useSession } from 'next-auth/react'
+import { Plus, Search, Loader2, AlertCircle } from 'lucide-react'
+import { toast } from 'sonner'
+import Decimal from 'decimal.js'
+import { DataTable, Avatar, StatusBadge, type Column, type RowAction } from '@/components/ui/DataTable'
+import { InlineDetailPanel } from '@/components/ui/InlineDetailPanel'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
-import { Plus, Search, Loader2, HandCoins, AlertCircle, ChevronDown, ChevronRight } from 'lucide-react'
-import { toast } from 'sonner'
-import { useSession } from 'next-auth/react'
 import { format } from '@/lib/utils/format'
 import { CustomerLookupWidget } from '@/components/CustomerLookupWidget'
 
@@ -26,19 +27,10 @@ type Repayment = {
 }
 
 type Loan = {
-  id: string
-  refNumber: string
-  principalAmount: string
-  balanceAmount: string
-  paymentMethod: string
-  notes?: string
-  status: 'active' | 'settled' | 'voided'
-  voidedAt?: string
-  voidReason?: string
-  createdAt: string
-  customer: Customer
-  _count?: { repayments: number }
-  repayments?: Repayment[]
+  id: string; refNumber: string; principalAmount: string; balanceAmount: string
+  paymentMethod: string; notes?: string; status: 'active' | 'settled' | 'voided'
+  voidedAt?: string; voidReason?: string; createdAt: string
+  customer: Customer; _count?: { repayments: number }; repayments?: Repayment[]
 }
 
 type SelectedCustomer = {
@@ -47,552 +39,573 @@ type SelectedCustomer = {
 }
 
 const PAYMENT_METHODS = [
-  { value: 'cash',      label: 'Cash' },
-  { value: 'eft',       label: 'EFT' },
-  { value: 'cheque',    label: 'Cheque' },
-  { value: 'amplopay',  label: 'AmploPay' },
+  { value: 'cash',     label: 'Cash' },
+  { value: 'eft',      label: 'EFT' },
+  { value: 'cheque',   label: 'Cheque' },
+  { value: 'amplopay', label: 'AmploPay' },
 ]
 
-const statusBadge = (status: string) => {
-  if (status === 'active')  return <Badge className="bg-blue-100 text-blue-800 border-0">Active</Badge>
-  if (status === 'settled') return <Badge className="bg-green-100 text-green-800 border-0">Settled</Badge>
-  return <Badge className="bg-red-100 text-red-800 border-0">Voided</Badge>
-}
+type PageTab = 'active' | 'history'
 
 export default function LoansPage() {
   const { data: session } = useSession()
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
 
-  // ── List state ───────────────────────────────────────────────────────────────
-  const [activeSearch, setActiveSearch]   = useState('')
-  const [historySearch, setHistorySearch] = useState('')
-  const [historyFrom,   setHistoryFrom]   = useState('')
-  const [historyTo,     setHistoryTo]     = useState('')
-  const [expandedId,    setExpandedId]    = useState<string | null>(null)
+  const [activeTab,    setActiveTab]    = useState<PageTab>('active')
+  const [activeSearch, setActiveSearch] = useState('')
+  const [histSearch,   setHistSearch]   = useState('')
+  const [histFrom,     setHistFrom]     = useState('')
+  const [histTo,       setHistTo]       = useState('')
+  const [selectedId,   setSelectedId]   = useState<string | null>(null)
 
-  // ── Dialog state ─────────────────────────────────────────────────────────────
   const [newLoanOpen,    setNewLoanOpen]    = useState(false)
   const [repayTarget,    setRepayTarget]    = useState<Loan | null>(null)
   const [voidTarget,     setVoidTarget]     = useState<Loan | null>(null)
 
-  // ── New loan form ─────────────────────────────────────────────────────────────
-  const [loanCustomer,   setLoanCustomer]   = useState<SelectedCustomer | null>(null)
-  const [loanAmount,     setLoanAmount]     = useState('')
-  const [loanMethod,     setLoanMethod]     = useState('cash')
-  const [loanNotes,      setLoanNotes]      = useState('')
-  const [loanSubmitting, setLoanSubmitting] = useState(false)
-
-  // ── Repayment form ────────────────────────────────────────────────────────────
-  const [repayAmount,     setRepayAmount]     = useState('')
-  const [repayMethod,     setRepayMethod]     = useState('cash')
-  const [repayNotes,      setRepayNotes]      = useState('')
-  const [repaySubmitting, setRepaySubmitting] = useState(false)
-
-  // ── Void form ─────────────────────────────────────────────────────────────────
-  const [voidReason,     setVoidReason]     = useState('')
-  const [voidSubmitting, setVoidSubmitting] = useState(false)
-
-  // ── Queries ───────────────────────────────────────────────────────────────────
   const activeQuery = new URLSearchParams({
     status: 'active',
     ...(activeSearch && { search: activeSearch }),
     pageSize: '100',
   })
-  const historyQuery = new URLSearchParams({
-    ...(historySearch && { search: historySearch }),
-    ...(historyFrom   && { from: historyFrom }),
-    ...(historyTo     && { to: historyTo }),
+  const histQuery = new URLSearchParams({
+    ...(histSearch && { search: histSearch }),
+    ...(histFrom   && { from: histFrom }),
+    ...(histTo     && { to: histTo }),
     pageSize: '100',
   })
 
   const { data: activeData,  isLoading: loadingActive }  = useSWR<{ loans: Loan[]; total: number }>(`/api/loans?${activeQuery}`, fetcher)
-  const { data: historyData, isLoading: loadingHistory } = useSWR<{ loans: Loan[]; total: number }>(`/api/loans?${historyQuery}`, fetcher)
-
-  const activeLoans  = activeData?.loans ?? []
-  const historyLoans = historyData?.loans ?? []
-
-  // ── Expanded loan detail ──────────────────────────────────────────────────────
-  const { data: expandedLoan } = useSWR<Loan>(
-    expandedId ? `/api/loans/${expandedId}` : null,
-    fetcher
+  const { data: historyData, isLoading: loadingHistory } = useSWR<{ loans: Loan[]; total: number }>(`/api/loans?${histQuery}`, fetcher)
+  const { data: selectedLoan, isLoading: detailLoading } = useSWR<Loan>(
+    selectedId ? `/api/loans/${selectedId}` : null,
+    fetcher,
   )
 
-  // ── Handlers ─────────────────────────────────────────────────────────────────
+  const activeLoans  = activeData?.loans  ?? []
+  const historyLoans = historyData?.loans ?? []
 
-  async function handleCreateLoan() {
-    if (!loanCustomer || !loanAmount) return
-    setLoanSubmitting(true)
-    try {
-      const res = await fetch('/api/loans', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          customerId:      loanCustomer.id,
-          principalAmount: loanAmount,
-          paymentMethod:   loanMethod,
-          notes:           loanNotes || undefined,
-        }),
-      })
-      if (!res.ok) {
-        const j = await res.json() as { error?: string | { formErrors?: string[] } }
-        const msg = typeof j.error === 'string' ? j.error : (j.error as { formErrors?: string[] })?.formErrors?.[0] ?? 'Failed to create loan'
-        toast.error(msg)
-        return
-      }
-      toast.success('Loan advance created')
-      setNewLoanOpen(false)
-      setLoanCustomer(null); setLoanAmount(''); setLoanMethod('cash'); setLoanNotes('')
-      mutate((key: string) => key.startsWith('/api/loans'))
-    } finally {
-      setLoanSubmitting(false)
-    }
+  function revalidate() {
+    mutate((key: string) => key.startsWith('/api/loans'))
   }
 
-  async function handleRepay() {
-    if (!repayTarget || !repayAmount) return
-    setRepaySubmitting(true)
-    try {
-      const res = await fetch(`/api/loans/${repayTarget.id}/repay`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: repayAmount, paymentMethod: repayMethod, notes: repayNotes || undefined }),
-      })
-      if (!res.ok) {
-        const j = await res.json() as { error?: string }
-        toast.error(j.error ?? 'Failed to record repayment')
-        return
-      }
-      toast.success('Repayment recorded')
-      setRepayTarget(null); setRepayAmount(''); setRepayMethod('cash'); setRepayNotes('')
-      mutate((key: string) => key.startsWith('/api/loans'))
-    } finally {
-      setRepaySubmitting(false)
-    }
-  }
+  // ── Active loans columns ─────────────────────────────────────────────────────
+  const activeColumns: Column<Loan>[] = [
+    {
+      key: 'refNumber',
+      header: 'Ref #',
+      width: '130px',
+      render: (r) => <span className="font-mono text-xs" style={{ color: '#6C757D' }}>{r.refNumber}</span>,
+    },
+    {
+      key: 'customer',
+      header: 'Customer',
+      render: (r) => (
+        <div className="flex items-center gap-2">
+          <Avatar name={`${r.customer.firstName} ${r.customer.lastName}`} size={26} />
+          <div>
+            <p style={{ fontSize: 12, fontWeight: 500, color: '#212529' }}>
+              {r.customer.firstName} {r.customer.lastName}
+            </p>
+            <p className="font-mono" style={{ fontSize: 10, color: '#6C757D' }}>{r.customer.idNumber}</p>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'principalAmount',
+      header: 'Principal',
+      width: '110px',
+      render: (r) => (
+        <span className="font-mono" style={{ fontSize: 12, color: '#6C757D' }}>
+          {format.currency(r.principalAmount)}
+        </span>
+      ),
+    },
+    {
+      key: 'balanceAmount',
+      header: 'Balance',
+      width: '110px',
+      render: (r) => {
+        const bal = new Decimal(r.balanceAmount)
+        return (
+          <span className="font-mono font-semibold" style={{ color: bal.gt(0) ? '#C9A020' : '#217346' }}>
+            {format.currency(r.balanceAmount)}
+          </span>
+        )
+      },
+    },
+    {
+      key: 'paymentMethod',
+      header: 'Method',
+      width: '90px',
+      render: (r) => <span className="capitalize" style={{ fontSize: 12, color: '#6C757D' }}>{r.paymentMethod}</span>,
+    },
+    {
+      key: 'createdAt',
+      header: 'Date',
+      width: '100px',
+      render: (r) => (
+        <span style={{ fontSize: 11, color: '#6C757D' }}>
+          {new Date(r.createdAt).toLocaleDateString('en-ZA')}
+        </span>
+      ),
+    },
+  ]
 
-  async function handleVoid() {
-    if (!voidTarget || !voidReason) return
-    setVoidSubmitting(true)
-    try {
-      const res = await fetch(`/api/loans/${voidTarget.id}/void`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason: voidReason }),
-      })
-      if (!res.ok) {
-        const j = await res.json() as { error?: string }
-        toast.error(j.error ?? 'Failed to void loan')
-        return
-      }
-      toast.success('Loan voided')
-      setVoidTarget(null); setVoidReason('')
-      mutate((key: string) => key.startsWith('/api/loans'))
-    } finally {
-      setVoidSubmitting(false)
-    }
-  }
+  const activeActions: RowAction<Loan>[] = [
+    {
+      label:   'Record Repayment',
+      onClick: (r) => { setRepayTarget(r) },
+    },
+    {
+      label:   'Void Loan',
+      danger:  true,
+      hidden:  () => !isManager,
+      onClick: (r) => { setVoidTarget(r) },
+    },
+  ]
 
-  // ─────────────────────────────────────────────────────────────────────────────
+  // ── History columns ──────────────────────────────────────────────────────────
+  const historyColumns: Column<Loan>[] = [
+    {
+      key: 'refNumber',
+      header: 'Ref #',
+      width: '130px',
+      render: (r) => <span className="font-mono text-xs" style={{ color: '#6C757D' }}>{r.refNumber}</span>,
+    },
+    {
+      key: 'customer',
+      header: 'Customer',
+      render: (r) => (
+        <div>
+          <p style={{ fontSize: 12, fontWeight: 500, color: '#212529' }}>
+            {r.customer.firstName} {r.customer.lastName}
+          </p>
+          <p className="font-mono" style={{ fontSize: 10, color: '#6C757D' }}>{r.customer.idNumber}</p>
+        </div>
+      ),
+    },
+    {
+      key: 'principalAmount',
+      header: 'Principal',
+      width: '110px',
+      render: (r) => (
+        <span className="font-mono" style={{ fontSize: 12, color: '#6C757D' }}>
+          {format.currency(r.principalAmount)}
+        </span>
+      ),
+    },
+    {
+      key: 'balanceAmount',
+      header: 'Balance',
+      width: '110px',
+      render: (r) => (
+        <span className="font-mono" style={{ fontSize: 12, color: '#6C757D' }}>
+          {format.currency(r.balanceAmount)}
+        </span>
+      ),
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      width: '90px',
+      render: (r) => <StatusBadge status={r.status} />,
+    },
+    {
+      key: 'createdAt',
+      header: 'Date',
+      width: '100px',
+      render: (r) => (
+        <span style={{ fontSize: 11, color: '#6C757D' }}>
+          {new Date(r.createdAt).toLocaleDateString('en-ZA')}
+        </span>
+      ),
+    },
+  ]
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Loans</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Manage customer loan advances and repayments</p>
-        </div>
-        <Button onClick={() => setNewLoanOpen(true)}>
-          <Plus className="w-4 h-4 mr-2" />
-          New Loan
-        </Button>
+    <div className="flex flex-col flex-1 min-h-0 gap-3">
+
+      {/* Page header */}
+      <div className="shrink-0">
+        <h1 className="text-xl font-bold" style={{ color: '#212529' }}>Loans</h1>
+        <p className="text-sm mt-0.5" style={{ color: '#6C757D' }}>Manage customer loan advances and repayments</p>
       </div>
 
-      {/* Tabs */}
-      <Tabs defaultValue="active">
-        <TabsList>
-          <TabsTrigger value="active">
+      {/* Tab bar + action */}
+      <div className="flex items-center justify-between shrink-0 border-b border-[#E0E0E0]">
+        <div className="flex items-center">
+          <button
+            onClick={() => { setActiveTab('active'); setSelectedId(null) }}
+            className="px-4 py-2 text-xs font-medium border-b-2 transition-colors"
+            style={{ borderColor: activeTab === 'active' ? '#185ABD' : 'transparent', color: activeTab === 'active' ? '#185ABD' : '#6C757D' }}
+          >
             Active Loans {activeData?.total ? `(${activeData.total})` : ''}
-          </TabsTrigger>
-          <TabsTrigger value="history">History</TabsTrigger>
-        </TabsList>
+          </button>
+          <button
+            onClick={() => { setActiveTab('history'); setSelectedId(null) }}
+            className="px-4 py-2 text-xs font-medium border-b-2 transition-colors"
+            style={{ borderColor: activeTab === 'history' ? '#185ABD' : 'transparent', color: activeTab === 'history' ? '#185ABD' : '#6C757D' }}
+          >
+            History
+          </button>
+        </div>
+        <button
+          onClick={() => setNewLoanOpen(true)}
+          className="flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium text-white mb-1"
+          style={{ background: '#217346' }}
+        >
+          <Plus className="w-3.5 h-3.5" /> New Loan
+        </button>
+      </div>
 
-        {/* ── Active Loans ── */}
-        <TabsContent value="active" className="mt-4 space-y-3">
-          <div className="flex gap-2">
-            <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-gray-400" />
-              <Input
-                placeholder="Search by name, ID or ref…"
-                className="pl-8"
+      {/* Active tab */}
+      {activeTab === 'active' && (
+        <>
+          <div className="shrink-0">
+            <div className="relative w-64">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3" style={{ color: '#6C757D' }} />
+              <input
                 value={activeSearch}
                 onChange={(e) => setActiveSearch(e.target.value)}
-              />
-            </div>
-          </div>
-
-          {loadingActive && <p className="text-sm text-gray-400">Loading…</p>}
-
-          {!loadingActive && activeLoans.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-16 text-gray-400 gap-2">
-              <HandCoins className="w-10 h-10 opacity-30" />
-              <p className="text-sm">No active loans</p>
-            </div>
-          )}
-
-          {activeLoans.length > 0 && (
-            <div className="rounded-xl border overflow-hidden bg-white">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 border-b">
-                  <tr>
-                    <th className="px-4 py-3 text-left font-medium text-gray-600">Ref</th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-600">Customer</th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-600">ID No</th>
-                    <th className="px-4 py-3 text-right font-medium text-gray-600">Principal</th>
-                    <th className="px-4 py-3 text-right font-medium text-gray-600">Balance</th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-600">Method</th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-600">Date</th>
-                    <th className="px-4 py-3 text-right font-medium text-gray-600">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {activeLoans.map((loan) => (
-                    <>
-                      <tr key={loan.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 font-mono text-xs text-gray-500">{loan.refNumber}</td>
-                        <td className="px-4 py-3 font-medium">
-                          {loan.customer.firstName} {loan.customer.lastName}
-                        </td>
-                        <td className="px-4 py-3 text-gray-500">{loan.customer.idNumber}</td>
-                        <td className="px-4 py-3 text-right font-medium">
-                          {format.currency(loan.principalAmount)}
-                        </td>
-                        <td className="px-4 py-3 text-right font-bold text-orange-600">
-                          {format.currency(loan.balanceAmount)}
-                        </td>
-                        <td className="px-4 py-3 capitalize text-gray-500">{loan.paymentMethod}</td>
-                        <td className="px-4 py-3 text-gray-500 text-xs">
-                          {new Date(loan.createdAt).toLocaleDateString('en-ZA')}
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-7 text-xs"
-                              onClick={() => {
-                                setExpandedId(expandedId === loan.id ? null : loan.id)
-                              }}
-                            >
-                              {expandedId === loan.id
-                                ? <ChevronDown className="w-3 h-3" />
-                                : <ChevronRight className="w-3 h-3" />}
-                            </Button>
-                            <Button
-                              size="sm"
-                              className="h-7 text-xs bg-green-600 hover:bg-green-700"
-                              onClick={() => {
-                                setRepayTarget(loan)
-                                setRepayAmount(loan.balanceAmount.toString())
-                                setRepayMethod('cash')
-                                setRepayNotes('')
-                              }}
-                            >
-                              Repay
-                            </Button>
-                            {isManager && (
-                              <Button
-                                size="sm"
-                                variant="destructive"
-                                className="h-7 text-xs"
-                                onClick={() => { setVoidTarget(loan); setVoidReason('') }}
-                              >
-                                Void
-                              </Button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-
-                      {/* Repayment history expansion */}
-                      {expandedId === loan.id && (
-                        <tr key={`${loan.id}-expand`}>
-                          <td colSpan={8} className="px-6 pb-3 bg-gray-50">
-                            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mt-2 mb-2">
-                              Repayment History
-                            </p>
-                            {!expandedLoan ? (
-                              <p className="text-xs text-gray-400">Loading…</p>
-                            ) : expandedLoan.repayments?.length === 0 ? (
-                              <p className="text-xs text-gray-400">No repayments yet</p>
-                            ) : (
-                              <div className="space-y-1">
-                                {expandedLoan.repayments?.map((r) => (
-                                  <div key={r.id} className="flex items-center justify-between text-xs py-1 border-b border-gray-100">
-                                    <span className="font-mono text-gray-400">{r.refNumber}</span>
-                                    <span className="font-medium text-green-700">{format.currency(r.amount)}</span>
-                                    <span className="capitalize text-gray-500">{r.paymentMethod}</span>
-                                    <span className="text-gray-400">
-                                      {new Date(r.createdAt).toLocaleDateString('en-ZA')}
-                                    </span>
-                                    {r.notes && <span className="text-gray-400 max-w-xs truncate">{r.notes}</span>}
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                            {loan.notes && (
-                              <p className="text-xs text-gray-400 mt-2">Note: {loan.notes}</p>
-                            )}
-                          </td>
-                        </tr>
-                      )}
-                    </>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </TabsContent>
-
-        {/* ── History ── */}
-        <TabsContent value="history" className="mt-4 space-y-3">
-          <div className="flex flex-wrap gap-2">
-            <div className="relative flex-1 min-w-[200px] max-w-sm">
-              <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-gray-400" />
-              <Input
                 placeholder="Search by name, ID or ref…"
-                className="pl-8"
-                value={historySearch}
-                onChange={(e) => setHistorySearch(e.target.value)}
+                className="pl-7 pr-3 py-1 text-xs rounded border border-[#E0E0E0] bg-white focus:outline-none focus:border-[#185ABD] w-full"
               />
             </div>
-            <Input type="date" className="w-36" value={historyFrom} onChange={(e) => setHistoryFrom(e.target.value)} />
-            <Input type="date" className="w-36" value={historyTo}   onChange={(e) => setHistoryTo(e.target.value)} />
           </div>
+          <div className="flex-1 min-h-0">
+            <DataTable
+              columns={activeColumns}
+              rows={activeLoans}
+              rowKey={(r) => r.id}
+              onRowClick={(r) => setSelectedId(r.id === selectedId ? null : r.id)}
+              selectedKey={selectedId}
+              rowActions={activeActions}
+              loading={loadingActive}
+              emptyMessage="No active loans"
+              emptyAction={{ label: '+ New Loan', onClick: () => setNewLoanOpen(true) }}
+            />
+          </div>
+          <InlineDetailPanel
+            open={!!selectedId}
+            onClose={() => setSelectedId(null)}
+            title={
+              selectedLoan
+                ? `${selectedLoan.refNumber} · ${selectedLoan.customer.firstName} ${selectedLoan.customer.lastName}`
+                : 'Repayment History'
+            }
+            height={260}
+          >
+            {detailLoading || !selectedLoan ? (
+              <div className="flex items-center gap-2" style={{ color: '#6C757D', fontSize: 12 }}>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading…
+              </div>
+            ) : (
+              <div className="flex gap-6 h-full">
+                <div className="w-44 shrink-0 space-y-2">
+                  <div>
+                    <p className="uppercase tracking-wide font-semibold mb-0.5" style={{ fontSize: 10, color: '#6C757D' }}>Customer</p>
+                    <p style={{ fontSize: 12, fontWeight: 600, color: '#212529' }}>
+                      {selectedLoan.customer.firstName} {selectedLoan.customer.lastName}
+                    </p>
+                    <p className="font-mono" style={{ fontSize: 10, color: '#6C757D' }}>{selectedLoan.customer.idNumber}</p>
+                  </div>
+                  <div>
+                    <p className="uppercase tracking-wide font-semibold mb-0.5" style={{ fontSize: 10, color: '#6C757D' }}>Principal</p>
+                    <p className="font-mono" style={{ fontSize: 12, color: '#212529' }}>{format.currency(selectedLoan.principalAmount)}</p>
+                  </div>
+                  <div>
+                    <p className="uppercase tracking-wide font-semibold mb-0.5" style={{ fontSize: 10, color: '#6C757D' }}>Balance</p>
+                    <p className="font-mono font-semibold" style={{ fontSize: 12, color: new Decimal(selectedLoan.balanceAmount).gt(0) ? '#C9A020' : '#217346' }}>
+                      {format.currency(selectedLoan.balanceAmount)}
+                    </p>
+                  </div>
+                  {selectedLoan.notes && (
+                    <div>
+                      <p className="uppercase tracking-wide font-semibold mb-0.5" style={{ fontSize: 10, color: '#6C757D' }}>Notes</p>
+                      <p style={{ fontSize: 11, color: '#212529' }}>{selectedLoan.notes}</p>
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 overflow-auto">
+                  <p className="uppercase tracking-wide font-semibold mb-2" style={{ fontSize: 10, color: '#6C757D' }}>Repayment History</p>
+                  {!selectedLoan.repayments?.length ? (
+                    <p style={{ fontSize: 12, color: '#6C757D' }}>No repayments yet</p>
+                  ) : (
+                    <table className="w-full" style={{ fontSize: 12, borderCollapse: 'collapse' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid #E0E0E0' }}>
+                          {['Ref', 'Amount', 'Method', 'Date', 'Notes'].map((h) => (
+                            <th key={h} className="text-left pb-1" style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#6C757D' }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selectedLoan.repayments.map((r) => (
+                          <tr key={r.id} style={{ borderBottom: '1px solid #F1F3F4' }}>
+                            <td className="font-mono py-1" style={{ color: '#6C757D', paddingRight: 12 }}>{r.refNumber}</td>
+                            <td className="font-mono font-semibold py-1" style={{ color: '#217346', paddingRight: 12 }}>{format.currency(r.amount)}</td>
+                            <td className="capitalize py-1" style={{ color: '#6C757D', paddingRight: 12 }}>{r.paymentMethod}</td>
+                            <td className="py-1" style={{ color: '#6C757D', paddingRight: 12 }}>{new Date(r.createdAt).toLocaleDateString('en-ZA')}</td>
+                            <td className="py-1" style={{ color: '#6C757D' }}>{r.notes ?? '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </div>
+            )}
+          </InlineDetailPanel>
+        </>
+      )}
 
-          {loadingHistory && <p className="text-sm text-gray-400">Loading…</p>}
-
-          {!loadingHistory && historyLoans.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-16 text-gray-400 gap-2">
-              <HandCoins className="w-10 h-10 opacity-30" />
-              <p className="text-sm">No loan history found</p>
+      {/* History tab */}
+      {activeTab === 'history' && (
+        <>
+          <div className="flex gap-2 flex-wrap shrink-0">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3" style={{ color: '#6C757D' }} />
+              <input
+                value={histSearch}
+                onChange={(e) => setHistSearch(e.target.value)}
+                placeholder="Search by name, ID or ref…"
+                className="pl-7 pr-3 py-1 text-xs rounded border border-[#E0E0E0] bg-white focus:outline-none focus:border-[#185ABD] w-56"
+              />
             </div>
-          )}
-
-          {historyLoans.length > 0 && (
-            <div className="rounded-xl border overflow-hidden bg-white">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 border-b">
-                  <tr>
-                    <th className="px-4 py-3 text-left font-medium text-gray-600">Ref</th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-600">Customer</th>
-                    <th className="px-4 py-3 text-right font-medium text-gray-600">Principal</th>
-                    <th className="px-4 py-3 text-right font-medium text-gray-600">Balance</th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-600">Status</th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-600">Date</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {historyLoans.map((loan) => (
-                    <tr key={loan.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 font-mono text-xs text-gray-500">{loan.refNumber}</td>
-                      <td className="px-4 py-3 font-medium">
-                        {loan.customer.firstName} {loan.customer.lastName}
-                        <span className="ml-2 text-xs text-gray-400">{loan.customer.idNumber}</span>
-                      </td>
-                      <td className="px-4 py-3 text-right font-medium">{format.currency(loan.principalAmount)}</td>
-                      <td className="px-4 py-3 text-right">{format.currency(loan.balanceAmount)}</td>
-                      <td className="px-4 py-3">{statusBadge(loan.status)}</td>
-                      <td className="px-4 py-3 text-gray-500 text-xs">
-                        {new Date(loan.createdAt).toLocaleDateString('en-ZA')}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </TabsContent>
-      </Tabs>
+            <input
+              type="date"
+              value={histFrom}
+              onChange={(e) => setHistFrom(e.target.value)}
+              className="border border-[#E0E0E0] rounded px-2 py-1 text-xs bg-white focus:outline-none focus:border-[#185ABD]"
+            />
+            <input
+              type="date"
+              value={histTo}
+              onChange={(e) => setHistTo(e.target.value)}
+              className="border border-[#E0E0E0] rounded px-2 py-1 text-xs bg-white focus:outline-none focus:border-[#185ABD]"
+            />
+          </div>
+          <div className="flex-1 min-h-0">
+            <DataTable
+              columns={historyColumns}
+              rows={historyLoans}
+              rowKey={(r) => r.id}
+              loading={loadingHistory}
+              emptyMessage="No loan history found"
+            />
+          </div>
+        </>
+      )}
 
       {/* ── New Loan Dialog ── */}
-      <Dialog open={newLoanOpen} onOpenChange={setNewLoanOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>New Loan Advance</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 pt-2">
-            <div>
-              <Label className="mb-1 block">Customer</Label>
-              <CustomerLookupWidget
-                onSelect={(c) => setLoanCustomer(c)}
-                selectedCustomer={loanCustomer}
-              />
-              {loanCustomer?.blacklisted && (
-                <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
-                  <AlertCircle className="w-3 h-3" /> This customer is blacklisted
-                </p>
-              )}
-            </div>
-
-            <div>
-              <Label htmlFor="loanAmount">Advance Amount (R)</Label>
-              <Input
-                id="loanAmount"
-                placeholder="0.00"
-                value={loanAmount}
-                onChange={(e) => setLoanAmount(e.target.value)}
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="loanMethod">Payment Method</Label>
-              <Select value={loanMethod} onValueChange={(v) => setLoanMethod(v ?? 'cash')}>
-                <SelectTrigger id="loanMethod">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PAYMENT_METHODS.map((m) => (
-                    <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label htmlFor="loanNotes">Notes (optional)</Label>
-              <Textarea
-                id="loanNotes"
-                placeholder="Reason for advance…"
-                value={loanNotes}
-                onChange={(e) => setLoanNotes(e.target.value)}
-                rows={2}
-              />
-            </div>
-
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setNewLoanOpen(false)}>Cancel</Button>
-              <Button
-                onClick={handleCreateLoan}
-                disabled={loanSubmitting || !loanCustomer || !loanAmount}
-              >
-                {loanSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                Create Loan
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {newLoanOpen && (
+        <NewLoanDialog
+          onClose={() => setNewLoanOpen(false)}
+          onSuccess={() => { revalidate(); setNewLoanOpen(false) }}
+        />
+      )}
 
       {/* ── Repay Dialog ── */}
       {repayTarget && (
-        <Dialog open onOpenChange={() => setRepayTarget(null)}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Record Repayment</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 pt-2">
-              <div className="rounded-lg bg-gray-50 border p-3 text-sm space-y-1">
-                <p className="font-medium">{repayTarget.customer.firstName} {repayTarget.customer.lastName}</p>
-                <p className="text-gray-500">Ref: {repayTarget.refNumber}</p>
-                <p className="text-gray-500">
-                  Principal: {format.currency(repayTarget.principalAmount)} ·
-                  Balance: <span className="font-semibold text-orange-600">{format.currency(repayTarget.balanceAmount)}</span>
-                </p>
-              </div>
-
-              <div>
-                <Label htmlFor="repayAmount">Repayment Amount (R)</Label>
-                <Input
-                  id="repayAmount"
-                  placeholder="0.00"
-                  value={repayAmount}
-                  onChange={(e) => setRepayAmount(e.target.value)}
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="repayMethod">Payment Method</Label>
-                <Select value={repayMethod} onValueChange={(v) => setRepayMethod(v ?? 'cash')}>
-                  <SelectTrigger id="repayMethod"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {PAYMENT_METHODS.map((m) => (
-                      <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="repayNotes">Notes (optional)</Label>
-                <Textarea
-                  id="repayNotes"
-                  value={repayNotes}
-                  onChange={(e) => setRepayNotes(e.target.value)}
-                  rows={2}
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2">
-                <Button variant="outline" onClick={() => setRepayTarget(null)}>Cancel</Button>
-                <Button
-                  className="bg-green-600 hover:bg-green-700"
-                  onClick={handleRepay}
-                  disabled={repaySubmitting || !repayAmount}
-                >
-                  {repaySubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                  Record Repayment
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <RepayDialog
+          loan={repayTarget}
+          onClose={() => setRepayTarget(null)}
+          onSuccess={() => { revalidate(); setRepayTarget(null) }}
+        />
       )}
 
       {/* ── Void Dialog ── */}
       {voidTarget && (
-        <Dialog open onOpenChange={() => setVoidTarget(null)}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Void Loan</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 pt-2">
-              <div className="rounded-lg bg-red-50 border border-red-100 p-3 text-sm">
-                <p className="font-medium text-red-800">
-                  {voidTarget.customer.firstName} {voidTarget.customer.lastName} — {voidTarget.refNumber}
-                </p>
-                <p className="text-red-600 text-xs mt-1">
-                  This will void the loan of {format.currency(voidTarget.principalAmount)}.
-                  This action cannot be undone.
-                </p>
-              </div>
-
-              <div>
-                <Label htmlFor="voidReason">Reason for Void</Label>
-                <Textarea
-                  id="voidReason"
-                  placeholder="Enter a reason (min 5 characters)…"
-                  value={voidReason}
-                  onChange={(e) => setVoidReason(e.target.value)}
-                  rows={2}
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2">
-                <Button variant="outline" onClick={() => setVoidTarget(null)}>Cancel</Button>
-                <Button
-                  variant="destructive"
-                  onClick={handleVoid}
-                  disabled={voidSubmitting || voidReason.length < 5}
-                >
-                  {voidSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                  Void Loan
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <VoidLoanDialog
+          loan={voidTarget}
+          onClose={() => setVoidTarget(null)}
+          onSuccess={() => { revalidate(); setVoidTarget(null) }}
+        />
       )}
     </div>
+  )
+}
+
+// ─── New Loan Dialog ──────────────────────────────────────────────────────────
+function NewLoanDialog({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
+  const [customer,  setCustomer]  = useState<SelectedCustomer | null>(null)
+  const [amount,    setAmount]    = useState('')
+  const [method,    setMethod]    = useState('cash')
+  const [notes,     setNotes]     = useState('')
+  const [loading,   setLoading]   = useState(false)
+
+  async function onSubmit() {
+    if (!customer || !amount) return
+    setLoading(true)
+    const res = await fetch('/api/loans', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ customerId: customer.id, principalAmount: amount, paymentMethod: method, notes: notes || undefined }),
+    })
+    setLoading(false)
+    if (res.ok) { toast.success('Loan advance created'); onSuccess() }
+    else {
+      const j = await res.json() as { error?: string | { formErrors?: string[] } }
+      const msg = typeof j.error === 'string' ? j.error : (j.error as { formErrors?: string[] })?.formErrors?.[0] ?? 'Failed'
+      toast.error(msg)
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader><DialogTitle>New Loan Advance</DialogTitle></DialogHeader>
+        <div className="space-y-4 pt-2">
+          <div>
+            <Label className="mb-1 block">Customer</Label>
+            <CustomerLookupWidget onSelect={(c) => setCustomer(c)} selectedCustomer={customer} />
+            {customer?.blacklisted && (
+              <p className="text-xs mt-1 flex items-center gap-1" style={{ color: '#C0392B' }}>
+                <AlertCircle className="w-3 h-3" /> This customer is blacklisted
+              </p>
+            )}
+          </div>
+          <div>
+            <Label>Advance Amount (R)</Label>
+            <Input placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} className="mt-1" />
+          </div>
+          <div>
+            <Label>Payment Method</Label>
+            <Select value={method} onValueChange={(v) => setMethod(v ?? 'cash')}>
+              <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {PAYMENT_METHODS.map((m) => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label>Notes <span className="font-normal" style={{ color: '#6C757D' }}>(optional)</span></Label>
+            <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="mt-1" />
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
+            <Button style={{ background: '#217346' }} className="hover:opacity-90" onClick={onSubmit} disabled={loading || !customer || !amount}>
+              {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Creating…</> : 'Create Loan'}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ─── Repay Dialog ─────────────────────────────────────────────────────────────
+function RepayDialog({ loan, onClose, onSuccess }: { loan: Loan; onClose: () => void; onSuccess: () => void }) {
+  const [amount,  setAmount]  = useState(loan.balanceAmount.toString())
+  const [method,  setMethod]  = useState('cash')
+  const [notes,   setNotes]   = useState('')
+  const [loading, setLoading] = useState(false)
+
+  async function onSubmit() {
+    if (!amount) return
+    setLoading(true)
+    const res = await fetch(`/api/loans/${loan.id}/repay`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ amount, paymentMethod: method, notes: notes || undefined }),
+    })
+    setLoading(false)
+    if (res.ok) { toast.success('Repayment recorded'); onSuccess() }
+    else { const j = await res.json() as { error?: string }; toast.error(j.error ?? 'Failed') }
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
+      <DialogContent className="max-w-md">
+        <DialogHeader><DialogTitle>Record Repayment</DialogTitle></DialogHeader>
+        <div className="space-y-4 pt-2">
+          <div className="rounded-lg p-3 text-sm space-y-1" style={{ background: '#F8F9FA', border: '1px solid #E0E0E0' }}>
+            <p className="font-medium" style={{ color: '#212529' }}>{loan.customer.firstName} {loan.customer.lastName}</p>
+            <p style={{ color: '#6C757D' }}>Ref: {loan.refNumber}</p>
+            <p style={{ color: '#6C757D' }}>
+              Principal: {format.currency(loan.principalAmount)} ·{' '}
+              Balance: <span className="font-semibold" style={{ color: '#C9A020' }}>{format.currency(loan.balanceAmount)}</span>
+            </p>
+          </div>
+          <div>
+            <Label>Repayment Amount (R)</Label>
+            <Input placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} className="mt-1" />
+          </div>
+          <div>
+            <Label>Payment Method</Label>
+            <Select value={method} onValueChange={(v) => setMethod(v ?? 'cash')}>
+              <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {PAYMENT_METHODS.map((m) => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label>Notes <span className="font-normal" style={{ color: '#6C757D' }}>(optional)</span></Label>
+            <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="mt-1" />
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
+            <Button style={{ background: '#217346' }} className="hover:opacity-90" onClick={onSubmit} disabled={loading || !amount}>
+              {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving…</> : 'Record Repayment'}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ─── Void Loan Dialog ─────────────────────────────────────────────────────────
+function VoidLoanDialog({ loan, onClose, onSuccess }: { loan: Loan; onClose: () => void; onSuccess: () => void }) {
+  const [reason,  setReason]  = useState('')
+  const [loading, setLoading] = useState(false)
+
+  async function onSubmit() {
+    if (reason.length < 5) return
+    setLoading(true)
+    const res = await fetch(`/api/loans/${loan.id}/void`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ reason }),
+    })
+    setLoading(false)
+    if (res.ok) { toast.success('Loan voided'); onSuccess() }
+    else { const j = await res.json() as { error?: string }; toast.error(j.error ?? 'Failed') }
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
+      <DialogContent className="max-w-md">
+        <DialogHeader><DialogTitle style={{ color: '#C0392B' }}>Void Loan</DialogTitle></DialogHeader>
+        <div className="space-y-4 pt-2">
+          <div className="rounded-lg p-3 text-sm" style={{ background: '#FEF2F2', border: '1px solid #C0392B30' }}>
+            <p className="font-medium" style={{ color: '#C0392B' }}>
+              {loan.customer.firstName} {loan.customer.lastName} — {loan.refNumber}
+            </p>
+            <p className="text-xs mt-1" style={{ color: '#C0392B' }}>
+              This will void the loan of {format.currency(loan.principalAmount)}. Cannot be undone.
+            </p>
+          </div>
+          <div>
+            <Label>Reason for Void</Label>
+            <Textarea
+              placeholder="Enter a reason (min 5 characters)…"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              rows={2}
+              className="mt-1"
+            />
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
+            <Button variant="destructive" onClick={onSubmit} disabled={loading || reason.length < 5}>
+              {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Voiding…</> : 'Void Loan'}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }

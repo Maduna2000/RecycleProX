@@ -2,18 +2,17 @@
 
 import { useState } from 'react'
 import useSWR, { mutate } from 'swr'
-import { Badge } from '@/components/ui/badge'
+import { useSession } from 'next-auth/react'
+import { SlidersHorizontal, Loader2, TrendingUp, TrendingDown, Minus, AlertTriangle, Download } from 'lucide-react'
+import { toast } from 'sonner'
+import Decimal from 'decimal.js'
+import { DataTable, type Column } from '@/components/ui/DataTable'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { SlidersHorizontal, Loader2, TrendingUp, TrendingDown, Minus, AlertTriangle, Download, Grid3X3 } from 'lucide-react'
-import { toast } from 'sonner'
-import { useSession } from 'next-auth/react'
 import { format } from '@/lib/utils/format'
-import Decimal from 'decimal.js'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -29,13 +28,8 @@ type GridRow = {
 }
 
 type Movement = {
-  id: string
-  direction: 'in' | 'out'
-  quantity: string
-  source: string
-  sourceId?: string
-  notes?: string
-  createdAt: string
+  id: string; direction: 'in' | 'out'; quantity: string; source: string
+  sourceId?: string; notes?: string; createdAt: string
   product: { id: string; code: string; name: string; unit: string; category: string }
 }
 
@@ -43,32 +37,53 @@ const CATEGORY_LABELS: Record<string, string> = {
   ferrous: 'Ferrous', non_ferrous: 'Non-Ferrous', copper: 'Copper',
   aluminium: 'Aluminium', plastic: 'Plastic', paper: 'Paper', e_waste: 'E-Waste', other: 'Other',
 }
-
 const SOURCE_LABELS: Record<string, string> = {
   purchase: 'Purchase', sale: 'Sale',
   manual_adjustment: 'Manual Adj.', void_reversal: 'Void Reversal',
 }
 
+type PageTab = 'onhand' | 'movements' | 'grid'
+
 export default function StockPage() {
   const { data: session } = useSession()
-  const [adjustOpen, setAdjustOpen] = useState(false)
-  const [categoryFilter, setCategoryFilter] = useState('')
-  const [showZero, setShowZero] = useState(true)
-
-  // Stock Grid state
-  const today = new Date().toISOString().slice(0, 10)
-  const [gridPeriod, setGridPeriod]     = useState<'daily' | 'weekly' | 'mtd'>('mtd')
-  const [gridDate, setGridDate]         = useState(today)
-  const [gridCategory, setGridCategory] = useState('')
-  const [exporting, setExporting]       = useState(false)
-
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
 
-  const { data: stockData } = useSWR<{ stock: StockEntry[] }>('/api/stock/on-hand', fetcher)
-  const { data: movementsData } = useSWR<{ movements: Movement[]; total: number }>('/api/stock/movements?pageSize=200', fetcher)
+  const [activeTab,      setActiveTab]      = useState<PageTab>('onhand')
+  const [adjustOpen,     setAdjustOpen]     = useState(false)
+  const [categoryFilter, setCategoryFilter] = useState('')
+  const [showZero,       setShowZero]       = useState(true)
 
+  const today = new Date().toISOString().slice(0, 10)
+  const [gridPeriod,   setGridPeriod]   = useState<'daily' | 'weekly' | 'mtd'>('mtd')
+  const [gridDate,     setGridDate]     = useState(today)
+  const [gridCategory, setGridCategory] = useState('')
+  const [exporting,    setExporting]    = useState(false)
+
+  const { data: stockData } = useSWR<{ stock: StockEntry[] }>('/api/stock/on-hand', fetcher)
+  const { data: movementsData, isLoading: movLoading } = useSWR<{ movements: Movement[]; total: number }>(
+    '/api/stock/movements?pageSize=200',
+    fetcher,
+  )
   const gridKey = `/api/stock/grid?period=${gridPeriod}&date=${gridDate}${gridCategory ? `&category=${gridCategory}` : ''}`
-  const { data: gridData, isLoading: gridLoading } = useSWR<{ grid: GridRow[] }>(gridKey, fetcher)
+  const { data: gridData, isLoading: gridLoading } = useSWR<{ grid: GridRow[] }>(
+    activeTab === 'grid' ? gridKey : null,
+    fetcher,
+  )
+
+  const allStock = stockData?.stock ?? []
+  const stock = allStock.filter((s) => {
+    if (!showZero && parseFloat(s.onHand) === 0 && !s.hasMovements) return false
+    if (categoryFilter && s.product.category !== categoryFilter) return false
+    return true
+  })
+  const movements = movementsData?.movements ?? []
+
+  const totalProducts = stock.filter((s) => parseFloat(s.onHand) > 0).length
+  const lowStock      = stock.filter((s) => parseFloat(s.onHand) < 0).length
+  const reorderCount  = stock.filter((s) => {
+    const min = s.product.minStockLevel ? parseFloat(s.product.minStockLevel) : null
+    return min !== null && parseFloat(s.onHand) < min
+  }).length
 
   async function handleExport() {
     setExporting(true)
@@ -77,61 +92,275 @@ export default function StockPage() {
     setExporting(false)
     if (!res.ok) { toast.error('Export failed'); return }
     const blob = await res.blob()
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
+    const url  = URL.createObjectURL(blob)
+    const a    = document.createElement('a')
+    a.href     = url
     a.download = `stock-grid-${gridPeriod}-${gridDate}.xlsx`
     a.click()
     URL.revokeObjectURL(url)
   }
 
-  const allStock = stockData?.stock ?? []
-  const stock = allStock.filter((s) => {
-    if (!showZero && parseFloat(s.onHand) === 0 && !s.hasMovements) return false
-    if (categoryFilter && s.product.category !== categoryFilter) return false
-    return true
-  })
+  // ── On-Hand columns ─────────────────────────────────────────────────────────
+  const onHandColumns: Column<StockEntry>[] = [
+    {
+      key: 'product',
+      header: 'Product',
+      render: (r) => {
+        const minLevel    = r.product.minStockLevel ? parseFloat(r.product.minStockLevel) : null
+        const belowReorder = minLevel !== null && parseFloat(r.onHand) < minLevel
+        return (
+          <div className="flex items-center gap-2">
+            <div>
+              <p style={{ fontSize: 12, fontWeight: 500, color: '#212529' }}>{r.product.name}</p>
+              <p className="font-mono" style={{ fontSize: 10, color: '#6C757D' }}>{r.product.code}</p>
+            </div>
+            {belowReorder && (
+              <AlertTriangle
+                className="w-3.5 h-3.5 shrink-0"
+                style={{ color: '#C9A020' }}
+                title={`Below reorder level (min: ${minLevel?.toFixed(3)} ${r.product.unit})`}
+              />
+            )}
+          </div>
+        )
+      },
+    },
+    {
+      key: 'category',
+      header: 'Category',
+      width: '120px',
+      render: (r) => (
+        <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: '#F1F3F4', color: '#6C757D' }}>
+          {CATEGORY_LABELS[r.product.category] ?? r.product.category}
+        </span>
+      ),
+    },
+    {
+      key: 'totalIn',
+      header: 'Total In',
+      width: '110px',
+      render: (r) => (
+        <span className="font-mono text-xs" style={{ color: '#217346' }}>
+          {Number(r.totalIn).toFixed(3)} {r.product.unit}
+        </span>
+      ),
+    },
+    {
+      key: 'totalOut',
+      header: 'Total Out',
+      width: '110px',
+      render: (r) => (
+        <span className="font-mono text-xs" style={{ color: '#C0392B' }}>
+          {Number(r.totalOut).toFixed(3)} {r.product.unit}
+        </span>
+      ),
+    },
+    {
+      key: 'onHand',
+      header: 'On Hand',
+      width: '120px',
+      render: (r) => {
+        const qty = parseFloat(r.onHand)
+        return (
+          <div className="flex items-center gap-1.5">
+            {qty > 0
+              ? <TrendingUp  className="w-3.5 h-3.5" style={{ color: '#217346' }} />
+              : qty < 0
+              ? <TrendingDown className="w-3.5 h-3.5" style={{ color: '#C0392B' }} />
+              : <Minus className="w-3.5 h-3.5" style={{ color: '#CCC' }} />}
+            <span
+              className="font-mono font-semibold text-xs"
+              style={{ color: qty > 0 ? '#212529' : qty < 0 ? '#C0392B' : '#6C757D' }}
+            >
+              {Number(r.onHand).toFixed(3)} {r.product.unit}
+            </span>
+          </div>
+        )
+      },
+    },
+  ]
 
-  const movements = movementsData?.movements ?? []
+  // ── Movements columns ────────────────────────────────────────────────────────
+  const movementColumns: Column<Movement>[] = [
+    {
+      key: 'product',
+      header: 'Product',
+      render: (r) => (
+        <div>
+          <p style={{ fontSize: 12, fontWeight: 500, color: '#212529' }}>{r.product.name}</p>
+          <p className="font-mono" style={{ fontSize: 10, color: '#6C757D' }}>{r.product.code}</p>
+        </div>
+      ),
+    },
+    {
+      key: 'direction',
+      header: 'Dir',
+      width: '60px',
+      render: (r) => (
+        <span
+          className="px-2 py-0.5 rounded text-xs font-bold"
+          style={
+            r.direction === 'in'
+              ? { background: '#F0FBF4', color: '#217346' }
+              : { background: '#FEF2F2', color: '#C0392B' }
+          }
+        >
+          {r.direction.toUpperCase()}
+        </span>
+      ),
+    },
+    {
+      key: 'quantity',
+      header: 'Quantity',
+      width: '110px',
+      render: (r) => (
+        <span className="font-mono text-xs" style={{ color: '#212529' }}>
+          {Number(r.quantity).toFixed(3)} {r.product.unit}
+        </span>
+      ),
+    },
+    {
+      key: 'source',
+      header: 'Source',
+      width: '120px',
+      render: (r) => (
+        <span className="px-2 py-0.5 rounded border text-xs" style={{ borderColor: '#E0E0E0', color: '#6C757D' }}>
+          {SOURCE_LABELS[r.source] ?? r.source}
+        </span>
+      ),
+    },
+    {
+      key: 'notes',
+      header: 'Notes',
+      render: (r) => (
+        <span className="truncate block max-w-[180px] text-xs" style={{ color: '#6C757D' }}>{r.notes ?? '—'}</span>
+      ),
+    },
+    {
+      key: 'createdAt',
+      header: 'Date',
+      width: '140px',
+      render: (r) => <span style={{ fontSize: 11, color: '#6C757D' }}>{format.datetime(r.createdAt)}</span>,
+    },
+  ]
 
-  // Totals
-  const totalProducts = stock.filter((s) => parseFloat(s.onHand) > 0).length
-  const lowStock = stock.filter((s) => parseFloat(s.onHand) < 0).length
-  const reorderCount = stock.filter((s) => {
-    const min = s.product.minStockLevel ? parseFloat(s.product.minStockLevel) : null
-    return min !== null && parseFloat(s.onHand) < min
-  }).length
+  // ── Stock Grid columns ───────────────────────────────────────────────────────
+  const gridColumns: Column<GridRow>[] = [
+    {
+      key: 'name',
+      header: 'Product',
+      render: (r) => (
+        <div>
+          <p style={{ fontSize: 12, fontWeight: 500, color: '#212529' }}>{r.name}</p>
+          <p className="font-mono" style={{ fontSize: 10, color: '#6C757D' }}>{r.code}</p>
+        </div>
+      ),
+    },
+    {
+      key: 'category',
+      header: 'Cat',
+      width: '100px',
+      render: (r) => <span style={{ fontSize: 11, color: '#6C757D' }}>{CATEGORY_LABELS[r.category] ?? r.category}</span>,
+    },
+    {
+      key: 'unit',
+      header: 'Unit',
+      width: '56px',
+      render: (r) => <span style={{ fontSize: 11, color: '#6C757D' }}>{r.unit}</span>,
+    },
+    {
+      key: 'openingQty',
+      header: 'Opening',
+      width: '88px',
+      render: (r) => <span className="font-mono text-xs" style={{ color: '#6C757D' }}>{r.openingQty}</span>,
+    },
+    {
+      key: 'purchasedQty',
+      header: 'Purchased',
+      width: '90px',
+      render: (r) => <span className="font-mono text-xs" style={{ color: '#217346' }}>{r.purchasedQty}</span>,
+    },
+    {
+      key: 'soldQty',
+      header: 'Sold',
+      width: '80px',
+      render: (r) => <span className="font-mono text-xs" style={{ color: '#C0392B' }}>{r.soldQty}</span>,
+    },
+    {
+      key: 'adjustedQty',
+      header: 'Adjusted',
+      width: '84px',
+      render: (r) => <span className="font-mono text-xs" style={{ color: '#185ABD' }}>{r.adjustedQty}</span>,
+    },
+    {
+      key: 'closingQty',
+      header: 'Closing',
+      width: '84px',
+      render: (r) => {
+        const isNeg = new Decimal(r.closingQty).isNegative()
+        return (
+          <span className="font-mono text-xs font-semibold" style={{ color: isNeg ? '#C0392B' : '#212529' }}>
+            {r.closingQty}
+          </span>
+        )
+      },
+    },
+    {
+      key: 'closingValue',
+      header: 'Value (R)',
+      width: '96px',
+      render: (r) => <span className="font-mono text-xs" style={{ color: '#212529' }}>R {r.closingValue}</span>,
+    },
+  ]
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
+    <div className="flex flex-col flex-1 min-h-0 gap-3">
+
+      {/* Page header */}
+      <div className="flex items-center justify-between shrink-0">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Stock</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
+          <h1 className="text-xl font-bold" style={{ color: '#212529' }}>Stock</h1>
+          <p className="text-sm mt-0.5" style={{ color: '#6C757D' }}>
             {totalProducts} products in stock
-            {lowStock > 0 && <span className="text-red-500 ml-2">· {lowStock} negative balance</span>}
-            {reorderCount > 0 && <span className="text-orange-500 ml-2">· {reorderCount} below reorder level</span>}
+            {lowStock > 0 && <span style={{ color: '#C0392B' }}> · {lowStock} negative</span>}
+            {reorderCount > 0 && <span style={{ color: '#C9A020' }}> · {reorderCount} below reorder</span>}
           </p>
         </div>
         {isManager && (
-          <Button variant="outline" onClick={() => setAdjustOpen(true)}>
-            <SlidersHorizontal className="w-4 h-4 mr-2" /> Manual Adjustment
-          </Button>
+          <button
+            onClick={() => setAdjustOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium border border-[#E0E0E0] bg-white"
+            style={{ color: '#212529' }}
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5" /> Manual Adjustment
+          </button>
         )}
       </div>
 
-      <Tabs defaultValue="onhand">
-        <TabsList className="mb-4">
-          <TabsTrigger value="onhand">Stock On Hand</TabsTrigger>
-          <TabsTrigger value="movements">Movement History</TabsTrigger>
-          <TabsTrigger value="grid"><Grid3X3 className="w-3.5 h-3.5 mr-1.5 inline" />Stock Grid</TabsTrigger>
-        </TabsList>
+      {/* Tab bar */}
+      <div className="flex items-center border-b border-[#E0E0E0] shrink-0">
+        {([['onhand', 'Stock On Hand'], ['movements', 'Movement History'], ['grid', 'Stock Grid']] as const).map(([id, label]) => (
+          <button
+            key={id}
+            onClick={() => setActiveTab(id)}
+            className="px-4 py-2 text-xs font-medium border-b-2 transition-colors"
+            style={{
+              borderColor: activeTab === id ? '#185ABD' : 'transparent',
+              color:       activeTab === id ? '#185ABD' : '#6C757D',
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
 
-        {/* ── On-Hand Tab ── */}
-        <TabsContent value="onhand">
-          <div className="flex gap-3 mb-4">
+      {/* On Hand tab */}
+      {activeTab === 'onhand' && (
+        <>
+          <div className="flex gap-2 items-center shrink-0">
             <select
-              className="border rounded-md px-3 py-2 text-sm bg-white"
+              className="border border-[#E0E0E0] rounded px-2 py-1 text-xs bg-white focus:outline-none"
+              style={{ color: '#212529' }}
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
             >
@@ -140,7 +369,7 @@ export default function StockPage() {
                 <option key={v} value={v}>{l}</option>
               ))}
             </select>
-            <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+            <label className="flex items-center gap-1.5 text-xs cursor-pointer" style={{ color: '#6C757D' }}>
               <input
                 type="checkbox"
                 checked={showZero}
@@ -150,118 +379,41 @@ export default function StockPage() {
               Show zero stock
             </label>
           </div>
-
-          <div className="bg-white rounded-xl border overflow-hidden">
-            {stock.length === 0 ? (
-              <div className="p-10 text-center text-gray-400">No stock data — complete some purchases first</div>
-            ) : (
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 border-b">
-                  <tr>
-                    {['Product', 'Category', 'Total In', 'Total Out', 'On Hand', ''].map((h) => (
-                      <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {stock.map(({ product: p, totalIn, totalOut, onHand }) => {
-                    const qty = parseFloat(onHand)
-                    const minLevel = p.minStockLevel ? parseFloat(p.minStockLevel) : null
-                    const belowReorder = minLevel !== null && qty < minLevel
-                    return (
-                      <tr key={p.id} className={qty < 0 ? 'bg-red-50' : belowReorder ? 'bg-orange-50' : qty === 0 ? 'opacity-60' : ''}>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <div>
-                              <p className="font-medium text-gray-900">{p.name}</p>
-                              <p className="text-xs text-gray-400 font-mono">{p.code}</p>
-                            </div>
-                            {belowReorder && (
-                              <span title={`Below reorder level (min: ${minLevel?.toFixed(3)} ${p.unit})`}>
-                                <AlertTriangle className="w-4 h-4 text-orange-500 shrink-0" />
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <Badge variant="secondary" className="text-xs">{CATEGORY_LABELS[p.category] ?? p.category}</Badge>
-                        </td>
-                        <td className="px-4 py-3 font-mono text-green-700">
-                          {Number(totalIn).toFixed(3)} {p.unit}
-                        </td>
-                        <td className="px-4 py-3 font-mono text-red-600">
-                          {Number(totalOut).toFixed(3)} {p.unit}
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className={`font-mono font-semibold ${qty > 0 ? 'text-gray-900' : qty < 0 ? 'text-red-600' : 'text-gray-400'}`}>
-                            {Number(onHand).toFixed(3)} {p.unit}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          {qty > 0
-                            ? <TrendingUp className="w-4 h-4 text-green-500" />
-                            : qty < 0
-                            ? <TrendingDown className="w-4 h-4 text-red-500" />
-                            : <Minus className="w-4 h-4 text-gray-300" />}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            )}
+          <div className="flex-1 min-h-0">
+            <DataTable
+              columns={onHandColumns}
+              rows={stock}
+              rowKey={(r) => r.product.id}
+              loading={!stockData}
+              emptyMessage="No stock data — complete some purchases first"
+            />
           </div>
-        </TabsContent>
+        </>
+      )}
 
-        {/* ── Movements Tab ── */}
-        <TabsContent value="movements">
-          <div className="bg-white rounded-xl border overflow-hidden">
-            {movements.length === 0 ? (
-              <div className="p-10 text-center text-gray-400">No movements recorded yet</div>
-            ) : (
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 border-b">
-                  <tr>
-                    {['Product', 'Direction', 'Quantity', 'Source', 'Notes', 'Date'].map((h) => (
-                      <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {movements.map((m) => (
-                    <tr key={m.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3">
-                        <p className="font-medium text-gray-900">{m.product.name}</p>
-                        <p className="text-xs text-gray-400 font-mono">{m.product.code}</p>
-                      </td>
-                      <td className="px-4 py-3">
-                        {m.direction === 'in'
-                          ? <Badge className="bg-green-100 text-green-700 hover:bg-green-100">IN</Badge>
-                          : <Badge className="bg-red-100 text-red-700 hover:bg-red-100">OUT</Badge>}
-                      </td>
-                      <td className="px-4 py-3 font-mono text-gray-700">
-                        {Number(m.quantity).toFixed(3)} {m.product.unit}
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge variant="outline" className="text-xs">{SOURCE_LABELS[m.source] ?? m.source}</Badge>
-                      </td>
-                      <td className="px-4 py-3 text-gray-500 text-xs max-w-[200px] truncate">{m.notes ?? '—'}</td>
-                      <td className="px-4 py-3 text-gray-500 text-xs">{format.datetime(m.createdAt)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </TabsContent>
-        {/* ── Stock Grid Tab ── */}
-        <TabsContent value="grid">
-          {/* Filters */}
-          <div className="flex flex-wrap gap-3 mb-4 items-end">
+      {/* Movements tab */}
+      {activeTab === 'movements' && (
+        <div className="flex-1 min-h-0">
+          <DataTable
+            columns={movementColumns}
+            rows={movements}
+            rowKey={(r) => r.id}
+            loading={movLoading}
+            emptyMessage="No movements recorded yet"
+            total={movementsData?.total}
+            pageSize={200}
+          />
+        </div>
+      )}
+
+      {/* Stock Grid tab */}
+      {activeTab === 'grid' && (
+        <>
+          <div className="flex flex-wrap gap-3 items-end shrink-0">
             <div>
-              <Label className="text-xs mb-1 block">Period</Label>
+              <p className="text-xs font-medium mb-1" style={{ color: '#6C757D' }}>Period</p>
               <Select value={gridPeriod} onValueChange={(v) => setGridPeriod(v as 'daily' | 'weekly' | 'mtd')}>
-                <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="w-36 h-8 text-xs"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="daily">Daily</SelectItem>
                   <SelectItem value="weekly">Weekly</SelectItem>
@@ -270,13 +422,14 @@ export default function StockPage() {
               </Select>
             </div>
             <div>
-              <Label className="text-xs mb-1 block">Date</Label>
-              <Input type="date" value={gridDate} max={today} onChange={(e) => setGridDate(e.target.value)} className="w-40" />
+              <p className="text-xs font-medium mb-1" style={{ color: '#6C757D' }}>Date</p>
+              <Input type="date" value={gridDate} max={today} onChange={(e) => setGridDate(e.target.value)} className="w-40 h-8 text-xs" />
             </div>
             <div>
-              <Label className="text-xs mb-1 block">Category</Label>
+              <p className="text-xs font-medium mb-1" style={{ color: '#6C757D' }}>Category</p>
               <select
-                className="border rounded-md px-3 py-2 text-sm bg-white h-10"
+                className="border border-[#E0E0E0] rounded px-2 h-8 text-xs bg-white focus:outline-none"
+                style={{ color: '#212529' }}
                 value={gridCategory}
                 onChange={(e) => setGridCategory(e.target.value)}
               >
@@ -286,65 +439,34 @@ export default function StockPage() {
                 ))}
               </select>
             </div>
-            <Button variant="outline" onClick={handleExport} disabled={exporting} className="ml-auto">
-              {exporting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Exporting...</> : <><Download className="w-4 h-4 mr-2" />Export Excel</>}
-            </Button>
+            <button
+              onClick={handleExport}
+              disabled={exporting}
+              className="ml-auto flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium border border-[#E0E0E0] bg-white disabled:opacity-50"
+              style={{ color: '#212529' }}
+            >
+              {exporting
+                ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Exporting…</>
+                : <><Download className="w-3.5 h-3.5" /> Export Excel</>}
+            </button>
           </div>
 
-          <div className="bg-white rounded-xl border overflow-hidden overflow-x-auto">
+          <div className="flex-1 min-h-0">
             {gridLoading ? (
-              <div className="flex items-center justify-center p-10 text-gray-400">
-                <Loader2 className="w-5 h-5 animate-spin mr-2" /> Building grid...
+              <div className="flex items-center justify-center h-32 gap-2" style={{ color: '#6C757D' }}>
+                <Loader2 className="w-4 h-4 animate-spin" /> Building grid…
               </div>
-            ) : !gridData?.grid?.length ? (
-              <div className="text-center p-10 text-gray-400">No data for selected period</div>
             ) : (
-              <table className="w-full text-sm whitespace-nowrap">
-                <thead className="bg-gray-50 border-b">
-                  <tr>
-                    {['Product', 'Cat', 'Unit', 'Opening', 'Purchased', 'Sold', 'Adjusted', 'Closing', 'Value (R)'].map((h) => (
-                      <th key={h} className="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {gridData.grid.map((row) => {
-                    const closingNum = new Decimal(row.closingQty)
-                    return (
-                      <tr key={row.productId} className={closingNum.isNegative() ? 'bg-red-50' : closingNum.isZero() ? 'opacity-60' : ''}>
-                        <td className="px-3 py-2">
-                          <p className="font-medium text-gray-900">{row.name}</p>
-                          <p className="text-xs text-gray-400 font-mono">{row.code}</p>
-                        </td>
-                        <td className="px-3 py-2 text-xs text-gray-500">{CATEGORY_LABELS[row.category] ?? row.category}</td>
-                        <td className="px-3 py-2 text-xs text-gray-500">{row.unit}</td>
-                        <td className="px-3 py-2 font-mono text-xs">{row.openingQty}</td>
-                        <td className="px-3 py-2 font-mono text-xs text-green-700">{row.purchasedQty}</td>
-                        <td className="px-3 py-2 font-mono text-xs text-red-600">{row.soldQty}</td>
-                        <td className="px-3 py-2 font-mono text-xs text-blue-600">{row.adjustedQty}</td>
-                        <td className={`px-3 py-2 font-mono text-xs font-semibold ${closingNum.isNegative() ? 'text-red-600' : 'text-gray-900'}`}>
-                          {row.closingQty}
-                        </td>
-                        <td className="px-3 py-2 font-mono text-xs text-gray-700">R {row.closingValue}</td>
-                      </tr>
-                    )
-                  })}
-                  {/* Totals row */}
-                  {(() => {
-                    const total = gridData.grid.reduce((acc, r) => acc.plus(new Decimal(r.closingValue)), new Decimal(0))
-                    return (
-                      <tr className="bg-gray-50 font-semibold">
-                        <td colSpan={8} className="px-3 py-2 text-right text-xs text-gray-600">Total Closing Value</td>
-                        <td className="px-3 py-2 font-mono text-xs text-gray-900">R {total.toFixed(2)}</td>
-                      </tr>
-                    )
-                  })()}
-                </tbody>
-              </table>
+              <DataTable
+                columns={gridColumns}
+                rows={gridData?.grid ?? []}
+                rowKey={(r) => r.productId}
+                emptyMessage="No data for selected period"
+              />
             )}
           </div>
-        </TabsContent>
-      </Tabs>
+        </>
+      )}
 
       {adjustOpen && (
         <AdjustmentModal
@@ -367,34 +489,33 @@ function AdjustmentModal({
   onClose,
   onSuccess,
 }: {
-  products: StockEntry['product'][]
-  onClose: () => void
+  products:  StockEntry['product'][]
+  onClose:   () => void
   onSuccess: () => void
 }) {
-  const [productId, setProductId] = useState('')
-  const [direction, setDirection] = useState<'in' | 'out'>('in')
-  const [quantity, setQuantity] = useState('')
-  const [notes, setNotes] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [productId,  setProductId]  = useState('')
+  const [direction,  setDirection]  = useState<'in' | 'out'>('in')
+  const [quantity,   setQuantity]   = useState('')
+  const [notes,      setNotes]      = useState('')
+  const [loading,    setLoading]    = useState(false)
+
+  const selectedProduct = products.find((p) => p.id === productId)
 
   async function onSubmit() {
-    if (!productId) { toast.error('Select a product'); return }
+    if (!productId)                    { toast.error('Select a product'); return }
     if (!quantity || parseFloat(quantity) <= 0) { toast.error('Enter a valid quantity'); return }
-    if (notes.trim().length < 3) { toast.error('Notes required (min 3 characters)'); return }
+    if (notes.trim().length < 3)       { toast.error('Notes required (min 3 characters)'); return }
 
     setLoading(true)
     const res = await fetch('/api/stock/adjust', {
-      method: 'POST',
+      method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ productId, direction, quantity, notes }),
+      body:    JSON.stringify({ productId, direction, quantity, notes }),
     })
     setLoading(false)
-
     if (res.ok) { toast.success('Stock adjustment recorded'); onSuccess() }
     else { const j = await res.json(); toast.error(j.error ?? 'Failed to record adjustment') }
   }
-
-  const selectedProduct = products.find((p) => p.id === productId)
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
@@ -404,11 +525,11 @@ function AdjustmentModal({
           <div>
             <Label>Product</Label>
             <select
-              className="mt-1 w-full border rounded-md px-3 py-2 text-sm bg-white"
+              className="mt-1 w-full border border-[#E0E0E0] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:border-[#185ABD]"
               value={productId}
               onChange={(e) => setProductId(e.target.value)}
             >
-              <option value="">Select product...</option>
+              <option value="">Select product…</option>
               {products.map((p) => (
                 <option key={p.id} value={p.id}>{p.name} ({p.code})</option>
               ))}
@@ -427,7 +548,12 @@ function AdjustmentModal({
               </Select>
             </div>
             <div>
-              <Label>Quantity {selectedProduct && <span className="text-gray-400 font-normal">({selectedProduct.unit})</span>}</Label>
+              <Label>
+                Quantity{' '}
+                {selectedProduct && (
+                  <span className="font-normal" style={{ color: '#6C757D' }}>({selectedProduct.unit})</span>
+                )}
+              </Label>
               <Input
                 value={quantity}
                 onChange={(e) => setQuantity(e.target.value)}
@@ -451,8 +577,8 @@ function AdjustmentModal({
 
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
-            <Button className="bg-green-600 hover:bg-green-700" onClick={onSubmit} disabled={loading}>
-              {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving...</> : 'Record Adjustment'}
+            <Button style={{ background: '#217346' }} className="hover:opacity-90" onClick={onSubmit} disabled={loading}>
+              {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving…</> : 'Record Adjustment'}
             </Button>
           </div>
         </div>

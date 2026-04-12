@@ -3,18 +3,18 @@
 import { useState } from 'react'
 import Decimal from 'decimal.js'
 import useSWR, { mutate } from 'swr'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { useSession } from 'next-auth/react'
+import { Plus, CheckCircle, Trash2, Loader2, Receipt } from 'lucide-react'
+import { toast } from 'sonner'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { CreateExpenseSchema, type CreateExpenseFormInput, type CreateExpenseInput } from '@/lib/schemas/expense'
-import { useSession } from 'next-auth/react'
-import { toast } from 'sonner'
-import { Plus, CheckCircle, Trash2, Loader2, Receipt } from 'lucide-react'
+import { DataTable, StatusBadge, type Column, type RowAction } from '@/components/ui/DataTable'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -26,22 +26,28 @@ type Expense = {
   createdAt: string; expenseType: { name: string }
 }
 
-const TABS = ['Pending', 'Approved', 'All'] as const
+const PAGE_TABS = ['Pending', 'Approved', 'All'] as const
+type PageTab = typeof PAGE_TABS[number]
 
 export default function ExpensesPage() {
   const { data: session } = useSession()
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
-  const [tab, setTab] = useState<typeof TABS[number]>('Pending')
-  const [addOpen, setAddOpen] = useState(false)
+  const [tab,      setTab]      = useState<PageTab>('Pending')
+  const [addOpen,  setAddOpen]  = useState(false)
 
-  const statusMap: Record<typeof TABS[number], string | undefined> = {
-    Pending: 'pending',
+  const statusMap: Record<PageTab, string | undefined> = {
+    Pending:  'pending',
     Approved: 'approved',
-    All: undefined,
+    All:      undefined,
   }
-  const status = statusMap[tab]
-  const key = `/api/expenses?${status ? `status=${status}&` : ''}limit=50`
+  const statusFilter = statusMap[tab]
+  const key = `/api/expenses?${statusFilter ? `status=${statusFilter}&` : ''}limit=50`
   const { data, isLoading } = useSWR<{ expenses: Expense[]; total: number }>(key, fetcher)
+  const expenses = data?.expenses ?? []
+
+  const totalApproved = expenses
+    .filter((e) => e.status === 'approved')
+    .reduce((acc, e) => acc.plus(new Decimal(e.amount)), new Decimal(0))
 
   async function handleApprove(id: string) {
     const res = await fetch(`/api/expenses/${id}/approve`, { method: 'POST' })
@@ -56,113 +62,148 @@ export default function ExpensesPage() {
     else { const j = await res.json(); toast.error(j.error ?? 'Failed to void') }
   }
 
-  const totalApproved = (data?.expenses ?? [])
-    .filter((e) => e.status === 'approved')
-    .reduce((acc, e) => acc.plus(new Decimal(e.amount)), new Decimal(0))
+  const columns: Column<Expense>[] = [
+    {
+      key: 'refNumber',
+      header: 'Ref #',
+      width: '130px',
+      render: (r) => <span className="font-mono text-xs" style={{ color: '#6C757D' }}>{r.refNumber}</span>,
+    },
+    {
+      key: 'expenseType',
+      header: 'Category',
+      width: '140px',
+      render: (r) => (
+        <span className="px-2 py-0.5 rounded-full text-xs font-medium" style={{ background: '#EBF3FC', color: '#185ABD' }}>
+          {r.expenseType.name}
+        </span>
+      ),
+    },
+    {
+      key: 'description',
+      header: 'Description',
+      render: (r) => (
+        <span className="truncate block max-w-[220px]" style={{ fontSize: 12, color: '#212529' }}>{r.description}</span>
+      ),
+    },
+    {
+      key: 'amount',
+      header: 'Amount',
+      width: '100px',
+      render: (r) => (
+        <span className="font-mono font-semibold" style={{ color: '#212529' }}>
+          R {new Decimal(r.amount).toFixed(2)}
+        </span>
+      ),
+    },
+    {
+      key: 'vatAmount',
+      header: 'VAT',
+      width: '90px',
+      render: (r) => (
+        <span className="font-mono" style={{ fontSize: 12, color: '#6C757D' }}>
+          {r.includesVat ? `R ${new Decimal(r.vatAmount).toFixed(2)}` : '—'}
+        </span>
+      ),
+    },
+    {
+      key: 'paymentMethod',
+      header: 'Method',
+      width: '90px',
+      render: (r) => <span className="capitalize" style={{ fontSize: 12, color: '#6C757D' }}>{r.paymentMethod}</span>,
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      width: '90px',
+      render: (r) => <StatusBadge status={r.status} />,
+    },
+    {
+      key: 'createdAt',
+      header: 'Date',
+      width: '100px',
+      render: (r) => (
+        <span style={{ fontSize: 11, color: '#6C757D' }}>
+          {new Date(r.createdAt).toLocaleDateString('en-ZA')}
+        </span>
+      ),
+    },
+  ]
+
+  const rowActions: RowAction<Expense>[] = [
+    {
+      label:  'Approve',
+      icon:   CheckCircle,
+      hidden: (r) => !isManager || r.status !== 'pending',
+      onClick: (r) => handleApprove(r.id),
+    },
+    {
+      label:  'Void',
+      icon:   Trash2,
+      danger: true,
+      hidden: (r) => !isManager || r.status === 'voided',
+      onClick: (r) => handleVoid(r.id),
+    },
+  ]
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Expenses</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Track and manage business expenses</p>
-        </div>
-        <Button onClick={() => setAddOpen(true)} className="bg-green-600 hover:bg-green-700">
-          <Plus className="w-4 h-4 mr-2" /> Add Expense
-        </Button>
+    <div className="flex flex-col flex-1 min-h-0 gap-3">
+
+      {/* Page header */}
+      <div className="shrink-0">
+        <h1 className="text-xl font-bold" style={{ color: '#212529' }}>Expenses</h1>
+        <p className="text-sm mt-0.5" style={{ color: '#6C757D' }}>Track and manage business expenses</p>
       </div>
 
-      {/* Summary card */}
+      {/* Tab bar + action */}
+      <div className="flex items-center justify-between shrink-0 border-b border-[#E0E0E0]">
+        <div className="flex items-center">
+          {PAGE_TABS.map((t) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className="px-4 py-2 text-xs font-medium border-b-2 transition-colors"
+              style={{
+                borderColor: tab === t ? '#185ABD' : 'transparent',
+                color:       tab === t ? '#185ABD' : '#6C757D',
+              }}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+        <button
+          onClick={() => setAddOpen(true)}
+          className="flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium text-white mb-1"
+          style={{ background: '#217346' }}
+        >
+          <Plus className="w-3.5 h-3.5" /> Add Expense
+        </button>
+      </div>
+
+      {/* Approved total banner */}
       {tab === 'Approved' && data && (
-        <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-4 flex items-center gap-4">
-          <Receipt className="w-6 h-6 text-green-600" />
+        <div className="flex items-center gap-3 px-4 py-2.5 rounded-lg shrink-0" style={{ background: '#F0FBF4', border: '1px solid #21734630' }}>
+          <Receipt className="w-4 h-4 shrink-0" style={{ color: '#217346' }} />
           <div>
-            <p className="text-xs text-green-600 font-semibold uppercase tracking-wide">Total Approved Expenses (current view)</p>
-            <p className="text-2xl font-bold text-green-800">R {totalApproved.toFixed(2)}</p>
+            <p className="text-xs font-semibold" style={{ color: '#217346' }}>Total Approved Expenses (current view)</p>
+            <p className="font-mono font-bold" style={{ fontSize: 16, color: '#1a5c38' }}>R {totalApproved.toFixed(2)}</p>
           </div>
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="flex gap-1 border-b mb-4">
-        {TABS.map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-              tab === t ? 'border-green-600 text-green-700' : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            {t}
-          </button>
-        ))}
-      </div>
-
       {/* Table */}
-      <div className="bg-white rounded-xl border overflow-hidden">
-        {isLoading ? (
-          <div className="flex items-center justify-center p-10 text-gray-400">
-            <Loader2 className="w-5 h-5 animate-spin mr-2" /> Loading...
-          </div>
-        ) : !data?.expenses?.length ? (
-          <div className="text-center p-10 text-gray-400">No expenses found</div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b">
-              <tr>
-                {['Ref #', 'Category', 'Description', 'Amount', 'VAT', 'Method', 'Status', 'Date', 'Actions'].map((h) => (
-                  <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {data.expenses.map((e) => (
-                <tr key={e.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 font-mono text-xs text-gray-500">{e.refNumber}</td>
-                  <td className="px-4 py-3">
-                    <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{e.expenseType.name}</span>
-                  </td>
-                  <td className="px-4 py-3 max-w-[200px] truncate">{e.description}</td>
-                  <td className="px-4 py-3 font-semibold">R {parseFloat(e.amount).toFixed(2)}</td>
-                  <td className="px-4 py-3 text-gray-500 text-xs">
-                    {e.includesVat ? `R ${parseFloat(e.vatAmount).toFixed(2)}` : '—'}
-                  </td>
-                  <td className="px-4 py-3 capitalize">{e.paymentMethod}</td>
-                  <td className="px-4 py-3">
-                    <StatusBadge status={e.status} />
-                  </td>
-                  <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
-                    {new Date(e.createdAt).toLocaleDateString('en-ZA')}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-1">
-                      {isManager && e.status === 'pending' && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-7 text-xs border-green-300 text-green-700 hover:bg-green-50"
-                          onClick={() => handleApprove(e.id)}
-                        >
-                          <CheckCircle className="w-3.5 h-3.5 mr-1" /> Approve
-                        </Button>
-                      )}
-                      {isManager && e.status !== 'voided' && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-7 text-xs text-red-600 hover:bg-red-50"
-                          onClick={() => handleVoid(e.id)}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+      <div className="flex-1 min-h-0">
+        <DataTable
+          columns={columns}
+          rows={expenses}
+          rowKey={(r) => r.id}
+          rowActions={rowActions}
+          loading={isLoading}
+          emptyMessage="No expenses found"
+          total={data?.total}
+          pageSize={50}
+        />
       </div>
 
       {addOpen && (
@@ -175,31 +216,15 @@ export default function ExpensesPage() {
   )
 }
 
-function StatusBadge({ status }: { status: string }) {
-  const map: Record<string, string> = {
-    pending:  'bg-yellow-100 text-yellow-700',
-    approved: 'bg-green-100 text-green-700',
-    voided:   'bg-red-100 text-red-700',
-  }
-  return (
-    <Badge className={map[status] ?? 'bg-gray-100 text-gray-600'}>
-      {status}
-    </Badge>
-  )
-}
-
 // ─── Add Expense Modal ────────────────────────────────────────────────────────
 function AddExpenseModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
-  const [loading, setLoading] = useState(false)
+  const [loading,     setLoading]     = useState(false)
   const [addTypeOpen, setAddTypeOpen] = useState(false)
   const { data: types } = useSWR<ExpenseType[]>('/api/expense-types', fetcher)
 
   const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<CreateExpenseFormInput, unknown, CreateExpenseInput>({
     resolver: zodResolver(CreateExpenseSchema),
-    defaultValues: {
-      paymentMethod: 'cash',
-      includesVat:   false,
-    },
+    defaultValues: { paymentMethod: 'cash', includesVat: false },
   })
 
   const paymentMethod = watch('paymentMethod')
@@ -208,9 +233,9 @@ function AddExpenseModal({ onClose, onSuccess }: { onClose: () => void; onSucces
   async function onSubmit(data: CreateExpenseInput) {
     setLoading(true)
     const res = await fetch('/api/expenses', {
-      method: 'POST',
+      method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
+      body:    JSON.stringify(data),
     })
     setLoading(false)
     if (res.ok) { toast.success('Expense recorded'); onSuccess() }
@@ -229,40 +254,38 @@ function AddExpenseModal({ onClose, onSuccess }: { onClose: () => void; onSucces
               <button
                 type="button"
                 onClick={() => setAddTypeOpen(true)}
-                className="text-xs text-green-600 hover:underline"
+                className="text-xs hover:underline"
+                style={{ color: '#217346' }}
               >
                 + New category
               </button>
             </div>
             <Select onValueChange={(v) => setValue('expenseTypeId', v as string)}>
-              <SelectTrigger><SelectValue placeholder="Select category..." /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder="Select category…" /></SelectTrigger>
               <SelectContent>
                 {(types ?? []).map((t) => (
                   <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            {errors.expenseTypeId && <p className="text-xs text-red-600 mt-1">{errors.expenseTypeId.message}</p>}
+            {errors.expenseTypeId && <p className="text-xs mt-1" style={{ color: '#C0392B' }}>{errors.expenseTypeId.message}</p>}
           </div>
 
           <div>
             <Label>Description</Label>
-            <Input {...register('description')} className="mt-1" disabled={loading} placeholder="Brief description..." />
-            {errors.description && <p className="text-xs text-red-600 mt-1">{errors.description.message}</p>}
+            <Input {...register('description')} className="mt-1" disabled={loading} placeholder="Brief description…" />
+            {errors.description && <p className="text-xs mt-1" style={{ color: '#C0392B' }}>{errors.description.message}</p>}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label>Amount (R)</Label>
               <Input {...register('amount')} type="number" step="0.01" min="0.01" className="mt-1" disabled={loading} />
-              {errors.amount && <p className="text-xs text-red-600 mt-1">{errors.amount.message}</p>}
+              {errors.amount && <p className="text-xs mt-1" style={{ color: '#C0392B' }}>{errors.amount.message}</p>}
             </div>
             <div>
               <Label>Payment Method</Label>
-              <Select
-                onValueChange={(v) => setValue('paymentMethod', v as 'cash' | 'eft' | 'cheque' | 'amplopay')}
-                defaultValue="cash"
-              >
+              <Select onValueChange={(v) => setValue('paymentMethod', v as 'cash' | 'eft' | 'cheque' | 'amplopay')} defaultValue="cash">
                 <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="cash">Cash</SelectItem>
@@ -281,20 +304,20 @@ function AddExpenseModal({ onClose, onSuccess }: { onClose: () => void; onSucces
             </div>
           )}
 
-          <label className="flex items-center gap-2 text-sm cursor-pointer">
+          <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: '#212529' }}>
             <input
               type="checkbox"
               checked={!!includesVat}
               onChange={(e) => setValue('includesVat', e.target.checked)}
-              className="w-4 h-4 rounded border-gray-300 text-green-600"
+              className="w-4 h-4 rounded"
             />
             Amount includes 15% VAT
           </label>
 
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
-            <Button type="submit" className="bg-green-600 hover:bg-green-700" disabled={loading}>
-              {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving...</> : 'Record Expense'}
+            <Button type="submit" style={{ background: '#217346' }} className="hover:opacity-90" disabled={loading}>
+              {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving…</> : 'Record Expense'}
             </Button>
           </div>
         </form>
@@ -310,19 +333,19 @@ function AddExpenseModal({ onClose, onSuccess }: { onClose: () => void; onSucces
   )
 }
 
-// ─── Quick-add Category Modal ────────────────────────────────────────────────
+// ─── Quick-add Category Modal ─────────────────────────────────────────────────
 function AddTypeModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
   const [loading, setLoading] = useState(false)
-  const [name, setName] = useState('')
+  const [name,    setName]    = useState('')
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!name.trim()) return
     setLoading(true)
     const res = await fetch('/api/expense-types', {
-      method: 'POST',
+      method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: name.trim() }),
+      body:    JSON.stringify({ name: name.trim() }),
     })
     setLoading(false)
     if (res.ok) { toast.success('Category created'); onSuccess() }
@@ -336,11 +359,18 @@ function AddTypeModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
         <form onSubmit={handleSubmit} className="space-y-4 mt-2">
           <div>
             <Label>Category Name</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} className="mt-1" placeholder="e.g. Fuel, Wages, Repairs" disabled={loading} autoFocus />
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="mt-1"
+              placeholder="e.g. Fuel, Wages, Repairs"
+              disabled={loading}
+              autoFocus
+            />
           </div>
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
-            <Button type="submit" className="bg-green-600 hover:bg-green-700" disabled={loading || !name.trim()}>
+            <Button type="submit" style={{ background: '#217346' }} className="hover:opacity-90" disabled={loading || !name.trim()}>
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Create'}
             </Button>
           </div>
