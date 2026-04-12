@@ -6,33 +6,33 @@ import Link from 'next/link'
 import { useSession } from 'next-auth/react'
 import Decimal from 'decimal.js'
 import {
-  TrendingUp, ShoppingCart, ArrowRightLeft,
-  DollarSign, AlertCircle, CheckCircle2, Clock,
-  Pencil, Check, X,
+  TrendingUp, ShoppingCart, ArrowRightLeft, DollarSign,
+  AlertCircle, CheckCircle2, Clock, Pencil, Check, X,
+  Package, Activity,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { StatCard } from '@/components/ui/StatCard'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
-// All available quick-action pages
 const ALL_PAGES = [
-  { label: 'New Purchase',    href: '/app/purchases/new'  },
-  { label: 'New Sale',        href: '/app/sales/new'      },
-  { label: 'Payments',        href: '/app/payments'       },
-  { label: 'Cash-Up',         href: '/app/cashup'         },
-  { label: 'Customers',       href: '/app/customers'      },
-  { label: 'Stock',           href: '/app/stock'          },
-  { label: 'Expenses',        href: '/app/expenses'       },
-  { label: 'Products',        href: '/app/products'       },
-  { label: 'Price Groups',    href: '/app/price-groups'   },
-  { label: 'Reports',         href: '/app/reports'        },
-  { label: 'Loans',           href: '/app/loans'          },
-  { label: 'Photos',          href: '/app/photos'         },
-  { label: 'Police Register', href: '/app/police-register'},
-  { label: 'Stocktake',       href: '/app/stocktake'      },
-  { label: 'Casual',          href: '/app/casual'         },
+  { label: 'New Purchase',    href: '/app/purchases/new'   },
+  { label: 'New Sale',        href: '/app/sales/new'       },
+  { label: 'Payments',        href: '/app/payments'        },
+  { label: 'Cash-Up',         href: '/app/cashup'          },
+  { label: 'Customers',       href: '/app/customers'       },
+  { label: 'Stock',           href: '/app/stock'           },
+  { label: 'Expenses',        href: '/app/expenses'        },
+  { label: 'Products',        href: '/app/products'        },
+  { label: 'Price Groups',    href: '/app/price-groups'    },
+  { label: 'Reports',         href: '/app/reports'         },
+  { label: 'Loans',           href: '/app/loans'           },
+  { label: 'Photos',          href: '/app/photos'          },
+  { label: 'Police Register', href: '/app/police-register' },
+  { label: 'Stocktake',       href: '/app/stocktake'       },
+  { label: 'Casual',          href: '/app/casual'          },
 ]
 
 const DEFAULT_SHORTCUTS = [
@@ -42,8 +42,8 @@ const DEFAULT_SHORTCUTS = [
   '/app/cashup',
 ]
 
-const COLORS = [
-  'bg-green-600', 'bg-blue-600', 'bg-gray-700', 'bg-orange-600',
+const SHORTCUT_COLORS = [
+  'bg-[#217346]', 'bg-[#185ABD]', 'bg-[#6C757D]', 'bg-[#C9A020]',
 ]
 
 type TodayStats = {
@@ -55,43 +55,10 @@ type TodayStats = {
   cashUpId:     string | null
 }
 
-function KpiCard({
-  icon: Icon,
-  label,
-  value,
-  sub,
-  color = 'gray',
-}: {
-  icon: React.ElementType
-  label: string
-  value: string
-  sub?: string
-  color?: 'green' | 'red' | 'blue' | 'gray'
-}) {
-  const colors = {
-    green: 'text-green-600 bg-green-50',
-    red:   'text-red-600 bg-red-50',
-    blue:  'text-blue-600 bg-blue-50',
-    gray:  'text-gray-600 bg-gray-50',
-  }
-  return (
-    <div className="bg-white rounded-xl border p-5 flex items-start gap-4">
-      <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${colors[color]}`}>
-        <Icon className="w-5 h-5" />
-      </div>
-      <div>
-        <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">{label}</p>
-        <p className="text-2xl font-bold text-gray-900 mt-0.5">{value}</p>
-        {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
-      </div>
-    </div>
-  )
-}
-
 export default function DashboardPage() {
   const { data: session } = useSession()
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
-  const userId = session?.user?.id
+  const userId    = session?.user?.id
 
   const { data, isLoading } = useSWR<TodayStats>('/api/reports/today', fetcher, {
     refreshInterval: 30_000,
@@ -108,7 +75,6 @@ export default function DashboardPage() {
   const [editOpen, setEditOpen] = useState(false)
   const [draft, setDraft]       = useState<string[]>(savedShortcuts)
 
-  // Sync draft whenever saved shortcuts change
   const savedShortcutsStr = JSON.stringify(savedShortcuts)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { setDraft(savedShortcuts) }, [savedShortcutsStr])
@@ -116,9 +82,9 @@ export default function DashboardPage() {
   async function saveShortcuts(newShortcuts: string[]) {
     if (!shortcutKey) return
     const res = await fetch('/api/settings', {
-      method: 'PATCH',
+      method:  'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ [shortcutKey]: JSON.stringify(newShortcuts) }),
+      body:    JSON.stringify({ [shortcutKey]: JSON.stringify(newShortcuts) }),
     })
     if (res.ok) {
       await swrMutate('/api/settings')
@@ -129,94 +95,94 @@ export default function DashboardPage() {
     }
   }
 
-  const name = session?.user?.name ?? session?.user?.username ?? 'there'
+  const name      = session?.user?.name ?? session?.user?.username ?? 'there'
+  const netFlow   = data ? new Decimal(data.netFlow) : null
+  const netIsPos  = netFlow?.gte(0) ?? true
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
+
       {/* Welcome */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-sm text-gray-500 mt-0.5">
-          Welcome back, {name} ·{' '}
-          {new Date().toLocaleDateString('en-ZA', { dateStyle: 'full' })}
+        <h1 className="text-xl font-bold" style={{ color: '#212529' }}>Dashboard</h1>
+        <p className="text-sm mt-0.5" style={{ color: '#6C757D' }}>
+          Welcome back, {name} · {new Date().toLocaleDateString('en-ZA', { dateStyle: 'full' })}
         </p>
       </div>
 
       {isLoading && (
-        <div className="text-sm text-gray-400">Loading today&apos;s stats...</div>
+        <p className="text-sm" style={{ color: '#6C757D' }}>Loading today&apos;s stats…</p>
       )}
 
       {data && (
         <>
-          {/* KPI grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-            <KpiCard
-              icon={TrendingUp}
-              label="Today's Sales"
-              value={`R ${new Decimal(data.sales.total).toFixed(2)}`}
-              sub={`${data.sales.count} transaction${data.sales.count !== 1 ? 's' : ''}`}
-              color="green"
-            />
-            <KpiCard
-              icon={ShoppingCart}
+          {/* ── Stat cards (4 per spec) ── */}
+          <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+            <StatCard
               label="Today's Purchases"
               value={`R ${new Decimal(data.purchases.total).toFixed(2)}`}
-              sub={`${data.purchases.count} transaction${data.purchases.count !== 1 ? 's' : ''}`}
-              color="red"
+              icon={ShoppingCart}
+              iconColor="#185ABD"
+              trend={data.purchases.count > 0 ? 'up' : 'neutral'}
+              trendText={`${data.purchases.count} transaction${data.purchases.count !== 1 ? 's' : ''}`}
             />
-            <KpiCard
-              icon={ArrowRightLeft}
+            <StatCard
+              label="Today's Sales"
+              value={`R ${new Decimal(data.sales.total).toFixed(2)}`}
+              icon={TrendingUp}
+              iconColor="#217346"
+              trend={data.sales.count > 0 ? 'up' : 'neutral'}
+              trendText={`${data.sales.count} transaction${data.sales.count !== 1 ? 's' : ''}`}
+            />
+            <StatCard
               label="Net Flow"
-              value={`R ${new Decimal(data.netFlow).toFixed(2)}`}
+              value={`R ${netFlow?.toFixed(2) ?? '0.00'}`}
               sub="Sales minus purchases"
-              color={new Decimal(data.netFlow).gte(0) ? 'green' : 'red'}
+              icon={ArrowRightLeft}
+              iconColor={netIsPos ? '#217346' : '#C0392B'}
+              trend={netIsPos ? 'up' : 'down'}
+              trendText={netIsPos ? 'Positive' : 'Negative'}
             />
-            <KpiCard
-              icon={DollarSign}
+            <StatCard
               label="Cash-Up"
               value={
                 data.cashUpStatus === 'approved'  ? 'Approved' :
                 data.cashUpStatus === 'submitted' ? 'Awaiting' :
-                data.cashUpStatus === 'open'      ? 'Open' :
-                'Not Started'
+                data.cashUpStatus === 'open'      ? 'Open' : 'Not Started'
               }
               sub={
                 data.cashUpStatus === 'approved'  ? 'Session closed' :
-                data.cashUpStatus === 'submitted' ? 'Pending manager sign-off' :
-                data.cashUpStatus === 'open'      ? 'Session in progress' :
-                'Open a session to begin'
+                data.cashUpStatus === 'submitted' ? 'Pending sign-off' :
+                data.cashUpStatus === 'open'      ? 'In progress' : 'No session yet'
               }
-              color={
-                data.cashUpStatus === 'approved'  ? 'green' :
-                data.cashUpStatus === 'submitted' ? 'blue' :
-                'gray'
+              icon={DollarSign}
+              iconColor={
+                data.cashUpStatus === 'approved'  ? '#217346' :
+                data.cashUpStatus === 'submitted' ? '#185ABD' : '#6C757D'
               }
             />
           </div>
 
-          {/* Cash-up alert banner */}
+          {/* ── Status banners ── */}
           {isManager && data.cashUpStatus === 'submitted' && data.cashUpId && (
-            <div className="flex items-center gap-3 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 text-sm text-blue-800">
+            <div className="flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm"
+              style={{ background: '#EBF3FC', border: '1px solid #185ABD30', color: '#185ABD' }}>
               <Clock className="w-4 h-4 shrink-0" />
               <span>A cash-up is waiting for your approval.</span>
-              <Link href="/app/cashup" className="ml-auto font-semibold underline-offset-2 hover:underline">
-                Review →
-              </Link>
+              <Link href="/app/cashup" className="ml-auto font-semibold hover:underline text-xs">Review →</Link>
             </div>
           )}
-
           {!data.cashUpStatus && (
-            <div className="flex items-center gap-3 bg-yellow-50 border border-yellow-100 rounded-xl px-4 py-3 text-sm text-yellow-800">
+            <div className="flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm"
+              style={{ background: '#FFF8E1', border: '1px solid #C9A02030', color: '#856404' }}>
               <AlertCircle className="w-4 h-4 shrink-0" />
               <span>No cash-up session open for today.</span>
-              <Link href="/app/cashup" className="ml-auto font-semibold underline-offset-2 hover:underline">
-                Open session →
-              </Link>
+              <Link href="/app/cashup" className="ml-auto font-semibold hover:underline text-xs">Open session →</Link>
             </div>
           )}
-
           {data.cashUpStatus === 'approved' && (
-            <div className="flex items-center gap-3 bg-green-50 border border-green-100 rounded-xl px-4 py-3 text-sm text-green-800">
+            <div className="flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm"
+              style={{ background: '#F0FBF4', border: '1px solid #21734630', color: '#217346' }}>
               <CheckCircle2 className="w-4 h-4 shrink-0" />
               <span>Today&apos;s cash-up has been approved.</span>
             </div>
@@ -224,14 +190,17 @@ export default function DashboardPage() {
         </>
       )}
 
-      {/* Configurable Quick Actions */}
+      {/* ── Quick Actions ── */}
       <div>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Quick Actions</h2>
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#6C757D' }}>
+            Quick Actions
+          </h2>
           {userId && (
             <button
               onClick={() => { setDraft(savedShortcuts); setEditOpen(true) }}
-              className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 transition-colors"
+              className="flex items-center gap-1 text-xs transition-colors"
+              style={{ color: '#6C757D' }}
             >
               <Pencil className="w-3 h-3" /> Customise
             </button>
@@ -245,7 +214,7 @@ export default function DashboardPage() {
               <Link
                 key={href}
                 href={href}
-                className={`${COLORS[i] ?? 'bg-gray-600'} text-white text-sm font-semibold rounded-xl px-4 py-3 text-center hover:opacity-90 transition-opacity`}
+                className={`${SHORTCUT_COLORS[i] ?? 'bg-[#6C757D]'} text-white text-sm font-semibold rounded-lg px-4 py-3 text-center hover:opacity-90 transition-opacity`}
               >
                 {page.label}
               </Link>
@@ -254,14 +223,44 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Edit shortcuts dialog */}
+      {/* ── Lower two-column ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="rounded-lg border p-4" style={{ borderColor: '#E0E0E0' }}>
+          <div className="flex items-center gap-2 mb-2">
+            <Activity className="w-4 h-4" style={{ color: '#6C757D' }} />
+            <h3 className="text-sm font-semibold" style={{ color: '#212529' }}>Recent Activity</h3>
+          </div>
+          <p className="text-xs" style={{ color: '#6C757D' }}>
+            {data ? `${data.purchases.count} purchases · ${data.sales.count} sales today` : 'Loading…'}
+          </p>
+          <Link href="/app/purchases" className="mt-2 inline-block text-xs font-medium hover:underline" style={{ color: '#185ABD' }}>
+            View all transactions →
+          </Link>
+        </div>
+        <div className="rounded-lg border p-4" style={{ borderColor: '#E0E0E0' }}>
+          <div className="flex items-center gap-2 mb-2">
+            <Package className="w-4 h-4" style={{ color: '#6C757D' }} />
+            <h3 className="text-sm font-semibold" style={{ color: '#212529' }}>Stock Overview</h3>
+          </div>
+          <p className="text-xs" style={{ color: '#6C757D' }}>Track on-hand stock levels in the Stock tab.</p>
+          <Link href="/app/stock" className="mt-2 inline-block text-xs font-medium hover:underline" style={{ color: '#185ABD' }}>
+            Go to Stock →
+          </Link>
+        </div>
+      </div>
+
+      {isManager && (
+        <Link href="/app/reports" className="text-sm font-medium hover:underline" style={{ color: '#217346' }}>
+          View detailed reports →
+        </Link>
+      )}
+
+      {/* ── Customise dialog ── */}
       {editOpen && (
         <Dialog open onOpenChange={(o) => { if (!o) setEditOpen(false) }}>
           <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>Customise Quick Actions</DialogTitle>
-            </DialogHeader>
-            <p className="text-sm text-gray-500">Select up to 4 pages to show as quick shortcuts.</p>
+            <DialogHeader><DialogTitle>Customise Quick Actions</DialogTitle></DialogHeader>
+            <p className="text-sm" style={{ color: '#6C757D' }}>Select up to 4 pages to show as shortcuts.</p>
             <div className="space-y-1 max-h-72 overflow-y-auto mt-2">
               {ALL_PAGES.map((page) => {
                 const isSelected = draft.includes(page.href)
@@ -281,34 +280,23 @@ export default function DashboardPage() {
                       }}
                       className="rounded"
                     />
-                    <span className="text-sm text-gray-800">{page.label}</span>
-                    {isSelected && (
-                      <span className="ml-auto text-xs text-gray-400 font-mono">#{idx + 1}</span>
-                    )}
+                    <span className="text-sm" style={{ color: '#212529' }}>{page.label}</span>
+                    {isSelected && <span className="ml-auto text-xs font-mono" style={{ color: '#6C757D' }}>#{idx + 1}</span>}
                   </label>
                 )
               })}
             </div>
-            <p className="text-xs text-gray-400">{draft.length}/4 selected</p>
+            <p className="text-xs" style={{ color: '#6C757D' }}>{draft.length}/4 selected</p>
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => setEditOpen(false)}>
                 <X className="w-3.5 h-3.5 mr-1.5" /> Cancel
               </Button>
-              <Button className="bg-green-600 hover:bg-green-700" onClick={() => saveShortcuts(draft)}>
+              <Button style={{ background: '#217346' }} className="hover:opacity-90" onClick={() => saveShortcuts(draft)}>
                 <Check className="w-3.5 h-3.5 mr-1.5" /> Save
               </Button>
             </div>
           </DialogContent>
         </Dialog>
-      )}
-
-      {/* Reports link (managers only) */}
-      {isManager && (
-        <div className="text-sm">
-          <Link href="/app/reports" className="text-green-700 font-medium hover:underline">
-            View detailed reports →
-          </Link>
-        </div>
       )}
     </div>
   )

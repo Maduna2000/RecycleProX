@@ -1,0 +1,23 @@
+/**
+ * RecycleProX Basic — Electron Preload
+ * Exposes safe IPC APIs to the renderer (Next.js) via contextBridge.
+ */
+
+const { contextBridge, ipcRenderer } = require('electron')
+
+contextBridge.exposeInMainWorld('electronAPI', {
+  // Window controls (custom title bar)
+  minimize:      () => ipcRenderer.send('window-minimize'),
+  maximize:      () => ipcRenderer.send('window-maximize'),
+  close:         () => ipcRenderer.send('window-close'),
+
+  // Scale hardware
+  readScale:     (scaleNum) => ipcRenderer.invoke('read-scale', scaleNum),
+
+  // Thermal printer
+  printSlip:     (data)     => ipcRenderer.invoke('print-slip', data),
+  openCashDrawer:()         => ipcRenderer.invoke('open-cash-drawer'),
+
+  // Detect if running inside Electron
+  isElectron: true,
+})

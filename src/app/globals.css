@@ -9,6 +9,30 @@
   }
 }
 
+/* ─── RecycleProX Desktop Design Tokens ──────────────────────────────────── */
+:root {
+  --rpx-navy:        #1B3A6B;
+  --rpx-green:       #217346;
+  --rpx-blue:        #185ABD;
+  --rpx-amber:       #C9A020;
+  --rpx-red:         #C0392B;
+  --rpx-ribbon-grey: #F1F3F4;
+  --rpx-row-alt:     #F8F9FA;
+  --rpx-border:      #E0E0E0;
+  --rpx-text:        #212529;
+  --rpx-muted:       #6C757D;
+  --rpx-hover-row:   #EBF3FC;
+  --rpx-tab-muted:   #8BA4D4;
+  --rpx-tab-amber:   #F2AB1A;
+
+  /* Ribbon sizes */
+  --rpx-titlebar-h:  48px;
+  --rpx-toolbar-h:   36px;
+
+  /* Font stack — Segoe UI on Windows, system on others */
+  --rpx-font: "Segoe UI", -apple-system, Arial, sans-serif;
+}
+
 @layer base {
   :root {
     --background: oklch(1 0 0);
