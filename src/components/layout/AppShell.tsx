@@ -2,14 +2,14 @@
 
 import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { signOut, useSession } from 'next-auth/react'
+import { signOut } from 'next-auth/react'
 import { useState, useEffect, useCallback } from 'react'
 import {
   Recycle, ChevronDown, Bell, Search,
   Plus, Scale, Printer, Zap, Ban,
-  CreditCard, Receipt, DollarSign, BarChart2,
-  Users, ClipboardList, ShieldCheck, UserCheck,
-  Package, ArrowLeftRight, ClipboardCheck, FileSpreadsheet,
+  CreditCard, DollarSign, BarChart2,
+  ShieldCheck, UserCheck,
+  ArrowLeftRight, ClipboardCheck, FileSpreadsheet,
   FileText, Download, RefreshCw,
   Handshake, LogOut, Settings,
   Minus, Square, X as XIcon,
@@ -122,7 +122,6 @@ function useToolbarButtons(activeTab: TabId): ToolbarButton[] {
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function ToolbarBtn({ btn }: { btn: ToolbarButton }) {
-  const router = useRouter()
   const base = 'flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium transition-colors focus:outline-none whitespace-nowrap'
   const variants: Record<string, string> = {
     primary:   'bg-[#217346] text-white hover:bg-[#1a5c38]',
