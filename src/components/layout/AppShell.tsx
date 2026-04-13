@@ -9,10 +9,11 @@ import {
   Plus, Scale, Printer, Zap, Ban,
   CreditCard, DollarSign, BarChart2,
   ShieldCheck, UserCheck, AlertCircle,
-  ArrowLeftRight, ClipboardCheck, FileSpreadsheet,
+  ClipboardCheck, FileSpreadsheet,
   FileText, Download, RefreshCw,
   Handshake, LogOut, Settings,
   Minus, Square, X as XIcon,
+  Package, Tag, Images, ShieldAlert, Users,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -35,10 +36,10 @@ const TABS: Tab[] = [
   { id: 'transactions', label: 'Transactions',  href: '/app/purchases',  shortcut: 'T', matches: ['/app/purchases', '/app/sales', '/app/purchases/unpaid'] },
   { id: 'finance',      label: 'Finance',       href: '/app/payments',   shortcut: 'F', matches: ['/app/payments', '/app/expenses', '/app/cashup', '/app/float'] },
   { id: 'customers',    label: 'Customers',     href: '/app/customers',  shortcut: 'C', matches: ['/app/customers', '/app/casual', '/app/police-register', '/app/photos'] },
-  { id: 'stock',        label: 'Stock',         href: '/app/stock',      shortcut: 'S', matches: ['/app/stock', '/app/stocktake'] },
+  { id: 'stock',        label: 'Stock',         href: '/app/stock',      shortcut: 'S', matches: ['/app/stock', '/app/stocktake', '/app/products', '/app/price-groups'] },
   { id: 'loans',        label: 'Loans',         href: '/app/loans',      shortcut: 'L', matches: ['/app/loans'] },
   { id: 'reports',      label: 'Reports',       href: '/app/reports',    shortcut: 'R', matches: ['/app/reports'] },
-  { id: 'settings',     label: 'Settings',      href: '/app/settings',   shortcut: ',', matches: ['/app/settings', '/app/products', '/app/price-groups', '/app/audit-log'] },
+  { id: 'settings',     label: 'Settings',      href: '/app/settings',   shortcut: ',', matches: ['/app/settings', '/app/audit-log'] },
 ]
 
 function getActiveTab(pathname: string): TabId {
@@ -90,15 +91,17 @@ function useToolbarButtons(activeTab: TabId): ToolbarButton[] {
       return [
         { label: 'Add Customer',    icon: Plus,        href: '/app/customers/new',   variant: 'primary' },
         { label: 'Casual Details',  icon: UserCheck,   href: '/app/casual',          variant: 'secondary' },
-        { label: 'Police Register', icon: ShieldCheck, href: '/app/police-register', variant: 'ghost', iconOnly: true },
+        { label: 'Police Register', icon: ShieldCheck, href: '/app/police-register', variant: 'ghost' },
+        { label: 'Photos',          icon: Images,      href: '/app/photos',          variant: 'ghost' },
         { label: 'Blacklist',       icon: Ban,         variant: 'danger', iconOnly: true },
       ]
     case 'stock':
       return [
-        { label: 'Adjust',        icon: Plus,             href: '/app/stock',    variant: 'primary' },
-        { label: 'Transfer',      icon: ArrowLeftRight,   variant: 'secondary', iconOnly: true },
-        { label: 'Stocktake',     icon: ClipboardCheck,   href: '/app/stocktake', variant: 'ghost', iconOnly: true },
-        { label: 'Export Excel',  icon: FileSpreadsheet,  variant: 'ghost', iconOnly: true },
+        { label: 'Adjust',        icon: Plus,            href: '/app/stock',        variant: 'primary' },
+        { label: 'Products',      icon: Package,         href: '/app/products',     variant: 'secondary' },
+        { label: 'Price Groups',  icon: Tag,             href: '/app/price-groups', variant: 'ghost' },
+        { label: 'Stocktake',     icon: ClipboardCheck,  href: '/app/stocktake',    variant: 'ghost' },
+        { label: 'Export Excel',  icon: FileSpreadsheet, variant: 'ghost', iconOnly: true },
       ]
     case 'loans':
       return [
@@ -114,7 +117,11 @@ function useToolbarButtons(activeTab: TabId): ToolbarButton[] {
         { label: 'Print',        icon: Printer,     variant: 'ghost', iconOnly: true },
       ]
     case 'settings':
-      return []
+      return [
+        { label: 'Users',     icon: Users,       href: '/app/settings/users', variant: 'primary' },
+        { label: 'Audit Log', icon: ShieldAlert, href: '/app/audit-log',      variant: 'secondary' },
+        { label: 'Settings',  icon: Settings,    href: '/app/settings',       variant: 'ghost' },
+      ]
     default:
       return []
   }
