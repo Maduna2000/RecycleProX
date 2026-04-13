@@ -4,14 +4,13 @@ import { useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import useSWR, { mutate } from 'swr'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { CreateUserModal } from '@/components/users/CreateUserModal'
 import { EditUserModal } from '@/components/users/EditUserModal'
 import { ResetPasswordModal } from '@/components/users/ResetPasswordModal'
-import { MoreHorizontal, Plus, Search, Unlock, UserCheck, UserX } from 'lucide-react'
+import { MoreHorizontal, Search, Unlock, UserCheck, UserX } from 'lucide-react'
 import { toast } from 'sonner'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
@@ -22,14 +21,20 @@ type User = {
 }
 
 function statusBadge(user: User) {
-  if (user.lockedAt) return <Badge variant="destructive">Locked</Badge>
-  if (!user.isActive) return <Badge variant="secondary">Inactive</Badge>
-  return <Badge className="bg-green-100 text-green-700 hover:bg-green-100">Active</Badge>
+  if (user.lockedAt) return <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: '#FEF2F2', color: '#C0392B' }}>Locked</span>
+  if (!user.isActive) return <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: '#F1F3F4', color: '#6C757D' }}>Inactive</span>
+  return <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: '#F0FBF4', color: '#217346' }}>Active</span>
+}
+
+const ROLE_STYLES: Record<string, { background: string; color: string }> = {
+  admin:   { background: '#F3EBF9', color: '#7B2D8B' },
+  manager: { background: '#EBF3FC', color: '#185ABD' },
+  cashier: { background: '#F1F3F4', color: '#6C757D' },
 }
 
 function roleBadge(role: string) {
-  const map: Record<string, string> = { admin: 'bg-purple-100 text-purple-700', manager: 'bg-blue-100 text-blue-700', cashier: 'bg-gray-100 text-gray-700' }
-  return <Badge className={`${map[role] ?? ''} hover:opacity-80 capitalize`}>{role}</Badge>
+  const style = ROLE_STYLES[role] ?? { background: '#F1F3F4', color: '#6C757D' }
+  return <span className="px-2 py-0.5 rounded text-xs font-medium capitalize" style={style}>{role}</span>
 }
 
 export default function UsersPage() {
@@ -63,25 +68,23 @@ export default function UsersPage() {
   }
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Users</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Manage system user accounts</p>
-        </div>
-        <Button className="bg-green-600 hover:bg-green-700" onClick={() => setCreateOpen(true)}>
-          <Plus className="w-4 h-4 mr-2" /> Add User
-        </Button>
+    <div className="flex flex-col flex-1 min-h-0 gap-3">
+
+      {/* Page header */}
+      <div className="shrink-0">
+        <h1 className="text-xl font-bold" style={{ color: '#212529' }}>Users</h1>
+        <p className="text-sm mt-0.5" style={{ color: '#6C757D' }}>Manage system user accounts</p>
       </div>
 
       {/* Filters */}
-      <div className="flex gap-3 mb-4">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <Input placeholder="Search name or username..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
+      <div className="flex gap-2 items-center shrink-0">
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3" style={{ color: '#6C757D' }} />
+          <Input placeholder="Search name or username…" className="pl-7 h-7 text-xs w-56 border-[#E0E0E0]" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
         <select
-          className="border rounded-md px-3 py-2 text-sm bg-white"
+          className="border border-[#E0E0E0] rounded px-2 py-1 text-xs bg-white focus:outline-none focus:border-[#185ABD]"
+          style={{ color: '#212529' }}
           value={roleFilter}
           onChange={(e) => setRoleFilter(e.target.value)}
         >
@@ -93,26 +96,26 @@ export default function UsersPage() {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl border overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b">
+      <div className="flex-1 min-h-0 overflow-y-auto rounded-lg" style={{ border: '1px solid #E0E0E0' }}>
+        <table className="w-full bg-white">
+          <thead style={{ background: '#F8F9FA', borderBottom: '1px solid #E0E0E0' }}>
             <tr>
               {['Full Name', 'Username', 'Role', 'Status', 'Last Login', 'Actions'].map((h) => (
-                <th key={h} className="text-left px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">{h}</th>
+                <th key={h} className="text-left px-4 py-2" style={{ fontSize: 10, fontWeight: 600, color: '#6C757D', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y">
-            {data?.users?.map((user) => (
-              <tr key={user.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3 font-medium text-gray-900">{user.fullName}</td>
-                <td className="px-4 py-3 text-gray-500">{user.username}</td>
-                <td className="px-4 py-3">{roleBadge(user.role)}</td>
-                <td className="px-4 py-3">{statusBadge(user)}</td>
-                <td className="px-4 py-3 text-gray-500">
+          <tbody>
+            {data?.users?.map((user, i) => (
+              <tr key={user.id} style={{ borderBottom: i < (data.users.length - 1) ? '1px solid #F1F3F4' : 'none' }}>
+                <td className="px-4 py-2.5 font-medium" style={{ fontSize: 12, color: '#212529' }}>{user.fullName}</td>
+                <td className="px-4 py-2.5" style={{ fontSize: 12, color: '#6C757D' }}>{user.username}</td>
+                <td className="px-4 py-2.5">{roleBadge(user.role)}</td>
+                <td className="px-4 py-2.5">{statusBadge(user)}</td>
+                <td className="px-4 py-2.5" style={{ fontSize: 11, color: '#6C757D' }}>
                   {user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString('en-ZA') : '—'}
                 </td>
-                <td className="px-4 py-3">
+                <td className="px-4 py-2.5">
                   <DropdownMenu>
                     <DropdownMenuTrigger>
                       <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
@@ -136,7 +139,7 @@ export default function UsersPage() {
               </tr>
             ))}
             {!data?.users?.length && (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">No users found</td></tr>
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-sm" style={{ color: '#6C757D' }}>No users found</td></tr>
             )}
           </tbody>
         </table>
