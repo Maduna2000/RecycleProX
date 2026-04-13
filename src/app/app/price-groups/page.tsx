@@ -13,6 +13,8 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { CreatePriceGroupSchema, type CreatePriceGroupInput, type CreatePriceGroupFormInput } from '@/lib/schemas/product'
 import { useSession } from 'next-auth/react'
+import { PageShell } from '@/components/layout/PageShell'
+import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -31,78 +33,79 @@ export default function PriceGroupsPage() {
   const { data } = useSWR<{ groups: PriceGroup[] }>('/api/price-groups', fetcher)
   const groups = data?.groups ?? []
 
+  const count = groups.length
+  const subtitle = `${count} price group${count !== 1 ? 's' : ''}`
+
   return (
-    <div className="flex flex-col flex-1 min-h-0 gap-3">
+    <PageShell title="Price Groups" subtitle={subtitle}>
+      <div className="flex flex-col flex-1 min-h-0 gap-3">
 
-      {/* Page header */}
-      <div className="flex items-center justify-between shrink-0">
-        <div>
-          <h1 className="text-xl font-bold" style={{ color: '#212529' }}>Price Groups</h1>
-          <p className="text-sm mt-0.5" style={{ color: '#6C757D' }}>Assign custom buy/sell prices to customer groups</p>
-        </div>
+        {/* Actions row */}
         {isManager && (
-          <button
-            onClick={() => setCreateOpen(true)}
-            className="flex items-center gap-1.5 h-8 px-3 rounded text-xs font-medium text-white transition-colors"
-            style={{ background: '#217346' }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = '#185A38')}
-            onMouseLeave={(e) => (e.currentTarget.style.background = '#217346')}
-          >
-            <Plus className="w-3.5 h-3.5" /> New Group
-          </button>
-        )}
-      </div>
-
-      {/* List */}
-      <div className="flex-1 min-h-0 overflow-y-auto space-y-2">
-        {groups.length === 0 ? (
-          <div className="rounded-lg p-10 text-center text-sm bg-white" style={{ border: '1px solid #E0E0E0', color: '#6C757D' }}>
-            No price groups created yet
-          </div>
-        ) : (
-          groups.map((g) => (
-            <div
-              key={g.id}
-              className="bg-white rounded-lg p-4 flex items-center justify-between cursor-pointer transition-colors"
-              style={{ border: '1px solid #E0E0E0' }}
-              onClick={() => router.push(`/app/price-groups/${g.id}`)}
-              onMouseEnter={(e) => (e.currentTarget.style.borderColor = '#217346')}
-              onMouseLeave={(e) => (e.currentTarget.style.borderColor = '#E0E0E0')}
+          <div className="flex justify-end shrink-0">
+            <button
+              onClick={() => setCreateOpen(true)}
+              className="flex items-center gap-1.5 h-8 px-3 rounded text-xs font-medium text-white transition-colors"
+              style={{ background: colors.action }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = '#185A38')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = colors.action)}
             >
-              <div className="flex items-center gap-3">
-                {g.isDefault && <Star className="w-4 h-4 shrink-0" style={{ color: '#C9A020', fill: '#C9A020' }} />}
-                <div>
-                  <p className="font-semibold text-sm" style={{ color: '#212529' }}>{g.name}</p>
-                  {g.description && <p className="text-xs mt-0.5" style={{ color: '#6C757D' }}>{g.description}</p>}
-                  <div className="flex items-center gap-3 mt-1">
-                    <span className="text-xs" style={{ color: '#6C757D' }}>{g._count.customers} customers</span>
-                    <span className="text-xs" style={{ color: '#6C757D' }}>{g._count.overrides} price overrides</span>
+              <Plus className="w-3.5 h-3.5" /> New Group
+            </button>
+          </div>
+        )}
+
+        {/* List */}
+        <div className="flex-1 min-h-0 overflow-y-auto space-y-2">
+          {groups.length === 0 ? (
+            <div className="rounded-lg p-10 text-center text-sm bg-white" style={{ border: `1px solid ${colors.border}`, color: colors.textSecondary }}>
+              No price groups created yet
+            </div>
+          ) : (
+            groups.map((g) => (
+              <div
+                key={g.id}
+                className="bg-white rounded-lg p-4 flex items-center justify-between cursor-pointer transition-colors"
+                style={{ border: `1px solid ${colors.border}` }}
+                onClick={() => router.push(`/app/price-groups/${g.id}`)}
+                onMouseEnter={(e) => (e.currentTarget.style.borderColor = colors.action)}
+                onMouseLeave={(e) => (e.currentTarget.style.borderColor = colors.border)}
+              >
+                <div className="flex items-center gap-3">
+                  {g.isDefault && <Star className="w-4 h-4 shrink-0" style={{ color: colors.warning, fill: colors.warning }} />}
+                  <div>
+                    <p className="font-semibold text-sm" style={{ color: colors.textPrimary }}>{g.name}</p>
+                    {g.description && <p className="text-xs mt-0.5" style={{ color: colors.textSecondary }}>{g.description}</p>}
+                    <div className="flex items-center gap-3 mt-1">
+                      <span className="text-xs" style={{ color: colors.textSecondary }}>{g._count.customers} customers</span>
+                      <span className="text-xs" style={{ color: colors.textSecondary }}>{g._count.overrides} price overrides</span>
+                    </div>
                   </div>
                 </div>
+                <div className="flex items-center gap-2">
+                  {g.isDefault && (
+                    <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: colors.warningBg, color: colors.warning }}>Default</span>
+                  )}
+                  <span className="px-2 py-0.5 rounded text-xs font-medium" style={g.isActive
+                    ? { background: colors.actionBg, color: colors.action }
+                    : { background: colors.neutralBg, color: colors.textSecondary }}>
+                    {g.isActive ? 'Active' : 'Inactive'}
+                  </span>
+                  <ChevronRight className="w-4 h-4" style={{ color: colors.textSecondary }} />
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                {g.isDefault && (
-                  <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: '#FFFBEB', color: '#C9A020' }}>Default</span>
-                )}
-                <span className="px-2 py-0.5 rounded text-xs font-medium" style={g.isActive
-                  ? { background: '#F0FBF4', color: '#217346' }
-                  : { background: '#F1F3F4', color: '#6C757D' }}>
-                  {g.isActive ? 'Active' : 'Inactive'}
-                </span>
-                <ChevronRight className="w-4 h-4" style={{ color: '#6C757D' }} />
-              </div>
-            </div>
-          ))
+            ))
+          )}
+        </div>
+
+        {createOpen && (
+          <CreatePriceGroupModal
+            onClose={() => setCreateOpen(false)}
+            onSuccess={() => { mutate('/api/price-groups'); setCreateOpen(false) }}
+          />
         )}
       </div>
-
-      {createOpen && (
-        <CreatePriceGroupModal
-          onClose={() => setCreateOpen(false)}
-          onSuccess={() => { mutate('/api/price-groups'); setCreateOpen(false) }}
-        />
-      )}
-    </div>
+    </PageShell>
   )
 }
 
@@ -128,15 +131,15 @@ function CreatePriceGroupModal({ onClose, onSuccess }: { onClose: () => void; on
         <DialogHeader><DialogTitle>New Price Group</DialogTitle></DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-2">
           <div>
-            <Label style={{ color: '#212529' }}>Group Name</Label>
+            <Label style={{ color: colors.textPrimary }}>Group Name</Label>
             <Input {...register('name')} className="mt-1 border-[#E0E0E0]" placeholder="e.g. Platinum Dealer" disabled={loading} />
-            {errors.name && <p className="text-xs mt-1" style={{ color: '#C0392B' }}>{errors.name.message}</p>}
+            {errors.name && <p className="text-xs mt-1" style={{ color: colors.danger }}>{errors.name.message}</p>}
           </div>
           <div>
-            <Label style={{ color: '#212529' }}>Description <span className="font-normal" style={{ color: '#6C757D' }}>(optional)</span></Label>
+            <Label style={{ color: colors.textPrimary }}>Description <span className="font-normal" style={{ color: colors.textSecondary }}>(optional)</span></Label>
             <Input {...register('description')} className="mt-1 border-[#E0E0E0]" disabled={loading} />
           </div>
-          <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: '#212529' }}>
+          <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: colors.textPrimary }}>
             <input type="checkbox" onChange={(e) => setValue('isDefault', e.target.checked)} className="rounded" />
             Set as default price group
           </label>
@@ -146,9 +149,9 @@ function CreatePriceGroupModal({ onClose, onSuccess }: { onClose: () => void; on
               type="submit"
               disabled={loading}
               className="flex items-center gap-1.5 h-9 px-4 rounded text-sm font-medium text-white transition-colors disabled:opacity-50"
-              style={{ background: '#217346' }}
+              style={{ background: colors.action }}
               onMouseEnter={(e) => !loading && (e.currentTarget.style.background = '#185A38')}
-              onMouseLeave={(e) => !loading && (e.currentTarget.style.background = '#217346')}
+              onMouseLeave={(e) => !loading && (e.currentTarget.style.background = colors.action)}
             >
               {loading ? <><Loader2 className="w-4 h-4 animate-spin" />Creating…</> : 'Create Group'}
             </button>

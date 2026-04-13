@@ -6,8 +6,10 @@ import { useSession } from 'next-auth/react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Loader2, Settings, Save } from 'lucide-react'
+import { Loader2, Save } from 'lucide-react'
 import { toast } from 'sonner'
+import { PageShell } from '@/components/layout/PageShell'
+import { colors } from '@/lib/design-tokens'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -54,9 +56,9 @@ function ScaleRow({
 }) {
   const type = (form[scaleKey(n, 'type')] ?? 'none') as ScaleType
   return (
-    <div className="rounded-lg p-4 space-y-3" style={{ border: '1px solid #E0E0E0' }}>
+    <div className="rounded-lg p-4 space-y-3" style={{ border: `1px solid ${colors.border}` }}>
       <div className="flex items-center gap-3">
-        <span className="text-xs font-semibold w-16" style={{ color: '#212529' }}>Scale {n}</span>
+        <span className="text-xs font-semibold w-16" style={{ color: colors.textPrimary }}>Scale {n}</span>
         <div className="flex-1 max-w-[180px]">
           <Select
             value={type}
@@ -145,9 +147,11 @@ export default function SettingsPage() {
 
   if (!isAdmin) {
     return (
-      <div className="flex items-center justify-center h-40 text-sm" style={{ color: '#6C757D' }}>
-        Access restricted to administrators.
-      </div>
+      <PageShell title="Settings" subtitle="System configuration">
+        <div className="flex items-center justify-center h-40 text-sm" style={{ color: colors.textSecondary }}>
+          Access restricted to administrators.
+        </div>
+      </PageShell>
     )
   }
 
@@ -168,22 +172,18 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto">
+    <PageShell title="Settings" subtitle="System configuration">
       <div className="max-w-2xl space-y-5 pb-6">
-      <div className="flex items-center gap-2">
-        <Settings className="w-5 h-5" style={{ color: '#217346' }} />
-        <h1 className="text-xl font-bold" style={{ color: '#212529' }}>System Settings</h1>
-      </div>
 
       {isLoading ? (
-        <div className="flex items-center gap-2 p-10" style={{ color: '#6C757D' }}>
+        <div className="flex items-center gap-2 p-10" style={{ color: colors.textSecondary }}>
           <Loader2 className="w-4 h-4 animate-spin" /> Loading…
         </div>
       ) : (
         <div className="space-y-4">
           {/* ── Yard Information ─────────────────────────── */}
-          <div className="rounded-lg border p-5 space-y-4 bg-white" style={{ borderColor: '#E0E0E0' }}>
-            <h2 className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#6C757D' }}>Yard Information</h2>
+          <div className="rounded-lg border p-5 space-y-4 bg-white" style={{ borderColor: colors.border }}>
+            <h2 className="text-xs font-semibold uppercase tracking-wide" style={{ color: colors.textSecondary }}>Yard Information</h2>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -218,8 +218,8 @@ export default function SettingsPage() {
           </div>
 
           {/* ── Tax & Receipts ────────────────────────────── */}
-          <div className="rounded-lg border p-5 space-y-4 bg-white" style={{ borderColor: '#E0E0E0' }}>
-            <h2 className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#6C757D' }}>Tax &amp; Receipts</h2>
+          <div className="rounded-lg border p-5 space-y-4 bg-white" style={{ borderColor: colors.border }}>
+            <h2 className="text-xs font-semibold uppercase tracking-wide" style={{ color: colors.textSecondary }}>Tax &amp; Receipts</h2>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -234,7 +234,7 @@ export default function SettingsPage() {
                   className="mt-1"
                   placeholder="15"
                 />
-                <p className="text-xs mt-1" style={{ color: '#6C757D' }}>Used for expense VAT calculations. Default: 15%</p>
+                <p className="text-xs mt-1" style={{ color: colors.textSecondary }}>Used for expense VAT calculations. Default: 15%</p>
               </div>
             </div>
 
@@ -250,10 +250,10 @@ export default function SettingsPage() {
           </div>
 
           {/* ── Scale Configuration ───────────────────────── */}
-          <div className="rounded-lg border p-5 space-y-4 bg-white" style={{ borderColor: '#E0E0E0' }}>
+          <div className="rounded-lg border p-5 space-y-4 bg-white" style={{ borderColor: colors.border }}>
             <div>
-              <h2 className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#6C757D' }}>Scale Configuration</h2>
-              <p className="text-xs mt-1" style={{ color: '#6C757D' }}>
+              <h2 className="text-xs font-semibold uppercase tracking-wide" style={{ color: colors.textSecondary }}>Scale Configuration</h2>
+              <p className="text-xs mt-1" style={{ color: colors.textSecondary }}>
                 Configure up to 3 platform scales. TCP connects over your local network;
                 Serial connects via RS232/USB-serial adapter.
               </p>
@@ -270,7 +270,7 @@ export default function SettingsPage() {
               onClick={handleSave}
               disabled={saving}
               className="flex items-center gap-1.5 px-4 py-1.5 rounded text-xs font-medium text-white disabled:opacity-50"
-              style={{ background: '#217346' }}
+              style={{ background: colors.action }}
             >
               {saving
                 ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Saving…</>
@@ -279,7 +279,7 @@ export default function SettingsPage() {
           </div>
         </div>
       )}
-    </div>
-    </div>
+      </div>
+    </PageShell>
   )
 }

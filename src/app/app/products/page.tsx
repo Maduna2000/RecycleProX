@@ -14,18 +14,20 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { CreateProductSchema, UpdateProductSchema, BulkPriceUpdateSchema, type CreateProductInput, type CreateProductFormInput, type UpdateProductInput } from '@/lib/schemas/product'
 import { useSession } from 'next-auth/react'
 import Decimal from 'decimal.js'
+import { PageShell } from '@/components/layout/PageShell'
+import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 function calcMargin(buy: string, sell: string): { pct: string; color: string } {
   const b = new Decimal(buy  || '0')
   const s = new Decimal(sell || '0')
-  if (b.isZero()) return { pct: '—', color: '#6C757D' }
+  if (b.isZero()) return { pct: '—', color: colors.textSecondary }
   const pct = s.minus(b).dividedBy(b).times(100)
   const formatted = pct.toFixed(1) + '%'
-  if (pct.gte(20)) return { pct: formatted, color: '#217346' }
-  if (pct.gte(10)) return { pct: formatted, color: '#C9A020' }
-  return { pct: formatted, color: '#C0392B' }
+  if (pct.gte(20)) return { pct: formatted, color: colors.action }
+  if (pct.gte(10)) return { pct: formatted, color: colors.warning }
+  return { pct: formatted, color: colors.danger }
 }
 
 const CATEGORIES = [
@@ -40,14 +42,14 @@ const CATEGORIES = [
 ]
 
 const CATEGORY_STYLES: Record<string, { background: string; color: string }> = {
-  ferrous:     { background: '#F1F3F4', color: '#6C757D' },
-  non_ferrous: { background: '#EBF3FC', color: '#185ABD' },
-  copper:      { background: '#FEF3E8', color: '#C0392B' },
-  aluminium:   { background: '#F3EBF9', color: '#7B2D8B' },
-  plastic:     { background: '#FFFBEB', color: '#C9A020' },
-  paper:       { background: '#F0FBF4', color: '#217346' },
-  e_waste:     { background: '#FEF2F2', color: '#C0392B' },
-  other:       { background: '#F1F3F4', color: '#6C757D' },
+  ferrous:     { background: colors.neutralBg,  color: colors.textSecondary },
+  non_ferrous: { background: colors.processBg,  color: colors.process },
+  copper:      { background: '#FEF3E8',          color: colors.danger },
+  aluminium:   { background: '#F3EBF9',          color: '#7B2D8B' },
+  plastic:     { background: colors.warningBg,  color: colors.warning },
+  paper:       { background: colors.actionBg,   color: colors.action },
+  e_waste:     { background: colors.dangerBg,   color: colors.danger },
+  other:       { background: colors.neutralBg,  color: colors.textSecondary },
 }
 
 type Product = {
@@ -85,30 +87,30 @@ export default function ProductsPage() {
   const revalidate = () => mutate(`/api/products?${query}`)
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 gap-3">
-
-      {/* Page header */}
-      <div className="shrink-0">
-        <h1 className="text-xl font-bold" style={{ color: '#212529' }}>Products &amp; Pricing</h1>
-        <p className="text-sm mt-0.5" style={{ color: '#6C757D' }}>{products.length} products</p>
-      </div>
+    <PageShell title="Products" subtitle={`${products.length} products`}>
 
       {/* Filters */}
-      <div className="flex gap-2 flex-wrap items-center shrink-0">
+      <div className="flex gap-2 flex-wrap items-center shrink-0 mb-3">
         <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3" style={{ color: '#6C757D' }} />
-          <Input placeholder="Search code or name…" className="pl-7 h-7 text-xs w-56 border-[#E0E0E0]" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3" style={{ color: colors.textSecondary }} />
+          <Input
+            placeholder="Search code or name…"
+            className="pl-7 h-7 text-xs w-56"
+            style={{ borderColor: colors.border }}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
         </div>
         <select
-          className="border border-[#E0E0E0] rounded px-2 py-1 text-xs bg-white focus:outline-none focus:border-[#185ABD]"
-          style={{ color: '#212529' }}
+          className="border rounded px-2 py-1 text-xs bg-white focus:outline-none"
+          style={{ borderColor: colors.border, color: colors.textPrimary }}
           value={category}
           onChange={(e) => setCategory(e.target.value)}
         >
           <option value="">All Categories</option>
           {CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
         </select>
-        <label className="flex items-center gap-1.5 text-xs cursor-pointer" style={{ color: '#6C757D' }}>
+        <label className="flex items-center gap-1.5 text-xs cursor-pointer" style={{ color: colors.textSecondary }}>
           <input type="checkbox" checked={activeOnly} onChange={(e) => setActiveOnly(e.target.checked)} className="rounded" />
           Active only
         </label>
@@ -116,8 +118,8 @@ export default function ProductsPage() {
           <div className="ml-auto flex gap-2">
             <button
               onClick={() => setBulkOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium border border-[#E0E0E0] bg-white"
-              style={{ color: '#212529' }}
+              className="flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium border bg-white"
+              style={{ borderColor: colors.border, color: colors.textPrimary }}
             >
               <TrendingUp className="w-3.5 h-3.5" /> Bulk Price Update
             </button>
@@ -128,37 +130,60 @@ export default function ProductsPage() {
       {/* Product tables grouped by category */}
       <div className="flex-1 min-h-0 overflow-y-auto space-y-3 pb-4">
         {grouped.length === 0 ? (
-          <div className="flex items-center justify-center py-10 rounded-lg text-sm" style={{ background: '#F8F9FA', border: '1px solid #E0E0E0', color: '#6C757D' }}>
+          <div
+            className="flex items-center justify-center py-10 rounded-lg text-sm"
+            style={{ background: colors.toolbar, border: `1px solid ${colors.border}`, color: colors.textSecondary }}
+          >
             No products found
           </div>
         ) : (
           grouped.map(({ category: cat, label, items }) => (
-            <div key={cat} className="rounded-lg overflow-hidden" style={{ border: '1px solid #E0E0E0' }}>
-              <div className="flex items-center gap-2 px-4 py-2" style={{ background: '#F8F9FA', borderBottom: '1px solid #E0E0E0' }}>
-                <span className="px-2 py-0.5 rounded text-xs font-medium" style={CATEGORY_STYLES[cat] ?? { background: '#F1F3F4', color: '#6C757D' }}>{label}</span>
-                <span className="text-xs" style={{ color: '#6C757D' }}>{items.length} items</span>
+            <div key={cat} className="rounded-lg overflow-hidden" style={{ border: `1px solid ${colors.border}` }}>
+              <div
+                className="flex items-center gap-2 px-4 py-2"
+                style={{ background: colors.toolbar, borderBottom: `1px solid ${colors.border}` }}
+              >
+                <span
+                  className="px-2 py-0.5 rounded text-xs font-medium"
+                  style={CATEGORY_STYLES[cat] ?? { background: colors.neutralBg, color: colors.textSecondary }}
+                >
+                  {label}
+                </span>
+                <span className="text-xs" style={{ color: colors.textSecondary }}>{items.length} items</span>
               </div>
-              <table className="w-full bg-white">
+              <table className="w-full" style={{ background: colors.surface }}>
                 <thead>
-                  <tr style={{ borderBottom: '1px solid #E0E0E0' }}>
+                  <tr style={{ borderBottom: `1px solid ${colors.border}` }}>
                     {['Code', 'Name', 'Unit', 'Buy Price', 'Sell Price', 'Margin %', 'Status', ...(isManager ? [''] : [])].map((h) => (
-                      <th key={h} className="text-left px-4 py-2" style={{ fontSize: 10, fontWeight: 600, color: '#6C757D', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
+                      <th
+                        key={h}
+                        className="text-left px-4 py-2"
+                        style={{ fontSize: fontSize.xs, fontWeight: fontWeight.semibold, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.04em' }}
+                      >
+                        {h}
+                      </th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {items.map((p, i) => (
-                    <tr key={p.id} style={{ borderBottom: i < items.length - 1 ? '1px solid #F1F3F4' : 'none' }}>
-                      <td className="px-4 py-2.5 font-mono" style={{ fontSize: 11, color: '#6C757D' }}>{p.code}</td>
-                      <td className="px-4 py-2.5 font-medium" style={{ fontSize: 12, color: '#212529' }}>{p.name}</td>
-                      <td className="px-4 py-2.5 uppercase" style={{ fontSize: 11, color: '#6C757D' }}>{p.unit}</td>
-                      <td className="px-4 py-2.5 font-mono" style={{ fontSize: 12, color: '#217346' }}>R {new Decimal(p.defaultBuyPrice).toFixed(2)}</td>
-                      <td className="px-4 py-2.5 font-mono" style={{ fontSize: 12, color: '#185ABD' }}>R {new Decimal(p.defaultSellPrice).toFixed(2)}</td>
-                      <td className="px-4 py-2.5 font-mono font-semibold" style={{ fontSize: 12, color: calcMargin(p.defaultBuyPrice, p.defaultSellPrice).color }}>
+                    <tr key={p.id} style={{ borderBottom: i < items.length - 1 ? `1px solid ${colors.neutralBg}` : 'none' }}>
+                      <td className="px-4 py-2.5 font-mono" style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>{p.code}</td>
+                      <td className="px-4 py-2.5 font-medium" style={{ fontSize: fontSize.sm, color: colors.textPrimary }}>{p.name}</td>
+                      <td className="px-4 py-2.5 uppercase" style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>{p.unit}</td>
+                      <td className="px-4 py-2.5 font-mono" style={{ fontSize: fontSize.sm, color: colors.action }}>R {new Decimal(p.defaultBuyPrice).toFixed(2)}</td>
+                      <td className="px-4 py-2.5 font-mono" style={{ fontSize: fontSize.sm, color: colors.process }}>R {new Decimal(p.defaultSellPrice).toFixed(2)}</td>
+                      <td className="px-4 py-2.5 font-mono font-semibold" style={{ fontSize: fontSize.sm, color: calcMargin(p.defaultBuyPrice, p.defaultSellPrice).color }}>
                         {calcMargin(p.defaultBuyPrice, p.defaultSellPrice).pct}
                       </td>
                       <td className="px-4 py-2.5">
-                        <span className="px-2 py-0.5 rounded text-xs font-medium" style={p.isActive ? { background: '#F0FBF4', color: '#217346' } : { background: '#F1F3F4', color: '#6C757D' }}>
+                        <span
+                          className="px-2 py-0.5 rounded text-xs font-medium"
+                          style={p.isActive
+                            ? { background: colors.actionBg, color: colors.action }
+                            : { background: colors.neutralBg, color: colors.textSecondary }
+                          }
+                        >
                           {p.isActive ? 'Active' : 'Inactive'}
                         </span>
                       </td>
@@ -166,8 +191,10 @@ export default function ProductsPage() {
                         <td className="px-4 py-2.5">
                           <button
                             onClick={() => setEditProduct(p)}
-                            className="p-1 rounded hover:bg-[#F1F3F4]"
-                            style={{ color: '#6C757D' }}
+                            className="p-1 rounded"
+                            style={{ color: colors.textSecondary }}
+                            onMouseEnter={(e) => (e.currentTarget.style.background = colors.neutralBg)}
+                            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                           >
                             <Pencil className="w-3.5 h-3.5" />
                           </button>
@@ -202,7 +229,7 @@ export default function ProductsPage() {
           onSuccess={() => { revalidate(); setBulkOpen(false) }}
         />
       )}
-    </div>
+    </PageShell>
   )
 }
 
@@ -275,7 +302,7 @@ function CreateProductModal({ onClose, onSuccess }: { onClose: () => void; onSuc
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
-            <Button type="submit" className="bg-green-600 hover:bg-green-700" disabled={loading}>
+            <Button type="submit" style={{ background: colors.action }} className="hover:opacity-90 text-white" disabled={loading}>
               {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving...</> : 'Create Product'}
             </Button>
           </div>
@@ -359,7 +386,7 @@ function EditProductModal({ product, onClose, onSuccess }: { product: Product; o
           </label>
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
-            <Button type="submit" className="bg-green-600 hover:bg-green-700" disabled={loading}>
+            <Button type="submit" style={{ background: colors.action }} className="hover:opacity-90 text-white" disabled={loading}>
               {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving...</> : 'Save Changes'}
             </Button>
           </div>
@@ -414,21 +441,35 @@ function BulkPriceModal({ products, onClose, onSuccess }: { products: Product[];
 
         {!preview ? (
           <div className="space-y-3 mt-2">
-            <p className="text-sm text-gray-500">Edit buy/sell prices below. Only changed prices will be updated.</p>
+            <p className="text-sm" style={{ color: colors.textSecondary }}>Edit buy/sell prices below. Only changed prices will be updated.</p>
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b">
+                <tr style={{ borderBottom: `1px solid ${colors.border}` }}>
                   {['Product', 'Buy Price (R)', 'Sell Price (R)'].map((h) => (
-                    <th key={h} className="text-left px-2 py-2 text-xs font-semibold text-gray-500 uppercase">{h}</th>
+                    <th
+                      key={h}
+                      className="text-left px-2 py-2 uppercase"
+                      style={{ fontSize: fontSize.xs, fontWeight: fontWeight.semibold, color: colors.textSecondary }}
+                    >
+                      {h}
+                    </th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y">
+              <tbody className="divide-y" style={{ borderColor: colors.border }}>
                 {products.filter((p) => p.isActive).map((p) => (
-                  <tr key={p.id} className={prices[p.id]?.buy !== Number(p.defaultBuyPrice).toFixed(2) || prices[p.id]?.sell !== Number(p.defaultSellPrice).toFixed(2) ? 'bg-yellow-50' : ''}>
+                  <tr
+                    key={p.id}
+                    style={
+                      prices[p.id]?.buy !== Number(p.defaultBuyPrice).toFixed(2) ||
+                      prices[p.id]?.sell !== Number(p.defaultSellPrice).toFixed(2)
+                        ? { background: colors.warningBg }
+                        : {}
+                    }
+                  >
                     <td className="px-2 py-2">
-                      <p className="font-medium text-gray-900">{p.name}</p>
-                      <p className="text-xs text-gray-400 font-mono">{p.code}</p>
+                      <p className="font-medium" style={{ color: colors.textPrimary }}>{p.name}</p>
+                      <p className="text-xs font-mono" style={{ color: colors.textMuted }}>{p.code}</p>
                     </td>
                     <td className="px-2 py-2">
                       <Input
@@ -449,16 +490,17 @@ function BulkPriceModal({ products, onClose, onSuccess }: { products: Product[];
               </tbody>
             </table>
             <div>
-              <Label>Reason for update <span className="text-gray-400 font-normal">(optional)</span></Label>
+              <Label>Reason for update <span className="font-normal" style={{ color: colors.textMuted }}>(optional)</span></Label>
               <Input value={reason} onChange={(e) => setReason(e.target.value)} className="mt-1" placeholder="e.g. Market price adjustment" />
             </div>
             <div className="flex justify-between items-center pt-2">
-              <p className="text-sm text-gray-500">{changed.length} product{changed.length !== 1 ? 's' : ''} changed</p>
+              <p className="text-sm" style={{ color: colors.textSecondary }}>{changed.length} product{changed.length !== 1 ? 's' : ''} changed</p>
               <div className="flex gap-2">
                 <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
                 <Button
                   type="button"
-                  className="bg-green-600 hover:bg-green-700"
+                  style={{ background: colors.action }}
+                  className="hover:opacity-90 text-white"
                   disabled={changed.length === 0}
                   onClick={() => setPreview(true)}
                 >
@@ -469,34 +511,46 @@ function BulkPriceModal({ products, onClose, onSuccess }: { products: Product[];
           </div>
         ) : (
           <div className="space-y-4 mt-2">
-            <p className="text-sm text-gray-600">The following {changed.length} price{changed.length !== 1 ? 's' : ''} will be updated:</p>
-            <table className="w-full text-sm border rounded-lg overflow-hidden">
-              <thead className="bg-gray-50 border-b">
+            <p className="text-sm" style={{ color: colors.textSecondary }}>The following {changed.length} price{changed.length !== 1 ? 's' : ''} will be updated:</p>
+            <table className="w-full text-sm rounded-lg overflow-hidden" style={{ border: `1px solid ${colors.border}` }}>
+              <thead style={{ background: colors.neutralBg, borderBottom: `1px solid ${colors.border}` }}>
                 <tr>
                   {['Product', 'Old Buy', 'New Buy', 'Old Sell', 'New Sell'].map((h) => (
-                    <th key={h} className="text-left px-3 py-2 text-xs font-semibold text-gray-500 uppercase">{h}</th>
+                    <th
+                      key={h}
+                      className="text-left px-3 py-2 uppercase"
+                      style={{ fontSize: fontSize.xs, fontWeight: fontWeight.semibold, color: colors.textSecondary }}
+                    >
+                      {h}
+                    </th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y">
+              <tbody className="divide-y" style={{ borderColor: colors.border }}>
                 {changed.map((p) => (
                   <tr key={p.id}>
                     <td className="px-3 py-2">
-                      <p className="font-medium">{p.name}</p>
-                      <p className="text-xs text-gray-400 font-mono">{p.code}</p>
+                      <p className="font-medium" style={{ color: colors.textPrimary }}>{p.name}</p>
+                      <p className="text-xs font-mono" style={{ color: colors.textMuted }}>{p.code}</p>
                     </td>
-                    <td className="px-3 py-2 font-mono text-gray-500">R {Number(p.defaultBuyPrice).toFixed(2)}</td>
-                    <td className="px-3 py-2 font-mono text-green-700 font-semibold">R {Number(prices[p.id]?.buy).toFixed(2)}</td>
-                    <td className="px-3 py-2 font-mono text-gray-500">R {Number(p.defaultSellPrice).toFixed(2)}</td>
-                    <td className="px-3 py-2 font-mono text-blue-700 font-semibold">R {Number(prices[p.id]?.sell).toFixed(2)}</td>
+                    <td className="px-3 py-2 font-mono" style={{ color: colors.textSecondary }}>R {Number(p.defaultBuyPrice).toFixed(2)}</td>
+                    <td className="px-3 py-2 font-mono font-semibold" style={{ color: colors.action }}>R {Number(prices[p.id]?.buy).toFixed(2)}</td>
+                    <td className="px-3 py-2 font-mono" style={{ color: colors.textSecondary }}>R {Number(p.defaultSellPrice).toFixed(2)}</td>
+                    <td className="px-3 py-2 font-mono font-semibold" style={{ color: colors.process }}>R {Number(prices[p.id]?.sell).toFixed(2)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            {reason && <p className="text-sm text-gray-500">Reason: <span className="font-medium">{reason}</span></p>}
+            {reason && <p className="text-sm" style={{ color: colors.textSecondary }}>Reason: <span className="font-medium">{reason}</span></p>}
             <div className="flex justify-end gap-2 pt-2">
               <Button type="button" variant="outline" onClick={() => setPreview(false)} disabled={loading}>Back</Button>
-              <Button type="button" className="bg-green-600 hover:bg-green-700" onClick={onConfirm} disabled={loading}>
+              <Button
+                type="button"
+                style={{ background: colors.action }}
+                className="hover:opacity-90 text-white"
+                onClick={onConfirm}
+                disabled={loading}
+              >
                 {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Updating...</> : 'Confirm Update'}
               </Button>
             </div>

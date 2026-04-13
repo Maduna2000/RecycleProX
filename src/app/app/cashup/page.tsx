@@ -11,6 +11,8 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { CheckCircle2, Clock, Loader2, Lock, Info } from 'lucide-react'
 import { DENOMINATIONS, DENOMINATION_LABELS, type Denomination } from '@/lib/schemas/cashup'
+import { PageShell } from '@/components/layout/PageShell'
+import { colors } from '@/lib/design-tokens'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -49,8 +51,8 @@ function DenomRow({
   const value   = new Decimal(count).times(denom).div(100)
   return (
     <div className="flex items-center gap-3">
-      <span className="w-12 text-right font-mono text-sm font-semibold" style={{ color: '#212529' }}>{label}</span>
-      <span className="text-xs" style={{ color: '#6C757D' }}>×</span>
+      <span className="w-12 text-right font-mono text-sm font-semibold" style={{ color: colors.textPrimary }}>{label}</span>
+      <span className="text-xs" style={{ color: colors.textSecondary }}>×</span>
       <Input
         type="number" min={0}
         value={count === 0 ? '' : count}
@@ -58,8 +60,8 @@ function DenomRow({
         className="w-20 text-right font-mono border-[#E0E0E0]"
         disabled={disabled} placeholder="0"
       />
-      <span className="text-xs" style={{ color: '#6C757D' }}>=</span>
-      <span className="w-20 text-right font-mono text-sm" style={{ color: '#212529' }}>R {value.toFixed(2)}</span>
+      <span className="text-xs" style={{ color: colors.textSecondary }}>=</span>
+      <span className="w-20 text-right font-mono text-sm" style={{ color: colors.textPrimary }}>R {value.toFixed(2)}</span>
     </div>
   )
 }
@@ -143,31 +145,29 @@ export default function CashUpPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-40 text-sm" style={{ color: '#6C757D' }}>
-        Loading…
-      </div>
+      <PageShell title="Cash-Up" subtitle="Daily reconciliation">
+        <div className="flex items-center justify-center h-40 text-sm" style={{ color: colors.textSecondary }}>
+          Loading…
+        </div>
+      </PageShell>
     )
   }
 
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto">
+    <PageShell title="Cash-Up" subtitle={`${today} · Daily cash reconciliation`}>
       <div className="max-w-2xl space-y-5 pb-6">
-      <div>
-        <h1 className="text-xl font-bold" style={{ color: '#212529' }}>Cash-Up</h1>
-        <p className="text-sm mt-0.5" style={{ color: '#6C757D' }}>{today} · Daily cash reconciliation</p>
-      </div>
 
       {/* No session yet */}
       {!cashUp && (
-        <div className="rounded-lg border p-8 text-center bg-white" style={{ borderColor: '#E0E0E0' }}>
-          <Clock className="w-10 h-10 mx-auto mb-3" style={{ color: '#E0E0E0' }} />
-          <p className="font-medium mb-1" style={{ color: '#212529' }}>No session open for today</p>
-          <p className="text-sm mb-5" style={{ color: '#6C757D' }}>Open a session to begin tracking today&apos;s cash.</p>
+        <div className="rounded-lg border p-8 text-center bg-white" style={{ borderColor: colors.border }}>
+          <Clock className="w-10 h-10 mx-auto mb-3" style={{ color: colors.border }} />
+          <p className="font-medium mb-1" style={{ color: colors.textPrimary }}>No session open for today</p>
+          <p className="text-sm mb-5" style={{ color: colors.textSecondary }}>Open a session to begin tracking today&apos;s cash.</p>
           <button
             onClick={handleOpen}
             disabled={opening}
             className="flex items-center gap-1.5 px-4 py-1.5 rounded text-xs font-medium text-white mx-auto disabled:opacity-50"
-            style={{ background: '#217346' }}
+            style={{ background: colors.action }}
           >
             {opening ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Opening…</> : 'Open Session'}
           </button>
@@ -178,18 +178,18 @@ export default function CashUpPage() {
         <>
           {/* Status banner */}
           <div className="flex items-center gap-3">
-            {cashUp.status === 'open'      && <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: '#FFFBEB', color: '#C9A020' }}>Open</span>}
-            {cashUp.status === 'submitted' && <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: '#EBF3FC', color: '#185ABD' }}>Submitted — Awaiting Approval</span>}
-            {cashUp.status === 'approved'  && <span className="flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium" style={{ background: '#F0FBF4', color: '#217346' }}><CheckCircle2 className="w-3 h-3" />Approved</span>}
+            {cashUp.status === 'open'      && <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: colors.warningBg, color: colors.warning }}>Open</span>}
+            {cashUp.status === 'submitted' && <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: colors.processBg, color: colors.process }}>Submitted — Awaiting Approval</span>}
+            {cashUp.status === 'approved'  && <span className="flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium" style={{ background: colors.actionBg, color: colors.action }}><CheckCircle2 className="w-3 h-3" />Approved</span>}
             {cashUp.approvedAt && (
-              <span className="text-xs text-gray-400">{new Date(cashUp.approvedAt).toLocaleString('en-ZA')}</span>
+              <span className="text-xs" style={{ color: colors.textMuted }}>{new Date(cashUp.approvedAt).toLocaleString('en-ZA')}</span>
             )}
           </div>
 
           {/* Opening float info */}
           {new Decimal(cashUp.openingBalance ?? '0').gt(0) && (
-            <div className="flex items-center gap-2 p-3 rounded-lg text-sm" style={{ background: '#FFFBEB', border: '1px solid #C9A02040' }}>
-              <Info className="w-4 h-4 shrink-0" style={{ color: '#C9A020' }} />
+            <div className="flex items-center gap-2 p-3 rounded-lg text-sm" style={{ background: colors.warningBg, border: `1px solid ${colors.warning}40` }}>
+              <Info className="w-4 h-4 shrink-0" style={{ color: colors.warning }} />
               <span style={{ color: '#92700F' }}>
                 Opening float for today: <strong>R {new Decimal(cashUp.openingBalance).toFixed(2)}</strong>
               </span>
@@ -200,8 +200,8 @@ export default function CashUpPage() {
           {cashUp.status === 'open' && (
             <>
               {/* Denomination entry */}
-              <div className="rounded-lg border p-5 bg-white" style={{ borderColor: '#E0E0E0' }}>
-                <h2 className="font-semibold mb-4" style={{ color: '#212529' }}>Count Your Cash</h2>
+              <div className="rounded-lg border p-5 bg-white" style={{ borderColor: colors.border }}>
+                <h2 className="font-semibold mb-4" style={{ color: colors.textPrimary }}>Count Your Cash</h2>
                 <div className="space-y-2">
                   {DENOMINATIONS.map((d) => (
                     <DenomRow
@@ -213,14 +213,14 @@ export default function CashUpPage() {
                   ))}
                 </div>
                 <div className="mt-4 pt-4 border-t flex items-center justify-between">
-                  <span className="font-semibold" style={{ color: '#212529' }}>Declared Total</span>
-                  <span className="font-mono text-lg font-bold" style={{ color: '#212529' }}>R {declaredCash.toFixed(2)}</span>
+                  <span className="font-semibold" style={{ color: colors.textPrimary }}>Declared Total</span>
+                  <span className="font-mono text-lg font-bold" style={{ color: colors.textPrimary }}>R {declaredCash.toFixed(2)}</span>
                 </div>
               </div>
 
               {/* Reconciliation panel */}
-              <div className="rounded-lg border p-5 bg-white" style={{ borderColor: '#E0E0E0' }}>
-                <h2 className="font-semibold mb-4" style={{ color: '#212529' }}>Reconciliation</h2>
+              <div className="rounded-lg border p-5 bg-white" style={{ borderColor: colors.border }}>
+                <h2 className="font-semibold mb-4" style={{ color: colors.textPrimary }}>Reconciliation</h2>
                 <div className="space-y-2 text-sm">
                   <ReconRow label="Opening Balance (float)" value={cashUp.openingBalance ?? '0'} positive />
                   <ReconRow label="Cash Sales received" value={cashUp.systemCashSales} positive />
@@ -232,7 +232,7 @@ export default function CashUpPage() {
                   {/* Editable fields */}
                   <div className="pt-3 space-y-3 border-t">
                     <div className="flex items-center justify-between">
-                      <span style={{ color: '#6C757D' }}>Drawings Received (R)</span>
+                      <span style={{ color: colors.textSecondary }}>Drawings Received (R)</span>
                       <Input
                         type="number" min="0" step="0.01"
                         value={drawings}
@@ -242,7 +242,7 @@ export default function CashUpPage() {
                       />
                     </div>
                     <div className="flex items-center justify-between">
-                      <span style={{ color: '#6C757D' }}>Loans (+/-) (R)</span>
+                      <span style={{ color: colors.textSecondary }}>Loans (+/-) (R)</span>
                       <Input
                         type="number" step="0.01"
                         value={loans}
@@ -269,16 +269,16 @@ export default function CashUpPage() {
                     return (
                       <>
                         <div className="pt-3 border-t flex justify-between font-semibold">
-                          <span style={{ color: '#212529' }}>Expected in Drawer</span>
-                          <span className="font-mono text-gray-900">R {expected.toFixed(2)}</span>
+                          <span style={{ color: colors.textPrimary }}>Expected in Drawer</span>
+                          <span className="font-mono" style={{ color: colors.textPrimary }}>R {expected.toFixed(2)}</span>
                         </div>
                         <div className="flex justify-between font-semibold">
-                          <span style={{ color: '#212529' }}>Declared (counted)</span>
-                          <span className="font-mono text-gray-900">R {declaredCash.toFixed(2)}</span>
+                          <span style={{ color: colors.textPrimary }}>Declared (counted)</span>
+                          <span className="font-mono" style={{ color: colors.textPrimary }}>R {declaredCash.toFixed(2)}</span>
                         </div>
                         <div
                           className="flex justify-between font-semibold rounded px-2 py-1"
-                          style={isZero ? { background: '#F0FBF4', color: '#217346' } : isOver ? { background: '#EBF3FC', color: '#185ABD' } : { background: '#FEF2F2', color: '#C0392B' }}
+                          style={isZero ? { background: colors.actionBg, color: colors.action } : isOver ? { background: colors.processBg, color: colors.process } : { background: colors.dangerBg, color: colors.danger }}
                         >
                           <span>Variance</span>
                           <span className="font-mono">{isOver && !isZero ? '+' : ''}R {variance.toFixed(2)}</span>
@@ -308,8 +308,8 @@ export default function CashUpPage() {
 
           {/* Submitted — view declaration + approve */}
           {cashUp.status === 'submitted' && (
-            <div className="rounded-lg border p-5 bg-white" style={{ borderColor: '#E0E0E0' }}>
-              <h2 className="font-semibold mb-4" style={{ color: '#212529' }}>Cashier Declaration</h2>
+            <div className="rounded-lg border p-5 bg-white" style={{ borderColor: colors.border }}>
+              <h2 className="font-semibold mb-4" style={{ color: colors.textPrimary }}>Cashier Declaration</h2>
 
               {cashUp.denominations && Object.keys(cashUp.denominations).length > 0 && (
                 <div className="mb-4 space-y-1">
@@ -319,11 +319,11 @@ export default function CashUpPage() {
                     const val = new Decimal(c).times(d).div(100)
                     return (
                       <div key={d} className="flex items-center gap-3 text-sm">
-                        <span className="w-12 text-right font-mono font-semibold" style={{ color: '#212529' }}>{DENOMINATION_LABELS[d]}</span>
-                        <span style={{ color: '#6C757D' }}>×</span>
-                        <span className="w-8 text-right font-mono" style={{ color: '#212529' }}>{c}</span>
-                        <span style={{ color: '#6C757D' }}>=</span>
-                        <span className="font-mono" style={{ color: '#212529' }}>R {val.toFixed(2)}</span>
+                        <span className="w-12 text-right font-mono font-semibold" style={{ color: colors.textPrimary }}>{DENOMINATION_LABELS[d]}</span>
+                        <span style={{ color: colors.textSecondary }}>×</span>
+                        <span className="w-8 text-right font-mono" style={{ color: colors.textPrimary }}>{c}</span>
+                        <span style={{ color: colors.textSecondary }}>=</span>
+                        <span className="font-mono" style={{ color: colors.textPrimary }}>R {val.toFixed(2)}</span>
                       </div>
                     )
                   })}
@@ -345,7 +345,7 @@ export default function CashUpPage() {
                 </div>
               </div>
 
-              {cashUp.notes && <p className="mt-3 text-sm italic" style={{ color: '#6C757D' }}>&quot;{cashUp.notes}&quot;</p>}
+              {cashUp.notes && <p className="mt-3 text-sm italic" style={{ color: colors.textSecondary }}>&quot;{cashUp.notes}&quot;</p>}
 
               {isManager ? (
                 <div className="mt-5 flex justify-end">
@@ -354,15 +354,15 @@ export default function CashUpPage() {
                   </Button>
                 </div>
               ) : (
-                <p className="mt-4 text-sm text-center" style={{ color: '#6C757D' }}>Awaiting manager approval</p>
+                <p className="mt-4 text-sm text-center" style={{ color: colors.textSecondary }}>Awaiting manager approval</p>
               )}
             </div>
           )}
 
           {/* Approved summary */}
           {cashUp.status === 'approved' && (
-            <div className="rounded-lg border p-5 bg-white" style={{ borderColor: '#E0E0E0' }}>
-              <h2 className="font-semibold mb-4" style={{ color: '#212529' }}>Approved Summary</h2>
+            <div className="rounded-lg border p-5 bg-white" style={{ borderColor: colors.border }}>
+              <h2 className="font-semibold mb-4" style={{ color: colors.textPrimary }}>Approved Summary</h2>
               <div className="space-y-2 text-sm">
                 <ReconRow label="Opening Balance" value={cashUp.openingBalance ?? '0'} positive />
                 <ReconRow label="Cash Sales" value={cashUp.systemCashSales} positive />
@@ -378,13 +378,13 @@ export default function CashUpPage() {
                   {cashUp.variance !== undefined && <VarianceRow variance={cashUp.variance} />}
                 </div>
               </div>
-              {cashUp.notes && <p className="mt-3 text-sm italic" style={{ color: '#6C757D' }}>&quot;{cashUp.notes}&quot;</p>}
+              {cashUp.notes && <p className="mt-3 text-sm italic" style={{ color: colors.textSecondary }}>&quot;{cashUp.notes}&quot;</p>}
             </div>
           )}
         </>
       )}
       </div>
-    </div>
+    </PageShell>
   )
 }
 
@@ -394,8 +394,8 @@ function ReconRow({ label, value, positive, negative, highlight, muted }: {
   positive?: boolean; negative?: boolean; highlight?: boolean; muted?: boolean
 }) {
   const n = new Decimal(value ?? '0')
-  const labelColor = muted ? '#6C757D' : highlight ? '#212529' : '#6C757D'
-  const valueColor = positive ? '#217346' : negative ? '#C0392B' : muted ? '#6C757D' : '#212529'
+  const labelColor = muted ? colors.textSecondary : highlight ? colors.textPrimary : colors.textSecondary
+  const valueColor = positive ? colors.action : negative ? colors.danger : muted ? colors.textSecondary : colors.textPrimary
   return (
     <div className={`flex justify-between ${highlight ? 'font-semibold' : ''}`}>
       <span style={{ color: labelColor }}>{label}</span>
@@ -410,9 +410,9 @@ function VarianceRow({ variance }: { variance: string }) {
   const v = new Decimal(variance)
   const pos = v.gte(0)
   const style = v.isZero()
-    ? { background: '#F0FBF4', color: '#217346' }
-    : pos ? { background: '#EBF3FC', color: '#185ABD' }
-           : { background: '#FEF2F2', color: '#C0392B' }
+    ? { background: colors.actionBg, color: colors.action }
+    : pos ? { background: colors.processBg, color: colors.process }
+           : { background: colors.dangerBg, color: colors.danger }
   return (
     <div className="flex justify-between font-semibold rounded px-2 py-1 mt-1" style={style}>
       <span>Variance</span>

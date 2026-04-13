@@ -6,6 +6,8 @@ import useSWR, { mutate } from 'swr'
 import { AlertTriangle } from 'lucide-react'
 import { DataTable, Avatar, StatusBadge, type Column, type RowAction } from '@/components/ui/DataTable'
 import { CreateCustomerModal } from '@/components/customers/CreateCustomerModal'
+import { PageShell } from '@/components/layout/PageShell'
+import { colors } from '@/lib/design-tokens'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -47,7 +49,7 @@ export default function CustomersPage() {
       key: 'idNumber',
       header: 'ID Number',
       width: '140px',
-      render: (r) => <span className="font-mono text-xs" style={{ color: '#6C757D' }}>{r.idNumber}</span>,
+      render: (r) => <span className="font-mono text-xs" style={{ color: colors.textSecondary }}>{r.idNumber}</span>,
     },
     {
       key: 'name',
@@ -56,12 +58,12 @@ export default function CustomersPage() {
         <div className="flex items-center gap-2">
           <Avatar name={`${r.firstName} ${r.lastName}`} size={26} />
           <div className="flex items-center gap-1.5">
-            <span style={{ fontSize: 12, fontWeight: 500, color: '#212529' }}>
+            <span style={{ fontSize: 12, fontWeight: 500, color: colors.textPrimary }}>
               {r.firstName} {r.lastName}
             </span>
             {r.blacklisted && (
               <span title="Blacklisted">
-                <AlertTriangle className="w-3.5 h-3.5 shrink-0" style={{ color: '#C0392B' }} />
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0" style={{ color: colors.danger }} />
               </span>
             )}
           </div>
@@ -77,8 +79,8 @@ export default function CustomersPage() {
           className="px-2 py-0.5 rounded text-xs font-medium"
           style={
             r.customerType === 'account'
-              ? { background: '#EBF3FC', color: '#185ABD' }
-              : { background: '#F1F3F4', color: '#6C757D' }
+              ? { background: colors.processBg, color: colors.process }
+              : { background: colors.neutralBg, color: colors.textSecondary }
           }
         >
           {r.customerType}
@@ -89,7 +91,7 @@ export default function CustomersPage() {
       key: 'phone',
       header: 'Phone',
       width: '130px',
-      render: (r) => <span style={{ fontSize: 12, color: '#6C757D' }}>{r.phone}</span>,
+      render: (r) => <span style={{ fontSize: 12, color: colors.textSecondary }}>{r.phone}</span>,
     },
     {
       key: 'status',
@@ -109,42 +111,42 @@ export default function CustomersPage() {
   ]
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 gap-3">
-
-      {/* Page header */}
-      <div className="shrink-0">
-        <h1 className="text-xl font-bold" style={{ color: '#212529' }}>Customers</h1>
-        <p className="text-sm mt-0.5" style={{ color: '#6C757D' }}>{customers.length} customers</p>
-      </div>
-
-      {/* Filters + action */}
-      <div className="flex gap-2 flex-wrap items-center shrink-0">
+    <PageShell title="Customers" subtitle={`${customers.length} customers`}>
+      {/* Filters */}
+      <div className="flex gap-2 flex-wrap items-center shrink-0 mb-3">
         <div className="relative">
-          <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3" style={{ color: '#6C757D' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3" style={{ color: colors.textSecondary }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
           </svg>
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search name, ID, phone…"
-            className="pl-7 pr-3 py-1 text-xs rounded border border-[#E0E0E0] bg-white focus:outline-none focus:border-[#185ABD] w-64"
+            className="pl-7 pr-3 py-1 text-xs rounded border bg-white focus:outline-none w-64"
+            style={{ borderColor: colors.border }}
+            onFocus={(e) => (e.currentTarget.style.borderColor = colors.borderFocus)}
+            onBlur={(e) => (e.currentTarget.style.borderColor = colors.border)}
           />
         </div>
         <select
-          className="border border-[#E0E0E0] rounded px-2 py-1 text-xs bg-white focus:outline-none focus:border-[#185ABD]"
-          style={{ color: '#212529' }}
+          className="rounded px-2 py-1 text-xs bg-white focus:outline-none border"
+          style={{ color: colors.textPrimary, borderColor: colors.border }}
           value={typeFilter}
           onChange={(e) => setTypeFilter(e.target.value)}
+          onFocus={(e) => (e.currentTarget.style.borderColor = colors.borderFocus)}
+          onBlur={(e) => (e.currentTarget.style.borderColor = colors.border)}
         >
           <option value="">All Types</option>
           <option value="casual">Casual</option>
           <option value="account">Account</option>
         </select>
         <select
-          className="border border-[#E0E0E0] rounded px-2 py-1 text-xs bg-white focus:outline-none focus:border-[#185ABD]"
-          style={{ color: '#212529' }}
+          className="rounded px-2 py-1 text-xs bg-white focus:outline-none border"
+          style={{ color: colors.textPrimary, borderColor: colors.border }}
           value={showBlacklisted}
           onChange={(e) => setShowBlacklisted(e.target.value)}
+          onFocus={(e) => (e.currentTarget.style.borderColor = colors.borderFocus)}
+          onBlur={(e) => (e.currentTarget.style.borderColor = colors.border)}
         >
           <option value="">All Status</option>
           <option value="false">Active Only</option>
@@ -171,6 +173,6 @@ export default function CustomersPage() {
         onClose={() => setCreateOpen(false)}
         onSuccess={() => { mutate(`/api/customers?${query}`); setCreateOpen(false) }}
       />
-    </div>
+    </PageShell>
   )
 }

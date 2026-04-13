@@ -12,6 +12,8 @@ import { EditUserModal } from '@/components/users/EditUserModal'
 import { ResetPasswordModal } from '@/components/users/ResetPasswordModal'
 import { MoreHorizontal, Search, Unlock, UserCheck, UserX } from 'lucide-react'
 import { toast } from 'sonner'
+import { PageShell } from '@/components/layout/PageShell'
+import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -21,19 +23,33 @@ type User = {
 }
 
 function statusBadge(user: User) {
-  if (user.lockedAt) return <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: '#FEF2F2', color: '#C0392B' }}>Locked</span>
-  if (!user.isActive) return <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: '#F1F3F4', color: '#6C757D' }}>Inactive</span>
-  return <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: '#F0FBF4', color: '#217346' }}>Active</span>
+  if (user.lockedAt)
+    return (
+      <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: colors.dangerBg, color: colors.danger }}>
+        Locked
+      </span>
+    )
+  if (!user.isActive)
+    return (
+      <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: colors.neutralBg, color: colors.textSecondary }}>
+        Inactive
+      </span>
+    )
+  return (
+    <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: colors.actionBg, color: colors.action }}>
+      Active
+    </span>
+  )
 }
 
 const ROLE_STYLES: Record<string, { background: string; color: string }> = {
   admin:   { background: '#F3EBF9', color: '#7B2D8B' },
-  manager: { background: '#EBF3FC', color: '#185ABD' },
-  cashier: { background: '#F1F3F4', color: '#6C757D' },
+  manager: { background: colors.processBg, color: colors.process },
+  cashier: { background: colors.neutralBg, color: colors.textSecondary },
 }
 
 function roleBadge(role: string) {
-  const style = ROLE_STYLES[role] ?? { background: '#F1F3F4', color: '#6C757D' }
+  const style = ROLE_STYLES[role] ?? { background: colors.neutralBg, color: colors.textSecondary }
   return <span className="px-2 py-0.5 rounded text-xs font-medium capitalize" style={style}>{role}</span>
 }
 
@@ -55,6 +71,8 @@ export default function UsersPage() {
     return null
   }
 
+  const users = data?.users ?? []
+
   async function handleToggleActive(user: User) {
     const res = await fetch(`/api/users/${user.id}/toggle-active`, { method: 'POST' })
     if (res.ok) { toast.success(`User ${user.isActive ? 'deactivated' : 'activated'}`); mutate(`/api/users?${query}`) }
@@ -68,23 +86,23 @@ export default function UsersPage() {
   }
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 gap-3">
-
-      {/* Page header */}
-      <div className="shrink-0">
-        <h1 className="text-xl font-bold" style={{ color: '#212529' }}>Users</h1>
-        <p className="text-sm mt-0.5" style={{ color: '#6C757D' }}>Manage system user accounts</p>
-      </div>
+    <PageShell title="Users" subtitle={`${users.length} user${users.length !== 1 ? 's' : ''}`}>
 
       {/* Filters */}
-      <div className="flex gap-2 items-center shrink-0">
+      <div className="flex gap-2 items-center shrink-0 mb-3">
         <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3" style={{ color: '#6C757D' }} />
-          <Input placeholder="Search name or username…" className="pl-7 h-7 text-xs w-56 border-[#E0E0E0]" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3" style={{ color: colors.textSecondary }} />
+          <Input
+            placeholder="Search name or username…"
+            className="pl-7 h-7 text-xs w-56"
+            style={{ borderColor: colors.border }}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
         </div>
         <select
-          className="border border-[#E0E0E0] rounded px-2 py-1 text-xs bg-white focus:outline-none focus:border-[#185ABD]"
-          style={{ color: '#212529' }}
+          className="border rounded px-2 py-1 text-xs bg-white focus:outline-none"
+          style={{ borderColor: colors.border, color: colors.textPrimary }}
           value={roleFilter}
           onChange={(e) => setRoleFilter(e.target.value)}
         >
@@ -96,23 +114,29 @@ export default function UsersPage() {
       </div>
 
       {/* Table */}
-      <div className="flex-1 min-h-0 overflow-y-auto rounded-lg" style={{ border: '1px solid #E0E0E0' }}>
-        <table className="w-full bg-white">
-          <thead style={{ background: '#F8F9FA', borderBottom: '1px solid #E0E0E0' }}>
+      <div className="flex-1 min-h-0 overflow-y-auto rounded-lg" style={{ border: `1px solid ${colors.border}` }}>
+        <table className="w-full" style={{ background: colors.surface }}>
+          <thead style={{ background: colors.toolbar, borderBottom: `1px solid ${colors.border}` }}>
             <tr>
               {['Full Name', 'Username', 'Role', 'Status', 'Last Login', 'Actions'].map((h) => (
-                <th key={h} className="text-left px-4 py-2" style={{ fontSize: 10, fontWeight: 600, color: '#6C757D', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
+                <th
+                  key={h}
+                  className="text-left px-4 py-2"
+                  style={{ fontSize: fontSize.xs, fontWeight: fontWeight.semibold, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.04em' }}
+                >
+                  {h}
+                </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {data?.users?.map((user, i) => (
-              <tr key={user.id} style={{ borderBottom: i < (data.users.length - 1) ? '1px solid #F1F3F4' : 'none' }}>
-                <td className="px-4 py-2.5 font-medium" style={{ fontSize: 12, color: '#212529' }}>{user.fullName}</td>
-                <td className="px-4 py-2.5" style={{ fontSize: 12, color: '#6C757D' }}>{user.username}</td>
+            {users.map((user, i) => (
+              <tr key={user.id} style={{ borderBottom: i < users.length - 1 ? `1px solid ${colors.neutralBg}` : 'none' }}>
+                <td className="px-4 py-2.5 font-medium" style={{ fontSize: fontSize.sm, color: colors.textPrimary }}>{user.fullName}</td>
+                <td className="px-4 py-2.5" style={{ fontSize: fontSize.sm, color: colors.textSecondary }}>{user.username}</td>
                 <td className="px-4 py-2.5">{roleBadge(user.role)}</td>
                 <td className="px-4 py-2.5">{statusBadge(user)}</td>
-                <td className="px-4 py-2.5" style={{ fontSize: 11, color: '#6C757D' }}>
+                <td className="px-4 py-2.5" style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>
                   {user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString('en-ZA') : '—'}
                 </td>
                 <td className="px-4 py-2.5">
@@ -138,8 +162,12 @@ export default function UsersPage() {
                 </td>
               </tr>
             ))}
-            {!data?.users?.length && (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-sm" style={{ color: '#6C757D' }}>No users found</td></tr>
+            {!users.length && (
+              <tr>
+                <td colSpan={6} className="px-4 py-8 text-center text-sm" style={{ color: colors.textSecondary }}>
+                  No users found
+                </td>
+              </tr>
             )}
           </tbody>
         </table>
@@ -148,6 +176,6 @@ export default function UsersPage() {
       <CreateUserModal open={createOpen} onClose={() => setCreateOpen(false)} onSuccess={() => mutate(`/api/users?${query}`)} />
       {editUser && <EditUserModal user={editUser} onClose={() => setEditUser(null)} onSuccess={() => mutate(`/api/users?${query}`)} />}
       {resetUser && <ResetPasswordModal user={resetUser} onClose={() => setResetUser(null)} />}
-    </div>
+    </PageShell>
   )
 }

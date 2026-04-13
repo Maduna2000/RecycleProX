@@ -9,8 +9,10 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { SetFloatSchema, type SetFloatFormInput, type SetFloatInput } from '@/lib/schemas/float'
 import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
-import { Coins, Loader2, Calendar } from 'lucide-react'
+import { Loader2, Calendar } from 'lucide-react'
 import Decimal from 'decimal.js'
+import { PageShell } from '@/components/layout/PageShell'
+import { colors } from '@/lib/design-tokens'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -60,72 +62,60 @@ export default function FloatPage() {
   }
 
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto">
+    <PageShell title="Float" subtitle="Opening cash float">
       <div className="max-w-3xl space-y-5 pb-6">
-
-        {/* Page header */}
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: '#FFFBEB' }}>
-            <Coins className="w-4 h-4" style={{ color: '#C9A020' }} />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold" style={{ color: '#212529' }}>Cash Float</h1>
-            <p className="text-sm mt-0.5" style={{ color: '#6C757D' }}>Daily opening float management</p>
-          </div>
-        </div>
-
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
 
           {/* Today's float */}
-          <div className="rounded-lg border p-5 space-y-4 bg-white" style={{ borderColor: '#E0E0E0' }}>
-            <h2 className="text-sm font-semibold" style={{ color: '#212529' }}>Today&apos;s Float</h2>
+          <div className="rounded-lg border p-5 space-y-4 bg-white" style={{ borderColor: colors.border }}>
+            <h2 className="text-sm font-semibold" style={{ color: colors.textPrimary }}>Today&apos;s Float</h2>
 
             {loadingToday ? (
-              <div className="flex items-center gap-2 text-sm" style={{ color: '#6C757D' }}>
+              <div className="flex items-center gap-2 text-sm" style={{ color: colors.textSecondary }}>
                 <Loader2 className="w-4 h-4 animate-spin" /> Loading…
               </div>
             ) : todayFloat ? (
-              <div className="px-4 py-3 rounded-lg" style={{ background: '#FFFBEB', border: '1px solid #C9A02040' }}>
-                <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#C9A020' }}>Opening Float Set</p>
+              <div className="px-4 py-3 rounded-lg" style={{ background: colors.warningBg, border: `1px solid ${colors.warning}40` }}>
+                <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: colors.warning }}>Opening Float Set</p>
                 <p className="font-mono font-bold mt-1" style={{ fontSize: 24, color: '#92700F' }}>
                   R {new Decimal(todayFloat.openingAmount).toFixed(2)}
                 </p>
-                <p className="text-xs mt-1" style={{ color: '#6C757D' }}>
+                <p className="text-xs mt-1" style={{ color: colors.textSecondary }}>
                   {new Date(todayFloat.floatDate).toLocaleDateString('en-ZA', { dateStyle: 'full' })}
                 </p>
-                {todayFloat.notes && <p className="text-xs mt-1" style={{ color: '#6C757D' }}>{todayFloat.notes}</p>}
+                {todayFloat.notes && <p className="text-xs mt-1" style={{ color: colors.textSecondary }}>{todayFloat.notes}</p>}
                 {isManager && (
-                  <p className="text-xs mt-2" style={{ color: '#C9A020' }}>Submit the form below to update today&apos;s float.</p>
+                  <p className="text-xs mt-2" style={{ color: colors.warning }}>Submit the form below to update today&apos;s float.</p>
                 )}
               </div>
             ) : (
-              <div className="py-6 rounded-lg text-center text-sm" style={{ background: '#F8F9FA', border: '1px dashed #E0E0E0', color: '#6C757D' }}>
+              <div className="py-6 rounded-lg text-center text-sm" style={{ background: colors.toolbar, border: `1px dashed ${colors.border}`, color: colors.textSecondary }}>
                 No float set for today yet
               </div>
             )}
 
             {isManager && (
-              <form onSubmit={handleSubmit(onSubmit)} className="space-y-3 pt-3" style={{ borderTop: '1px solid #E0E0E0' }}>
-                <p className="text-sm font-medium" style={{ color: '#212529' }}>Set / Update Float</p>
+              <form onSubmit={handleSubmit(onSubmit)} className="space-y-3 pt-3" style={{ borderTop: `1px solid ${colors.border}` }}>
+                <p className="text-sm font-medium" style={{ color: colors.textPrimary }}>Set / Update Float</p>
                 <div>
-                  <Label className="text-xs" style={{ color: '#6C757D' }}>Date</Label>
+                  <Label className="text-xs" style={{ color: colors.textSecondary }}>Date</Label>
                   <Input {...register('floatDate')} type="date" className="mt-1 h-8 text-xs border-[#E0E0E0]" disabled={saving} />
-                  {errors.floatDate && <p className="text-xs mt-1" style={{ color: '#C0392B' }}>{errors.floatDate.message}</p>}
+                  {errors.floatDate && <p className="text-xs mt-1" style={{ color: colors.danger }}>{errors.floatDate.message}</p>}
                 </div>
                 <div>
-                  <Label className="text-xs" style={{ color: '#6C757D' }}>Opening Amount (R)</Label>
+                  <Label className="text-xs" style={{ color: colors.textSecondary }}>Opening Amount (R)</Label>
                   <Input {...register('openingAmount')} type="number" step="0.01" min="0" className="mt-1 h-8 text-xs font-mono border-[#E0E0E0]" disabled={saving} placeholder="0.00" />
-                  {errors.openingAmount && <p className="text-xs mt-1" style={{ color: '#C0392B' }}>{errors.openingAmount.message}</p>}
+                  {errors.openingAmount && <p className="text-xs mt-1" style={{ color: colors.danger }}>{errors.openingAmount.message}</p>}
                 </div>
                 <div>
-                  <Label className="text-xs" style={{ color: '#6C757D' }}>Notes (optional)</Label>
+                  <Label className="text-xs" style={{ color: colors.textSecondary }}>Notes (optional)</Label>
                   <Input {...register('notes')} className="mt-1 h-8 text-xs border-[#E0E0E0]" disabled={saving} placeholder="e.g. Taken from safe" />
                 </div>
                 <button
                   type="submit"
                   disabled={saving}
                   className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded text-xs font-medium text-white disabled:opacity-50"
-                  style={{ background: '#217346' }}
+                  style={{ background: colors.action }}
                 >
                   {saving ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Saving…</> : 'Save Float'}
                 </button>
@@ -134,33 +124,33 @@ export default function FloatPage() {
           </div>
 
           {/* History */}
-          <div className="rounded-lg border p-5 bg-white" style={{ borderColor: '#E0E0E0' }}>
+          <div className="rounded-lg border p-5 bg-white" style={{ borderColor: colors.border }}>
             <div className="flex items-center gap-2 mb-4">
-              <Calendar className="w-4 h-4" style={{ color: '#6C757D' }} />
-              <h2 className="text-sm font-semibold" style={{ color: '#212529' }}>Float History</h2>
-              <span className="text-xs ml-1" style={{ color: '#6C757D' }}>(last 30 days)</span>
+              <Calendar className="w-4 h-4" style={{ color: colors.textSecondary }} />
+              <h2 className="text-sm font-semibold" style={{ color: colors.textPrimary }}>Float History</h2>
+              <span className="text-xs ml-1" style={{ color: colors.textSecondary }}>(last 30 days)</span>
             </div>
 
             {loadingHistory ? (
-              <div className="flex items-center gap-2 text-sm" style={{ color: '#6C757D' }}>
+              <div className="flex items-center gap-2 text-sm" style={{ color: colors.textSecondary }}>
                 <Loader2 className="w-4 h-4 animate-spin" /> Loading…
               </div>
             ) : !history?.length ? (
-              <div className="text-center py-8 text-sm" style={{ color: '#6C757D' }}>No float history</div>
+              <div className="text-center py-8 text-sm" style={{ color: colors.textSecondary }}>No float history</div>
             ) : (
               <div className="space-y-0 overflow-y-auto max-h-96">
                 {history.map((f, i) => (
-                  <div key={f.id} className="flex items-center justify-between py-2.5" style={{ borderBottom: i < history.length - 1 ? '1px solid #F1F3F4' : 'none' }}>
+                  <div key={f.id} className="flex items-center justify-between py-2.5" style={{ borderBottom: i < history.length - 1 ? `1px solid ${colors.bg}` : 'none' }}>
                     <div>
-                      <p className="text-xs font-medium" style={{ color: '#212529' }}>
+                      <p className="text-xs font-medium" style={{ color: colors.textPrimary }}>
                         {new Date(f.floatDate).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })}
                       </p>
-                      {f.notes && <p className="text-xs mt-0.5" style={{ color: '#6C757D' }}>{f.notes}</p>}
+                      {f.notes && <p className="text-xs mt-0.5" style={{ color: colors.textSecondary }}>{f.notes}</p>}
                     </div>
                     <div className="text-right">
-                      <p className="font-mono font-semibold text-xs" style={{ color: '#212529' }}>R {new Decimal(f.openingAmount).toFixed(2)}</p>
+                      <p className="font-mono font-semibold text-xs" style={{ color: colors.textPrimary }}>R {new Decimal(f.openingAmount).toFixed(2)}</p>
                       {f.closingAmount && (
-                        <p className="font-mono text-xs mt-0.5" style={{ color: '#6C757D' }}>Close: R {new Decimal(f.closingAmount).toFixed(2)}</p>
+                        <p className="font-mono text-xs mt-0.5" style={{ color: colors.textSecondary }}>Close: R {new Decimal(f.closingAmount).toFixed(2)}</p>
                       )}
                     </div>
                   </div>
@@ -170,6 +160,6 @@ export default function FloatPage() {
           </div>
         </div>
       </div>
-    </div>
+    </PageShell>
   )
 }
