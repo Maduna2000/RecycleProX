@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import useSWR, { mutate } from 'swr'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -33,46 +32,64 @@ export default function PriceGroupsPage() {
   const groups = data?.groups ?? []
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
+    <div className="flex flex-col flex-1 min-h-0 gap-3">
+
+      {/* Page header */}
+      <div className="flex items-center justify-between shrink-0">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Price Groups</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Assign custom buy/sell prices to customer groups</p>
+          <h1 className="text-xl font-bold" style={{ color: '#212529' }}>Price Groups</h1>
+          <p className="text-sm mt-0.5" style={{ color: '#6C757D' }}>Assign custom buy/sell prices to customer groups</p>
         </div>
         {isManager && (
-          <Button className="bg-green-600 hover:bg-green-700" onClick={() => setCreateOpen(true)}>
-            <Plus className="w-4 h-4 mr-2" /> New Group
-          </Button>
+          <button
+            onClick={() => setCreateOpen(true)}
+            className="flex items-center gap-1.5 h-8 px-3 rounded text-xs font-medium text-white transition-colors"
+            style={{ background: '#217346' }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = '#185A38')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = '#217346')}
+          >
+            <Plus className="w-3.5 h-3.5" /> New Group
+          </button>
         )}
       </div>
 
-      <div className="space-y-3">
+      {/* List */}
+      <div className="flex-1 min-h-0 overflow-y-auto space-y-2">
         {groups.length === 0 ? (
-          <div className="bg-white rounded-xl border p-10 text-center text-gray-400">No price groups created yet</div>
+          <div className="rounded-lg p-10 text-center text-sm bg-white" style={{ border: '1px solid #E0E0E0', color: '#6C757D' }}>
+            No price groups created yet
+          </div>
         ) : (
           groups.map((g) => (
             <div
               key={g.id}
-              className="bg-white rounded-xl border p-4 flex items-center justify-between hover:border-green-300 cursor-pointer transition-colors"
+              className="bg-white rounded-lg p-4 flex items-center justify-between cursor-pointer transition-colors"
+              style={{ border: '1px solid #E0E0E0' }}
               onClick={() => router.push(`/app/price-groups/${g.id}`)}
+              onMouseEnter={(e) => (e.currentTarget.style.borderColor = '#217346')}
+              onMouseLeave={(e) => (e.currentTarget.style.borderColor = '#E0E0E0')}
             >
               <div className="flex items-center gap-3">
-                {g.isDefault && <Star className="w-4 h-4 text-yellow-500 fill-yellow-500 shrink-0" />}
+                {g.isDefault && <Star className="w-4 h-4 shrink-0" style={{ color: '#C9A020', fill: '#C9A020' }} />}
                 <div>
-                  <p className="font-semibold text-gray-900">{g.name}</p>
-                  {g.description && <p className="text-sm text-gray-500 mt-0.5">{g.description}</p>}
+                  <p className="font-semibold text-sm" style={{ color: '#212529' }}>{g.name}</p>
+                  {g.description && <p className="text-xs mt-0.5" style={{ color: '#6C757D' }}>{g.description}</p>}
                   <div className="flex items-center gap-3 mt-1">
-                    <span className="text-xs text-gray-400">{g._count.customers} customers</span>
-                    <span className="text-xs text-gray-400">{g._count.overrides} price overrides</span>
+                    <span className="text-xs" style={{ color: '#6C757D' }}>{g._count.customers} customers</span>
+                    <span className="text-xs" style={{ color: '#6C757D' }}>{g._count.overrides} price overrides</span>
                   </div>
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                {g.isDefault && <Badge className="bg-yellow-100 text-yellow-700">Default</Badge>}
-                <Badge className={g.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}>
+                {g.isDefault && (
+                  <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: '#FFFBEB', color: '#C9A020' }}>Default</span>
+                )}
+                <span className="px-2 py-0.5 rounded text-xs font-medium" style={g.isActive
+                  ? { background: '#F0FBF4', color: '#217346' }
+                  : { background: '#F1F3F4', color: '#6C757D' }}>
                   {g.isActive ? 'Active' : 'Inactive'}
-                </Badge>
-                <ChevronRight className="w-4 h-4 text-gray-400" />
+                </span>
+                <ChevronRight className="w-4 h-4" style={{ color: '#6C757D' }} />
               </div>
             </div>
           ))
@@ -111,23 +128,30 @@ function CreatePriceGroupModal({ onClose, onSuccess }: { onClose: () => void; on
         <DialogHeader><DialogTitle>New Price Group</DialogTitle></DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-2">
           <div>
-            <Label>Group Name</Label>
-            <Input {...register('name')} className="mt-1" placeholder="e.g. Platinum Dealer" disabled={loading} />
-            {errors.name && <p className="text-xs text-red-600 mt-1">{errors.name.message}</p>}
+            <Label style={{ color: '#212529' }}>Group Name</Label>
+            <Input {...register('name')} className="mt-1 border-[#E0E0E0]" placeholder="e.g. Platinum Dealer" disabled={loading} />
+            {errors.name && <p className="text-xs mt-1" style={{ color: '#C0392B' }}>{errors.name.message}</p>}
           </div>
           <div>
-            <Label>Description <span className="text-gray-400 font-normal">(optional)</span></Label>
-            <Input {...register('description')} className="mt-1" disabled={loading} />
+            <Label style={{ color: '#212529' }}>Description <span className="font-normal" style={{ color: '#6C757D' }}>(optional)</span></Label>
+            <Input {...register('description')} className="mt-1 border-[#E0E0E0]" disabled={loading} />
           </div>
-          <label className="flex items-center gap-2 text-sm cursor-pointer">
+          <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: '#212529' }}>
             <input type="checkbox" onChange={(e) => setValue('isDefault', e.target.checked)} className="rounded" />
             Set as default price group
           </label>
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
-            <Button type="submit" className="bg-green-600 hover:bg-green-700" disabled={loading}>
-              {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Creating...</> : 'Create Group'}
-            </Button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex items-center gap-1.5 h-9 px-4 rounded text-sm font-medium text-white transition-colors disabled:opacity-50"
+              style={{ background: '#217346' }}
+              onMouseEnter={(e) => !loading && (e.currentTarget.style.background = '#185A38')}
+              onMouseLeave={(e) => !loading && (e.currentTarget.style.background = '#217346')}
+            >
+              {loading ? <><Loader2 className="w-4 h-4 animate-spin" />Creating…</> : 'Create Group'}
+            </button>
           </div>
         </form>
       </DialogContent>
