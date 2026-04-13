@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight, MoreHorizontal, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { colors, fontSize, fontWeight, layout } from '@/lib/design-tokens'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -45,24 +46,37 @@ export interface DataTableProps<T> {
 
 // ─── Status Badge helper ──────────────────────────────────────────────────────
 
+const STATUS_STYLES: Record<string, { color: string; background: string }> = {
+  active:      { color: colors.action,        background: colors.actionBg },
+  completed:   { color: colors.action,        background: colors.actionBg },
+  done:        { color: colors.action,        background: colors.actionBg },
+  approved:    { color: colors.action,        background: colors.actionBg },
+  settled:     { color: colors.action,        background: colors.actionBg },
+  pending:     { color: colors.warning,       background: colors.warningBg },
+  open:        { color: colors.process,       background: colors.processBg },
+  submitted:   { color: colors.process,       background: colors.processBg },
+  voided:      { color: colors.danger,        background: colors.dangerBg },
+  void:        { color: colors.danger,        background: colors.dangerBg },
+  blacklisted: { color: colors.danger,        background: colors.dangerBg },
+  locked:      { color: colors.danger,        background: colors.dangerBg },
+  inactive:    { color: colors.textSecondary, background: colors.neutralBg },
+}
+
 export function StatusBadge({ status }: { status: string }) {
-  const colours: Record<string, string> = {
-    active:    'bg-green-100 text-green-700',
-    completed: 'bg-green-100 text-green-700',
-    done:      'bg-green-100 text-green-700',
-    approved:  'bg-green-100 text-green-700',
-    settled:   'bg-green-100 text-green-700',
-    pending:   'bg-amber-100 text-amber-700',
-    open:      'bg-amber-100 text-amber-700',
-    submitted: 'bg-blue-100 text-blue-700',
-    voided:    'bg-red-100 text-red-700',
-    void:      'bg-red-100 text-red-700',
-    inactive:  'bg-gray-100 text-gray-600',
-    blacklisted: 'bg-red-100 text-red-700',
+  const s = STATUS_STYLES[status.toLowerCase()] ?? {
+    color: colors.textSecondary, background: colors.neutralBg,
   }
-  const cls = colours[status.toLowerCase()] ?? 'bg-gray-100 text-gray-600'
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${cls}`} style={{ borderRadius: 6 }}>
+    <span style={{
+      display:      'inline-flex',
+      alignItems:   'center',
+      padding:      '2px 8px',
+      borderRadius: layout.btnRadius,
+      fontSize:     fontSize.xs,
+      fontWeight:   fontWeight.medium,
+      color:        s.color,
+      background:   s.background,
+    }}>
       {status.charAt(0).toUpperCase() + status.slice(1)}
     </span>
   )

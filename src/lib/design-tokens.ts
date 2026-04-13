@@ -1,0 +1,335 @@
+/**
+ * RecycleProX Design Tokens
+ * Single source of truth for all colours, typography, and spacing.
+ *
+ * Usage:
+ *   import { colors, tw, fontSize, spacing, styles, statusStyle } from '@/lib/design-tokens'
+ *
+ * - colors.*     → raw hex values for inline style={{ color: colors.action }}
+ * - tw.*         → Tailwind class strings for className={tw.textPrimary}
+ * - fontSize.*   → pixel values for inline style={{ fontSize: fontSize.sm }}
+ * - spacing.*    → pixel values for inline style={{ gap: spacing[6] }}
+ * - styles.*     → pre-built style objects for common UI patterns
+ * - statusStyle  → semantic helper: returns inline styles for a given status string
+ */
+
+// ─── Colour Palette ───────────────────────────────────────────────────────────
+
+export const colors = {
+  // Brand
+  /** Navy — top nav bar, active tab background */
+  primary:       '#1B3A6B',
+  /** Green — primary action buttons (Confirm, Save, Complete) */
+  action:        '#217346',
+  /** Blue — secondary buttons, links, info states */
+  process:       '#185ABD',
+  /** Amber — pending states, warnings, loan banners */
+  warning:       '#C9A020',
+  /** Red — void, delete, errors, blacklisted indicators */
+  danger:        '#C0392B',
+
+  // Surfaces
+  /** White — all cards and table backgrounds */
+  surface:       '#FFFFFF',
+  /** Light grey — page / zone-3 background */
+  bg:            '#F1F3F4',
+  /** Off-white — toolbar (zone-2) strip */
+  toolbar:       '#F8F9FA',
+  /** Blue tint — hovered table row */
+  rowHover:      '#EBF3FC',
+
+  // Text
+  /** Near-black — all primary body text */
+  textPrimary:   '#212529',
+  /** Mid-grey — secondary labels, metadata */
+  textSecondary: '#6C757D',
+  /** Light grey — muted captions, placeholders */
+  textMuted:     '#9CA3AF',
+  /** White text — used on coloured backgrounds */
+  textOnDark:    '#FFFFFF',
+
+  // Borders & Outlines
+  /** Standard border on cards, inputs, dividers */
+  border:        '#E0E0E0',
+  /** Focused input / active element ring */
+  borderFocus:   '#185ABD',
+
+  // Extra UI tints (used in badges, backgrounds)
+  /** Amber background tint — warning / pending badge fill */
+  warningBg:     '#FEF9EC',
+  /** Red background tint — danger / voided badge fill */
+  dangerBg:      '#FDECEA',
+  /** Green background tint — active / completed badge fill */
+  actionBg:      '#EBF5F0',
+  /** Blue background tint — info badge fill */
+  processBg:     '#EBF3FC',
+  /** Grey background tint — inactive badge fill */
+  neutralBg:     '#F1F3F4',
+
+  // Tab bar
+  /** Inactive tab text in the top nav */
+  tabMuted:      '#8BA4D4',
+  /** Active tab underline accent */
+  tabAccent:     '#F2AB1A',
+} as const
+
+// ─── Tailwind Utility Classes ─────────────────────────────────────────────────
+// Use these in className="" instead of hardcoding colour class names.
+// They map to the rpx.* colours registered in tailwind.config.ts.
+
+export const tw = {
+  // Text colours
+  textPrimary:   'text-rpx-text',
+  textSecondary: 'text-rpx-muted',
+  textAction:    'text-rpx-green',
+  textProcess:   'text-rpx-blue',
+  textWarning:   'text-rpx-amber',
+  textDanger:    'text-rpx-red',
+
+  // Background colours
+  bgPage:        'bg-rpx-grey',
+  bgSurface:     'bg-white',
+  bgToolbar:     'bg-rpx-rowalt',
+  bgRowHover:    'bg-rpx-hover',
+  bgAction:      'bg-rpx-green',
+  bgProcess:     'bg-rpx-blue',
+  bgNavy:        'bg-rpx-navy',
+
+  // Border colours
+  border:        'border-rpx-border',
+  borderFocus:   'focus:border-rpx-blue',
+
+  // Common combinations
+  card:          'bg-white border border-rpx-border rounded-lg',
+  inputBase:     'border border-rpx-border rounded-md focus:outline-none focus:border-rpx-blue',
+  btnPrimary:    'bg-rpx-green text-white hover:opacity-90',
+  btnSecondary:  'border border-rpx-blue text-rpx-blue bg-white hover:bg-rpx-hover',
+  btnDanger:     'border border-rpx-red text-rpx-red bg-white hover:bg-red-50',
+  btnGhost:      'text-rpx-muted hover:bg-white hover:text-rpx-text',
+} as const
+
+// ─── Typography ───────────────────────────────────────────────────────────────
+
+export const fontSize = {
+  /** 11px — status bar, timestamps, badges */
+  xs:   11,
+  /** 12px — table column headers, form labels */
+  sm:   12,
+  /** 13px — table row data, button text, body copy */
+  base: 13,
+  /** 14px — section titles, modal headers */
+  md:   14,
+  /** 16px — page titles */
+  lg:   16,
+  /** 20px — stat card labels */
+  xl:   20,
+  /** 24px — stat card values */
+  '2xl': 24,
+} as const
+
+export const fontWeight = {
+  regular:    400,
+  medium:     500,
+  semibold:   600,
+  bold:       700,
+} as const
+
+export const fontFamily = '"Segoe UI", -apple-system, Arial, sans-serif'
+
+// ─── Spacing ──────────────────────────────────────────────────────────────────
+
+/** Standard spacing scale (multiples of 4px), keys match Tailwind p-/gap-/m- scale */
+export const spacing: Record<number, number> = {
+  1:  4,
+  2:  8,
+  3: 12,
+  4: 16,   // component internal padding
+  5: 20,
+  6: 24,   // section gap
+  8: 32,
+}
+
+export const layout = {
+  /** All cards, table wrappers */
+  cardRadius:    8,
+  /** All buttons */
+  btnRadius:     6,
+  /** Input / select fields */
+  inputRadius:   6,
+  /** Height of each table data row */
+  tableRowH:     40,
+  /** Top nav zone height */
+  navbarH:       48,
+  /** Contextual toolbar zone height */
+  toolbarH:      36,
+  /** Zone 3 content padding (all sides) */
+  contentPadding: 24,
+} as const
+
+// ─── Pre-built Inline Style Objects ──────────────────────────────────────────
+// Drop these directly into style={} for consistent component styling.
+
+export const styles = {
+  // Text
+  textPrimary:   { color: colors.textPrimary }   as React.CSSProperties,
+  textSecondary: { color: colors.textSecondary } as React.CSSProperties,
+  textMuted:     { color: colors.textMuted }     as React.CSSProperties,
+  textAction:    { color: colors.action }        as React.CSSProperties,
+  textProcess:   { color: colors.process }       as React.CSSProperties,
+  textWarning:   { color: colors.warning }       as React.CSSProperties,
+  textDanger:    { color: colors.danger }        as React.CSSProperties,
+
+  // Cards
+  card: {
+    background:   colors.surface,
+    border:       `1px solid ${colors.border}`,
+    borderRadius: layout.cardRadius,
+  } as React.CSSProperties,
+
+  // Table header cell
+  tableHeader: {
+    fontSize:      fontSize.sm,
+    fontWeight:    fontWeight.semibold,
+    color:         colors.textSecondary,
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.04em',
+    background:    colors.bg,
+  } as React.CSSProperties,
+
+  // Table row cell
+  tableCell: {
+    fontSize:   fontSize.base,
+    fontWeight: fontWeight.regular,
+    color:      colors.textPrimary,
+    height:     layout.tableRowH,
+  } as React.CSSProperties,
+
+  // Money values
+  moneyPositive: {
+    fontFamily: 'monospace',
+    color:      colors.action,
+    fontWeight: fontWeight.semibold,
+  } as React.CSSProperties,
+
+  moneyNegative: {
+    fontFamily: 'monospace',
+    color:      colors.danger,
+    fontWeight: fontWeight.semibold,
+  } as React.CSSProperties,
+
+  moneyNeutral: {
+    fontFamily: 'monospace',
+    color:      colors.textPrimary,
+    fontWeight: fontWeight.semibold,
+  } as React.CSSProperties,
+
+  // Page title
+  pageTitle: {
+    fontSize:   fontSize.lg,
+    fontWeight: fontWeight.semibold,
+    color:      colors.textPrimary,
+  } as React.CSSProperties,
+
+  // Section title
+  sectionTitle: {
+    fontSize:   fontSize.md,
+    fontWeight: fontWeight.semibold,
+    color:      colors.textPrimary,
+  } as React.CSSProperties,
+
+  // Stat card value
+  statValue: {
+    fontSize:   fontSize['2xl'],
+    fontWeight: fontWeight.bold,
+    color:      colors.textPrimary,
+  } as React.CSSProperties,
+
+  statLabel: {
+    fontSize:   fontSize.xl,
+    fontWeight: fontWeight.medium,
+    color:      colors.textSecondary,
+  } as React.CSSProperties,
+} as const
+
+// ─── Semantic Status Helpers ──────────────────────────────────────────────────
+// Used by status badges throughout the app.
+
+type AppStatus =
+  | 'active' | 'inactive'
+  | 'completed' | 'pending' | 'voided'
+  | 'settled' | 'approved' | 'submitted' | 'open'
+  | 'blacklisted' | 'locked'
+
+interface StatusStyle {
+  color:      string
+  background: string
+  label:      string
+}
+
+const STATUS_MAP: Record<AppStatus, StatusStyle> = {
+  active:      { color: colors.action,    background: colors.actionBg,   label: 'Active' },
+  completed:   { color: colors.action,    background: colors.actionBg,   label: 'Completed' },
+  settled:     { color: colors.action,    background: colors.actionBg,   label: 'Settled' },
+  approved:    { color: colors.action,    background: colors.actionBg,   label: 'Approved' },
+
+  pending:     { color: colors.warning,   background: colors.warningBg,  label: 'Pending' },
+  submitted:   { color: colors.warning,   background: colors.warningBg,  label: 'Submitted' },
+  open:        { color: colors.process,   background: colors.processBg,  label: 'Open' },
+
+  voided:      { color: colors.danger,    background: colors.dangerBg,   label: 'Voided' },
+  blacklisted: { color: colors.danger,    background: colors.dangerBg,   label: 'Blacklisted' },
+  locked:      { color: colors.danger,    background: colors.dangerBg,   label: 'Locked' },
+
+  inactive:    { color: colors.textSecondary, background: colors.neutralBg, label: 'Inactive' },
+}
+
+/**
+ * Returns inline style + display label for a given status string.
+ * Falls back to neutral styling for unknown values.
+ *
+ * @example
+ * const s = statusStyle('completed')
+ * <span style={s.badge}>{s.label}</span>
+ */
+export function statusStyle(status: string): {
+  badge:      React.CSSProperties
+  dotColor:   string
+  label:      string
+} {
+  const s = STATUS_MAP[status as AppStatus] ?? {
+    color:      colors.textSecondary,
+    background: colors.neutralBg,
+    label:      status.charAt(0).toUpperCase() + status.slice(1),
+  }
+
+  return {
+    badge: {
+      display:      'inline-flex',
+      alignItems:   'center',
+      padding:      '2px 8px',
+      borderRadius: 999,
+      fontSize:     fontSize.xs,
+      fontWeight:   fontWeight.medium,
+      color:        s.color,
+      background:   s.background,
+    } as React.CSSProperties,
+    dotColor: s.color,
+    label:    s.label,
+  }
+}
+
+// ─── Re-export as grouped object (optional convenience) ───────────────────────
+
+const designTokens = {
+  colors,
+  tw,
+  fontSize,
+  fontWeight,
+  fontFamily,
+  spacing,
+  layout,
+  styles,
+  statusStyle,
+}
+
+export default designTokens

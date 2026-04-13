@@ -16,6 +16,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea'
 import { format } from '@/lib/utils/format'
 import { CustomerLookupWidget } from '@/components/CustomerLookupWidget'
+import { PageShell } from '@/components/layout/PageShell'
+import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -94,7 +96,7 @@ export default function LoansPage() {
       key: 'refNumber',
       header: 'Ref #',
       width: '130px',
-      render: (r) => <span className="font-mono text-xs" style={{ color: '#6C757D' }}>{r.refNumber}</span>,
+      render: (r) => <span className="font-mono text-xs" style={{ color: colors.textSecondary }}>{r.refNumber}</span>,
     },
     {
       key: 'customer',
@@ -103,10 +105,10 @@ export default function LoansPage() {
         <div className="flex items-center gap-2">
           <Avatar name={`${r.customer.firstName} ${r.customer.lastName}`} size={26} />
           <div>
-            <p style={{ fontSize: 12, fontWeight: 500, color: '#212529' }}>
+            <p style={{ fontSize: fontSize.sm, fontWeight: fontWeight.medium, color: colors.textPrimary }}>
               {r.customer.firstName} {r.customer.lastName}
             </p>
-            <p className="font-mono" style={{ fontSize: 10, color: '#6C757D' }}>{r.customer.idNumber}</p>
+            <p className="font-mono" style={{ fontSize: 10, color: colors.textSecondary }}>{r.customer.idNumber}</p>
           </div>
         </div>
       ),
@@ -116,7 +118,7 @@ export default function LoansPage() {
       header: 'Principal',
       width: '110px',
       render: (r) => (
-        <span className="font-mono" style={{ fontSize: 12, color: '#6C757D' }}>
+        <span className="font-mono" style={{ fontSize: fontSize.sm, color: colors.textSecondary }}>
           {format.currency(r.principalAmount)}
         </span>
       ),
@@ -128,7 +130,7 @@ export default function LoansPage() {
       render: (r) => {
         const bal = new Decimal(r.balanceAmount)
         return (
-          <span className="font-mono font-semibold" style={{ color: bal.gt(0) ? '#C9A020' : '#217346' }}>
+          <span className="font-mono font-semibold" style={{ color: bal.gt(0) ? colors.warning : colors.action }}>
             {format.currency(r.balanceAmount)}
           </span>
         )
@@ -138,14 +140,14 @@ export default function LoansPage() {
       key: 'paymentMethod',
       header: 'Method',
       width: '90px',
-      render: (r) => <span className="capitalize" style={{ fontSize: 12, color: '#6C757D' }}>{r.paymentMethod}</span>,
+      render: (r) => <span className="capitalize" style={{ fontSize: fontSize.sm, color: colors.textSecondary }}>{r.paymentMethod}</span>,
     },
     {
       key: 'createdAt',
       header: 'Date',
       width: '100px',
       render: (r) => (
-        <span style={{ fontSize: 11, color: '#6C757D' }}>
+        <span style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>
           {new Date(r.createdAt).toLocaleDateString('en-ZA')}
         </span>
       ),
@@ -171,17 +173,17 @@ export default function LoansPage() {
       key: 'refNumber',
       header: 'Ref #',
       width: '130px',
-      render: (r) => <span className="font-mono text-xs" style={{ color: '#6C757D' }}>{r.refNumber}</span>,
+      render: (r) => <span className="font-mono text-xs" style={{ color: colors.textSecondary }}>{r.refNumber}</span>,
     },
     {
       key: 'customer',
       header: 'Customer',
       render: (r) => (
         <div>
-          <p style={{ fontSize: 12, fontWeight: 500, color: '#212529' }}>
+          <p style={{ fontSize: fontSize.sm, fontWeight: fontWeight.medium, color: colors.textPrimary }}>
             {r.customer.firstName} {r.customer.lastName}
           </p>
-          <p className="font-mono" style={{ fontSize: 10, color: '#6C757D' }}>{r.customer.idNumber}</p>
+          <p className="font-mono" style={{ fontSize: 10, color: colors.textSecondary }}>{r.customer.idNumber}</p>
         </div>
       ),
     },
@@ -190,7 +192,7 @@ export default function LoansPage() {
       header: 'Principal',
       width: '110px',
       render: (r) => (
-        <span className="font-mono" style={{ fontSize: 12, color: '#6C757D' }}>
+        <span className="font-mono" style={{ fontSize: fontSize.sm, color: colors.textSecondary }}>
           {format.currency(r.principalAmount)}
         </span>
       ),
@@ -200,7 +202,7 @@ export default function LoansPage() {
       header: 'Balance',
       width: '110px',
       render: (r) => (
-        <span className="font-mono" style={{ fontSize: 12, color: '#6C757D' }}>
+        <span className="font-mono" style={{ fontSize: fontSize.sm, color: colors.textSecondary }}>
           {format.currency(r.balanceAmount)}
         </span>
       ),
@@ -216,51 +218,37 @@ export default function LoansPage() {
       header: 'Date',
       width: '100px',
       render: (r) => (
-        <span style={{ fontSize: 11, color: '#6C757D' }}>
+        <span style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>
           {new Date(r.createdAt).toLocaleDateString('en-ZA')}
         </span>
       ),
     },
   ]
 
+  const totalCount = (activeData?.total ?? 0) + (historyData?.total ?? 0)
+
   return (
-    <div className="flex flex-col flex-1 min-h-0 gap-3">
-
-      {/* Page header */}
-      <div className="shrink-0">
-        <h1 className="text-xl font-bold" style={{ color: '#212529' }}>Loans</h1>
-        <p className="text-sm mt-0.5" style={{ color: '#6C757D' }}>Manage customer loan advances and repayments</p>
-      </div>
-
-      {/* Tab bar */}
-      <div className="flex items-center shrink-0 border-b border-[#E0E0E0]">
-        <button
-          onClick={() => { setActiveTab('active'); setSelectedId(null) }}
-          className="px-4 py-2 text-xs font-medium border-b-2 transition-colors"
-          style={{ borderColor: activeTab === 'active' ? '#185ABD' : 'transparent', color: activeTab === 'active' ? '#185ABD' : '#6C757D' }}
-        >
-          Active Loans {activeData?.total ? `(${activeData.total})` : ''}
-        </button>
-        <button
-          onClick={() => { setActiveTab('history'); setSelectedId(null) }}
-          className="px-4 py-2 text-xs font-medium border-b-2 transition-colors"
-          style={{ borderColor: activeTab === 'history' ? '#185ABD' : 'transparent', color: activeTab === 'history' ? '#185ABD' : '#6C757D' }}
-        >
-          History
-        </button>
-      </div>
-
+    <PageShell
+      title="Loans"
+      subtitle={`${totalCount} total records`}
+      tabs={[
+        { value: 'active',  label: 'Active Loans', count: activeData?.total },
+        { value: 'history', label: 'History',      count: historyData?.total },
+      ]}
+      activeTab={activeTab}
+      onTabChange={(v) => { setActiveTab(v as PageTab); setSelectedId(null) }}
+    >
       {/* Active tab */}
       {activeTab === 'active' && (
         <>
-          <div className="shrink-0">
+          <div className="shrink-0 mb-3">
             <div className="relative w-64">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3" style={{ color: '#6C757D' }} />
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3" style={{ color: colors.textSecondary }} />
               <input
                 value={activeSearch}
                 onChange={(e) => setActiveSearch(e.target.value)}
                 placeholder="Search by name, ID or ref…"
-                className="pl-7 pr-3 py-1 text-xs rounded border border-[#E0E0E0] bg-white focus:outline-none focus:border-[#185ABD] w-full"
+                className="pl-7 pr-3 py-1 text-xs rounded border bg-white focus:outline-none w-full border-rpx-border focus:border-rpx-blue"
               />
             </div>
           </div>
@@ -288,57 +276,57 @@ export default function LoansPage() {
             height={260}
           >
             {detailLoading || !selectedLoan ? (
-              <div className="flex items-center gap-2" style={{ color: '#6C757D', fontSize: 12 }}>
+              <div className="flex items-center gap-2" style={{ color: colors.textSecondary, fontSize: fontSize.sm }}>
                 <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading…
               </div>
             ) : (
               <div className="flex gap-6 h-full">
                 <div className="w-44 shrink-0 space-y-2">
                   <div>
-                    <p className="uppercase tracking-wide font-semibold mb-0.5" style={{ fontSize: 10, color: '#6C757D' }}>Customer</p>
-                    <p style={{ fontSize: 12, fontWeight: 600, color: '#212529' }}>
+                    <p className="uppercase tracking-wide font-semibold mb-0.5" style={{ fontSize: 10, color: colors.textSecondary }}>Customer</p>
+                    <p style={{ fontSize: fontSize.sm, fontWeight: fontWeight.semibold, color: colors.textPrimary }}>
                       {selectedLoan.customer.firstName} {selectedLoan.customer.lastName}
                     </p>
-                    <p className="font-mono" style={{ fontSize: 10, color: '#6C757D' }}>{selectedLoan.customer.idNumber}</p>
+                    <p className="font-mono" style={{ fontSize: 10, color: colors.textSecondary }}>{selectedLoan.customer.idNumber}</p>
                   </div>
                   <div>
-                    <p className="uppercase tracking-wide font-semibold mb-0.5" style={{ fontSize: 10, color: '#6C757D' }}>Principal</p>
-                    <p className="font-mono" style={{ fontSize: 12, color: '#212529' }}>{format.currency(selectedLoan.principalAmount)}</p>
+                    <p className="uppercase tracking-wide font-semibold mb-0.5" style={{ fontSize: 10, color: colors.textSecondary }}>Principal</p>
+                    <p className="font-mono" style={{ fontSize: fontSize.sm, color: colors.textPrimary }}>{format.currency(selectedLoan.principalAmount)}</p>
                   </div>
                   <div>
-                    <p className="uppercase tracking-wide font-semibold mb-0.5" style={{ fontSize: 10, color: '#6C757D' }}>Balance</p>
-                    <p className="font-mono font-semibold" style={{ fontSize: 12, color: new Decimal(selectedLoan.balanceAmount).gt(0) ? '#C9A020' : '#217346' }}>
+                    <p className="uppercase tracking-wide font-semibold mb-0.5" style={{ fontSize: 10, color: colors.textSecondary }}>Balance</p>
+                    <p className="font-mono font-semibold" style={{ fontSize: fontSize.sm, color: new Decimal(selectedLoan.balanceAmount).gt(0) ? colors.warning : colors.action }}>
                       {format.currency(selectedLoan.balanceAmount)}
                     </p>
                   </div>
                   {selectedLoan.notes && (
                     <div>
-                      <p className="uppercase tracking-wide font-semibold mb-0.5" style={{ fontSize: 10, color: '#6C757D' }}>Notes</p>
-                      <p style={{ fontSize: 11, color: '#212529' }}>{selectedLoan.notes}</p>
+                      <p className="uppercase tracking-wide font-semibold mb-0.5" style={{ fontSize: 10, color: colors.textSecondary }}>Notes</p>
+                      <p style={{ fontSize: fontSize.xs, color: colors.textPrimary }}>{selectedLoan.notes}</p>
                     </div>
                   )}
                 </div>
                 <div className="flex-1 overflow-auto">
-                  <p className="uppercase tracking-wide font-semibold mb-2" style={{ fontSize: 10, color: '#6C757D' }}>Repayment History</p>
+                  <p className="uppercase tracking-wide font-semibold mb-2" style={{ fontSize: 10, color: colors.textSecondary }}>Repayment History</p>
                   {!selectedLoan.repayments?.length ? (
-                    <p style={{ fontSize: 12, color: '#6C757D' }}>No repayments yet</p>
+                    <p style={{ fontSize: fontSize.sm, color: colors.textSecondary }}>No repayments yet</p>
                   ) : (
-                    <table className="w-full" style={{ fontSize: 12, borderCollapse: 'collapse' }}>
+                    <table className="w-full" style={{ fontSize: fontSize.sm, borderCollapse: 'collapse' }}>
                       <thead>
-                        <tr style={{ borderBottom: '1px solid #E0E0E0' }}>
+                        <tr style={{ borderBottom: `1px solid ${colors.border}` }}>
                           {['Ref', 'Amount', 'Method', 'Date', 'Notes'].map((h) => (
-                            <th key={h} className="text-left pb-1" style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#6C757D' }}>{h}</th>
+                            <th key={h} className="text-left pb-1" style={{ fontSize: 10, fontWeight: fontWeight.semibold, textTransform: 'uppercase', letterSpacing: '0.05em', color: colors.textSecondary }}>{h}</th>
                           ))}
                         </tr>
                       </thead>
                       <tbody>
                         {selectedLoan.repayments.map((r) => (
-                          <tr key={r.id} style={{ borderBottom: '1px solid #F1F3F4' }}>
-                            <td className="font-mono py-1" style={{ color: '#6C757D', paddingRight: 12 }}>{r.refNumber}</td>
-                            <td className="font-mono font-semibold py-1" style={{ color: '#217346', paddingRight: 12 }}>{format.currency(r.amount)}</td>
-                            <td className="capitalize py-1" style={{ color: '#6C757D', paddingRight: 12 }}>{r.paymentMethod}</td>
-                            <td className="py-1" style={{ color: '#6C757D', paddingRight: 12 }}>{new Date(r.createdAt).toLocaleDateString('en-ZA')}</td>
-                            <td className="py-1" style={{ color: '#6C757D' }}>{r.notes ?? '—'}</td>
+                          <tr key={r.id} style={{ borderBottom: `1px solid ${colors.bg}` }}>
+                            <td className="font-mono py-1" style={{ color: colors.textSecondary, paddingRight: 12 }}>{r.refNumber}</td>
+                            <td className="font-mono font-semibold py-1" style={{ color: colors.action, paddingRight: 12 }}>{format.currency(r.amount)}</td>
+                            <td className="capitalize py-1" style={{ color: colors.textSecondary, paddingRight: 12 }}>{r.paymentMethod}</td>
+                            <td className="py-1" style={{ color: colors.textSecondary, paddingRight: 12 }}>{new Date(r.createdAt).toLocaleDateString('en-ZA')}</td>
+                            <td className="py-1" style={{ color: colors.textSecondary }}>{r.notes ?? '—'}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -354,27 +342,27 @@ export default function LoansPage() {
       {/* History tab */}
       {activeTab === 'history' && (
         <>
-          <div className="flex gap-2 flex-wrap shrink-0">
+          <div className="flex gap-2 flex-wrap shrink-0 mb-3">
             <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3" style={{ color: '#6C757D' }} />
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3" style={{ color: colors.textSecondary }} />
               <input
                 value={histSearch}
                 onChange={(e) => setHistSearch(e.target.value)}
                 placeholder="Search by name, ID or ref…"
-                className="pl-7 pr-3 py-1 text-xs rounded border border-[#E0E0E0] bg-white focus:outline-none focus:border-[#185ABD] w-56"
+                className="pl-7 pr-3 py-1 text-xs rounded border bg-white focus:outline-none w-56 border-rpx-border focus:border-rpx-blue"
               />
             </div>
             <input
               type="date"
               value={histFrom}
               onChange={(e) => setHistFrom(e.target.value)}
-              className="border border-[#E0E0E0] rounded px-2 py-1 text-xs bg-white focus:outline-none focus:border-[#185ABD]"
+              className="border rounded px-2 py-1 text-xs bg-white focus:outline-none border-rpx-border focus:border-rpx-blue"
             />
             <input
               type="date"
               value={histTo}
               onChange={(e) => setHistTo(e.target.value)}
-              className="border border-[#E0E0E0] rounded px-2 py-1 text-xs bg-white focus:outline-none focus:border-[#185ABD]"
+              className="border rounded px-2 py-1 text-xs bg-white focus:outline-none border-rpx-border focus:border-rpx-blue"
             />
           </div>
           <div className="flex-1 min-h-0">
@@ -414,7 +402,7 @@ export default function LoansPage() {
           onSuccess={() => { revalidate(); setVoidTarget(null) }}
         />
       )}
-    </div>
+    </PageShell>
   )
 }
 
@@ -452,7 +440,7 @@ function NewLoanDialog({ onClose, onSuccess }: { onClose: () => void; onSuccess:
             <Label className="mb-1 block">Customer</Label>
             <CustomerLookupWidget onSelect={(c) => setCustomer(c)} selectedCustomer={customer} />
             {customer?.blacklisted && (
-              <p className="text-xs mt-1 flex items-center gap-1" style={{ color: '#C0392B' }}>
+              <p className="text-xs mt-1 flex items-center gap-1" style={{ color: colors.danger }}>
                 <AlertCircle className="w-3 h-3" /> This customer is blacklisted
               </p>
             )}
@@ -471,12 +459,12 @@ function NewLoanDialog({ onClose, onSuccess }: { onClose: () => void; onSuccess:
             </Select>
           </div>
           <div>
-            <Label>Notes <span className="font-normal" style={{ color: '#6C757D' }}>(optional)</span></Label>
+            <Label>Notes <span className="font-normal" style={{ color: colors.textSecondary }}>(optional)</span></Label>
             <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="mt-1" />
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
-            <Button style={{ background: '#217346' }} className="hover:opacity-90" onClick={onSubmit} disabled={loading || !customer || !amount}>
+            <Button style={{ background: colors.action }} className="hover:opacity-90" onClick={onSubmit} disabled={loading || !customer || !amount}>
               {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Creating…</> : 'Create Loan'}
             </Button>
           </div>
@@ -511,12 +499,12 @@ function RepayDialog({ loan, onClose, onSuccess }: { loan: Loan; onClose: () => 
       <DialogContent className="max-w-md">
         <DialogHeader><DialogTitle>Record Repayment</DialogTitle></DialogHeader>
         <div className="space-y-4 pt-2">
-          <div className="rounded-lg p-3 text-sm space-y-1" style={{ background: '#F8F9FA', border: '1px solid #E0E0E0' }}>
-            <p className="font-medium" style={{ color: '#212529' }}>{loan.customer.firstName} {loan.customer.lastName}</p>
-            <p style={{ color: '#6C757D' }}>Ref: {loan.refNumber}</p>
-            <p style={{ color: '#6C757D' }}>
+          <div className="rounded-lg p-3 text-sm space-y-1" style={{ background: colors.toolbar, border: `1px solid ${colors.border}` }}>
+            <p className="font-medium" style={{ color: colors.textPrimary }}>{loan.customer.firstName} {loan.customer.lastName}</p>
+            <p style={{ color: colors.textSecondary }}>Ref: {loan.refNumber}</p>
+            <p style={{ color: colors.textSecondary }}>
               Principal: {format.currency(loan.principalAmount)} ·{' '}
-              Balance: <span className="font-semibold" style={{ color: '#C9A020' }}>{format.currency(loan.balanceAmount)}</span>
+              Balance: <span className="font-semibold" style={{ color: colors.warning }}>{format.currency(loan.balanceAmount)}</span>
             </p>
           </div>
           <div>
@@ -533,12 +521,12 @@ function RepayDialog({ loan, onClose, onSuccess }: { loan: Loan; onClose: () => 
             </Select>
           </div>
           <div>
-            <Label>Notes <span className="font-normal" style={{ color: '#6C757D' }}>(optional)</span></Label>
+            <Label>Notes <span className="font-normal" style={{ color: colors.textSecondary }}>(optional)</span></Label>
             <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="mt-1" />
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
-            <Button style={{ background: '#217346' }} className="hover:opacity-90" onClick={onSubmit} disabled={loading || !amount}>
+            <Button style={{ background: colors.action }} className="hover:opacity-90" onClick={onSubmit} disabled={loading || !amount}>
               {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving…</> : 'Record Repayment'}
             </Button>
           </div>
@@ -569,13 +557,13 @@ function VoidLoanDialog({ loan, onClose, onSuccess }: { loan: Loan; onClose: () 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="max-w-md">
-        <DialogHeader><DialogTitle style={{ color: '#C0392B' }}>Void Loan</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle style={{ color: colors.danger }}>Void Loan</DialogTitle></DialogHeader>
         <div className="space-y-4 pt-2">
-          <div className="rounded-lg p-3 text-sm" style={{ background: '#FEF2F2', border: '1px solid #C0392B30' }}>
-            <p className="font-medium" style={{ color: '#C0392B' }}>
+          <div className="rounded-lg p-3 text-sm" style={{ background: colors.dangerBg, border: `1px solid ${colors.danger}30` }}>
+            <p className="font-medium" style={{ color: colors.danger }}>
               {loan.customer.firstName} {loan.customer.lastName} — {loan.refNumber}
             </p>
-            <p className="text-xs mt-1" style={{ color: '#C0392B' }}>
+            <p className="text-xs mt-1" style={{ color: colors.danger }}>
               This will void the loan of {format.currency(loan.principalAmount)}. Cannot be undone.
             </p>
           </div>

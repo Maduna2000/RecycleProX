@@ -14,6 +14,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { format } from '@/lib/utils/format'
+import { PageShell } from '@/components/layout/PageShell'
+import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -94,7 +96,7 @@ export default function PurchasesPage() {
       width: '140px',
       sortable: true,
       render: (row) => (
-        <span className="font-mono text-xs" style={{ color: '#6C757D' }}>{row.refNumber}</span>
+        <span className="font-mono text-xs" style={{ color: colors.textSecondary }}>{row.refNumber}</span>
       ),
     },
     {
@@ -104,10 +106,10 @@ export default function PurchasesPage() {
         <div className="flex items-center gap-2">
           <Avatar name={`${row.customer.firstName} ${row.customer.lastName}`} size={26} />
           <div>
-            <p style={{ fontSize: 12, fontWeight: 500, color: '#212529' }}>
+            <p style={{ fontSize: fontSize.sm, fontWeight: fontWeight.medium, color: colors.textPrimary }}>
               {row.customer.firstName} {row.customer.lastName}
             </p>
-            <p className="font-mono" style={{ fontSize: 10, color: '#6C757D' }}>{row.customer.idNumber}</p>
+            <p className="font-mono" style={{ fontSize: 10, color: colors.textSecondary }}>{row.customer.idNumber}</p>
           </div>
         </div>
       ),
@@ -116,7 +118,7 @@ export default function PurchasesPage() {
       key: 'lines',
       header: 'Lines',
       width: '56px',
-      render: (row) => <span style={{ color: '#6C757D' }}>{row.lines.length}</span>,
+      render: (row) => <span style={{ color: colors.textSecondary }}>{row.lines.length}</span>,
     },
     {
       key: 'totalAmount',
@@ -124,7 +126,7 @@ export default function PurchasesPage() {
       width: '110px',
       sortable: true,
       render: (row) => (
-        <span className="font-mono font-semibold" style={{ color: '#212529' }}>
+        <span className="font-mono font-semibold" style={{ color: colors.textPrimary }}>
           R {new Decimal(row.totalAmount).toFixed(2)}
         </span>
       ),
@@ -134,7 +136,7 @@ export default function PurchasesPage() {
       header: 'Payment',
       width: '96px',
       render: (row) => (
-        <span className="capitalize" style={{ fontSize: 12, color: '#6C757D' }}>{row.paymentMethod}</span>
+        <span className="capitalize" style={{ fontSize: fontSize.sm, color: colors.textSecondary }}>{row.paymentMethod}</span>
       ),
     },
     {
@@ -143,7 +145,7 @@ export default function PurchasesPage() {
       width: '148px',
       sortable: true,
       render: (row) => (
-        <span style={{ fontSize: 11, color: '#6C757D' }}>{format.datetime(row.createdAt)}</span>
+        <span style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>{format.datetime(row.createdAt)}</span>
       ),
     },
     {
@@ -180,28 +182,24 @@ export default function PurchasesPage() {
   ]
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 gap-3">
-
-      {/* Page header */}
-      <div className="shrink-0">
-        <h1 className="text-xl font-bold" style={{ color: '#212529' }}>Purchases</h1>
-        <p className="text-sm mt-0.5" style={{ color: '#6C757D' }}>{data?.total ?? 0} total records</p>
-      </div>
-
+    <PageShell
+      title="Purchases"
+      subtitle={`${data?.total ?? 0} total records`}
+    >
       {/* Filters */}
-      <div className="flex gap-2 flex-wrap shrink-0">
+      <div className="flex gap-2 flex-wrap shrink-0 mb-3">
         <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3" style={{ color: '#6C757D' }} />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3" style={{ color: colors.textSecondary }} />
           <input
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1) }}
             placeholder="Search ref, customer name or ID..."
-            className="pl-7 pr-3 py-1 text-xs rounded border border-[#E0E0E0] bg-white focus:outline-none focus:border-[#185ABD] w-72"
+            className="pl-7 pr-3 py-1 text-xs rounded border bg-white focus:outline-none w-72 border-rpx-border focus:border-rpx-blue"
           />
         </div>
         <select
-          className="border border-[#E0E0E0] rounded px-2 py-1 text-xs bg-white focus:outline-none focus:border-[#185ABD]"
-          style={{ color: '#212529' }}
+          className="border rounded px-2 py-1 text-xs bg-white focus:outline-none border-rpx-border focus:border-rpx-blue"
+          style={{ color: colors.textPrimary }}
           value={status}
           onChange={(e) => { setStatus(e.target.value); setPage(1) }}
         >
@@ -246,7 +244,7 @@ export default function PurchasesPage() {
         height={300}
       >
         {detailLoading || !detail ? (
-          <div className="flex items-center gap-2" style={{ color: '#6C757D', fontSize: 12 }}>
+          <div className="flex items-center gap-2" style={{ color: colors.textSecondary, fontSize: fontSize.sm }}>
             <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading…
           </div>
         ) : (
@@ -255,41 +253,41 @@ export default function PurchasesPage() {
             {/* Left: meta */}
             <div className="w-44 shrink-0 space-y-3">
               <div>
-                <p className="uppercase tracking-wide font-semibold mb-0.5" style={{ fontSize: 10, color: '#6C757D' }}>Customer</p>
-                <p style={{ fontSize: 12, fontWeight: 600, color: '#212529' }}>
+                <p className="uppercase tracking-wide font-semibold mb-0.5" style={{ fontSize: 10, color: colors.textSecondary }}>Customer</p>
+                <p style={{ fontSize: fontSize.sm, fontWeight: fontWeight.semibold, color: colors.textPrimary }}>
                   {detail.customer.firstName} {detail.customer.lastName}
                 </p>
-                <p className="font-mono" style={{ fontSize: 10, color: '#6C757D' }}>{detail.customer.idNumber}</p>
+                <p className="font-mono" style={{ fontSize: 10, color: colors.textSecondary }}>{detail.customer.idNumber}</p>
                 {detail.customer.phone && (
-                  <p style={{ fontSize: 11, color: '#6C757D' }}>{detail.customer.phone}</p>
+                  <p style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>{detail.customer.phone}</p>
                 )}
               </div>
               <div>
-                <p className="uppercase tracking-wide font-semibold mb-0.5" style={{ fontSize: 10, color: '#6C757D' }}>Payment</p>
-                <p className="capitalize" style={{ fontSize: 12, color: '#212529' }}>{detail.paymentMethod}</p>
+                <p className="uppercase tracking-wide font-semibold mb-0.5" style={{ fontSize: 10, color: colors.textSecondary }}>Payment</p>
+                <p className="capitalize" style={{ fontSize: fontSize.sm, color: colors.textPrimary }}>{detail.paymentMethod}</p>
               </div>
               <div>
-                <p className="uppercase tracking-wide font-semibold mb-0.5" style={{ fontSize: 10, color: '#6C757D' }}>Date</p>
-                <p style={{ fontSize: 11, color: '#6C757D' }}>{format.datetime(detail.createdAt)}</p>
+                <p className="uppercase tracking-wide font-semibold mb-0.5" style={{ fontSize: 10, color: colors.textSecondary }}>Date</p>
+                <p style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>{format.datetime(detail.createdAt)}</p>
               </div>
               {detail.notes && (
                 <div>
-                  <p className="uppercase tracking-wide font-semibold mb-0.5" style={{ fontSize: 10, color: '#6C757D' }}>Notes</p>
-                  <p style={{ fontSize: 11, color: '#212529' }}>{detail.notes}</p>
+                  <p className="uppercase tracking-wide font-semibold mb-0.5" style={{ fontSize: 10, color: colors.textSecondary }}>Notes</p>
+                  <p style={{ fontSize: fontSize.xs, color: colors.textPrimary }}>{detail.notes}</p>
                 </div>
               )}
             </div>
 
             {/* Right: lines */}
             <div className="flex-1 overflow-auto">
-              <table className="w-full" style={{ fontSize: 12, borderCollapse: 'collapse' }}>
+              <table className="w-full" style={{ fontSize: fontSize.sm, borderCollapse: 'collapse' }}>
                 <thead>
-                  <tr style={{ borderBottom: '1px solid #E0E0E0' }}>
+                  <tr style={{ borderBottom: `1px solid ${colors.border}` }}>
                     {['Product', 'Qty', 'Unit Price', 'Line Total'].map((h) => (
                       <th
                         key={h}
                         className="text-left pb-1"
-                        style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#6C757D' }}
+                        style={{ fontSize: 10, fontWeight: fontWeight.semibold, textTransform: 'uppercase', letterSpacing: '0.05em', color: colors.textSecondary }}
                       >
                         {h}
                       </th>
@@ -298,29 +296,29 @@ export default function PurchasesPage() {
                 </thead>
                 <tbody>
                   {detail.lines.map((line) => (
-                    <tr key={line.id} style={{ borderBottom: '1px solid #F1F3F4' }}>
+                    <tr key={line.id} style={{ borderBottom: `1px solid ${colors.bg}` }}>
                       <td style={{ padding: '4px 0' }}>
-                        <p style={{ fontWeight: 500, color: '#212529' }}>{line.product.name}</p>
-                        <p className="font-mono" style={{ fontSize: 10, color: '#6C757D' }}>{line.product.code}</p>
+                        <p style={{ fontWeight: fontWeight.medium, color: colors.textPrimary }}>{line.product.name}</p>
+                        <p className="font-mono" style={{ fontSize: 10, color: colors.textSecondary }}>{line.product.code}</p>
                       </td>
-                      <td className="font-mono" style={{ padding: '4px 12px 4px 0', color: '#6C757D' }}>
+                      <td className="font-mono" style={{ padding: '4px 12px 4px 0', color: colors.textSecondary }}>
                         {new Decimal(line.quantity).toFixed(3)} {line.product.unit}
                       </td>
-                      <td className="font-mono" style={{ padding: '4px 12px 4px 0', color: '#6C757D' }}>
+                      <td className="font-mono" style={{ padding: '4px 12px 4px 0', color: colors.textSecondary }}>
                         R {new Decimal(line.unitPrice).toFixed(2)}
                       </td>
-                      <td className="font-mono font-semibold" style={{ padding: '4px 0', color: '#212529' }}>
+                      <td className="font-mono font-semibold" style={{ padding: '4px 0', color: colors.textPrimary }}>
                         R {new Decimal(line.lineTotal).toFixed(2)}
                       </td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot>
-                  <tr style={{ borderTop: '1px solid #E0E0E0' }}>
-                    <td colSpan={3} className="text-right font-semibold" style={{ padding: '6px 12px 0 0', color: '#6C757D' }}>
+                  <tr style={{ borderTop: `1px solid ${colors.border}` }}>
+                    <td colSpan={3} className="text-right font-semibold" style={{ padding: '6px 12px 0 0', color: colors.textSecondary }}>
                       Total Payout
                     </td>
-                    <td className="font-mono font-bold" style={{ padding: '6px 0 0', fontSize: 13, color: '#212529' }}>
+                    <td className="font-mono font-bold" style={{ padding: '6px 0 0', fontSize: fontSize.base, color: colors.textPrimary }}>
                       R {new Decimal(detail.totalAmount).toFixed(2)}
                     </td>
                   </tr>
@@ -343,7 +341,7 @@ export default function PurchasesPage() {
           }}
         />
       )}
-    </div>
+    </PageShell>
   )
 }
 
@@ -383,12 +381,12 @@ function VoidDialog({
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle style={{ color: '#C0392B' }}>Void Purchase</DialogTitle>
+          <DialogTitle style={{ color: colors.danger }}>Void Purchase</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 mt-2">
-          <p className="text-sm" style={{ color: '#6C757D' }}>
+          <p className="text-sm" style={{ color: colors.textSecondary }}>
             You are about to void{' '}
-            <span className="font-semibold" style={{ color: '#212529' }}>{purchase.refNumber}</span>
+            <span className="font-semibold" style={{ color: colors.textPrimary }}>{purchase.refNumber}</span>
             {' '}(R {new Decimal(purchase.totalAmount).toFixed(2)}). This cannot be undone.
           </p>
           <div>
