@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Decimal from 'decimal.js'
 import useSWR, { mutate } from 'swr'
 import { useSession } from 'next-auth/react'
-import { Plus, CheckCircle, Trash2, Loader2, Receipt } from 'lucide-react'
+import { CheckCircle, Trash2, Loader2, Receipt } from 'lucide-react'
 import { toast } from 'sonner'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -155,30 +155,21 @@ export default function ExpensesPage() {
         <p className="text-sm mt-0.5" style={{ color: '#6C757D' }}>Track and manage business expenses</p>
       </div>
 
-      {/* Tab bar + action */}
-      <div className="flex items-center justify-between shrink-0 border-b border-[#E0E0E0]">
-        <div className="flex items-center">
-          {PAGE_TABS.map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className="px-4 py-2 text-xs font-medium border-b-2 transition-colors"
-              style={{
-                borderColor: tab === t ? '#185ABD' : 'transparent',
-                color:       tab === t ? '#185ABD' : '#6C757D',
-              }}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
-        <button
-          onClick={() => setAddOpen(true)}
-          className="flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium text-white mb-1"
-          style={{ background: '#217346' }}
-        >
-          <Plus className="w-3.5 h-3.5" /> Add Expense
-        </button>
+      {/* Tab bar */}
+      <div className="flex items-center shrink-0 border-b border-[#E0E0E0]">
+        {PAGE_TABS.map((t) => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            className="px-4 py-2 text-xs font-medium border-b-2 transition-colors"
+            style={{
+              borderColor: tab === t ? '#185ABD' : 'transparent',
+              color:       tab === t ? '#185ABD' : '#6C757D',
+            }}
+          >
+            {t}
+          </button>
+        ))}
       </div>
 
       {/* Approved total banner */}

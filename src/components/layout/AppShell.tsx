@@ -8,7 +8,7 @@ import {
   Recycle, ChevronDown, Bell, Search,
   Plus, Scale, Printer, Zap, Ban,
   CreditCard, DollarSign, BarChart2,
-  ShieldCheck, UserCheck,
+  ShieldCheck, UserCheck, AlertCircle,
   ArrowLeftRight, ClipboardCheck, FileSpreadsheet,
   FileText, Download, RefreshCw,
   Handshake, LogOut, Settings,
@@ -32,7 +32,7 @@ interface Tab {
 
 const TABS: Tab[] = [
   { id: 'home',         label: 'Home',         href: '/app/dashboard',  shortcut: 'H', matches: ['/app/dashboard'] },
-  { id: 'transactions', label: 'Transactions',  href: '/app/purchases',  shortcut: 'T', matches: ['/app/purchases', '/app/sales'] },
+  { id: 'transactions', label: 'Transactions',  href: '/app/purchases',  shortcut: 'T', matches: ['/app/purchases', '/app/sales', '/app/purchases/unpaid'] },
   { id: 'finance',      label: 'Finance',       href: '/app/payments',   shortcut: 'F', matches: ['/app/payments', '/app/expenses', '/app/cashup', '/app/float'] },
   { id: 'customers',    label: 'Customers',     href: '/app/customers',  shortcut: 'C', matches: ['/app/customers', '/app/casual', '/app/police-register', '/app/photos'] },
   { id: 'stock',        label: 'Stock',         href: '/app/stock',      shortcut: 'S', matches: ['/app/stock', '/app/stocktake'] },
@@ -72,11 +72,12 @@ function useToolbarButtons(activeTab: TabId): ToolbarButton[] {
       ]
     case 'transactions':
       return [
-        { label: 'New Purchase', icon: Plus,     href: '/app/purchases/new', variant: 'primary' },
-        { label: 'New Sale',     icon: Plus,     href: '/app/sales/new',     variant: 'secondary' },
-        { label: 'Weigh',        icon: Scale,    href: '/app/purchases/new', variant: 'ghost', iconOnly: true },
-        { label: 'Print Slip',   icon: Printer,  variant: 'ghost', iconOnly: true },
-        { label: 'Void',         icon: Zap,      variant: 'danger', iconOnly: true },
+        { label: 'New Purchase', icon: Plus,          href: '/app/purchases/new',     variant: 'primary' },
+        { label: 'New Sale',     icon: Plus,          href: '/app/sales/new',         variant: 'secondary' },
+        { label: 'Unpaid',       icon: AlertCircle,   href: '/app/purchases/unpaid',  variant: 'ghost' },
+        { label: 'Weigh',        icon: Scale,         href: '/app/purchases/new', variant: 'ghost', iconOnly: true },
+        { label: 'Print Slip',   icon: Printer,       variant: 'ghost', iconOnly: true },
+        { label: 'Void',         icon: Zap,           variant: 'danger', iconOnly: true },
       ]
     case 'finance':
       return [

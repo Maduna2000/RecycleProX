@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import useSWR, { mutate } from 'swr'
 import { useSession } from 'next-auth/react'
-import { Plus, Search, Loader2, AlertCircle } from 'lucide-react'
+import { Search, Loader2, AlertCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import Decimal from 'decimal.js'
 import { DataTable, Avatar, StatusBadge, type Column, type RowAction } from '@/components/ui/DataTable'
@@ -232,30 +232,21 @@ export default function LoansPage() {
         <p className="text-sm mt-0.5" style={{ color: '#6C757D' }}>Manage customer loan advances and repayments</p>
       </div>
 
-      {/* Tab bar + action */}
-      <div className="flex items-center justify-between shrink-0 border-b border-[#E0E0E0]">
-        <div className="flex items-center">
-          <button
-            onClick={() => { setActiveTab('active'); setSelectedId(null) }}
-            className="px-4 py-2 text-xs font-medium border-b-2 transition-colors"
-            style={{ borderColor: activeTab === 'active' ? '#185ABD' : 'transparent', color: activeTab === 'active' ? '#185ABD' : '#6C757D' }}
-          >
-            Active Loans {activeData?.total ? `(${activeData.total})` : ''}
-          </button>
-          <button
-            onClick={() => { setActiveTab('history'); setSelectedId(null) }}
-            className="px-4 py-2 text-xs font-medium border-b-2 transition-colors"
-            style={{ borderColor: activeTab === 'history' ? '#185ABD' : 'transparent', color: activeTab === 'history' ? '#185ABD' : '#6C757D' }}
-          >
-            History
-          </button>
-        </div>
+      {/* Tab bar */}
+      <div className="flex items-center shrink-0 border-b border-[#E0E0E0]">
         <button
-          onClick={() => setNewLoanOpen(true)}
-          className="flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium text-white mb-1"
-          style={{ background: '#217346' }}
+          onClick={() => { setActiveTab('active'); setSelectedId(null) }}
+          className="px-4 py-2 text-xs font-medium border-b-2 transition-colors"
+          style={{ borderColor: activeTab === 'active' ? '#185ABD' : 'transparent', color: activeTab === 'active' ? '#185ABD' : '#6C757D' }}
         >
-          <Plus className="w-3.5 h-3.5" /> New Loan
+          Active Loans {activeData?.total ? `(${activeData.total})` : ''}
+        </button>
+        <button
+          onClick={() => { setActiveTab('history'); setSelectedId(null) }}
+          className="px-4 py-2 text-xs font-medium border-b-2 transition-colors"
+          style={{ borderColor: activeTab === 'history' ? '#185ABD' : 'transparent', color: activeTab === 'history' ? '#185ABD' : '#6C757D' }}
+        >
+          History
         </button>
       </div>
 

@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import useSWR, { mutate } from 'swr'
 import { useSession } from 'next-auth/react'
-import { Plus, Search, Ban, Loader2, TrendingDown, AlertCircle, HandCoins } from 'lucide-react'
+import { Search, Ban, Loader2, TrendingDown, AlertCircle, HandCoins } from 'lucide-react'
 import Decimal from 'decimal.js'
 import { toast } from 'sonner'
 import { DataTable, Avatar, StatusBadge, type Column, type RowAction } from '@/components/ui/DataTable'
@@ -209,41 +209,32 @@ export default function PaymentsPage() {
         <p className="text-sm mt-0.5" style={{ color: '#6C757D' }}>Customer payouts</p>
       </div>
 
-      {/* Page-level tab bar + actions */}
-      <div className="flex items-center justify-between shrink-0 border-b border-[#E0E0E0]">
-        <div className="flex items-center gap-0">
-          <button
-            onClick={() => setActiveTab('payments')}
-            className="px-4 py-2 text-xs font-medium border-b-2 transition-colors"
-            style={{
-              borderColor: activeTab === 'payments' ? '#185ABD' : 'transparent',
-              color:       activeTab === 'payments' ? '#185ABD' : '#6C757D',
-            }}
-          >
-            Payment History
-          </button>
-          <button
-            onClick={() => setActiveTab('balances')}
-            className="px-4 py-2 text-xs font-medium border-b-2 transition-colors flex items-center gap-1.5"
-            style={{
-              borderColor: activeTab === 'balances' ? '#185ABD' : 'transparent',
-              color:       activeTab === 'balances' ? '#185ABD' : '#6C757D',
-            }}
-          >
-            Account Balances
-            {outstandingCount > 0 && (
-              <span className="rounded-full px-1.5 py-0.5 text-white font-bold" style={{ fontSize: 10, background: '#C0392B', lineHeight: 1.2 }}>
-                {outstandingCount}
-              </span>
-            )}
-          </button>
-        </div>
+      {/* Tab bar */}
+      <div className="flex items-center shrink-0 border-b border-[#E0E0E0]">
         <button
-          onClick={() => setNewPaymentOpen(true)}
-          className="flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium text-white mb-1"
-          style={{ background: '#217346' }}
+          onClick={() => setActiveTab('payments')}
+          className="px-4 py-2 text-xs font-medium border-b-2 transition-colors"
+          style={{
+            borderColor: activeTab === 'payments' ? '#185ABD' : 'transparent',
+            color:       activeTab === 'payments' ? '#185ABD' : '#6C757D',
+          }}
         >
-          <Plus className="w-3.5 h-3.5" /> Record Payment
+          Payment History
+        </button>
+        <button
+          onClick={() => setActiveTab('balances')}
+          className="px-4 py-2 text-xs font-medium border-b-2 transition-colors flex items-center gap-1.5"
+          style={{
+            borderColor: activeTab === 'balances' ? '#185ABD' : 'transparent',
+            color:       activeTab === 'balances' ? '#185ABD' : '#6C757D',
+          }}
+        >
+          Account Balances
+          {outstandingCount > 0 && (
+            <span className="rounded-full px-1.5 py-0.5 text-white font-bold" style={{ fontSize: 10, background: '#C0392B', lineHeight: 1.2 }}>
+              {outstandingCount}
+            </span>
+          )}
         </button>
       </div>
 

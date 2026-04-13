@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react'
 import useSWR, { mutate } from 'swr'
 import { useSession } from 'next-auth/react'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -55,9 +54,9 @@ function ScaleRow({
 }) {
   const type = (form[scaleKey(n, 'type')] ?? 'none') as ScaleType
   return (
-    <div className="border rounded-lg p-4 space-y-3">
+    <div className="rounded-lg p-4 space-y-3" style={{ border: '1px solid #E0E0E0' }}>
       <div className="flex items-center gap-3">
-        <span className="text-sm font-semibold text-gray-700 w-16">Scale {n}</span>
+        <span className="text-xs font-semibold w-16" style={{ color: '#212529' }}>Scale {n}</span>
         <div className="flex-1 max-w-[180px]">
           <Select
             value={type}
@@ -146,7 +145,7 @@ export default function SettingsPage() {
 
   if (!isAdmin) {
     return (
-      <div className="flex items-center justify-center h-64 text-sm text-gray-400">
+      <div className="flex items-center justify-center h-40 text-sm" style={{ color: '#6C757D' }}>
         Access restricted to administrators.
       </div>
     )
@@ -169,21 +168,22 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="max-w-2xl space-y-6">
-      <div className="flex items-center gap-3">
-        <Settings className="w-6 h-6 text-green-700" />
-        <h1 className="text-2xl font-bold text-gray-900">System Settings</h1>
+    <div className="flex-1 min-h-0 overflow-y-auto">
+      <div className="max-w-2xl space-y-5 pb-6">
+      <div className="flex items-center gap-2">
+        <Settings className="w-5 h-5" style={{ color: '#217346' }} />
+        <h1 className="text-xl font-bold" style={{ color: '#212529' }}>System Settings</h1>
       </div>
 
       {isLoading ? (
-        <div className="flex items-center gap-2 text-gray-400 p-10">
+        <div className="flex items-center gap-2 p-10" style={{ color: '#6C757D' }}>
           <Loader2 className="w-4 h-4 animate-spin" /> Loading…
         </div>
       ) : (
-        <div className="space-y-5">
+        <div className="space-y-4">
           {/* ── Yard Information ─────────────────────────── */}
-          <div className="bg-white rounded-xl border p-6 space-y-5">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Yard Information</h2>
+          <div className="rounded-lg border p-5 space-y-4 bg-white" style={{ borderColor: '#E0E0E0' }}>
+            <h2 className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#6C757D' }}>Yard Information</h2>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -218,8 +218,8 @@ export default function SettingsPage() {
           </div>
 
           {/* ── Tax & Receipts ────────────────────────────── */}
-          <div className="bg-white rounded-xl border p-6 space-y-5">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Tax &amp; Receipts</h2>
+          <div className="rounded-lg border p-5 space-y-4 bg-white" style={{ borderColor: '#E0E0E0' }}>
+            <h2 className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#6C757D' }}>Tax &amp; Receipts</h2>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -234,7 +234,7 @@ export default function SettingsPage() {
                   className="mt-1"
                   placeholder="15"
                 />
-                <p className="text-xs text-gray-400 mt-1">Used for expense VAT calculations. Default: 15%</p>
+                <p className="text-xs mt-1" style={{ color: '#6C757D' }}>Used for expense VAT calculations. Default: 15%</p>
               </div>
             </div>
 
@@ -250,10 +250,10 @@ export default function SettingsPage() {
           </div>
 
           {/* ── Scale Configuration ───────────────────────── */}
-          <div className="bg-white rounded-xl border p-6 space-y-4">
+          <div className="rounded-lg border p-5 space-y-4 bg-white" style={{ borderColor: '#E0E0E0' }}>
             <div>
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Scale Configuration</h2>
-              <p className="text-xs text-gray-400 mt-1">
+              <h2 className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#6C757D' }}>Scale Configuration</h2>
+              <p className="text-xs mt-1" style={{ color: '#6C757D' }}>
                 Configure up to 3 platform scales. TCP connects over your local network;
                 Serial connects via RS232/USB-serial adapter.
               </p>
@@ -265,15 +265,21 @@ export default function SettingsPage() {
           </div>
 
           {/* ── Save ─────────────────────────────────────── */}
-          <div className="flex justify-end pb-6">
-            <Button onClick={handleSave} disabled={saving} className="bg-green-600 hover:bg-green-700">
+          <div className="flex justify-end pb-2">
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="flex items-center gap-1.5 px-4 py-1.5 rounded text-xs font-medium text-white disabled:opacity-50"
+              style={{ background: '#217346' }}
+            >
               {saving
-                ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving…</>
-                : <><Save className="w-4 h-4 mr-2" />Save Settings</>}
-            </Button>
+                ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Saving…</>
+                : <><Save className="w-3.5 h-3.5" /> Save Settings</>}
+            </button>
           </div>
         </div>
       )}
+    </div>
     </div>
   )
 }

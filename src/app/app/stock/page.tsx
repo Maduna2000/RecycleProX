@@ -115,11 +115,9 @@ export default function StockPage() {
               <p className="font-mono" style={{ fontSize: 10, color: '#6C757D' }}>{r.product.code}</p>
             </div>
             {belowReorder && (
-              <AlertTriangle
-                className="w-3.5 h-3.5 shrink-0"
-                style={{ color: '#C9A020' }}
-                title={`Below reorder level (min: ${minLevel?.toFixed(3)} ${r.product.unit})`}
-              />
+              <span title={`Below reorder level (min: ${minLevel?.toFixed(3)} ${r.product.unit})`}>
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0" style={{ color: '#C9A020' }} />
+              </span>
             )}
           </div>
         )

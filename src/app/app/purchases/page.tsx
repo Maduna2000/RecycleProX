@@ -206,6 +206,7 @@ export default function PurchasesPage() {
           onChange={(e) => { setStatus(e.target.value); setPage(1) }}
         >
           <option value="">All Statuses</option>
+          <option value="pending">Pending</option>
           <option value="completed">Completed</option>
           <option value="voided">Voided</option>
         </select>

@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import useSWR, { mutate } from 'swr'
-import { Plus, AlertTriangle } from 'lucide-react'
+import { AlertTriangle } from 'lucide-react'
 import { DataTable, Avatar, StatusBadge, type Column, type RowAction } from '@/components/ui/DataTable'
 import { CreateCustomerModal } from '@/components/customers/CreateCustomerModal'
 
@@ -51,7 +51,9 @@ export default function CustomersPage() {
               {r.firstName} {r.lastName}
             </span>
             {r.blacklisted && (
-              <AlertTriangle className="w-3.5 h-3.5 shrink-0" style={{ color: '#C0392B' }} title="Blacklisted" />
+              <span title="Blacklisted">
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0" style={{ color: '#C0392B' }} />
+              </span>
             )}
           </div>
         </div>
@@ -139,13 +141,6 @@ export default function CustomersPage() {
           <option value="false">Active Only</option>
           <option value="true">Blacklisted Only</option>
         </select>
-        <button
-          onClick={() => setCreateOpen(true)}
-          className="ml-auto flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium text-white"
-          style={{ background: '#217346' }}
-        >
-          <Plus className="w-3.5 h-3.5" /> Add Customer
-        </button>
       </div>
 
       {/* Table */}
