@@ -15,6 +15,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { PageShell } from '@/components/layout/PageShell'
+import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -67,14 +69,19 @@ export default function ExpensesPage() {
       key: 'refNumber',
       header: 'Ref #',
       width: '130px',
-      render: (r) => <span className="font-mono text-xs" style={{ color: '#6C757D' }}>{r.refNumber}</span>,
+      render: (r) => (
+        <span className="font-mono text-xs" style={{ color: colors.textSecondary }}>{r.refNumber}</span>
+      ),
     },
     {
       key: 'expenseType',
       header: 'Category',
       width: '140px',
       render: (r) => (
-        <span className="px-2 py-0.5 rounded-full text-xs font-medium" style={{ background: '#EBF3FC', color: '#185ABD' }}>
+        <span
+          className="px-2 py-0.5 rounded-full text-xs font-medium"
+          style={{ background: colors.processBg, color: colors.process }}
+        >
           {r.expenseType.name}
         </span>
       ),
@@ -83,7 +90,12 @@ export default function ExpensesPage() {
       key: 'description',
       header: 'Description',
       render: (r) => (
-        <span className="truncate block max-w-[220px]" style={{ fontSize: 12, color: '#212529' }}>{r.description}</span>
+        <span
+          className="truncate block max-w-[220px]"
+          style={{ fontSize: fontSize.sm, color: colors.textPrimary }}
+        >
+          {r.description}
+        </span>
       ),
     },
     {
@@ -91,7 +103,7 @@ export default function ExpensesPage() {
       header: 'Amount',
       width: '100px',
       render: (r) => (
-        <span className="font-mono font-semibold" style={{ color: '#212529' }}>
+        <span className="font-mono font-semibold" style={{ color: colors.textPrimary }}>
           R {new Decimal(r.amount).toFixed(2)}
         </span>
       ),
@@ -101,7 +113,7 @@ export default function ExpensesPage() {
       header: 'VAT',
       width: '90px',
       render: (r) => (
-        <span className="font-mono" style={{ fontSize: 12, color: '#6C757D' }}>
+        <span className="font-mono" style={{ fontSize: fontSize.sm, color: colors.textSecondary }}>
           {r.includesVat ? `R ${new Decimal(r.vatAmount).toFixed(2)}` : '—'}
         </span>
       ),
@@ -110,7 +122,11 @@ export default function ExpensesPage() {
       key: 'paymentMethod',
       header: 'Method',
       width: '90px',
-      render: (r) => <span className="capitalize" style={{ fontSize: 12, color: '#6C757D' }}>{r.paymentMethod}</span>,
+      render: (r) => (
+        <span className="capitalize" style={{ fontSize: fontSize.sm, color: colors.textSecondary }}>
+          {r.paymentMethod}
+        </span>
+      ),
     },
     {
       key: 'status',
@@ -123,7 +139,7 @@ export default function ExpensesPage() {
       header: 'Date',
       width: '100px',
       render: (r) => (
-        <span style={{ fontSize: 11, color: '#6C757D' }}>
+        <span style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>
           {new Date(r.createdAt).toLocaleDateString('en-ZA')}
         </span>
       ),
@@ -146,39 +162,30 @@ export default function ExpensesPage() {
     },
   ]
 
+  const pageTabs = PAGE_TABS.map((t) => ({ value: t, label: t }))
+
   return (
-    <div className="flex flex-col flex-1 min-h-0 gap-3">
-
-      {/* Page header */}
-      <div className="shrink-0">
-        <h1 className="text-xl font-bold" style={{ color: '#212529' }}>Expenses</h1>
-        <p className="text-sm mt-0.5" style={{ color: '#6C757D' }}>Track and manage business expenses</p>
-      </div>
-
-      {/* Tab bar */}
-      <div className="flex items-center shrink-0 border-b border-[#E0E0E0]">
-        {PAGE_TABS.map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className="px-4 py-2 text-xs font-medium border-b-2 transition-colors"
-            style={{
-              borderColor: tab === t ? '#185ABD' : 'transparent',
-              color:       tab === t ? '#185ABD' : '#6C757D',
-            }}
-          >
-            {t}
-          </button>
-        ))}
-      </div>
-
+    <PageShell
+      title="Expenses"
+      subtitle={`${data?.total ?? expenses.length} expenses`}
+      tabs={pageTabs}
+      activeTab={tab}
+      onTabChange={(v) => setTab(v as PageTab)}
+    >
       {/* Approved total banner */}
       {tab === 'Approved' && data && (
-        <div className="flex items-center gap-3 px-4 py-2.5 rounded-lg shrink-0" style={{ background: '#F0FBF4', border: '1px solid #21734630' }}>
-          <Receipt className="w-4 h-4 shrink-0" style={{ color: '#217346' }} />
+        <div
+          className="flex items-center gap-3 px-4 py-2.5 rounded-lg shrink-0 mb-3"
+          style={{ background: colors.actionBg, border: `1px solid ${colors.action}30` }}
+        >
+          <Receipt className="w-4 h-4 shrink-0" style={{ color: colors.action }} />
           <div>
-            <p className="text-xs font-semibold" style={{ color: '#217346' }}>Total Approved Expenses (current view)</p>
-            <p className="font-mono font-bold" style={{ fontSize: 16, color: '#1a5c38' }}>R {totalApproved.toFixed(2)}</p>
+            <p className="text-xs font-semibold" style={{ color: colors.action }}>
+              Total Approved Expenses (current view)
+            </p>
+            <p className="font-mono font-bold" style={{ fontSize: fontSize.lg, color: '#1a5c38' }}>
+              R {totalApproved.toFixed(2)}
+            </p>
           </div>
         </div>
       )}
@@ -203,7 +210,7 @@ export default function ExpensesPage() {
           onSuccess={() => { mutate(key); setAddOpen(false) }}
         />
       )}
-    </div>
+    </PageShell>
   )
 }
 
@@ -246,7 +253,7 @@ function AddExpenseModal({ onClose, onSuccess }: { onClose: () => void; onSucces
                 type="button"
                 onClick={() => setAddTypeOpen(true)}
                 className="text-xs hover:underline"
-                style={{ color: '#217346' }}
+                style={{ color: colors.action }}
               >
                 + New category
               </button>
@@ -259,20 +266,26 @@ function AddExpenseModal({ onClose, onSuccess }: { onClose: () => void; onSucces
                 ))}
               </SelectContent>
             </Select>
-            {errors.expenseTypeId && <p className="text-xs mt-1" style={{ color: '#C0392B' }}>{errors.expenseTypeId.message}</p>}
+            {errors.expenseTypeId && (
+              <p className="text-xs mt-1" style={{ color: colors.danger }}>{errors.expenseTypeId.message}</p>
+            )}
           </div>
 
           <div>
             <Label>Description</Label>
             <Input {...register('description')} className="mt-1" disabled={loading} placeholder="Brief description…" />
-            {errors.description && <p className="text-xs mt-1" style={{ color: '#C0392B' }}>{errors.description.message}</p>}
+            {errors.description && (
+              <p className="text-xs mt-1" style={{ color: colors.danger }}>{errors.description.message}</p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label>Amount (R)</Label>
               <Input {...register('amount')} type="number" step="0.01" min="0.01" className="mt-1" disabled={loading} />
-              {errors.amount && <p className="text-xs mt-1" style={{ color: '#C0392B' }}>{errors.amount.message}</p>}
+              {errors.amount && (
+                <p className="text-xs mt-1" style={{ color: colors.danger }}>{errors.amount.message}</p>
+              )}
             </div>
             <div>
               <Label>Payment Method</Label>
@@ -295,7 +308,7 @@ function AddExpenseModal({ onClose, onSuccess }: { onClose: () => void; onSucces
             </div>
           )}
 
-          <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: '#212529' }}>
+          <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: colors.textPrimary }}>
             <input
               type="checkbox"
               checked={!!includesVat}
@@ -307,7 +320,12 @@ function AddExpenseModal({ onClose, onSuccess }: { onClose: () => void; onSucces
 
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
-            <Button type="submit" style={{ background: '#217346' }} className="hover:opacity-90" disabled={loading}>
+            <Button
+              type="submit"
+              style={{ background: colors.action }}
+              className="hover:opacity-90"
+              disabled={loading}
+            >
               {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving…</> : 'Record Expense'}
             </Button>
           </div>
@@ -361,7 +379,12 @@ function AddTypeModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
           </div>
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
-            <Button type="submit" style={{ background: '#217346' }} className="hover:opacity-90" disabled={loading || !name.trim()}>
+            <Button
+              type="submit"
+              style={{ background: colors.action }}
+              className="hover:opacity-90"
+              disabled={loading || !name.trim()}
+            >
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Create'}
             </Button>
           </div>

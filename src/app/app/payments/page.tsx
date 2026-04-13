@@ -14,6 +14,8 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { format } from '@/lib/utils/format'
 import { CustomerLookupWidget } from '@/components/CustomerLookupWidget'
+import { PageShell } from '@/components/layout/PageShell'
+import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -80,7 +82,9 @@ export default function PaymentsPage() {
       key: 'refNumber',
       header: 'Ref #',
       width: '140px',
-      render: (r) => <span className="font-mono text-xs" style={{ color: '#6C757D' }}>{r.refNumber}</span>,
+      render: (r) => (
+        <span className="font-mono text-xs" style={{ color: colors.textSecondary }}>{r.refNumber}</span>
+      ),
     },
     {
       key: 'customer',
@@ -89,10 +93,10 @@ export default function PaymentsPage() {
         <div className="flex items-center gap-2">
           <Avatar name={`${r.customer.firstName} ${r.customer.lastName}`} size={26} />
           <div>
-            <p style={{ fontSize: 12, fontWeight: 500, color: '#212529' }}>
+            <p style={{ fontSize: fontSize.sm, fontWeight: fontWeight.medium, color: colors.textPrimary }}>
               {r.customer.firstName} {r.customer.lastName}
             </p>
-            <p className="font-mono" style={{ fontSize: 10, color: '#6C757D' }}>{r.customer.idNumber}</p>
+            <p className="font-mono" style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>{r.customer.idNumber}</p>
           </div>
         </div>
       ),
@@ -102,7 +106,7 @@ export default function PaymentsPage() {
       header: 'Amount',
       width: '110px',
       render: (r) => (
-        <span className="font-mono font-semibold" style={{ color: '#212529' }}>
+        <span className="font-mono font-semibold" style={{ color: colors.textPrimary }}>
           R {new Decimal(r.amount).toFixed(2)}
         </span>
       ),
@@ -111,13 +115,15 @@ export default function PaymentsPage() {
       key: 'paymentMethod',
       header: 'Method',
       width: '96px',
-      render: (r) => <span className="capitalize" style={{ fontSize: 12, color: '#6C757D' }}>{r.paymentMethod}</span>,
+      render: (r) => (
+        <span className="capitalize" style={{ fontSize: fontSize.sm, color: colors.textSecondary }}>{r.paymentMethod}</span>
+      ),
     },
     {
       key: 'createdAt',
       header: 'Date',
       width: '148px',
-      render: (r) => <span style={{ fontSize: 11, color: '#6C757D' }}>{format.datetime(r.createdAt)}</span>,
+      render: (r) => <span style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>{format.datetime(r.createdAt)}</span>,
     },
     {
       key: 'status',
@@ -146,8 +152,10 @@ export default function PaymentsPage() {
         <div className="flex items-center gap-2">
           <Avatar name={`${r.firstName} ${r.lastName}`} size={26} />
           <div>
-            <p style={{ fontSize: 12, fontWeight: 500, color: '#212529' }}>{r.firstName} {r.lastName}</p>
-            <p className="font-mono" style={{ fontSize: 10, color: '#6C757D' }}>{r.idNumber}</p>
+            <p style={{ fontSize: fontSize.sm, fontWeight: fontWeight.medium, color: colors.textPrimary }}>
+              {r.firstName} {r.lastName}
+            </p>
+            <p className="font-mono" style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>{r.idNumber}</p>
           </div>
         </div>
       ),
@@ -157,7 +165,7 @@ export default function PaymentsPage() {
       header: 'Total Purchases',
       width: '140px',
       render: (r) => (
-        <span className="font-mono" style={{ color: '#6C757D' }}>
+        <span className="font-mono" style={{ color: colors.textSecondary }}>
           R {new Decimal(r.totalPurchases).toFixed(2)}
         </span>
       ),
@@ -167,7 +175,7 @@ export default function PaymentsPage() {
       header: 'Total Paid',
       width: '120px',
       render: (r) => (
-        <span className="font-mono" style={{ color: '#217346' }}>
+        <span className="font-mono" style={{ color: colors.action }}>
           R {new Decimal(r.totalPaid).toFixed(2)}
         </span>
       ),
@@ -181,8 +189,8 @@ export default function PaymentsPage() {
         const isPos = outstanding.gt(0)
         return (
           <div className="flex items-center gap-1.5">
-            {isPos && <AlertCircle className="w-3.5 h-3.5 shrink-0" style={{ color: '#C9A020' }} />}
-            <span className="font-mono font-semibold" style={{ color: isPos ? '#C9A020' : '#6C757D' }}>
+            {isPos && <AlertCircle className="w-3.5 h-3.5 shrink-0" style={{ color: colors.warning }} />}
+            <span className="font-mono font-semibold" style={{ color: isPos ? colors.warning : colors.textSecondary }}>
               R {outstanding.toFixed(2)}
             </span>
           </div>
@@ -200,58 +208,44 @@ export default function PaymentsPage() {
     },
   ]
 
+  const pageTabs = [
+    { value: 'payments', label: 'Payment History' },
+    {
+      value: 'balances',
+      label: 'Account Balances',
+      count: outstandingCount > 0 ? outstandingCount : undefined,
+    },
+  ]
+
   return (
-    <div className="flex flex-col flex-1 min-h-0 gap-3">
-
-      {/* Page header */}
-      <div className="shrink-0">
-        <h1 className="text-xl font-bold" style={{ color: '#212529' }}>Payments</h1>
-        <p className="text-sm mt-0.5" style={{ color: '#6C757D' }}>Customer payouts</p>
-      </div>
-
-      {/* Tab bar */}
-      <div className="flex items-center shrink-0 border-b border-[#E0E0E0]">
-        <button
-          onClick={() => setActiveTab('payments')}
-          className="px-4 py-2 text-xs font-medium border-b-2 transition-colors"
-          style={{
-            borderColor: activeTab === 'payments' ? '#185ABD' : 'transparent',
-            color:       activeTab === 'payments' ? '#185ABD' : '#6C757D',
-          }}
-        >
-          Payment History
-        </button>
-        <button
-          onClick={() => setActiveTab('balances')}
-          className="px-4 py-2 text-xs font-medium border-b-2 transition-colors flex items-center gap-1.5"
-          style={{
-            borderColor: activeTab === 'balances' ? '#185ABD' : 'transparent',
-            color:       activeTab === 'balances' ? '#185ABD' : '#6C757D',
-          }}
-        >
-          Account Balances
-          {outstandingCount > 0 && (
-            <span className="rounded-full px-1.5 py-0.5 text-white font-bold" style={{ fontSize: 10, background: '#C0392B', lineHeight: 1.2 }}>
-              {outstandingCount}
-            </span>
-          )}
-        </button>
-      </div>
-
+    <PageShell
+      title="Payments"
+      subtitle="Customer payouts"
+      tabs={pageTabs}
+      activeTab={activeTab}
+      onTabChange={(v) => setActiveTab(v as PageTab)}
+    >
       {/* Payments tab */}
       {activeTab === 'payments' && (
         <>
-          <div className="flex gap-2 items-center shrink-0">
+          <div className="flex gap-2 items-center shrink-0 mb-3">
             <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3" style={{ color: '#6C757D' }} />
+              <Search
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3"
+                style={{ color: colors.textSecondary }}
+              />
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search ref or customer..."
-                className="pl-7 pr-3 py-1 text-xs rounded border border-[#E0E0E0] bg-white focus:outline-none focus:border-[#185ABD] w-64"
+                className="pl-7 pr-3 py-1 text-xs rounded border bg-white focus:outline-none w-64"
+                style={{ borderColor: colors.border }}
               />
             </div>
-            <label className="flex items-center gap-1.5 text-xs cursor-pointer" style={{ color: '#6C757D' }}>
+            <label
+              className="flex items-center gap-1.5 text-xs cursor-pointer"
+              style={{ color: colors.textSecondary }}
+            >
               <input
                 type="checkbox"
                 checked={includeVoided}
@@ -303,7 +297,7 @@ export default function PaymentsPage() {
           onSuccess={() => { revalidate(); setVoidTarget(null) }}
         />
       )}
-    </div>
+    </PageShell>
   )
 }
 
@@ -356,14 +350,22 @@ function NewPaymentModal({ onClose, onSuccess }: { onClose: () => void; onSucces
             {!customer ? (
               <CustomerLookupWidget onSelect={(c) => setCustomer(c)} />
             ) : (
-              <div className="p-3 rounded-lg flex items-center justify-between" style={{ background: '#F0FBF4', border: '1px solid #21734630' }}>
+              <div
+                className="p-3 rounded-lg flex items-center justify-between"
+                style={{ background: colors.actionBg, border: `1px solid ${colors.action}30` }}
+              >
                 <div>
-                  <p className="font-semibold text-sm" style={{ color: '#212529' }}>{customer.firstName} {customer.lastName}</p>
-                  <p className="font-mono text-xs" style={{ color: '#6C757D' }}>{customer.idNumber}</p>
+                  <p className="font-semibold text-sm" style={{ color: colors.textPrimary }}>
+                    {customer.firstName} {customer.lastName}
+                  </p>
+                  <p className="font-mono text-xs" style={{ color: colors.textSecondary }}>{customer.idNumber}</p>
                   {balanceData && (
                     <p className="text-xs mt-0.5">
                       Outstanding:{' '}
-                      <span className="font-semibold" style={{ color: parseFloat(balanceData.balance) > 0 ? '#C9A020' : '#6C757D' }}>
+                      <span
+                        className="font-semibold"
+                        style={{ color: parseFloat(balanceData.balance) > 0 ? colors.warning : colors.textSecondary }}
+                      >
                         R {Number(balanceData.balance).toFixed(2)}
                       </span>
                     </p>
@@ -375,7 +377,10 @@ function NewPaymentModal({ onClose, onSuccess }: { onClose: () => void; onSucces
           </div>
 
           {customer && hasOutstandingLoan && (
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs" style={{ background: '#FFF8E1', border: '1px solid #C9A02030', color: '#856404' }}>
+            <div
+              className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs"
+              style={{ background: colors.warningBg, border: `1px solid ${colors.warning}30`, color: '#856404' }}
+            >
               <HandCoins className="w-4 h-4 shrink-0" />
               <span>Outstanding loan: <strong>R {new Decimal(outstandingLoanAmt).toFixed(2)}</strong></span>
               <a href="/app/loans" className="ml-auto font-semibold hover:underline shrink-0">View →</a>
@@ -395,7 +400,7 @@ function NewPaymentModal({ onClose, onSuccess }: { onClose: () => void; onSucces
               <button
                 type="button"
                 className="text-xs hover:underline mt-1"
-                style={{ color: '#217346' }}
+                style={{ color: colors.action }}
                 onClick={() => setAmount(Number(balanceData.balance).toFixed(2))}
               >
                 Use full balance (R {Number(balanceData.balance).toFixed(2)})
@@ -417,13 +422,21 @@ function NewPaymentModal({ onClose, onSuccess }: { onClose: () => void; onSucces
           </div>
 
           <div>
-            <Label>Notes <span className="font-normal" style={{ color: '#6C757D' }}>(optional)</span></Label>
+            <Label>
+              Notes{' '}
+              <span className="font-normal" style={{ color: colors.textSecondary }}>(optional)</span>
+            </Label>
             <Input value={notes} onChange={(e) => setNotes(e.target.value)} className="mt-1" disabled={loading} />
           </div>
 
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
-            <Button style={{ background: '#217346' }} className="hover:opacity-90" onClick={onSubmit} disabled={loading || !customer}>
+            <Button
+              style={{ background: colors.action }}
+              className="hover:opacity-90"
+              onClick={onSubmit}
+              disabled={loading || !customer}
+            >
               {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving…</> : 'Record Payment'}
             </Button>
           </div>
@@ -455,13 +468,14 @@ function VoidPaymentModal({ payment, onClose, onSuccess }: { payment: Payment; o
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle style={{ color: '#C0392B' }}>Void Payment</DialogTitle>
+          <DialogTitle style={{ color: colors.danger }}>Void Payment</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 mt-2">
-          <p className="text-sm" style={{ color: '#6C757D' }}>
-            Void <span className="font-semibold" style={{ color: '#212529' }}>{payment.refNumber}</span>{' '}
-            (R {new Decimal(payment.amount).toFixed(2)}) to{' '}
-            <span className="font-semibold" style={{ color: '#212529' }}>
+          <p className="text-sm" style={{ color: colors.textSecondary }}>
+            Void{' '}
+            <span className="font-semibold" style={{ color: colors.textPrimary }}>{payment.refNumber}</span>
+            {' '}(R {new Decimal(payment.amount).toFixed(2)}) to{' '}
+            <span className="font-semibold" style={{ color: colors.textPrimary }}>
               {payment.customer.firstName} {payment.customer.lastName}
             </span>? This cannot be undone.
           </p>
