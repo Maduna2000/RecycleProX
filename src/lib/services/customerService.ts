@@ -60,7 +60,10 @@ export async function updateCustomer(id: string, data: UpdateCustomerInput, user
 }
 
 export async function getCustomer(id: string) {
-  return prisma.customer.findUniqueOrThrow({ where: { id } })
+  return prisma.customer.findUniqueOrThrow({
+    where: { id },
+    include: { priceGroup: { select: { id: true, name: true } } },
+  })
 }
 
 export async function searchCustomers(

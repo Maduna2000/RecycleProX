@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
+import useSWR from 'swr'
 import { CreateCustomerSchema, type CreateCustomerInput, type CreateCustomerFormInput } from '@/lib/schemas/customer'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -14,16 +15,22 @@ import { toast } from 'sonner'
 import { validateSaId } from '@/lib/utils/saId'
 import Link from 'next/link'
 
+const fetcher = (url: string) => fetch(url).then((r) => r.json())
+
 export function CreateCustomerModal({ open, onClose, onSuccess }: { open: boolean; onClose: () => void; onSuccess: () => void }) {
   const [loading, setLoading] = useState(false)
   const [duplicate, setDuplicate] = useState<{ id: string } | null>(null)
+
+  const { data: pgData } = useSWR<{ groups: { id: string; name: string; isActive: boolean }[] }>('/api/price-groups', fetcher)
+  const priceGroups = (pgData?.groups ?? []).filter((g) => g.isActive)
 
   const { register, handleSubmit, setValue, watch, reset, formState: { errors } } = useForm<CreateCustomerFormInput, unknown, CreateCustomerInput>({
     resolver: zodResolver(CreateCustomerSchema),
     defaultValues: { customerType: 'casual' },
   })
 
-  const idNumber = watch('idNumber', '')
+  const idNumber    = watch('idNumber', '')
+  const customerType = watch('customerType', 'casual')
   const idValidation = idNumber?.length === 13 ? validateSaId(idNumber) : null
 
   async function onSubmit(data: CreateCustomerInput) {
@@ -95,6 +102,21 @@ export function CreateCustomerModal({ open, onClose, onSuccess }: { open: boolea
               {errors.lastName && <p className="text-xs text-red-600 mt-1">{errors.lastName.message}</p>}
             </div>
           </div>
+
+          {customerType === 'account' && priceGroups.length > 0 && (
+            <div>
+              <Label>Price Group <span className="text-gray-400 font-normal">(optional)</span></Label>
+              <Select onValueChange={(v: string | null) => setValue('priceGroupId', v === null || v === 'none' ? undefined : v)}>
+                <SelectTrigger className="mt-1"><SelectValue placeholder="No price group" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No price group</SelectItem>
+                  {priceGroups.map((g) => (
+                    <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div>
             <Label>Phone</Label>

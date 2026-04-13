@@ -37,6 +37,7 @@ type Customer = {
   tradeCommodities?: string[]; customerNotes?: string
   isActive: boolean; blacklisted: boolean; blacklistReason?: string; blacklistedAt?: string
   createdAt: string; priceGroupId?: string; idPhotoR2Key?: string
+  priceGroup?: { id: string; name: string }
 }
 
 const TABS = ['Overview', 'Transactions', 'Documents', 'Blacklist'] as const
@@ -192,6 +193,7 @@ function OverviewTab({ customer }: { customer: Customer }) {
       <Section title="Business Details">
         <Field label="Customer Type" value={customer.customerType} />
         <Field label="Primary Function" value={fmt(customer.primaryFunction)} />
+        <Field label="Price Group" value={customer.priceGroup?.name ?? '—'} />
         <Field label="Company Name" value={fmt(customer.companyName)} />
         <Field label="Contact Person" value={fmt(customer.contactPerson)} />
         <Field label="VAT Number" value={fmt(customer.vatNumber)} />
@@ -372,6 +374,8 @@ const EDIT_TABS = ['Personal', 'Business', 'Banking', 'Compliance'] as const
 function EditCustomerModal({ customer, onClose, onSuccess }: { customer: Customer; onClose: () => void; onSuccess: () => void }) {
   const [loading, setLoading] = useState(false)
   const [editTab, setEditTab] = useState<typeof EDIT_TABS[number]>('Personal')
+  const { data: pgData } = useSWR<{ groups: { id: string; name: string; isActive: boolean }[] }>('/api/price-groups', fetcher)
+  const priceGroups = (pgData?.groups ?? []).filter((g) => g.isActive)
 
   const fmtDateInput = (v?: string | null) => {
     if (!v) return ''
@@ -406,6 +410,7 @@ function EditCustomerModal({ customer, onClose, onSuccess }: { customer: Custome
       licenseExpiry:    fmtDateInput(customer.licenseExpiry),
       tradeCommodities: customer.tradeCommodities ?? [],
       customerNotes:    customer.customerNotes ?? '',
+      priceGroupId:     customer.priceGroupId ?? undefined,
     },
   })
 
@@ -534,6 +539,21 @@ function EditCustomerModal({ customer, onClose, onSuccess }: { customer: Custome
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+              <div>
+                <Label>Price Group <span className="text-gray-400 font-normal">(optional)</span></Label>
+                <Select
+                  onValueChange={(v: string | null) => setValue('priceGroupId', v === null || v === 'none' ? undefined : v)}
+                  defaultValue={customer.priceGroupId ?? 'none'}
+                >
+                  <SelectTrigger className="mt-1"><SelectValue placeholder="No price group" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No price group</SelectItem>
+                    {priceGroups.map((g) => (
+                      <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Label>Company Name</Label>
