@@ -89,7 +89,7 @@ function useToolbarButtons(activeTab: TabId): ToolbarButton[] {
       ]
     case 'customers':
       return [
-        { label: 'Add Customer',    icon: Plus,        href: '/app/customers/new',   variant: 'primary' },
+        { label: 'Add Customer',    icon: Plus,        href: '/app/customers?create=1', variant: 'primary' },
         { label: 'Casual Details',  icon: UserCheck,   href: '/app/casual',          variant: 'secondary' },
         { label: 'Police Register', icon: ShieldCheck, href: '/app/police-register', variant: 'ghost' },
         { label: 'Photos',          icon: Images,      href: '/app/photos',          variant: 'ghost' },

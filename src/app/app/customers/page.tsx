@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import useSWR, { mutate } from 'swr'
 import { AlertTriangle } from 'lucide-react'
 import { DataTable, Avatar, StatusBadge, type Column, type RowAction } from '@/components/ui/DataTable'
@@ -15,11 +15,20 @@ type Customer = {
 }
 
 export default function CustomersPage() {
-  const router = useRouter()
+  const router       = useRouter()
+  const searchParams = useSearchParams()
   const [search,          setSearch]          = useState('')
   const [typeFilter,      setTypeFilter]      = useState('')
   const [showBlacklisted, setShowBlacklisted] = useState('')
   const [createOpen,      setCreateOpen]      = useState(false)
+
+  // Auto-open create modal when toolbar "Add Customer" button navigates here with ?create=1
+  useEffect(() => {
+    if (searchParams.get('create') === '1') {
+      setCreateOpen(true)
+      router.replace('/app/customers')
+    }
+  }, [searchParams, router])
 
   const query = new URLSearchParams({
     ...(search          && { search }),

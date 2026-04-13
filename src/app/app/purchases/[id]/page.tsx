@@ -30,6 +30,7 @@ type Purchase = {
   refNumber: string
   status: 'completed' | 'voided' | 'pending'
   totalAmount: string
+  loanDeductionAmount?: string
   paymentMethod: string
   notes?: string
   voidedAt?: string
@@ -136,12 +137,35 @@ export default function PurchaseDetailPage() {
             ))}
           </tbody>
           <tfoot className="border-t bg-gray-50">
-            <tr>
-              <td colSpan={3} className="px-4 py-3 text-right font-semibold text-gray-700">Total Payout</td>
-              <td className="px-4 py-3 font-mono font-bold text-lg text-gray-900">
-                R {Number(purchase.totalAmount).toFixed(2)}
-              </td>
-            </tr>
+            {purchase.loanDeductionAmount && Number(purchase.loanDeductionAmount) > 0 ? (
+              <>
+                <tr>
+                  <td colSpan={3} className="px-4 py-2 text-right text-sm" style={{ color: '#6C757D' }}>Gross payout</td>
+                  <td className="px-4 py-2 font-mono text-sm" style={{ color: '#6C757D' }}>
+                    R {Number(purchase.totalAmount).toFixed(2)}
+                  </td>
+                </tr>
+                <tr>
+                  <td colSpan={3} className="px-4 py-2 text-right text-sm font-medium" style={{ color: '#C9A020' }}>Loan deduction</td>
+                  <td className="px-4 py-2 font-mono text-sm font-medium" style={{ color: '#C9A020' }}>
+                    − R {Number(purchase.loanDeductionAmount).toFixed(2)}
+                  </td>
+                </tr>
+                <tr className="border-t">
+                  <td colSpan={3} className="px-4 py-3 text-right font-semibold" style={{ color: '#212529' }}>Cash Paid Out</td>
+                  <td className="px-4 py-3 font-mono font-bold text-lg" style={{ color: '#217346' }}>
+                    R {(Number(purchase.totalAmount) - Number(purchase.loanDeductionAmount)).toFixed(2)}
+                  </td>
+                </tr>
+              </>
+            ) : (
+              <tr>
+                <td colSpan={3} className="px-4 py-3 text-right font-semibold text-gray-700">Total Payout</td>
+                <td className="px-4 py-3 font-mono font-bold text-lg text-gray-900">
+                  R {Number(purchase.totalAmount).toFixed(2)}
+                </td>
+              </tr>
+            )}
           </tfoot>
         </table>
       </div>

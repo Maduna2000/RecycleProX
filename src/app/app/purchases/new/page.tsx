@@ -83,6 +83,8 @@ export default function NewPurchasePage() {
   const [keyCounter, setKeyCounter] = useState(2)
   const [sigDialog,   setSigDialog]   = useState<{ purchaseId: string; refNumber: string } | null>(null)
   const [printDialog, setPrintDialog] = useState<{ id: string; refNumber: string } | null>(null)
+  const [deductLoan,     setDeductLoan]     = useState(false)
+  const [deductionAmount, setDeductionAmount] = useState('')
 
   const { data: productsData } = useSWR<{ products: Product[] }>('/api/products?active=true', fetcher)
   const products = productsData?.products ?? []
@@ -168,7 +170,11 @@ export default function NewPurchasePage() {
     }
   }
 
-  const handleCustomerSelect = useCallback((c: SelectedCustomer) => setCustomer(c), [])
+  const handleCustomerSelect = useCallback((c: SelectedCustomer) => {
+    setCustomer(c)
+    setDeductLoan(false)
+    setDeductionAmount('')
+  }, [])
 
   async function submitPurchase(status: 'completed' | 'pending') {
     if (!customer) { toast.error('Please select a customer'); return }
@@ -181,6 +187,15 @@ export default function NewPurchasePage() {
       if (parseFloat(l.unitPrice) < 0)  { toast.error('Unit price cannot be negative'); return }
     }
 
+    const deduction = deductLoan && deductionAmount && parseFloat(deductionAmount) > 0
+      ? deductionAmount
+      : undefined
+
+    if (deduction && new Decimal(deduction).greaterThan(total)) {
+      toast.error('Loan deduction cannot exceed the gross payout total')
+      return
+    }
+
     setSubmitting(true)
     const res = await fetch('/api/purchases', {
       method: 'POST',
@@ -190,6 +205,7 @@ export default function NewPurchasePage() {
         paymentMethod,
         status,
         notes: notes || undefined,
+        ...(deduction ? { loanDeductionAmount: deduction } : {}),
         lines: validLines.map((l) => ({
           productId:  l.productId,
           quantity:   l.quantity,
@@ -253,14 +269,52 @@ export default function NewPurchasePage() {
 
         {/* Outstanding loan banner */}
         {customer && hasOutstandingLoan && (
-          <div className="flex items-center gap-3 bg-yellow-50 border border-yellow-200 rounded-xl px-4 py-3 text-sm text-yellow-800">
-            <AlertTriangle className="w-4 h-4 shrink-0" />
-            <span>
-              This customer has an outstanding loan of <strong>R {new Decimal(outstandingLoanAmount).toFixed(2)}</strong>.
-            </span>
-            <a href="/app/loans" className="ml-auto font-semibold underline-offset-2 hover:underline text-yellow-900 shrink-0">
-              View Loans →
-            </a>
+          <div className="bg-yellow-50 border border-yellow-200 rounded-xl px-4 py-3 text-sm text-yellow-800 space-y-2">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="w-4 h-4 shrink-0" />
+              <span>
+                Outstanding loan: <strong>R {new Decimal(outstandingLoanAmount).toFixed(2)}</strong>
+              </span>
+              <a href="/app/loans" className="ml-auto font-semibold underline-offset-2 hover:underline text-yellow-900 shrink-0">
+                View Loans →
+              </a>
+            </div>
+            <div className="flex items-center gap-3 pt-1">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 accent-amber-600"
+                  checked={deductLoan}
+                  onChange={(e) => {
+                    const checked = e.target.checked
+                    setDeductLoan(checked)
+                    if (checked) {
+                      const maxDeduct = Decimal.min(new Decimal(outstandingLoanAmount), total)
+                      setDeductionAmount(maxDeduct.toFixed(2))
+                    } else {
+                      setDeductionAmount('')
+                    }
+                  }}
+                />
+                <span className="font-medium">Deduct from this payout</span>
+              </label>
+              {deductLoan && (
+                <div className="flex items-center gap-2">
+                  <span className="text-yellow-700">R</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    className="w-28 px-2 py-0.5 rounded border border-yellow-300 bg-white text-sm font-mono text-yellow-900 focus:outline-none focus:border-yellow-500"
+                    value={deductionAmount}
+                    onChange={(e) => setDeductionAmount(e.target.value)}
+                  />
+                  <span className="text-yellow-600 text-xs">
+                    (max R {Decimal.min(new Decimal(outstandingLoanAmount), total).toFixed(2)})
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -455,10 +509,29 @@ export default function NewPurchasePage() {
 
           {/* Total */}
           <div className="border-t mt-4 pt-4 flex justify-end">
-            <div className="text-right">
-              <p className="text-sm text-gray-500">Total Payout</p>
-              <p className="text-2xl font-bold text-gray-900">R {total.toFixed(2)}</p>
-            </div>
+            {deductLoan && deductionAmount && parseFloat(deductionAmount) > 0 ? (
+              <div className="text-right space-y-1">
+                <div className="flex justify-between gap-8">
+                  <p className="text-sm" style={{ color: '#6C757D' }}>Gross payout</p>
+                  <p className="text-sm font-mono" style={{ color: '#212529' }}>R {total.toFixed(2)}</p>
+                </div>
+                <div className="flex justify-between gap-8">
+                  <p className="text-sm" style={{ color: '#C9A020' }}>Loan deduction</p>
+                  <p className="text-sm font-mono" style={{ color: '#C9A020' }}>− R {new Decimal(deductionAmount || '0').toFixed(2)}</p>
+                </div>
+                <div className="flex justify-between gap-8 border-t pt-1">
+                  <p className="text-sm font-semibold" style={{ color: '#212529' }}>Cash to pay</p>
+                  <p className="text-xl font-bold" style={{ color: '#217346' }}>
+                    R {Decimal.max(total.minus(new Decimal(deductionAmount || '0')), new Decimal(0)).toFixed(2)}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="text-right">
+                <p className="text-sm" style={{ color: '#6C757D' }}>Total Payout</p>
+                <p className="text-2xl font-bold" style={{ color: '#212529' }}>R {total.toFixed(2)}</p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -536,7 +609,9 @@ export default function NewPurchasePage() {
           >
             {submitting
               ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...</>
-              : `Confirm Purchase · R ${total.toFixed(2)}`}
+              : deductLoan && deductionAmount && parseFloat(deductionAmount) > 0
+                ? `Confirm · Pay R ${Decimal.max(total.minus(new Decimal(deductionAmount)), new Decimal(0)).toFixed(2)}`
+                : `Confirm Purchase · R ${total.toFixed(2)}`}
           </Button>
         </div>
       </div>

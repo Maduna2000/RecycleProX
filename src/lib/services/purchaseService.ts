@@ -3,6 +3,7 @@ import logger from '@/lib/logger'
 import Decimal from 'decimal.js'
 import { resolvePrice } from '@/lib/services/productService'
 import { recordMovement, recordVoidReversal } from '@/lib/services/stockService'
+import { applyRepaymentTx } from '@/lib/services/loanService'
 import type { CreatePurchaseInput, VoidPurchaseInput } from '@/lib/schemas/purchase'
 
 // ─── Typed Errors ─────────────────────────────────────────────────────────────
@@ -25,6 +26,10 @@ export class CustomerInactiveError extends Error {
 
 export class ProductInactiveError extends Error {
   constructor(code: string) { super(`Product "${code}" is inactive`); this.name = 'ProductInactiveError' }
+}
+
+export class LoanDeductionExceedsTotalError extends Error {
+  constructor() { super('Loan deduction cannot exceed the gross payout total'); this.name = 'LoanDeductionExceedsTotalError' }
 }
 
 // ─── Reference number generator ───────────────────────────────────────────────
@@ -74,6 +79,13 @@ export async function createPurchase(data: CreatePurchaseInput, createdByUserId?
   )
 
   const totalAmount = resolvedLines.reduce((sum, l) => sum.plus(l.lineTotal), new Decimal(0))
+
+  // Validate loan deduction amount
+  const deduction = data.loanDeductionAmount ? new Decimal(data.loanDeductionAmount) : null
+  if (deduction && deduction.greaterThan(totalAmount)) {
+    throw new LoanDeductionExceedsTotalError()
+  }
+
   const refNumber = await generateRefNumber()
 
   const purchase = await prisma.$transaction(async (tx) => {
@@ -83,6 +95,7 @@ export async function createPurchase(data: CreatePurchaseInput, createdByUserId?
         customerId: data.customerId,
         status: data.status ?? 'completed',
         totalAmount,
+        loanDeductionAmount: deduction ?? undefined,
         paymentMethod: data.paymentMethod ?? 'cash',
         notes: data.notes,
         createdByUserId,
@@ -112,6 +125,11 @@ export async function createPurchase(data: CreatePurchaseInput, createdByUserId?
         sourceId: p.id,
         createdByUserId,
       })
+    }
+
+    // Apply loan deduction as a repayment (FIFO across active loans)
+    if (deduction && deduction.greaterThan(0)) {
+      await applyRepaymentTx(tx, data.customerId, deduction.toFixed(2), createdByUserId, p.id)
     }
 
     return p

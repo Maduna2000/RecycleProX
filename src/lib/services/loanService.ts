@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/db/prisma'
 import logger from '@/lib/logger'
 import Decimal from 'decimal.js'
+import type { Prisma } from '@prisma/client'
 import type { CreateLoanInput, CreateRepaymentInput, VoidLoanInput } from '@/lib/schemas/loan'
 
 // ─── Typed Errors ─────────────────────────────────────────────────────────────
@@ -49,6 +50,69 @@ async function generateRepaymentRef(): Promise<string> {
   const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate())
   const count = await prisma.loanRepayment.count({ where: { createdAt: { gte: startOfDay } } })
   return `${prefix}-${String(count + 1).padStart(4, '0')}`
+}
+
+// ─── Apply Repayment inside an existing transaction ───────────────────────────
+// Called from purchaseService when a payout should deduct from outstanding loans.
+// Uses FIFO: oldest active loan is paid down first.
+// The caller supplies the Prisma transaction client (tx) so this runs atomically.
+
+export async function applyRepaymentTx(
+  tx: Prisma.TransactionClient,
+  customerId: string,
+  amount: string,
+  createdByUserId: string | undefined,
+  purchaseId?: string,
+): Promise<void> {
+  const today = new Date()
+  const prefix = `REP-${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`
+  const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+
+  // Count existing repayments today (outside this tx scope) as base sequence
+  const baseCount = await tx.loanRepayment.count({ where: { createdAt: { gte: startOfDay } } })
+
+  // Fetch active loans FIFO (oldest first)
+  const activeLoans = await tx.loan.findMany({
+    where: { customerId, status: 'active' },
+    orderBy: { createdAt: 'asc' },
+  })
+
+  let remaining = new Decimal(amount)
+  let seqOffset = 0
+
+  for (const loan of activeLoans) {
+    if (remaining.isZero()) break
+
+    const balance = new Decimal(loan.balanceAmount.toString())
+    const repayAmount = Decimal.min(remaining, balance)
+    const newBalance = balance.minus(repayAmount)
+    const isNowSettled = newBalance.isZero()
+    const refNumber = `${prefix}-${String(baseCount + seqOffset + 1).padStart(4, '0')}`
+    seqOffset++
+
+    await tx.loanRepayment.create({
+      data: {
+        refNumber,
+        loanId:          loan.id,
+        customerId,
+        purchaseId,
+        amount:          repayAmount,
+        paymentMethod:   'cash',
+        createdByUserId,
+      },
+    })
+
+    await tx.loan.update({
+      where: { id: loan.id },
+      data: {
+        balanceAmount: newBalance,
+        status:        isNowSettled ? 'settled' : 'active',
+      },
+    })
+
+    logger.info({ loanId: loan.id, refNumber, repayAmount: repayAmount.toFixed(2), newBalance: newBalance.toFixed(2), settled: isNowSettled, purchaseId, createdByUserId }, 'loan.repayment.from_purchase')
+    remaining = remaining.minus(repayAmount)
+  }
 }
 
 // ─── Create Loan ──────────────────────────────────────────────────────────────
