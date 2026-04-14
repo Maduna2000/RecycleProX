@@ -10,7 +10,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { CreateUserModal } from '@/components/users/CreateUserModal'
 import { EditUserModal } from '@/components/users/EditUserModal'
 import { ResetPasswordModal } from '@/components/users/ResetPasswordModal'
-import { MoreHorizontal, Search, Unlock, UserCheck, UserX } from 'lucide-react'
+import { MoreHorizontal, Search, Unlock, UserCheck, UserX, KeyRound } from 'lucide-react'
 import { toast } from 'sonner'
 import { PageShell } from '@/components/layout/PageShell'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
@@ -94,6 +94,12 @@ export default function UsersPage() {
     else toast.error('Failed to unlock account')
   }
 
+  async function handleResetPin(user: User) {
+    const res = await fetch(`/api/users/${user.id}/reset-pin`, { method: 'POST' })
+    if (res.ok) toast.success(`PIN reset to default for ${user.fullName}`)
+    else toast.error('Failed to reset PIN')
+  }
+
   return (
     <PageShell title="Users" subtitle={`${users.length} user${users.length !== 1 ? 's' : ''}`}>
 
@@ -158,6 +164,9 @@ export default function UsersPage() {
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem onClick={() => setEditUser(user)}>Edit</DropdownMenuItem>
                       <DropdownMenuItem onClick={() => setResetUser(user)}>Reset Password</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleResetPin(user)}>
+                        <KeyRound className="w-4 h-4 mr-2" />Reset PIN to Default
+                      </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => handleToggleActive(user)}>
                         {user.isActive ? <><UserX className="w-4 h-4 mr-2" />Deactivate</> : <><UserCheck className="w-4 h-4 mr-2" />Activate</>}
                       </DropdownMenuItem>

@@ -18,8 +18,8 @@ const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 type Customer = {
   id: string; firstName: string; lastName: string; idNumber: string
-  phone: string; customerType: string; isActive: boolean; blacklisted: boolean
-  createdAt: string
+  phone: string; customerType: string; primaryFunction: string; isActive: boolean; blacklisted: boolean
+  createdAt: string; priceGroup?: { id: string; name: string } | null
 }
 
 type Tab = 'accounts' | 'casuals'
@@ -176,11 +176,32 @@ function ImportCsvModal({ onClose, onSuccess }: { onClose: () => void; onSuccess
   )
 }
 
+// ─── Primary function badge ────────────────────────────────────────────────────
+function PrimaryFunctionBadge({ fn }: { fn: string }) {
+  const map: Record<string, { label: string; bg: string; color: string }> = {
+    supplier: { label: 'Supplier',  bg: colors.processBg,  color: colors.process },
+    customer: { label: 'Customer',  bg: colors.actionBg,   color: colors.action  },
+    both:     { label: 'Both',      bg: colors.warningBg,  color: colors.warning },
+  }
+  const meta = map[fn] ?? { label: fn, bg: colors.neutralBg, color: colors.textSecondary }
+  return (
+    <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: meta.bg, color: meta.color }}>
+      {meta.label}
+    </span>
+  )
+}
+
 // ─── Accounts tab ──────────────────────────────────────────────────────────────
 function AccountsTab({ onAddCustomer }: { onAddCustomer: () => void }) {
   const router = useRouter()
+  const { data: session } = useSession()
+  const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
+
   const [search,          setSearch]          = useState('')
   const [showBlacklisted, setShowBlacklisted] = useState('')
+  const [blacklistId,     setBlacklistId]     = useState<string | null>(null)
+  const [deleteId,        setDeleteId]        = useState<string | null>(null)
+  const [deleteLoading,   setDeleteLoading]   = useState(false)
 
   const query = new URLSearchParams({
     type: 'account',
@@ -192,6 +213,37 @@ function AccountsTab({ onAddCustomer }: { onAddCustomer: () => void }) {
     `/api/customers?${query}`, fetcher,
   )
   const customers = data?.customers ?? []
+
+  function refreshList() {
+    mutate((key) => typeof key === 'string' && key.includes('/api/customers'), undefined, { revalidate: true })
+  }
+
+  async function handleSuspend(c: Customer) {
+    const res = await fetch(`/api/customers/${c.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ isActive: !c.isActive }),
+    })
+    if (res.ok) { toast.success(c.isActive ? 'Customer suspended' : 'Customer reactivated'); refreshList() }
+    else toast.error('Failed to update customer')
+  }
+
+  async function handleUnblacklist(c: Customer) {
+    const res = await fetch(`/api/customers/${c.id}/unblacklist`, { method: 'POST' })
+    if (res.ok) { toast.success('Customer unblacklisted'); refreshList() }
+    else toast.error('Failed to unblacklist')
+  }
+
+  async function handleDelete(id: string) {
+    setDeleteLoading(true)
+    const res = await fetch(`/api/customers/${id}`, { method: 'DELETE' })
+    setDeleteLoading(false)
+    if (res.ok) { toast.success('Customer deleted'); setDeleteId(null); refreshList() }
+    else { const j = await res.json(); toast.error(j.error ?? 'Failed to delete customer') }
+  }
+
+  const blacklistTarget = customers.find((c) => c.id === blacklistId)
+  const deleteTarget    = customers.find((c) => c.id === deleteId)
 
   const columns: Column<Customer>[] = [
     {
@@ -218,15 +270,29 @@ function AccountsTab({ onAddCustomer }: { onAddCustomer: () => void }) {
       ),
     },
     {
+      key: 'primaryFunction',
+      header: 'Function',
+      width: '110px',
+      render: (r) => <PrimaryFunctionBadge fn={r.primaryFunction} />,
+    },
+    {
+      key: 'priceGroup',
+      header: 'Price Group',
+      width: '130px',
+      render: (r) => r.priceGroup
+        ? <span className="text-xs font-medium" style={{ color: colors.process }}>{r.priceGroup.name}</span>
+        : <span className="text-xs" style={{ color: colors.textSecondary }}>—</span>,
+    },
+    {
       key: 'phone',
       header: 'Phone',
-      width: '140px',
+      width: '130px',
       render: (r) => <span style={{ fontSize: 12, color: colors.textSecondary }}>{r.phone}</span>,
     },
     {
       key: 'status',
       header: 'Status',
-      width: '120px',
+      width: '110px',
       render: (r) => (
         <StatusBadge status={r.blacklisted ? 'blacklisted' : r.isActive ? 'active' : 'inactive'} />
       ),
@@ -234,7 +300,7 @@ function AccountsTab({ onAddCustomer }: { onAddCustomer: () => void }) {
     {
       key: 'createdAt',
       header: 'Registered',
-      width: '120px',
+      width: '110px',
       render: (r) => (
         <span style={{ fontSize: 11, color: colors.textSecondary }}>
           {new Date(r.createdAt).toLocaleDateString('en-ZA')}
@@ -244,7 +310,43 @@ function AccountsTab({ onAddCustomer }: { onAddCustomer: () => void }) {
   ]
 
   const rowActions: RowAction<Customer>[] = [
-    { label: 'View Profile', onClick: (r) => router.push(`/app/customers/${r.id}`) },
+    {
+      label: 'View Profile',
+      icon: Eye,
+      onClick: (r) => router.push(`/app/customers/${r.id}`),
+    },
+    {
+      label: 'Blacklist',
+      icon: ShieldBan,
+      danger: true,
+      hidden: (r) => r.blacklisted || !isManager,
+      onClick: (r) => setBlacklistId(r.id),
+    },
+    {
+      label: 'Remove Blacklist',
+      icon: ShieldCheck,
+      hidden: (r) => !r.blacklisted || !isManager,
+      onClick: (r) => handleUnblacklist(r),
+    },
+    {
+      label: 'Suspend',
+      icon: UserX,
+      hidden: (r) => !r.isActive || !isManager,
+      onClick: (r) => handleSuspend(r),
+    },
+    {
+      label: 'Reactivate',
+      icon: UserX,
+      hidden: (r) => r.isActive || !isManager,
+      onClick: (r) => handleSuspend(r),
+    },
+    {
+      label: 'Delete',
+      icon: Trash2,
+      danger: true,
+      hidden: () => !isManager,
+      onClick: (r) => setDeleteId(r.id),
+    },
   ]
 
   return (
@@ -292,6 +394,40 @@ function AccountsTab({ onAddCustomer }: { onAddCustomer: () => void }) {
           emptyAction={{ label: '+ Add Account Customer', onClick: onAddCustomer }}
         />
       </div>
+
+      {/* Blacklist modal */}
+      {blacklistId && blacklistTarget && (
+        <BlacklistModal
+          customer={blacklistTarget}
+          onClose={() => setBlacklistId(null)}
+          onSuccess={() => { setBlacklistId(null); refreshList() }}
+        />
+      )}
+
+      {/* Delete confirm */}
+      {deleteId && deleteTarget && (
+        <Dialog open onOpenChange={(o) => { if (!o) setDeleteId(null) }}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader><DialogTitle>Delete Customer</DialogTitle></DialogHeader>
+            <div className="space-y-4 mt-2">
+              <p className="text-sm" style={{ color: colors.textSecondary }}>
+                Permanently delete <strong style={{ color: colors.textPrimary }}>{deleteTarget.firstName} {deleteTarget.lastName}</strong>? This cannot be undone.
+              </p>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setDeleteId(null)} disabled={deleteLoading}>Cancel</Button>
+                <button
+                  onClick={() => handleDelete(deleteId)}
+                  disabled={deleteLoading}
+                  className="h-9 px-4 rounded text-sm font-medium text-white disabled:opacity-50"
+                  style={{ background: colors.danger }}
+                >
+                  {deleteLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Delete'}
+                </button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   )
 }

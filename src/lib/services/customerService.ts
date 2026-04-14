@@ -92,6 +92,7 @@ export async function searchCustomers(
       skip: (page - 1) * limit,
       take: limit,
       orderBy: { lastName: 'asc' },
+      include: { priceGroup: { select: { id: true, name: true } } },
     }),
     prisma.customer.count({ where }),
   ])

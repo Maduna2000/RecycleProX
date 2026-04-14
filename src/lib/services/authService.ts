@@ -158,10 +158,29 @@ export async function setPin(userId: string, pin: string) {
   logger.info({ userId }, 'PIN set')
 }
 
+// Fallback PIN used when a user has not yet set their own PIN.
+// Admin can override this in SystemSettings key `defaultPin`.
+const SYSTEM_DEFAULT_PIN = '1234'
+
 export async function verifyPin(userId: string, pin: string): Promise<boolean> {
-  const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } })
-  if (!user.pinHash) return false
-  return bcrypt.compare(pin, user.pinHash)
+  const [user, defaultPinRow] = await Promise.all([
+    prisma.user.findUniqueOrThrow({ where: { id: userId } }),
+    prisma.systemSettings.findUnique({ where: { key: 'defaultPin' } }),
+  ])
+
+  if (user.pinHash) {
+    // User has set their own PIN — verify against it
+    return bcrypt.compare(pin, user.pinHash)
+  }
+
+  // No user PIN yet — compare against the system default (plaintext, 4-digit)
+  const defaultPin = defaultPinRow?.value ?? SYSTEM_DEFAULT_PIN
+  return pin === defaultPin
+}
+
+export async function resetPinToDefault(userId: string): Promise<void> {
+  await prisma.user.update({ where: { id: userId }, data: { pinHash: null } })
+  logger.info({ userId }, 'PIN reset to default')
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

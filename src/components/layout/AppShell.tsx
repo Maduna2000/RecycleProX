@@ -64,65 +64,87 @@ interface ToolbarButton {
 
 // ─── Toolbar configs per tab ──────────────────────────────────────────────────
 
-function useToolbarButtons(activeTab: TabId): ToolbarButton[] {
+function useToolbarButtons(activeTab: TabId, role: string): ToolbarButton[] {
+  const isMgr   = role === 'admin' || role === 'manager'
+  const isAdmin  = role === 'admin'
+
   switch (activeTab) {
     case 'home':
       return [
-        { label: 'Quick Purchase', icon: Plus,     href: '/app/purchases/new', variant: 'primary' },
-        { label: 'Refresh',        icon: RefreshCw, variant: 'ghost', iconOnly: true },
+        { label: 'Quick Purchase', icon: Plus,      href: '/app/purchases/new', variant: 'primary' },
+        { label: 'Refresh',        icon: RefreshCw,  variant: 'ghost', iconOnly: true },
       ]
+
     case 'transactions':
       return [
-        { label: 'New Purchase', icon: Plus,          href: '/app/purchases/new',     variant: 'primary' },
-        { label: 'New Sale',     icon: Plus,          href: '/app/sales/new',         variant: 'secondary' },
-        { label: 'Unpaid',       icon: AlertCircle,   href: '/app/purchases/unpaid',  variant: 'ghost' },
-        { label: 'Weigh',        icon: Scale,         href: '/app/purchases/new', variant: 'ghost', iconOnly: true },
-        { label: 'Print Slip',   icon: Printer,       variant: 'ghost', iconOnly: true },
-        { label: 'Void',         icon: Zap,           variant: 'danger', iconOnly: true },
+        { label: 'New Purchase', icon: Plus,        href: '/app/purchases/new',    variant: 'primary' },
+        { label: 'New Sale',     icon: Plus,        href: '/app/sales/new',        variant: 'secondary' },
+        { label: 'Unpaid',       icon: AlertCircle, href: '/app/purchases/unpaid', variant: 'ghost' },
+        { label: 'Weigh',        icon: Scale,       href: '/app/purchases/new',    variant: 'ghost', iconOnly: true },
+        { label: 'Print Slip',   icon: Printer,     variant: 'ghost', iconOnly: true },
+        // Void — manager/admin only
+        ...(isMgr ? [{ label: 'Void', icon: Zap, variant: 'danger' as const, iconOnly: true }] : []),
       ]
+
     case 'finance':
       return [
-        { label: 'Record Payment', icon: Plus,       href: '/app/payments',  variant: 'primary' },
-        { label: 'Add Expense',    icon: Plus,       href: '/app/expenses',  variant: 'secondary' },
-        { label: 'Cash-Up',        icon: DollarSign, href: '/app/cashup',    variant: 'ghost', iconOnly: true },
-        { label: 'Float',          icon: CreditCard, href: '/app/float',     variant: 'ghost', iconOnly: true },
+        { label: 'Record Payment', icon: Plus,       href: '/app/payments', variant: 'primary' },
+        { label: 'Add Expense',    icon: Plus,       href: '/app/expenses', variant: 'secondary' },
+        { label: 'Cash-Up',        icon: DollarSign, href: '/app/cashup',   variant: 'ghost', iconOnly: true },
+        { label: 'Float',          icon: CreditCard, href: '/app/float',    variant: 'ghost', iconOnly: true },
       ]
+
     case 'customers':
       return [
-        { label: 'Add Account',     icon: Plus,        href: '/app/customers?create=1&type=account', variant: 'primary' },
-        { label: 'Add Casual',      icon: UserCheck,   href: '/app/customers?create=1&type=casual',  variant: 'secondary' },
-        { label: 'Police Register', icon: ShieldCheck, href: '/app/police-register', variant: 'ghost' },
-        { label: 'Photos',          icon: Images,      href: '/app/photos',          variant: 'ghost' },
-        { label: 'Blacklist',       icon: Ban,         variant: 'danger', iconOnly: true },
+        { label: 'Add Account', icon: Plus,      href: '/app/customers?create=1&type=account', variant: 'primary' },
+        { label: 'Add Casual',  icon: UserCheck, href: '/app/customers?create=1&type=casual',  variant: 'secondary' },
+        // Police Register + Blacklist — manager/admin only
+        ...(isMgr ? [
+          { label: 'Police Register', icon: ShieldCheck, href: '/app/police-register', variant: 'ghost' as const },
+        ] : []),
+        { label: 'Photos', icon: Images, href: '/app/photos', variant: 'ghost' },
+        ...(isMgr ? [{ label: 'Blacklist', icon: Ban, variant: 'danger' as const, iconOnly: true }] : []),
       ]
+
     case 'stock':
       return [
-        { label: 'Adjust',        icon: Plus,            href: '/app/stock',        variant: 'primary' },
-        { label: 'Products',      icon: Package,         href: '/app/products',     variant: 'secondary' },
-        { label: 'Price Groups',  icon: Tag,             href: '/app/price-groups', variant: 'ghost' },
-        { label: 'Stocktake',     icon: ClipboardCheck,  href: '/app/stocktake',    variant: 'ghost' },
-        { label: 'Export Excel',  icon: FileSpreadsheet, variant: 'ghost', iconOnly: true },
+        // Adjust + Stocktake — manager/admin only
+        ...(isMgr ? [
+          { label: 'Adjust',    icon: Plus,           href: '/app/stock',      variant: 'primary' as const },
+          { label: 'Stocktake', icon: ClipboardCheck, href: '/app/stocktake',  variant: 'ghost' as const },
+        ] : []),
+        { label: 'Products',     icon: Package,         href: '/app/products',     variant: isMgr ? 'secondary' as const : 'primary' as const },
+        { label: 'Price Groups', icon: Tag,             href: '/app/price-groups', variant: 'ghost' },
+        { label: 'Export Excel', icon: FileSpreadsheet, variant: 'ghost', iconOnly: true },
       ]
+
     case 'loans':
       return [
-        { label: 'New Loan',    icon: Plus,      href: '/app/loans',  variant: 'primary' },
-        { label: 'Repayment',   icon: Handshake, variant: 'secondary', iconOnly: true },
-        { label: 'Statement',   icon: FileText,  variant: 'ghost', iconOnly: true },
+        { label: 'New Loan',  icon: Plus,      href: '/app/loans', variant: 'primary' },
+        { label: 'Repayment', icon: Handshake, variant: 'secondary', iconOnly: true },
+        { label: 'Statement', icon: FileText,  variant: 'ghost',    iconOnly: true },
       ]
+
     case 'reports':
+      // Entire reports area is manager/admin only
+      if (!isMgr) return []
       return [
-        { label: 'Generate',     icon: BarChart2,   variant: 'primary' },
-        { label: 'Export CSV',   icon: Download,    variant: 'secondary', iconOnly: true },
-        { label: 'Export Excel', icon: FileSpreadsheet, variant: 'ghost', iconOnly: true },
-        { label: 'Print',        icon: Printer,     variant: 'ghost', iconOnly: true },
+        { label: 'Generate',     icon: BarChart2,        variant: 'primary' },
+        { label: 'Export CSV',   icon: Download,         variant: 'secondary', iconOnly: true },
+        { label: 'Export Excel', icon: FileSpreadsheet,  variant: 'ghost',    iconOnly: true },
+        { label: 'Print',        icon: Printer,          variant: 'ghost',    iconOnly: true },
       ]
+
     case 'settings':
+      // All settings pages are admin-only; user management is admin-only
+      if (!isAdmin) return []
       return [
         { label: 'Add User',  icon: UserPlus,    href: '/app/settings/users?create=1', variant: 'primary' },
-        { label: 'Users',     icon: Users,       href: '/app/settings/users', variant: 'secondary' },
-        { label: 'Audit Log', icon: ShieldAlert, href: '/app/audit-log',      variant: 'ghost' },
-        { label: 'Settings',  icon: Settings,    href: '/app/settings',       variant: 'ghost' },
+        { label: 'Users',     icon: Users,       href: '/app/settings/users',          variant: 'secondary' },
+        { label: 'Audit Log', icon: ShieldAlert, href: '/app/audit-log',               variant: 'ghost' },
+        { label: 'Settings',  icon: Settings,    href: '/app/settings',                variant: 'ghost' },
       ]
+
     default:
       return []
   }
@@ -253,7 +275,7 @@ export function AppShell({
   const pathname    = usePathname()
   const router      = useRouter()
   const activeTab   = getActiveTab(pathname)
-  const toolbarBtns = useToolbarButtons(activeTab)
+  const toolbarBtns = useToolbarButtons(activeTab, role)
   const [search, setSearch] = useState('')
 
   // Alt+key shortcuts for ribbon tabs
