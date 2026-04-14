@@ -29,7 +29,7 @@ function statusBadge(c: Customer) {
   return <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: colors.neutralBg, color: colors.textSecondary }}>Suspended</span>
 }
 
-export default function CasualDetailsPage() {
+export default function CasualsPage() {
   const router = useRouter()
   const { data: session } = useSession()
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
@@ -93,7 +93,7 @@ export default function CasualDetailsPage() {
   const blacklistTarget = customers.find((c) => c.id === blacklistId)
 
   return (
-    <PageShell title="Casual Details" subtitle={subtitle}>
+    <PageShell title="Casuals" subtitle={subtitle}>
       <div className="flex flex-col flex-1 min-h-0 gap-3" onClick={() => setMenuOpen(null)}>
 
         {/* Actions row */}

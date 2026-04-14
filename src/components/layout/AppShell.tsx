@@ -35,7 +35,7 @@ const TABS: Tab[] = [
   { id: 'home',         label: 'Home',         href: '/app/dashboard',  shortcut: 'H', matches: ['/app/dashboard'] },
   { id: 'transactions', label: 'Transactions',  href: '/app/purchases',  shortcut: 'T', matches: ['/app/purchases', '/app/sales', '/app/purchases/unpaid'] },
   { id: 'finance',      label: 'Finance',       href: '/app/payments',   shortcut: 'F', matches: ['/app/payments', '/app/expenses', '/app/cashup', '/app/float'] },
-  { id: 'customers',    label: 'Customers',     href: '/app/customers',  shortcut: 'C', matches: ['/app/customers', '/app/casual', '/app/police-register', '/app/photos'] },
+  { id: 'customers',    label: 'Accounts',      href: '/app/customers',  shortcut: 'C', matches: ['/app/customers', '/app/casual', '/app/police-register', '/app/photos'] },
   { id: 'stock',        label: 'Stock',         href: '/app/stock',      shortcut: 'S', matches: ['/app/stock', '/app/stocktake', '/app/products', '/app/price-groups'] },
   { id: 'loans',        label: 'Loans',         href: '/app/loans',      shortcut: 'L', matches: ['/app/loans'] },
   { id: 'reports',      label: 'Reports',       href: '/app/reports',    shortcut: 'R', matches: ['/app/reports'] },
@@ -89,8 +89,8 @@ function useToolbarButtons(activeTab: TabId): ToolbarButton[] {
       ]
     case 'customers':
       return [
-        { label: 'Add Customer',    icon: Plus,        href: '/app/customers?create=1', variant: 'primary' },
-        { label: 'Casual Details',  icon: UserCheck,   href: '/app/casual',          variant: 'secondary' },
+        { label: 'Add Account',     icon: Plus,        href: '/app/customers?create=1&type=account', variant: 'primary' },
+        { label: 'Add Casual',      icon: UserCheck,   href: '/app/customers?create=1&type=casual',  variant: 'secondary' },
         { label: 'Police Register', icon: ShieldCheck, href: '/app/police-register', variant: 'ghost' },
         { label: 'Photos',          icon: Images,      href: '/app/photos',          variant: 'ghost' },
         { label: 'Blacklist',       icon: Ban,         variant: 'danger', iconOnly: true },

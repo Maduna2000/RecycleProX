@@ -27,7 +27,8 @@
       "Bash(sed -i 's/<div className=\"max-w-4xl space-y-4 pb-6\">/<div className=\"max-w-4xl mx-auto w-full space-y-4 pb-6\">/g' \"c:/Users/MD TECH SOLUTION/RecycleProX/src/app/app/purchases/unpaid/page.tsx\")",
       "Bash(sed -i 's/<div className=\"max-w-4xl space-y-6\">/<div className=\"max-w-4xl mx-auto w-full space-y-6\">/g' \"c:/Users/MD TECH SOLUTION/RecycleProX/src/app/app/stocktake/[id]/page.tsx\")",
       "Bash(taskkill //F //IM node.exe)",
-      "Bash(rm -rf \"c:/Users/MD TECH SOLUTION/RecycleProX/.next\")"
+      "Bash(rm -rf \"c:/Users/MD TECH SOLUTION/RecycleProX/.next\")",
+      "Bash(npx claude-mem:*)"
     ]
   }
 }

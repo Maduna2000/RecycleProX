@@ -17,7 +17,7 @@ import Link from 'next/link'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
-export function CreateCustomerModal({ open, onClose, onSuccess }: { open: boolean; onClose: () => void; onSuccess: () => void }) {
+export function CreateCustomerModal({ open, onClose, onSuccess, defaultType = 'casual' }: { open: boolean; onClose: () => void; onSuccess: () => void; defaultType?: 'account' | 'casual' }) {
   const [loading, setLoading] = useState(false)
   const [duplicate, setDuplicate] = useState<{ id: string } | null>(null)
 
@@ -26,7 +26,7 @@ export function CreateCustomerModal({ open, onClose, onSuccess }: { open: boolea
 
   const { register, handleSubmit, setValue, watch, reset, formState: { errors } } = useForm<CreateCustomerFormInput, unknown, CreateCustomerInput>({
     resolver: zodResolver(CreateCustomerSchema),
-    defaultValues: { customerType: 'casual' },
+    defaultValues: { customerType: defaultType },
   })
 
   const idNumber    = watch('idNumber', '')
@@ -70,7 +70,7 @@ export function CreateCustomerModal({ open, onClose, onSuccess }: { open: boolea
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label>Customer Type</Label>
-              <Select onValueChange={(v) => setValue('customerType', v as 'casual' | 'account')} defaultValue="casual">
+              <Select onValueChange={(v) => setValue('customerType', v as 'casual' | 'account')} defaultValue={defaultType}>
                 <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="casual">Casual</SelectItem>
