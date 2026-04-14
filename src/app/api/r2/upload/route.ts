@@ -72,7 +72,14 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     logger.error({ err, message }, 'POST /api/r2/upload failed')
-    const detail = process.env.NODE_ENV !== 'production' ? message : 'Storage upload failed — check R2 credentials'
-    return NextResponse.json({ error: detail }, { status: 500 })
+    const isProd = process.env.NODE_ENV === 'production'
+    const detail = isProd ? 'Storage upload failed — check R2 credentials' : message
+    const debug = isProd ? undefined : {
+      bucket: R2_BUCKET,
+      accountIdSet: !!process.env.R2_ACCOUNT_ID,
+      accessKeySet: !!process.env.R2_ACCESS_KEY_ID,
+      secretKeySet: !!process.env.R2_SECRET_ACCESS_KEY,
+    }
+    return NextResponse.json({ error: detail, debug }, { status: 500 })
   }
 }

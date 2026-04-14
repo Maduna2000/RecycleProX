@@ -12,9 +12,6 @@ export async function GET() {
     return NextResponse.json({ error: 'Not available in production' }, { status: 403 })
   }
 
-  const session = await auth()
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
   const accountId  = process.env.R2_ACCOUNT_ID
   const keyId      = process.env.R2_ACCESS_KEY_ID
   const bucket     = R2_BUCKET

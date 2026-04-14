@@ -119,6 +119,11 @@ export async function blacklistCustomer(id: string, reason: string, userId: stri
   return customer
 }
 
+export async function deleteCustomer(id: string, userId: string) {
+  await prisma.customer.delete({ where: { id } })
+  logger.info({ customerId: id, userId }, 'Customer deleted')
+}
+
 export async function unblacklistCustomer(id: string, userId: string, userRole: string) {
   if (!['manager', 'admin'].includes(userRole)) throw new ForbiddenError('Only managers and admins can unblacklist customers')
 
@@ -131,6 +136,29 @@ export async function unblacklistCustomer(id: string, userId: string, userRole: 
 }
 
 export async function getTransactionHistory(id: string, page = 1) {
-  // Stub — transaction history is served directly from /api/customers/[id]/transactions
-  return { transactions: [], total: 0, page, totalPages: 0 }
+  const limit = 20
+  const skip  = (page - 1) * limit
+
+  const [purchases, total] = await Promise.all([
+    prisma.purchase.findMany({
+      where:   { customerId: id },
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take:    limit,
+      select:  { id: true, refNumber: true, totalAmount: true, status: true, createdAt: true, paymentMethod: true },
+    }),
+    prisma.purchase.count({ where: { customerId: id } }),
+  ])
+
+  const transactions = purchases.map((p) => ({
+    id:            p.id,
+    type:          'purchase',
+    reference:     p.refNumber,
+    date:          p.createdAt.toISOString(),
+    amount:        p.totalAmount.toString(),
+    status:        p.status,
+    paymentMethod: p.paymentMethod,
+  }))
+
+  return { transactions, total, page, totalPages: Math.ceil(total / limit) }
 }

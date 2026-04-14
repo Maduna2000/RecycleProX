@@ -14,7 +14,7 @@ export default auth((req: NextRequest & { auth: { user?: { role?: string; forceP
   const session = req.auth
 
   // Public routes — always allow
-  if (pathname.startsWith('/login') || pathname.startsWith('/police')) {
+  if (pathname.startsWith('/login') || pathname.startsWith('/police') || pathname === '/api/r2/test') {
     return NextResponse.next()
   }
 

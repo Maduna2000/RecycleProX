@@ -88,7 +88,10 @@ export const BlacklistSchema = z.object({
   reason: z.string().min(10, 'Reason must be at least 10 characters'),
 })
 
-export const UpdateCustomerSchema = CreateCustomerSchema.partial().omit({ idNumber: true })
+export const UpdateCustomerSchema = CreateCustomerSchema.partial().omit({ idNumber: true }).extend({
+  idPhotoR2Key: z.string().nullable().optional(),
+  isActive:     z.boolean().optional(),
+})
 
 export type CreateCustomerInput     = z.infer<typeof CreateCustomerSchema>
 export type CreateCustomerFormInput = z.input<typeof CreateCustomerSchema>

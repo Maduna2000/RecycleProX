@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
-import { getCustomer, updateCustomer } from '@/lib/services/customerService'
+import { getCustomer, updateCustomer, deleteCustomer } from '@/lib/services/customerService'
 import { UpdateCustomerSchema } from '@/lib/schemas/customer'
 import logger from '@/lib/logger'
 
@@ -32,5 +32,21 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   } catch (err) {
     logger.error({ err }, 'PUT /api/customers/[id] failed')
     return NextResponse.json({ error: 'Failed to update customer' }, { status: 500 })
+  }
+}
+
+export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+  const session = await auth()
+  if (!session) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+  if (!['admin', 'manager'].includes(session.user.role ?? '')) {
+    return NextResponse.json({ error: 'Only managers and admins can delete customers' }, { status: 403 })
+  }
+
+  try {
+    await deleteCustomer(params.id, session.user.id)
+    return NextResponse.json({ ok: true })
+  } catch (err) {
+    logger.error({ err }, 'DELETE /api/customers/[id] failed')
+    return NextResponse.json({ error: 'Failed to delete customer' }, { status: 500 })
   }
 }

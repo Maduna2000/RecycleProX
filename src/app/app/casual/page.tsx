@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Search, Loader2, Upload, Download, CheckCircle2, AlertCircle } from 'lucide-react'
+import { Search, Loader2, Upload, Download, CheckCircle2, AlertCircle, MoreVertical, Eye, ShieldBan, ShieldCheck, UserX, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useSession } from 'next-auth/react'
 import { PageShell } from '@/components/layout/PageShell'
@@ -26,7 +26,7 @@ function statusBadge(c: Customer) {
     return <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: colors.dangerBg, color: colors.danger }}>Blacklisted</span>
   if (c.isActive)
     return <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: colors.actionBg, color: colors.action }}>Active</span>
-  return <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: colors.neutralBg, color: colors.textSecondary }}>Inactive</span>
+  return <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: colors.neutralBg, color: colors.textSecondary }}>Suspended</span>
 }
 
 export default function CasualDetailsPage() {
@@ -34,9 +34,13 @@ export default function CasualDetailsPage() {
   const { data: session } = useSession()
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
 
-  const [search, setSearch]         = useState('')
-  const [letter, setLetter]         = useState<string | null>(null)
-  const [importOpen, setImportOpen] = useState(false)
+  const [search, setSearch]               = useState('')
+  const [letter, setLetter]               = useState<string | null>(null)
+  const [importOpen, setImportOpen]       = useState(false)
+  const [menuOpen, setMenuOpen]           = useState<string | null>(null)
+  const [blacklistId, setBlacklistId]     = useState<string | null>(null)
+  const [deleteId, setDeleteId]           = useState<string | null>(null)
+  const [deleteLoading, setDeleteLoading] = useState(false)
 
   const params = new URLSearchParams({ type: 'casual', limit: '200' })
   if (search) params.set('search', search)
@@ -52,15 +56,51 @@ export default function CasualDetailsPage() {
   const count = data?.total ?? 0
   const subtitle = `${count} casual seller${count !== 1 ? 's' : ''} on record`
 
+  function refreshList() {
+    mutate((key) => typeof key === 'string' && key.includes('/api/customers'), undefined, { revalidate: true })
+  }
+
+  async function handleSuspend(c: Customer) {
+    setMenuOpen(null)
+    const res = await fetch(`/api/customers/${c.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ isActive: !c.isActive }),
+    })
+    if (res.ok) {
+      toast.success(c.isActive ? 'Customer suspended' : 'Customer reactivated')
+      refreshList()
+    } else {
+      toast.error('Failed to update customer')
+    }
+  }
+
+  async function handleDelete(id: string) {
+    setDeleteLoading(true)
+    const res = await fetch(`/api/customers/${id}`, { method: 'DELETE' })
+    setDeleteLoading(false)
+    if (res.ok) {
+      toast.success('Customer deleted')
+      setDeleteId(null)
+      refreshList()
+    } else {
+      const j = await res.json()
+      toast.error(j.error ?? 'Failed to delete customer')
+    }
+  }
+
+  const deleteTarget = customers.find((c) => c.id === deleteId)
+  const blacklistTarget = customers.find((c) => c.id === blacklistId)
+
   return (
     <PageShell title="Casual Details" subtitle={subtitle}>
-      <div className="flex flex-col flex-1 min-h-0 gap-3">
+      <div className="flex flex-col flex-1 min-h-0 gap-3" onClick={() => setMenuOpen(null)}>
 
         {/* Actions row */}
         {isManager && (
           <div className="flex justify-end shrink-0">
             <button
-              onClick={() => setImportOpen(true)}
+              onClick={(e) => { e.stopPropagation(); setImportOpen(true) }}
               className="flex items-center gap-1.5 h-8 px-3 rounded text-xs font-medium transition-colors"
               style={{ border: `1px solid ${colors.border}`, color: colors.textPrimary, background: colors.surface }}
               onMouseEnter={(e) => (e.currentTarget.style.background = colors.toolbar)}
@@ -123,8 +163,8 @@ export default function CasualDetailsPage() {
             <table className="w-full bg-white">
               <thead style={{ background: colors.toolbar, borderBottom: `1px solid ${colors.border}` }}>
                 <tr>
-                  {['Name', 'ID Number', 'Phone', 'Registered', 'Status'].map((h) => (
-                    <th key={h} className="text-left px-4 py-2" style={{ fontSize: fontSize.xs, fontWeight: fontWeight.semibold, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
+                  {['Name', 'ID Number', 'Phone', 'Registered', 'Status', ''].map((h, i) => (
+                    <th key={i} className="text-left px-4 py-2" style={{ fontSize: fontSize.xs, fontWeight: fontWeight.semibold, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.04em', width: h === '' ? '48px' : undefined }}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -132,21 +172,80 @@ export default function CasualDetailsPage() {
                 {customers.map((c, i) => (
                   <tr
                     key={c.id}
-                    className="cursor-pointer"
                     style={{ borderBottom: i < customers.length - 1 ? `1px solid ${colors.neutralBg}` : 'none' }}
-                    onClick={() => router.push(`/app/customers/${c.id}`)}
                     onMouseEnter={(e) => (e.currentTarget.style.background = colors.toolbar)}
                     onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                   >
-                    <td className="px-4 py-2.5 font-medium" style={{ fontSize: fontSize.sm, color: colors.textPrimary }}>
+                    <td
+                      className="px-4 py-2.5 font-medium cursor-pointer"
+                      style={{ fontSize: fontSize.sm, color: colors.textPrimary }}
+                      onClick={() => router.push(`/app/customers/${c.id}`)}
+                    >
                       {c.lastName}, {c.firstName}
                     </td>
-                    <td className="px-4 py-2.5 font-mono" style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>{c.idNumber}</td>
-                    <td className="px-4 py-2.5" style={{ fontSize: fontSize.sm, color: colors.textSecondary }}>{c.phone}</td>
-                    <td className="px-4 py-2.5" style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>
+                    <td className="px-4 py-2.5 font-mono cursor-pointer" style={{ fontSize: fontSize.xs, color: colors.textSecondary }} onClick={() => router.push(`/app/customers/${c.id}`)}>{c.idNumber}</td>
+                    <td className="px-4 py-2.5 cursor-pointer" style={{ fontSize: fontSize.sm, color: colors.textSecondary }} onClick={() => router.push(`/app/customers/${c.id}`)}>{c.phone}</td>
+                    <td className="px-4 py-2.5 cursor-pointer" style={{ fontSize: fontSize.xs, color: colors.textSecondary }} onClick={() => router.push(`/app/customers/${c.id}`)}>
                       {new Date(c.createdAt).toLocaleDateString('en-ZA')}
                     </td>
-                    <td className="px-4 py-2.5">{statusBadge(c)}</td>
+                    <td className="px-4 py-2.5 cursor-pointer" onClick={() => router.push(`/app/customers/${c.id}`)}>{statusBadge(c)}</td>
+
+                    {/* Action menu cell */}
+                    <td className="px-2 py-2.5 relative" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 transition-colors"
+                        style={{ color: colors.textSecondary }}
+                        onClick={(e) => { e.stopPropagation(); setMenuOpen(menuOpen === c.id ? null : c.id) }}
+                        title="Actions"
+                      >
+                        <MoreVertical className="w-4 h-4" />
+                      </button>
+
+                      {menuOpen === c.id && (
+                        <div
+                          className="absolute right-2 top-9 z-50 rounded-lg shadow-lg py-1 min-w-[160px]"
+                          style={{ background: colors.surface, border: `1px solid ${colors.border}` }}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <MenuItem icon={<Eye className="w-3.5 h-3.5" />} label="View Profile" onClick={() => { setMenuOpen(null); router.push(`/app/customers/${c.id}`) }} />
+                          {!c.blacklisted ? (
+                            <MenuItem
+                              icon={<ShieldBan className="w-3.5 h-3.5" />}
+                              label="Blacklist"
+                              danger
+                              disabled={!isManager}
+                              onClick={() => { setMenuOpen(null); setBlacklistId(c.id) }}
+                            />
+                          ) : (
+                            <MenuItem
+                              icon={<ShieldCheck className="w-3.5 h-3.5" />}
+                              label="Remove Blacklist"
+                              disabled={!isManager}
+                              onClick={async () => {
+                                setMenuOpen(null)
+                                const res = await fetch(`/api/customers/${c.id}/unblacklist`, { method: 'POST' })
+                                if (res.ok) { toast.success('Customer unblacklisted'); refreshList() }
+                                else toast.error('Failed to unblacklist')
+                              }}
+                            />
+                          )}
+                          <MenuItem
+                            icon={<UserX className="w-3.5 h-3.5" />}
+                            label={c.isActive ? 'Suspend' : 'Reactivate'}
+                            disabled={!isManager}
+                            onClick={() => handleSuspend(c)}
+                          />
+                          <div style={{ borderTop: `1px solid ${colors.border}`, margin: '4px 0' }} />
+                          <MenuItem
+                            icon={<Trash2 className="w-3.5 h-3.5" />}
+                            label="Delete"
+                            danger
+                            disabled={!isManager}
+                            onClick={() => { setMenuOpen(null); setDeleteId(c.id) }}
+                          />
+                        </div>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -154,17 +253,123 @@ export default function CasualDetailsPage() {
           )}
         </div>
 
+        {/* Import CSV Modal */}
         {importOpen && (
           <ImportCsvModal
             onClose={() => setImportOpen(false)}
-            onSuccess={() => {
-              mutate((key) => typeof key === 'string' && key.includes('/api/customers'), undefined, { revalidate: true })
-              setImportOpen(false)
-            }}
+            onSuccess={() => { refreshList(); setImportOpen(false) }}
           />
+        )}
+
+        {/* Blacklist Modal */}
+        {blacklistId && blacklistTarget && (
+          <BlacklistModal
+            customer={blacklistTarget}
+            onClose={() => setBlacklistId(null)}
+            onSuccess={() => { setBlacklistId(null); refreshList() }}
+          />
+        )}
+
+        {/* Delete Confirm Dialog */}
+        {deleteId && deleteTarget && (
+          <Dialog open onOpenChange={(o) => { if (!o) setDeleteId(null) }}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader><DialogTitle>Delete Customer</DialogTitle></DialogHeader>
+              <div className="space-y-4 mt-2">
+                <p className="text-sm" style={{ color: colors.textSecondary }}>
+                  Are you sure you want to permanently delete <strong style={{ color: colors.textPrimary }}>{deleteTarget.firstName} {deleteTarget.lastName}</strong>?
+                  This action cannot be undone and will remove all associated records.
+                </p>
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setDeleteId(null)} disabled={deleteLoading}>Cancel</Button>
+                  <button
+                    onClick={() => handleDelete(deleteId)}
+                    disabled={deleteLoading}
+                    className="h-9 px-4 rounded text-sm font-medium text-white transition-colors disabled:opacity-50"
+                    style={{ background: colors.danger }}
+                  >
+                    {deleteLoading ? <span className="flex items-center gap-1.5"><Loader2 className="w-4 h-4 animate-spin" />Deleting…</span> : 'Delete'}
+                  </button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
         )}
       </div>
     </PageShell>
+  )
+}
+
+// ─── Menu Item ─────────────────────────────────────────────────────────────────
+function MenuItem({ icon, label, onClick, danger, disabled }: {
+  icon: React.ReactNode; label: string; onClick: () => void; danger?: boolean; disabled?: boolean
+}) {
+  return (
+    <button
+      className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left transition-colors disabled:opacity-40"
+      style={{ color: danger ? colors.danger : colors.textPrimary }}
+      onClick={disabled ? undefined : onClick}
+      disabled={disabled}
+      onMouseEnter={(e) => !disabled && (e.currentTarget.style.background = colors.toolbar)}
+      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+    >
+      {icon}
+      {label}
+      {disabled && <span className="ml-auto text-xs" style={{ color: colors.textSecondary }}>(manager)</span>}
+    </button>
+  )
+}
+
+// ─── Blacklist Modal ───────────────────────────────────────────────────────────
+function BlacklistModal({ customer, onClose, onSuccess }: { customer: Customer; onClose: () => void; onSuccess: () => void }) {
+  const [reason, setReason]   = useState('')
+  const [loading, setLoading] = useState(false)
+
+  async function handleSubmit() {
+    if (reason.length < 10) { toast.error('Reason must be at least 10 characters'); return }
+    setLoading(true)
+    const res = await fetch(`/api/customers/${customer.id}/blacklist`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason }),
+    })
+    setLoading(false)
+    if (res.ok) { toast.success('Customer blacklisted'); onSuccess() }
+    else { const j = await res.json(); toast.error(j.error ?? 'Failed to blacklist') }
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader><DialogTitle>Blacklist Customer</DialogTitle></DialogHeader>
+        <div className="space-y-4 mt-2">
+          <p className="text-sm" style={{ color: colors.textSecondary }}>
+            Blacklisting <strong style={{ color: colors.textPrimary }}>{customer.firstName} {customer.lastName}</strong> will prevent them from transacting.
+          </p>
+          <div>
+            <label className="text-xs font-medium" style={{ color: colors.textSecondary }}>Reason (min 10 characters)</label>
+            <Input
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="Reason for blacklisting…"
+              className="mt-1 border-[#E0E0E0]"
+              disabled={loading}
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
+            <button
+              onClick={handleSubmit}
+              disabled={loading || reason.length < 10}
+              className="h-9 px-4 rounded text-sm font-medium text-white transition-colors disabled:opacity-50"
+              style={{ background: colors.danger }}
+            >
+              {loading ? <span className="flex items-center gap-1.5"><Loader2 className="w-4 h-4 animate-spin" />Blacklisting…</span> : 'Blacklist'}
+            </button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -250,7 +455,6 @@ function ImportCsvModal({ onClose, onSuccess }: { onClose: () => void; onSuccess
             />
           </div>
 
-          {/* Result */}
           {result && (
             <div className="rounded-lg p-4 space-y-2" style={{ border: `1px solid ${colors.border}` }}>
               <div className="flex items-center gap-2 text-sm font-medium" style={{ color: colors.action }}>
