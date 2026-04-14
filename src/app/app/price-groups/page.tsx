@@ -14,7 +14,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { CreatePriceGroupSchema, type CreatePriceGroupInput, type CreatePriceGroupFormInput } from '@/lib/schemas/product'
 import { useSession } from 'next-auth/react'
 import { PageShell } from '@/components/layout/PageShell'
-import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
+import { colors } from '@/lib/design-tokens'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 

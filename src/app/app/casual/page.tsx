@@ -180,7 +180,7 @@ function ImportCsvModal({ onClose, onSuccess }: { onClose: () => void; onSuccess
 
   function downloadTemplate() {
     const headers = 'idNumber,firstName,lastName,phone,dateOfBirth,gender,nationality,physicalAddress'
-    const example = '8001015009087,John,Doe,0821234567,1980-01-01,male,South African,123 Main St Pretoria'
+    const example = 'EZ12345678,John,Dlamini,76123456,1980-01-01,male,Swazi,123 Main St Mbabane'
     const blob = new Blob([headers + '\n' + example], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')

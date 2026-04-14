@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { StatCard } from '@/components/ui/StatCard'
 import { PageShell } from '@/components/layout/PageShell'
-import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
+import { colors, fontSize } from '@/lib/design-tokens'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 

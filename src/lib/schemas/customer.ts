@@ -1,12 +1,15 @@
 import { z } from 'zod'
 import { validateSaId } from '@/lib/utils/saId'
 
-// Coerce phone to E.164 (+27XXXXXXXXX)
+// Coerce phone to E.164 (+268XXXXXXXX) — Eswatini (+268, 8-digit local numbers)
 function toE164(phone: string): string {
   const digits = phone.replace(/\D/g, '')
-  if (digits.startsWith('27') && digits.length === 11) return `+${digits}`
-  if (digits.startsWith('0') && digits.length === 10) return `+27${digits.slice(1)}`
-  if (digits.length === 9) return `+27${digits}`
+  // Already has country code: +268XXXXXXXX or 268XXXXXXXX
+  if (digits.startsWith('268') && digits.length === 11) return `+${digits}`
+  // 8-digit local number (standard Eswatini format)
+  if (digits.length === 8) return `+268${digits}`
+  // Leading zero variant (non-standard but tolerate)
+  if (digits.startsWith('0') && digits.length === 9) return `+268${digits.slice(1)}`
   return `+${digits}`
 }
 
@@ -14,15 +17,17 @@ const phoneSchema = z
   .string()
   .min(1, 'Phone number is required')
   .transform(toE164)
-  .refine((v) => /^\+27\d{9}$/.test(v), 'Phone must be a valid South African number')
+  .refine((v) => /^\+268\d{8}$/.test(v), 'Phone must be a valid Eswatini number (+268 followed by 8 digits)')
 
 const idNumberSchema = z
   .string()
-  .regex(/^\d{13}$/, 'ID number must be exactly 13 digits')
+  .min(5, 'National ID number is too short')
+  .max(20, 'National ID number is too long')
+  .regex(/^[A-Za-z0-9\-\/]+$/, 'National ID may only contain letters, digits, hyphens, or slashes')
   .superRefine((v, ctx) => {
     const result = validateSaId(v)
     if (!result.valid) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: result.error ?? 'Invalid SA ID number' })
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: result.error ?? 'Invalid National ID number' })
     }
   })
 
@@ -56,7 +61,7 @@ export const CreateCustomerSchema = z.object({
   postalAddress:    z.string().optional(),
   vatNumber:        z
     .string()
-    .regex(/^4\d{9}$/, 'VAT number must be 10 digits starting with 4')
+    .regex(/^\d{7,15}$/, 'VAT number must be 7–15 digits')
     .optional()
     .or(z.literal(''))
     .transform(v => v || undefined),

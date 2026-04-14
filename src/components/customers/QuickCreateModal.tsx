@@ -31,7 +31,7 @@ export function QuickCreateModal({ open, prefillQuery, onClose, onSuccess }: Pro
   })
 
   const idNumber = watch('idNumber', '')
-  const idValidation = idNumber.length === 13 ? validateSaId(idNumber) : null
+  const idValidation = idNumber.length >= 5 ? validateSaId(idNumber) : null
 
   useEffect(() => {
     if (prefillQuery && /^\d+$/.test(prefillQuery)) {
@@ -62,14 +62,10 @@ export function QuickCreateModal({ open, prefillQuery, onClose, onSuccess }: Pro
         <DialogHeader><DialogTitle>Quick Create Customer</DialogTitle></DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-2">
           <div>
-            <Label>SA ID Number</Label>
-            <Input {...register('idNumber')} className="mt-1" placeholder="13-digit ID number" disabled={loading} />
-            {idNumber.length === 13 && idValidation && (
-              <p className={`text-xs mt-1 ${idValidation.valid ? 'text-green-600' : 'text-red-600'}`}>
-                {idValidation.valid
-                  ? `✓ Valid — ${idValidation.gender}, born ${idValidation.dateOfBirth?.toLocaleDateString('en-ZA')}`
-                  : `✗ ${idValidation.error}`}
-              </p>
+            <Label>National ID Number</Label>
+            <Input {...register('idNumber')} className="mt-1" placeholder="National ID" disabled={loading} />
+            {idNumber.length >= 5 && idValidation && !idValidation.valid && (
+              <p className="text-xs mt-1 text-red-600">✗ {idValidation.error}</p>
             )}
             {errors.idNumber && <p className="text-xs text-red-600 mt-1">{errors.idNumber.message}</p>}
           </div>
@@ -87,7 +83,7 @@ export function QuickCreateModal({ open, prefillQuery, onClose, onSuccess }: Pro
           </div>
           <div>
             <Label>Phone</Label>
-            <Input {...register('phone')} className="mt-1" placeholder="071 234 5678" disabled={loading} />
+            <Input {...register('phone')} className="mt-1" placeholder="76 123 456" disabled={loading} />
             {errors.phone && <p className="text-xs text-red-600 mt-1">{errors.phone.message}</p>}
           </div>
           <div className="flex justify-end gap-2 pt-2">

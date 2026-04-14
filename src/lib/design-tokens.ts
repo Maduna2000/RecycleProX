@@ -1,5 +1,5 @@
 /**
- * RecycleProX Design Tokens
+ * Renovo Pro Design Tokens
  * Single source of truth for all colours, typography, and spacing.
  *
  * Usage:

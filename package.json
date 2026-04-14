@@ -1,5 +1,5 @@
 {
-  "name": "recycleprox",
+  "name": "renovopro",
   "version": "0.1.0",
   "private": true,
   "main": "electron/main.js",
@@ -14,8 +14,8 @@
     "electron:build": "next build && electron-builder"
   },
   "build": {
-    "appId": "za.co.lariat.recycleprox",
-    "productName": "RecycleProX Basic",
+    "appId": "za.co.lariat.renovopro",
+    "productName": "Renovo Pro",
     "files": [
       "electron/**/*",
       ".next/**/*",

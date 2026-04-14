@@ -632,13 +632,14 @@ function SignatureDialog({
 
     setSaving(true)
     try {
-      const key    = `purchases/${purchaseId}/signature.png`
-      const urlRes = await fetch(`/api/r2/upload-url?key=${encodeURIComponent(key)}&contentType=image/png`)
-      if (!urlRes.ok) throw new Error('Failed to get upload URL')
-      const { url } = await urlRes.json() as { url: string }
+      const fd = new FormData()
+      fd.append('context', 'purchase_signature')
+      fd.append('referenceId', purchaseId)
+      fd.append('file', blob, 'signature.png')
 
-      const uploadRes = await fetch(url, { method: 'PUT', body: blob, headers: { 'Content-Type': 'image/png' } })
+      const uploadRes = await fetch('/api/r2/upload', { method: 'POST', body: fd })
       if (!uploadRes.ok) throw new Error('Failed to upload signature')
+      const { key } = await uploadRes.json() as { key: string }
 
       const patchRes = await fetch(`/api/purchases/${purchaseId}/signature`, {
         method: 'PATCH',

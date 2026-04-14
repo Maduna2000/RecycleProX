@@ -54,7 +54,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     }))
 
     const pdfBytes = await generateVat264({
-      dealerName:    settings.yardName    ?? 'RecycleProX',
+      dealerName:    settings.yardName    ?? 'Renovo Pro',
       dealerAddress: settings.yardAddress ?? 'Pretoria, South Africa',
       dealerVatNo:   settings.vatNumber   ?? '',
       dealerPhone:   settings.dealerPhone,

@@ -26,7 +26,7 @@ interface Tab {
 interface PageShellProps {
   title:      string
   subtitle?:  string       // e.g. "247 customers" or "Record and manage purchases"
-  tabs?:      Tab[]        // renders inside Zone 3, below the header
+  tabs?:      readonly Tab[]   // renders inside Zone 3, below the header
   activeTab?: string
   onTabChange?: (value: string) => void
   children:   React.ReactNode

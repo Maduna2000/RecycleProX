@@ -31,7 +31,7 @@ export function CreateCustomerModal({ open, onClose, onSuccess }: { open: boolea
 
   const idNumber    = watch('idNumber', '')
   const customerType = watch('customerType', 'casual')
-  const idValidation = idNumber?.length === 13 ? validateSaId(idNumber) : null
+  const idValidation = idNumber && idNumber.length >= 5 ? validateSaId(idNumber) : null
 
   async function onSubmit(data: CreateCustomerInput) {
     setLoading(true)
@@ -79,12 +79,10 @@ export function CreateCustomerModal({ open, onClose, onSuccess }: { open: boolea
               </Select>
             </div>
             <div>
-              <Label>SA ID Number</Label>
-              <Input {...register('idNumber')} className="mt-1" placeholder="13 digits" disabled={loading} />
-              {idNumber?.length === 13 && idValidation && (
-                <p className={`text-xs mt-1 ${idValidation.valid ? 'text-green-600' : 'text-red-600'}`}>
-                  {idValidation.valid ? `✓ ${idValidation.gender}` : `✗ ${idValidation.error}`}
-                </p>
+              <Label>National ID Number</Label>
+              <Input {...register('idNumber')} className="mt-1" placeholder="National ID" disabled={loading} />
+              {idNumber && idNumber.length >= 5 && idValidation && !idValidation.valid && (
+                <p className="text-xs mt-1 text-red-600">✗ {idValidation.error}</p>
               )}
               {errors.idNumber && <p className="text-xs text-red-600 mt-1">{errors.idNumber.message}</p>}
             </div>
@@ -120,7 +118,7 @@ export function CreateCustomerModal({ open, onClose, onSuccess }: { open: boolea
 
           <div>
             <Label>Phone</Label>
-            <Input {...register('phone')} className="mt-1" placeholder="071 234 5678" disabled={loading} />
+            <Input {...register('phone')} className="mt-1" placeholder="76 123 456" disabled={loading} />
             {errors.phone && <p className="text-xs text-red-600 mt-1">{errors.phone.message}</p>}
           </div>
 

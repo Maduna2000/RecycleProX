@@ -66,7 +66,7 @@ export async function generateTransactionSlip(data: TransactionSlipData): Promis
   // ── Green header bar ──────────────────────────────────────────────────────
   page.drawRectangle({ x: 0, y: PAGE_H - 80, width: PAGE_W, height: 80, color: GREEN })
 
-  page.drawText('RecycleProX', {
+  page.drawText('Renovo Pro', {
     x: MARGIN, y: PAGE_H - 40, size: 22, font: bold, color: WHITE,
   })
   page.drawText('LARIAT TECHNOLOGIES', {
@@ -163,7 +163,7 @@ export async function generateTransactionSlip(data: TransactionSlipData): Promis
   y = MARGIN + 50
   hRule(page, y + 10)
   page.drawText(`Cashier: ${data.cashierName}`, { x: MARGIN, y, size: 9, font: reg, color: GRAY })
-  page.drawText('www.lariat.co.za · Pretoria, South Africa', {
+  page.drawText('www.lariat.co.za · Mbabane, Eswatini', {
     x: MARGIN, y: y - 14, size: 8, font: reg, color: GRAY,
   })
 

@@ -24,7 +24,9 @@ export const CreateSaleSchema = z.object({
   buyerName: z.string().min(1, 'Buyer name is required').max(100),
   buyerIdNumber: z
     .string()
-    .regex(/^\d{13}$/, 'ID number must be 13 digits')
+    .min(5, 'National ID number is too short')
+    .max(20, 'National ID number is too long')
+    .regex(/^[A-Za-z0-9\-\/]+$/, 'National ID may only contain letters, digits, hyphens, or slashes')
     .optional()
     .or(z.literal(''))
     .transform((v) => v || undefined),

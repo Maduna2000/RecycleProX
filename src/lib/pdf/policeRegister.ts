@@ -1,9 +1,9 @@
 /**
  * Police Register PDF generator.
  *
- * South African Second-Hand Goods Act (Act 6 of 2009) requires dealers to
- * keep a register of every purchase from the public, available for inspection
- * by the South African Police Service.
+ * Eswatini second-hand goods dealers are required to keep a register of every
+ * purchase from the public, available for inspection by the Eswatini Police
+ * Service (EPS) in accordance with applicable trade regulations.
  *
  * Columns: #, Time, Supplier Name, ID Number, Address, Items, Total Paid
  *
@@ -99,7 +99,7 @@ export async function generatePoliceRegister(data: PoliceRegisterData): Promise<
     page.drawText('SECOND-HAND GOODS DEALER — PURCHASE REGISTER', {
       x: MARGIN, y: PAGE_H - 26, size: 13, font: bold, color: WHITE,
     })
-    page.drawText('South African Second-Hand Goods Act, Act 6 of 2009', {
+    page.drawText('Eswatini Dealers in Second-Hand Goods Regulations', {
       x: MARGIN, y: PAGE_H - 44, size: 8, font: reg, color: rgb(0.7, 0.8, 1),
     })
 
@@ -243,7 +243,7 @@ export async function generatePoliceRegister(data: PoliceRegisterData): Promise<
         x: MARGIN + 350, y, size: 8, font: reg, color: DARK,
       })
       y -= 14
-      page.drawText('SAPS Officer Signature: ____________________________', {
+      page.drawText('EPS Officer Signature: ____________________________', {
         x: MARGIN, y, size: 8, font: reg, color: DARK,
       })
       page.drawText('Badge No: ________________', {
@@ -252,7 +252,7 @@ export async function generatePoliceRegister(data: PoliceRegisterData): Promise<
     }
 
     // Footer
-    page.drawText(`Generated: ${data.generatedAt.toLocaleString('en-ZA')} · RecycleProX Basic · Lariat Technologies`, {
+    page.drawText(`Generated: ${data.generatedAt.toLocaleString('en-ZA')} · Renovo Pro · Lariat Technologies`, {
       x: MARGIN, y: MARGIN, size: 6, font: reg, color: GRAY,
     })
   }

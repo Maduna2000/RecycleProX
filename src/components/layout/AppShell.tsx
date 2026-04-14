@@ -5,12 +5,12 @@ import Link from 'next/link'
 import { signOut } from 'next-auth/react'
 import { useState, useEffect, useCallback } from 'react'
 import {
-  Recycle, ChevronDown, Bell, Search,
+  RefreshCw, ChevronDown, Bell, Search,
   Plus, Scale, Printer, Zap, Ban,
   CreditCard, DollarSign, BarChart2,
   ShieldCheck, UserCheck, AlertCircle,
   ClipboardCheck, FileSpreadsheet,
-  FileText, Download, RefreshCw,
+  FileText, Download,
   Handshake, LogOut, Settings,
   Minus, Square, X as XIcon,
   Package, Tag, Images, ShieldAlert, Users,
@@ -286,10 +286,10 @@ export function AppShell({
       >
         {/* Logo */}
         <div className="flex items-center gap-2 pr-4 shrink-0">
-          <div className="w-7 h-7 rounded-md bg-[#217346] flex items-center justify-center">
-            <Recycle className="w-4 h-4 text-white" />
+          <div className="w-7 h-7 rounded-md bg-[#1B3A6B] flex items-center justify-center">
+            <RefreshCw className="w-4 h-4 text-white" />
           </div>
-          <span className="text-white font-bold text-sm hidden lg:block">RecycleProX</span>
+          <span className="text-white font-bold text-sm hidden lg:block">Renovo Pro</span>
         </div>
 
         {/* Ribbon Tabs */}

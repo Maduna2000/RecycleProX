@@ -17,4 +17,4 @@ export function getR2Client(): S3Client {
   return _client
 }
 
-export const R2_BUCKET = process.env.R2_BUCKET ?? process.env.R2_BUCKET_NAME ?? 'recycleprox'
+export const R2_BUCKET = process.env.R2_BUCKET ?? process.env.R2_BUCKET_NAME ?? 'renovopro'

@@ -192,7 +192,7 @@ export default function SettingsPage() {
                   value={form.yardName ?? ''}
                   onChange={(e) => set('yardName', e.target.value)}
                   className="mt-1"
-                  placeholder="e.g. RecycleProX Yard"
+                  placeholder="e.g. Renovo Pro Yard"
                 />
               </div>
               <div>

@@ -43,7 +43,7 @@ function addHeader(printer: ThermalPrinter, title: string, refNumber: string, da
   printer.bold(true)
   printer.println('LARIAT TECHNOLOGIES')
   printer.bold(false)
-  printer.println('RecycleProX Recycling Yard')
+  printer.println('Renovo Pro')
   printer.drawLine()
   printer.bold(true)
   printer.println(title)

@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { FileDown, Loader2, History, Pen, CheckCircle, ExternalLink, RotateCcw } from 'lucide-react'
+import { FileDown, Loader2, Pen, CheckCircle, ExternalLink, RotateCcw } from 'lucide-react'
 import { toast } from 'sonner'
 import { PageShell } from '@/components/layout/PageShell'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
@@ -180,7 +180,7 @@ export default function PoliceRegisterPage() {
               <div className="rounded-lg p-4 text-sm space-y-1" style={{ background: colors.processBg, border: '1px solid #C7DDF5', color: colors.process }}>
                 <p className="font-semibold">Legal requirement</p>
                 <p style={{ color: '#1249A0' }}>
-                  This register must be kept for at least 5 years and made available to the South African Police Service on request.
+                  This register must be kept for at least 5 years and made available to the Eswatini Police Service (EPS) on request.
                   Each page must be signed by the dealer.
                 </p>
               </div>
@@ -340,16 +340,14 @@ function SignatureDialog({
       const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'))
       if (!blob) throw new Error('Failed to capture signature')
 
-      const urlRes = await fetch('/api/r2/upload-url', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ context: 'police_signature', referenceId: visitId, contentType: 'image/png', fileSize: blob.size }),
-      })
-      if (!urlRes.ok) throw new Error('Failed to get upload URL')
-      const { uploadUrl, key } = await urlRes.json() as { uploadUrl: string; key: string }
+      const fd = new FormData()
+      fd.append('context', 'police_signature')
+      fd.append('referenceId', visitId)
+      fd.append('file', blob, 'signature.png')
 
-      const uploadRes = await fetch(uploadUrl, { method: 'PUT', body: blob, headers: { 'Content-Type': 'image/png' } })
+      const uploadRes = await fetch('/api/r2/upload', { method: 'POST', body: fd })
       if (!uploadRes.ok) throw new Error('Upload failed')
+      const { key } = await uploadRes.json() as { key: string }
 
       const patchRes = await fetch(`/api/police-visits/${visitId}`, {
         method: 'PATCH',

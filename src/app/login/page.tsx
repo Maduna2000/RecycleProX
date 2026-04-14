@@ -6,10 +6,9 @@ import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { LoginSchema, type LoginInput } from '@/lib/schemas/auth'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Recycle, Loader2 } from 'lucide-react'
+import { RefreshCw, Loader2 } from 'lucide-react'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -48,21 +47,21 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="min-h-screen flex items-center justify-center" style={{ background: '#F8F9FA' }}>
       <div className="w-full max-w-md">
-        <div className="bg-white rounded-2xl shadow-lg p-8">
+        <div className="bg-white rounded-2xl shadow-lg p-8" style={{ border: '1px solid #E0E0E0' }}>
           {/* Logo & Title */}
           <div className="flex flex-col items-center mb-8">
-            <div className="w-16 h-16 bg-green-600 rounded-2xl flex items-center justify-center mb-4">
-              <Recycle className="w-9 h-9 text-white" />
+            <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4" style={{ background: '#1B3A6B' }}>
+              <RefreshCw className="w-9 h-9 text-white" />
             </div>
-            <h1 className="text-2xl font-bold text-gray-900">RecycleProX Basic</h1>
-            <p className="text-sm text-gray-500 mt-1">Lariat Technologies</p>
+            <h1 className="text-2xl font-bold" style={{ color: '#212529' }}>Renovo Pro</h1>
+            <p className="text-sm mt-1" style={{ color: '#6C757D' }}>Lariat Technologies</p>
           </div>
 
           {/* Error */}
           {error && (
-            <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
+            <div className="mb-4 p-3 rounded-lg text-sm" style={{ background: '#FFF0F0', border: '1px solid #F5C6C6', color: '#C0392B' }}>
               {error}
             </div>
           )}
@@ -70,40 +69,45 @@ export default function LoginPage() {
           {/* Form */}
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div>
-              <Label htmlFor="username">Username</Label>
+              <Label htmlFor="username" style={{ color: '#212529' }}>Username</Label>
               <Input
                 id="username"
                 autoComplete="username"
                 {...register('username')}
-                className="mt-1"
+                className="mt-1 border-[#E0E0E0]"
                 disabled={loading}
               />
               {errors.username && (
-                <p className="text-xs text-red-600 mt-1">{errors.username.message}</p>
+                <p className="text-xs mt-1" style={{ color: '#C0392B' }}>{errors.username.message}</p>
               )}
             </div>
 
             <div>
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password" style={{ color: '#212529' }}>Password</Label>
               <Input
                 id="password"
                 type="password"
                 autoComplete="current-password"
                 {...register('password')}
-                className="mt-1"
+                className="mt-1 border-[#E0E0E0]"
                 disabled={loading}
               />
               {errors.password && (
-                <p className="text-xs text-red-600 mt-1">{errors.password.message}</p>
+                <p className="text-xs mt-1" style={{ color: '#C0392B' }}>{errors.password.message}</p>
               )}
             </div>
 
-            <Button type="submit" className="w-full bg-green-600 hover:bg-green-700" disabled={loading}>
-              {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Signing in...</> : 'Sign In'}
-            </Button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full flex items-center justify-center gap-2 h-10 rounded-lg text-sm font-semibold text-white transition-colors disabled:opacity-50"
+              style={{ background: '#1B3A6B' }}
+            >
+              {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Signing in…</> : 'Sign In'}
+            </button>
           </form>
 
-          <p className="text-center text-xs text-gray-400 mt-6">
+          <p className="text-center text-xs mt-6" style={{ color: '#6C757D' }}>
             Accounts are created by an administrator
           </p>
         </div>

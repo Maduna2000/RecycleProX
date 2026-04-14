@@ -118,7 +118,7 @@ export async function generateVat264(data: Vat264Data): Promise<Uint8Array> {
   y -= 6
 
   drawField(page, 'Full Name', data.sellerName, MARGIN, y, halfW, fonts)
-  drawField(page, 'SA Identity / Passport Number', data.sellerIdNumber, MARGIN + halfW + 8, y, halfW, fonts)
+  drawField(page, 'National ID / Passport Number', data.sellerIdNumber, MARGIN + halfW + 8, y, halfW, fonts)
   y -= 26
 
   drawField(page, 'Residential Address', data.sellerAddress ?? '', MARGIN, y, halfW, fonts)

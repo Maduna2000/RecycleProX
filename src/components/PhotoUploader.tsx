@@ -32,30 +32,19 @@ export function PhotoUploader({ context, referenceId, onUploaded, disabled, labe
     setProgress(10)
 
     try {
-      // Step 1: get presigned upload URL from our API
-      const urlRes = await fetch('/api/r2/upload-url', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ context, referenceId, contentType: file.type, fileSize: file.size }),
-      })
-      if (!urlRes.ok) {
-        const j = await urlRes.json()
-        toast.error(j.error ?? 'Failed to get upload URL')
-        return
-      }
-      const { uploadUrl, key } = await urlRes.json() as { uploadUrl: string; key: string }
-      setProgress(30)
+      const fd = new FormData()
+      fd.append('context', context)
+      fd.append('referenceId', referenceId)
+      fd.append('file', file)
 
-      // Step 2: PUT directly to R2 using the presigned URL
-      const uploadRes = await fetch(uploadUrl, {
-        method: 'PUT',
-        headers: { 'Content-Type': file.type },
-        body: file,
-      })
-      if (!uploadRes.ok) {
-        toast.error('Upload to storage failed')
+      setProgress(40)
+      const res = await fetch('/api/r2/upload', { method: 'POST', body: fd })
+      if (!res.ok) {
+        const j = await res.json()
+        toast.error(j.error ?? 'Upload failed')
         return
       }
+      const { key } = await res.json() as { key: string }
       setProgress(100)
       toast.success('Photo uploaded successfully')
       onUploaded(key)

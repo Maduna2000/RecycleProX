@@ -74,8 +74,8 @@ export async function GET(req: NextRequest) {
     const pdfBytes = await generatePoliceRegister({
       date:          start,
       entries,
-      dealerName:    settingsMap['yardName']    ?? 'RecycleProX',
-      dealerAddress: settingsMap['yardAddress'] ?? 'Pretoria, Gauteng, South Africa',
+      dealerName:    settingsMap['yardName']    ?? 'Renovo Pro',
+      dealerAddress: settingsMap['yardAddress'] ?? 'Mbabane, Eswatini',
       generatedAt:   new Date(),
     })
 

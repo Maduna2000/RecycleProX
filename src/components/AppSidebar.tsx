@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import {
   LayoutDashboard, ShoppingCart, TrendingUp, Users,
-  Package, BarChart2, Settings, LogOut, Recycle,
+  Package, BarChart2, Settings, LogOut, RefreshCw,
   Warehouse, DollarSign, Tag, Banknote, ShieldCheck, ShieldAlert,
   Receipt, Coins, UserCheck, ClipboardList, HandCoins, Images,
   AlertCircle,
@@ -98,12 +98,12 @@ export function AppSidebar({ role, fullName }: { role: string; fullName: string;
 
       {/* Logo */}
       <div className="px-4 py-4 flex items-center gap-2.5 shrink-0">
-        <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: '#217346' }}>
-          <Recycle className="w-4 h-4 text-white" />
+        <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: '#1B3A6B' }}>
+          <RefreshCw className="w-4 h-4 text-white" />
         </div>
         <div>
-          <p className="font-bold text-sm" style={{ color: '#212529' }}>RecycleProX</p>
-          <p className="text-xs" style={{ color: '#6C757D' }}>Basic</p>
+          <p className="font-bold text-sm" style={{ color: '#212529' }}>Renovo Pro</p>
+          <p className="text-xs" style={{ color: '#6C757D' }}>Lariat Technologies</p>
         </div>
       </div>
 

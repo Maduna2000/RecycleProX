@@ -14,8 +14,8 @@ const geistMono = localFont({
 })
 
 export const metadata: Metadata = {
-  title: 'RecycleProX Basic',
-  description: 'Recycling yard management system by Lariat Technologies',
+  title: 'Renovo Pro',
+  description: 'Yard management system by Lariat Technologies',
 }
 
 export default function RootLayout({

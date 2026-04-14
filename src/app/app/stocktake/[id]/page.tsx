@@ -199,18 +199,15 @@ export default function StocktakeDetailPage() {
 
     setUploadingPhoto((prev) => ({ ...prev, [pid]: true }))
     try {
-      // Get presigned upload URL
-      const urlRes = await fetch('/api/r2/upload-url', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ context: 'stocktake_entry', referenceId: id, contentType: file.type, fileSize: file.size }),
-      })
-      if (!urlRes.ok) throw new Error('Failed to get upload URL')
-      const { uploadUrl, key } = await urlRes.json() as { uploadUrl: string; key: string }
+      // Upload to R2 via server proxy (no CORS required)
+      const fd = new FormData()
+      fd.append('context', 'stocktake_entry')
+      fd.append('referenceId', id)
+      fd.append('file', file)
 
-      // Upload to R2
-      const uploadRes = await fetch(uploadUrl, { method: 'PUT', body: file, headers: { 'Content-Type': file.type } })
+      const uploadRes = await fetch('/api/r2/upload', { method: 'POST', body: fd })
       if (!uploadRes.ok) throw new Error('Upload failed')
+      const { key } = await uploadRes.json() as { key: string }
 
       // Save the key on the entry
       const patchRes = await fetch(`/api/stocktake/${id}`, {
