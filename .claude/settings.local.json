@@ -19,7 +19,15 @@
       "Bash(curl -s --max-time 15 http://localhost:3000/login)",
       "Bash(npx vercel:*)",
       "Bash(node -e \"const d=require\\(process.env.APPDATA+'/com.vercel.cli/Data/auth.json'\\); const keys=Object.keys\\(d.token||{}\\); console.log\\(keys.length > 0 ? 'token found' : JSON.stringify\\(d\\).slice\\(0,200\\)\\)\")",
-      "Bash(npm cache:*)"
+      "Bash(npm cache:*)",
+      "Bash(sed -i 's/<div className=\"max-w-4xl\">/<div className=\"max-w-4xl mx-auto w-full\">/g' \"c:/Users/MD TECH SOLUTION/RecycleProX/src/app/app/sales/new/page.tsx\")",
+      "Bash(sed -i 's/<div className=\"max-w-3xl\">/<div className=\"max-w-3xl mx-auto w-full\">/g' \"c:/Users/MD TECH SOLUTION/RecycleProX/src/app/app/purchases/[id]/page.tsx\")",
+      "Bash(sed -i 's/<div className=\"max-w-3xl\">/<div className=\"max-w-3xl mx-auto w-full\">/g' \"c:/Users/MD TECH SOLUTION/RecycleProX/src/app/app/sales/[id]/page.tsx\")",
+      "Bash(sed -i 's/<div className=\"max-w-xl space-y-4 pb-6\">/<div className=\"max-w-xl mx-auto w-full space-y-4 pb-6\">/g' \"c:/Users/MD TECH SOLUTION/RecycleProX/src/app/app/police-register/page.tsx\")",
+      "Bash(sed -i 's/<div className=\"max-w-4xl space-y-4 pb-6\">/<div className=\"max-w-4xl mx-auto w-full space-y-4 pb-6\">/g' \"c:/Users/MD TECH SOLUTION/RecycleProX/src/app/app/purchases/unpaid/page.tsx\")",
+      "Bash(sed -i 's/<div className=\"max-w-4xl space-y-6\">/<div className=\"max-w-4xl mx-auto w-full space-y-6\">/g' \"c:/Users/MD TECH SOLUTION/RecycleProX/src/app/app/stocktake/[id]/page.tsx\")",
+      "Bash(taskkill //F //IM node.exe)",
+      "Bash(rm -rf \"c:/Users/MD TECH SOLUTION/RecycleProX/.next\")"
     ]
   }
 }

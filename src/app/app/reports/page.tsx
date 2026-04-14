@@ -105,41 +105,43 @@ export default function ReportsPage() {
 
   return (
     <PageShell title="Reports" subtitle="Business insights">
-      <div className="max-w-3xl space-y-5 pb-6">
+      <div className="max-w-4xl mx-auto w-full space-y-5 pb-6">
 
         {/* Date range controls */}
-        <div className="rounded-lg border p-4 flex flex-wrap items-end gap-3 bg-white" style={{ borderColor: colors.border }}>
-          <div>
-            <Label className="text-xs mb-1 block" style={{ color: colors.textSecondary }}>From</Label>
-            <Input type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} className="w-40 h-8 text-xs" />
-          </div>
-          <div>
-            <Label className="text-xs mb-1 block" style={{ color: colors.textSecondary }}>To</Label>
-            <Input type="date" value={to} min={from} max={today} onChange={(e) => setTo(e.target.value)} className="w-40 h-8 text-xs" />
-          </div>
-          <button
-            onClick={handleRun}
-            disabled={isLoading}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-white disabled:opacity-50"
-            style={{ background: colors.action }}
-          >
-            {isLoading ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading…</> : 'Run Report'}
-          </button>
-          {data && (
+        <div className="rounded-lg border p-5 space-y-3 bg-white" style={{ borderColor: colors.border }}>
+          <div className="flex flex-wrap items-end gap-3">
+            <div>
+              <Label className="text-xs mb-1 block" style={{ color: colors.textSecondary }}>From</Label>
+              <Input type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} className="w-40 h-9 text-sm" />
+            </div>
+            <div>
+              <Label className="text-xs mb-1 block" style={{ color: colors.textSecondary }}>To</Label>
+              <Input type="date" value={to} min={from} max={today} onChange={(e) => setTo(e.target.value)} className="w-40 h-9 text-sm" />
+            </div>
             <button
-              onClick={exportCSV}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium border"
-              style={{ borderColor: colors.border, background: colors.surface, color: colors.textPrimary }}
+              onClick={handleRun}
+              disabled={isLoading}
+              className="flex items-center gap-1.5 px-4 py-2 rounded text-sm font-medium text-white disabled:opacity-50"
+              style={{ background: colors.action }}
             >
-              <Download className="w-3.5 h-3.5" /> Export CSV
+              {isLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Loading…</> : 'Run Report'}
             </button>
-          )}
-          <div className="flex gap-1.5 flex-wrap">
+            {data && (
+              <button
+                onClick={exportCSV}
+                className="flex items-center gap-1.5 px-4 py-2 rounded text-sm font-medium border"
+                style={{ borderColor: colors.border, background: colors.surface, color: colors.textPrimary }}
+              >
+                <Download className="w-4 h-4" /> Export CSV
+              </button>
+            )}
+          </div>
+          <div className="flex gap-2 flex-wrap" style={{ borderTop: `1px solid ${colors.border}`, paddingTop: 10 }}>
             {PRESETS.map((p) => (
               <button
                 key={p.label}
                 onClick={() => { setFrom(p.from); setTo(p.to); setQuery(`from=${p.from}&to=${p.to}`) }}
-                className="text-xs px-2.5 py-1 rounded border transition-colors"
+                className="text-xs px-3 py-1.5 rounded border font-medium transition-colors"
                 style={{ borderColor: colors.border, color: colors.textSecondary, background: colors.surface }}
                 onMouseEnter={(e) => (e.currentTarget.style.background = colors.bg)}
                 onMouseLeave={(e) => (e.currentTarget.style.background = colors.surface)}

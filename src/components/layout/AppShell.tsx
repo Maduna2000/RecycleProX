@@ -360,9 +360,11 @@ export function AppShell({
 
       {/* ── ZONE 3: Content Area ── */}
       <main
-        className="flex-1 min-h-0 flex flex-col overflow-hidden bg-[#F8F9FA] px-5 pt-6 pb-5"
+        className="flex-1 min-h-0 flex flex-col overflow-y-auto bg-[#F8F9FA] px-6 pt-6 pb-6"
       >
-        {children}
+        <div className="flex flex-col flex-1 min-h-0 w-full max-w-[1440px] mx-auto">
+          {children}
+        </div>
       </main>
     </div>
   )

@@ -127,7 +127,7 @@ export default function PoliceRegisterPage() {
         {/* Content */}
         <div className="flex-1 min-h-0 overflow-y-auto">
           {tab === 'Generate Register' && (
-            <div className="max-w-xl space-y-4 pb-6">
+            <div className="max-w-xl mx-auto w-full space-y-4 pb-6">
               <div className="rounded-lg p-5 space-y-4 bg-white" style={{ border: `1px solid ${colors.border}` }}>
                 <h2 className="font-semibold" style={{ fontSize: fontSize.md, color: colors.textPrimary }}>Officer Details</h2>
 

@@ -53,7 +53,7 @@ export default function UnpaidPurchasesPage() {
 
   return (
     <div className="flex-1 min-h-0 overflow-y-auto">
-      <div className="max-w-4xl space-y-4 pb-6">
+      <div className="max-w-4xl mx-auto w-full space-y-4 pb-6">
 
         {/* Page header */}
         <div className="flex items-center gap-2">

@@ -273,7 +273,7 @@ export default function StocktakeDetailPage() {
   if (!stocktake) return <div className="p-10 text-center text-gray-400">Stocktake not found</div>
 
   return (
-    <div className="max-w-4xl space-y-6">
+    <div className="max-w-4xl mx-auto w-full space-y-6">
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>

@@ -155,7 +155,7 @@ export default function CashUpPage() {
 
   return (
     <PageShell title="Cash-Up" subtitle={`${today} · Daily cash reconciliation`}>
-      <div className="max-w-2xl space-y-5 pb-6">
+      <div className="max-w-3xl mx-auto w-full space-y-5 pb-6">
 
       {/* No session yet */}
       {!cashUp && (
@@ -198,7 +198,7 @@ export default function CashUpPage() {
 
           {/* Open: denomination counting + reconciliation */}
           {cashUp.status === 'open' && (
-            <>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               {/* Denomination entry */}
               <div className="rounded-lg border p-5 bg-white" style={{ borderColor: colors.border }}>
                 <h2 className="font-semibold mb-4" style={{ color: colors.textPrimary }}>Count Your Cash</h2>
@@ -303,7 +303,7 @@ export default function CashUpPage() {
                   </Button>
                 </div>
               </div>
-            </>
+            </div>
           )}
 
           {/* Submitted — view declaration + approve */}

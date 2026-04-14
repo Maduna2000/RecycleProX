@@ -52,7 +52,7 @@ export default function SaleDetailPage() {
   if (!sale) return <div className="flex items-center justify-center h-64 text-gray-400">Sale not found</div>
 
   return (
-    <div className="max-w-3xl">
+    <div className="max-w-3xl mx-auto w-full">
       <div className="flex items-center gap-3 mb-6">
         <Button variant="ghost" size="sm" onClick={() => router.back()}>
           <ArrowLeft className="w-4 h-4 mr-1" /> Back

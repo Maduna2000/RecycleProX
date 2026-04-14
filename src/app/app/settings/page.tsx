@@ -174,7 +174,7 @@ export default function SettingsPage() {
 
   return (
     <PageShell title="Settings" subtitle="System configuration">
-      <div className="max-w-2xl space-y-5 pb-6">
+      <div className="max-w-2xl mx-auto w-full space-y-5 pb-6">
 
       {isLoading ? (
         <div className="flex items-center gap-2 p-10" style={{ color: colors.textSecondary }}>

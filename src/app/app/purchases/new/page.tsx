@@ -233,7 +233,7 @@ export default function NewPurchasePage() {
   }
 
   return (
-    <div className="max-w-4xl">
+    <div className="max-w-4xl mx-auto w-full">
       {/* Header */}
       <div className="flex items-center gap-3 mb-6">
         <Button variant="ghost" size="sm" onClick={() => router.back()}>
