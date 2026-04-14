@@ -70,7 +70,9 @@ export async function POST(req: NextRequest) {
     logger.info({ context, referenceId, key, bytes: file.size, userId: session.user.id }, 'r2.upload.success')
     return NextResponse.json({ key })
   } catch (err) {
-    logger.error({ err }, 'POST /api/r2/upload failed')
-    return NextResponse.json({ error: 'Storage upload failed — check R2 credentials' }, { status: 500 })
+    const message = err instanceof Error ? err.message : String(err)
+    logger.error({ err, message }, 'POST /api/r2/upload failed')
+    const detail = process.env.NODE_ENV !== 'production' ? message : 'Storage upload failed — check R2 credentials'
+    return NextResponse.json({ error: detail }, { status: 500 })
   }
 }

@@ -8,7 +8,10 @@
       "Bash(mkdir -p \"c:\\\\Users\\\\MD TECH SOLUTION\\\\RecycleProX\\\\src\\\\app\\\\api\\\\expenses\\\\[id]\")",
       "Bash(mkdir -p \"c:\\\\Users\\\\MD TECH SOLUTION\\\\RecycleProX\\\\src\\\\app\\\\api\\\\expenses\\\\[id]\\\\approve\")",
       "Bash(npx next:*)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(python3 -c \" with open\\('C:/Users/MDTECH~1/AppData/Local/Temp/claude/c--Users-MD-TECH-SOLUTION-RecycleProX/dd04554b-1114-459d-bdaa-199dcdc662e4/tasks/bvvj0zk2h.output', 'rb'\\) as f: print\\(f.read\\(\\).decode\\('utf-8', errors='replace'\\)\\) \")",
+      "Bash(powershell.exe -Command \"Get-Content -Encoding UTF8 'C:\\\\Users\\\\MDTECH~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-MD-TECH-SOLUTION-RecycleProX\\\\dd04554b-1114-459d-bdaa-199dcdc662e4\\\\tasks\\\\bvvj0zk2h.output'\")",
+      "Bash(curl -s http://localhost:3000/api/r2/test)"
     ]
   }
 }
