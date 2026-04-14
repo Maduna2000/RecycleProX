@@ -18,6 +18,7 @@ type ScaleType = 'none' | 'tcp' | 'serial'
 type SettingsMap = {
   yardName?: string
   yardAddress?: string
+  yardPhone?: string
   vatNumber?: string
   vatRate?: string
   receiptFooter?: string
@@ -206,14 +207,25 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div>
-              <Label>Physical Address</Label>
-              <Input
-                value={form.yardAddress ?? ''}
-                onChange={(e) => set('yardAddress', e.target.value)}
-                className="mt-1"
-                placeholder="Street, City, Province, Code"
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Physical Address</Label>
+                <Input
+                  value={form.yardAddress ?? ''}
+                  onChange={(e) => set('yardAddress', e.target.value)}
+                  className="mt-1"
+                  placeholder="Street, City, Province, Code"
+                />
+              </div>
+              <div>
+                <Label>Phone Number</Label>
+                <Input
+                  value={form.yardPhone ?? ''}
+                  onChange={(e) => set('yardPhone', e.target.value)}
+                  className="mt-1"
+                  placeholder="e.g. +27 12 345 6789"
+                />
+              </div>
             </div>
           </div>
 

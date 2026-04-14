@@ -62,10 +62,18 @@ export async function GET(req: NextRequest) {
       prisma.auditLog.count({ where }),
     ])
 
-    // Serialize BigInt id to string
+    // Resolve user names for all changedById values in one batch query
+    const userIds = Array.from(new Set(items.map((i) => i.changedById).filter(Boolean))) as string[]
+    const users = userIds.length
+      ? await prisma.user.findMany({ where: { id: { in: userIds } }, select: { id: true, fullName: true, username: true } })
+      : []
+    const userMap = Object.fromEntries(users.map((u) => [u.id, u.fullName || u.username]))
+
+    // Serialize BigInt id to string and attach user name
     const serialized = items.map((item) => ({
       ...item,
-      id: item.id.toString(),
+      id:             item.id.toString(),
+      changedByName:  item.changedById ? (userMap[item.changedById] ?? null) : null,
     }))
 
     return NextResponse.json({ items: serialized, total, page, pageSize })

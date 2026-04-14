@@ -56,7 +56,7 @@ export default function LoginPage() {
               <RefreshCw className="w-9 h-9 text-white" />
             </div>
             <h1 className="text-2xl font-bold" style={{ color: '#212529' }}>Renovo Pro</h1>
-            <p className="text-sm mt-1" style={{ color: '#6C757D' }}>Lariat Technologies</p>
+            <p className="text-sm mt-1" style={{ color: '#6C757D' }}>Golden Keys Investments</p>
           </div>
 
           {/* Error */}

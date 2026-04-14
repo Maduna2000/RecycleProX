@@ -12,15 +12,16 @@ import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 type AuditEntry = {
-  id:          string
-  tableName:   string
-  recordId:    string
-  action:      'INSERT' | 'UPDATE' | 'DELETE' | 'VOID' | 'LOGIN' | 'LOGOUT'
-  oldValues:   Record<string, unknown> | null
-  newValues:   Record<string, unknown> | null
-  changedById: string | null
-  ipAddress:   string | null
-  createdAt:   string
+  id:             string
+  tableName:      string
+  recordId:       string
+  action:         'INSERT' | 'UPDATE' | 'DELETE' | 'VOID' | 'LOGIN' | 'LOGOUT'
+  oldValues:      Record<string, unknown> | null
+  newValues:      Record<string, unknown> | null
+  changedById:    string | null
+  changedByName:  string | null
+  ipAddress:      string | null
+  createdAt:      string
 }
 
 type AuditResponse = {
@@ -160,7 +161,9 @@ export default function AuditLogPage() {
                       </td>
                       <td className="px-4 py-2.5 font-medium" style={{ fontSize: fontSize.sm, color: colors.textPrimary }}>{entry.tableName}</td>
                       <td className="px-4 py-2.5 font-mono max-w-[120px] truncate" style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>{entry.recordId}</td>
-                      <td className="px-4 py-2.5 font-mono" style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>{entry.changedById?.substring(0, 8) ?? '—'}</td>
+                      <td className="px-4 py-2.5" style={{ fontSize: fontSize.sm, color: colors.textPrimary }}>
+                        {entry.changedByName ?? (entry.changedById ? entry.changedById.substring(0, 8) + '…' : '—')}
+                      </td>
                       <td className="px-4 py-2.5" style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>{entry.ipAddress ?? '—'}</td>
                       <td className="px-4 py-2.5 text-xs" style={{ color: colors.textSecondary }}>{expanded === entry.id ? '▲' : '▼'}</td>
                     </tr>

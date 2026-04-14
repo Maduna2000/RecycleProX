@@ -3,9 +3,12 @@ import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { getSale } from '@/lib/services/saleService'
 import { generateTransactionSlip } from '@/lib/pdf/slip'
+import { prisma } from '@/lib/db/prisma'
 
 /**
  * GET /api/sales/[id]/receipt?format=pdf|thermal
+ * - pdf     → returns thermal-style PDF receipt
+ * - thermal → returns ESC/POS buffer as application/octet-stream
  */
 export async function GET(
   req: NextRequest,
@@ -17,7 +20,22 @@ export async function GET(
   const format = req.nextUrl.searchParams.get('format') ?? 'pdf'
 
   try {
-    const sale = await getSale(params.id)
+    const [sale, settingsRows] = await Promise.all([
+      getSale(params.id),
+      prisma.systemSettings.findMany({
+        where: { key: { in: ['yardName', 'yardAddress', 'yardPhone', 'vatNumber', 'receiptFooter'] } },
+      }),
+    ])
+
+    const settings: Record<string, string> = {}
+    for (const row of settingsRows) settings[row.key] = row.value
+
+    const lines = sale.lines.map((l) => ({
+      productName: l.product.name,
+      qty:         Number(l.quantity),
+      unitPrice:   l.unitPrice.toString(),
+      lineTotal:   l.lineTotal.toString(),
+    }))
 
     if (format === 'thermal') {
       const { buildSaleReceipt } = await import('@/lib/print/thermal')
@@ -25,16 +43,11 @@ export async function GET(
         refNumber:      sale.refNumber,
         buyerName:      sale.buyerName ?? undefined,
         buyerIdNumber:  sale.buyerIdNumber ?? undefined,
-        lines: sale.lines.map((l) => ({
-          productName: l.product.name,
-          qty:         Number(l.quantity),
-          unitPrice:   l.unitPrice.toString(),
-          lineTotal:   l.lineTotal.toString(),
-        })),
-        totalAmount:   sale.totalAmount.toString(),
-        paymentMethod: sale.paymentMethod,
-        cashierName:   session.user.name ?? 'Cashier',
-        createdAt:     sale.createdAt,
+        lines,
+        totalAmount:    sale.totalAmount.toString(),
+        paymentMethod:  sale.paymentMethod,
+        cashierName:    session.user.name ?? 'Cashier',
+        createdAt:      sale.createdAt,
       })
       return new NextResponse(buf.buffer as ArrayBuffer, {
         headers: {
@@ -44,31 +57,31 @@ export async function GET(
       })
     }
 
-    // PDF (default)
+    // Thermal-style PDF receipt
     const pdfBytes = await generateTransactionSlip({
-      type:          'SALE',
-      refNumber:     sale.refNumber,
-      date:          sale.createdAt,
-      partyLabel:    'Buyer',
-      partyName:     sale.buyerName ?? 'Walk-in Customer',
-      partyIdNumber: sale.buyerIdNumber ?? undefined,
-      partyPhone:    sale.buyerPhone ?? undefined,
-      lines: sale.lines.map((l) => ({
-        productName: l.product.name,
-        qty:         Number(l.quantity),
-        unitPrice:   l.unitPrice.toString(),
-        lineTotal:   l.lineTotal.toString(),
-      })),
-      totalAmount:   sale.totalAmount.toString(),
-      paymentMethod: sale.paymentMethod,
-      cashierName:   session.user.name ?? 'Cashier',
-      notes:         sale.notes ?? undefined,
+      type:           'SALE',
+      refNumber:      sale.refNumber,
+      date:           sale.createdAt,
+      partyLabel:     'Buyer',
+      partyName:      sale.buyerName ?? 'Walk-in Customer',
+      partyIdNumber:  sale.buyerIdNumber ?? undefined,
+      partyPhone:     sale.buyerPhone ?? undefined,
+      lines,
+      totalAmount:    sale.totalAmount.toString(),
+      paymentMethod:  sale.paymentMethod,
+      cashierName:    session.user.name ?? 'Cashier',
+      notes:          sale.notes ?? undefined,
+      companyName:    settings.yardName,
+      companyAddress: settings.yardAddress,
+      companyPhone:   settings.yardPhone,
+      vatNumber:      settings.vatNumber,
+      receiptFooter:  settings.receiptFooter,
     })
 
     return new NextResponse(pdfBytes.buffer as ArrayBuffer, {
       headers: {
         'Content-Type':        'application/pdf',
-        'Content-Disposition': `inline; filename="sale-${sale.refNumber}.pdf"`,
+        'Content-Disposition': `inline; filename="receipt-${sale.refNumber}.pdf"`,
       },
     })
   } catch (err) {

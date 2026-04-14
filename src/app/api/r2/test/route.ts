@@ -3,7 +3,6 @@
  * Remove or guard this before production.
  */
 import { NextResponse } from 'next/server'
-import { auth } from '@/auth'
 import { ListObjectsV2Command } from '@aws-sdk/client-s3'
 import { getR2Client, R2_BUCKET } from '@/lib/r2/client'
 

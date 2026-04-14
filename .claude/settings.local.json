@@ -16,7 +16,10 @@
       "Bash(taskkill /F /IM node.exe)",
       "Bash(powershell.exe -Command \"Stop-Process -Name node -Force -ErrorAction SilentlyContinue; Write-Host 'done'\")",
       "Bash(curl -s --max-time 10 http://localhost:3000/)",
-      "Bash(curl -s --max-time 15 http://localhost:3000/login)"
+      "Bash(curl -s --max-time 15 http://localhost:3000/login)",
+      "Bash(npx vercel:*)",
+      "Bash(node -e \"const d=require\\(process.env.APPDATA+'/com.vercel.cli/Data/auth.json'\\); const keys=Object.keys\\(d.token||{}\\); console.log\\(keys.length > 0 ? 'token found' : JSON.stringify\\(d\\).slice\\(0,200\\)\\)\")",
+      "Bash(npm cache:*)"
     ]
   }
 }

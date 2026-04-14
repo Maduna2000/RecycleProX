@@ -13,7 +13,7 @@ import {
   FileText, Download,
   Handshake, LogOut, Settings,
   Minus, Square, X as XIcon,
-  Package, Tag, Images, ShieldAlert, Users,
+  Package, Tag, Images, ShieldAlert, Users, UserPlus,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -118,8 +118,9 @@ function useToolbarButtons(activeTab: TabId): ToolbarButton[] {
       ]
     case 'settings':
       return [
-        { label: 'Users',     icon: Users,       href: '/app/settings/users', variant: 'primary' },
-        { label: 'Audit Log', icon: ShieldAlert, href: '/app/audit-log',      variant: 'secondary' },
+        { label: 'Add User',  icon: UserPlus,    href: '/app/settings/users?create=1', variant: 'primary' },
+        { label: 'Users',     icon: Users,       href: '/app/settings/users', variant: 'secondary' },
+        { label: 'Audit Log', icon: ShieldAlert, href: '/app/audit-log',      variant: 'ghost' },
         { label: 'Settings',  icon: Settings,    href: '/app/settings',       variant: 'ghost' },
       ]
     default:

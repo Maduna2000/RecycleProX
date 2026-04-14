@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import useSWR, { mutate } from 'swr'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -56,11 +56,20 @@ function roleBadge(role: string) {
 export default function UsersPage() {
   const { data: session } = useSession()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [search, setSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
   const [editUser, setEditUser] = useState<User | null>(null)
   const [resetUser, setResetUser] = useState<User | null>(null)
+
+  // Auto-open create modal when ?create=1 is in the URL
+  useEffect(() => {
+    if (searchParams.get('create') === '1') {
+      setCreateOpen(true)
+      router.replace('/app/settings/users')
+    }
+  }, [searchParams, router])
 
   const isAdmin = session?.user?.role === 'admin'
   const query = new URLSearchParams({ ...(search && { search }), ...(roleFilter && { role: roleFilter }) })
