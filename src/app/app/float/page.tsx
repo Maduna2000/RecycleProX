@@ -13,6 +13,8 @@ import { Loader2, Calendar } from 'lucide-react'
 import Decimal from 'decimal.js'
 import { PageShell } from '@/components/layout/PageShell'
 import { colors } from '@/lib/design-tokens'
+import { useOfflineMutation } from '@/hooks/useOfflineFetch'
+import { offlineDB } from '@/lib/offline/db'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -38,6 +40,7 @@ function todayISO() {
 export default function FloatPage() {
   const { data: session } = useSession()
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
+  const { mutate: offlineMutate } = useOfflineMutation()
 
   const { data: todayData, isLoading: loadingToday } = useSWR<TodayFloatResponse>('/api/float/today', fetcher)
   const { data: history, isLoading: loadingHistory } = useSWR<CashFloat[]>('/api/float', fetcher)
@@ -53,22 +56,37 @@ export default function FloatPage() {
   })
 
   async function onSubmit(data: SetFloatInput) {
+    const localId = `local_${crypto.randomUUID()}`
     setSaving(true)
-    const res = await fetch('/api/float', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    })
-    setSaving(false)
-    if (res.ok) {
-      toast.success('Float saved')
-      mutate('/api/float/today')
-      mutate('/api/float')
-
-      reset({ floatDate: todayISO(), openingAmount: '' })
-    } else {
-      const j = await res.json()
-      toast.error(j.error ?? 'Failed to save float')
+    try {
+      const { queued } = await offlineMutate({
+        method: 'POST',
+        url: '/api/float',
+        body: data,
+        localId,
+      })
+      if (queued) {
+        await offlineDB.cashFloats.put({
+          id: localId,
+          floatDate: data.floatDate,
+          openingAmount: String(data.openingAmount),
+          notes: data.notes || undefined,
+          createdByUserId: session?.user?.id,
+          createdAt: new Date().toISOString(),
+          _offlineCreated: true,
+        })
+        toast.success('Float saved offline — will sync when connected')
+        reset({ floatDate: todayISO(), openingAmount: '' })
+      } else {
+        toast.success('Float saved')
+        mutate('/api/float/today')
+        mutate('/api/float')
+        reset({ floatDate: todayISO(), openingAmount: '' })
+      }
+    } catch {
+      toast.error('Failed to save float')
+    } finally {
+      setSaving(false)
     }
   }
 

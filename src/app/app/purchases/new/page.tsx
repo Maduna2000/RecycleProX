@@ -19,6 +19,8 @@ import { SignatureCanvas, SignatureCanvasHandle } from '@/components/SignatureCa
 import { PrintResultModal } from '@/components/PrintResultModal'
 import { PhotoUploader } from '@/components/PhotoUploader'
 import Decimal from 'decimal.js'
+import { useOfflineMutation } from '@/hooks/useOfflineFetch'
+import { offlineDB } from '@/lib/offline/db'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -75,6 +77,7 @@ function useScaleRead() {
 export default function NewPurchasePage() {
   const router = useRouter()
   const readScale = useScaleRead()
+  const { mutate: offlineMutate } = useOfflineMutation()
 
   const [customer, setCustomer] = useState<SelectedCustomer | null>(null)
   const [lines, setLines] = useState<LineItem[]>([emptyLine(1)])
@@ -198,39 +201,73 @@ export default function NewPurchasePage() {
       return
     }
 
-    setSubmitting(true)
-    const res = await fetch('/api/purchases', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        customerId: customer.id,
-        paymentMethod,
-        status,
-        notes: notes || undefined,
-        ...(deduction ? { loanDeductionAmount: deduction } : {}),
-        lines: validLines.map((l) => ({
-          productId:  l.productId,
-          quantity:   l.quantity,
-          unitPrice:  l.unitPrice,
-          ...(l.grossQty   ? { grossQty:   l.grossQty   } : {}),
-          ...(l.tareQty    ? { tareQty:    l.tareQty    } : {}),
-          ...(l.tareReason ? { tareReason: l.tareReason } : {}),
-        })),
-      }),
-    })
-    setSubmitting(false)
+    const body = {
+      customerId: customer.id,
+      paymentMethod,
+      status,
+      notes: notes || undefined,
+      ...(deduction ? { loanDeductionAmount: deduction } : {}),
+      lines: validLines.map((l) => ({
+        productId:  l.productId,
+        quantity:   l.quantity,
+        unitPrice:  l.unitPrice,
+        ...(l.grossQty   ? { grossQty:   l.grossQty   } : {}),
+        ...(l.tareQty    ? { tareQty:    l.tareQty    } : {}),
+        ...(l.tareReason ? { tareReason: l.tareReason } : {}),
+      })),
+    }
+    const localId = `local_${crypto.randomUUID()}`
 
-    if (res.ok) {
-      const data = await res.json() as { id: string; refNumber: string }
-      if (status === 'pending') {
-        toast.success(`Purchase ${data.refNumber} saved as unpaid`)
-        router.push('/app/purchases/unpaid')
+    setSubmitting(true)
+    try {
+      const { queued, data } = await offlineMutate({
+        method: 'POST',
+        url: '/api/purchases',
+        body,
+        localId,
+      })
+
+      if (queued) {
+        await offlineDB.purchases.add({
+          id: localId,
+          refNumber: `OFF-${Date.now()}`,
+          customerId: customer.id,
+          status,
+          totalAmount: total.toFixed(2),
+          paymentMethod,
+          notes: notes || undefined,
+          createdAt: new Date().toISOString(),
+          _offlineCreated: true,
+        })
+        for (const l of validLines) {
+          await offlineDB.purchaseLines.add({
+            id: `local_${crypto.randomUUID()}`,
+            purchaseId: localId,
+            productId: l.productId,
+            quantity: l.quantity,
+            grossQty: l.grossQty || undefined,
+            tareQty: l.tareQty || undefined,
+            tareReason: l.tareReason || undefined,
+            unitPrice: l.unitPrice,
+            lineTotal: new Decimal(l.quantity || '0').times(l.unitPrice || '0').toFixed(2),
+            priceSource: 'default',
+          })
+        }
+        toast.success('Purchase saved offline — will sync when connected')
+        router.push('/app/purchases')
       } else {
-        setSigDialog({ purchaseId: data.id, refNumber: data.refNumber })
+        const purchase = data as { id: string; refNumber: string }
+        if (status === 'pending') {
+          toast.success(`Purchase ${purchase.refNumber} saved as unpaid`)
+          router.push('/app/purchases/unpaid')
+        } else {
+          setSigDialog({ purchaseId: purchase.id, refNumber: purchase.refNumber })
+        }
       }
-    } else {
-      const j = await res.json() as { error?: string }
-      toast.error(j.error ?? 'Failed to create purchase')
+    } catch {
+      toast.error('Failed to create purchase')
+    } finally {
+      setSubmitting(false)
     }
   }
 

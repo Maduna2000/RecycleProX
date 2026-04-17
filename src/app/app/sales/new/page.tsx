@@ -11,6 +11,8 @@ import { toast } from 'sonner'
 import useSWR from 'swr'
 import Decimal from 'decimal.js'
 import { PrintResultModal } from '@/components/PrintResultModal'
+import { useOfflineMutation } from '@/hooks/useOfflineFetch'
+import { offlineDB } from '@/lib/offline/db'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -34,6 +36,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 export default function NewSalePage() {
   const router = useRouter()
+  const { mutate: offlineMutate } = useOfflineMutation()
 
   // Buyer details
   const [buyerName, setBuyerName] = useState('')
@@ -92,32 +95,64 @@ export default function NewSalePage() {
       if (parseFloat(l.unitPrice) < 0) { toast.error('Unit price cannot be negative'); return }
     }
 
-    setSubmitting(true)
-    const res = await fetch('/api/sales', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        buyerName: buyerName.trim(),
-        buyerIdNumber: buyerIdNumber.trim() || undefined,
-        buyerPhone: buyerPhone.trim() || undefined,
-        paymentMethod,
-        notes: notes || undefined,
-        lines: validLines.map((l) => ({
-          productId: l.productId,
-          quantity: l.quantity,
-          unitPrice: l.unitPrice,
-        })),
-      }),
-    })
-    setSubmitting(false)
+    const body = {
+      buyerName: buyerName.trim(),
+      buyerIdNumber: buyerIdNumber.trim() || undefined,
+      buyerPhone: buyerPhone.trim() || undefined,
+      paymentMethod,
+      notes: notes || undefined,
+      lines: validLines.map((l) => ({
+        productId: l.productId,
+        quantity: l.quantity,
+        unitPrice: l.unitPrice,
+      })),
+    }
+    const localId = `local_${crypto.randomUUID()}`
 
-    if (res.ok) {
-      const data = await res.json()
-      toast.success(`Sale ${data.refNumber} created`)
-      setPrintDialog({ id: data.id, refNumber: data.refNumber })
-    } else {
-      const j = await res.json()
-      toast.error(j.error ?? 'Failed to create sale')
+    setSubmitting(true)
+    try {
+      const { queued, data } = await offlineMutate({
+        method: 'POST',
+        url: '/api/sales',
+        body,
+        localId,
+      })
+
+      if (queued) {
+        await offlineDB.sales.add({
+          id: localId,
+          refNumber: `OFF-${Date.now()}`,
+          buyerName: buyerName.trim(),
+          buyerIdNumber: buyerIdNumber.trim() || undefined,
+          buyerPhone: buyerPhone.trim() || undefined,
+          status: 'completed',
+          totalAmount: total.toFixed(2),
+          paymentMethod,
+          notes: notes || undefined,
+          createdAt: new Date().toISOString(),
+          _offlineCreated: true,
+        })
+        for (const l of validLines) {
+          await offlineDB.saleLines.add({
+            id: `local_${crypto.randomUUID()}`,
+            saleId: localId,
+            productId: l.productId,
+            quantity: l.quantity,
+            unitPrice: l.unitPrice,
+            lineTotal: new Decimal(l.quantity || '0').times(l.unitPrice || '0').toFixed(2),
+          })
+        }
+        toast.success('Sale saved offline — will sync when connected')
+        router.push('/app/sales')
+      } else {
+        const sale = data as { id: string; refNumber: string }
+        toast.success(`Sale ${sale.refNumber} created`)
+        setPrintDialog({ id: sale.id, refNumber: sale.refNumber })
+      }
+    } catch {
+      toast.error('Failed to create sale')
+    } finally {
+      setSubmitting(false)
     }
   }
 

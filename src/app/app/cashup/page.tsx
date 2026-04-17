@@ -14,6 +14,7 @@ import { CheckCircle2, Clock, Loader2, Lock, RefreshCw, ExternalLink } from 'luc
 import { DENOMINATIONS, DENOMINATION_LABELS, type Denomination } from '@/lib/schemas/cashup'
 import { PageShell } from '@/components/layout/PageShell'
 import { colors } from '@/lib/design-tokens'
+import { useOfflineMutation } from '@/hooks/useOfflineFetch'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -135,6 +136,7 @@ function UnpaidCard({ label, total, count, href }: {
 export default function CashUpPage() {
   const { data: session } = useSession()
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
+  const { mutate: offlineMutate } = useOfflineMutation()
 
   const today = (() => {
     const n = new Date()
@@ -165,14 +167,24 @@ export default function CashUpPage() {
 
   async function handleOpen() {
     setOpening(true)
-    const res = await fetch('/api/cashup', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionDate: today }),
-    })
-    setOpening(false)
-    if (res.ok) { toast.success('Cash-up session opened'); swrMutate(CASHUP_KEY) }
-    else { const j = await res.json(); toast.error(j.error ?? 'Failed to open session') }
+    try {
+      const { queued } = await offlineMutate({
+        method: 'POST',
+        url: '/api/cashup',
+        body: { sessionDate: today },
+        localId: `local_cashup_${today}`,
+      })
+      if (queued) {
+        toast.success('Cash-up session queued — will open when connected')
+      } else {
+        toast.success('Cash-up session opened')
+        swrMutate(CASHUP_KEY)
+      }
+    } catch {
+      toast.error('Failed to open session')
+    } finally {
+      setOpening(false)
+    }
   }
 
   async function handleSubmit() {
@@ -180,19 +192,29 @@ export default function CashUpPage() {
     setSubmitting(true)
     const denoms: Record<string, number> = {}
     for (const d of DENOMINATIONS) { const c = counts[d] ?? 0; if (c > 0) denoms[String(d)] = c }
-    const res = await fetch(`/api/cashup/${cashUp.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        denominations:    denoms,
-        declaredCash:     declaredCash.toNumber(),
-        drawingsReceived: new Decimal(drawings || '0').toFixed(2),
-        notes:            notes || undefined,
-      }),
-    })
-    setSubmitting(false)
-    if (res.ok) { toast.success('Cash-up submitted for approval'); swrMutate(CASHUP_KEY) }
-    else { const j = await res.json(); toast.error(j.error ?? 'Failed to submit cash-up') }
+    try {
+      const { queued } = await offlineMutate({
+        method: 'PUT',
+        url: `/api/cashup/${cashUp.id}`,
+        body: {
+          denominations:    denoms,
+          declaredCash:     declaredCash.toNumber(),
+          drawingsReceived: new Decimal(drawings || '0').toFixed(2),
+          notes:            notes || undefined,
+        },
+        localId: cashUp.id,
+      })
+      if (queued) {
+        toast.success('Cash-up saved offline — will submit when connected')
+      } else {
+        toast.success('Cash-up submitted for approval')
+        swrMutate(CASHUP_KEY)
+      }
+    } catch {
+      toast.error('Failed to submit cash-up')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   async function handleApprove() {

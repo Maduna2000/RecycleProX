@@ -14,8 +14,10 @@ import {
   Handshake, LogOut, Settings,
   Minus, Square, X as XIcon,
   Package, Tag, Images, ShieldAlert, Users, UserPlus,
+  Wifi, WifiOff,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useOfflineStore } from '@/stores/offlineStore'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -228,6 +230,30 @@ function UserMenu({ role, fullName }: { role: string; fullName: string }) {
   )
 }
 
+// ─── Offline status chip ──────────────────────────────────────────────────────
+
+function OfflineChip() {
+  const { isOnline, pendingCount } = useOfflineStore()
+  if (isOnline && pendingCount === 0) return null
+  return (
+    <div
+      className={cn(
+        'flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium shrink-0',
+        isOnline ? 'bg-amber-100 text-amber-700' : 'bg-red-900/30 text-red-300',
+      )}
+      title={isOnline ? `${pendingCount} pending sync` : 'Working offline'}
+    >
+      {isOnline
+        ? <Wifi className="w-3 h-3" />
+        : <WifiOff className="w-3 h-3" />
+      }
+      <span className="hidden sm:inline">
+        {isOnline ? `Syncing ${pendingCount}` : `Offline${pendingCount > 0 ? ` · ${pendingCount}` : ''}`}
+      </span>
+    </div>
+  )
+}
+
 // ─── Window Controls (Electron only) ─────────────────────────────────────────
 
 function WindowControls() {
@@ -339,6 +365,7 @@ export function AppShell({
 
         {/* Right controls */}
         <div className="flex items-center gap-1 pl-2 shrink-0">
+          <OfflineChip />
           <button className="p-1.5 rounded hover:bg-white/10 transition-colors" title="Notifications">
             <Bell className="w-4 h-4 text-white/80" />
           </button>

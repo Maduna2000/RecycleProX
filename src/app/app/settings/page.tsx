@@ -6,10 +6,13 @@ import { useSession } from 'next-auth/react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Loader2, Save, Printer, RefreshCw, CheckCircle2, XCircle } from 'lucide-react'
+import { Loader2, Save, Printer, RefreshCw, CheckCircle2, XCircle, WifiOff } from 'lucide-react'
 import { toast } from 'sonner'
 import { PageShell } from '@/components/layout/PageShell'
 import { colors } from '@/lib/design-tokens'
+import { useOfflineStore } from '@/stores/offlineStore'
+import { triggerSync, getPendingCount } from '@/lib/offline/sync'
+import { runSeeder } from '@/lib/offline/seeder'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -157,6 +160,14 @@ export default function SettingsPage() {
   const [availablePorts, setAvailablePorts]   = useState<SerialPortInfo[]>([])
   const [testingPrinter, setTestingPrinter]   = useState(false)
   const [printerStatus, setPrinterStatus]     = useState<'idle' | 'ok' | 'err'>('idle')
+  const [syncing, setSyncing]     = useState(false)
+  const [seeding, setSeeding]     = useState(false)
+  const [pendingCount, setPending] = useState(0)
+  const isOnline = useOfflineStore((s) => s.isOnline)
+
+  useEffect(() => {
+    getPendingCount().then(setPending)
+  }, [])
 
   useEffect(() => {
     if (data) setForm(data)
@@ -475,6 +486,65 @@ export default function SettingsPage() {
             {SCALE_NUMS.map((n) => (
               <ScaleRow key={n} n={n} form={form} set={set} />
             ))}
+          </div>
+
+          {/* ── Offline Sync ──────────────────────────────── */}
+          <div className="rounded-lg border p-4 space-y-3" style={{ borderColor: colors.border }}>
+            <div className="flex items-center gap-2">
+              <WifiOff className="w-4 h-4" style={{ color: isOnline ? colors.action : colors.danger }} />
+              <span className="text-sm font-semibold" style={{ color: colors.textPrimary }}>
+                Offline Sync
+              </span>
+              <span
+                className="ml-auto text-xs px-2 py-0.5 rounded-full font-medium"
+                style={isOnline
+                  ? { background: colors.actionBg, color: colors.action }
+                  : { background: colors.dangerBg, color: colors.danger }
+                }
+              >
+                {isOnline ? 'Online' : 'Offline'}
+              </span>
+            </div>
+            <p className="text-xs" style={{ color: colors.textSecondary }}>
+              {pendingCount > 0
+                ? `${pendingCount} transaction${pendingCount > 1 ? 's' : ''} queued and waiting to sync.`
+                : 'All transactions are synced.'}
+            </p>
+            <div className="flex gap-2 flex-wrap">
+              <button
+                onClick={async () => {
+                  setSyncing(true)
+                  await triggerSync()
+                  const n = await getPendingCount()
+                  setPending(n)
+                  setSyncing(false)
+                }}
+                disabled={syncing || !isOnline}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium disabled:opacity-40"
+                style={{ background: colors.actionBg, color: colors.action }}
+              >
+                {syncing
+                  ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Syncing…</>
+                  : <><RefreshCw className="w-3.5 h-3.5" /> Sync Now{pendingCount > 0 ? ` (${pendingCount})` : ''}</>
+                }
+              </button>
+              <button
+                onClick={async () => {
+                  setSeeding(true)
+                  await runSeeder(true)
+                  setSeeding(false)
+                  toast.success('Offline data refreshed')
+                }}
+                disabled={seeding || !isOnline}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium disabled:opacity-40"
+                style={{ background: colors.toolbar, color: colors.textSecondary }}
+              >
+                {seeding
+                  ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Refreshing…</>
+                  : <><RefreshCw className="w-3.5 h-3.5" /> Refresh Offline Data</>
+                }
+              </button>
+            </div>
           </div>
 
           {/* ── Save ─────────────────────────────────────── */}
