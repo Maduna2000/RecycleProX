@@ -307,7 +307,7 @@ export default function SettingsPage() {
               <h2 className="text-xs font-semibold uppercase tracking-wide" style={{ color: colors.textSecondary }}>Security &amp; PIN Lock</h2>
               <p className="text-xs mt-1" style={{ color: colors.textSecondary }}>
                 The session lock activates after 5 minutes of inactivity. Users without a personal PIN will use the default PIN below.
-                Use <strong>Users → Reset PIN to Default</strong> to clear any user's custom PIN.
+                Use <strong>Users → Reset PIN to Default</strong> to clear any user&apos;s custom PIN.
               </p>
             </div>
             <div className="max-w-xs">
@@ -346,7 +346,7 @@ export default function SettingsPage() {
               <Label>Connection Type</Label>
               <Select
                 value={(form.printerType ?? 'none') as PrinterType}
-                onValueChange={(v) => set('printerType', v)}
+                onValueChange={(v) => set('printerType', v ?? '')}
               >
                 <SelectTrigger className="mt-1 h-8 text-sm">
                   <SelectValue />
@@ -397,7 +397,7 @@ export default function SettingsPage() {
                   <Label className="text-xs">Baud Rate</Label>
                   <Select
                     value={form.printerBaudRate ?? '9600'}
-                    onValueChange={(v) => set('printerBaudRate', v)}
+                    onValueChange={(v) => set('printerBaudRate', v ?? '')}
                   >
                     <SelectTrigger className="mt-1 h-8 text-sm">
                       <SelectValue />

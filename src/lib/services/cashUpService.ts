@@ -2,7 +2,7 @@ import Decimal from 'decimal.js'
 import { prisma } from '@/lib/db/prisma'
 import logger from '@/lib/logger'
 import { SubmitCashUpInput, ApproveCashUpInput } from '@/lib/schemas/cashup'
-import { getFloatForDate, updateClosingAmount } from './floatService'
+import { getFloatForDate, getMostRecentFloatBefore, updateClosingAmount } from './floatService'
 import { getExpenseTotalsForDate } from './expenseService'
 import { getLoanTotalsForDate } from './loanService'
 
@@ -34,11 +34,26 @@ export async function openCashUp(openedByUserId: string, sessionDateStr?: string
     return existing
   }
 
-  // Pull opening balance from today's float record
+  // Pull opening balance from today's float record.
+  // If no float has been manually set for today, carry forward the previous
+  // day's closing amount (or opening amount if never closed) so the balance
+  // never silently resets to zero.
   const floatRecord = await getFloatForDate(sessionDate)
-  const openingBalance = floatRecord
-    ? new Decimal(floatRecord.openingAmount.toString())
-    : new Decimal(0)
+  let openingBalance: Decimal
+  if (floatRecord) {
+    openingBalance = new Decimal(floatRecord.openingAmount.toString())
+  } else {
+    const prevFloat = await getMostRecentFloatBefore(sessionDate)
+    if (prevFloat?.closingAmount) {
+      openingBalance = new Decimal(prevFloat.closingAmount.toString())
+      logger.info({ prevDate: prevFloat.floatDate, amount: openingBalance.toFixed(2) }, 'CashUp: carrying forward previous closing as opening balance')
+    } else if (prevFloat?.openingAmount) {
+      openingBalance = new Decimal(prevFloat.openingAmount.toString())
+      logger.info({ prevDate: prevFloat.floatDate, amount: openingBalance.toFixed(2) }, 'CashUp: carrying forward previous opening as opening balance (no closing set)')
+    } else {
+      openingBalance = new Decimal(0)
+    }
+  }
 
   const cashUp = await prisma.cashUp.create({
     data: {
@@ -97,9 +112,10 @@ async function calcSystemTotals(sessionDate: Date, drawingsReceived = new Decima
   const cashPayments    = new Decimal(paymentsAgg._sum.amount?.toString() ?? '0')
   const expensesTotal   = await getExpenseTotalsForDate(sessionDate)
 
-  // Expected in drawer = opening + cash sales - cash purchases - cash payments - expenses - drawings + loans
-  // openingBalance is stored on the cashUp record; here we return the variable components
-  const cashExpected = cashSales.minus(cashPurchases).minus(cashPayments).minus(expensesTotal).minus(drawingsReceived).plus(loansTotal)
+  // Expected in drawer = opening + drawings + cash sales - cash purchases - cash payments - expenses - loan advances + loan repayments
+  // "Drawings Received" = additional cash injected into drawer by management (positive, like RecyclePro X).
+  // openingBalance is stored on the cashUp record; here we return the variable components only.
+  const cashExpected = cashSales.minus(cashPurchases).minus(cashPayments).minus(expensesTotal).plus(drawingsReceived).plus(loansTotal)
 
   return { cashSales, cashPurchases, cashPayments, cashExpected, cardPayments, expensesTotal }
 }

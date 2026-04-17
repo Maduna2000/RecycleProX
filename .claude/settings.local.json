@@ -28,7 +28,15 @@
       "Bash(sed -i 's/<div className=\"max-w-4xl space-y-6\">/<div className=\"max-w-4xl mx-auto w-full space-y-6\">/g' \"c:/Users/MD TECH SOLUTION/RecycleProX/src/app/app/stocktake/[id]/page.tsx\")",
       "Bash(taskkill //F //IM node.exe)",
       "Bash(rm -rf \"c:/Users/MD TECH SOLUTION/RecycleProX/.next\")",
-      "Bash(npx claude-mem:*)"
+      "Bash(npx claude-mem:*)",
+      "WebFetch(domain:www.connectpos.com)",
+      "WebFetch(domain:paycomplete.com)",
+      "WebFetch(domain:www.retaildogma.com)",
+      "WebFetch(domain:fitsmallbusiness.com)",
+      "Bash(npx skills *)",
+      "Bash(grep -E \"\\\\.\\(ts|tsx\\)$\")",
+      "Bash(node -e \"require\\('dexie'\\); console.log\\('dexie ok'\\)\")",
+      "Bash(node -e \"require\\('next-pwa'\\); console.log\\('next-pwa ok'\\)\")"
     ]
   }
 }

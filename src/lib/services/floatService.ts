@@ -44,6 +44,21 @@ export async function listFloats(limit = 30) {
 }
 
 /**
+ * Returns the most recent CashFloat record strictly before the given date.
+ * Used to carry forward the previous day's closing amount when no float is
+ * manually set for today.
+ */
+export async function getMostRecentFloatBefore(date: Date) {
+  const d = new Date(date)
+  d.setHours(0, 0, 0, 0)
+
+  return prisma.cashFloat.findFirst({
+    where: { floatDate: { lt: d } },
+    orderBy: { floatDate: 'desc' },
+  })
+}
+
+/**
  * Write the closing amount on the CashFloat record for the given date.
  * Called by cashUpService.approveCashUp to record the declared cash as the closing balance.
  */

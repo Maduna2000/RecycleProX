@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "skills": {
+    "brainstorming": {
+      "source": "obra/superpowers",
+      "sourceType": "github",
+      "computedHash": "f483c304fcde060211ffae00f49bb728536e7e7613c99db45b5b924d9fc17243"
+    },
+    "ui-ux-pro-max": {
+      "source": "nextlevelbuilder/ui-ux-pro-max-skill",
+      "sourceType": "github",
+      "computedHash": "6337038fe1fe6bbe1b9f252ab678ee575859190bab6f0f246f4061824eb40875"
+    }
+  }
+}

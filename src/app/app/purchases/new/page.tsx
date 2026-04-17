@@ -10,13 +10,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
   ArrowLeft, Plus, Trash2, Loader2, User, AlertTriangle,
-  PenLine, FileText, Scale, RefreshCw,
+  PenLine, FileText, Scale, RefreshCw, Camera,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import useSWR from 'swr'
 import { CustomerLookupWidget } from '@/components/CustomerLookupWidget'
 import { SignatureCanvas, SignatureCanvasHandle } from '@/components/SignatureCanvas'
 import { PrintResultModal } from '@/components/PrintResultModal'
+import { PhotoUploader } from '@/components/PhotoUploader'
 import Decimal from 'decimal.js'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
@@ -82,6 +83,7 @@ export default function NewPurchasePage() {
   const [submitting, setSubmitting] = useState(false)
   const [keyCounter, setKeyCounter] = useState(2)
   const [sigDialog,   setSigDialog]   = useState<{ purchaseId: string; refNumber: string } | null>(null)
+  const [photoDialog, setPhotoDialog] = useState<{ purchaseId: string; refNumber: string } | null>(null)
   const [printDialog, setPrintDialog] = useState<{ id: string; refNumber: string } | null>(null)
   const [deductLoan,     setDeductLoan]     = useState(false)
   const [deductionAmount, setDeductionAmount] = useState('')
@@ -570,6 +572,18 @@ export default function NewPurchasePage() {
             onDone={() => {
               const { purchaseId, refNumber } = sigDialog
               setSigDialog(null)
+              setPhotoDialog({ purchaseId, refNumber })
+            }}
+          />
+        )}
+
+        {photoDialog && (
+          <PhotoUploadStep
+            purchaseId={photoDialog.purchaseId}
+            refNumber={photoDialog.refNumber}
+            onDone={() => {
+              const { purchaseId, refNumber } = photoDialog
+              setPhotoDialog(null)
               setPrintDialog({ id: purchaseId, refNumber })
             }}
           />
@@ -682,6 +696,47 @@ function SignatureDialog({
               </Button>
             </div>
           </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ─── Photo Upload Step ────────────────────────────────────────────────────────
+function PhotoUploadStep({
+  purchaseId, refNumber, onDone,
+}: { purchaseId: string; refNumber: string; onDone: () => void }) {
+  const [keys, setKeys] = useState<string[]>([])
+
+  return (
+    <Dialog open>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Camera className="w-5 h-5 text-green-600" />
+            Add Product Photos
+          </DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-gray-500 mb-3">
+          {refNumber} — Capture photos of the stock before printing the receipt.
+        </p>
+        <div className="space-y-2">
+          {keys.map((k, i) => (
+            <p key={k} className="text-xs text-green-700 font-mono truncate">
+              Photo {i + 1} uploaded ✓
+            </p>
+          ))}
+          <PhotoUploader
+            context="purchase_photo"
+            referenceId={purchaseId}
+            label="Add Photo"
+            onUploaded={(key) => setKeys((prev) => [...prev, key])}
+          />
+        </div>
+        <div className="flex justify-end mt-4">
+          <Button className="bg-green-600 hover:bg-green-700" onClick={onDone}>
+            {keys.length === 0 ? 'Skip →' : `Done (${keys.length} photo${keys.length > 1 ? 's' : ''}) →`}
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

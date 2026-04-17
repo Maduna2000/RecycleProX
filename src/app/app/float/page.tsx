@@ -25,6 +25,12 @@ type CashFloat = {
   createdAt: string
 }
 
+type TodayFloatResponse = {
+  today: CashFloat | null
+  suggestedAmount: string | null
+  suggestedDate: string | null
+}
+
 function todayISO() {
   return new Date().toISOString().split('T')[0]!
 }
@@ -33,11 +39,15 @@ export default function FloatPage() {
   const { data: session } = useSession()
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
 
-  const { data: todayFloat, isLoading: loadingToday } = useSWR<CashFloat | null>('/api/float/today', fetcher)
+  const { data: todayData, isLoading: loadingToday } = useSWR<TodayFloatResponse>('/api/float/today', fetcher)
   const { data: history, isLoading: loadingHistory } = useSWR<CashFloat[]>('/api/float', fetcher)
   const [saving, setSaving] = useState(false)
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<SetFloatFormInput, unknown, SetFloatInput>({
+  const todayFloat        = todayData?.today ?? null
+  const suggestedAmount   = todayData?.suggestedAmount ?? null
+  const suggestedDate     = todayData?.suggestedDate ?? null
+
+  const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm<SetFloatFormInput, unknown, SetFloatInput>({
     resolver: zodResolver(SetFloatSchema),
     defaultValues: { floatDate: todayISO(), openingAmount: '' },
   })
@@ -54,6 +64,7 @@ export default function FloatPage() {
       toast.success('Float saved')
       mutate('/api/float/today')
       mutate('/api/float')
+
       reset({ floatDate: todayISO(), openingAmount: '' })
     } else {
       const j = await res.json()
@@ -89,8 +100,31 @@ export default function FloatPage() {
                 )}
               </div>
             ) : (
-              <div className="py-6 rounded-lg text-center text-sm" style={{ background: colors.toolbar, border: `1px dashed ${colors.border}`, color: colors.textSecondary }}>
-                No float set for today yet
+              <div className="space-y-3">
+                <div className="py-6 rounded-lg text-center text-sm" style={{ background: colors.toolbar, border: `1px dashed ${colors.border}`, color: colors.textSecondary }}>
+                  No float set for today yet
+                </div>
+                {suggestedAmount && (
+                  <div className="rounded-lg px-4 py-3" style={{ background: colors.processBg, border: `1px solid ${colors.process}30` }}>
+                    <p className="text-xs font-semibold" style={{ color: colors.process }}>Carry-Forward Available</p>
+                    <p className="text-xs mt-0.5" style={{ color: colors.textSecondary }}>
+                      Previous closing: <span className="font-mono font-semibold" style={{ color: colors.textPrimary }}>R {new Decimal(suggestedAmount).toFixed(2)}</span>
+                      {suggestedDate && (
+                        <> · {new Date(suggestedDate).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' })}</>
+                      )}
+                    </p>
+                    {isManager && (
+                      <button
+                        type="button"
+                        className="mt-2 text-xs font-medium underline"
+                        style={{ color: colors.process }}
+                        onClick={() => setValue('openingAmount', new Decimal(suggestedAmount).toFixed(2))}
+                      >
+                        Use this amount →
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
