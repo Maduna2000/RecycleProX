@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { CreateSaleSchema } from '@/lib/schemas/sale'
-import { createSale, listSales, ProductInactiveError } from '@/lib/services/saleService'
+import { createSale, listSales, ProductInactiveError, InsufficientStockError } from '@/lib/services/saleService'
 
 export async function GET(req: NextRequest) {
   const session = await auth()
@@ -38,6 +38,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(sale, { status: 201 })
   } catch (err) {
     if (err instanceof ProductInactiveError) return NextResponse.json({ error: err.message }, { status: 422 })
+    if (err instanceof InsufficientStockError) return NextResponse.json({ error: err.message }, { status: 422 })
     logger.error({ err }, 'POST /api/sales failed')
     return NextResponse.json({ error: 'Failed to create sale' }, { status: 500 })
   }

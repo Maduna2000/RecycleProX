@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/db/prisma'
 import logger from '@/lib/logger'
 import Decimal from 'decimal.js'
-import { recordMovement, recordVoidReversal } from '@/lib/services/stockService'
+import { recordMovement, recordVoidReversal, getStockOnHand } from '@/lib/services/stockService'
 import type { CreateSaleInput, VoidSaleInput } from '@/lib/schemas/sale'
 
 // ─── Typed Errors ─────────────────────────────────────────────────────────────
@@ -50,6 +50,16 @@ export async function createSale(data: CreateSaleInput, createdByUserId?: string
     })
   )
 
+  // Stock availability check — prevent selling more than on hand
+  for (const line of resolvedLines) {
+    const stockRows = await getStockOnHand(line.productId)
+    const onHand = stockRows[0] ? new Decimal(stockRows[0].onHand) : new Decimal(0)
+    if (line.quantity.gt(onHand)) {
+      const product = await prisma.product.findUnique({ where: { id: line.productId }, select: { name: true } })
+      throw new InsufficientStockError(product?.name ?? line.productId)
+    }
+  }
+
   const totalAmount = resolvedLines.reduce((sum, l) => sum.plus(l.lineTotal), new Decimal(0))
   const refNumber = await generateRefNumber()
 
@@ -57,6 +67,7 @@ export async function createSale(data: CreateSaleInput, createdByUserId?: string
     const s = await tx.sale.create({
       data: {
         refNumber,
+        customerId: data.customerId,
         buyerId: data.buyerId,
         buyerName: data.buyerName,
         buyerIdNumber: data.buyerIdNumber,

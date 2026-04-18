@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { ArrowLeft, Ban, Loader2, Printer } from 'lucide-react'
+import { ArrowLeft, Ban, Loader2, Plus, Printer } from 'lucide-react'
 import { toast } from 'sonner'
 import { useSession } from 'next-auth/react'
 import { format } from '@/lib/utils/format'
@@ -53,9 +53,18 @@ export default function SaleDetailPage() {
 
   return (
     <div className="max-w-3xl mx-auto w-full">
-      <div className="flex items-center gap-3 mb-6">
-        <Button variant="ghost" size="sm" onClick={() => router.back()}>
-          <ArrowLeft className="w-4 h-4 mr-1" /> Back
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="sm" onClick={() => router.push('/app/sales')}>
+            <ArrowLeft className="w-4 h-4 mr-1" /> Sales
+          </Button>
+          <div>
+            <h1 className="text-xl font-bold text-gray-900 font-mono">{sale.refNumber}</h1>
+            <p className="text-xs text-gray-400">{format.datetime(sale.createdAt)}</p>
+          </div>
+        </div>
+        <Button className="bg-green-600 hover:bg-green-700" onClick={() => router.push('/app/sales/new')}>
+          <Plus className="w-4 h-4 mr-1.5" /> New Sale
         </Button>
       </div>
 

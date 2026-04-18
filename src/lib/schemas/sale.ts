@@ -19,7 +19,8 @@ export const SaleLineSchema = z.object({
 })
 
 export const CreateSaleSchema = z.object({
-  // Buyer info — walk-in buyer, not necessarily a registered customer
+  // Buyer info — registered customer or walk-in
+  customerId: z.string().uuid().optional(),
   buyerId: z.string().uuid().optional(),
   buyerName: z.string().min(1, 'Buyer name is required').max(100),
   buyerIdNumber: z
