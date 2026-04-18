@@ -543,8 +543,8 @@ function EditCustomerModal({ customer, onClose, onSuccess }: { customer: Custome
               <div>
                 <Label>Price Group <span className="text-gray-400 font-normal">(optional)</span></Label>
                 <Select
-                  onValueChange={(v: string | null) => setValue('priceGroupId', v === null || v === 'none' ? undefined : v)}
-                  defaultValue={customer.priceGroupId ?? 'none'}
+                  onValueChange={(v: string) => setValue('priceGroupId', v === 'none' ? undefined : v)}
+                  value={watch('priceGroupId') ?? 'none'}
                 >
                   <SelectTrigger className="mt-1"><SelectValue placeholder="No price group" /></SelectTrigger>
                   <SelectContent>
