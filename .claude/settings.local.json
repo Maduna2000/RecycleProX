@@ -38,7 +38,9 @@
       "Bash(node -e \"require\\('dexie'\\); console.log\\('dexie ok'\\)\")",
       "Bash(node -e \"require\\('next-pwa'\\); console.log\\('next-pwa ok'\\)\")",
       "Bash(node -e \"const p=require\\('./node_modules/next-pwa/package.json'\\); console.log\\(p.name, p.version\\)\")",
-      "mcp__claude_ai_Vercel__get_project"
+      "mcp__claude_ai_Vercel__get_project",
+      "mcp__claude_ai_Vercel__get_runtime_logs",
+      "mcp__claude_ai_Vercel__list_deployments"
     ]
   }
 }
