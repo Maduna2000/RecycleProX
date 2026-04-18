@@ -36,7 +36,8 @@
       "Bash(npx skills *)",
       "Bash(grep -E \"\\\\.\\(ts|tsx\\)$\")",
       "Bash(node -e \"require\\('dexie'\\); console.log\\('dexie ok'\\)\")",
-      "Bash(node -e \"require\\('next-pwa'\\); console.log\\('next-pwa ok'\\)\")"
+      "Bash(node -e \"require\\('next-pwa'\\); console.log\\('next-pwa ok'\\)\")",
+      "Bash(node -e \"const p=require\\('./node_modules/next-pwa/package.json'\\); console.log\\(p.name, p.version\\)\")"
     ]
   }
 }

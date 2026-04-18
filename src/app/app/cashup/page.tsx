@@ -199,7 +199,7 @@ export default function CashUpPage() {
         body: {
           denominations:    denoms,
           declaredCash:     declaredCash.toNumber(),
-          drawingsReceived: new Decimal(drawings || '0').toFixed(2),
+          drawingsReceived: new Decimal(drawings || '0').toNumber(),
           notes:            notes || undefined,
         },
         localId: cashUp.id,
