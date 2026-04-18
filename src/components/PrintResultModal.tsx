@@ -2,17 +2,18 @@
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Printer, FileText, X, CheckCircle } from 'lucide-react'
+import { Printer, FileText, CheckCircle, Plus, ExternalLink } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface PrintResultModalProps {
-  type:      'purchase' | 'sale'
-  id:        string
-  refNumber: string
-  onClose:   () => void
+  type:             'purchase' | 'sale'
+  id:               string
+  refNumber:        string
+  onClose:          () => void          // "New Purchase/Sale" — primary action
+  onViewPurchase?:  () => void          // "View this transaction" — secondary
 }
 
-export function PrintResultModal({ type, id, refNumber, onClose }: PrintResultModalProps) {
+export function PrintResultModal({ type, id, refNumber, onClose, onViewPurchase }: PrintResultModalProps) {
   const receiptUrl = `/api/${type}s/${id}/receipt?format=pdf`
   const vat264Url  = `/api/purchases/${id}/vat264`
 
@@ -43,33 +44,24 @@ export function PrintResultModal({ type, id, refNumber, onClose }: PrintResultMo
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <CheckCircle className="w-5 h-5 text-green-600" />
-            {type === 'purchase' ? 'Purchase' : 'Sale'} Recorded
+            {type === 'purchase' ? 'Purchase' : 'Sale'} Complete
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 mt-2">
-          <div className="text-center py-2">
-            <p className="text-sm text-gray-600">Reference:</p>
-            <p className="text-xl font-bold font-mono text-gray-900">{refNumber}</p>
+          <div className="text-center py-2 bg-green-50 rounded-lg border border-green-100">
+            <p className="text-xs text-gray-500 uppercase tracking-wide">Reference</p>
+            <p className="text-xl font-bold font-mono text-gray-900 mt-0.5">{refNumber}</p>
           </div>
 
-          <p className="text-sm text-gray-600 text-center">
-            Would you like to print a receipt?
-          </p>
+          <p className="text-sm text-gray-500 text-center">Print a receipt before starting the next transaction.</p>
 
           <div className="space-y-2">
-            <Button
-              className="w-full bg-green-600 hover:bg-green-700"
-              onClick={() => openPdf(receiptUrl)}
-            >
+            <Button className="w-full bg-green-600 hover:bg-green-700" onClick={() => openPdf(receiptUrl)}>
               <Printer className="w-4 h-4 mr-2" /> Print PDF Slip
             </Button>
 
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={printThermal}
-            >
+            <Button variant="outline" className="w-full" onClick={printThermal}>
               <Printer className="w-4 h-4 mr-2" /> Download Thermal Receipt
             </Button>
 
@@ -84,9 +76,18 @@ export function PrintResultModal({ type, id, refNumber, onClose }: PrintResultMo
             )}
           </div>
 
-          <div className="flex justify-end pt-2">
-            <Button variant="ghost" size="sm" onClick={onClose}>
-              <X className="w-4 h-4 mr-1" /> Close
+          <div className="border-t pt-3 flex items-center justify-between gap-2">
+            {onViewPurchase && (
+              <Button variant="ghost" size="sm" className="text-gray-500" onClick={onViewPurchase}>
+                <ExternalLink className="w-3.5 h-3.5 mr-1" /> View Transaction
+              </Button>
+            )}
+            <Button
+              className="ml-auto bg-green-600 hover:bg-green-700 min-w-[140px]"
+              onClick={onClose}
+            >
+              <Plus className="w-4 h-4 mr-1.5" />
+              {type === 'purchase' ? 'New Purchase' : 'New Sale'}
             </Button>
           </div>
         </div>

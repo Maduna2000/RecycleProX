@@ -85,9 +85,13 @@ export default function NewPurchasePage() {
   const [notes, setNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [keyCounter, setKeyCounter] = useState(2)
-  const [sigDialog,   setSigDialog]   = useState<{ purchaseId: string; refNumber: string } | null>(null)
-  const [photoDialog, setPhotoDialog] = useState<{ purchaseId: string; refNumber: string } | null>(null)
-  const [printDialog, setPrintDialog] = useState<{ id: string; refNumber: string } | null>(null)
+  const [sigDialog,     setSigDialog]     = useState<{ purchaseId: string; refNumber: string } | null>(null)
+  const [photoDialog,   setPhotoDialog]   = useState<{ purchaseId: string; refNumber: string } | null>(null)
+  const [payoutDialog,  setPayoutDialog]  = useState<{
+    purchaseId: string; refNumber: string; amount: string; method: string
+    customerId: string; customerName: string
+  } | null>(null)
+  const [printDialog,   setPrintDialog]   = useState<{ id: string; refNumber: string } | null>(null)
   const [deductLoan,     setDeductLoan]     = useState(false)
   const [deductionAmount, setDeductionAmount] = useState('')
 
@@ -620,7 +624,30 @@ export default function NewPurchasePage() {
             refNumber={photoDialog.refNumber}
             onDone={() => {
               const { purchaseId, refNumber } = photoDialog
+              const cashAmount = deductLoan && deductionAmount && parseFloat(deductionAmount) > 0
+                ? Decimal.max(total.minus(new Decimal(deductionAmount)), new Decimal(0)).toFixed(2)
+                : total.toFixed(2)
               setPhotoDialog(null)
+              setPayoutDialog({
+                purchaseId, refNumber, amount: cashAmount, method: paymentMethod,
+                customerId: customer!.id,
+                customerName: `${customer!.firstName} ${customer!.lastName}`,
+              })
+            }}
+          />
+        )}
+
+        {payoutDialog && (
+          <RecordPayoutStep
+            purchaseId={payoutDialog.purchaseId}
+            refNumber={payoutDialog.refNumber}
+            amount={payoutDialog.amount}
+            method={payoutDialog.method}
+            customerId={payoutDialog.customerId}
+            customerName={payoutDialog.customerName}
+            onDone={() => {
+              const { purchaseId, refNumber } = payoutDialog
+              setPayoutDialog(null)
               setPrintDialog({ id: purchaseId, refNumber })
             }}
           />
@@ -631,7 +658,8 @@ export default function NewPurchasePage() {
             type="purchase"
             id={printDialog.id}
             refNumber={printDialog.refNumber}
-            onClose={() => router.push(`/app/purchases/${printDialog.id}`)}
+            onClose={() => router.push('/app/purchases/new')}
+            onViewPurchase={() => router.push(`/app/purchases/${printDialog.id}`)}
           />
         )}
 
@@ -745,6 +773,15 @@ function PhotoUploadStep({
 }: { purchaseId: string; refNumber: string; onDone: () => void }) {
   const [keys, setKeys] = useState<string[]>([])
 
+  async function handleUploaded(key: string) {
+    await fetch(`/api/purchases/${purchaseId}/photos`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ add: key }),
+    })
+    setKeys((prev) => [...prev, key])
+  }
+
   return (
     <Dialog open>
       <DialogContent className="sm:max-w-md">
@@ -767,12 +804,98 @@ function PhotoUploadStep({
             context="purchase_photo"
             referenceId={purchaseId}
             label="Add Photo"
-            onUploaded={(key) => setKeys((prev) => [...prev, key])}
+            onUploaded={handleUploaded}
           />
         </div>
         <div className="flex justify-end mt-4">
           <Button className="bg-green-600 hover:bg-green-700" onClick={onDone}>
-            {keys.length === 0 ? 'Skip →' : `Done (${keys.length} photo${keys.length > 1 ? 's' : ''}) →`}
+            {keys.length === 0 ? 'Skip →' : `Next (${keys.length} photo${keys.length > 1 ? 's' : ''}) →`}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ─── Record Payout Step ───────────────────────────────────────────────────────
+function RecordPayoutStep({
+  refNumber, amount, method, customerId, customerName, onDone,
+}: {
+  purchaseId: string; refNumber: string; amount: string; method: string
+  customerId: string; customerName: string; onDone: () => void
+}) {
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'eft' | 'cheque' | 'amplopay'>(method as 'cash' | 'eft' | 'cheque' | 'amplopay')
+  const [notes,   setNotes]   = useState('')
+  const [loading, setLoading] = useState(false)
+
+  async function handleRecord() {
+    setLoading(true)
+    try {
+      const res = await fetch('/api/payments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customerId, amount, paymentMethod, notes: notes || undefined }),
+      })
+      if (!res.ok) {
+        const j = await res.json() as { error?: string }
+        toast.error(j.error ?? 'Failed to record payout')
+        return
+      }
+      const data = await res.json() as { refNumber: string }
+      toast.success(`Payout ${data.refNumber} recorded`)
+      onDone()
+    } catch {
+      toast.error('Failed to record payout')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <Dialog open>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <FileText className="w-5 h-5 text-green-600" />
+            Record Payout — {refNumber}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 mt-2">
+          {/* Amount banner */}
+          <div className="rounded-xl bg-green-50 border border-green-200 p-4 text-center">
+            <p className="text-xs text-gray-500 mb-0.5">Pay to</p>
+            <p className="font-semibold text-gray-900">{customerName}</p>
+            <p className="text-3xl font-bold text-green-700 font-mono mt-2">R {amount}</p>
+          </div>
+
+          {/* Payment method */}
+          <div>
+            <Label>Payment Method</Label>
+            <Select value={paymentMethod} onValueChange={(v) => setPaymentMethod(v as typeof paymentMethod)}>
+              <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="cash">Cash</SelectItem>
+                <SelectItem value="eft">EFT</SelectItem>
+                <SelectItem value="cheque">Cheque</SelectItem>
+                <SelectItem value="amplopay">AmploPay</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Notes */}
+          <div>
+            <Label>Notes <span className="text-gray-400 font-normal">(optional)</span></Label>
+            <Input value={notes} onChange={(e) => setNotes(e.target.value)} className="mt-1" placeholder="Any remarks..." disabled={loading} />
+          </div>
+
+          <Button
+            className="w-full bg-green-600 hover:bg-green-700 h-11 text-base font-semibold"
+            onClick={handleRecord}
+            disabled={loading}
+          >
+            {loading
+              ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Recording…</>
+              : 'Confirm Payout & Print Receipt'}
           </Button>
         </div>
       </DialogContent>

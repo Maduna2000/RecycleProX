@@ -329,7 +329,8 @@ export default function NewSalePage() {
           type="sale"
           id={printDialog.id}
           refNumber={printDialog.refNumber}
-          onClose={() => router.push(`/app/sales/${printDialog.id}`)}
+          onClose={() => router.push('/app/sales/new')}
+          onViewPurchase={() => router.push(`/app/sales/${printDialog.id}`)}
         />
       )}
     </div>

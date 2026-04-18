@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { ArrowLeft, Ban, Loader2, Printer, Camera, FileText } from 'lucide-react'
+import { ArrowLeft, Ban, Loader2, Plus, Printer, Camera, FileText } from 'lucide-react'
 import { toast } from 'sonner'
 import { useSession } from 'next-auth/react'
 import { format } from '@/lib/utils/format'
@@ -61,9 +61,18 @@ export default function PurchaseDetailPage() {
   return (
     <div className="max-w-3xl mx-auto w-full">
       {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
-        <Button variant="ghost" size="sm" onClick={() => router.back()}>
-          <ArrowLeft className="w-4 h-4 mr-1" /> Back
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="sm" onClick={() => router.push('/app/purchases')}>
+            <ArrowLeft className="w-4 h-4 mr-1" /> Purchases
+          </Button>
+          <div>
+            <h1 className="text-xl font-bold text-gray-900 font-mono">{purchase.refNumber}</h1>
+            <p className="text-xs text-gray-400">{format.datetime(purchase.createdAt)}</p>
+          </div>
+        </div>
+        <Button className="bg-green-600 hover:bg-green-700" onClick={() => router.push('/app/purchases/new')}>
+          <Plus className="w-4 h-4 mr-1.5" /> New Purchase
         </Button>
       </div>
 
@@ -177,7 +186,7 @@ export default function PurchaseDetailPage() {
             <Camera className="w-4 h-4 text-green-600" />
             <h2 className="font-semibold text-gray-900">Product Photos</h2>
           </div>
-          <PurchasePhotos purchaseId={purchase.id} />
+          <PurchasePhotos purchaseId={purchase.id} initialKeys={purchase.photoR2Keys ?? []} />
         </div>
       )}
 
@@ -224,25 +233,26 @@ export default function PurchaseDetailPage() {
 }
 
 // ─── Purchase Photos ─────────────────────────────────────────────────────────
-function PurchasePhotos({ purchaseId }: { purchaseId: string }) {
+function PurchasePhotos({ purchaseId, initialKeys }: { purchaseId: string; initialKeys: string[] }) {
   const { data: session } = useSession()
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
+  const [keys, setKeys] = useState<string[]>(initialKeys)
 
-  // Store keys locally — in a full M9 these would be persisted on the Purchase record
-  // For now we use local state (resets on page reload); a future migration adds photoR2Keys[]
-  const [keys, setKeys] = useState<string[]>([])
-
-  function handleUploaded(key: string) {
+  async function handleUploaded(key: string) {
+    await fetch(`/api/purchases/${purchaseId}/photos`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ add: key }),
+    })
     setKeys((prev) => [...prev, key])
   }
 
   async function handleDelete(key: string) {
-    const res = await fetch('/api/r2/delete', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key }),
-    })
-    if (res.ok) {
+    const [r2Res, dbRes] = await Promise.all([
+      fetch('/api/r2/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key }) }),
+      fetch(`/api/purchases/${purchaseId}/photos`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ remove: key }) }),
+    ])
+    if (r2Res.ok && dbRes.ok) {
       setKeys((prev) => prev.filter((k) => k !== key))
       toast.success('Photo deleted')
     }

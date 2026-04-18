@@ -266,6 +266,7 @@ model Purchase {
   loanDeductionAmount Decimal?      @db.Decimal(18, 2)
   signatureR2Key  String?
   vat264R2Key     String?
+  photoR2Keys     String[]
   voidedAt        DateTime?
   voidedById      String?
   voidReason      String?
