@@ -26,6 +26,7 @@ interface Tab {
 interface PageShellProps {
   title:      string
   subtitle?:  string       // e.g. "247 customers" or "Record and manage purchases"
+  action?:    React.ReactNode  // optional button/element in the top-right of the header
   tabs?:      readonly Tab[]   // renders inside Zone 3, below the header
   activeTab?: string
   onTabChange?: (value: string) => void
@@ -37,6 +38,7 @@ interface PageShellProps {
 export function PageShell({
   title,
   subtitle,
+  action,
   tabs,
   activeTab,
   onTabChange,
@@ -45,24 +47,27 @@ export function PageShell({
   return (
     <div className="flex flex-col flex-1 min-h-0 gap-4">
       {/* Page header */}
-      <div className="shrink-0">
-        <h1 style={{
-          fontSize:   fontSize.lg,
-          fontWeight: fontWeight.semibold,
-          color:      colors.textPrimary,
-          lineHeight: 1.3,
-        }}>
-          {title}
-        </h1>
-        {subtitle && (
-          <p style={{
-            fontSize:   fontSize.sm,
-            color:      colors.textSecondary,
-            marginTop:  2,
+      <div className="flex items-start justify-between shrink-0">
+        <div>
+          <h1 style={{
+            fontSize:   fontSize.lg,
+            fontWeight: fontWeight.semibold,
+            color:      colors.textPrimary,
+            lineHeight: 1.3,
           }}>
-            {subtitle}
-          </p>
-        )}
+            {title}
+          </h1>
+          {subtitle && (
+            <p style={{
+              fontSize:   fontSize.sm,
+              color:      colors.textSecondary,
+              marginTop:  2,
+            }}>
+              {subtitle}
+            </p>
+          )}
+        </div>
+        {action && <div className="shrink-0">{action}</div>}
       </div>
 
       {/* Tab bar — inside Zone 3, never in the AppShell toolbar */}

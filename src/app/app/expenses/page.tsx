@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Decimal from 'decimal.js'
 import useSWR, { mutate } from 'swr'
 import { useSession } from 'next-auth/react'
-import { CheckCircle, Trash2, Loader2, Receipt, Search, X } from 'lucide-react'
+import { CheckCircle, Trash2, Loader2, Receipt, Search, X, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -181,6 +181,15 @@ export default function ExpensesPage() {
     <PageShell
       title="Expenses"
       subtitle={`${data?.total ?? expenses.length} expenses`}
+      action={
+        <Button
+          onClick={() => setAddOpen(true)}
+          style={{ background: colors.action }}
+          className="text-white hover:opacity-90 text-xs h-8 px-3"
+        >
+          <Plus className="w-3.5 h-3.5 mr-1.5" /> Add Expense
+        </Button>
+      }
       tabs={pageTabs}
       activeTab={tab}
       onTabChange={(v) => setTab(v as PageTab)}

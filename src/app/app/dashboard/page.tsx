@@ -101,7 +101,7 @@ export default function DashboardPage() {
   }
 
   const name      = session?.user?.name ?? session?.user?.username ?? 'there'
-  const netFlow   = data ? new Decimal(data.netFlow) : null
+  const netFlow   = data?.netFlow != null ? new Decimal(data.netFlow) : null
   const netIsPos  = netFlow?.gte(0) ?? true
 
   return (
