@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import useSWR, { mutate } from 'swr'
 import { useSession } from 'next-auth/react'
-import { SlidersHorizontal, Loader2, TrendingUp, TrendingDown, Minus, AlertTriangle, Download } from 'lucide-react'
+import { SlidersHorizontal, Loader2, TrendingUp, TrendingDown, Minus, AlertTriangle, Download, Search, X } from 'lucide-react'
 import { toast } from 'sonner'
 import Decimal from 'decimal.js'
 import { DataTable, type Column } from '@/components/ui/DataTable'
@@ -54,6 +54,18 @@ export default function StockPage() {
   const [adjustOpen,     setAdjustOpen]     = useState(false)
   const [categoryFilter, setCategoryFilter] = useState('')
   const [showZero,       setShowZero]       = useState(true)
+  const [onHandSearch,   setOnHandSearch]   = useState('')
+
+  // Movements filters
+  const [movDirection, setMovDirection] = useState('')
+  const [movSource,    setMovSource]    = useState('')
+  const [movFrom,      setMovFrom]      = useState('')
+  const [movTo,        setMovTo]        = useState('')
+
+  const hasMovFilters = !!(movDirection || movSource || movFrom || movTo)
+  function clearMovFilters() {
+    setMovDirection(''); setMovSource(''); setMovFrom(''); setMovTo('')
+  }
 
   const today = new Date().toISOString().slice(0, 10)
   const [gridPeriod,   setGridPeriod]   = useState<'daily' | 'weekly' | 'mtd'>('mtd')
@@ -61,9 +73,17 @@ export default function StockPage() {
   const [gridCategory, setGridCategory] = useState('')
   const [exporting,    setExporting]    = useState(false)
 
+  const movementsQuery = new URLSearchParams({
+    ...(movDirection && { direction: movDirection }),
+    ...(movSource    && { source: movSource }),
+    ...(movFrom      && { from: movFrom }),
+    ...(movTo        && { to: movTo }),
+    pageSize: '200',
+  })
+
   const { data: stockData } = useSWR<{ stock: StockEntry[] }>('/api/stock/on-hand', fetcher)
   const { data: movementsData, isLoading: movLoading } = useSWR<{ movements: Movement[]; total: number }>(
-    '/api/stock/movements?pageSize=200',
+    `/api/stock/movements?${movementsQuery}`,
     fetcher,
   )
   const gridKey = `/api/stock/grid?period=${gridPeriod}&date=${gridDate}${gridCategory ? `&category=${gridCategory}` : ''}`
@@ -76,6 +96,10 @@ export default function StockPage() {
   const stock = allStock.filter((s) => {
     if (!showZero && parseFloat(s.onHand) === 0 && !s.hasMovements) return false
     if (categoryFilter && s.product.category !== categoryFilter) return false
+    if (onHandSearch) {
+      const q = onHandSearch.toLowerCase()
+      if (!s.product.name.toLowerCase().includes(q) && !s.product.code.toLowerCase().includes(q)) return false
+    }
     return true
   })
   const movements = movementsData?.movements ?? []
@@ -380,10 +404,19 @@ export default function StockPage() {
       {/* On Hand tab */}
       {activeTab === 'onhand' && (
         <>
-          <div className="flex gap-2 items-center shrink-0 mb-3">
+          <div className="flex gap-2 flex-wrap items-center shrink-0 mb-3">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3" style={{ color: colors.textSecondary }} />
+              <input
+                value={onHandSearch}
+                onChange={(e) => setOnHandSearch(e.target.value)}
+                placeholder="Search product..."
+                className="pl-7 pr-3 py-1 text-xs rounded border bg-white focus:outline-none w-44 border-rpx-border focus:border-rpx-blue"
+              />
+            </div>
             <select
-              className="border rounded px-2 py-1 text-xs bg-white focus:outline-none"
-              style={{ color: colors.textPrimary, borderColor: colors.border }}
+              className="border rounded px-2 py-1 text-xs bg-white focus:outline-none border-rpx-border focus:border-rpx-blue"
+              style={{ color: colors.textPrimary }}
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
             >
@@ -419,17 +452,68 @@ export default function StockPage() {
 
       {/* Movements tab */}
       {activeTab === 'movements' && (
-        <div className="flex-1 min-h-0">
-          <DataTable
-            columns={movementColumns}
-            rows={movements}
-            rowKey={(r) => r.id}
-            loading={movLoading}
-            emptyMessage="No movements recorded yet"
-            total={movementsData?.total}
-            pageSize={200}
-          />
-        </div>
+        <>
+          <div className="flex gap-2 flex-wrap items-center shrink-0 mb-3">
+            <select
+              className="border rounded px-2 py-1 text-xs bg-white focus:outline-none border-rpx-border focus:border-rpx-blue"
+              style={{ color: colors.textPrimary }}
+              value={movDirection}
+              onChange={(e) => setMovDirection(e.target.value)}
+            >
+              <option value="">All Directions</option>
+              <option value="in">In</option>
+              <option value="out">Out</option>
+            </select>
+            <select
+              className="border rounded px-2 py-1 text-xs bg-white focus:outline-none border-rpx-border focus:border-rpx-blue"
+              style={{ color: colors.textPrimary }}
+              value={movSource}
+              onChange={(e) => setMovSource(e.target.value)}
+            >
+              <option value="">All Sources</option>
+              <option value="purchase">Purchase</option>
+              <option value="sale">Sale</option>
+              <option value="manual_adjustment">Manual Adjustment</option>
+              <option value="void_reversal">Void Reversal</option>
+            </select>
+            <input
+              type="date"
+              value={movFrom}
+              onChange={(e) => setMovFrom(e.target.value)}
+              className="border rounded px-2 py-1 text-xs bg-white focus:outline-none border-rpx-border focus:border-rpx-blue"
+              style={{ color: movFrom ? colors.textPrimary : colors.textSecondary }}
+              title="From date"
+            />
+            <input
+              type="date"
+              value={movTo}
+              onChange={(e) => setMovTo(e.target.value)}
+              className="border rounded px-2 py-1 text-xs bg-white focus:outline-none border-rpx-border focus:border-rpx-blue"
+              style={{ color: movTo ? colors.textPrimary : colors.textSecondary }}
+              title="To date"
+            />
+            {hasMovFilters && (
+              <button
+                onClick={clearMovFilters}
+                className="flex items-center gap-1 text-xs hover:text-[#212529] transition-colors"
+                style={{ color: colors.textSecondary }}
+              >
+                <X className="w-3 h-3" /> Clear
+              </button>
+            )}
+          </div>
+          <div className="flex-1 min-h-0">
+            <DataTable
+              columns={movementColumns}
+              rows={movements}
+              rowKey={(r) => r.id}
+              loading={movLoading}
+              emptyMessage="No movements recorded yet"
+              total={movementsData?.total}
+              pageSize={200}
+            />
+          </div>
+        </>
       )}
 
       {/* Stock Grid tab */}

@@ -4,7 +4,7 @@ import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import useSWR, { mutate as swrMutate } from 'swr'
 import { useSession } from 'next-auth/react'
-import { Search, Eye, Ban, Printer, FileText, Loader2 } from 'lucide-react'
+import { Search, Eye, Ban, Printer, FileText, Loader2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import Decimal from 'decimal.js'
 import { DataTable, StatusBadge, Avatar, type Column, type RowAction, type SortDir } from '@/components/ui/DataTable'
@@ -57,17 +57,29 @@ export default function PurchasesPage() {
   const { data: session } = useSession()
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
 
-  const [search,     setSearch]     = useState('')
-  const [status,     setStatus]     = useState('')
-  const [page,       setPage]       = useState(1)
-  const [sortKey,    setSortKey]    = useState<string | null>(null)
-  const [sortDir,    setSortDir]    = useState<SortDir>(null)
-  const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [voidTarget, setVoidTarget] = useState<Purchase | null>(null)
+  const [search,        setSearch]        = useState('')
+  const [status,        setStatus]        = useState('')
+  const [paymentMethod, setPaymentMethod] = useState('')
+  const [from,          setFrom]          = useState('')
+  const [to,            setTo]            = useState('')
+  const [page,          setPage]          = useState(1)
+  const [sortKey,       setSortKey]       = useState<string | null>(null)
+  const [sortDir,       setSortDir]       = useState<SortDir>(null)
+  const [selectedId,    setSelectedId]    = useState<string | null>(null)
+  const [voidTarget,    setVoidTarget]    = useState<Purchase | null>(null)
+
+  const hasFilters = !!(search || status || paymentMethod || from || to)
+
+  function clearFilters() {
+    setSearch(''); setStatus(''); setPaymentMethod(''); setFrom(''); setTo(''); setPage(1)
+  }
 
   const query = new URLSearchParams({
-    ...(search  && { search }),
-    ...(status  && { status }),
+    ...(search        && { search }),
+    ...(status        && { status }),
+    ...(paymentMethod && { paymentMethod }),
+    ...(from          && { from }),
+    ...(to            && { to }),
     ...(sortKey && sortDir && { sortKey, sortDir }),
     page:     String(page),
     pageSize: '50',
@@ -187,14 +199,14 @@ export default function PurchasesPage() {
       subtitle={`${data?.total ?? 0} total records`}
     >
       {/* Filters */}
-      <div className="flex gap-2 flex-wrap shrink-0 mb-3">
+      <div className="flex gap-2 flex-wrap shrink-0 mb-3 items-center">
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3" style={{ color: colors.textSecondary }} />
           <input
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1) }}
-            placeholder="Search ref, customer name or ID..."
-            className="pl-7 pr-3 py-1 text-xs rounded border bg-white focus:outline-none w-72 border-rpx-border focus:border-rpx-blue"
+            placeholder="Search ref, customer or ID..."
+            className="pl-7 pr-3 py-1 text-xs rounded border bg-white focus:outline-none w-56 border-rpx-border focus:border-rpx-blue"
           />
         </div>
         <select
@@ -208,6 +220,43 @@ export default function PurchasesPage() {
           <option value="completed">Completed</option>
           <option value="voided">Voided</option>
         </select>
+        <select
+          className="border rounded px-2 py-1 text-xs bg-white focus:outline-none border-rpx-border focus:border-rpx-blue"
+          style={{ color: colors.textPrimary }}
+          value={paymentMethod}
+          onChange={(e) => { setPaymentMethod(e.target.value); setPage(1) }}
+        >
+          <option value="">All Methods</option>
+          <option value="cash">Cash</option>
+          <option value="eft">EFT</option>
+          <option value="cheque">Cheque</option>
+          <option value="amplopay">AmploPay</option>
+        </select>
+        <input
+          type="date"
+          value={from}
+          onChange={(e) => { setFrom(e.target.value); setPage(1) }}
+          className="border rounded px-2 py-1 text-xs bg-white focus:outline-none border-rpx-border focus:border-rpx-blue"
+          style={{ color: from ? colors.textPrimary : colors.textSecondary }}
+          title="From date"
+        />
+        <input
+          type="date"
+          value={to}
+          onChange={(e) => { setTo(e.target.value); setPage(1) }}
+          className="border rounded px-2 py-1 text-xs bg-white focus:outline-none border-rpx-border focus:border-rpx-blue"
+          style={{ color: to ? colors.textPrimary : colors.textSecondary }}
+          title="To date"
+        />
+        {hasFilters && (
+          <button
+            onClick={clearFilters}
+            className="flex items-center gap-1 text-xs hover:text-[#212529] transition-colors"
+            style={{ color: colors.textSecondary }}
+          >
+            <X className="w-3 h-3" /> Clear
+          </button>
+        )}
       </div>
 
       {/* Table — grows to fill available height */}

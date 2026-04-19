@@ -132,6 +132,7 @@ export async function listPayments(opts?: {
   to?: Date
   search?: string
   includeVoided?: boolean
+  paymentMethod?: string
   page?: number
   pageSize?: number
 }) {
@@ -142,6 +143,7 @@ export async function listPayments(opts?: {
   const where = {
     ...(opts?.customerId && { customerId: opts.customerId }),
     ...(!opts?.includeVoided && { voidedAt: null }),
+    ...(opts?.paymentMethod && { paymentMethod: opts.paymentMethod as 'cash' | 'eft' | 'cheque' | 'amplopay' }),
     ...(opts?.from || opts?.to ? {
       createdAt: {
         ...(opts?.from && { gte: opts.from }),

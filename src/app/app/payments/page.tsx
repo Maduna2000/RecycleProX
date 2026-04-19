@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import useSWR, { mutate } from 'swr'
 import { useSession } from 'next-auth/react'
-import { Search, Ban, Loader2, TrendingDown, AlertCircle, HandCoins } from 'lucide-react'
+import { Search, Ban, Loader2, TrendingDown, AlertCircle, HandCoins, X } from 'lucide-react'
 import Decimal from 'decimal.js'
 import { toast } from 'sonner'
 import { DataTable, Avatar, StatusBadge, type Column, type RowAction } from '@/components/ui/DataTable'
@@ -48,12 +48,24 @@ export default function PaymentsPage() {
 
   const [activeTab,      setActiveTab]      = useState<PageTab>('payments')
   const [search,         setSearch]         = useState('')
+  const [paymentMethod,  setPaymentMethod]  = useState('')
+  const [from,           setFrom]           = useState('')
+  const [to,             setTo]             = useState('')
   const [includeVoided,  setIncludeVoided]  = useState(false)
   const [newPaymentOpen, setNewPaymentOpen] = useState(false)
   const [voidTarget,     setVoidTarget]     = useState<Payment | null>(null)
 
+  const hasFilters = !!(search || paymentMethod || from || to)
+
+  function clearFilters() {
+    setSearch(''); setPaymentMethod(''); setFrom(''); setTo('')
+  }
+
   const query = new URLSearchParams({
     ...(search        && { search }),
+    ...(paymentMethod && { paymentMethod }),
+    ...(from          && { from }),
+    ...(to            && { to }),
     ...(includeVoided && { includeVoided: 'true' }),
     pageSize: '100',
   })
@@ -228,7 +240,7 @@ export default function PaymentsPage() {
       {/* Payments tab */}
       {activeTab === 'payments' && (
         <>
-          <div className="flex gap-2 items-center shrink-0 mb-3">
+          <div className="flex gap-2 flex-wrap items-center shrink-0 mb-3">
             <div className="relative">
               <Search
                 className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3"
@@ -238,10 +250,37 @@ export default function PaymentsPage() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search ref or customer..."
-                className="pl-7 pr-3 py-1 text-xs rounded border bg-white focus:outline-none w-64"
-                style={{ borderColor: colors.border }}
+                className="pl-7 pr-3 py-1 text-xs rounded border bg-white focus:outline-none w-52 border-rpx-border focus:border-rpx-blue"
               />
             </div>
+            <select
+              className="border rounded px-2 py-1 text-xs bg-white focus:outline-none border-rpx-border focus:border-rpx-blue"
+              style={{ color: colors.textPrimary }}
+              value={paymentMethod}
+              onChange={(e) => setPaymentMethod(e.target.value)}
+            >
+              <option value="">All Methods</option>
+              <option value="cash">Cash</option>
+              <option value="eft">EFT</option>
+              <option value="cheque">Cheque</option>
+              <option value="amplopay">AmploPay</option>
+            </select>
+            <input
+              type="date"
+              value={from}
+              onChange={(e) => setFrom(e.target.value)}
+              className="border rounded px-2 py-1 text-xs bg-white focus:outline-none border-rpx-border focus:border-rpx-blue"
+              style={{ color: from ? colors.textPrimary : colors.textSecondary }}
+              title="From date"
+            />
+            <input
+              type="date"
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
+              className="border rounded px-2 py-1 text-xs bg-white focus:outline-none border-rpx-border focus:border-rpx-blue"
+              style={{ color: to ? colors.textPrimary : colors.textSecondary }}
+              title="To date"
+            />
             <label
               className="flex items-center gap-1.5 text-xs cursor-pointer"
               style={{ color: colors.textSecondary }}
@@ -254,6 +293,15 @@ export default function PaymentsPage() {
               />
               Include voided
             </label>
+            {hasFilters && (
+              <button
+                onClick={clearFilters}
+                className="flex items-center gap-1 text-xs hover:text-[#212529] transition-colors"
+                style={{ color: colors.textSecondary }}
+              >
+                <X className="w-3 h-3" /> Clear
+              </button>
+            )}
           </div>
           <div className="flex-1 min-h-0">
             <DataTable

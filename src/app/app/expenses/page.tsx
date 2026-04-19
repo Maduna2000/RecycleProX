@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Decimal from 'decimal.js'
 import useSWR, { mutate } from 'swr'
 import { useSession } from 'next-auth/react'
-import { CheckCircle, Trash2, Loader2, Receipt } from 'lucide-react'
+import { CheckCircle, Trash2, Loader2, Receipt, Search, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -36,6 +36,12 @@ export default function ExpensesPage() {
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
   const [tab,      setTab]      = useState<PageTab>('Pending')
   const [addOpen,  setAddOpen]  = useState(false)
+  const [search,   setSearch]   = useState('')
+  const [from,     setFrom]     = useState('')
+  const [to,       setTo]       = useState('')
+
+  const hasFilters = !!(search || from || to)
+  function clearFilters() { setSearch(''); setFrom(''); setTo('') }
 
   const statusMap: Record<PageTab, string | undefined> = {
     Pending:  'pending',
@@ -43,7 +49,14 @@ export default function ExpensesPage() {
     All:      undefined,
   }
   const statusFilter = statusMap[tab]
-  const key = `/api/expenses?${statusFilter ? `status=${statusFilter}&` : ''}limit=50`
+  const query = new URLSearchParams({
+    ...(statusFilter && { status: statusFilter }),
+    ...(search       && { search }),
+    ...(from         && { from }),
+    ...(to           && { to }),
+    limit: '50',
+  })
+  const key = `/api/expenses?${query}`
   const { data, isLoading } = useSWR<{ expenses: Expense[]; total: number }>(key, fetcher)
   const expenses = data?.expenses ?? []
 
@@ -172,6 +185,44 @@ export default function ExpensesPage() {
       activeTab={tab}
       onTabChange={(v) => setTab(v as PageTab)}
     >
+      {/* Filters */}
+      <div className="flex gap-2 flex-wrap items-center shrink-0 mb-3">
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3" style={{ color: colors.textSecondary }} />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search ref, category or description..."
+            className="pl-7 pr-3 py-1 text-xs rounded border bg-white focus:outline-none w-60 border-rpx-border focus:border-rpx-blue"
+          />
+        </div>
+        <input
+          type="date"
+          value={from}
+          onChange={(e) => setFrom(e.target.value)}
+          className="border rounded px-2 py-1 text-xs bg-white focus:outline-none border-rpx-border focus:border-rpx-blue"
+          style={{ color: from ? colors.textPrimary : colors.textSecondary }}
+          title="From date"
+        />
+        <input
+          type="date"
+          value={to}
+          onChange={(e) => setTo(e.target.value)}
+          className="border rounded px-2 py-1 text-xs bg-white focus:outline-none border-rpx-border focus:border-rpx-blue"
+          style={{ color: to ? colors.textPrimary : colors.textSecondary }}
+          title="To date"
+        />
+        {hasFilters && (
+          <button
+            onClick={clearFilters}
+            className="flex items-center gap-1 text-xs hover:text-[#212529] transition-colors"
+            style={{ color: colors.textSecondary }}
+          >
+            <X className="w-3 h-3" /> Clear
+          </button>
+        )}
+      </div>
+
       {/* Approved total banner */}
       {tab === 'Approved' && data && (
         <div

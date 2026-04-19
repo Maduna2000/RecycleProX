@@ -199,6 +199,7 @@ export async function listPurchases(opts?: {
   from?: Date
   to?: Date
   search?: string
+  paymentMethod?: string
   page?: number
   pageSize?: number
 }) {
@@ -209,6 +210,7 @@ export async function listPurchases(opts?: {
   const where = {
     ...(opts?.customerId && { customerId: opts.customerId }),
     ...(opts?.status && { status: opts.status as 'completed' | 'voided' | 'pending' }),
+    ...(opts?.paymentMethod && { paymentMethod: opts.paymentMethod as 'cash' | 'eft' | 'cheque' | 'amplopay' }),
     ...(opts?.from || opts?.to ? {
       createdAt: {
         ...(opts.from && { gte: opts.from }),

@@ -72,13 +72,21 @@ export async function listExpenses(filters: {
   status?: string
   from?: Date
   to?: Date
+  search?: string
   page?: number
   limit?: number
 }) {
-  const { status, from, to, page = 1, limit = 30 } = filters
+  const { status, from, to, search, page = 1, limit = 30 } = filters
   const where = {
     ...(status && { status: status as 'pending' | 'approved' | 'voided' }),
     ...(from || to ? { createdAt: { ...(from && { gte: from }), ...(to && { lte: to }) } } : {}),
+    ...(search && {
+      OR: [
+        { refNumber:   { contains: search, mode: 'insensitive' as const } },
+        { description: { contains: search, mode: 'insensitive' as const } },
+        { expenseType: { name: { contains: search, mode: 'insensitive' as const } } },
+      ],
+    }),
   }
   const [expenses, total] = await Promise.all([
     prisma.expense.findMany({
