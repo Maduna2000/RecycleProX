@@ -285,8 +285,10 @@ function AddExpenseModal({ onClose, onSuccess }: { onClose: () => void; onSucces
     defaultValues: { paymentMethod: 'cash', includesVat: false },
   })
 
-  const paymentMethod = watch('paymentMethod')
-  const includesVat   = watch('includesVat')
+  const paymentMethod  = watch('paymentMethod')
+  const includesVat    = watch('includesVat')
+  const expenseTypeId  = watch('expenseTypeId') as string | undefined
+  const selectedTypeName = (types ?? []).find((t) => t.id === expenseTypeId)?.name
 
   async function onSubmit(data: CreateExpenseInput) {
     setLoading(true)
@@ -318,8 +320,15 @@ function AddExpenseModal({ onClose, onSuccess }: { onClose: () => void; onSucces
                 + New category
               </button>
             </div>
-            <Select onValueChange={(v) => setValue('expenseTypeId', v as string)}>
-              <SelectTrigger><SelectValue placeholder="Select category…" /></SelectTrigger>
+            <Select
+              value={expenseTypeId ?? ''}
+              onValueChange={(v) => setValue('expenseTypeId', v as string)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select category…">
+                  {selectedTypeName ?? ''}
+                </SelectValue>
+              </SelectTrigger>
               <SelectContent>
                 {(types ?? []).map((t) => (
                   <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>

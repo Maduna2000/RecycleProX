@@ -158,10 +158,10 @@ export default function ReportsPage() {
           </div>
         )}
 
-        {data && (
+        {data && data.sales && data.purchases && data.cashUp && (
           <>
             <p style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>
-              Showing {data.range.from} → {data.range.to}
+              Showing {data.range?.from} → {data.range?.to}
             </p>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -6,7 +6,7 @@ import { getViewUrl } from '@/lib/r2'
 
 // Photo record shape returned to the client
 export type PhotoRecord = {
-  type: 'purchase_signature' | 'purchase_vat264' | 'sale_photo' | 'weighbridge' | 'casual_id'
+  type: 'purchase_signature' | 'purchase_vat264' | 'purchase_photo' | 'sale_photo' | 'weighbridge' | 'casual_id'
   transactionId: string
   refNumber?: string
   r2Key: string
@@ -49,6 +49,7 @@ export async function GET(req: NextRequest) {
         OR: [
           { signatureR2Key: { not: null } },
           { vat264R2Key:    { not: null } },
+          { photoR2Keys:    { isEmpty: false } },
         ],
         status: { not: 'voided' },
       }
@@ -96,6 +97,17 @@ export async function GET(req: NextRequest) {
             refNumber: p.refNumber,
             r2Key: p.vat264R2Key,
             viewUrl: await getViewUrl(p.vat264R2Key),
+            createdAt: p.createdAt.toISOString(),
+            customer: p.customer ?? undefined,
+          })
+        }
+        for (const key of (p.photoR2Keys ?? [])) {
+          records.push({
+            type: 'purchase_photo',
+            transactionId: p.id,
+            refNumber: p.refNumber,
+            r2Key: key,
+            viewUrl: await getViewUrl(key),
             createdAt: p.createdAt.toISOString(),
             customer: p.customer ?? undefined,
           })
@@ -192,7 +204,6 @@ export async function GET(req: NextRequest) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const customerWhere: any = {
         idPhotoR2Key: { not: null },
-        customerType: 'casual',
         ...(customerId && { id: customerId }),
       }
 

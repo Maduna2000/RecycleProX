@@ -40,7 +40,14 @@
       "Bash(node -e \"const p=require\\('./node_modules/next-pwa/package.json'\\); console.log\\(p.name, p.version\\)\")",
       "mcp__claude_ai_Vercel__get_project",
       "mcp__claude_ai_Vercel__get_runtime_logs",
-      "mcp__claude_ai_Vercel__list_deployments"
+      "mcp__claude_ai_Vercel__list_deployments",
+      "Bash(python skills/ui-ux-pro-max/scripts/search.py \"scrap yard POS management photo media gallery document viewer admin desktop\" --design-system -p \"Renovo Pro\" -f markdown)",
+      "Bash(python3 skills/ui-ux-pro-max/scripts/search.py \"scrap yard POS management photo document viewer admin desktop\" --design-system -p \"Renovo Pro\" -f markdown)",
+      "Bash(where python *)",
+      "Bash(where python3 *)",
+      "Bash(where py *)",
+      "Bash(ls /c/Python*/python.exe)",
+      "Read(//c/Users/MD TECH SOLUTION/AppData/Local/Programs/**)"
     ]
   }
 }

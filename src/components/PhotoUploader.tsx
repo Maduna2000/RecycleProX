@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Upload, Loader2, X, Camera } from 'lucide-react'
 import { toast } from 'sonner'
@@ -118,13 +118,17 @@ interface ViewerProps {
   alt?: string
   onDelete?: () => void
   canDelete?: boolean
+  autoLoad?: boolean
 }
 
-export function PhotoViewer({ r2Key, alt = 'Photo', onDelete, canDelete }: ViewerProps) {
+export function PhotoViewer({ r2Key, alt = 'Photo', onDelete, canDelete, autoLoad }: ViewerProps) {
   const [url, setUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [expanded, setExpanded] = useState(false)
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (autoLoad) loadUrl() }, [])
 
   async function loadUrl() {
     if (url) { setExpanded(true); return }

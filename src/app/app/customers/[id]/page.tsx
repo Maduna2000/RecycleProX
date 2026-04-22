@@ -290,6 +290,7 @@ function TransactionsTab({ customerId }: { customerId: string }) {
 function DocumentsTab({ customer, onPhotoSaved }: { customer: Customer; onPhotoSaved: () => void }) {
   const { data: session } = useSession()
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
+  const [justUploaded, setJustUploaded] = useState(false)
 
   async function savePhotoKey(key: string) {
     const res = await fetch(`/api/customers/${customer.id}`, {
@@ -297,7 +298,7 @@ function DocumentsTab({ customer, onPhotoSaved }: { customer: Customer; onPhotoS
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ idPhotoR2Key: key }),
     })
-    if (res.ok) { onPhotoSaved() }
+    if (res.ok) { setJustUploaded(true); onPhotoSaved() }
     else { const j = await res.json(); toast.error(j.error ?? 'Failed to save photo reference') }
   }
 
@@ -323,6 +324,7 @@ function DocumentsTab({ customer, onPhotoSaved }: { customer: Customer; onPhotoS
           alt={`${customer.firstName} ${customer.lastName} ID`}
           canDelete={isManager}
           onDelete={handlePhotoDeleted}
+          autoLoad={justUploaded}
         />
       ) : (
         <div className="space-y-3">

@@ -115,7 +115,7 @@ export default function DashboardPage() {
           <p className="text-sm" style={{ color: colors.textSecondary }}>Loading today&apos;s stats…</p>
         )}
 
-        {data && (
+        {data && data.purchases && data.sales && (
           <>
             {/* ── Stat cards (4 per spec) ── */}
             <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">

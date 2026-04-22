@@ -438,14 +438,14 @@ export default function CashUpPage() {
               <div className="space-y-4">
                 <UnpaidCard
                   label="Total Unpaid Cash"
-                  total={stats?.unpaidAllTime.total ?? '0'}
-                  count={stats?.unpaidAllTime.count ?? 0}
+                  total={stats?.unpaidAllTime?.total ?? '0'}
+                  count={stats?.unpaidAllTime?.count ?? 0}
                   href="/app/purchases/unpaid"
                 />
                 <UnpaidCard
                   label="Today Unpaid Cash"
-                  total={stats?.unpaidToday.total ?? '0'}
-                  count={stats?.unpaidToday.count ?? 0}
+                  total={stats?.unpaidToday?.total ?? '0'}
+                  count={stats?.unpaidToday?.count ?? 0}
                   href="/app/purchases/unpaid"
                 />
 
