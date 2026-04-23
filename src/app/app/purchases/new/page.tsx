@@ -658,8 +658,9 @@ export default function NewPurchasePage() {
             type="purchase"
             id={printDialog.id}
             refNumber={printDialog.refNumber}
-            onClose={() => router.push('/app/purchases/new')}
+            onClose={() => router.push(`/app/purchases/new?t=${Date.now()}`)}
             onViewPurchase={() => router.push(`/app/purchases/${printDialog.id}`)}
+            onDone={() => router.push('/app/dashboard')}
           />
         )}
 

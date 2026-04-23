@@ -11,9 +11,10 @@ interface PrintResultModalProps {
   refNumber:        string
   onClose:          () => void          // "New Purchase/Sale" — primary action
   onViewPurchase?:  () => void          // "View this transaction" — secondary
+  onDone?:          () => void          // "Done" — go to dashboard
 }
 
-export function PrintResultModal({ type, id, refNumber, onClose, onViewPurchase }: PrintResultModalProps) {
+export function PrintResultModal({ type, id, refNumber, onClose, onViewPurchase, onDone }: PrintResultModalProps) {
   const receiptUrl = `/api/${type}s/${id}/receipt?format=pdf`
   const vat264Url  = `/api/purchases/${id}/vat264`
 
@@ -82,13 +83,20 @@ export function PrintResultModal({ type, id, refNumber, onClose, onViewPurchase 
                 <ExternalLink className="w-3.5 h-3.5 mr-1" /> View Transaction
               </Button>
             )}
-            <Button
-              className="ml-auto bg-green-600 hover:bg-green-700 min-w-[140px]"
-              onClick={onClose}
-            >
-              <Plus className="w-4 h-4 mr-1.5" />
-              {type === 'purchase' ? 'New Purchase' : 'New Sale'}
-            </Button>
+            <div className="ml-auto flex items-center gap-2">
+              {onDone && (
+                <Button variant="outline" size="sm" onClick={onDone}>
+                  <CheckCircle className="w-3.5 h-3.5 mr-1" /> Done
+                </Button>
+              )}
+              <Button
+                className="bg-green-600 hover:bg-green-700 min-w-[140px]"
+                onClick={onClose}
+              >
+                <Plus className="w-4 h-4 mr-1.5" />
+                {type === 'purchase' ? 'New Purchase' : 'New Sale'}
+              </Button>
+            </div>
           </div>
         </div>
       </DialogContent>
