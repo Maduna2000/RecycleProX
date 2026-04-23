@@ -3,6 +3,7 @@ import Credentials from 'next-auth/providers/credentials'
 import { login } from '@/lib/services/authService'
 import { LoginSchema } from '@/lib/schemas/auth'
 import { authConfig } from '@/auth.config'
+import logger from '@/lib/logger'
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   ...authConfig,
