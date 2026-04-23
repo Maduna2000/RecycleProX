@@ -30,7 +30,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             fullName: user.fullName,
             username: user.username,
           }
-        } catch {
+        } catch (err) {
+          // Log the real error so it shows in Vercel function logs
+          logger.error({ err }, 'authorize() failed')
           return null
         }
       },
