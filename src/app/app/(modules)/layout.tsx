@@ -6,7 +6,7 @@ import { PinLockOverlay } from '@/components/PinLockOverlay'
 import { OfflineProvider } from '@/components/OfflineProvider'
 import { Toaster } from '@/components/ui/sonner'
 
-export default async function AppLayout({ children }: { children: React.ReactNode }) {
+export default async function ModulesLayout({ children }: { children: React.ReactNode }) {
   const session = await auth()
   if (!session) redirect('/login')
 
