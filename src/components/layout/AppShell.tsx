@@ -66,9 +66,17 @@ interface ToolbarButton {
 
 // ─── Toolbar configs per tab ──────────────────────────────────────────────────
 
-function useToolbarButtons(activeTab: TabId, role: string): ToolbarButton[] {
+function useToolbarButtons(activeTab: TabId, role: string, pathname: string): ToolbarButton[] {
   const isMgr   = role === 'admin' || role === 'manager'
   const isAdmin  = role === 'admin'
+
+  // Expenses-specific toolbar overrides the generic Finance tab
+  if (pathname === '/app/expenses' || pathname.startsWith('/app/expenses/')) {
+    return [
+      { label: 'Add Expense',      icon: Plus, href: '/app/expenses?add=1',     variant: 'primary' },
+      { label: 'Add Expense Type', icon: Tag,  href: '/app/expenses?addtype=1', variant: 'secondary' },
+    ]
+  }
 
   switch (activeTab) {
     case 'home':
@@ -301,7 +309,7 @@ export function AppShell({
   const pathname    = usePathname()
   const router      = useRouter()
   const activeTab   = getActiveTab(pathname)
-  const toolbarBtns = useToolbarButtons(activeTab, role)
+  const toolbarBtns = useToolbarButtons(activeTab, role, pathname)
   const [search, setSearch] = useState('')
 
   // Alt+key shortcuts for ribbon tabs

@@ -1,10 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import Decimal from 'decimal.js'
 import useSWR, { mutate } from 'swr'
 import { useSession } from 'next-auth/react'
-import { CheckCircle, Trash2, Loader2, Receipt, Search, X, Plus } from 'lucide-react'
+import { CheckCircle, Trash2, Loader2, Receipt, Search, X, Plus, Paperclip } from 'lucide-react'
 import { toast } from 'sonner'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -24,21 +26,38 @@ type ExpenseType = { id: string; name: string; parentId?: string | null }
 type Expense = {
   id: string; refNumber: string; description: string
   amount: string; vatAmount: string; includesVat: boolean
-  paymentMethod: string; chequeNo?: string; status: string
+  paymentMethod: string; chequeNo?: string | null; status: string
   createdAt: string; expenseType: { name: string }
+  _count?: { attachments: number }
 }
 
 const PAGE_TABS = ['Pending', 'Approved', 'All'] as const
 type PageTab = typeof PAGE_TABS[number]
 
 export default function ExpensesPage() {
+  const router        = useRouter()
+  const searchParams  = useSearchParams()
   const { data: session } = useSession()
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
-  const [tab,      setTab]      = useState<PageTab>('Pending')
-  const [addOpen,  setAddOpen]  = useState(false)
-  const [search,   setSearch]   = useState('')
-  const [from,     setFrom]     = useState('')
-  const [to,       setTo]       = useState('')
+
+  const [tab,         setTab]         = useState<PageTab>('Pending')
+  const [addOpen,     setAddOpen]     = useState(false)
+  const [addTypeOpen, setAddTypeOpen] = useState(false)
+  const [search,      setSearch]      = useState('')
+  const [from,        setFrom]        = useState('')
+  const [to,          setTo]          = useState('')
+
+  // Open modal from toolbar query params
+  useEffect(() => {
+    if (searchParams.get('add') === '1') {
+      setAddOpen(true)
+      router.replace('/app/expenses')
+    }
+    if (searchParams.get('addtype') === '1') {
+      setAddTypeOpen(true)
+      router.replace('/app/expenses')
+    }
+  }, [searchParams, router])
 
   const hasFilters = !!(search || from || to)
   function clearFilters() { setSearch(''); setFrom(''); setTo('') }
@@ -79,6 +98,14 @@ export default function ExpensesPage() {
 
   const columns: Column<Expense>[] = [
     {
+      key: 'attachments',
+      header: '',
+      width: '28px',
+      render: (r) => (r._count?.attachments ?? 0) > 0
+        ? <Paperclip className="w-3 h-3" style={{ color: colors.textSecondary }} />
+        : null,
+    },
+    {
       key: 'refNumber',
       header: 'Ref #',
       width: '130px',
@@ -104,7 +131,7 @@ export default function ExpensesPage() {
       header: 'Description',
       render: (r) => (
         <span
-          className="truncate block max-w-[220px]"
+          className="truncate block max-w-[200px]"
           style={{ fontSize: fontSize.sm, color: colors.textPrimary }}
         >
           {r.description}
@@ -138,6 +165,16 @@ export default function ExpensesPage() {
       render: (r) => (
         <span className="capitalize" style={{ fontSize: fontSize.sm, color: colors.textSecondary }}>
           {r.paymentMethod}
+        </span>
+      ),
+    },
+    {
+      key: 'chequeNo',
+      header: 'Cheque No',
+      width: '100px',
+      render: (r) => (
+        <span className="font-mono" style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>
+          {r.chequeNo ?? '—'}
         </span>
       ),
     },
@@ -261,6 +298,7 @@ export default function ExpensesPage() {
           emptyMessage="No expenses found"
           total={data?.total}
           pageSize={50}
+          onRowClick={(r) => router.push(`/app/expenses/${r.id}`)}
         />
       </div>
 
@@ -268,6 +306,13 @@ export default function ExpensesPage() {
         <AddExpenseModal
           onClose={() => setAddOpen(false)}
           onSuccess={() => { mutate(key); setAddOpen(false) }}
+        />
+      )}
+
+      {addTypeOpen && (
+        <AddTypeModal
+          onClose={() => setAddTypeOpen(false)}
+          onSuccess={() => { mutate('/api/expense-types'); setAddTypeOpen(false) }}
         />
       )}
     </PageShell>

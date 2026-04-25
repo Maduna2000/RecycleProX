@@ -18,6 +18,10 @@ export function customerDocumentKey(customerId: string, ext: string): string {
   return `customers/${customerId}/documents/${randomUUID()}.${ext}`
 }
 
+export function expenseAttachmentKey(expenseId: string, ext: string): string {
+  return `expenses/${expenseId}/attachments/${randomUUID()}.${ext}`
+}
+
 // ─── Presigned upload URL (PUT) ───────────────────────────────────────────────
 // Client uploads directly to R2 — server never handles the binary.
 

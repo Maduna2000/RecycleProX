@@ -26,3 +26,10 @@ export type CreateExpenseTypeInput = z.infer<typeof CreateExpenseTypeSchema>
 export type CreateExpenseInput     = z.infer<typeof CreateExpenseSchema>
 export type CreateExpenseFormInput = z.input<typeof CreateExpenseSchema>
 export type ApproveExpenseInput    = z.infer<typeof ApproveExpenseSchema>
+
+export const UploadExpenseAttachmentSchema = z.object({
+  r2Key:    z.string().min(1),
+  fileName: z.string().min(1).max(255),
+  notes:    z.string().max(500).optional(),
+})
+export type UploadExpenseAttachmentInput = z.infer<typeof UploadExpenseAttachmentSchema>

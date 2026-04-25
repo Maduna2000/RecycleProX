@@ -3,7 +3,7 @@ import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { z } from 'zod'
 import {
-  getUploadUrl, customerIdPhotoKey, customerDocumentKey, purchasePhotoKey,
+  getUploadUrl, customerIdPhotoKey, customerDocumentKey, expenseAttachmentKey, purchasePhotoKey,
   mimeToExt, ALLOWED_PHOTO_TYPES, MAX_PHOTO_BYTES,
 } from '@/lib/r2'
 import { randomUUID } from 'crypto'
@@ -12,8 +12,8 @@ const ALLOWED_DOCUMENT_TYPES = [...ALLOWED_PHOTO_TYPES, 'application/pdf']
 const MAX_DOCUMENT_BYTES = 20 * 1024 * 1024  // 20 MB
 
 const Schema = z.object({
-  context: z.enum(['customer_id', 'purchase_photo', 'police_signature', 'stocktake_entry', 'customer_document']),
-  referenceId: z.string().uuid(),      // customerId, purchaseId, policeVisitId, or stocktakeId
+  context: z.enum(['customer_id', 'purchase_photo', 'police_signature', 'stocktake_entry', 'customer_document', 'expense_attachment']),
+  referenceId: z.string().uuid(),
   contentType: z.string(),
   fileSize: z.number().int().positive(),
 })
@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
 
   const { context, referenceId, contentType, fileSize } = parsed.data
 
-  const isDocumentContext = context === 'customer_document'
+  const isDocumentContext = context === 'customer_document' || context === 'expense_attachment'
   const allowedTypes = isDocumentContext ? ALLOWED_DOCUMENT_TYPES : ALLOWED_PHOTO_TYPES
   const maxBytes = isDocumentContext ? MAX_DOCUMENT_BYTES : MAX_PHOTO_BYTES
 
@@ -45,11 +45,13 @@ export async function POST(req: NextRequest) {
       ? customerIdPhotoKey(referenceId, ext)
       : context === 'customer_document'
         ? customerDocumentKey(referenceId, ext)
-        : context === 'police_signature'
-          ? `police-visits/${referenceId}/signature-${randomUUID()}.${ext}`
-          : context === 'stocktake_entry'
-            ? `stocktakes/${referenceId}/photo-${randomUUID()}.${ext}`
-            : purchasePhotoKey(referenceId, ext)
+        : context === 'expense_attachment'
+          ? expenseAttachmentKey(referenceId, ext)
+          : context === 'police_signature'
+            ? `police-visits/${referenceId}/signature-${randomUUID()}.${ext}`
+            : context === 'stocktake_entry'
+              ? `stocktakes/${referenceId}/photo-${randomUUID()}.${ext}`
+              : purchasePhotoKey(referenceId, ext)
 
     const uploadUrl = await getUploadUrl({ key, contentType, maxBytes: fileSize })
 

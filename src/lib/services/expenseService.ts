@@ -94,7 +94,7 @@ export async function listExpenses(filters: {
       skip: (page - 1) * limit,
       take: limit,
       orderBy: { createdAt: 'desc' },
-      include: { expenseType: true },
+      include: { expenseType: true, _count: { select: { attachments: true } } },
     }),
     prisma.expense.count({ where }),
   ])
@@ -102,7 +102,10 @@ export async function listExpenses(filters: {
 }
 
 export async function getExpense(id: string) {
-  return prisma.expense.findUniqueOrThrow({ where: { id }, include: { expenseType: true } })
+  return prisma.expense.findUniqueOrThrow({
+    where: { id },
+    include: { expenseType: true, attachments: { orderBy: { uploadedAt: 'desc' } } },
+  })
 }
 
 export async function approveExpense(id: string, userId: string) {

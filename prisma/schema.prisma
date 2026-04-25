@@ -474,9 +474,24 @@ model Expense {
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
+  attachments     ExpenseAttachment[]
+
   @@index([expenseTypeId])
   @@index([status])
   @@index([createdAt])
+}
+
+model ExpenseAttachment {
+  id               String   @id @default(uuid())
+  expenseId        String
+  expense          Expense  @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  r2Key            String
+  fileName         String
+  notes            String?
+  uploadedAt       DateTime @default(now())
+  uploadedByUserId String?
+
+  @@index([expenseId])
 }
 
 // ─── Float (M16) ──────────────────────────────────────────────────────────────
