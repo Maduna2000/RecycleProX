@@ -86,7 +86,7 @@ Fetches from `/api/reports/today` (existing endpoint already used by the current
 | Amber `#C9A020` | Finance | Cash Up, Expenses, Float |
 | Grey `#374151` | System | Settings |
 
-**Unbuilt tiles** (Coming Soon): Casual Details, Photo Viewer, Weighbridge, Top Product Prices, Float, Loans (if shown)
+**Unbuilt tile** (Coming Soon): Weighbridge only — all other modules have existing pages.
 
 Each tile: icon (lucide SVG, not emoji — matches production icon set), bold label, small subtitle, hover highlight, click → `router.push(href)`.
 
@@ -193,7 +193,7 @@ No changes to page content logic — only layout/sizing adjustments where tables
 
 ## 6. Out of Scope
 
-- Building the Weighbridge, Float, or Photo Viewer modules (Coming Soon tiles only)
+- Building the Weighbridge module (its tile shows "Coming Soon")
 - Changing any existing module's internal layout or data logic
 - Role-based tile visibility (all users see all tiles; access control remains on the module page itself)
 - Dark mode or theme switching
