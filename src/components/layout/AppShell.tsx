@@ -57,11 +57,13 @@ const MODULE_NAMES: Record<string, string> = {
 
 function getModuleName(pathname: string): string {
   // Exact match first
-  if (MODULE_NAMES[pathname]) return MODULE_NAMES[pathname]
+  const exact = MODULE_NAMES[pathname]
+  if (exact) return exact
   // Prefix match (e.g. /app/customers/abc → Accounts)
   const sorted = Object.keys(MODULE_NAMES).sort((a, b) => b.length - a.length)
   for (const key of sorted) {
-    if (pathname.startsWith(key + '/')) return MODULE_NAMES[key]
+    const name = MODULE_NAMES[key]
+    if (name && pathname.startsWith(key + '/')) return name
   }
   return 'RecycleProX'
 }
