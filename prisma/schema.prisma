@@ -86,6 +86,26 @@ enum AuditAction {
   ADJUSTMENT
 }
 
+enum MarketSector {
+  formal
+  informal
+}
+
+enum DealerCategory {
+  casual
+  dealer_1
+  dealer_2
+  dealer_3
+}
+
+enum CustomerDocumentType {
+  trading_licence
+  sars_certificate
+  company_registration
+  id_copy
+  other
+}
+
 // ─── Models ───────────────────────────────────────────────────────────────────
 
 model User {
@@ -166,6 +186,9 @@ model Customer {
   payments         Payment[]
   loans            Loan[]
   loanRepayments   LoanRepayment[]
+  marketSector     MarketSector?
+  dealerCategory   DealerCategory?
+  zeroRated        Boolean         @default(false)
   isActive         Boolean         @default(true)
   blacklisted      Boolean         @default(false)
   blacklistReason  String?
@@ -175,10 +198,26 @@ model Customer {
   updatedAt        DateTime        @updatedAt
   createdByUserId  String?
 
+  documents        CustomerDocument[]
+
   @@index([idNumber])
   @@index([phone])
   @@index([lastName])
   @@index([customerType])
+}
+
+model CustomerDocument {
+  id               String               @id @default(uuid())
+  customerId       String
+  customer         Customer             @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  documentType     CustomerDocumentType
+  r2Key            String
+  fileName         String
+  notes            String?
+  uploadedAt       DateTime             @default(now())
+  uploadedByUserId String?
+
+  @@index([customerId])
 }
 
 // ─── Products & Pricing ───────────────────────────────────────────────────────

@@ -1,0 +1,174 @@
+<h2>New Account — Full Page Layout</h2>
+<p class="subtitle">Required fields at the top, optional sections below. Each section saves independently so staff can skip and return later.</p>
+
+<div class="mockup">
+  <div class="mockup-header">/app/customers/new — New Account</div>
+  <div class="mockup-body" style="padding:0;font-size:12px;">
+
+    <!-- Page header -->
+    <div style="background:#1e293b;padding:10px 16px;display:flex;justify-content:space-between;align-items:center;">
+      <div style="color:white;font-weight:600;font-size:13px">← Customers &nbsp;/&nbsp; New Account</div>
+      <div style="display:flex;gap:8px;">
+        <span style="background:#334155;color:#94a3b8;padding:4px 12px;border-radius:4px;font-size:11px">Cancel</span>
+        <span style="background:#2563eb;color:white;padding:4px 12px;border-radius:4px;font-size:11px;font-weight:600">Save Account</span>
+      </div>
+    </div>
+
+    <div style="padding:16px;display:flex;flex-direction:column;gap:12px;">
+
+      <!-- REQUIRED section -->
+      <div style="background:#fff;border:2px solid #2563eb;border-radius:10px;overflow:hidden;">
+        <div style="background:#eff6ff;padding:8px 14px;display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-weight:700;color:#1d4ed8;font-size:12px">★ REQUIRED DETAILS</span>
+          <span style="font-size:10px;color:#64748b">Fields marked * must be filled to save</span>
+        </div>
+        <div style="padding:12px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+          <div>
+            <div style="color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:3px">ID Number *</div>
+            <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:5px;padding:5px 8px;color:#94a3b8">e.g. 9001015800086</div>
+          </div>
+          <div>
+            <div style="color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:3px">First Name *</div>
+            <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:5px;padding:5px 8px;color:#94a3b8">First name</div>
+          </div>
+          <div>
+            <div style="color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:3px">Last Name *</div>
+            <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:5px;padding:5px 8px;color:#94a3b8">Last name</div>
+          </div>
+          <div>
+            <div style="color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:3px">Phone *</div>
+            <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:5px;padding:5px 8px;color:#94a3b8">+268 ...</div>
+          </div>
+          <div>
+            <div style="color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:3px">Market Sector *</div>
+            <div style="display:flex;gap:6px;margin-top:3px;">
+              <span style="background:#1d4ed8;color:white;padding:4px 10px;border-radius:99px;font-size:11px;cursor:pointer">Formal</span>
+              <span style="background:#e2e8f0;color:#475569;padding:4px 10px;border-radius:99px;font-size:11px;cursor:pointer">Informal</span>
+            </div>
+          </div>
+          <div>
+            <div style="color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:3px">Dealer Category *</div>
+            <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:5px;padding:5px 8px;display:flex;justify-content:space-between;">
+              <span style="color:#374151">Dealer 1</span><span style="color:#94a3b8">▼</span>
+            </div>
+            <div style="font-size:10px;color:#059669;margin-top:2px">→ Auto-assigned: Price Group A</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- COMPANY section (optional) -->
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;">
+        <div style="background:#f8fafc;padding:8px 14px;display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-weight:600;color:#374151;font-size:12px">🏢 Company Details <span style="color:#94a3b8;font-weight:400;font-size:10px">— optional</span></span>
+          <span style="color:#2563eb;font-size:11px;cursor:pointer">▼ expand</span>
+        </div>
+        <div style="padding:12px;display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div>
+            <div style="color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:3px">Company Name</div>
+            <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:5px;padding:5px 8px;color:#94a3b8">e.g. xTimely Pty Ltd</div>
+          </div>
+          <div>
+            <div style="color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:3px">Contact Person</div>
+            <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:5px;padding:5px 8px;color:#94a3b8">e.g. James Smith</div>
+          </div>
+          <div>
+            <div style="color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:3px">VAT Number</div>
+            <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:5px;padding:5px 8px;color:#94a3b8">4123456789</div>
+          </div>
+          <div>
+            <div style="color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:3px">Company Reg No</div>
+            <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:5px;padding:5px 8px;color:#94a3b8">2015/012345/07</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CLASSIFICATION section (optional) -->
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;">
+        <div style="background:#f8fafc;padding:8px 14px;display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-weight:600;color:#374151;font-size:12px">🏷️ Classification &amp; VAT <span style="color:#94a3b8;font-weight:400;font-size:10px">— optional</span></span>
+          <span style="color:#2563eb;font-size:11px;cursor:pointer">▼ expand</span>
+        </div>
+        <div style="padding:12px;display:flex;flex-direction:column;gap:8px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;background:#fef9c3;border:1px solid #fde047;border-radius:6px;padding:8px 12px;">
+            <div>
+              <div style="font-weight:600;color:#854d0e;font-size:12px">Zero-Rated VAT</div>
+              <div style="font-size:10px;color:#92400e">No VAT will be charged on this account's transactions</div>
+            </div>
+            <div style="width:36px;height:20px;background:#d1d5db;border-radius:99px;position:relative;cursor:pointer;">
+              <div style="width:16px;height:16px;background:white;border-radius:99px;position:absolute;top:2px;left:2px;box-shadow:0 1px 3px rgba(0,0,0,0.2)"></div>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div>
+              <div style="color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:3px">Primary Function</div>
+              <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:5px;padding:5px 8px;display:flex;justify-content:space-between;">
+                <span style="color:#374151">Supplier</span><span style="color:#94a3b8">▼</span>
+              </div>
+            </div>
+            <div>
+              <div style="color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:3px">Credit Limit</div>
+              <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:5px;padding:5px 8px;color:#94a3b8">R 0.00</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TRADE COMMODITIES section -->
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;">
+        <div style="background:#f8fafc;padding:8px 14px;display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-weight:600;color:#374151;font-size:12px">🪙 Trade Commodities <span style="color:#94a3b8;font-weight:400;font-size:10px">— controls which products show at purchase</span></span>
+          <span style="color:#2563eb;font-size:11px;cursor:pointer">▼ expand</span>
+        </div>
+        <div style="padding:12px;display:grid;grid-template-columns:repeat(4,1fr);gap:6px;">
+          <label style="display:flex;align-items:center;gap:5px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:5px;padding:5px 8px;cursor:pointer"><input type="checkbox" checked style="accent-color:#16a34a"> <span style="font-size:11px;color:#166534">Ferrous</span></label>
+          <label style="display:flex;align-items:center;gap:5px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:5px;padding:5px 8px;cursor:pointer"><input type="checkbox" checked style="accent-color:#16a34a"> <span style="font-size:11px;color:#166534">Non-Ferrous</span></label>
+          <label style="display:flex;align-items:center;gap:5px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:5px;padding:5px 8px;cursor:pointer"><input type="checkbox"> <span style="font-size:11px;color:#64748b">Copper</span></label>
+          <label style="display:flex;align-items:center;gap:5px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:5px;padding:5px 8px;cursor:pointer"><input type="checkbox"> <span style="font-size:11px;color:#64748b">Aluminium</span></label>
+          <label style="display:flex;align-items:center;gap:5px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:5px;padding:5px 8px;cursor:pointer"><input type="checkbox"> <span style="font-size:11px;color:#64748b">Plastic</span></label>
+          <label style="display:flex;align-items:center;gap:5px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:5px;padding:5px 8px;cursor:pointer"><input type="checkbox"> <span style="font-size:11px;color:#64748b">Paper</span></label>
+          <label style="display:flex;align-items:center;gap:5px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:5px;padding:5px 8px;cursor:pointer"><input type="checkbox"> <span style="font-size:11px;color:#64748b">E-Waste</span></label>
+          <label style="display:flex;align-items:center;gap:5px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:5px;padding:5px 8px;cursor:pointer"><input type="checkbox"> <span style="font-size:11px;color:#64748b">Batteries</span></label>
+        </div>
+      </div>
+
+      <!-- BANKING section -->
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;">
+        <div style="background:#f8fafc;padding:8px 14px;display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-weight:600;color:#374151;font-size:12px">🏦 Banking Details <span style="color:#94a3b8;font-weight:400;font-size:10px">— optional, required for EFT payments</span></span>
+          <span style="color:#2563eb;font-size:11px;cursor:pointer">▼ expand</span>
+        </div>
+        <div style="padding:12px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+          <div>
+            <div style="color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:3px">Bank Name</div>
+            <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:5px;padding:5px 8px;color:#94a3b8">e.g. FNB</div>
+          </div>
+          <div>
+            <div style="color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:3px">Account Number</div>
+            <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:5px;padding:5px 8px;color:#94a3b8">62012345678</div>
+          </div>
+          <div>
+            <div style="color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:3px">Branch Code</div>
+            <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:5px;padding:5px 8px;color:#94a3b8">250655</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- DOCUMENTS section -->
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;">
+        <div style="background:#f8fafc;padding:8px 14px;display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-weight:600;color:#374151;font-size:12px">📎 Documents <span style="color:#94a3b8;font-weight:400;font-size:10px">— optional, upload after saving</span></span>
+          <span style="color:#94a3b8;font-size:11px">Save account first to upload</span>
+        </div>
+        <div style="padding:12px;display:flex;gap:8px;flex-wrap:wrap;">
+          <div style="border:1px dashed #cbd5e1;border-radius:6px;padding:8px 14px;font-size:11px;color:#94a3b8;display:flex;align-items:center;gap:6px;cursor:not-allowed">📄 Trading Licence</div>
+          <div style="border:1px dashed #cbd5e1;border-radius:6px;padding:8px 14px;font-size:11px;color:#94a3b8;display:flex;align-items:center;gap:6px;cursor:not-allowed">📄 SARS Certificate</div>
+          <div style="border:1px dashed #cbd5e1;border-radius:6px;padding:8px 14px;font-size:11px;color:#94a3b8;display:flex;align-items:center;gap:6px;cursor:not-allowed">📄 Company Registration</div>
+          <div style="border:1px dashed #cbd5e1;border-radius:6px;padding:8px 14px;font-size:11px;color:#94a3b8;display:flex;align-items:center;gap:6px;cursor:not-allowed">📄 Other</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:12px;text-align:center">Does this layout and section structure look right? Any sections to add, remove or rename?</p>

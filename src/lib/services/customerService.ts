@@ -24,6 +24,26 @@ export class ForbiddenError extends Error {
 
 // ─── Service ──────────────────────────────────────────────────────────────────
 
+const DEALER_PRICE_GROUP_NAMES: Record<string, string> = {
+  dealer_1: 'Dealer 1',
+  dealer_2: 'Dealer 2',
+  dealer_3: 'Dealer 3',
+}
+
+async function resolvePriceGroupId(
+  dealerCategory: string | undefined,
+  explicitPriceGroupId: string | undefined,
+): Promise<string | undefined> {
+  if (dealerCategory === 'casual') return undefined
+  if (dealerCategory && DEALER_PRICE_GROUP_NAMES[dealerCategory]) {
+    const group = await prisma.priceGroup.findFirst({
+      where: { name: DEALER_PRICE_GROUP_NAMES[dealerCategory] },
+    })
+    if (group) return group.id
+  }
+  return explicitPriceGroupId
+}
+
 export async function createCustomer(data: CreateCustomerInput, userId: string) {
   const idCheck = validateSaId(data.idNumber)
   if (!idCheck.valid) throw new Error(idCheck.error)
@@ -31,8 +51,10 @@ export async function createCustomer(data: CreateCustomerInput, userId: string) 
   const existing = await prisma.customer.findUnique({ where: { idNumber: data.idNumber } })
   if (existing) throw new DuplicateCustomerError(existing.id)
 
+  const resolvedPriceGroupId = await resolvePriceGroupId(data.dealerCategory, data.priceGroupId)
+
   const customer = await prisma.customer.create({
-    data: { ...data, createdByUserId: userId },
+    data: { ...data, priceGroupId: resolvedPriceGroupId, createdByUserId: userId },
   })
   logger.info({ customerId: customer.id, userId }, 'Customer created')
   return customer
@@ -51,9 +73,16 @@ export async function quickCreate(data: QuickCreateInput, userId: string) {
 }
 
 export async function updateCustomer(id: string, data: UpdateCustomerInput, userId: string) {
+  let updateData: typeof data = data
+
+  if (data.dealerCategory !== undefined) {
+    const resolvedPriceGroupId = await resolvePriceGroupId(data.dealerCategory, data.priceGroupId)
+    updateData = { ...data, priceGroupId: resolvedPriceGroupId }
+  }
+
   const customer = await prisma.customer.update({
     where: { id },
-    data,
+    data: updateData,
   })
   logger.info({ customerId: id, userId }, 'Customer updated')
   return customer

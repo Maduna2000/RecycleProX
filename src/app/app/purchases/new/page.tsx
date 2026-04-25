@@ -32,6 +32,24 @@ type Product = {
 type SelectedCustomer = {
   id: string; firstName: string; lastName: string; idNumber: string
   phone: string; blacklisted: boolean; priceGroupId?: string | null
+  tradeCommodities?: string[] | null; zeroRated?: boolean
+}
+
+const COMMODITY_MAP: Record<string, string[]> = {
+  'Copper':                 ['copper'],
+  'Aluminium':              ['aluminium'],
+  'Steel (Ferrous)':        ['ferrous'],
+  'Non-Ferrous Metals':     ['non_ferrous'],
+  'Stainless Steel':        ['ferrous', 'non_ferrous'],
+  'Lead':                   ['non_ferrous'],
+  'Brass':                  ['non_ferrous'],
+  'Iron':                   ['ferrous'],
+  'E-Waste (Electronics)':  ['e_waste'],
+  'Plastic':                ['plastic'],
+  'Paper / Cardboard':      ['paper'],
+  'Catalytic Converters':   ['other'],
+  'Batteries':              ['other'],
+  'Other':                  ['other'],
 }
 
 type LineItem = {
@@ -94,6 +112,7 @@ export default function NewPurchasePage() {
   const [printDialog,   setPrintDialog]   = useState<{ id: string; refNumber: string } | null>(null)
   const [deductLoan,     setDeductLoan]     = useState(false)
   const [deductionAmount, setDeductionAmount] = useState('')
+  const [showAllProducts, setShowAllProducts] = useState(false)
 
   const { data: productsData } = useSWR<{ products: Product[] }>('/api/products?active=true', fetcher)
   const products = productsData?.products ?? []
@@ -105,7 +124,14 @@ export default function NewPurchasePage() {
   const hasOutstandingLoan = loanData?.summary?.hasOutstanding ?? false
   const outstandingLoanAmount = loanData?.summary?.outstanding ?? '0'
 
-  const productsByCategory = products.reduce<Record<string, Product[]>>((acc, p) => {
+  const visibleProducts = (() => {
+    const commodities = customer?.tradeCommodities
+    if (showAllProducts || !commodities?.length) return products
+    const allowed = new Set(commodities.flatMap((c) => COMMODITY_MAP[c] ?? []))
+    return products.filter((p) => allowed.has(p.category))
+  })()
+
+  const productsByCategory = visibleProducts.reduce<Record<string, Product[]>>((acc, p) => {
     acc[p.category] = acc[p.category] ?? []
     acc[p.category]!.push(p)
     return acc
@@ -183,6 +209,7 @@ export default function NewPurchasePage() {
     setCustomer(c)
     setDeductLoan(false)
     setDeductionAmount('')
+    setShowAllProducts(false)
   }, [])
 
   async function submitPurchase(status: 'completed' | 'pending') {
@@ -297,16 +324,27 @@ export default function NewPurchasePage() {
           {!customer ? (
             <CustomerLookupWidget onSelect={handleCustomerSelect} />
           ) : (
-            <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
-              <div>
-                <p className="font-semibold text-gray-900">{customer.firstName} {customer.lastName}</p>
-                <p className="text-sm text-gray-500 font-mono">{customer.idNumber} · {customer.phone}</p>
+            <>
+              <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
+                <div>
+                  <p className="font-semibold text-gray-900">{customer.firstName} {customer.lastName}</p>
+                  <p className="text-sm text-gray-500 font-mono">{customer.idNumber} · {customer.phone}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {customer.priceGroupId && <Badge className="bg-blue-100 text-blue-700">Custom Pricing</Badge>}
+                  {customer.zeroRated && <Badge className="bg-yellow-100 text-yellow-800">Zero Rated</Badge>}
+                  <Button variant="outline" size="sm" onClick={() => setCustomer(null)}>Change</Button>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                {customer.priceGroupId && <Badge className="bg-blue-100 text-blue-700">Custom Pricing</Badge>}
-                <Button variant="outline" size="sm" onClick={() => setCustomer(null)}>Change</Button>
-              </div>
-            </div>
+              {!showAllProducts && (customer?.tradeCommodities?.length ?? 0) > 0 && (
+                <p className="text-xs text-gray-500 mt-2">
+                  Showing {customer!.tradeCommodities!.join(', ')} products only ·{' '}
+                  <button type="button" className="text-blue-600 underline" onClick={() => setShowAllProducts(true)}>
+                    Show all products
+                  </button>
+                </p>
+              )}
+            </>
           )}
         </div>
 

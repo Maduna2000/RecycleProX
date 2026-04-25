@@ -47,7 +47,9 @@
       "Bash(where python3 *)",
       "Bash(where py *)",
       "Bash(ls /c/Python*/python.exe)",
-      "Read(//c/Users/MD TECH SOLUTION/AppData/Local/Programs/**)"
+      "Read(//c/Users/MD TECH SOLUTION/AppData/Local/Programs/**)",
+      "Bash(psql --version)",
+      "Bash(pg_isready)"
     ]
   }
 }

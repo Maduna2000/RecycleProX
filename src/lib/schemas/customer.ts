@@ -75,6 +75,9 @@ export const CreateCustomerSchema = z.object({
   tradeCommodities: z.array(z.string()).optional(),
   customerNotes:    z.string().optional(),
   priceGroupId:     z.string().uuid().optional(),
+  marketSector:     z.enum(['formal', 'informal']).optional(),
+  dealerCategory:   z.enum(['casual', 'dealer_1', 'dealer_2', 'dealer_3']).optional(),
+  zeroRated:        z.boolean().optional().default(false),
 })
 
 export const QuickCreateSchema = z.object({
@@ -93,9 +96,17 @@ export const UpdateCustomerSchema = CreateCustomerSchema.partial().omit({ idNumb
   isActive:     z.boolean().optional(),
 })
 
-export type CreateCustomerInput     = z.infer<typeof CreateCustomerSchema>
-export type CreateCustomerFormInput = z.input<typeof CreateCustomerSchema>
-export type QuickCreateInput        = z.infer<typeof QuickCreateSchema>
-export type BlacklistInput          = z.infer<typeof BlacklistSchema>
-export type UpdateCustomerInput     = z.infer<typeof UpdateCustomerSchema>
-export type UpdateCustomerFormInput = z.input<typeof UpdateCustomerSchema>
+export const UploadCustomerDocumentSchema = z.object({
+  documentType: z.enum(['trading_licence', 'sars_certificate', 'company_registration', 'id_copy', 'other']),
+  fileName:     z.string().min(1).max(255),
+  r2Key:        z.string().min(1),
+  notes:        z.string().max(500).optional(),
+})
+
+export type CreateCustomerInput          = z.infer<typeof CreateCustomerSchema>
+export type CreateCustomerFormInput      = z.input<typeof CreateCustomerSchema>
+export type QuickCreateInput             = z.infer<typeof QuickCreateSchema>
+export type BlacklistInput               = z.infer<typeof BlacklistSchema>
+export type UpdateCustomerInput          = z.infer<typeof UpdateCustomerSchema>
+export type UpdateCustomerFormInput      = z.input<typeof UpdateCustomerSchema>
+export type UploadCustomerDocumentInput  = z.infer<typeof UploadCustomerDocumentSchema>

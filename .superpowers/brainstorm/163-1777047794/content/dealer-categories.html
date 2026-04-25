@@ -1,0 +1,78 @@
+<h2>What do Dealer 1 / 2 / 3 mean?</h2>
+<p class="subtitle">Help me understand how dealer categories actually work in your yard</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Price Tiers — each dealer level gets different buy prices</h3>
+      <p>Dealer 1 might get the best prices, Dealer 2 slightly lower, Dealer 3 lower still. The category drives what price list they're on.</p>
+      <div style="margin-top:10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px;font-size:12px;">
+        <table style="width:100%;border-collapse:collapse;">
+          <tr style="color:#64748b;font-size:11px;text-transform:uppercase">
+            <th style="text-align:left;padding:4px">Product</th>
+            <th style="text-align:right;padding:4px">Dealer 1</th>
+            <th style="text-align:right;padding:4px">Dealer 2</th>
+            <th style="text-align:right;padding:4px">Dealer 3</th>
+          </tr>
+          <tr style="border-top:1px solid #e2e8f0">
+            <td style="padding:4px">Copper Wire</td>
+            <td style="text-align:right;padding:4px;color:#166534">R 85/kg</td>
+            <td style="text-align:right;padding:4px;color:#854d0e">R 80/kg</td>
+            <td style="text-align:right;padding:4px;color:#991b1b">R 75/kg</td>
+          </tr>
+          <tr style="border-top:1px solid #e2e8f0">
+            <td style="padding:4px">Steel</td>
+            <td style="text-align:right;padding:4px;color:#166534">R 4.50/kg</td>
+            <td style="text-align:right;padding:4px;color:#854d0e">R 4.20/kg</td>
+            <td style="text-align:right;padding:4px;color:#991b1b">R 3.90/kg</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Size / Volume Tiers — categories reflect how big the supplier is</h3>
+      <p>Dealer 1 = large established scrap yards, Dealer 2 = medium, Dealer 3 = small. Used for reporting and grouping, but pricing is set separately per account via price groups.</p>
+      <div style="margin-top:10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px;font-size:12px;">
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <div style="display:flex;align-items:center;gap:8px"><span style="background:#1d4ed8;color:white;padding:2px 8px;border-radius:99px;font-size:11px">Dealer 1</span> Large established scrap yard</div>
+          <div style="display:flex;align-items:center;gap:8px"><span style="background:#7c3aed;color:white;padding:2px 8px;border-radius:99px;font-size:11px">Dealer 2</span> Medium yard / collector</div>
+          <div style="display:flex;align-items:center;gap:8px"><span style="background:#059669;color:white;padding:2px 8px;border-radius:99px;font-size:11px">Dealer 3</span> Small yard / part-time</div>
+          <div style="display:flex;align-items:center;gap:8px"><span style="background:#64748b;color:white;padding:2px 8px;border-radius:99px;font-size:11px">Casual</span> Walk-in street seller</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Both — categories drive price AND describe size</h3>
+      <p>Dealer 1/2/3 is a label that both describes the supplier's size AND is linked to a specific price group. Assigning the category automatically sets their price list.</p>
+      <div style="margin-top:10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px;font-size:12px;">
+        <div style="display:flex;flex-direction:column;gap:4px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #e2e8f0">
+            <span style="font-weight:600;color:#1d4ed8">Dealer 1</span>
+            <span style="color:#64748b">→ automatically on <strong>Price Group A</strong></span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #e2e8f0">
+            <span style="font-weight:600;color:#7c3aed">Dealer 2</span>
+            <span style="color:#64748b">→ automatically on <strong>Price Group B</strong></span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #e2e8f0">
+            <span style="font-weight:600;color:#059669">Dealer 3</span>
+            <span style="color:#64748b">→ automatically on <strong>Price Group C</strong></span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0">
+            <span style="font-weight:600;color:#64748b">Casual</span>
+            <span style="color:#64748b">→ default buy prices</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

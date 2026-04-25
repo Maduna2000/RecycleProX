@@ -3,13 +3,16 @@ import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { z } from 'zod'
 import {
-  getUploadUrl, customerIdPhotoKey, purchasePhotoKey,
+  getUploadUrl, customerIdPhotoKey, customerDocumentKey, purchasePhotoKey,
   mimeToExt, ALLOWED_PHOTO_TYPES, MAX_PHOTO_BYTES,
 } from '@/lib/r2'
 import { randomUUID } from 'crypto'
 
+const ALLOWED_DOCUMENT_TYPES = [...ALLOWED_PHOTO_TYPES, 'application/pdf']
+const MAX_DOCUMENT_BYTES = 20 * 1024 * 1024  // 20 MB
+
 const Schema = z.object({
-  context: z.enum(['customer_id', 'purchase_photo', 'police_signature', 'stocktake_entry']),
+  context: z.enum(['customer_id', 'purchase_photo', 'police_signature', 'stocktake_entry', 'customer_document']),
   referenceId: z.string().uuid(),      // customerId, purchaseId, policeVisitId, or stocktakeId
   contentType: z.string(),
   fileSize: z.number().int().positive(),
@@ -25,22 +28,28 @@ export async function POST(req: NextRequest) {
 
   const { context, referenceId, contentType, fileSize } = parsed.data
 
-  if (!ALLOWED_PHOTO_TYPES.includes(contentType)) {
-    return NextResponse.json({ error: `Unsupported file type. Allowed: ${ALLOWED_PHOTO_TYPES.join(', ')}` }, { status: 422 })
+  const isDocumentContext = context === 'customer_document'
+  const allowedTypes = isDocumentContext ? ALLOWED_DOCUMENT_TYPES : ALLOWED_PHOTO_TYPES
+  const maxBytes = isDocumentContext ? MAX_DOCUMENT_BYTES : MAX_PHOTO_BYTES
+
+  if (!allowedTypes.includes(contentType)) {
+    return NextResponse.json({ error: `Unsupported file type. Allowed: ${allowedTypes.join(', ')}` }, { status: 422 })
   }
-  if (fileSize > MAX_PHOTO_BYTES) {
-    return NextResponse.json({ error: `File too large. Max 10 MB.` }, { status: 422 })
+  if (fileSize > maxBytes) {
+    return NextResponse.json({ error: `File too large. Max ${isDocumentContext ? '20' : '10'} MB.` }, { status: 422 })
   }
 
   try {
     const ext = mimeToExt(contentType)
     const key = context === 'customer_id'
       ? customerIdPhotoKey(referenceId, ext)
-      : context === 'police_signature'
-        ? `police-visits/${referenceId}/signature-${randomUUID()}.${ext}`
-        : context === 'stocktake_entry'
-          ? `stocktakes/${referenceId}/photo-${randomUUID()}.${ext}`
-          : purchasePhotoKey(referenceId, ext)
+      : context === 'customer_document'
+        ? customerDocumentKey(referenceId, ext)
+        : context === 'police_signature'
+          ? `police-visits/${referenceId}/signature-${randomUUID()}.${ext}`
+          : context === 'stocktake_entry'
+            ? `stocktakes/${referenceId}/photo-${randomUUID()}.${ext}`
+            : purchasePhotoKey(referenceId, ext)
 
     const uploadUrl = await getUploadUrl({ key, contentType, maxBytes: fileSize })
 

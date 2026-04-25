@@ -98,7 +98,7 @@ function useToolbarButtons(activeTab: TabId, role: string): ToolbarButton[] {
 
     case 'customers':
       return [
-        { label: 'Add Account', icon: Plus,      href: '/app/customers?create=1&type=account', variant: 'primary' },
+        { label: 'Add Account', icon: Plus,      href: '/app/customers/new', variant: 'primary' },
         { label: 'Add Casual',  icon: UserCheck, href: '/app/customers?create=1&type=casual',  variant: 'secondary' },
         // Police Register + Blacklist — manager/admin only
         ...(isMgr ? [

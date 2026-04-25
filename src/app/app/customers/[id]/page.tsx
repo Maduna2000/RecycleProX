@@ -38,6 +38,26 @@ type Customer = {
   isActive: boolean; blacklisted: boolean; blacklistReason?: string; blacklistedAt?: string
   createdAt: string; priceGroupId?: string; idPhotoR2Key?: string
   priceGroup?: { id: string; name: string }
+  marketSector?: 'formal' | 'informal'
+  dealerCategory?: 'casual' | 'dealer_1' | 'dealer_2' | 'dealer_3'
+  zeroRated?: boolean
+}
+
+const DEALER_LABELS: Record<string, string> = {
+  casual: 'Casual', dealer_1: 'Dealer 1', dealer_2: 'Dealer 2', dealer_3: 'Dealer 3',
+}
+
+type CustomerDoc = {
+  id: string; documentType: string; fileName: string; r2Key: string
+  notes?: string; uploadedAt: string
+}
+
+const DOCUMENT_TYPE_LABELS: Record<string, string> = {
+  trading_licence:      'Trading Licence',
+  sars_certificate:     'SARS Certificate',
+  company_registration: 'Company Registration',
+  id_copy:              'ID Copy',
+  other:                'Other',
 }
 
 const TABS = ['Overview', 'Transactions', 'Documents', 'Blacklist'] as const
@@ -193,6 +213,33 @@ function OverviewTab({ customer }: { customer: Customer }) {
       <Section title="Business Details">
         <Field label="Customer Type" value={customer.customerType} />
         <Field label="Primary Function" value={fmt(customer.primaryFunction)} />
+        <div>
+          <dt className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Market Sector</dt>
+          <dd className="mt-1">
+            {customer.marketSector === 'formal'
+              ? <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">Formal</span>
+              : customer.marketSector === 'informal'
+              ? <span className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">Informal</span>
+              : <span className="text-sm text-gray-400">—</span>}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Dealer Category</dt>
+          <dd className="mt-1 flex items-center gap-2">
+            {customer.dealerCategory
+              ? <><span className="text-sm text-gray-900">{DEALER_LABELS[customer.dealerCategory]}</span>
+                  {customer.priceGroup && <span className="text-xs text-gray-500">· {customer.priceGroup.name}</span>}</>
+              : <span className="text-sm text-gray-400">—</span>}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-xs font-semibold text-gray-400 uppercase tracking-wide">VAT</dt>
+          <dd className="mt-1">
+            {customer.zeroRated
+              ? <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full font-medium">Zero Rated</span>
+              : <span className="text-sm text-gray-500">VAT Applied</span>}
+          </dd>
+        </div>
         <Field label="Price Group" value={customer.priceGroup?.name ?? '—'} />
         <Field label="Company Name" value={fmt(customer.companyName)} />
         <Field label="Contact Person" value={fmt(customer.contactPerson)} />
@@ -291,6 +338,11 @@ function DocumentsTab({ customer, onPhotoSaved }: { customer: Customer; onPhotoS
   const { data: session } = useSession()
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
   const [justUploaded, setJustUploaded] = useState(false)
+  const [docType, setDocType] = useState<string>('trading_licence')
+  const [uploading, setUploading] = useState(false)
+  const { data: docs, mutate: mutateDocs } = useSWR<CustomerDoc[]>(
+    `/api/customers/${customer.id}/documents`, fetcher,
+  )
 
   async function savePhotoKey(key: string) {
     const res = await fetch(`/api/customers/${customer.id}`, {
@@ -311,32 +363,127 @@ function DocumentsTab({ customer, onPhotoSaved }: { customer: Customer; onPhotoS
     if (res.ok) { onPhotoSaved() }
   }
 
+  async function handleDocUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    try {
+      // 1. Get presign URL
+      const presignRes = await fetch('/api/r2/upload-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contentType: file.type, context: 'customer_document', referenceId: customer.id, fileSize: file.size }),
+      })
+      if (!presignRes.ok) { toast.error('Failed to get upload URL'); return }
+      const { uploadUrl: url, key } = await presignRes.json()
+      // 2. Upload to R2
+      const uploadRes = await fetch(url, { method: 'PUT', body: file, headers: { 'Content-Type': file.type } })
+      if (!uploadRes.ok) { toast.error('Upload failed'); return }
+      // 3. Save document record
+      const saveRes = await fetch(`/api/customers/${customer.id}/documents`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ documentType: docType, r2Key: key, fileName: file.name }),
+      })
+      if (saveRes.ok) { toast.success('Document uploaded'); mutateDocs() }
+      else { toast.error('Failed to save document') }
+    } finally {
+      setUploading(false)
+      e.target.value = ''
+    }
+  }
+
+  async function handleDocDelete(docId: string) {
+    const res = await fetch(`/api/customers/${customer.id}/documents/${docId}`, { method: 'DELETE' })
+    if (res.ok) { toast.success('Document deleted'); mutateDocs() }
+    else toast.error('Failed to delete document')
+  }
+
+  async function handleDocView(r2Key: string) {
+    const res = await fetch(`/api/r2/view-url?key=${encodeURIComponent(r2Key)}`)
+    if (res.ok) { const { url } = await res.json(); window.open(url, '_blank') }
+    else toast.error('Failed to get view URL')
+  }
+
   return (
-    <div className="bg-white rounded-xl border p-6">
-      <div className="flex items-center gap-2 mb-4">
-        <Camera className="w-4 h-4 text-green-600" />
-        <h3 className="font-semibold text-gray-900">ID Document</h3>
+    <div className="space-y-4">
+      {/* Compliance Documents */}
+      <div className="bg-white rounded-xl border p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <span className="text-gray-600">📎</span>
+          <h3 className="font-semibold text-gray-900">Compliance Documents</h3>
+        </div>
+
+        {/* Upload row */}
+        <div className="flex items-center gap-3 mb-4">
+          <select
+            value={docType}
+            onChange={(e) => setDocType(e.target.value)}
+            className="border rounded-md px-3 py-2 text-sm bg-white border-gray-300 focus:outline-none focus:ring-1 focus:ring-green-500"
+          >
+            {Object.entries(DOCUMENT_TYPE_LABELS).map(([v, l]) => (
+              <option key={v} value={v}>{l}</option>
+            ))}
+          </select>
+          <label className={`cursor-pointer flex items-center gap-2 px-4 py-2 rounded-md border text-sm font-medium transition-colors ${uploading ? 'opacity-50 cursor-not-allowed bg-gray-50' : 'bg-white hover:bg-gray-50 border-gray-300'}`}>
+            {uploading ? 'Uploading…' : '+ Upload'}
+            <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png" onChange={handleDocUpload} disabled={uploading} />
+          </label>
+        </div>
+
+        {/* Document list */}
+        {!docs?.length ? (
+          <p className="text-sm text-gray-400">No compliance documents uploaded yet.</p>
+        ) : (
+          <div className="divide-y border rounded-lg overflow-hidden">
+            {docs.map((doc) => (
+              <div key={doc.id} className="flex items-center justify-between px-4 py-3 bg-white hover:bg-gray-50">
+                <div className="flex items-center gap-3">
+                  <span className="text-gray-400 text-lg">📄</span>
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">{DOCUMENT_TYPE_LABELS[doc.documentType] ?? doc.documentType}</p>
+                    <p className="text-xs text-gray-400">{doc.fileName} · {new Date(doc.uploadedAt).toLocaleDateString('en-ZA')}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => handleDocView(doc.r2Key)} className="text-xs text-blue-600 hover:underline">View</button>
+                  {isManager && (
+                    <button onClick={() => handleDocDelete(doc.id)} className="text-xs text-red-600 hover:underline">Delete</button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      {customer.idPhotoR2Key ? (
-        <PhotoViewer
-          r2Key={customer.idPhotoR2Key}
-          alt={`${customer.firstName} ${customer.lastName} ID`}
-          canDelete={isManager}
-          onDelete={handlePhotoDeleted}
-          autoLoad={justUploaded}
-        />
-      ) : (
-        <div className="space-y-3">
-          <p className="text-sm text-gray-500">No ID photo uploaded yet</p>
-          <PhotoUploader
-            context="customer_id"
-            referenceId={customer.id}
-            label="Upload ID Photo"
-            onUploaded={savePhotoKey}
-          />
+      {/* ID Photo */}
+      <div className="bg-white rounded-xl border p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Camera className="w-4 h-4 text-green-600" />
+          <h3 className="font-semibold text-gray-900">ID Document Photo</h3>
         </div>
-      )}
+
+        {customer.idPhotoR2Key ? (
+          <PhotoViewer
+            r2Key={customer.idPhotoR2Key}
+            alt={`${customer.firstName} ${customer.lastName} ID`}
+            canDelete={isManager}
+            onDelete={handlePhotoDeleted}
+            autoLoad={justUploaded}
+          />
+        ) : (
+          <div className="space-y-3">
+            <p className="text-sm text-gray-500">No ID photo uploaded yet</p>
+            <PhotoUploader
+              context="customer_id"
+              referenceId={customer.id}
+              label="Upload ID Photo"
+              onUploaded={savePhotoKey}
+            />
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -413,6 +560,9 @@ function EditCustomerModal({ customer, onClose, onSuccess }: { customer: Custome
       tradeCommodities: customer.tradeCommodities ?? [],
       customerNotes:    customer.customerNotes ?? '',
       priceGroupId:     customer.priceGroupId ?? undefined,
+      marketSector:     customer.marketSector ?? undefined,
+      dealerCategory:   customer.dealerCategory ?? undefined,
+      zeroRated:        customer.zeroRated ?? false,
     },
   })
 
@@ -519,6 +669,44 @@ function EditCustomerModal({ customer, onClose, onSuccess }: { customer: Custome
           {/* Business */}
           {editTab === 'Business' && (
             <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Market Sector</Label>
+                  <Select onValueChange={(v) => setValue('marketSector', v === 'none' ? undefined : v as 'formal' | 'informal')} defaultValue={customer.marketSector ?? 'none'}>
+                    <SelectTrigger className="mt-1"><SelectValue placeholder="Select..." /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Not set</SelectItem>
+                      <SelectItem value="formal">Formal (scrap yard)</SelectItem>
+                      <SelectItem value="informal">Informal (street seller)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Dealer Category</Label>
+                  <Select onValueChange={(v) => setValue('dealerCategory', v === 'none' ? undefined : v as 'casual' | 'dealer_1' | 'dealer_2' | 'dealer_3')} defaultValue={customer.dealerCategory ?? 'none'}>
+                    <SelectTrigger className="mt-1"><SelectValue placeholder="Select..." /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Not set</SelectItem>
+                      <SelectItem value="casual">Casual</SelectItem>
+                      <SelectItem value="dealer_1">Dealer 1 → Price Group A</SelectItem>
+                      <SelectItem value="dealer_2">Dealer 2 → Price Group B</SelectItem>
+                      <SelectItem value="dealer_3">Dealer 3 → Price Group C</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="flex items-center justify-between p-3 rounded-lg bg-yellow-50 border border-yellow-200">
+                <div>
+                  <Label className="text-yellow-800">Zero-Rated VAT</Label>
+                  <p className="text-xs text-yellow-700 mt-0.5">No VAT will be charged on this account&apos;s transactions</p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={watch('zeroRated') ?? false}
+                  onChange={(e) => setValue('zeroRated', e.target.checked)}
+                  className="w-4 h-4 rounded border-gray-300 text-green-600 cursor-pointer"
+                />
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label>Customer Type</Label>
