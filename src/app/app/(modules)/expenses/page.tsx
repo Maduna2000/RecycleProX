@@ -6,7 +6,7 @@ import { useSearchParams } from 'next/navigation'
 import Decimal from 'decimal.js'
 import useSWR, { mutate } from 'swr'
 import { useSession } from 'next-auth/react'
-import { CheckCircle, Trash2, Loader2, Receipt, Search, X, Plus, Paperclip, Upload } from 'lucide-react'
+import { CheckCircle, Trash2, Loader2, Receipt, Search, X, Plus, Paperclip, Upload, Eye } from 'lucide-react'
 import { toast } from 'sonner'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -198,16 +198,28 @@ export default function ExpensesPage() {
 
   const rowActions: RowAction<Expense>[] = [
     {
-      label:  'Approve',
-      icon:   CheckCircle,
-      hidden: (r) => !isManager || r.status !== 'pending',
+      label:   'View Details',
+      icon:    Eye,
+      hidden:  () => false,
+      onClick: (r) => router.push(`/app/expenses/${r.id}`),
+    },
+    {
+      label:   'View Slip',
+      icon:    Paperclip,
+      hidden:  (r) => (r._count?.attachments ?? 0) === 0,
+      onClick: (r) => router.push(`/app/expenses/${r.id}`),
+    },
+    {
+      label:   'Approve',
+      icon:    CheckCircle,
+      hidden:  (r) => !isManager || r.status !== 'pending',
       onClick: (r) => handleApprove(r.id),
     },
     {
-      label:  'Void',
-      icon:   Trash2,
-      danger: true,
-      hidden: (r) => !isManager || r.status === 'voided',
+      label:   'Void',
+      icon:    Trash2,
+      danger:  true,
+      hidden:  (r) => !isManager || r.status === 'voided',
       onClick: (r) => handleVoid(r.id),
     },
   ]
@@ -298,7 +310,6 @@ export default function ExpensesPage() {
           emptyMessage="No expenses found"
           total={data?.total}
           pageSize={50}
-          onRowClick={(r) => router.push(`/app/expenses/${r.id}`)}
         />
       </div>
 
