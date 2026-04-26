@@ -2,13 +2,13 @@
 
 import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { ArrowLeft, Plus, Trash2, Loader2, User, AlertTriangle, FileText } from 'lucide-react'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Button } from '@/components/ui/button'
+import { ArrowLeft, Plus, Trash2, Loader2, AlertTriangle, FileText } from 'lucide-react'
 import { toast } from 'sonner'
 import useSWR from 'swr'
 import Decimal from 'decimal.js'
@@ -50,11 +50,22 @@ const emptyLine = (key: number): LineItem => ({
   key, productId: '', product: null, quantity: '', unitPrice: '',
 })
 
+// ─── Field label for right panel ──────────────────────────────────────────────
+
+function PosLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: '#8BA4D4' }}>
+      {children}
+    </p>
+  )
+}
+
+// ─── NewSalePage ──────────────────────────────────────────────────────────────
+
 export default function NewSalePage() {
   const router = useRouter()
   const { mutate: offlineMutate } = useOfflineMutation()
 
-  // Buyer section
   const [buyerMode,     setBuyerMode]     = useState<BuyerMode>('walkin')
   const [customer,      setCustomer]      = useState<SelectedCustomer | null>(null)
   const [buyerName,     setBuyerName]     = useState('')
@@ -70,7 +81,7 @@ export default function NewSalePage() {
   const [paymentDialog, setPaymentDialog] = useState<{
     saleId: string; refNumber: string; amount: string; method: string; buyerName: string
   } | null>(null)
-  const [printDialog,   setPrintDialog]   = useState<{ id: string; refNumber: string } | null>(null)
+  const [printDialog, setPrintDialog] = useState<{ id: string; refNumber: string } | null>(null)
 
   const { data: productsData } = useSWR<{ products: Product[] }>('/api/products?active=true', fetcher)
   const { data: stockData }    = useSWR<{ stock: StockRow[] }>('/api/stock/on-hand', fetcher)
@@ -85,9 +96,7 @@ export default function NewSalePage() {
   }, {})
 
   const total = lines.reduce((sum, l) => {
-    const qty   = new Decimal(l.quantity  || '0')
-    const price = new Decimal(l.unitPrice || '0')
-    return sum.plus(qty.times(price))
+    return sum.plus(new Decimal(l.quantity || '0').times(new Decimal(l.unitPrice || '0')))
   }, new Decimal(0))
 
   function addLine() {
@@ -106,8 +115,6 @@ export default function NewSalePage() {
   async function onProductSelect(key: number, productId: string) {
     const product = products.find((p) => p.id === productId) ?? null
     let unitPrice = product ? new Decimal(product.defaultSellPrice).toFixed(2) : ''
-
-    // Apply price group sell override for registered buyer
     if (product && customer?.priceGroupId) {
       try {
         const res = await fetch(`/api/products/${productId}?priceGroupId=${customer.priceGroupId}`)
@@ -117,14 +124,15 @@ export default function NewSalePage() {
         }
       } catch { /* use default */ }
     }
-
     setLines((prev) => prev.map((l) => l.key === key ? { ...l, productId, product, unitPrice } : l))
   }
 
   const handleCustomerSelect = useCallback((c: SelectedCustomer) => {
     setCustomer(c)
-    // Re-apply sell prices with new price group
-    setLines((prev) => prev.map((l) => l.product ? { ...l, unitPrice: new Decimal(l.product.defaultSellPrice).toFixed(2) } : l))
+    setLines((prev) => prev.map((l) => l.product
+      ? { ...l, unitPrice: new Decimal(l.product.defaultSellPrice).toFixed(2) }
+      : l
+    ))
   }, [])
 
   function switchMode(mode: BuyerMode) {
@@ -144,14 +152,12 @@ export default function NewSalePage() {
   async function onSubmit() {
     if (buyerMode === 'registered' && !customer) { toast.error('Select a buyer'); return }
     if (buyerMode === 'walkin' && !buyerName.trim()) { toast.error('Buyer name is required'); return }
-
     const validLines = lines.filter((l) => l.productId && l.quantity && l.unitPrice)
     if (validLines.length === 0) { toast.error('Add at least one product line'); return }
     for (const l of validLines) {
       if (parseFloat(l.quantity) <= 0) { toast.error('Quantity must be greater than 0'); return }
       if (parseFloat(l.unitPrice) < 0)  { toast.error('Sell price cannot be negative'); return }
     }
-
     const body = {
       ...(buyerMode === 'registered' && customer ? { customerId: customer.id } : {}),
       buyerName: effectiveBuyerName.trim(),
@@ -162,11 +168,9 @@ export default function NewSalePage() {
       lines: validLines.map((l) => ({ productId: l.productId, quantity: l.quantity, unitPrice: l.unitPrice })),
     }
     const localId = `local_${crypto.randomUUID()}`
-
     setSubmitting(true)
     try {
       const { queued, data } = await offlineMutate({ method: 'POST', url: '/api/sales', body, localId })
-
       if (queued) {
         await offlineDB.sales.add({
           id: localId, refNumber: `OFF-${Date.now()}`, buyerName: effectiveBuyerName.trim(),
@@ -198,118 +202,190 @@ export default function NewSalePage() {
     }
   }
 
+  // ─── Render ─────────────────────────────────────────────────────────────────
+
   return (
-    <div className="max-w-4xl mx-auto w-full">
-      <div className="flex items-center gap-3 mb-6">
-        <Button variant="ghost" size="sm" onClick={() => router.push('/app/sales')}>
-          <ArrowLeft className="w-4 h-4 mr-1" /> Sales
-        </Button>
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">New Sale</h1>
-          <p className="text-sm text-gray-500">Sell recyclable material to a buyer</p>
-        </div>
+    <div className="h-full flex flex-col min-h-0 overflow-hidden">
+
+      {/* Top strip */}
+      <div className="flex items-center gap-3 shrink-0 pb-2">
+        <button
+          type="button"
+          onClick={() => router.push('/app/sales')}
+          className="flex items-center gap-1 text-xs transition-colors"
+          style={{ color: '#6C757D' }}
+        >
+          <ArrowLeft className="w-3.5 h-3.5" /> Sales
+        </button>
+        <span className="text-sm font-semibold" style={{ color: '#212529' }}>New Sale</span>
+        {isBlacklisted && (
+          <span className="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-red-100 text-red-700">
+            <AlertTriangle className="w-3 h-3" /> Blacklisted — cannot process
+          </span>
+        )}
       </div>
 
-      <div className="space-y-5">
-        {/* Buyer Section */}
-        <div className="bg-white rounded-xl border p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-gray-900 flex items-center gap-2">
-              <User className="w-4 h-4 text-green-600" /> Buyer
-            </h2>
-            {/* Toggle */}
-            <div className="flex rounded-lg border overflow-hidden text-sm">
+      {/* ── POS Split Panel ── */}
+      <div
+        className="flex-1 min-h-0 flex overflow-hidden rounded-xl border"
+        style={{ borderColor: '#E0E0E0', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}
+      >
+
+        {/* ─── LEFT: Entry ──────────────────────────────────────── */}
+        <div className="flex-1 flex flex-col min-w-0 bg-white" style={{ borderRight: '1px solid #E0E0E0' }}>
+
+          {/* Buyer strip */}
+          <div className="shrink-0" style={{ borderBottom: '1px solid #E0E0E0', background: '#F8F9FA' }}>
+            {/* Mode toggle */}
+            <div className="flex items-center gap-0 px-3 pt-2 pb-0">
               <button
-                className={`px-3 py-1.5 font-medium transition-colors ${buyerMode === 'registered' ? 'bg-green-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
-                onClick={() => switchMode('registered')}
-              >
-                Registered
-              </button>
-              <button
-                className={`px-3 py-1.5 font-medium transition-colors border-l ${buyerMode === 'walkin' ? 'bg-green-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                type="button"
                 onClick={() => switchMode('walkin')}
+                className="px-3 py-1 text-[11px] font-semibold rounded-t-md transition-colors"
+                style={buyerMode === 'walkin'
+                  ? { background: '#fff', color: '#212529', border: '1px solid #E0E0E0', borderBottom: '1px solid #fff', marginBottom: -1 }
+                  : { background: 'transparent', color: '#6C757D' }
+                }
               >
                 Walk-in
               </button>
+              <button
+                type="button"
+                onClick={() => switchMode('registered')}
+                className="px-3 py-1 text-[11px] font-semibold rounded-t-md transition-colors"
+                style={buyerMode === 'registered'
+                  ? { background: '#fff', color: '#212529', border: '1px solid #E0E0E0', borderBottom: '1px solid #fff', marginBottom: -1 }
+                  : { background: 'transparent', color: '#6C757D' }
+                }
+              >
+                Registered
+              </button>
+            </div>
+
+            {/* Buyer input area */}
+            <div className="px-3 py-2" style={{ background: '#fff', borderTop: '1px solid #E0E0E0' }}>
+              {buyerMode === 'registered' ? (
+                !customer ? (
+                  <CustomerLookupWidget onSelect={handleCustomerSelect} />
+                ) : (
+                  <div className="flex items-center gap-2.5">
+                    <div
+                      className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[11px] font-bold shrink-0"
+                      style={{ background: '#217346' }}
+                    >
+                      {customer.firstName[0]?.toUpperCase()}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[13px] font-semibold leading-none truncate" style={{ color: '#212529' }}>
+                        {customer.firstName} {customer.lastName}
+                      </p>
+                      <p className="text-[11px] font-mono mt-0.5 truncate" style={{ color: '#6C757D' }}>
+                        {customer.idNumber} · {customer.phone}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {customer.priceGroupId && (
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-700">
+                          Custom Pricing
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setCustomer(null)}
+                        className="px-2 py-0.5 rounded border text-[11px] transition-colors hover:bg-gray-50"
+                        style={{ borderColor: '#E0E0E0', color: '#6C757D' }}
+                      >
+                        Change
+                      </button>
+                    </div>
+                  </div>
+                )
+              ) : (
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <p className="text-[10px] font-medium mb-0.5" style={{ color: '#6C757D' }}>
+                      Buyer Name <span className="text-red-500">*</span>
+                    </p>
+                    <input
+                      value={buyerName}
+                      onChange={(e) => setBuyerName(e.target.value)}
+                      placeholder="Name or company…"
+                      className="h-8 w-full rounded border px-2 text-[12px] focus:outline-none transition-colors"
+                      style={{ borderColor: '#E0E0E0', color: '#212529' }}
+                    />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-medium mb-0.5" style={{ color: '#6C757D' }}>ID Number</p>
+                    <input
+                      value={buyerIdNumber}
+                      onChange={(e) => setBuyerIdNumber(e.target.value)}
+                      placeholder="13 digits"
+                      maxLength={13}
+                      className="h-8 w-full rounded border px-2 text-[12px] font-mono focus:outline-none transition-colors"
+                      style={{ borderColor: '#E0E0E0', color: '#212529' }}
+                    />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-medium mb-0.5" style={{ color: '#6C757D' }}>Phone</p>
+                    <input
+                      value={buyerPhone}
+                      onChange={(e) => setBuyerPhone(e.target.value)}
+                      placeholder="e.g. 0821234567"
+                      className="h-8 w-full rounded border px-2 text-[12px] focus:outline-none transition-colors"
+                      style={{ borderColor: '#E0E0E0', color: '#212529' }}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
-          {buyerMode === 'registered' ? (
-            !customer ? (
-              <CustomerLookupWidget onSelect={handleCustomerSelect} />
-            ) : (
-              <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
-                <div>
-                  <p className="font-semibold text-gray-900">{customer.firstName} {customer.lastName}</p>
-                  <p className="text-sm text-gray-500 font-mono">{customer.idNumber} · {customer.phone}</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  {customer.priceGroupId && <Badge className="bg-blue-100 text-blue-700">Custom Pricing</Badge>}
-                  <Button variant="outline" size="sm" onClick={() => setCustomer(null)}>Change</Button>
-                </div>
-              </div>
-            )
-          ) : (
-            <div className="grid grid-cols-3 gap-4">
-              <div className="col-span-1">
-                <Label>Buyer Name <span className="text-red-500">*</span></Label>
-                <Input value={buyerName} onChange={(e) => setBuyerName(e.target.value)} placeholder="Company or person name" className="mt-1" />
-              </div>
-              <div>
-                <Label>ID Number <span className="text-gray-400 font-normal">(optional)</span></Label>
-                <Input value={buyerIdNumber} onChange={(e) => setBuyerIdNumber(e.target.value)} placeholder="13 digits" className="mt-1 font-mono" maxLength={13} />
-              </div>
-              <div>
-                <Label>Phone <span className="text-gray-400 font-normal">(optional)</span></Label>
-                <Input value={buyerPhone} onChange={(e) => setBuyerPhone(e.target.value)} placeholder="e.g. 0821234567" className="mt-1" />
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Blacklist warning */}
-        {isBlacklisted && (
-          <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700">
-            <AlertTriangle className="w-5 h-5 shrink-0" />
-            <p className="text-sm font-medium">This customer is blacklisted and cannot complete a sale.</p>
-          </div>
-        )}
-
-        {/* Product Lines */}
-        <div className="bg-white rounded-xl border p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-gray-900">Products</h2>
-            <Button variant="outline" size="sm" onClick={addLine}>
-              <Plus className="w-4 h-4 mr-1.5" /> Add Line
-            </Button>
-          </div>
-
-          <div className="grid grid-cols-[1fr_120px_130px_100px_32px] gap-3 px-1 mb-1">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Product</p>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Qty</p>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Sell Price (R)</p>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Line Total</p>
+          {/* Column headers */}
+          <div
+            className="shrink-0 grid items-center px-3 py-1.5"
+            style={{
+              gridTemplateColumns: '1fr 104px 116px 92px 28px',
+              gap: '8px',
+              background: '#F8F9FA',
+              borderBottom: '1px solid #E0E0E0',
+            }}
+          >
+            <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: '#6C757D' }}>Product</p>
+            <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: '#6C757D' }}>Qty</p>
+            <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: '#6C757D' }}>Sell Price (R)</p>
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-right" style={{ color: '#6C757D' }}>Total</p>
             <span />
           </div>
 
-          <div className="space-y-2">
+          {/* Items list — only scrollable zone */}
+          <div className="flex-1 min-h-0 overflow-y-auto" style={{ borderBottom: '1px solid #E0E0E0' }}>
             {lines.map((line) => {
-              const qty        = new Decimal(line.quantity  || '0')
-              const price      = new Decimal(line.unitPrice || '0')
-              const lineTotal  = qty.times(price)
-              const onHand     = line.productId ? (stockMap.get(line.productId) ?? new Decimal(0)) : null
-              const overStock  = onHand !== null && qty.gt(new Decimal(0)) && qty.gt(onHand)
+              const qty       = new Decimal(line.quantity  || '0')
+              const price     = new Decimal(line.unitPrice || '0')
+              const lineTotal = qty.times(price)
+              const onHand    = line.productId ? (stockMap.get(line.productId) ?? new Decimal(0)) : null
+              const overStock = onHand !== null && qty.gt(new Decimal(0)) && qty.gt(onHand)
 
               return (
-                <div key={line.key} className={`rounded-lg border ${overStock ? 'border-red-200 bg-red-50/30' : 'border-gray-100 bg-gray-50/40'}`}>
-                  <div className="grid grid-cols-[1fr_120px_130px_100px_32px] gap-3 items-center p-2">
+                <div
+                  key={line.key}
+                  style={{ borderBottom: '1px solid #F0F0F0', background: overStock ? '#FFF5F5' : undefined }}
+                >
+                  <div
+                    className="grid items-start px-3 py-1.5"
+                    style={{ gridTemplateColumns: '1fr 104px 116px 92px 28px', gap: '8px', minHeight: 44 }}
+                  >
                     <div>
                       <select
-                        className="border rounded-md px-3 py-2 text-sm bg-white w-full"
+                        className="h-8 w-full rounded border px-2 text-[12px] bg-white focus:outline-none transition-colors"
+                        style={{
+                          borderColor: overStock ? '#FCA5A5' : '#E0E0E0',
+                          color: '#212529',
+                        }}
                         value={line.productId}
                         onChange={(e) => onProductSelect(line.key, e.target.value)}
                       >
-                        <option value="">Select product...</option>
+                        <option value="">Select product…</option>
                         {Object.entries(productsByCategory).map(([cat, prods]) => (
                           <optgroup key={cat} label={CATEGORY_LABELS[cat] ?? cat}>
                             {prods.map((p) => (
@@ -318,92 +394,151 @@ export default function NewSalePage() {
                           </optgroup>
                         ))}
                       </select>
-                      {onHand !== null && (
-                        <p className={`text-xs mt-0.5 pl-1 ${overStock ? 'text-red-500 font-medium' : 'text-gray-400'}`}>
-                          {overStock ? `⚠ Exceeds stock (${onHand.toFixed(3)} available)` : `Stock: ${onHand.toFixed(3)}`}
+                      {onHand !== null && line.productId && (
+                        <p
+                          className="text-[10px] mt-0.5 pl-1 font-medium"
+                          style={{ color: overStock ? '#EF4444' : '#9CA3AF' }}
+                        >
+                          {overStock
+                            ? `⚠ Exceeds stock (${onHand.toFixed(3)} avail)`
+                            : `Stock: ${onHand.toFixed(3)}`}
                         </p>
                       )}
                     </div>
 
-                    <Input
+                    <input
+                      type="number"
+                      step="0.001"
+                      min="0"
                       placeholder="0.000"
                       value={line.quantity}
                       onChange={(e) => updateLine(line.key, 'quantity', e.target.value)}
-                      className={`font-mono text-sm ${overStock ? 'border-red-300' : ''}`}
+                      className="h-8 w-full rounded border px-2 text-[12px] font-mono focus:outline-none transition-colors"
+                      style={{
+                        borderColor: overStock ? '#FCA5A5' : '#E0E0E0',
+                        color: '#212529',
+                      }}
                     />
 
-                    <Input
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
                       placeholder="0.00"
                       value={line.unitPrice}
                       onChange={(e) => updateLine(line.key, 'unitPrice', e.target.value)}
-                      className="font-mono text-sm"
+                      className="h-8 w-full rounded border px-2 text-[12px] font-mono focus:outline-none transition-colors"
+                      style={{ borderColor: '#E0E0E0', color: '#212529' }}
                     />
 
-                    <p className="font-mono text-sm text-gray-700 text-right">
+                    <p
+                      className="text-[13px] font-mono font-semibold text-right tabular-nums pr-1 pt-1"
+                      style={{ color: qty.gt(0) && price.gt(0) ? '#212529' : '#C0C0C0' }}
+                    >
                       {qty.gt(0) && price.gt(0) ? `R ${lineTotal.toFixed(2)}` : '—'}
                     </p>
 
-                    <Button
-                      variant="ghost" size="sm"
-                      className="text-gray-400 hover:text-red-500 p-1 h-8 w-8"
+                    <button
+                      type="button"
                       onClick={() => removeLine(line.key)}
                       disabled={lines.length === 1}
+                      className="h-8 w-7 rounded flex items-center justify-center transition-colors disabled:opacity-25 disabled:cursor-not-allowed mt-0"
+                      style={{ color: '#C0C0C0' }}
+                      onMouseEnter={(e) => { if (lines.length > 1) (e.currentTarget as HTMLButtonElement).style.color = '#EF4444' }}
+                      onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = '#C0C0C0' }}
                     >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 </div>
               )
             })}
-          </div>
 
-          <div className="border-t mt-4 pt-4 flex justify-end">
-            <div className="text-right">
-              <p className="text-sm text-gray-500">Total</p>
-              <p className="text-2xl font-bold text-gray-900">R {total.toFixed(2)}</p>
+            {/* Add line */}
+            <div className="px-3 py-2">
+              <button
+                type="button"
+                onClick={addLine}
+                className="flex items-center gap-1.5 text-[12px] font-medium transition-colors"
+                style={{ color: '#185ABD' }}
+              >
+                <Plus className="w-3.5 h-3.5" /> Add Line
+              </button>
             </div>
           </div>
         </div>
 
-        {/* Payment & Notes */}
-        <div className="bg-white rounded-xl border p-5">
-          <h2 className="font-semibold text-gray-900 mb-4">Payment &amp; Notes</h2>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>Payment Method</Label>
-              <Select value={paymentMethod} onValueChange={(v) => setPaymentMethod(v as typeof paymentMethod)}>
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="cash">Cash</SelectItem>
-                  <SelectItem value="eft">EFT</SelectItem>
-                  <SelectItem value="cheque">Cheque</SelectItem>
-                  <SelectItem value="amplopay">AmploPay</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Notes <span className="text-gray-400 font-normal">(optional)</span></Label>
-              <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Any remarks..." className="mt-1" />
+        {/* ─── RIGHT: Totals & Actions ──────────────────────────── */}
+        <div
+          className="w-[260px] shrink-0 flex flex-col"
+          style={{ background: '#1B3A6B' }}
+        >
+          {/* Payment method */}
+          <div className="px-4 pt-4 pb-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+            <PosLabel>Payment Method</PosLabel>
+            <select
+              value={paymentMethod}
+              onChange={(e) => setPaymentMethod(e.target.value as typeof paymentMethod)}
+              className="w-full h-9 rounded px-2.5 text-[12px] text-white focus:outline-none appearance-none"
+              style={{ background: 'rgba(255,255,255,0.10)', border: '1px solid rgba(255,255,255,0.20)' }}
+            >
+              <option value="cash"     className="bg-white text-[#212529]">Cash</option>
+              <option value="eft"      className="bg-white text-[#212529]">EFT</option>
+              <option value="cheque"   className="bg-white text-[#212529]">Cheque</option>
+              <option value="amplopay" className="bg-white text-[#212529]">AmploPay</option>
+            </select>
+          </div>
+
+          {/* Notes */}
+          <div className="px-4 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+            <PosLabel>Notes (optional)</PosLabel>
+            <input
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Any remarks…"
+              className="w-full h-8 rounded px-2.5 text-[12px] text-white focus:outline-none"
+              style={{
+                background: 'rgba(255,255,255,0.10)',
+                border: '1px solid rgba(255,255,255,0.20)',
+              }}
+            />
+          </div>
+
+          {/* Total */}
+          <div className="flex-1 flex flex-col items-center justify-center px-4">
+            <div className="text-center">
+              <p className="text-[10px] uppercase tracking-wider mb-2" style={{ color: '#8BA4D4' }}>
+                Sale Total
+              </p>
+              <p className="font-bold tabular-nums" style={{ color: '#F2AB1A', fontSize: 42, lineHeight: 1 }}>
+                R {total.toFixed(2)}
+              </p>
+              {total.gt(0) && (
+                <p className="text-[11px] mt-2 tabular-nums" style={{ color: '#8BA4D4' }}>
+                  incl. VAT at 15%
+                </p>
+              )}
             </div>
           </div>
-        </div>
 
-        {/* Submit */}
-        <div className="flex justify-end gap-3 pb-6">
-          <Button variant="outline" onClick={() => router.push('/app/sales')} disabled={submitting}>Cancel</Button>
-          <Button
-            className="bg-green-600 hover:bg-green-700 min-w-[160px]"
-            onClick={onSubmit}
-            disabled={submitting || isBlacklisted || (buyerMode === 'registered' && !customer)}
-          >
-            {submitting
-              ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...</>
-              : `Confirm Sale · R ${total.toFixed(2)}`}
-          </Button>
+          {/* Action button */}
+          <div className="px-4 pb-4 shrink-0">
+            <button
+              type="button"
+              onClick={onSubmit}
+              disabled={submitting || isBlacklisted || (buyerMode === 'registered' && !customer)}
+              className="w-full h-12 rounded text-[13px] font-bold text-white transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              style={{ background: '#217346' }}
+            >
+              {submitting
+                ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</>
+                : `Confirm Sale · R ${total.toFixed(2)}`}
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Payment received step */}
+      {/* ── Dialogs ── */}
       {paymentDialog && (
         <PaymentReceivedStep
           saleId={paymentDialog.saleId}
@@ -438,7 +573,9 @@ function PaymentReceivedStep({
 }: {
   saleId: string; refNumber: string; amount: string; method: string; buyerName: string; onDone: () => void
 }) {
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'eft' | 'cheque' | 'amplopay'>(method as 'cash' | 'eft' | 'cheque' | 'amplopay')
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'eft' | 'cheque' | 'amplopay'>(
+    method as 'cash' | 'eft' | 'cheque' | 'amplopay'
+  )
 
   return (
     <Dialog open>
@@ -455,7 +592,6 @@ function PaymentReceivedStep({
             <p className="font-semibold text-gray-900">{buyerName}</p>
             <p className="text-3xl font-bold text-green-700 font-mono mt-2">R {amount}</p>
           </div>
-
           <div>
             <Label>Payment Method</Label>
             <Select value={paymentMethod} onValueChange={(v) => setPaymentMethod(v as typeof paymentMethod)}>
@@ -468,7 +604,6 @@ function PaymentReceivedStep({
               </SelectContent>
             </Select>
           </div>
-
           <Button
             className="w-full bg-green-600 hover:bg-green-700 h-11 text-base font-semibold"
             onClick={onDone}
