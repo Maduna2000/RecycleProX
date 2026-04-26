@@ -5,13 +5,12 @@ import Link from 'next/link'
 import { signOut } from 'next-auth/react'
 import { useState, useEffect, useCallback } from 'react'
 import {
-  RefreshCw, Search, Plus, Scale, Printer,
-  Zap, Ban, BarChart2,
-  ShieldCheck, ClipboardCheck, FileSpreadsheet,
-  FileText, Download, Handshake, LogOut, Settings,
-  Minus, Square, X as XIcon, Package, Tag,
-  Images, ShieldAlert, Users, UserPlus, ChevronRight,
-  UserCheck, AlertCircle, Archive, Landmark,
+  RefreshCw, Search, Plus, Printer,
+  BarChart2, ClipboardCheck, FileSpreadsheet,
+  Download, LogOut, Settings,
+  Minus, Square, X as XIcon, Tag,
+  Users, UserPlus, ChevronRight,
+  Archive, Landmark,
   Wifi, WifiOff,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -71,126 +70,101 @@ function getModuleName(pathname: string): string {
 // ─── Toolbar configs — fully pathname-driven ──────────────────────────────────
 
 function useToolbarButtons(pathname: string, role: string): ToolbarButton[] {
-  const isMgr   = role === 'admin' || role === 'manager'
+  const isMgr  = role === 'admin' || role === 'manager'
   const isAdmin = role === 'admin'
 
-  // Accounts
-  if (pathname.startsWith('/app/customers')) return [
-    { label: 'Add Account', icon: Plus,      href: '/app/customers/new',                     variant: 'primary' },
-    { label: 'Add Casual',  icon: UserCheck, href: '/app/casual',                             variant: 'secondary' },
-    ...(isMgr ? [
-      { label: 'Police Register', icon: ShieldCheck, href: '/app/police-register', variant: 'ghost' as const },
-    ] : []),
-    { label: 'Photos', icon: Images, href: '/app/photos', variant: 'ghost' },
-    ...(isMgr ? [{ label: 'Blacklist', icon: Ban, variant: 'danger' as const, iconOnly: true }] : []),
-  ]
-
-  // Casual Details
-  if (pathname.startsWith('/app/casual')) return [
-    { label: 'Add Casual', icon: Plus, href: '/app/casual', variant: 'primary' },
-  ]
-
-  // Purchases (main + unpaid)
-  if (pathname.startsWith('/app/purchases')) return [
-    { label: 'New Purchase', icon: Plus,        href: '/app/purchases/new',    variant: 'primary' },
-    { label: 'Unpaid',       icon: AlertCircle, href: '/app/purchases/unpaid', variant: 'secondary' },
-    { label: 'Weigh',        icon: Scale,       href: '/app/purchases/new',    variant: 'ghost', iconOnly: true },
-    { label: 'Print Slip',   icon: Printer,     variant: 'ghost', iconOnly: true },
-    ...(isMgr ? [{ label: 'Void', icon: Zap, variant: 'danger' as const, iconOnly: true }] : []),
-  ]
-
-  // Sales
-  if (pathname.startsWith('/app/sales')) return [
-    { label: 'New Sale',   icon: Plus,    href: '/app/sales/new', variant: 'primary' },
-    { label: 'Print Slip', icon: Printer, variant: 'ghost', iconOnly: true },
-    ...(isMgr ? [{ label: 'Void', icon: Zap, variant: 'danger' as const, iconOnly: true }] : []),
-  ]
-
-  // Payments
-  if (pathname.startsWith('/app/payments')) return [
-    { label: 'Record Payment', icon: Plus,       href: '/app/payments', variant: 'primary' },
-    { label: 'Statement',      icon: FileText,   variant: 'ghost', iconOnly: true },
-  ]
-
-  // Expenses
-  if (pathname.startsWith('/app/expenses')) return [
-    { label: 'Add Expense',      icon: Plus, href: '/app/expenses?add=1',     variant: 'primary' },
-    { label: 'Add Expense Type', icon: Tag,  href: '/app/expenses?addtype=1', variant: 'secondary' },
-  ]
-
-  // Cash Up
-  if (pathname.startsWith('/app/cashup')) return [
-    { label: 'Open Cash-Up',  icon: Archive,    href: '/app/cashup', variant: 'primary' },
-    { label: 'Print Summary', icon: Printer,    variant: 'ghost', iconOnly: true },
-    { label: 'Export',        icon: Download,   variant: 'ghost', iconOnly: true },
-  ]
-
-  // Float
-  if (pathname.startsWith('/app/float')) return [
-    { label: 'Open Float', icon: Landmark, href: '/app/float', variant: 'primary' },
-  ]
-
-  // Stock
-  if (pathname.startsWith('/app/stocktake')) return isMgr ? [
-    { label: 'Start Stocktake', icon: ClipboardCheck, href: '/app/stocktake', variant: 'primary' },
-  ] : []
-
-  if (pathname.startsWith('/app/stock')) return [
-    ...(isMgr ? [
-      { label: 'Adjust',    icon: Plus,           href: '/app/stock',     variant: 'primary' as const },
-      { label: 'Stocktake', icon: ClipboardCheck, href: '/app/stocktake', variant: 'ghost' as const },
-    ] : []),
-    { label: 'Products',     icon: Package,         href: '/app/products',     variant: isMgr ? 'secondary' as const : 'primary' as const },
-    { label: 'Price Groups', icon: Tag,             href: '/app/price-groups', variant: 'ghost' },
-    { label: 'Export Excel', icon: FileSpreadsheet, variant: 'ghost', iconOnly: true },
-  ]
-
-  // Products
-  if (pathname.startsWith('/app/price-groups')) return isMgr ? [
-    { label: 'Add Price Group', icon: Plus, href: '/app/price-groups', variant: 'primary' },
-  ] : []
-
-  if (pathname.startsWith('/app/products')) return [
-    { label: 'Add Product',  icon: Plus, href: '/app/products', variant: 'primary' },
-    { label: 'Price Groups', icon: Tag,  href: '/app/price-groups', variant: 'secondary' },
-  ]
-
-  // Loans
-  if (pathname.startsWith('/app/loans')) return [
-    { label: 'New Loan',  icon: Plus,      href: '/app/loans', variant: 'primary' },
-    { label: 'Repayment', icon: Handshake, variant: 'secondary', iconOnly: true },
-    { label: 'Statement', icon: FileText,  variant: 'ghost',    iconOnly: true },
-  ]
-
-  // Reports
-  if (pathname.startsWith('/app/reports')) {
-    if (!isMgr) return []
+  if (pathname === '/app/customers' || pathname.startsWith('/app/customers/'))
     return [
+      { label: 'Add Account', icon: Plus, href: '/app/customers/new', variant: 'primary' },
+    ]
+
+  if (pathname === '/app/casual' || pathname.startsWith('/app/casual/'))
+    return [
+      { label: 'Add Casual', icon: Plus, href: '/app/casual', variant: 'primary' },
+    ]
+
+  if (pathname.startsWith('/app/purchases/unpaid'))
+    return []
+
+  if (pathname === '/app/purchases' || pathname.startsWith('/app/purchases/'))
+    return [
+      { label: 'New Purchase', icon: Plus, href: '/app/purchases/new', variant: 'primary' },
+    ]
+
+  if (pathname === '/app/sales' || pathname.startsWith('/app/sales/'))
+    return [
+      { label: 'New Sale', icon: Plus, href: '/app/sales/new', variant: 'primary' },
+    ]
+
+  if (pathname === '/app/payments' || pathname.startsWith('/app/payments/'))
+    return [
+      { label: 'Record Payment', icon: Plus, href: '/app/payments', variant: 'primary' },
+    ]
+
+  if (pathname === '/app/expenses' || pathname.startsWith('/app/expenses/'))
+    return [
+      { label: 'Add Expense',      icon: Plus, href: '/app/expenses?add=1',     variant: 'primary' },
+      { label: 'Add Expense Type', icon: Tag,  href: '/app/expenses?addtype=1', variant: 'secondary' },
+    ]
+
+  if (pathname === '/app/cashup' || pathname.startsWith('/app/cashup/'))
+    return [
+      { label: 'Open Cash-Up', icon: Archive, href: '/app/cashup', variant: 'primary' },
+    ]
+
+  if (pathname === '/app/float' || pathname.startsWith('/app/float/'))
+    return [
+      { label: 'Open Float', icon: Landmark, href: '/app/float', variant: 'primary' },
+    ]
+
+  if (pathname === '/app/stocktake' || pathname.startsWith('/app/stocktake/'))
+    return isMgr ? [
+      { label: 'Start Stocktake', icon: ClipboardCheck, href: '/app/stocktake', variant: 'primary' },
+    ] : []
+
+  if (pathname === '/app/stock' || pathname.startsWith('/app/stock/'))
+    return [
+      ...(isMgr ? [
+        { label: 'Adjust',    icon: Plus,           href: '/app/stock',     variant: 'primary'  as const },
+        { label: 'Stocktake', icon: ClipboardCheck, href: '/app/stocktake', variant: 'ghost'    as const },
+      ] : []),
+      { label: 'Export Excel', icon: FileSpreadsheet, variant: 'ghost', iconOnly: true },
+    ]
+
+  if (pathname === '/app/products' || pathname.startsWith('/app/products/'))
+    return [
+      { label: 'Add Product', icon: Plus, href: '/app/products', variant: 'primary' },
+    ]
+
+  if (pathname === '/app/price-groups' || pathname.startsWith('/app/price-groups/'))
+    return isMgr ? [
+      { label: 'Add Price Group', icon: Plus, href: '/app/price-groups', variant: 'primary' },
+    ] : []
+
+  if (pathname === '/app/loans' || pathname.startsWith('/app/loans/'))
+    return [
+      { label: 'New Loan',  icon: Plus,      href: '/app/loans', variant: 'primary' },
+      { label: 'Repayment', icon: BarChart2, variant: 'secondary', iconOnly: true },
+    ]
+
+  if (pathname === '/app/reports' || pathname.startsWith('/app/reports/'))
+    return !isMgr ? [] : [
       { label: 'Generate',     icon: BarChart2,       variant: 'primary' },
       { label: 'Export CSV',   icon: Download,        variant: 'secondary', iconOnly: true },
       { label: 'Export Excel', icon: FileSpreadsheet, variant: 'ghost',    iconOnly: true },
       { label: 'Print',        icon: Printer,         variant: 'ghost',    iconOnly: true },
     ]
-  }
 
-  // Settings & Audit Log
-  if (pathname.startsWith('/app/audit-log')) return isAdmin ? [
-    { label: 'Export', icon: Download, variant: 'ghost' },
-  ] : []
+  if (pathname === '/app/audit-log' || pathname.startsWith('/app/audit-log/'))
+    return isAdmin ? [
+      { label: 'Export', icon: Download, variant: 'ghost', iconOnly: true },
+    ] : []
 
-  if (pathname.startsWith('/app/settings')) {
-    if (!isAdmin) return []
-    return [
-      { label: 'Add User',  icon: UserPlus,    href: '/app/settings/users?create=1', variant: 'primary' },
-      { label: 'Users',     icon: Users,       href: '/app/settings/users',          variant: 'secondary' },
-      { label: 'Audit Log', icon: ShieldAlert, href: '/app/audit-log',               variant: 'ghost' },
+  if (pathname === '/app/settings' || pathname.startsWith('/app/settings/'))
+    return !isAdmin ? [] : [
+      { label: 'Add User', icon: UserPlus, href: '/app/settings/users?create=1', variant: 'primary' },
+      { label: 'Users',    icon: Users,    href: '/app/settings/users',           variant: 'secondary' },
     ]
-  }
-
-  // Photos / Police Register — no toolbar buttons
-  if (pathname.startsWith('/app/photos'))          return []
-  if (pathname.startsWith('/app/police-register')) return isMgr ? [] : []
-  if (pathname.startsWith('/app/change-password')) return []
 
   return []
 }
