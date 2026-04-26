@@ -6,12 +6,12 @@ import { signOut } from 'next-auth/react'
 import { useState, useEffect, useCallback } from 'react'
 import {
   RefreshCw, Search, Plus, Scale, Printer,
-  Zap, Ban, CreditCard, DollarSign, BarChart2,
+  Zap, Ban, BarChart2,
   ShieldCheck, ClipboardCheck, FileSpreadsheet,
   FileText, Download, Handshake, LogOut, Settings,
   Minus, Square, X as XIcon, Package, Tag,
   Images, ShieldAlert, Users, UserPlus, ChevronRight,
-  UserCheck, AlertCircle, Wallet, Archive, Landmark,
+  UserCheck, AlertCircle, Archive, Landmark,
   Wifi, WifiOff,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
