@@ -387,7 +387,6 @@ function AccountsTab({ onAddCustomer }: { onAddCustomer: () => void }) {
           columns={columns}
           rows={customers}
           rowKey={(r) => r.id}
-          onRowClick={(r) => router.push(`/app/customers/${r.id}`)}
           rowActions={rowActions}
           loading={isLoading}
           emptyMessage="No account customers found"

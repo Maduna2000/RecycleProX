@@ -371,10 +371,14 @@ function AddExpenseModal({ onClose, onSuccess }: { onClose: () => void; onSucces
           headers: { 'Content-Type': 'application/json' },
           body:    JSON.stringify({ context: 'expense_attachment', referenceId: created.id, contentType: slipFile.type, fileSize: slipFile.size }),
         })
-        if (presignRes.ok) {
+        if (!presignRes.ok) {
+          toast.warning('Expense saved — slip upload failed. Add it from expense details.')
+        } else {
           const { uploadUrl, key } = await presignRes.json()
           const uploadRes = await fetch(uploadUrl, { method: 'PUT', body: slipFile, headers: { 'Content-Type': slipFile.type } })
-          if (uploadRes.ok) {
+          if (!uploadRes.ok) {
+            toast.warning('Expense saved — slip upload failed. Add it from expense details.')
+          } else {
             await fetch(`/api/expenses/${created.id}/attachments`, {
               method:  'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -383,8 +387,7 @@ function AddExpenseModal({ onClose, onSuccess }: { onClose: () => void; onSucces
           }
         }
       } catch {
-        // Expense saved — slip upload failure is non-fatal
-        toast.warning('Expense saved but slip upload failed')
+        toast.warning('Expense saved — slip upload failed. Add it from expense details.')
       }
     }
 
