@@ -1,12 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSearchParams } from 'next/navigation'
 import Decimal from 'decimal.js'
 import useSWR, { mutate } from 'swr'
 import { useSession } from 'next-auth/react'
-import { CheckCircle, Trash2, Loader2, Receipt, Search, X, Plus, Paperclip } from 'lucide-react'
+import { CheckCircle, Trash2, Loader2, Receipt, Search, X, Plus, Paperclip, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -323,6 +323,8 @@ export default function ExpensesPage() {
 function AddExpenseModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
   const [loading,     setLoading]     = useState(false)
   const [addTypeOpen, setAddTypeOpen] = useState(false)
+  const [slipFile,    setSlipFile]    = useState<File | null>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
   const { data: types } = useSWR<ExpenseType[]>('/api/expense-types', fetcher)
 
   const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<CreateExpenseFormInput, unknown, CreateExpenseInput>({
@@ -342,9 +344,42 @@ function AddExpenseModal({ onClose, onSuccess }: { onClose: () => void; onSucces
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify(data),
     })
+    if (!res.ok) {
+      setLoading(false)
+      const j = await res.json()
+      toast.error(j.error ?? 'Failed to record expense')
+      return
+    }
+    const created = await res.json()
+
+    // Upload slip attachment if one was selected
+    if (slipFile && created?.id) {
+      try {
+        const presignRes = await fetch('/api/r2/upload-url', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ context: 'expense_attachment', referenceId: created.id, contentType: slipFile.type, fileSize: slipFile.size }),
+        })
+        if (presignRes.ok) {
+          const { uploadUrl, key } = await presignRes.json()
+          const uploadRes = await fetch(uploadUrl, { method: 'PUT', body: slipFile, headers: { 'Content-Type': slipFile.type } })
+          if (uploadRes.ok) {
+            await fetch(`/api/expenses/${created.id}/attachments`, {
+              method:  'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body:    JSON.stringify({ r2Key: key, fileName: slipFile.name }),
+            })
+          }
+        }
+      } catch {
+        // Expense saved — slip upload failure is non-fatal
+        toast.warning('Expense saved but slip upload failed')
+      }
+    }
+
     setLoading(false)
-    if (res.ok) { toast.success('Expense recorded'); onSuccess() }
-    else { const j = await res.json(); toast.error(j.error ?? 'Failed to record expense') }
+    toast.success('Expense recorded')
+    onSuccess()
   }
 
   return (
@@ -431,6 +466,51 @@ function AddExpenseModal({ onClose, onSuccess }: { onClose: () => void; onSucces
             />
             Amount includes 15% VAT
           </label>
+
+          {/* Slip / receipt upload */}
+          <div>
+            <Label>Slip / Receipt (optional)</Label>
+            <div className="mt-1">
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png,.webp"
+                className="hidden"
+                onChange={(e) => setSlipFile(e.target.files?.[0] ?? null)}
+                disabled={loading}
+              />
+              {slipFile ? (
+                <div
+                  className="flex items-center justify-between px-3 py-2 rounded border text-xs"
+                  style={{ borderColor: colors.border, color: colors.textPrimary }}
+                >
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <Paperclip className="w-3.5 h-3.5 shrink-0" style={{ color: colors.textSecondary }} />
+                    <span className="truncate">{slipFile.name}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { setSlipFile(null); if (fileRef.current) fileRef.current.value = '' }}
+                    className="ml-2 shrink-0"
+                    style={{ color: colors.textSecondary }}
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => fileRef.current?.click()}
+                  disabled={loading}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded border border-dashed text-xs w-full hover:bg-gray-50 transition-colors"
+                  style={{ borderColor: colors.border, color: colors.textSecondary }}
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  Upload slip or photo (PDF, JPG, PNG — max 20 MB)
+                </button>
+              )}
+            </div>
+          </div>
 
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>

@@ -158,7 +158,7 @@ export default function PortalPage() {
           <div className="w-6 h-6 rounded bg-[#1B3A6B] flex items-center justify-center shrink-0">
             <RefreshCw className="w-3.5 h-3.5 text-[#F2AB1A]" />
           </div>
-          <span className="text-[#F2AB1A] font-bold text-[13px] tracking-wide select-none">RecycleProX</span>
+          <span className="text-[#F2AB1A] font-bold text-[13px] tracking-wide select-none">Renovo Pro</span>
         </div>
 
         <div className="w-px h-5 bg-white/10 shrink-0" />
@@ -284,7 +284,7 @@ export default function PortalPage() {
         style={{ height: 26, background: '#081120' }}
       >
         <span className="text-white/20 text-[10px] tracking-widest uppercase select-none">
-          RecycleProX Management Software &nbsp;·&nbsp; Version 3.0
+          Renovo Pro Management Software &nbsp;·&nbsp; Version 3.0
         </span>
       </footer>
     </div>

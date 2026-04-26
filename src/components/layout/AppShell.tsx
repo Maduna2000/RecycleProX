@@ -64,7 +64,7 @@ function getModuleName(pathname: string): string {
     const name = MODULE_NAMES[key]
     if (name && pathname.startsWith(key + '/')) return name
   }
-  return 'RecycleProX'
+  return 'Renovo Pro'
 }
 
 // ─── Toolbar configs — fully pathname-driven ──────────────────────────────────
