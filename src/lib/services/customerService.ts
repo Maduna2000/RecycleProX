@@ -97,14 +97,24 @@ export async function getCustomer(id: string) {
 
 export async function searchCustomers(
   query: string,
-  filters: { type?: string; blacklisted?: boolean; isActive?: boolean },
+  filters: {
+    type?: string
+    blacklisted?: boolean
+    isActive?: boolean
+    dealerCategory?: string
+    primaryFunction?: string
+    priceGroupId?: string
+  },
   page = 1,
   limit = 20,
 ) {
   const where = {
-    ...(filters.type && { customerType: filters.type as 'casual' | 'account' }),
+    ...(filters.type            && { customerType:    filters.type            as 'casual' | 'account' }),
     ...(filters.blacklisted !== undefined && { blacklisted: filters.blacklisted }),
-    ...(filters.isActive !== undefined && { isActive: filters.isActive }),
+    ...(filters.isActive    !== undefined && { isActive:    filters.isActive }),
+    ...(filters.dealerCategory  && { dealerCategory:  filters.dealerCategory  as 'casual' | 'dealer_1' | 'dealer_2' | 'dealer_3' }),
+    ...(filters.primaryFunction && { primaryFunction: filters.primaryFunction as 'supplier' | 'customer' | 'both' }),
+    ...(filters.priceGroupId    && { priceGroupId:    filters.priceGroupId }),
     ...(query && {
       OR: [
         { lastName: { contains: query, mode: 'insensitive' as const } },

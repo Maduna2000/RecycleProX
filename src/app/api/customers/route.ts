@@ -9,14 +9,22 @@ export async function GET(req: NextRequest) {
   if (!session) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
   const { searchParams } = req.nextUrl
-  const query = searchParams.get('search') ?? ''
-  const type = searchParams.get('type') ?? undefined
-  const blacklisted = searchParams.has('blacklisted') ? searchParams.get('blacklisted') === 'true' : undefined
-  const isActive = searchParams.has('isActive') ? searchParams.get('isActive') === 'true' : undefined
-  const page = parseInt(searchParams.get('page') ?? '1')
-  const limit = parseInt(searchParams.get('limit') ?? '20')
+  const query           = searchParams.get('search')          ?? ''
+  const type            = searchParams.get('type')            ?? undefined
+  const blacklisted     = searchParams.has('blacklisted') ? searchParams.get('blacklisted') === 'true' : undefined
+  const isActive        = searchParams.has('isActive')    ? searchParams.get('isActive')    === 'true' : undefined
+  const dealerCategory  = searchParams.get('dealerCategory')  ?? undefined
+  const primaryFunction = searchParams.get('primaryFunction') ?? undefined
+  const priceGroupId    = searchParams.get('priceGroupId')    ?? undefined
+  const page            = parseInt(searchParams.get('page')   ?? '1')
+  const limit           = parseInt(searchParams.get('limit')  ?? '20')
 
-  const result = await searchCustomers(query, { type, blacklisted, isActive }, page, limit)
+  const result = await searchCustomers(
+    query,
+    { type, blacklisted, isActive, dealerCategory, primaryFunction, priceGroupId },
+    page,
+    limit,
+  )
   return NextResponse.json(result)
 }
 

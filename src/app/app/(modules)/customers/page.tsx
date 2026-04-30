@@ -20,6 +20,9 @@ type Customer = {
   id: string; firstName: string; lastName: string; idNumber: string
   phone: string; customerType: string; primaryFunction: string; isActive: boolean; blacklisted: boolean
   createdAt: string; priceGroup?: { id: string; name: string } | null
+  dealerCategory?: string | null
+  companyName?: string | null
+  zeroRated: boolean
 }
 
 type Tab = 'accounts' | 'casuals'
@@ -191,6 +194,19 @@ function PrimaryFunctionBadge({ fn }: { fn: string }) {
   )
 }
 
+// ─── Dealer category badge ─────────────────────────────────────────────────────
+function DealerCategoryBadge({ cat }: { cat?: string | null }) {
+  if (!cat) return <span style={{ color: colors.textSecondary, fontSize: fontSize.xs }}>—</span>
+  const map: Record<string, { label: string; bg: string; color: string }> = {
+    casual:   { label: 'Casual',   bg: colors.neutralBg, color: colors.textSecondary },
+    dealer_1: { label: 'Dealer 1', bg: colors.processBg, color: colors.process },
+    dealer_2: { label: 'Dealer 2', bg: colors.actionBg,  color: colors.action  },
+    dealer_3: { label: 'Dealer 3', bg: colors.warningBg, color: colors.warning },
+  }
+  const meta = map[cat] ?? { label: cat, bg: colors.neutralBg, color: colors.textSecondary }
+  return <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: meta.bg, color: meta.color }}>{meta.label}</span>
+}
+
 // ─── Accounts tab ──────────────────────────────────────────────────────────────
 function AccountsTab({ onAddCustomer }: { onAddCustomer: () => void }) {
   const router = useRouter()
@@ -199,6 +215,8 @@ function AccountsTab({ onAddCustomer }: { onAddCustomer: () => void }) {
 
   const [search,          setSearch]          = useState('')
   const [showBlacklisted, setShowBlacklisted] = useState('')
+  const [dealerCategory,  setDealerCategory]  = useState('')
+  const [primaryFunction, setPrimaryFunction] = useState('')
   const [blacklistId,     setBlacklistId]     = useState<string | null>(null)
   const [deleteId,        setDeleteId]        = useState<string | null>(null)
   const [deleteLoading,   setDeleteLoading]   = useState(false)
@@ -207,6 +225,8 @@ function AccountsTab({ onAddCustomer }: { onAddCustomer: () => void }) {
     type: 'account',
     ...(search          && { search }),
     ...(showBlacklisted && { blacklisted: showBlacklisted }),
+    ...(dealerCategory  && { dealerCategory }),
+    ...(primaryFunction && { primaryFunction }),
   })
 
   const { data, isLoading } = useSWR<{ customers: Customer[] }>(
@@ -258,16 +278,27 @@ function AccountsTab({ onAddCustomer }: { onAddCustomer: () => void }) {
       render: (r) => (
         <div className="flex items-center gap-2">
           <Avatar name={`${r.firstName} ${r.lastName}`} size={26} />
-          <div className="flex items-center gap-1.5">
-            <span style={{ fontSize: 12, fontWeight: 500, color: colors.textPrimary }}>
-              {r.firstName} {r.lastName}
-            </span>
-            {r.blacklisted && (
-              <AlertTriangle className="w-3.5 h-3.5 shrink-0" style={{ color: colors.danger }} aria-label="Blacklisted" />
+          <div>
+            <div className="flex items-center gap-1.5">
+              <span style={{ fontSize: 12, fontWeight: 500, color: colors.textPrimary }}>
+                {r.firstName} {r.lastName}
+              </span>
+              {r.blacklisted && (
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0" style={{ color: colors.danger }} aria-label="Blacklisted" />
+              )}
+            </div>
+            {r.companyName && (
+              <span style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>{r.companyName}</span>
             )}
           </div>
         </div>
       ),
+    },
+    {
+      key: 'dealerCategory',
+      header: 'Category',
+      width: '110px',
+      render: (r) => <DealerCategoryBadge cat={r.dealerCategory} />,
     },
     {
       key: 'primaryFunction',
@@ -290,21 +321,26 @@ function AccountsTab({ onAddCustomer }: { onAddCustomer: () => void }) {
       render: (r) => <span style={{ fontSize: 12, color: colors.textSecondary }}>{r.phone}</span>,
     },
     {
+      key: 'zeroRated',
+      header: 'Zero VAT',
+      width: '80px',
+      render: (r) => (
+        <span
+          className="px-2 py-0.5 rounded text-xs font-medium"
+          style={r.zeroRated
+            ? { background: colors.warningBg, color: colors.warning }
+            : { color: colors.textSecondary }}
+        >
+          {r.zeroRated ? 'Y' : 'N'}
+        </span>
+      ),
+    },
+    {
       key: 'status',
       header: 'Status',
       width: '110px',
       render: (r) => (
         <StatusBadge status={r.blacklisted ? 'blacklisted' : r.isActive ? 'active' : 'inactive'} />
-      ),
-    },
-    {
-      key: 'createdAt',
-      header: 'Registered',
-      width: '110px',
-      render: (r) => (
-        <span style={{ fontSize: 11, color: colors.textSecondary }}>
-          {new Date(r.createdAt).toLocaleDateString('en-ZA')}
-        </span>
       ),
     },
   ]
@@ -376,6 +412,29 @@ function AccountsTab({ onAddCustomer }: { onAddCustomer: () => void }) {
           <option value="">All Status</option>
           <option value="false">Active Only</option>
           <option value="true">Blacklisted Only</option>
+        </select>
+        <select
+          className="rounded px-2 py-1 text-xs bg-white focus:outline-none border"
+          style={{ color: colors.textPrimary, borderColor: colors.border }}
+          value={dealerCategory}
+          onChange={(e) => setDealerCategory(e.target.value)}
+        >
+          <option value="">All Categories</option>
+          <option value="casual">Casual</option>
+          <option value="dealer_1">Dealer 1</option>
+          <option value="dealer_2">Dealer 2</option>
+          <option value="dealer_3">Dealer 3</option>
+        </select>
+        <select
+          className="rounded px-2 py-1 text-xs bg-white focus:outline-none border"
+          style={{ color: colors.textPrimary, borderColor: colors.border }}
+          value={primaryFunction}
+          onChange={(e) => setPrimaryFunction(e.target.value)}
+        >
+          <option value="">All Functions</option>
+          <option value="supplier">Supplier</option>
+          <option value="customer">Customer</option>
+          <option value="both">Both</option>
         </select>
         <span className="text-xs ml-auto" style={{ color: colors.textSecondary }}>
           {customers.length} account{customers.length !== 1 ? 's' : ''}
