@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db/prisma'
+import { Prisma } from '@prisma/client'
 import logger from '@/lib/logger'
 import Decimal from 'decimal.js'
 import { resolvePrice } from '@/lib/services/productService'
@@ -34,13 +35,29 @@ export class LoanDeductionExceedsTotalError extends Error {
 
 // ─── Reference number generator ───────────────────────────────────────────────
 
-async function generateRefNumber(): Promise<string> {
+type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
+
+// Generated inside the transaction so it's atomic with the insert
+async function generateRefNumber(tx: TxClient): Promise<string> {
   const today = new Date()
   const prefix = `PUR-${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`
-  // Count purchases today for sequence
   const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate())
-  const count = await prisma.purchase.count({ where: { createdAt: { gte: startOfDay } } })
+  const count = await tx.purchase.count({ where: { createdAt: { gte: startOfDay } } })
   return `${prefix}-${String(count + 1).padStart(4, '0')}`
+}
+
+// Retries on PostgreSQL serialization failures (P2034 / 40001)
+async function withSerializableRetry<T>(fn: () => Promise<T>): Promise<T> {
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      return await fn()
+    } catch (e: unknown) {
+      const code = (e as { code?: string })?.code
+      if (attempt < 3 && (code === 'P2034' || code === '40001')) continue
+      throw e
+    }
+  }
+  throw new Error('unreachable')
 }
 
 // ─── Create Purchase ──────────────────────────────────────────────────────────
@@ -86,9 +103,10 @@ export async function createPurchase(data: CreatePurchaseInput, createdByUserId?
     throw new LoanDeductionExceedsTotalError()
   }
 
-  const refNumber = await generateRefNumber()
+  const purchase = await withSerializableRetry(() =>
+    prisma.$transaction(async (tx) => {
+      const refNumber = await generateRefNumber(tx)
 
-  const purchase = await prisma.$transaction(async (tx) => {
     const p = await tx.purchase.create({
       data: {
         refNumber,
@@ -132,10 +150,11 @@ export async function createPurchase(data: CreatePurchaseInput, createdByUserId?
       await applyRepaymentTx(tx, data.customerId, deduction.toFixed(2), createdByUserId, p.id)
     }
 
-    return p
-  })
+      return p
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+  )
 
-  logger.info({ purchaseId: purchase.id, refNumber, customerId: data.customerId, totalAmount: totalAmount.toFixed(2), createdByUserId }, 'purchase.created')
+  logger.info({ purchaseId: purchase.id, refNumber: purchase.refNumber, customerId: data.customerId, totalAmount: totalAmount.toFixed(2), createdByUserId }, 'purchase.created')
   return purchase
 }
 

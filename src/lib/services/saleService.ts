@@ -1,7 +1,8 @@
 import { prisma } from '@/lib/db/prisma'
+import { Prisma } from '@prisma/client'
 import logger from '@/lib/logger'
 import Decimal from 'decimal.js'
-import { recordMovement, recordVoidReversal, getStockOnHand } from '@/lib/services/stockService'
+import { recordMovement, recordVoidReversal } from '@/lib/services/stockService'
 import type { CreateSaleInput, VoidSaleInput } from '@/lib/schemas/sale'
 
 // ─── Typed Errors ─────────────────────────────────────────────────────────────
@@ -22,20 +23,37 @@ export class InsufficientStockError extends Error {
   constructor(name: string) { super(`Insufficient stock for "${name}"`); this.name = 'InsufficientStockError' }
 }
 
-// ─── Reference number generator ───────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-async function generateRefNumber(): Promise<string> {
+type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
+
+// Reference number generated inside the transaction so it's atomic with the insert
+async function generateRefNumber(tx: TxClient): Promise<string> {
   const today = new Date()
   const prefix = `SAL-${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`
   const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate())
-  const count = await prisma.sale.count({ where: { createdAt: { gte: startOfDay } } })
+  const count = await tx.sale.count({ where: { createdAt: { gte: startOfDay } } })
   return `${prefix}-${String(count + 1).padStart(4, '0')}`
+}
+
+// Retries on PostgreSQL serialization failures (P2034 / 40001)
+async function withSerializableRetry<T>(fn: () => Promise<T>): Promise<T> {
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      return await fn()
+    } catch (e: unknown) {
+      const code = (e as { code?: string })?.code
+      if (attempt < 3 && (code === 'P2034' || code === '40001')) continue
+      throw e
+    }
+  }
+  throw new Error('unreachable')
 }
 
 // ─── Create Sale ──────────────────────────────────────────────────────────────
 
 export async function createSale(data: CreateSaleInput, createdByUserId?: string) {
-  // Validate all products
+  // Validate products outside transaction — read-only, no race risk
   const resolvedLines = await Promise.all(
     data.lines.map(async (line) => {
       const product = await prisma.product.findUnique({ where: { id: line.productId } })
@@ -43,68 +61,77 @@ export async function createSale(data: CreateSaleInput, createdByUserId?: string
       if (!product.isActive) throw new ProductInactiveError(product.code)
 
       const unitPrice = new Decimal(line.unitPrice)
-      const quantity = new Decimal(line.quantity)
+      const quantity  = new Decimal(line.quantity)
       const lineTotal = unitPrice.times(quantity)
 
-      return { productId: line.productId, quantity, unitPrice, lineTotal }
+      return { productId: line.productId, productName: product.name, quantity, unitPrice, lineTotal }
     })
   )
 
-  // Stock availability check — prevent selling more than on hand
-  for (const line of resolvedLines) {
-    const stockRows = await getStockOnHand(line.productId)
-    const onHand = stockRows[0] ? new Decimal(stockRows[0].onHand) : new Decimal(0)
-    if (line.quantity.gt(onHand)) {
-      const product = await prisma.product.findUnique({ where: { id: line.productId }, select: { name: true } })
-      throw new InsufficientStockError(product?.name ?? line.productId)
-    }
-  }
-
   const totalAmount = resolvedLines.reduce((sum, l) => sum.plus(l.lineTotal), new Decimal(0))
-  const refNumber = await generateRefNumber()
 
-  const sale = await prisma.$transaction(async (tx) => {
-    const s = await tx.sale.create({
-      data: {
-        refNumber,
-        customerId: data.customerId,
-        buyerId: data.buyerId,
-        buyerName: data.buyerName,
-        buyerIdNumber: data.buyerIdNumber,
-        buyerPhone: data.buyerPhone,
-        status: 'completed',
-        totalAmount,
-        paymentMethod: data.paymentMethod ?? 'cash',
-        notes: data.notes,
-        createdByUserId,
-        lines: {
-          create: resolvedLines.map((l) => ({
-            productId: l.productId,
-            quantity: l.quantity,
-            unitPrice: l.unitPrice,
-            lineTotal: l.lineTotal,
-          })),
+  const sale = await withSerializableRetry(() =>
+    prisma.$transaction(async (tx) => {
+      // Ref number inside tx — races resolved by Serializable isolation
+      const refNumber = await generateRefNumber(tx)
+
+      // Stock check inside tx — eliminates TOCTOU window between check and write
+      for (const line of resolvedLines) {
+        const inAgg = await tx.stockMovement.aggregate({
+          where: { productId: line.productId, direction: 'in' },
+          _sum: { quantity: true },
+        })
+        const outAgg = await tx.stockMovement.aggregate({
+          where: { productId: line.productId, direction: 'out' },
+          _sum: { quantity: true },
+        })
+        const onHand = new Decimal(inAgg._sum.quantity?.toString() ?? '0')
+          .minus(new Decimal(outAgg._sum.quantity?.toString() ?? '0'))
+        if (line.quantity.gt(onHand)) throw new InsufficientStockError(line.productName)
+      }
+
+      const s = await tx.sale.create({
+        data: {
+          refNumber,
+          customerId:    data.customerId,
+          buyerId:       data.buyerId,
+          buyerName:     data.buyerName,
+          buyerIdNumber: data.buyerIdNumber,
+          buyerPhone:    data.buyerPhone,
+          status:        'completed',
+          totalAmount,
+          paymentMethod: data.paymentMethod ?? 'cash',
+          notes:         data.notes,
+          createdByUserId,
+          lines: {
+            create: resolvedLines.map((l) => ({
+              productId: l.productId,
+              quantity:  l.quantity,
+              unitPrice: l.unitPrice,
+              lineTotal: l.lineTotal,
+            })),
+          },
         },
-      },
-      include: { lines: { include: { product: true } } },
-    })
-
-    // Stock OUT: yard sold material to buyer
-    for (const line of resolvedLines) {
-      await recordMovement(tx, {
-        productId: line.productId,
-        direction: 'out',
-        quantity: line.quantity,
-        source: 'sale',
-        sourceId: s.id,
-        createdByUserId,
+        include: { lines: { include: { product: true } } },
       })
-    }
 
-    return s
-  })
+      // Stock OUT: yard sold material to buyer
+      for (const line of resolvedLines) {
+        await recordMovement(tx, {
+          productId: line.productId,
+          direction: 'out',
+          quantity:  line.quantity,
+          source:    'sale',
+          sourceId:  s.id,
+          createdByUserId,
+        })
+      }
 
-  logger.info({ saleId: sale.id, refNumber, totalAmount: totalAmount.toFixed(2), createdByUserId }, 'sale.created')
+      return s
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+  )
+
+  logger.info({ saleId: sale.id, refNumber: sale.refNumber, totalAmount: totalAmount.toFixed(2), createdByUserId }, 'sale.created')
   return sale
 }
 
@@ -127,9 +154,9 @@ export async function voidSale(id: string, data: VoidSaleInput, voidedById?: str
       originalMovements: sale.lines.map((l) => ({
         productId: l.productId,
         direction: 'out' as const,
-        quantity: new Decimal(l.quantity.toString()),
+        quantity:  new Decimal(l.quantity.toString()),
       })),
-      sourceId: id,
+      sourceId:       id,
       createdByUserId: voidedById,
     })
 
@@ -162,23 +189,23 @@ export async function listSales(opts?: {
   page?: number
   pageSize?: number
 }) {
-  const page = opts?.page ?? 1
+  const page     = opts?.page ?? 1
   const pageSize = opts?.pageSize ?? 50
-  const skip = (page - 1) * pageSize
+  const skip     = (page - 1) * pageSize
 
   const where = {
-    ...(opts?.status && { status: opts.status as 'completed' | 'voided' | 'pending' }),
+    ...(opts?.status        && { status:        opts.status        as 'completed' | 'voided' | 'pending' }),
     ...(opts?.paymentMethod && { paymentMethod: opts.paymentMethod as 'cash' | 'eft' | 'cheque' | 'amplopay' }),
     ...(opts?.from || opts?.to ? {
       createdAt: {
         ...(opts?.from && { gte: opts.from }),
-        ...(opts?.to && { lte: opts.to }),
+        ...(opts?.to   && { lte: opts.to }),
       },
     } : {}),
     ...(opts?.search && {
       OR: [
-        { refNumber: { contains: opts.search, mode: 'insensitive' as const } },
-        { buyerName: { contains: opts.search, mode: 'insensitive' as const } },
+        { refNumber:     { contains: opts.search, mode: 'insensitive' as const } },
+        { buyerName:     { contains: opts.search, mode: 'insensitive' as const } },
         { buyerIdNumber: { contains: opts.search, mode: 'insensitive' as const } },
       ],
     }),
@@ -187,10 +214,10 @@ export async function listSales(opts?: {
   const [sales, total] = await Promise.all([
     prisma.sale.findMany({
       where,
-      include: { lines: { select: { id: true } } },
-      orderBy: { createdAt: 'desc' },
+      include:  { lines: { select: { id: true } } },
+      orderBy:  { createdAt: 'desc' },
       skip,
-      take: pageSize,
+      take:     pageSize,
     }),
     prisma.sale.count({ where }),
   ])
