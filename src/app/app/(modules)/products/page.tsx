@@ -1,13 +1,15 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import useSWR, { mutate } from 'swr'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Search, Pencil, TrendingUp, Loader2 } from 'lucide-react'
+import { Search, Pencil, TrendingUp, Loader2, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -58,6 +60,8 @@ type Product = {
 }
 
 export default function ProductsPage() {
+  const router       = useRouter()
+  const searchParams = useSearchParams()
   const { data: session } = useSession()
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('')
@@ -67,6 +71,14 @@ export default function ProductsPage() {
   const [bulkOpen, setBulkOpen] = useState(false)
 
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
+
+  // Open Add Product modal from toolbar query param (?add=1)
+  useEffect(() => {
+    if (searchParams.get('add') === '1') {
+      setCreateOpen(true)
+      router.replace('/app/products')
+    }
+  }, [searchParams, router])
 
   const query = new URLSearchParams({
     ...(search && { search }),
@@ -122,6 +134,13 @@ export default function ProductsPage() {
               style={{ borderColor: colors.border, color: colors.textPrimary }}
             >
               <TrendingUp className="w-3.5 h-3.5" /> Bulk Price Update
+            </button>
+            <button
+              onClick={() => setCreateOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium text-white"
+              style={{ background: colors.action }}
+            >
+              <Plus className="w-3.5 h-3.5" /> Add Product
             </button>
           </div>
         )}
@@ -263,12 +282,13 @@ function CreateProductModal({ onClose, onSuccess }: { onClose: () => void; onSuc
             </div>
             <div>
               <Label>Unit</Label>
-              <Select onValueChange={(v) => setValue('unit', v as 'kg' | 'ton' | 'each')} defaultValue="kg">
+              <Select onValueChange={(v) => setValue('unit', v as 'kg' | 'ton' | 'each' | 'litre')} defaultValue="kg">
                 <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="kg">kg</SelectItem>
                   <SelectItem value="ton">ton</SelectItem>
                   <SelectItem value="each">each</SelectItem>
+                  <SelectItem value="litre">litre</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -358,12 +378,13 @@ function EditProductModal({ product, onClose, onSuccess }: { product: Product; o
             </div>
             <div>
               <Label>Unit</Label>
-              <Select onValueChange={(v) => setValue('unit', v as 'kg' | 'ton' | 'each')} defaultValue={product.unit}>
+              <Select onValueChange={(v) => setValue('unit', v as 'kg' | 'ton' | 'each' | 'litre')} defaultValue={product.unit}>
                 <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="kg">kg</SelectItem>
                   <SelectItem value="ton">ton</SelectItem>
                   <SelectItem value="each">each</SelectItem>
+                  <SelectItem value="litre">litre</SelectItem>
                 </SelectContent>
               </Select>
             </div>

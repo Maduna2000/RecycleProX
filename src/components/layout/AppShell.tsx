@@ -133,7 +133,7 @@ function useToolbarButtons(pathname: string, role: string): ToolbarButton[] {
 
   if (pathname === '/app/products' || pathname.startsWith('/app/products/'))
     return [
-      { label: 'Add Product', icon: Plus, href: '/app/products', variant: 'primary' },
+      { label: 'Add Product', icon: Plus, href: '/app/products?add=1', variant: 'primary' },
     ]
 
   if (pathname === '/app/price-groups' || pathname.startsWith('/app/price-groups/'))

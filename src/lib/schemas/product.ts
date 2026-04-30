@@ -10,7 +10,7 @@ export const CreateProductSchema = z.object({
   code: z.string().min(1, 'Product code is required').max(20).toUpperCase(),
   name: z.string().min(1, 'Product name is required').max(100),
   category: z.enum(['ferrous', 'non_ferrous', 'copper', 'aluminium', 'plastic', 'paper', 'e_waste', 'other']),
-  unit: z.enum(['kg', 'ton', 'each']).default('kg'),
+  unit: z.enum(['kg', 'ton', 'each', 'litre']).default('kg'),
   defaultBuyPrice: positiveDecimal,
   defaultSellPrice: positiveDecimal,
   isActive: z.boolean().default(true),
