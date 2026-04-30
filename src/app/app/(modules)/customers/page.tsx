@@ -275,6 +275,7 @@ function AccountsTab({ onAddCustomer }: { onAddCustomer: () => void }) {
     {
       key: 'name',
       header: 'Name',
+      width: '200px',
       render: (r) => (
         <div className="flex items-center gap-2">
           <Avatar name={`${r.firstName} ${r.lastName}`} size={26} />
@@ -332,6 +333,16 @@ function AccountsTab({ onAddCustomer }: { onAddCustomer: () => void }) {
             : { color: colors.textSecondary }}
         >
           {r.zeroRated ? 'Y' : 'N'}
+        </span>
+      ),
+    },
+    {
+      key: 'createdAt',
+      header: 'Registered',
+      width: '100px',
+      render: (r) => (
+        <span style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>
+          {new Date(r.createdAt).toLocaleDateString('en-ZA')}
         </span>
       ),
     },
