@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import useSWR, { mutate } from 'swr'
-import { AlertTriangle, Loader2, Eye, ShieldBan, ShieldCheck, UserX, Trash2 } from 'lucide-react'
+import { AlertTriangle, Loader2, Eye, ShieldBan, ShieldCheck, UserX, Trash2, UserMinus } from 'lucide-react'
 import { DataTable, Avatar, StatusBadge, type Column, type RowAction } from '@/components/ui/DataTable'
 import { CreateCustomerModal } from '@/components/customers/CreateCustomerModal'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -23,6 +23,7 @@ type Customer = {
   dealerCategory?: string | null
   companyName?: string | null
   zeroRated: boolean
+  accountCode?: string | null
 }
 
 // ─── Blacklist modal ───────────────────────────────────────────────────────────
@@ -115,6 +116,8 @@ function AccountsList({ onAddCustomer }: { onAddCustomer: () => void }) {
   const [blacklistId,     setBlacklistId]     = useState<string | null>(null)
   const [deleteId,        setDeleteId]        = useState<string | null>(null)
   const [deleteLoading,   setDeleteLoading]   = useState(false)
+  const [convertId,       setConvertId]       = useState<string | null>(null)
+  const [convertLoading,  setConvertLoading]  = useState(false)
 
   const query = new URLSearchParams({
     type: 'account',
@@ -149,6 +152,18 @@ function AccountsList({ onAddCustomer }: { onAddCustomer: () => void }) {
     else toast.error('Failed to unblacklist')
   }
 
+  async function handleConvertToCasual(id: string) {
+    setConvertLoading(true)
+    const res = await fetch(`/api/customers/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ customerType: 'casual', dealerCategory: null, priceGroupId: null }),
+    })
+    setConvertLoading(false)
+    if (res.ok) { toast.success('Converted to casual seller'); setConvertId(null); refreshList() }
+    else { const j = await res.json(); toast.error(j.error ?? 'Failed to convert customer') }
+  }
+
   async function handleDelete(id: string) {
     setDeleteLoading(true)
     const res = await fetch(`/api/customers/${id}`, { method: 'DELETE' })
@@ -159,8 +174,15 @@ function AccountsList({ onAddCustomer }: { onAddCustomer: () => void }) {
 
   const blacklistTarget = customers.find((c) => c.id === blacklistId)
   const deleteTarget    = customers.find((c) => c.id === deleteId)
+  const convertTarget   = customers.find((c) => c.id === convertId)
 
   const columns: Column<Customer>[] = [
+    {
+      key: 'accountCode',
+      header: 'Acc Code',
+      width: '90px',
+      render: (r) => <span className="font-mono text-xs font-semibold" style={{ color: colors.process }}>{r.accountCode ?? '—'}</span>,
+    },
     {
       key: 'idNumber',
       header: 'ID Number',
@@ -283,6 +305,13 @@ function AccountsList({ onAddCustomer }: { onAddCustomer: () => void }) {
       onClick: (r) => handleSuspend(r),
     },
     {
+      label: 'Convert to Casual',
+      icon: UserMinus,
+      danger: true,
+      hidden: () => !isManager,
+      onClick: (r) => setConvertId(r.id),
+    },
+    {
       label: 'Delete',
       icon: Trash2,
       danger: true,
@@ -366,6 +395,34 @@ function AccountsList({ onAddCustomer }: { onAddCustomer: () => void }) {
           onClose={() => setBlacklistId(null)}
           onSuccess={() => { setBlacklistId(null); refreshList() }}
         />
+      )}
+
+      {/* Convert to Casual confirm */}
+      {convertId && convertTarget && (
+        <Dialog open onOpenChange={(o) => { if (!o) setConvertId(null) }}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader><DialogTitle>Convert to Casual Seller</DialogTitle></DialogHeader>
+            <div className="space-y-4 mt-2">
+              <p className="text-sm" style={{ color: colors.textSecondary }}>
+                Convert <strong style={{ color: colors.textPrimary }}>{convertTarget.firstName} {convertTarget.lastName}</strong> to a casual seller?
+              </p>
+              <p className="text-xs px-3 py-2 rounded" style={{ background: colors.warningBg, color: colors.warning }}>
+                Dealer category and price group will be removed. Their account code will be retained for reference.
+              </p>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setConvertId(null)} disabled={convertLoading}>Cancel</Button>
+                <button
+                  onClick={() => handleConvertToCasual(convertId)}
+                  disabled={convertLoading}
+                  className="h-9 px-4 rounded text-sm font-medium text-white disabled:opacity-50"
+                  style={{ background: colors.danger }}
+                >
+                  {convertLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Convert'}
+                </button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
 
       {/* Delete confirm */}

@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Search, Loader2, Upload, Download, CheckCircle2, AlertCircle, MoreVertical, Eye, ShieldBan, ShieldCheck, UserX, Trash2 } from 'lucide-react'
+import { Search, Loader2, Upload, Download, CheckCircle2, AlertCircle, MoreVertical, Eye, ShieldBan, ShieldCheck, UserX, Trash2, UserCheck } from 'lucide-react'
 import { toast } from 'sonner'
 import { useSession } from 'next-auth/react'
 import { PageShell } from '@/components/layout/PageShell'
@@ -41,6 +41,7 @@ export default function CasualsPage() {
   const [blacklistId, setBlacklistId]     = useState<string | null>(null)
   const [deleteId, setDeleteId]           = useState<string | null>(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
+  const [promoteId, setPromoteId]         = useState<string | null>(null)
 
   const params = new URLSearchParams({ type: 'casual', limit: '200' })
   if (search) params.set('search', search)
@@ -208,6 +209,13 @@ export default function CasualsPage() {
                           onClick={(e) => e.stopPropagation()}
                         >
                           <MenuItem icon={<Eye className="w-3.5 h-3.5" />} label="View Profile" onClick={() => { setMenuOpen(null); router.push(`/app/customers/${c.id}`) }} />
+                          <MenuItem
+                            icon={<UserCheck className="w-3.5 h-3.5" />}
+                            label="Promote to Account"
+                            disabled={!isManager}
+                            onClick={() => { setMenuOpen(null); setPromoteId(c.id) }}
+                          />
+                          <div style={{ borderTop: `1px solid ${colors.border}`, margin: '4px 0' }} />
                           {!c.blacklisted ? (
                             <MenuItem
                               icon={<ShieldBan className="w-3.5 h-3.5" />}
@@ -258,6 +266,16 @@ export default function CasualsPage() {
           <ImportCsvModal
             onClose={() => setImportOpen(false)}
             onSuccess={() => { refreshList(); setImportOpen(false) }}
+          />
+        )}
+
+        {/* Promote to Account Modal */}
+        {promoteId && (
+          <PromoteToAccountModal
+            customerId={promoteId}
+            customerName={(() => { const c = customers.find(x => x.id === promoteId); return c ? `${c.firstName} ${c.lastName}` : '' })()}
+            onClose={() => setPromoteId(null)}
+            onSuccess={() => { setPromoteId(null); refreshList() }}
           />
         )}
 
@@ -365,6 +383,115 @@ function BlacklistModal({ customer, onClose, onSuccess }: { customer: Customer; 
               style={{ background: colors.danger }}
             >
               {loading ? <span className="flex items-center gap-1.5"><Loader2 className="w-4 h-4 animate-spin" />Blacklisting…</span> : 'Blacklist'}
+            </button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ─── Promote to Account Modal ─────────────────────────────────────────────────
+type PriceGroup = { id: string; name: string }
+
+function PromoteToAccountModal({ customerId, customerName, onClose, onSuccess }: {
+  customerId: string; customerName: string; onClose: () => void; onSuccess: () => void
+}) {
+  const { data: pgData } = useSWR<{ priceGroups: PriceGroup[] }>('/api/price-groups', fetcher)
+  const priceGroups = pgData?.priceGroups ?? []
+
+  const [dealerCategory,  setDealerCategory]  = useState('dealer_1')
+  const [priceGroupId,    setPriceGroupId]    = useState('')
+  const [primaryFunction, setPrimaryFunction] = useState('supplier')
+  const [loading,         setLoading]         = useState(false)
+
+  async function handlePromote() {
+    setLoading(true)
+    const res = await fetch(`/api/customers/${customerId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        customerType: 'account',
+        dealerCategory,
+        primaryFunction,
+        ...(priceGroupId && { priceGroupId }),
+      }),
+    })
+    setLoading(false)
+    if (res.ok) {
+      const customer = await res.json()
+      toast.success(`Promoted to account — code: ${customer.accountCode ?? ''}`)
+      onSuccess()
+    } else {
+      const j = await res.json()
+      toast.error(j.error ?? 'Failed to promote customer')
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader><DialogTitle>Promote to Account</DialogTitle></DialogHeader>
+        <div className="space-y-4 mt-2">
+          <p className="text-sm" style={{ color: colors.textSecondary }}>
+            Promoting <strong style={{ color: colors.textPrimary }}>{customerName}</strong> to an account customer. An account code will be auto-assigned.
+          </p>
+
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs font-medium block mb-1" style={{ color: colors.textSecondary }}>Dealer Category</label>
+              <select
+                className="w-full border rounded px-2 py-1.5 text-sm bg-white focus:outline-none"
+                style={{ borderColor: colors.border, color: colors.textPrimary }}
+                value={dealerCategory}
+                onChange={(e) => setDealerCategory(e.target.value)}
+              >
+                <option value="casual">Casual</option>
+                <option value="dealer_1">Dealer 1</option>
+                <option value="dealer_2">Dealer 2</option>
+                <option value="dealer_3">Dealer 3</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs font-medium block mb-1" style={{ color: colors.textSecondary }}>Price Group (optional)</label>
+              <select
+                className="w-full border rounded px-2 py-1.5 text-sm bg-white focus:outline-none"
+                style={{ borderColor: colors.border, color: colors.textPrimary }}
+                value={priceGroupId}
+                onChange={(e) => setPriceGroupId(e.target.value)}
+              >
+                <option value="">— None —</option>
+                {priceGroups.map((pg) => (
+                  <option key={pg.id} value={pg.id}>{pg.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs font-medium block mb-1" style={{ color: colors.textSecondary }}>Primary Function</label>
+              <select
+                className="w-full border rounded px-2 py-1.5 text-sm bg-white focus:outline-none"
+                style={{ borderColor: colors.border, color: colors.textPrimary }}
+                value={primaryFunction}
+                onChange={(e) => setPrimaryFunction(e.target.value)}
+              >
+                <option value="supplier">Supplier</option>
+                <option value="customer">Customer</option>
+                <option value="both">Both</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
+            <button
+              onClick={handlePromote}
+              disabled={loading}
+              className="h-9 px-4 rounded text-sm font-medium text-white disabled:opacity-50"
+              style={{ background: colors.action }}
+            >
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Promote →'}
             </button>
           </div>
         </div>

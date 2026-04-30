@@ -162,9 +162,12 @@ model Customer {
   dateOfBirth      DateTime?
   gender           Gender?
   nationality      String?
+  accountCode      String?         @unique
   companyName      String?
+  companyRegNumber String?
   contactPerson    String?
   phone            String
+  landline         String?
   email            String?
   physicalAddress  String?
   postalAddress    String?

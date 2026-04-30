@@ -54,8 +54,10 @@ export const CreateCustomerSchema = z.object({
   gender:           z.enum(['male', 'female', 'other']).optional(),
   nationality:      z.string().optional(),
   companyName:      z.string().optional(),
+  companyRegNumber: z.string().max(50).optional(),
   contactPerson:    z.string().optional(),
   phone:            phoneSchema,
+  landline:         z.string().max(20).optional(),
   email:            z.string().email('Invalid email address').optional().or(z.literal('')).transform(v => v || undefined),
   physicalAddress:  z.string().optional(),
   postalAddress:    z.string().optional(),
@@ -92,8 +94,10 @@ export const BlacklistSchema = z.object({
 })
 
 export const UpdateCustomerSchema = CreateCustomerSchema.partial().omit({ idNumber: true }).extend({
-  idPhotoR2Key: z.string().nullable().optional(),
-  isActive:     z.boolean().optional(),
+  idPhotoR2Key:   z.string().nullable().optional(),
+  isActive:       z.boolean().optional(),
+  dealerCategory: z.enum(['casual', 'dealer_1', 'dealer_2', 'dealer_3']).nullable().optional(),
+  priceGroupId:   z.string().uuid().nullable().optional(),
 })
 
 export const UploadCustomerDocumentSchema = z.object({

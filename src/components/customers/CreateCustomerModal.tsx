@@ -49,7 +49,9 @@ export function CreateCustomerModal({ open, onClose, onSuccess, defaultType = 'c
       toast.error(json.error ?? 'Failed to create customer')
       return
     }
-    toast.success('Customer created')
+    const created = await res.json()
+    const codeMsg = created.accountCode ? ` — code: ${created.accountCode}` : ''
+    toast.success(`Customer created${codeMsg}`)
     reset()
     onSuccess()
   }
@@ -117,10 +119,17 @@ export function CreateCustomerModal({ open, onClose, onSuccess, defaultType = 'c
           )}
 
           <div>
-            <Label>Phone</Label>
+            <Label>Phone (Mobile)</Label>
             <Input {...register('phone')} className="mt-1" placeholder="76 123 456" disabled={loading} />
             {errors.phone && <p className="text-xs text-red-600 mt-1">{errors.phone.message}</p>}
           </div>
+
+          {customerType === 'account' && (
+            <div>
+              <Label>Landline <span className="text-gray-400 font-normal">(optional)</span></Label>
+              <Input {...register('landline')} className="mt-1" placeholder="e.g. +268 2404 xxxx" disabled={loading} />
+            </div>
+          )}
 
           <div>
             <Label>Email <span className="text-gray-400 font-normal">(optional)</span></Label>
@@ -132,6 +141,13 @@ export function CreateCustomerModal({ open, onClose, onSuccess, defaultType = 'c
             <Label>Physical Address <span className="text-gray-400 font-normal">(optional)</span></Label>
             <Input {...register('physicalAddress')} className="mt-1" disabled={loading} />
           </div>
+
+          {customerType === 'account' && (
+            <div>
+              <Label>Company Reg No <span className="text-gray-400 font-normal">(optional)</span></Label>
+              <Input {...register('companyRegNumber')} className="mt-1" placeholder="e.g. 2021/123456/07" disabled={loading} />
+            </div>
+          )}
 
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>

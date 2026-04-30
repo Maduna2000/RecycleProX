@@ -27,9 +27,9 @@ const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 type Customer = {
   id: string; firstName: string; lastName: string; idNumber: string
-  phone: string; email?: string; physicalAddress?: string; postalAddress?: string
+  phone: string; landline?: string; email?: string; physicalAddress?: string; postalAddress?: string
   vatNumber?: string; customerType: string; primaryFunction?: string
-  companyName?: string; contactPerson?: string
+  companyName?: string; companyRegNumber?: string; contactPerson?: string
   dateOfBirth?: string; gender?: string; nationality?: string
   bankName?: string; bankAccountNo?: string; bankBranchCode?: string
   creditLimit?: string
@@ -41,6 +41,7 @@ type Customer = {
   marketSector?: 'formal' | 'informal'
   dealerCategory?: 'casual' | 'dealer_1' | 'dealer_2' | 'dealer_3'
   zeroRated?: boolean
+  accountCode?: string | null
 }
 
 const DEALER_LABELS: Record<string, string> = {
@@ -113,7 +114,12 @@ export default function CustomerDetailPage() {
               {customer.firstName.charAt(0)}{customer.lastName.charAt(0)}
             </div>
             <div>
-              <h1 className="text-xl font-bold text-gray-900">{fullName}</h1>
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl font-bold text-gray-900">{fullName}</h1>
+                {customer.accountCode && (
+                  <span className="font-mono text-sm font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">{customer.accountCode}</span>
+                )}
+              </div>
               <p className="text-sm text-gray-500 font-mono">{customer.idNumber}</p>
               <p className="text-sm text-gray-500">{customer.phone}</p>
             </div>
@@ -203,7 +209,8 @@ function OverviewTab({ customer }: { customer: Customer }) {
         <Field label="Date of Birth" value={fmtDate(customer.dateOfBirth)} />
         <Field label="Gender" value={fmt(customer.gender)} />
         <Field label="Nationality" value={fmt(customer.nationality)} />
-        <Field label="Phone" value={customer.phone} />
+        <Field label="Phone (Mobile)" value={customer.phone} />
+        {customer.landline && <Field label="Landline" value={customer.landline} />}
         <Field label="Email" value={fmt(customer.email)} />
         <Field label="Physical Address" value={fmt(customer.physicalAddress)} />
         <Field label="Postal Address" value={fmt(customer.postalAddress)} />
@@ -242,6 +249,7 @@ function OverviewTab({ customer }: { customer: Customer }) {
         </div>
         <Field label="Price Group" value={customer.priceGroup?.name ?? '—'} />
         <Field label="Company Name" value={fmt(customer.companyName)} />
+        <Field label="Company Reg No" value={fmt(customer.companyRegNumber)} />
         <Field label="Contact Person" value={fmt(customer.contactPerson)} />
         <Field label="VAT Number" value={fmt(customer.vatNumber)} />
         <Field label="Credit Limit" value={fmtMoney(customer.creditLimit)} />
@@ -544,7 +552,9 @@ function EditCustomerModal({ customer, onClose, onSuccess }: { customer: Custome
       postalAddress:    customer.postalAddress ?? '',
       vatNumber:        customer.vatNumber ?? '',
       companyName:      customer.companyName ?? '',
+      companyRegNumber: customer.companyRegNumber ?? '',
       contactPerson:    customer.contactPerson ?? '',
+      landline:         customer.landline ?? '',
       customerType:     customer.customerType as 'casual' | 'account',
       primaryFunction:  (customer.primaryFunction as 'customer' | 'supplier' | 'both') ?? 'supplier',
       gender:           (customer.gender as 'male' | 'female' | 'other') ?? undefined,
@@ -647,9 +657,13 @@ function EditCustomerModal({ customer, onClose, onSuccess }: { customer: Custome
                 <Input {...register('nationality')} className="mt-1" disabled={loading} />
               </div>
               <div>
-                <Label>Phone</Label>
+                <Label>Phone (Mobile)</Label>
                 <Input {...register('phone')} className="mt-1" disabled={loading} />
                 {errors.phone && <p className="text-xs text-red-600 mt-1">{errors.phone.message}</p>}
+              </div>
+              <div>
+                <Label>Landline <span className="text-gray-400 font-normal">(optional)</span></Label>
+                <Input {...register('landline')} className="mt-1" disabled={loading} placeholder="e.g. +268 2404 xxxx" />
               </div>
               <div>
                 <Label>Email</Label>
@@ -748,6 +762,10 @@ function EditCustomerModal({ customer, onClose, onSuccess }: { customer: Custome
               <div>
                 <Label>Company Name</Label>
                 <Input {...register('companyName')} className="mt-1" disabled={loading} />
+              </div>
+              <div>
+                <Label>Company Reg No <span className="text-gray-400 font-normal">(optional)</span></Label>
+                <Input {...register('companyRegNumber')} className="mt-1" disabled={loading} placeholder="e.g. 2021/123456/07" />
               </div>
               <div>
                 <Label>Contact Person</Label>

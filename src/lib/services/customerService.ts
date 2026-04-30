@@ -24,6 +24,19 @@ export class ForbiddenError extends Error {
 
 // ─── Service ──────────────────────────────────────────────────────────────────
 
+async function generateAccountCode(lastName: string): Promise<string> {
+  const prefix = lastName.replace(/[^a-zA-Z]/g, '').toUpperCase().substring(0, 3).padEnd(3, 'X')
+  const existing = await prisma.customer.findMany({
+    where: { accountCode: { startsWith: prefix } },
+    select: { accountCode: true },
+  })
+  const nums = existing
+    .map((c) => parseInt((c.accountCode ?? '').slice(3)))
+    .filter((n) => !isNaN(n))
+  const next = nums.length > 0 ? Math.max(...nums) + 1 : 1
+  return `${prefix}${String(next).padStart(3, '0')}`
+}
+
 const DEALER_PRICE_GROUP_NAMES: Record<string, string> = {
   dealer_1: 'Dealer 1',
   dealer_2: 'Dealer 2',
@@ -53,8 +66,12 @@ export async function createCustomer(data: CreateCustomerInput, userId: string) 
 
   const resolvedPriceGroupId = await resolvePriceGroupId(data.dealerCategory, data.priceGroupId)
 
+  const accountCode = data.customerType === 'account'
+    ? await generateAccountCode(data.lastName)
+    : undefined
+
   const customer = await prisma.customer.create({
-    data: { ...data, priceGroupId: resolvedPriceGroupId, createdByUserId: userId },
+    data: { ...data, priceGroupId: resolvedPriceGroupId, createdByUserId: userId, accountCode },
   })
   logger.info({ customerId: customer.id, userId }, 'Customer created')
   return customer
@@ -76,13 +93,26 @@ export async function updateCustomer(id: string, data: UpdateCustomerInput, user
   let updateData: typeof data = data
 
   if (data.dealerCategory !== undefined) {
-    const resolvedPriceGroupId = await resolvePriceGroupId(data.dealerCategory, data.priceGroupId)
+    const resolvedPriceGroupId = await resolvePriceGroupId(
+      data.dealerCategory ?? undefined,
+      data.priceGroupId ?? undefined,
+    )
     updateData = { ...data, priceGroupId: resolvedPriceGroupId }
+  }
+
+  // Auto-assign account code when converting casual → account
+  let newAccountCode: string | undefined
+  if (data.customerType === 'account') {
+    const current = await prisma.customer.findUnique({ where: { id }, select: { accountCode: true, lastName: true } })
+    if (current && !current.accountCode) {
+      const lastName = data.lastName ?? current.lastName
+      newAccountCode = await generateAccountCode(lastName)
+    }
   }
 
   const customer = await prisma.customer.update({
     where: { id },
-    data: updateData,
+    data: { ...updateData, ...(newAccountCode && { accountCode: newAccountCode }) },
   })
   logger.info({ customerId: id, userId }, 'Customer updated')
   return customer
