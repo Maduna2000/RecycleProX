@@ -49,7 +49,12 @@
       "Bash(ls /c/Python*/python.exe)",
       "Read(//c/Users/MD TECH SOLUTION/AppData/Local/Programs/**)",
       "Bash(psql --version)",
-      "Bash(pg_isready)"
+      "Bash(pg_isready)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(python skills/ui-ux-pro-max/scripts/search.py \"industrial POS terminal recycling yard management\" --design-system -p \"Renovo Pro POS\" -f markdown)",
+      "Bash(npx claude-code-templates@latest --skill development/senior-architect)"
     ]
   }
 }
