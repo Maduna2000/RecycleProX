@@ -83,10 +83,11 @@ export const CreateCustomerSchema = z.object({
 })
 
 export const QuickCreateSchema = z.object({
-  idNumber:  idNumberSchema,
-  firstName: z.string().min(1, 'First name is required'),
-  lastName:  z.string().min(1, 'Last name is required'),
-  phone:     phoneSchema,
+  idNumber:        idNumberSchema,
+  firstName:       z.string().min(1, 'First name is required'),
+  lastName:        z.string().min(1, 'Last name is required'),
+  phone:           phoneSchema,
+  physicalAddress: z.string().max(200).optional(),
 })
 
 export const BlacklistSchema = z.object({

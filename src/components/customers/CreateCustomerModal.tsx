@@ -17,7 +17,13 @@ import Link from 'next/link'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
-export function CreateCustomerModal({ open, onClose, onSuccess, defaultType = 'casual' }: { open: boolean; onClose: () => void; onSuccess: () => void; defaultType?: 'account' | 'casual' }) {
+type CreatedCustomerSummary = {
+  id: string; firstName: string; lastName: string; idNumber: string
+  phone: string; accountCode: string | null; priceGroupId: string | null
+  blacklisted: boolean; zeroRated: boolean
+}
+
+export function CreateCustomerModal({ open, onClose, onSuccess, defaultType = 'casual' }: { open: boolean; onClose: () => void; onSuccess: (customer?: CreatedCustomerSummary) => void; defaultType?: 'account' | 'casual' }) {
   const [loading, setLoading] = useState(false)
   const [duplicate, setDuplicate] = useState<{ id: string } | null>(null)
 
@@ -49,11 +55,11 @@ export function CreateCustomerModal({ open, onClose, onSuccess, defaultType = 'c
       toast.error(json.error ?? 'Failed to create customer')
       return
     }
-    const created = await res.json()
+    const created = await res.json() as CreatedCustomerSummary
     const codeMsg = created.accountCode ? ` — code: ${created.accountCode}` : ''
     toast.success(`Customer created${codeMsg}`)
     reset()
-    onSuccess()
+    onSuccess(created)
   }
 
   return (

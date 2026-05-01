@@ -10,7 +10,8 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import useSWR from 'swr'
-import { CustomerLookupWidget } from '@/components/CustomerLookupWidget'
+import { CasualSelectorPanel } from '@/components/customers/CasualSelectorPanel'
+import { AccountSelectorPanel } from '@/components/customers/AccountSelectorPanel'
 import { SignatureCanvas, SignatureCanvasHandle } from '@/components/SignatureCanvas'
 import { PrintResultModal } from '@/components/PrintResultModal'
 import { PhotoUploader } from '@/components/PhotoUploader'
@@ -109,6 +110,7 @@ export default function NewPurchasePage() {
   const { mutate: offlineMutate } = useOfflineMutation()
 
   const [customer,        setCustomer]        = useState<SelectedCustomer | null>(null)
+  const [customerType,    setCustomerType]    = useState<'casual' | 'account' | null>(null)
   const [lines,           setLines]           = useState<LineItem[]>([emptyLine(1)])
   const [paymentMethod,   setPaymentMethod]   = useState<'cash' | 'eft' | 'cheque' | 'amplopay'>('cash')
   const [notes,           setNotes]           = useState('')
@@ -322,7 +324,68 @@ export default function NewPurchasePage() {
           <div className="shrink-0" style={{ borderBottom: '1px solid #E0E0E0', background: '#F8F9FA' }}>
             {!customer ? (
               <div className="px-3 py-2">
-                <CustomerLookupWidget onSelect={handleCustomerSelect} />
+
+                {/* Mode selector */}
+                {customerType === null && (
+                  <div className="flex items-center gap-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider shrink-0" style={{ color: '#8BA4D4' }}>
+                      Seller type
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setCustomerType('casual')}
+                      className="px-3 py-1 rounded border text-[11px] font-medium transition-colors hover:bg-white"
+                      style={{ borderColor: '#E0E0E0', color: '#212529', background: '#fff' }}
+                    >
+                      Casual Seller
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCustomerType('account')}
+                      className="px-3 py-1 rounded border text-[11px] font-medium transition-colors hover:bg-white"
+                      style={{ borderColor: '#E0E0E0', color: '#212529', background: '#fff' }}
+                    >
+                      Account Customer
+                    </button>
+                  </div>
+                )}
+
+                {/* Casual panel */}
+                {customerType === 'casual' && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <button
+                        type="button"
+                        onClick={() => setCustomerType(null)}
+                        className="text-[11px] transition-colors"
+                        style={{ color: '#6C757D' }}
+                      >
+                        ← Back
+                      </button>
+                      <span className="text-[11px] font-semibold" style={{ color: '#212529' }}>Casual Seller</span>
+                    </div>
+                    <CasualSelectorPanel onSelect={handleCustomerSelect} />
+                  </div>
+                )}
+
+                {/* Account panel */}
+                {customerType === 'account' && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <button
+                        type="button"
+                        onClick={() => setCustomerType(null)}
+                        className="text-[11px] transition-colors"
+                        style={{ color: '#6C757D' }}
+                      >
+                        ← Back
+                      </button>
+                      <span className="text-[11px] font-semibold" style={{ color: '#212529' }}>Account Customer</span>
+                    </div>
+                    <AccountSelectorPanel onSelect={handleCustomerSelect} />
+                  </div>
+                )}
+
               </div>
             ) : (
               <div className="flex items-center gap-2.5 px-3 py-2">
@@ -363,7 +426,7 @@ export default function NewPurchasePage() {
                   )}
                   <button
                     type="button"
-                    onClick={() => setCustomer(null)}
+                    onClick={() => { setCustomer(null); setCustomerType(null) }}
                     className="px-2 py-0.5 rounded border text-[11px] transition-colors hover:bg-white"
                     style={{ borderColor: '#E0E0E0', color: '#6C757D' }}
                   >
