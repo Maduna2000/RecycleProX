@@ -33,12 +33,32 @@ interface Props {
 
 // ─── OCR extraction using Tesseract.js ────────────────────────────────────────
 
+const OCR_TIMEOUT_MS = 45_000
+
 async function extractFromIdImage(
   file: File
 ): Promise<{ idNumber: string | null; firstName: string | null; lastName: string | null }> {
-  // Dynamic import keeps Tesseract out of the initial bundle
-  const { recognize } = await import('tesseract.js')
-  const { data: { text } } = await recognize(file, 'eng', { logger: () => {} })
+  const { createWorker } = await import('tesseract.js')
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let worker: any = null
+
+  const ocrPromise = (async () => {
+    worker = await createWorker('eng', 1, { logger: () => {} })
+    const { data: { text } } = await worker.recognize(file)
+    return text as string
+  })()
+
+  const timeoutPromise = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error('OCR timed out after 45 s')), OCR_TIMEOUT_MS)
+  )
+
+  let text: string
+  try {
+    text = await Promise.race([ocrPromise, timeoutPromise])
+  } finally {
+    if (worker) await worker.terminate().catch(() => {})
+  }
 
   const lines = text.split('\n').map((l) => l.trim()).filter(Boolean)
 
@@ -54,10 +74,9 @@ async function extractFromIdImage(
     return null
   }
 
-  // ID number: labelled field first, then fallback regex for alphanumeric+slash/hyphen patterns
   const idRaw =
     extractAfterLabel(['ID NO', 'ID NUMBER', 'NATIONAL ID', 'IDENTITY NUMBER', 'ID:']) ??
-    lines.find((l) => /^[A-Z0-9]{2,}[\/\-][A-Z0-9]+/i.test(l)) ??
+    lines.find((l) => /^[A-Z0-9]{2,}[/\-][A-Z0-9]+/i.test(l)) ??
     null
 
   return {
@@ -82,7 +101,6 @@ export function CasualSelectorPanel({ onSelect }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const debounceRef  = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Clear debounce on unmount
   useEffect(() => {
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
   }, [])
@@ -143,11 +161,11 @@ export function CasualSelectorPanel({ onSelect }: Props) {
       if (extracted.idNumber && extracted.idNumber.length >= 5) {
         performLookup(extracted.idNumber)
       }
-      setScanStatus('idle')
       toast.success('ID scanned — please verify the details')
-    } catch {
-      setScanStatus('error')
-      toast.error('Scan failed — please enter details manually')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Scan failed'
+      toast.error(`${msg} — please enter details manually`)
+    } finally {
       setScanStatus('idle')
     }
   }
@@ -203,48 +221,58 @@ export function CasualSelectorPanel({ onSelect }: Props) {
 
   return (
     <div className="space-y-2">
-      {/* Row 1: ID + Scan */}
-      <div className="flex gap-2">
-        <div className="flex-1 relative">
-          <Input
-            value={form.idNumber}
-            onChange={(e) => handleIdChange(e.target.value)}
-            placeholder="National ID number"
-            className={`${inputCls} ${lockedCls} pr-7`}
-            readOnly={isLocked}
-            aria-label="National ID number"
-          />
-          {lookupStatus === 'loading' && (
-            <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 animate-spin text-[#6C757D]" />
-          )}
-        </div>
-        <button
-          type="button"
-          title={scanStatus === 'scanning' ? 'Reading ID…' : 'Scan ID document'}
-          disabled={scanStatus === 'scanning'}
-          onClick={() => fileInputRef.current?.click()}
-          className="w-8 h-8 rounded border flex items-center justify-center transition-colors shrink-0
-                     border-[#E0E0E0] bg-white hover:bg-[#F8F9FA] disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {scanStatus === 'scanning'
-            ? <Loader2 className="w-3.5 h-3.5 animate-spin text-[#185ABD]" />
-            : <ScanLine className="w-3.5 h-3.5 text-[#6C757D]" />}
-        </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          capture="environment"
-          style={{ display: 'none' }}
-          onChange={(e) => {
-            const file = e.target.files?.[0]
-            if (file) handleScan(file)
-            e.target.value = ''
-          }}
+      {/* Row 1: Full-width National ID field */}
+      <div className="relative">
+        <Input
+          value={form.idNumber}
+          onChange={(e) => handleIdChange(e.target.value)}
+          placeholder="National ID number"
+          className={`${inputCls} ${lockedCls} pr-7`}
+          readOnly={isLocked}
+          aria-label="National ID number"
         />
+        {lookupStatus === 'loading' && (
+          <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 animate-spin text-[#6C757D]" />
+        )}
       </div>
 
-      {/* Row 2: First + Last name */}
+      {/* Row 2: Scan ID button — full width, clearly labeled */}
+      <button
+        type="button"
+        disabled={scanStatus === 'scanning'}
+        onClick={() => fileInputRef.current?.click()}
+        className="w-full h-8 rounded border flex items-center justify-center gap-2 text-[11px] font-medium
+                   transition-colors border-[#185ABD] text-[#185ABD] bg-blue-50 hover:bg-blue-100
+                   disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {scanStatus === 'scanning' ? (
+          <>
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            Reading ID document… (this may take up to 30 s)
+          </>
+        ) : (
+          <>
+            <ScanLine className="w-3.5 h-3.5" />
+            Scan ID Document — upload a photo of the ID
+          </>
+        )}
+      </button>
+
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        capture="environment"
+        style={{ display: 'none' }}
+        onChange={(e) => {
+          const file = e.target.files?.[0]
+          if (file) handleScan(file)
+          e.target.value = ''
+        }}
+      />
+
+      {/* Row 3: First + Last name */}
       <div className="grid grid-cols-2 gap-2">
         <Input
           value={form.firstName}
@@ -264,7 +292,7 @@ export function CasualSelectorPanel({ onSelect }: Props) {
         />
       </div>
 
-      {/* Row 3: Phone + Address */}
+      {/* Row 4: Phone + Address */}
       <div className="grid grid-cols-2 gap-2">
         <Input
           value={form.phone}
@@ -283,7 +311,7 @@ export function CasualSelectorPanel({ onSelect }: Props) {
         />
       </div>
 
-      {/* Row 4: Status badge + Confirm */}
+      {/* Row 5: Status badge + Confirm */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           {lookupStatus === 'found' && !isBlacklisted && (
@@ -300,9 +328,6 @@ export function CasualSelectorPanel({ onSelect }: Props) {
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-red-100 text-red-700">
               <AlertTriangle className="w-3 h-3" /> Blacklisted — cannot process
             </span>
-          )}
-          {scanStatus === 'scanning' && (
-            <span className="text-[10px] text-[#6C757D]">Reading ID…</span>
           )}
         </div>
 
