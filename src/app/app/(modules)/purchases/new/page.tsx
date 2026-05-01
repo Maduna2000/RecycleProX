@@ -337,7 +337,7 @@ export default function NewPurchasePage() {
                       className="px-3 py-1 rounded border text-[11px] font-medium transition-colors hover:bg-white"
                       style={{ borderColor: '#E0E0E0', color: '#212529', background: '#fff' }}
                     >
-                      Casual Seller
+                      Casual
                     </button>
                     <button
                       type="button"
@@ -362,7 +362,7 @@ export default function NewPurchasePage() {
                       >
                         ← Back
                       </button>
-                      <span className="text-[11px] font-semibold" style={{ color: '#212529' }}>Casual Seller</span>
+                      <span className="text-[11px] font-semibold" style={{ color: '#212529' }}>Casual</span>
                     </div>
                     <CasualSelectorPanel onSelect={handleCustomerSelect} />
                   </div>

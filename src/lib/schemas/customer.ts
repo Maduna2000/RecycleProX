@@ -82,11 +82,24 @@ export const CreateCustomerSchema = z.object({
   zeroRated:        z.boolean().optional().default(false),
 })
 
+// Lenient phone for casual quick-create: normalise Eswatini numbers, accept any ≥7-digit number as-is
+const quickCreatePhoneSchema = z
+  .string()
+  .min(1, 'Phone number is required')
+  .transform((v) => {
+    const digits = v.replace(/\D/g, '')
+    if (digits.startsWith('268') && digits.length === 11) return `+${digits}`
+    if (digits.length === 8) return `+268${digits}`
+    if (digits.startsWith('0') && digits.length === 9) return `+268${digits.slice(1)}`
+    return v.trim()
+  })
+  .refine((v) => v.replace(/\D/g, '').length >= 7, 'Phone number must have at least 7 digits')
+
 export const QuickCreateSchema = z.object({
   idNumber:        idNumberSchema,
   firstName:       z.string().min(1, 'First name is required'),
   lastName:        z.string().min(1, 'Last name is required'),
-  phone:           phoneSchema,
+  phone:           quickCreatePhoneSchema,
   physicalAddress: z.string().max(200).optional(),
 })
 

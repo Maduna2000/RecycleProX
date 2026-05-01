@@ -198,8 +198,9 @@ export function CasualSelectorPanel({ onSelect }: Props) {
         }),
       })
       if (!res.ok) {
-        const j = await res.json() as { error?: string }
-        toast.error(j.error ?? 'Failed to register customer')
+        const j = await res.json() as { error?: string; issues?: { message: string }[] }
+        const msg = j.issues?.[0]?.message ?? j.error ?? 'Failed to register customer'
+        toast.error(msg)
         return
       }
       const customer = await res.json() as SelectedCustomer
@@ -340,7 +341,7 @@ export function CasualSelectorPanel({ onSelect }: Props) {
         >
           {confirming
             ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />Confirming…</>
-            : 'Confirm Seller →'}
+            : 'Confirm →'}
         </Button>
       </div>
     </div>
