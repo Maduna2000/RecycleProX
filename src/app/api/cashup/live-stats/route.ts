@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
       paymentsAgg,
       loanTotals,
       expenses,
-      unpaidTodayAgg,
+      unpaidTodayAgg,  // typed as { total: string; count: bigint }[]
       unpaidAllTimeAgg,
       approvedVariances,
     ] = await Promise.all([
@@ -53,18 +53,20 @@ export async function GET(req: NextRequest) {
       getLoanTotalsForDate(sessionDate),
       // Approved expenses
       getExpenseTotalsForDate(sessionDate),
-      // Pending (unpaid) purchases created today
-      prisma.purchase.aggregate({
-        _sum: { totalAmount: true },
-        _count: { id: true },
-        where: { status: 'pending', createdAt: { gte: start, lte: end } },
-      }),
-      // All pending purchases (all time)
-      prisma.purchase.aggregate({
-        _sum: { totalAmount: true },
-        _count: { id: true },
-        where: { status: 'pending' },
-      }),
+      // Pending purchases today — true outstanding (net of loan deduction and partial payments)
+      prisma.$queryRaw<{ total: string; count: bigint }[]>`
+        SELECT COALESCE(SUM("totalAmount" - COALESCE("loanDeductionAmount", 0) - "amountPaid"), 0)::text AS total,
+               COUNT(*)::bigint AS count
+        FROM "Purchase"
+        WHERE status = 'pending' AND "createdAt" >= ${start} AND "createdAt" <= ${end}
+      `,
+      // All pending purchases (all time) — true outstanding
+      prisma.$queryRaw<{ total: string; count: bigint }[]>`
+        SELECT COALESCE(SUM("totalAmount" - COALESCE("loanDeductionAmount", 0) - "amountPaid"), 0)::text AS total,
+               COUNT(*)::bigint AS count
+        FROM "Purchase"
+        WHERE status = 'pending'
+      `,
       // Cumulative variance from ALL approved cash-ups (Fin Period Cumulative)
       prisma.cashUp.aggregate({
         _sum: { variance: true },
@@ -80,12 +82,12 @@ export async function GET(req: NextRequest) {
       loanAdvance:   loanTotals.advanced,
       loanRepayment: loanTotals.repaid,
       unpaidToday: {
-        total: new Decimal(unpaidTodayAgg._sum.totalAmount?.toString() ?? '0').toFixed(2),
-        count: unpaidTodayAgg._count.id,
+        total: new Decimal(unpaidTodayAgg[0]?.total   ?? '0').toFixed(2),
+        count: Number(unpaidTodayAgg[0]?.count   ?? 0),
       },
       unpaidAllTime: {
-        total: new Decimal(unpaidAllTimeAgg._sum.totalAmount?.toString() ?? '0').toFixed(2),
-        count: unpaidAllTimeAgg._count.id,
+        total: new Decimal(unpaidAllTimeAgg[0]?.total ?? '0').toFixed(2),
+        count: Number(unpaidAllTimeAgg[0]?.count ?? 0),
       },
       finPeriodCumulative: new Decimal(approvedVariances._sum.variance?.toString() ?? '0').toFixed(2),
     })

@@ -8,26 +8,36 @@ import { toast } from 'sonner'
 import Decimal from 'decimal.js'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Input } from '@/components/ui/input'
 import { Avatar } from '@/components/ui/DataTable'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 type Purchase = {
-  id: string; refNumber: string; totalAmount: string; createdAt: string; notes?: string
+  id: string; refNumber: string; totalAmount: string; amountPaid: string
+  loanDeductionAmount?: string; createdAt: string; notes?: string
   customer: { id: string; firstName: string; lastName: string; idNumber: string }
   lines: { id: string }[]
 }
+
+type PayTarget = { id: string; ref: string; totalAmount: string; loanDeductionAmount: string; amountPaid: string }
 
 type GroupedCustomer = {
   customerId: string; customerName: string; idNumber: string
   purchases: Purchase[]; total: Decimal
 }
 
+function outstanding(p: Purchase): Decimal {
+  return new Decimal(p.totalAmount)
+    .minus(p.loanDeductionAmount ? new Decimal(p.loanDeductionAmount) : new Decimal(0))
+    .minus(new Decimal(p.amountPaid))
+}
+
 export default function UnpaidPurchasesPage() {
   const router = useRouter()
-  const KEY = '/api/purchases?status=pending&limit=200&include=customer,lines'
+  const KEY = '/api/purchases?status=pending&pageSize=200'
   const { data, isLoading } = useSWR<{ purchases: Purchase[] }>(KEY, fetcher)
-  const [payTarget,   setPayTarget]   = useState<{ id: string; ref: string; amount: string } | null>(null)
+  const [payTarget, setPayTarget] = useState<PayTarget | null>(null)
 
   const groups: GroupedCustomer[] = []
   const seen = new Map<string, GroupedCustomer>()
@@ -46,7 +56,7 @@ export default function UnpaidPurchasesPage() {
     }
     const g = seen.get(cid)!
     g.purchases.push(p)
-    g.total = g.total.plus(p.totalAmount)
+    g.total = g.total.plus(outstanding(p))
   }
 
   const grandTotal = groups.reduce((acc, g) => acc.plus(g.total), new Decimal(0))
@@ -123,7 +133,7 @@ export default function UnpaidPurchasesPage() {
             <table className="w-full" style={{ background: '#FFFFFF' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid #E0E0E0' }}>
-                  {['Ref #', 'Items', 'Amount', 'Date', ''].map((h) => (
+                  {['Ref #', 'Items', 'Total', 'Paid', 'Balance', 'Date', ''].map((h) => (
                     <th key={h} className="px-4 py-2 text-left" style={{ fontSize: 10, fontWeight: 600, color: '#6C757D', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                       {h}
                     </th>
@@ -131,29 +141,45 @@ export default function UnpaidPurchasesPage() {
                 </tr>
               </thead>
               <tbody>
-                {g.purchases.map((p, i) => (
-                  <tr key={p.id} style={{ borderBottom: i < g.purchases.length - 1 ? '1px solid #F1F3F4' : 'none' }}>
-                    <td className="px-4 py-2.5 font-mono" style={{ fontSize: 11, color: '#6C757D' }}>{p.refNumber}</td>
-                    <td className="px-4 py-2.5" style={{ fontSize: 12, color: '#6C757D' }}>
-                      {p.lines.length} item{p.lines.length !== 1 ? 's' : ''}
-                    </td>
-                    <td className="px-4 py-2.5 font-mono font-semibold" style={{ fontSize: 12, color: '#212529' }}>
-                      R {new Decimal(p.totalAmount).toFixed(2)}
-                    </td>
-                    <td className="px-4 py-2.5 whitespace-nowrap" style={{ fontSize: 11, color: '#6C757D' }}>
-                      {new Date(p.createdAt).toLocaleDateString('en-ZA')}
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <button
-                        onClick={() => setPayTarget({ id: p.id, ref: p.refNumber, amount: p.totalAmount })}
-                        className="flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium border"
-                        style={{ borderColor: '#217346', color: '#217346', background: '#F0FBF4' }}
-                      >
-                        <CreditCard className="w-3 h-3" /> Mark Paid
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {g.purchases.map((p, i) => {
+                  const paid = new Decimal(p.amountPaid)
+                  const bal  = outstanding(p)
+                  return (
+                    <tr key={p.id} style={{ borderBottom: i < g.purchases.length - 1 ? '1px solid #F1F3F4' : 'none' }}>
+                      <td className="px-4 py-2.5 font-mono" style={{ fontSize: 11, color: '#6C757D' }}>{p.refNumber}</td>
+                      <td className="px-4 py-2.5" style={{ fontSize: 12, color: '#6C757D' }}>
+                        {p.lines.length} item{p.lines.length !== 1 ? 's' : ''}
+                      </td>
+                      <td className="px-4 py-2.5 font-mono" style={{ fontSize: 12, color: '#6C757D' }}>
+                        R {new Decimal(p.totalAmount).toFixed(2)}
+                      </td>
+                      <td className="px-4 py-2.5 font-mono" style={{ fontSize: 12, color: paid.gt(0) ? '#217346' : '#6C757D' }}>
+                        {paid.gt(0) ? `R ${paid.toFixed(2)}` : '—'}
+                      </td>
+                      <td className="px-4 py-2.5 font-mono font-semibold" style={{ fontSize: 12, color: '#C9A020' }}>
+                        R {bal.toFixed(2)}
+                      </td>
+                      <td className="px-4 py-2.5 whitespace-nowrap" style={{ fontSize: 11, color: '#6C757D' }}>
+                        {new Date(p.createdAt).toLocaleDateString('en-ZA')}
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <button
+                          onClick={() => setPayTarget({
+                            id: p.id,
+                            ref: p.refNumber,
+                            totalAmount: p.totalAmount,
+                            loanDeductionAmount: p.loanDeductionAmount ?? '0',
+                            amountPaid: p.amountPaid,
+                          })}
+                          className="flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium border"
+                          style={{ borderColor: '#217346', color: '#217346', background: '#F0FBF4' }}
+                        >
+                          <CreditCard className="w-3 h-3" /> Process Payment
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
@@ -161,7 +187,7 @@ export default function UnpaidPurchasesPage() {
       </div>
 
       {payTarget && (
-        <MarkPaidModal
+        <ProcessPaymentModal
           purchase={payTarget}
           onClose={() => setPayTarget(null)}
           onSuccess={() => { mutate(KEY); setPayTarget(null) }}
@@ -171,32 +197,51 @@ export default function UnpaidPurchasesPage() {
   )
 }
 
-function MarkPaidModal({
+function ProcessPaymentModal({
   purchase,
   onClose,
   onSuccess,
 }: {
-  purchase: { id: string; ref: string; amount: string }
+  purchase: PayTarget
   onClose: () => void
   onSuccess: () => void
 }) {
-  const [method,  setMethod]  = useState<'cash' | 'eft' | 'cheque' | 'amplopay'>('cash')
-  const [loading, setLoading] = useState(false)
+  const [method,      setMethod]      = useState<'cash' | 'eft' | 'cheque' | 'amplopay'>('cash')
+  const [amount,      setAmount]      = useState('')
+  const [amountError, setAmountError] = useState<string | null>(null)
+  const [loading,     setLoading]     = useState(false)
+
+  const totalAmount   = new Decimal(purchase.totalAmount)
+  const loanDeduction = new Decimal(purchase.loanDeductionAmount)
+  const alreadyPaid   = new Decimal(purchase.amountPaid)
+  const remaining     = totalAmount.minus(loanDeduction).minus(alreadyPaid)
+
+  function validateAmount(raw: string): string | null {
+    if (!raw.trim()) return 'Amount is required'
+    if (!/^\d+(\.\d{1,2})?$/.test(raw)) return 'Enter a valid amount (e.g. 150.00)'
+    const d = new Decimal(raw)
+    if (d.lt(new Decimal('0.01'))) return 'Minimum amount is E0.01'
+    if (d.gt(remaining)) return `Cannot exceed remaining balance of R ${remaining.toFixed(2)}`
+    return null
+  }
 
   async function handlePay() {
+    const err = validateAmount(amount)
+    if (err) { setAmountError(err); return }
+    setAmountError(null)
     setLoading(true)
     const res = await fetch(`/api/purchases/${purchase.id}/mark-paid`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ paymentMethod: method }),
+      body: JSON.stringify({ amount, paymentMethod: method }),
     })
     setLoading(false)
     if (res.ok) {
-      toast.success(`${purchase.ref} marked as paid`)
+      toast.success(`Payment processed for ${purchase.ref}`)
       onSuccess()
     } else {
-      const j = await res.json()
-      toast.error(j.error ?? 'Failed to mark as paid')
+      const j = await res.json() as { error?: string }
+      toast.error(j.error ?? 'Failed to process payment')
     }
   }
 
@@ -204,15 +249,61 @@ function MarkPaidModal({
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
-          <DialogTitle style={{ color: '#212529' }}>Mark Purchase as Paid</DialogTitle>
+          <DialogTitle style={{ color: '#212529' }}>Process Payment</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 mt-2">
-          <div className="px-3 py-2.5 rounded-lg" style={{ background: '#F8F9FA', border: '1px solid #E0E0E0' }}>
+          {/* Balance summary */}
+          <div className="px-3 py-2.5 rounded-lg space-y-1" style={{ background: '#F8F9FA', border: '1px solid #E0E0E0' }}>
             <p className="font-mono font-medium" style={{ fontSize: 12, color: '#212529' }}>{purchase.ref}</p>
-            <p style={{ fontSize: 12, color: '#6C757D' }}>
-              Amount: <span className="font-mono font-semibold" style={{ color: '#212529' }}>R {new Decimal(purchase.amount).toFixed(2)}</span>
-            </p>
+            <div className="flex justify-between" style={{ fontSize: 12, color: '#6C757D' }}>
+              <span>Total amount</span>
+              <span className="font-mono">R {totalAmount.toFixed(2)}</span>
+            </div>
+            {loanDeduction.gt(0) && (
+              <div className="flex justify-between" style={{ fontSize: 12, color: '#6C757D' }}>
+                <span>Loan deduction</span>
+                <span className="font-mono">− R {loanDeduction.toFixed(2)}</span>
+              </div>
+            )}
+            {alreadyPaid.gt(0) && (
+              <div className="flex justify-between" style={{ fontSize: 12, color: '#217346' }}>
+                <span>Already paid</span>
+                <span className="font-mono">− R {alreadyPaid.toFixed(2)}</span>
+              </div>
+            )}
+            <div className="flex justify-between pt-1 border-t border-[#E0E0E0] mt-1" style={{ fontSize: 13 }}>
+              <span className="font-semibold" style={{ color: '#C9A020' }}>Remaining balance</span>
+              <span className="font-mono font-bold" style={{ color: '#C9A020' }}>R {remaining.toFixed(2)}</span>
+            </div>
           </div>
+
+          {/* Amount input */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-medium" style={{ color: '#6C757D' }}>Payment Amount</label>
+              <button
+                type="button"
+                onClick={() => { setAmount(remaining.toFixed(2)); setAmountError(null) }}
+                className="text-xs underline"
+                style={{ color: '#217346' }}
+              >
+                Pay full balance
+              </button>
+            </div>
+            <Input
+              type="text"
+              inputMode="decimal"
+              placeholder="0.00"
+              value={amount}
+              onChange={(e) => { setAmount(e.target.value); setAmountError(null) }}
+              className="h-8 text-[12px] font-mono"
+            />
+            {amountError && (
+              <p className="text-xs mt-1" style={{ color: '#DC3545' }}>{amountError}</p>
+            )}
+          </div>
+
+          {/* Payment method */}
           <div>
             <label className="block mb-1 text-xs font-medium" style={{ color: '#6C757D' }}>Payment Method</label>
             <Select onValueChange={(v) => setMethod(v as typeof method)} defaultValue="cash">
@@ -227,6 +318,7 @@ function MarkPaidModal({
               </SelectContent>
             </Select>
           </div>
+
           <div className="flex justify-end gap-2 pt-1">
             <button
               onClick={onClose}
@@ -243,7 +335,7 @@ function MarkPaidModal({
               style={{ background: '#217346' }}
             >
               {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CreditCard className="w-3.5 h-3.5" />}
-              Confirm Payment
+              Process Payment
             </button>
           </div>
         </div>

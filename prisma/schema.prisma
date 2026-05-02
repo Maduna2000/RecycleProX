@@ -307,6 +307,7 @@ model Purchase {
   paymentMethod   PaymentMethod @default(cash)
   notes           String?
   loanDeductionAmount Decimal?      @db.Decimal(18, 2)
+  amountPaid          Decimal       @default(0) @db.Decimal(18, 2)
   signatureR2Key  String?
   vat264R2Key     String?
   photoR2Keys     String[]
