@@ -33,6 +33,7 @@ export interface DataTableProps<T> {
   selectedKey?:  string | null
   rowActions?:   RowAction<T>[]
   loading?:      boolean
+  error?:        string | boolean
   emptyMessage?: string
   emptyAction?:  { label: string; onClick: () => void }
   total?:        number
@@ -154,6 +155,7 @@ export function DataTable<T>({
   selectedKey,
   rowActions,
   loading,
+  error,
   emptyMessage = 'No records found',
   emptyAction,
   total,
@@ -225,7 +227,15 @@ export function DataTable<T>({
 
           {/* Body */}
           <tbody>
-            {loading ? (
+            {error ? (
+              <tr>
+                <td colSpan={columns.length + (rowActions ? 1 : 0)} className="py-16 text-center">
+                  <p className="text-sm" style={{ color: colors.danger }}>
+                    {typeof error === 'string' ? error : 'Failed to load data. Please try again.'}
+                  </p>
+                </td>
+              </tr>
+            ) : loading ? (
               <tr>
                 <td colSpan={columns.length + (rowActions ? 1 : 0)} className="py-16 text-center text-[#6C757D]">
                   <div className="flex items-center justify-center gap-2">

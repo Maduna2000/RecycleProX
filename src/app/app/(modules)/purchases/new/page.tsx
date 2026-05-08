@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import Decimal from 'decimal.js'
+import { colors } from '@/lib/design-tokens'
 import { useOfflineMutation } from '@/hooks/useOfflineFetch'
 import { offlineDB } from '@/lib/offline/db'
 
@@ -96,7 +97,7 @@ function useScaleRead() {
 
 function PosLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: '#8BA4D4' }}>
+    <p className="text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: colors.tabMuted }}>
       {children}
     </p>
   )
@@ -299,11 +300,11 @@ export default function NewPurchasePage() {
           type="button"
           onClick={() => router.back()}
           className="flex items-center gap-1 text-xs transition-colors"
-          style={{ color: '#6C757D' }}
+          style={{ color: colors.textSecondary }}
         >
           <ArrowLeft className="w-3.5 h-3.5" /> Purchases
         </button>
-        <span className="text-sm font-semibold" style={{ color: '#212529' }}>New Purchase</span>
+        <span className="text-sm font-semibold" style={{ color: colors.textPrimary }}>New Purchase</span>
         {customer?.blacklisted && (
           <span className="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-red-100 text-red-700">
             <AlertTriangle className="w-3 h-3" /> Blacklisted — cannot process
@@ -314,28 +315,28 @@ export default function NewPurchasePage() {
       {/* ── POS Split Panel ── */}
       <div
         className="flex-1 min-h-0 flex overflow-hidden rounded-xl border"
-        style={{ borderColor: '#E0E0E0', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}
+        style={{ borderColor: colors.border, boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}
       >
 
         {/* ─── LEFT: Entry ──────────────────────────────────────── */}
-        <div className="flex-1 flex flex-col min-w-0 bg-white" style={{ borderRight: '1px solid #E0E0E0' }}>
+        <div className="flex-1 flex flex-col min-w-0 bg-white" style={{ borderRight: `1px solid ${colors.border}` }}>
 
           {/* Customer strip */}
-          <div className="shrink-0" style={{ borderBottom: '1px solid #E0E0E0', background: '#F8F9FA' }}>
+          <div className="shrink-0" style={{ borderBottom: `1px solid ${colors.border}`, background: colors.toolbar }}>
             {!customer ? (
               <div className="px-3 py-2">
 
                 {/* Mode selector */}
                 {customerType === null && (
                   <div className="flex items-center gap-2">
-                    <p className="text-[10px] font-semibold uppercase tracking-wider shrink-0" style={{ color: '#8BA4D4' }}>
+                    <p className="text-[10px] font-semibold uppercase tracking-wider shrink-0" style={{ color: colors.tabMuted }}>
                       Seller type
                     </p>
                     <button
                       type="button"
                       onClick={() => setCustomerType('casual')}
                       className="px-3 py-1 rounded border text-[11px] font-medium transition-colors hover:bg-white"
-                      style={{ borderColor: '#E0E0E0', color: '#212529', background: '#fff' }}
+                      style={{ borderColor: colors.border, color: colors.textPrimary, background: '#fff' }}
                     >
                       Casual
                     </button>
@@ -343,7 +344,7 @@ export default function NewPurchasePage() {
                       type="button"
                       onClick={() => setCustomerType('account')}
                       className="px-3 py-1 rounded border text-[11px] font-medium transition-colors hover:bg-white"
-                      style={{ borderColor: '#E0E0E0', color: '#212529', background: '#fff' }}
+                      style={{ borderColor: colors.border, color: colors.textPrimary, background: '#fff' }}
                     >
                       Account Customer
                     </button>
@@ -358,11 +359,11 @@ export default function NewPurchasePage() {
                         type="button"
                         onClick={() => setCustomerType(null)}
                         className="text-[11px] transition-colors"
-                        style={{ color: '#6C757D' }}
+                        style={{ color: colors.textSecondary }}
                       >
                         ← Back
                       </button>
-                      <span className="text-[11px] font-semibold" style={{ color: '#212529' }}>Casual</span>
+                      <span className="text-[11px] font-semibold" style={{ color: colors.textPrimary }}>Casual</span>
                     </div>
                     <CasualSelectorPanel onSelect={handleCustomerSelect} />
                   </div>
@@ -376,11 +377,11 @@ export default function NewPurchasePage() {
                         type="button"
                         onClick={() => setCustomerType(null)}
                         className="text-[11px] transition-colors"
-                        style={{ color: '#6C757D' }}
+                        style={{ color: colors.textSecondary }}
                       >
                         ← Back
                       </button>
-                      <span className="text-[11px] font-semibold" style={{ color: '#212529' }}>Account Customer</span>
+                      <span className="text-[11px] font-semibold" style={{ color: colors.textPrimary }}>Account Customer</span>
                     </div>
                     <AccountSelectorPanel onSelect={handleCustomerSelect} />
                   </div>
@@ -391,15 +392,15 @@ export default function NewPurchasePage() {
               <div className="flex items-center gap-2.5 px-3 py-2">
                 <div
                   className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[11px] font-bold shrink-0"
-                  style={{ background: '#1B3A6B' }}
+                  style={{ background: colors.primary }}
                 >
                   {customer.firstName[0]?.toUpperCase()}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[13px] font-semibold leading-none truncate" style={{ color: '#212529' }}>
+                  <p className="text-[13px] font-semibold leading-none truncate" style={{ color: colors.textPrimary }}>
                     {customer.firstName} {customer.lastName}
                   </p>
-                  <p className="text-[11px] font-mono mt-0.5 truncate" style={{ color: '#6C757D' }}>
+                  <p className="text-[11px] font-mono mt-0.5 truncate" style={{ color: colors.textSecondary }}>
                     {customer.idNumber} · {customer.phone}
                   </p>
                 </div>
@@ -419,7 +420,7 @@ export default function NewPurchasePage() {
                       type="button"
                       onClick={() => setShowAllProducts(true)}
                       className="px-1.5 py-0.5 rounded border text-[10px] transition-colors hover:bg-white"
-                      style={{ borderColor: '#E0E0E0', color: '#6C757D' }}
+                      style={{ borderColor: colors.border, color: colors.textSecondary }}
                     >
                       All Products
                     </button>
@@ -428,7 +429,7 @@ export default function NewPurchasePage() {
                     type="button"
                     onClick={() => { setCustomer(null); setCustomerType(null) }}
                     className="px-2 py-0.5 rounded border text-[11px] transition-colors hover:bg-white"
-                    style={{ borderColor: '#E0E0E0', color: '#6C757D' }}
+                    style={{ borderColor: colors.border, color: colors.textSecondary }}
                   >
                     Change
                   </button>
@@ -441,13 +442,13 @@ export default function NewPurchasePage() {
           {customer && hasOutstandingLoan && (
             <div
               className="shrink-0 flex items-center gap-3 px-3 py-2 flex-wrap"
-              style={{ background: '#FFFBEB', borderBottom: '1px solid #FDE68A' }}
+              style={{ background: colors.alertBg, borderBottom: `1px solid ${colors.alertBorder}` }}
             >
-              <AlertTriangle className="w-3.5 h-3.5 shrink-0" style={{ color: '#D97706' }} />
-              <span className="text-[12px]" style={{ color: '#92400E' }}>
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0" style={{ color: colors.alertIcon }} />
+              <span className="text-[12px]" style={{ color: colors.alertText }}>
                 Outstanding loan: <strong className="font-mono">R {new Decimal(outstandingLoanAmount).toFixed(2)}</strong>
               </span>
-              <label className="flex items-center gap-1.5 cursor-pointer select-none text-[12px]" style={{ color: '#92400E' }}>
+              <label className="flex items-center gap-1.5 cursor-pointer select-none text-[12px]" style={{ color: colors.alertText }}>
                 <input
                   type="checkbox"
                   className="w-3.5 h-3.5 accent-amber-600"
@@ -467,17 +468,17 @@ export default function NewPurchasePage() {
               </label>
               {deductLoan && (
                 <div className="flex items-center gap-1">
-                  <span className="text-[12px]" style={{ color: '#92400E' }}>R</span>
+                  <span className="text-[12px]" style={{ color: colors.alertText }}>R</span>
                   <input
                     type="number"
                     min="0"
                     step="0.01"
                     className="w-24 px-2 py-0.5 rounded border font-mono text-[12px] focus:outline-none"
-                    style={{ borderColor: '#FCD34D', color: '#92400E', background: '#FEF3C7' }}
+                    style={{ borderColor: colors.alertInputBorder, color: colors.alertText, background: colors.alertInput }}
                     value={deductionAmount}
                     onChange={(e) => setDeductionAmount(e.target.value)}
                   />
-                  <span className="text-[11px]" style={{ color: '#D97706' }}>
+                  <span className="text-[11px]" style={{ color: colors.alertIcon }}>
                     max R {Decimal.min(new Decimal(outstandingLoanAmount), total).toFixed(2)}
                   </span>
                 </div>
@@ -491,20 +492,20 @@ export default function NewPurchasePage() {
             style={{
               gridTemplateColumns: '1fr 104px 104px 92px 36px 28px',
               gap: '8px',
-              background: '#F8F9FA',
-              borderBottom: '1px solid #E0E0E0',
+              background: colors.toolbar,
+              borderBottom: `1px solid ${colors.border}`,
             }}
           >
-            <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: '#6C757D' }}>Product</p>
-            <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: '#6C757D' }}>Net Qty (kg)</p>
-            <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: '#6C757D' }}>Buy Price (R)</p>
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-right" style={{ color: '#6C757D' }}>Total</p>
+            <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: colors.textSecondary }}>Product</p>
+            <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: colors.textSecondary }}>Net Qty (kg)</p>
+            <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: colors.textSecondary }}>Buy Price (R)</p>
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-right" style={{ color: colors.textSecondary }}>Total</p>
             <span />
             <span />
           </div>
 
           {/* Items list — only scrollable zone */}
-          <div className="flex-1 min-h-0 overflow-y-auto" style={{ borderBottom: '1px solid #E0E0E0' }}>
+          <div className="flex-1 min-h-0 overflow-y-auto" style={{ borderBottom: `1px solid ${colors.border}` }}>
             {lines.map((line) => {
               const qty       = new Decimal(line.quantity  || '0')
               const price     = new Decimal(line.unitPrice || '0')
@@ -513,10 +514,10 @@ export default function NewPurchasePage() {
               const busyTare  = line.weighingTare
 
               const inputCls = 'h-8 w-full rounded border px-2 text-[12px] font-mono focus:outline-none transition-colors'
-              const inputStyle = { borderColor: '#E0E0E0', color: '#212529', background: '#fff' }
+              const inputStyle = { borderColor: colors.border, color: colors.textPrimary, background: '#fff' }
 
               return (
-                <div key={line.key} style={{ borderBottom: '1px solid #F0F0F0' }}>
+                <div key={line.key} style={{ borderBottom: `1px solid ${colors.rowDivider}` }}>
                   {/* Main row */}
                   <div
                     className="grid items-center px-3 py-1.5"
@@ -524,7 +525,7 @@ export default function NewPurchasePage() {
                   >
                     <select
                       className="h-8 w-full rounded border px-2 text-[12px] focus:outline-none transition-colors bg-white"
-                      style={{ borderColor: '#E0E0E0', color: '#212529' }}
+                      style={{ borderColor: colors.border, color: colors.textPrimary }}
                       value={line.productId}
                       onChange={(e) => onProductSelect(line.key, e.target.value)}
                     >
@@ -562,7 +563,7 @@ export default function NewPurchasePage() {
 
                     <p
                       className="text-[13px] font-mono font-semibold text-right tabular-nums pr-1"
-                      style={{ color: qty.gt(0) && price.gt(0) ? '#212529' : '#C0C0C0' }}
+                      style={{ color: qty.gt(0) && price.gt(0) ? colors.textPrimary : colors.disabled }}
                     >
                       {qty.gt(0) && price.gt(0) ? `R ${lineTotal.toFixed(2)}` : '—'}
                     </p>
@@ -573,8 +574,8 @@ export default function NewPurchasePage() {
                       onClick={() => patchLine(line.key, { weighMode: !line.weighMode })}
                       className="h-8 w-8 rounded flex items-center justify-center transition-colors"
                       style={line.weighMode
-                        ? { background: '#185ABD', color: '#fff' }
-                        : { border: '1px solid #E0E0E0', color: '#6C757D' }
+                        ? { background: colors.process, color: '#fff' }
+                        : { border: `1px solid ${colors.border}`, color: colors.textSecondary }
                       }
                     >
                       <Scale className="w-3.5 h-3.5" />
@@ -585,9 +586,9 @@ export default function NewPurchasePage() {
                       onClick={() => removeLine(line.key)}
                       disabled={lines.length === 1}
                       className="h-8 w-7 rounded flex items-center justify-center transition-colors disabled:opacity-25 disabled:cursor-not-allowed"
-                      style={{ color: '#C0C0C0' }}
+                      style={{ color: colors.disabled }}
                       onMouseEnter={(e) => { if (lines.length > 1) (e.currentTarget as HTMLButtonElement).style.color = '#EF4444' }}
-                      onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = '#C0C0C0' }}
+                      onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = colors.disabled }}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -600,12 +601,12 @@ export default function NewPurchasePage() {
                       style={{ background: '#EFF6FF', borderTop: '1px solid #BFDBFE' }}
                     >
                       <div className="flex flex-col gap-0.5">
-                        <span className="text-[10px] font-medium" style={{ color: '#6C757D' }}>Scale</span>
+                        <span className="text-[10px] font-medium" style={{ color: colors.textSecondary }}>Scale</span>
                         <Select
                           value={line.selectedScale}
                           onValueChange={(v) => patchLine(line.key, { selectedScale: v as '1' | '2' | '3' })}
                         >
-                          <SelectTrigger className="h-7 w-24 text-[11px]" style={{ borderColor: '#E0E0E0' }}>
+                          <SelectTrigger className="h-7 w-24 text-[11px]" style={{ borderColor: colors.border }}>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -617,7 +618,7 @@ export default function NewPurchasePage() {
                       </div>
 
                       <div className="flex flex-col gap-0.5">
-                        <span className="text-[10px] font-medium" style={{ color: '#6C757D' }}>Gross (kg)</span>
+                        <span className="text-[10px] font-medium" style={{ color: colors.textSecondary }}>Gross (kg)</span>
                         <div className="flex gap-1">
                           <input
                             type="number"
@@ -626,14 +627,14 @@ export default function NewPurchasePage() {
                             value={line.grossQty}
                             onChange={(e) => recomputeNet(line.key, e.target.value, line.tareQty)}
                             className="h-7 w-20 rounded border px-2 text-[11px] font-mono focus:outline-none"
-                            style={{ borderColor: '#E0E0E0' }}
+                            style={{ borderColor: colors.border }}
                           />
                           <button
                             type="button"
                             disabled={busyGross}
                             onClick={() => handleWeighGross(line)}
                             className="h-7 px-2 rounded text-white flex items-center justify-center disabled:opacity-60"
-                            style={{ background: '#185ABD' }}
+                            style={{ background: colors.process }}
                           >
                             {busyGross
                               ? <Loader2 className="w-3 h-3 animate-spin" />
@@ -643,7 +644,7 @@ export default function NewPurchasePage() {
                       </div>
 
                       <div className="flex flex-col gap-0.5">
-                        <span className="text-[10px] font-medium" style={{ color: '#6C757D' }}>Tare (kg)</span>
+                        <span className="text-[10px] font-medium" style={{ color: colors.textSecondary }}>Tare (kg)</span>
                         <div className="flex gap-1">
                           <input
                             type="number"
@@ -652,14 +653,14 @@ export default function NewPurchasePage() {
                             value={line.tareQty}
                             onChange={(e) => recomputeNet(line.key, line.grossQty, e.target.value)}
                             className="h-7 w-20 rounded border px-2 text-[11px] font-mono focus:outline-none"
-                            style={{ borderColor: '#E0E0E0' }}
+                            style={{ borderColor: colors.border }}
                           />
                           <button
                             type="button"
                             disabled={busyTare}
                             onClick={() => handleWeighTare(line)}
                             className="h-7 px-2 rounded flex items-center justify-center disabled:opacity-60 transition-colors"
-                            style={{ border: '1px solid #E0E0E0', color: '#6C757D', background: '#fff' }}
+                            style={{ border: `1px solid ${colors.border}`, color: colors.textSecondary, background: '#fff' }}
                           >
                             {busyTare
                               ? <Loader2 className="w-3 h-3 animate-spin" />
@@ -669,10 +670,10 @@ export default function NewPurchasePage() {
                       </div>
 
                       <div className="flex flex-col gap-0.5">
-                        <span className="text-[10px] font-medium" style={{ color: '#6C757D' }}>Net (kg)</span>
+                        <span className="text-[10px] font-medium" style={{ color: colors.textSecondary }}>Net (kg)</span>
                         <div
                           className="h-7 flex items-center px-2 rounded border font-mono text-[12px] font-bold min-w-[64px]"
-                          style={{ borderColor: '#A7F3D0', background: '#ECFDF5', color: '#059669' }}
+                          style={{ borderColor: colors.netWeightBorder, background: colors.netWeightBg, color: colors.netWeightText }}
                         >
                           {line.quantity || '0.000'}
                         </div>
@@ -680,13 +681,13 @@ export default function NewPurchasePage() {
 
                       {line.tareQty && parseFloat(line.tareQty) > 0 && (
                         <div className="flex flex-col gap-0.5">
-                          <span className="text-[10px] font-medium" style={{ color: '#6C757D' }}>Tare Reason</span>
+                          <span className="text-[10px] font-medium" style={{ color: colors.textSecondary }}>Tare Reason</span>
                           <input
                             placeholder="e.g. Bag, Pallet…"
                             value={line.tareReason}
                             onChange={(e) => patchLine(line.key, { tareReason: e.target.value })}
                             className="h-7 w-32 rounded border px-2 text-[11px] focus:outline-none"
-                            style={{ borderColor: '#E0E0E0' }}
+                            style={{ borderColor: colors.border }}
                           />
                         </div>
                       )}
@@ -702,7 +703,7 @@ export default function NewPurchasePage() {
                 type="button"
                 onClick={addLine}
                 className="flex items-center gap-1.5 text-[12px] font-medium transition-colors"
-                style={{ color: '#185ABD' }}
+                style={{ color: colors.process }}
               >
                 <Plus className="w-3.5 h-3.5" /> Add Line
               </button>
@@ -713,7 +714,7 @@ export default function NewPurchasePage() {
         {/* ─── RIGHT: Totals & Actions ──────────────────────────── */}
         <div
           className="w-[260px] shrink-0 flex flex-col"
-          style={{ background: '#1B3A6B' }}
+          style={{ background: colors.primary }}
         >
           {/* Payment method */}
           <div className="px-4 pt-4 pb-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
@@ -752,7 +753,7 @@ export default function NewPurchasePage() {
             {deductLoan && deductionAmount && parseFloat(deductionAmount) > 0 ? (
               <div className="w-full space-y-2">
                 <div className="flex justify-between">
-                  <span className="text-[11px]" style={{ color: '#8BA4D4' }}>Gross Payout</span>
+                  <span className="text-[11px]" style={{ color: colors.tabMuted }}>Gross Payout</span>
                   <span className="text-[13px] font-mono tabular-nums text-white">{total.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
@@ -763,18 +764,18 @@ export default function NewPurchasePage() {
                 </div>
                 <div className="h-px" style={{ background: 'rgba(255,255,255,0.15)' }} />
                 <div className="text-center pt-1">
-                  <p className="text-[10px] uppercase tracking-wider" style={{ color: '#8BA4D4' }}>Cash to Pay</p>
-                  <p className="font-bold tabular-nums mt-1" style={{ color: '#F2AB1A', fontSize: 34, lineHeight: 1.1 }}>
+                  <p className="text-[10px] uppercase tracking-wider" style={{ color: colors.tabMuted }}>Cash to Pay</p>
+                  <p className="font-bold tabular-nums mt-1" style={{ color: colors.tabAccent, fontSize: 34, lineHeight: 1.1 }}>
                     R {cashToPay.toFixed(2)}
                   </p>
                 </div>
               </div>
             ) : (
               <div className="text-center">
-                <p className="text-[10px] uppercase tracking-wider mb-2" style={{ color: '#8BA4D4' }}>
+                <p className="text-[10px] uppercase tracking-wider mb-2" style={{ color: colors.tabMuted }}>
                   Total Payout
                 </p>
-                <p className="font-bold tabular-nums" style={{ color: '#F2AB1A', fontSize: 42, lineHeight: 1 }}>
+                <p className="font-bold tabular-nums" style={{ color: colors.tabAccent, fontSize: 42, lineHeight: 1 }}>
                   R {total.toFixed(2)}
                 </p>
               </div>
@@ -788,7 +789,7 @@ export default function NewPurchasePage() {
               onClick={() => submitPurchase('pending')}
               disabled={submitting || !customer || customer.blacklisted}
               className="w-full h-10 rounded text-[12px] font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-              style={{ border: '1px solid #C9A020', color: '#C9A020' }}
+              style={{ border: `1px solid ${colors.warning}`, color: colors.warning }}
             >
               {submitting
                 ? <Loader2 className="w-4 h-4 animate-spin mx-auto" />
@@ -799,7 +800,7 @@ export default function NewPurchasePage() {
               onClick={() => submitPurchase('completed')}
               disabled={submitting || !customer || customer.blacklisted}
               className="w-full h-12 rounded text-[13px] font-bold text-white transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              style={{ background: '#217346' }}
+              style={{ background: colors.action }}
             >
               {submitting
                 ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</>

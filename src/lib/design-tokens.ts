@@ -71,6 +71,52 @@ export const colors = {
   tabMuted:      '#8BA4D4',
   /** Active tab underline accent */
   tabAccent:     '#F2AB1A',
+
+  // Dashboard dark-mode palette
+  /** Portal main background (very dark navy) */
+  dashBg:        '#0a1628',
+  /** Portal header / footer background */
+  dashSurface:   '#081120',
+  /** Portal stats strip background */
+  dashStrip:     '#0d1f3c',
+
+  // Tile gradient "from" shades (lighter than the primary token color)
+  tileNavyFrom:  '#1e4a8a',
+  tileNavyHover: '#2558a8',
+  tileBluFrom:   '#1d6bc7',
+  tileBluHover:  '#2278d4',
+  tileGreenFrom: '#278a54',
+  tileGreenHover:'#2e9e60',
+  tileAmberFrom: '#c49b1c',
+  tileAmberHover:'#d4a820',
+
+  // Loan / alert banner (amber tones not covered by warning*)
+  /** Amber-50 — loan/alert banner background */
+  alertBg:           '#FFFBEB',
+  /** Amber-200 — loan/alert banner bottom border */
+  alertBorder:       '#FDE68A',
+  /** Amber-600 — alert icons and strong text */
+  alertIcon:         '#D97706',
+  /** Amber-900 — alert body text (dark) */
+  alertText:         '#92400E',
+  /** Amber-100 — deduction input background */
+  alertInput:        '#FEF3C7',
+  /** Amber-300 — deduction input border */
+  alertInputBorder:  '#FCD34D',
+
+  // Utility
+  /** Disabled / placeholder icon colour */
+  disabled:      '#C0C0C0',
+  /** Dense list row separator (very light grey) */
+  rowDivider:    '#F0F0F0',
+
+  // Net weight display
+  /** Green-600 — net weight value in weighing mode */
+  netWeightText: '#059669',
+  /** Green-50 border tint for net weight box */
+  netWeightBorder: '#A7F3D0',
+  /** Green-50 background for net weight box */
+  netWeightBg:   '#ECFDF5',
 } as const
 
 // ─── Tailwind Utility Classes ─────────────────────────────────────────────────

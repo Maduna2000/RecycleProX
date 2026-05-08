@@ -85,7 +85,7 @@ export default function PurchasesPage() {
     pageSize: '50',
   })
 
-  const { data, isLoading } = useSWR<{ purchases: Purchase[]; total: number }>(
+  const { data, isLoading, error } = useSWR<{ purchases: Purchase[]; total: number }>(
     `/api/purchases?${query}`,
     fetcher,
   )
@@ -269,6 +269,7 @@ export default function PurchasesPage() {
           selectedKey={selectedId}
           rowActions={rowActions}
           loading={isLoading}
+          error={error}
           emptyMessage="No purchases found"
           emptyAction={{ label: '+ New Purchase', onClick: () => router.push('/app/purchases/new') }}
           total={data?.total}

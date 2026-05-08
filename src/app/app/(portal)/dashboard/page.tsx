@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useOfflineStore } from '@/stores/offlineStore'
+import { colors } from '@/lib/design-tokens'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -63,23 +64,23 @@ const TILES: Tile[] = [
 // ─── Design maps ──────────────────────────────────────────────────────────────
 
 const GRADIENT: Record<TileGroup, string> = {
-  navy:  'from-[#1e4a8a] to-[#1B3A6B]',
-  blue:  'from-[#1d6bc7] to-[#185ABD]',
-  green: 'from-[#278a54] to-[#217346]',
-  amber: 'from-[#c49b1c] to-[#C9A020]',
+  navy:  'from-rpx-navy-light to-rpx-navy',
+  blue:  'from-rpx-blue-light to-rpx-blue',
+  green: 'from-rpx-green-light to-rpx-green',
+  amber: 'from-rpx-amber-light to-rpx-amber',
   grey:  'from-[#4a5568] to-[#374151]',
 }
 
 const GRADIENT_HOVER: Record<TileGroup, string> = {
-  navy:  'hover:from-[#2558a8] hover:to-[#1e4a8a]',
-  blue:  'hover:from-[#2278d4] hover:to-[#1d6bc7]',
-  green: 'hover:from-[#2e9e60] hover:to-[#278a54]',
-  amber: 'hover:from-[#d4a820] hover:to-[#c49b1c]',
+  navy:  'hover:from-rpx-navy-hover hover:to-rpx-navy-light',
+  blue:  'hover:from-rpx-blue-hover hover:to-rpx-blue-light',
+  green: 'hover:from-rpx-green-hover hover:to-rpx-green-light',
+  amber: 'hover:from-rpx-amber-hover hover:to-rpx-amber-light',
   grey:  'hover:from-[#5a6578] hover:to-[#4a5568]',
 }
 
 const SUBTITLE_COLOR: Record<TileGroup, string> = {
-  navy:  'text-[#8BA4D4]',
+  navy:  'text-rpx-tabmuted',
   blue:  'text-[#a8c8f0]',
   green: 'text-[#a8d4b8]',
   amber: 'text-[#fde9a0]',
@@ -115,7 +116,7 @@ function LiveClock() {
   const dateStr = time.toLocaleDateString('en-ZA', { year: 'numeric', month: '2-digit', day: '2-digit' })
   const timeStr = time.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit', hour12: false })
   return (
-    <span className="text-[#8BA4D4] text-[11px] tabular-nums">{dateStr} · {timeStr}</span>
+    <span className="text-rpx-tabmuted text-[11px] tabular-nums">{dateStr} · {timeStr}</span>
   )
 }
 
@@ -139,26 +140,26 @@ export default function PortalPage() {
     stats?.cashUpStatus === 'open'      ? 'Open' : 'Not Started'
 
   const cashUpBadge =
-    stats?.cashUpStatus === 'approved'  ? 'bg-[#217346] text-white' :
-    stats?.cashUpStatus === 'submitted' ? 'bg-[#C9A020] text-[#1a1a1a]' :
-    stats?.cashUpStatus === 'open'      ? 'bg-[#185ABD] text-white' :
+    stats?.cashUpStatus === 'approved'  ? 'bg-rpx-green text-white' :
+    stats?.cashUpStatus === 'submitted' ? 'bg-rpx-amber text-[#1a1a1a]' :
+    stats?.cashUpStatus === 'open'      ? 'bg-rpx-blue text-white' :
                                           'bg-white/10 text-white/50'
 
   return (
     <div
       className="flex flex-col overflow-hidden"
-      style={{ height: '100dvh', background: '#0a1628', fontFamily: 'var(--rpx-font, system-ui)' }}
+      style={{ height: '100dvh', background: colors.dashBg, fontFamily: 'var(--rpx-font, system-ui)' }}
     >
       {/* ── TOP BAR ────────────────────────────────────────────── */}
       <header
         className="flex items-center shrink-0 px-4 gap-4 border-b border-white/[0.08]"
-        style={{ height: 40, background: '#081120' }}
+        style={{ height: 40, background: colors.dashSurface }}
       >
         <div className="flex items-center gap-2 shrink-0">
-          <div className="w-6 h-6 rounded bg-[#1B3A6B] flex items-center justify-center shrink-0">
-            <RefreshCw className="w-3.5 h-3.5 text-[#F2AB1A]" />
+          <div className="w-6 h-6 rounded bg-rpx-navy flex items-center justify-center shrink-0">
+            <RefreshCw className="w-3.5 h-3.5 text-rpx-accent" />
           </div>
-          <span className="text-[#F2AB1A] font-bold text-[13px] tracking-wide select-none">Renovo Pro</span>
+          <span className="text-rpx-accent font-bold text-[13px] tracking-wide select-none">Renovo Pro</span>
         </div>
 
         <div className="w-px h-5 bg-white/10 shrink-0" />
@@ -168,7 +169,7 @@ export default function PortalPage() {
         <OfflineChip />
 
         <div className="flex items-center gap-1.5">
-          <span className="text-[#8BA4D4] text-[11px] select-none">
+          <span className="text-rpx-tabmuted text-[11px] select-none">
             {fullName}
             {role && <span className="text-white/25 ml-1">· {role}</span>}
           </span>
@@ -177,7 +178,7 @@ export default function PortalPage() {
         <button
           onClick={() => signOut({ callbackUrl: '/login' })}
           className="flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-medium
-                     bg-[#C0392B]/80 text-white hover:bg-[#C0392B] active:scale-95
+                     bg-rpx-red/80 text-white hover:bg-rpx-red active:scale-95
                      transition-all duration-150 shrink-0"
           aria-label="Sign out"
         >
@@ -189,14 +190,14 @@ export default function PortalPage() {
       {/* ── STATS STRIP ────────────────────────────────────────── */}
       <div
         className="flex items-center shrink-0 px-4 gap-0 border-b border-white/[0.06]"
-        style={{ height: 34, background: '#0d1f3c' }}
+        style={{ height: 34, background: colors.dashStrip }}
       >
         {/* Purchases */}
         <div className="flex items-center gap-2 pr-5">
-          <span className="text-[#8BA4D4] text-[11px] select-none">Today&apos;s Purchases</span>
+          <span className="text-rpx-tabmuted text-[11px] select-none">Today&apos;s Purchases</span>
           {isLoading
             ? <StatSkeleton />
-            : <span className="text-[#F2AB1A] text-[12px] font-bold tabular-nums">
+            : <span className="text-rpx-accent text-[12px] font-bold tabular-nums">
                 R {new Decimal(stats?.purchases?.total ?? '0').toFixed(2)}
               </span>
           }
@@ -206,7 +207,7 @@ export default function PortalPage() {
 
         {/* Cash-Up */}
         <div className="flex items-center gap-2 px-0">
-          <span className="text-[#8BA4D4] text-[11px] select-none">Cash-Up</span>
+          <span className="text-rpx-tabmuted text-[11px] select-none">Cash-Up</span>
           {isLoading
             ? <StatSkeleton />
             : <span className={cn('text-[10px] font-semibold px-2 py-0.5 rounded-full select-none', cashUpBadge)}>
@@ -219,10 +220,10 @@ export default function PortalPage() {
 
         {/* Sales */}
         <div className="flex items-center gap-2 pl-0">
-          <span className="text-[#8BA4D4] text-[11px] select-none">Today&apos;s Sales</span>
+          <span className="text-rpx-tabmuted text-[11px] select-none">Today&apos;s Sales</span>
           {isLoading
             ? <StatSkeleton />
-            : <span className="text-[#F2AB1A] text-[12px] font-bold tabular-nums">
+            : <span className="text-rpx-accent text-[12px] font-bold tabular-nums">
                 R {new Decimal(stats?.sales?.total ?? '0').toFixed(2)}
               </span>
           }
@@ -250,7 +251,7 @@ export default function PortalPage() {
               className={cn(
                 'flex flex-col items-center justify-center gap-2.5 rounded-xl border border-white/[0.12]',
                 'bg-gradient-to-br transition-all duration-150 ease-out cursor-pointer',
-                'focus:outline-none focus-visible:ring-2 focus-visible:ring-[#F2AB1A]/70',
+                'focus:outline-none focus-visible:ring-2 focus-visible:ring-rpx-accent/70',
                 GRADIENT[tile.group],
                 isDisabled
                   ? 'opacity-30 cursor-not-allowed'
@@ -281,7 +282,7 @@ export default function PortalPage() {
       {/* ── FOOTER ───────────────────────────────────────────────── */}
       <footer
         className="shrink-0 flex items-center justify-center border-t border-white/[0.06]"
-        style={{ height: 26, background: '#081120' }}
+        style={{ height: 26, background: colors.dashSurface }}
       >
         <span className="text-white/20 text-[10px] tracking-widest uppercase select-none">
           Renovo Pro Management Software &nbsp;·&nbsp; Version 3.0

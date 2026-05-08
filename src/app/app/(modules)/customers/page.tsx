@@ -127,7 +127,7 @@ function AccountsList({ onAddCustomer }: { onAddCustomer: () => void }) {
     ...(primaryFunction && { primaryFunction }),
   })
 
-  const { data, isLoading } = useSWR<{ customers: Customer[] }>(
+  const { data, isLoading, error } = useSWR<{ customers: Customer[] }>(
     `/api/customers?${query}`, fetcher,
   )
   const customers = data?.customers ?? []
@@ -383,6 +383,7 @@ function AccountsList({ onAddCustomer }: { onAddCustomer: () => void }) {
           rowKey={(r) => r.id}
           rowActions={rowActions}
           loading={isLoading}
+          error={error}
           emptyMessage="No account customers found"
           emptyAction={{ label: '+ Add Account Customer', onClick: onAddCustomer }}
         />
