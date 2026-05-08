@@ -60,7 +60,7 @@ export async function openCashUp(openedByUserId: string, sessionDateStr?: string
       sessionDate,
       openedByUserId,
       status: 'open',
-      openingBalance: openingBalance.toFixed(2),
+      openingBalance: openingBalance,
     },
   })
 

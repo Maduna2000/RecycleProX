@@ -11,12 +11,12 @@ export async function setFloat(data: SetFloatInput, userId: string) {
     where: { floatDate },
     create: {
       floatDate,
-      openingAmount:   new Decimal(data.openingAmount).toFixed(2),
+      openingAmount:   new Decimal(data.openingAmount),
       notes:           data.notes,
       createdByUserId: userId,
     },
     update: {
-      openingAmount: new Decimal(data.openingAmount).toFixed(2),
+      openingAmount: new Decimal(data.openingAmount),
       notes:         data.notes,
     },
   })
@@ -72,7 +72,7 @@ export async function updateClosingAmount(date: Date, amount: Decimal) {
 
   await prisma.cashFloat.update({
     where: { floatDate: d },
-    data:  { closingAmount: amount.toFixed(2) },
+    data:  { closingAmount: amount },
   })
   logger.info({ floatDate: d.toISOString(), closingAmount: amount.toFixed(2) }, 'CashFloat closing amount updated')
 }

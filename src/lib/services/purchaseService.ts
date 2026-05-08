@@ -147,7 +147,7 @@ export async function createPurchase(data: CreatePurchaseInput, createdByUserId?
 
     // Apply loan deduction as a repayment (FIFO across active loans)
     if (deduction && deduction.greaterThan(0)) {
-      await applyRepaymentTx(tx, data.customerId, deduction.toFixed(2), createdByUserId, p.id)
+      await applyRepaymentTx(tx, data.customerId, deduction.toString(), createdByUserId, p.id)
     }
 
       return p

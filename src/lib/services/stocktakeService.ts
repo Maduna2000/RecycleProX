@@ -74,8 +74,8 @@ export async function upsertEntry(
   const variance  = counted.minus(systemQty)
 
   const scaleData = {
-    grossQty: opts?.grossQty ? new Decimal(opts.grossQty).toFixed(4) : undefined,
-    tareQty:  opts?.tareQty  ? new Decimal(opts.tareQty).toFixed(4)  : undefined,
+    grossQty: opts?.grossQty ? new Decimal(opts.grossQty) : undefined,
+    tareQty:  opts?.tareQty  ? new Decimal(opts.tareQty)  : undefined,
   }
 
   const entry = await prisma.stocktakeEntry.upsert({
@@ -83,16 +83,16 @@ export async function upsertEntry(
     create: {
       stocktakeId,
       productId,
-      systemQty:  systemQty.toFixed(4),
-      countedQty: counted.toFixed(4),
-      variance:   variance.toFixed(4),
+      systemQty:  systemQty,
+      countedQty: counted,
+      variance:   variance,
       ...scaleData,
       ...(opts?.photoR2Key ? { photoR2Key: opts.photoR2Key } : {}),
     },
     update: {
-      systemQty:  systemQty.toFixed(4),
-      countedQty: counted.toFixed(4),
-      variance:   variance.toFixed(4),
+      systemQty:  systemQty,
+      countedQty: counted,
+      variance:   variance,
       ...scaleData,
       ...(opts?.photoR2Key ? { photoR2Key: opts.photoR2Key } : {}),
     },
