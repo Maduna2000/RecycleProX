@@ -233,3 +233,46 @@ export async function getTransactionHistory(id: string, page = 1) {
 
   return { transactions, total, page, totalPages: Math.ceil(total / limit) }
 }
+
+// ─── Customer Documents ───────────────────────────────────────────────────────
+
+export async function listCustomerDocuments(customerId: string) {
+  return prisma.customerDocument.findMany({
+    where:   { customerId },
+    orderBy: { uploadedAt: 'desc' },
+  })
+}
+
+export async function addCustomerDocument(
+  customerId: string,
+  data: {
+    documentType: import('@prisma/client').CustomerDocumentType
+    r2Key:        string
+    fileName:     string
+    notes?:       string
+  },
+  uploadedByUserId: string
+) {
+  const customer = await prisma.customer.findUnique({ where: { id: customerId }, select: { id: true } })
+  if (!customer) throw new Error(`Customer "${customerId}" not found`)
+
+  const doc = await prisma.customerDocument.create({
+    data: { customerId, documentType: data.documentType, r2Key: data.r2Key, fileName: data.fileName, notes: data.notes, uploadedByUserId },
+  })
+  logger.info({ docId: doc.id, customerId, uploadedByUserId }, 'customer.document.added')
+  return doc
+}
+
+export async function deleteCustomerDocument(
+  customerId: string,
+  docId: string,
+  deletedByUserId: string
+) {
+  const doc = await prisma.customerDocument.findUnique({ where: { id: docId } })
+  if (!doc || doc.customerId !== customerId) throw new Error('Document not found')
+
+  const { deleteR2Object } = await import('@/lib/r2')
+  await deleteR2Object(doc.r2Key)
+  await prisma.customerDocument.delete({ where: { id: docId } })
+  logger.info({ docId, customerId, deletedByUserId }, 'customer.document.deleted')
+}

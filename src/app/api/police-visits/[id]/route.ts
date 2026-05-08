@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
-import { prisma } from '@/lib/db/prisma'
 import { z } from 'zod'
-import { getViewUrl } from '@/lib/r2'
+import { getPoliceVisit, updatePoliceVisit } from '@/lib/services/policeVisitService'
 
 const PatchVisitSchema = z.object({
   signatureR2Key: z.string().max(500).optional(),
@@ -25,14 +24,9 @@ export async function GET(
   }
 
   try {
-    const visit = await prisma.policeVisit.findUnique({ where: { id: params.id } })
+    const visit = await getPoliceVisit(params.id)
     if (!visit) return NextResponse.json({ error: 'Visit not found' }, { status: 404 })
-
-    return NextResponse.json({
-      ...visit,
-      registerUrl:  visit.registerR2Key  ? await getViewUrl(visit.registerR2Key,  3600) : null,
-      signatureUrl: visit.signatureR2Key ? await getViewUrl(visit.signatureR2Key, 3600) : null,
-    })
+    return NextResponse.json(visit)
   } catch (err) {
     logger.error({ err, id: params.id }, 'GET /api/police-visits/[id] failed')
     return NextResponse.json({ error: 'Failed to fetch visit' }, { status: 500 })
@@ -53,18 +47,14 @@ export async function PATCH(
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const body = await req.json().catch(() => null)
+  const body   = await req.json().catch(() => null)
   const parsed = PatchVisitSchema.safeParse(body)
   if (!parsed.success) {
     return NextResponse.json({ error: 'Validation failed', issues: parsed.error.flatten() }, { status: 422 })
   }
 
   try {
-    const visit = await prisma.policeVisit.update({
-      where: { id: params.id },
-      data: parsed.data,
-    })
-    logger.info({ visitId: visit.id, userId: session.user.id }, 'police-visit.updated')
+    const visit = await updatePoliceVisit(params.id, parsed.data, session.user.id)
     return NextResponse.json({ visit })
   } catch (err) {
     logger.error({ err, id: params.id }, 'PATCH /api/police-visits/[id] failed')

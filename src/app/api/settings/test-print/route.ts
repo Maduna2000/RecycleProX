@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
-import { prisma } from '@/lib/db/prisma'
 import logger from '@/lib/logger'
+import { getAllSettings } from '@/lib/services/settingsService'
 
 // POST /api/settings/test-print
 // Sends a small test page to the configured thermal printer.
@@ -13,11 +13,7 @@ export async function POST() {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  // Read printer settings
-  const rows = await prisma.systemSettings.findMany({
-    where: { key: { in: ['printerType', 'printerSerialPort', 'printerBaudRate', 'printerIp', 'printerTcpPort'] } },
-  })
-  const cfg: Record<string, string> = Object.fromEntries(rows.map((r) => [r.key, r.value]))
+  const cfg = await getAllSettings()
 
   if (!cfg.printerType || cfg.printerType === 'none') {
     return NextResponse.json({ error: 'No printer configured' }, { status: 400 })

@@ -138,6 +138,44 @@ export async function getExpenseTotalsForDate(date: Date): Promise<Decimal> {
   return new Decimal(result._sum.amount?.toString() ?? '0')
 }
 
+// ─── Expense Attachments ──────────────────────────────────────────────────────
+
+export async function listExpenseAttachments(expenseId: string) {
+  return prisma.expenseAttachment.findMany({
+    where:   { expenseId },
+    orderBy: { uploadedAt: 'desc' },
+  })
+}
+
+export async function addExpenseAttachment(
+  expenseId: string,
+  data: { r2Key: string; fileName: string; notes?: string },
+  uploadedByUserId: string
+) {
+  const expense = await prisma.expense.findUnique({ where: { id: expenseId }, select: { id: true } })
+  if (!expense) throw new Error(`Expense "${expenseId}" not found`)
+
+  const attachment = await prisma.expenseAttachment.create({
+    data: { expenseId, r2Key: data.r2Key, fileName: data.fileName, notes: data.notes, uploadedByUserId },
+  })
+  logger.info({ attachmentId: attachment.id, expenseId, uploadedByUserId }, 'expense.attachment.added')
+  return attachment
+}
+
+export async function deleteExpenseAttachment(
+  expenseId: string,
+  attachId: string,
+  deletedByUserId: string
+) {
+  const attachment = await prisma.expenseAttachment.findUnique({ where: { id: attachId } })
+  if (!attachment || attachment.expenseId !== expenseId) throw new Error('Attachment not found')
+
+  const { deleteR2Object } = await import('@/lib/r2')
+  await deleteR2Object(attachment.r2Key)
+  await prisma.expenseAttachment.delete({ where: { id: attachId } })
+  logger.info({ attachId, expenseId, deletedByUserId }, 'expense.attachment.deleted')
+}
+
 export async function getExpensesByCategory(from: Date, to: Date) {
   const expenses = await prisma.expense.findMany({
     where: {

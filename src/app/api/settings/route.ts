@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
-import { prisma } from '@/lib/db/prisma'
 import logger from '@/lib/logger'
+import { getAllSettings, upsertUserSettings, upsertGlobalSettings } from '@/lib/services/settingsService'
 
 /**
  * GET /api/settings
@@ -13,11 +13,7 @@ export async function GET() {
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   try {
-    const rows = await prisma.systemSettings.findMany()
-    const settings: Record<string, string> = {}
-    for (const row of rows) {
-      settings[row.key] = row.value
-    }
+    const settings = await getAllSettings()
     return NextResponse.json(settings)
   } catch (err) {
     logger.error({ err }, 'GET /api/settings failed')
@@ -39,26 +35,12 @@ export async function PATCH(req: NextRequest) {
     if (typeof body !== 'object' || Array.isArray(body)) {
       return NextResponse.json({ error: 'Body must be a key-value object' }, { status: 400 })
     }
-
-    const prefix = `user:${session.user.id}:`
-    const allowed = Object.entries(body).filter(([key]) => key.startsWith(prefix))
-    if (allowed.length === 0) {
-      return NextResponse.json({ error: 'No allowed keys provided' }, { status: 400 })
-    }
-
-    await prisma.$transaction(
-      allowed.map(([key, value]) =>
-        prisma.systemSettings.upsert({
-          where: { key },
-          update: { value: String(value) },
-          create: { key, value: String(value) },
-        })
-      )
-    )
-
-    logger.info({ userId: session.user.id, keys: allowed.map(([k]) => k) }, 'user-settings.updated')
+    await upsertUserSettings(session.user.id, body)
     return NextResponse.json({ ok: true })
-  } catch (err) {
+  } catch (err: unknown) {
+    if (err instanceof Error && err.message === 'No allowed keys provided') {
+      return NextResponse.json({ error: err.message }, { status: 400 })
+    }
     logger.error({ err }, 'PATCH /api/settings failed')
     return NextResponse.json({ error: 'Failed to save settings' }, { status: 500 })
   }
@@ -79,18 +61,7 @@ export async function PUT(req: NextRequest) {
     if (typeof body !== 'object' || Array.isArray(body)) {
       return NextResponse.json({ error: 'Body must be a key-value object' }, { status: 400 })
     }
-
-    await prisma.$transaction(
-      Object.entries(body).map(([key, value]) =>
-        prisma.systemSettings.upsert({
-          where: { key },
-          update: { value: String(value) },
-          create: { key, value: String(value) },
-        })
-      )
-    )
-
-    logger.info({ userId: session.user.id, keys: Object.keys(body) }, 'Settings updated')
+    await upsertGlobalSettings(body, session.user.id)
     return NextResponse.json({ ok: true })
   } catch (err) {
     logger.error({ err }, 'PUT /api/settings failed')

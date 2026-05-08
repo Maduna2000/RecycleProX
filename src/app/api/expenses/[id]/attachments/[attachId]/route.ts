@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
-import { prisma } from '@/lib/db/prisma'
-import { deleteR2Object } from '@/lib/r2'
 import logger from '@/lib/logger'
+import { deleteExpenseAttachment } from '@/lib/services/expenseService'
 
 export async function DELETE(
   _req: NextRequest,
@@ -14,17 +13,13 @@ export async function DELETE(
     return NextResponse.json({ error: 'Only managers and admins can delete attachments' }, { status: 403 })
   }
 
-  const attachment = await prisma.expenseAttachment.findUnique({ where: { id: params.attachId } })
-  if (!attachment || attachment.expenseId !== params.id) {
-    return NextResponse.json({ error: 'Attachment not found' }, { status: 404 })
-  }
-
   try {
-    await deleteR2Object(attachment.r2Key)
-    await prisma.expenseAttachment.delete({ where: { id: params.attachId } })
-    logger.info({ attachId: params.attachId, expenseId: params.id, userId: session.user.id }, 'Expense attachment deleted')
+    await deleteExpenseAttachment(params.id, params.attachId, session.user.id)
     return new Response(null, { status: 204 })
-  } catch (err) {
+  } catch (err: unknown) {
+    if (err instanceof Error && err.message === 'Attachment not found') {
+      return NextResponse.json({ error: err.message }, { status: 404 })
+    }
     logger.error({ err }, 'DELETE /api/expenses/[id]/attachments/[attachId] failed')
     return NextResponse.json({ error: 'Failed to delete attachment' }, { status: 500 })
   }

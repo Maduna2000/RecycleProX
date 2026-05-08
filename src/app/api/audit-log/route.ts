@@ -1,26 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
-import { prisma } from '@/lib/db/prisma'
+import { listAuditLogs } from '@/lib/services/auditLogService'
 
 /**
  * GET /api/audit-log
- * Query params:
- *   table     — filter by tableName
- *   action    — INSERT | UPDATE | DELETE | VOID | LOGIN | LOGOUT
- *   recordId  — filter by specific record UUID
- *   userId    — filter by changedById
- *   from      — YYYY-MM-DD
- *   to        — YYYY-MM-DD
- *   page      — default 1
- *   pageSize  — default 50, max 100
- *
+ * Query params: table, action, recordId, userId, from (YYYY-MM-DD), to, page, pageSize
  * Admin only.
  */
 export async function GET(req: NextRequest) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
   if (session.user.role !== 'admin') {
     return NextResponse.json({ error: 'Forbidden — admins only' }, { status: 403 })
   }
@@ -39,44 +29,17 @@ export async function GET(req: NextRequest) {
   const to   = toStr   ? (() => { const d = new Date(toStr);   d.setHours(23,59,59,999); return d })() : undefined
 
   try {
-    const where = {
-      ...(table    && { tableName:   table }),
-      ...(action   && { action:      action as 'INSERT' | 'UPDATE' | 'DELETE' | 'VOID' | 'LOGIN' | 'LOGOUT' }),
-      ...(recordId && { recordId }),
-      ...(userId   && { changedById: userId }),
-      ...((from || to) && {
-        createdAt: {
-          ...(from && { gte: from }),
-          ...(to   && { lte: to }),
-        },
-      }),
-    }
-
-    const [items, total] = await Promise.all([
-      prisma.auditLog.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        skip:  (page - 1) * pageSize,
-        take:  pageSize,
-      }),
-      prisma.auditLog.count({ where }),
-    ])
-
-    // Resolve user names for all changedById values in one batch query
-    const userIds = Array.from(new Set(items.map((i) => i.changedById).filter(Boolean))) as string[]
-    const users = userIds.length
-      ? await prisma.user.findMany({ where: { id: { in: userIds } }, select: { id: true, fullName: true, username: true } })
-      : []
-    const userMap = Object.fromEntries(users.map((u) => [u.id, u.fullName || u.username]))
-
-    // Serialize BigInt id to string and attach user name
-    const serialized = items.map((item) => ({
-      ...item,
-      id:             item.id.toString(),
-      changedByName:  item.changedById ? (userMap[item.changedById] ?? null) : null,
-    }))
-
-    return NextResponse.json({ items: serialized, total, page, pageSize })
+    const result = await listAuditLogs({
+      table,
+      action: action as 'INSERT' | 'UPDATE' | 'DELETE' | 'VOID' | 'LOGIN' | 'LOGOUT' | undefined,
+      recordId,
+      userId,
+      from,
+      to,
+      page,
+      pageSize,
+    })
+    return NextResponse.json(result)
   } catch (err) {
     logger.error({ err }, 'GET /api/audit-log failed')
     return NextResponse.json({ error: 'Failed to fetch audit log' }, { status: 500 })

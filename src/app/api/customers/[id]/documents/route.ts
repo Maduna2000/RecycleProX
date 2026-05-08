@@ -1,26 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
-import { prisma } from '@/lib/db/prisma'
 import { UploadCustomerDocumentSchema } from '@/lib/schemas/customer'
 import logger from '@/lib/logger'
+import { listCustomerDocuments, addCustomerDocument } from '@/lib/services/customerService'
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
-  const docs = await prisma.customerDocument.findMany({
-    where:   { customerId: params.id },
-    orderBy: { uploadedAt: 'desc' },
-  })
+  const docs = await listCustomerDocuments(params.id)
   return NextResponse.json(docs)
 }
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
-
-  const customer = await prisma.customer.findUnique({ where: { id: params.id }, select: { id: true } })
-  if (!customer) return NextResponse.json({ error: 'Customer not found' }, { status: 404 })
 
   const body = await req.json()
   const parsed = UploadCustomerDocumentSchema.safeParse(body)
@@ -29,19 +23,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   }
 
   try {
-    const doc = await prisma.customerDocument.create({
-      data: {
-        customerId:      params.id,
-        documentType:    parsed.data.documentType,
-        r2Key:           parsed.data.r2Key,
-        fileName:        parsed.data.fileName,
-        notes:           parsed.data.notes,
-        uploadedByUserId: session.user.id,
-      },
-    })
-    logger.info({ docId: doc.id, customerId: params.id, userId: session.user.id }, 'Customer document uploaded')
+    const doc = await addCustomerDocument(params.id, parsed.data, session.user.id)
     return NextResponse.json(doc, { status: 201 })
-  } catch (err) {
+  } catch (err: unknown) {
+    if (err instanceof Error && err.message.includes('not found')) {
+      return NextResponse.json({ error: 'Customer not found' }, { status: 404 })
+    }
     logger.error({ err }, 'POST /api/customers/[id]/documents failed')
     return NextResponse.json({ error: 'Failed to save document' }, { status: 500 })
   }

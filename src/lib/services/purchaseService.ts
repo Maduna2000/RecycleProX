@@ -33,6 +33,14 @@ export class LoanDeductionExceedsTotalError extends Error {
   constructor() { super('Loan deduction cannot exceed the gross payout total'); this.name = 'LoanDeductionExceedsTotalError' }
 }
 
+export class PurchaseNotPendingError extends Error {
+  constructor(status: string) { super(`Purchase is already "${status}" and cannot be settled`); this.name = 'PurchaseNotPendingError' }
+}
+
+export class PaymentExceedsBalanceError extends Error {
+  constructor(settle: string, outstanding: string) { super(`Payment amount (R ${settle}) exceeds remaining balance (R ${outstanding})`); this.name = 'PaymentExceedsBalanceError' }
+}
+
 // ─── Reference number generator ───────────────────────────────────────────────
 
 type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
@@ -208,6 +216,82 @@ export async function getPurchase(id: string) {
   })
   if (!purchase) throw new PurchaseNotFoundError(id)
   return purchase
+}
+
+// ─── Mark Purchase Paid (partial or full settlement) ─────────────────────────
+
+export async function markPurchasePaid(
+  id: string,
+  data: { amount: string; paymentMethod: string },
+  userId: string
+) {
+  const purchase = await prisma.purchase.findUniqueOrThrow({ where: { id } })
+  if (purchase.status !== 'pending') throw new PurchaseNotPendingError(purchase.status)
+
+  const totalAmount   = new Decimal(purchase.totalAmount.toString())
+  const loanDeduction = purchase.loanDeductionAmount
+    ? new Decimal(purchase.loanDeductionAmount.toString())
+    : new Decimal(0)
+  const currentPaid   = new Decimal(purchase.amountPaid.toString())
+  const outstanding   = totalAmount.minus(loanDeduction).minus(currentPaid)
+  const settleAmount  = new Decimal(data.amount)
+
+  if (settleAmount.greaterThan(outstanding)) {
+    throw new PaymentExceedsBalanceError(settleAmount.toFixed(2), outstanding.toFixed(2))
+  }
+
+  const isFullySettled = currentPaid.plus(settleAmount).gte(totalAmount.minus(loanDeduction))
+
+  const updated = await prisma.purchase.update({
+    where: { id },
+    data: {
+      amountPaid:    { increment: settleAmount },
+      paymentMethod: data.paymentMethod as Prisma.PurchaseUpdateInput['paymentMethod'],
+      ...(isFullySettled ? { status: 'completed' } : {}),
+    },
+  })
+
+  logger.info(
+    { purchaseId: id, userId, settleAmount: settleAmount.toFixed(2), isFullySettled },
+    'purchase.payment.recorded'
+  )
+  return { updated, isFullySettled }
+}
+
+// ─── Update Purchase Photos ───────────────────────────────────────────────────
+
+export async function updatePurchasePhotos(
+  id: string,
+  action: { add?: string; remove?: string },
+  userId: string
+) {
+  const purchase = await prisma.purchase.findUnique({ where: { id }, select: { photoR2Keys: true } })
+  if (!purchase) throw new PurchaseNotFoundError(id)
+
+  if (!action.add && !action.remove) throw new Error('Provide add or remove')
+
+  const keys = action.add
+    ? [...(purchase.photoR2Keys ?? []), action.add]
+    : (purchase.photoR2Keys ?? []).filter((k) => k !== action.remove)
+
+  const updated = await prisma.purchase.update({
+    where:  { id },
+    data:   { photoR2Keys: keys },
+    select: { photoR2Keys: true },
+  })
+
+  logger.info({ purchaseId: id, userId, action: action.add ? 'photo_added' : 'photo_removed' }, 'purchase.photos.updated')
+  return updated
+}
+
+// ─── Save Purchase Signature ──────────────────────────────────────────────────
+
+export async function savePurchaseSignature(id: string, signatureR2Key: string, userId: string) {
+  const purchase = await prisma.purchase.findUnique({ where: { id } })
+  if (!purchase) throw new PurchaseNotFoundError(id)
+
+  await prisma.purchase.update({ where: { id }, data: { signatureR2Key } })
+  logger.info({ purchaseId: id, userId }, 'purchase.signature.saved')
 }
 
 // ─── List Purchases ───────────────────────────────────────────────────────────

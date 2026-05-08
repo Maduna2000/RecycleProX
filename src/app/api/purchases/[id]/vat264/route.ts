@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
-import { prisma } from '@/lib/db/prisma'
 import logger from '@/lib/logger'
 import { getPurchase } from '@/lib/services/purchaseService'
+import { getAllSettings } from '@/lib/services/settingsService'
 import { generateVat264 } from '@/lib/pdf/vat264'
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
@@ -13,11 +13,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     const purchase = await getPurchase(params.id)
 
     // Load yard settings
-    const settingsRows = await prisma.systemSettings.findMany({
-      where: { key: { in: ['yardName', 'yardAddress', 'vatNumber', 'dealerPhone'] } },
-    })
-    const settings: Record<string, string> = {}
-    for (const row of settingsRows) settings[row.key] = row.value
+    const settings = await getAllSettings()
 
     // Load signature bytes if stored in R2
     let signatureBytes: Uint8Array | undefined

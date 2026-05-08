@@ -183,6 +183,51 @@ export async function resetPinToDefault(userId: string): Promise<void> {
   logger.info({ userId }, 'PIN reset to default')
 }
 
+// ─── User queries ─────────────────────────────────────────────────────────────
+
+const USER_SELECT = {
+  id: true, fullName: true, username: true, role: true,
+  isActive: true, forcePasswordChange: true, failedAttempts: true,
+  lockedAt: true, lastLoginAt: true, createdAt: true,
+} as const
+
+export async function listUsers(opts: {
+  role?:     string
+  isActive?: boolean
+  search?:   string
+  page?:     number
+  limit?:    number
+}) {
+  const { page = 1, limit = 20 } = opts
+  const where = {
+    ...(opts.role     && { role:     opts.role as import('@prisma/client').UserRole }),
+    ...(opts.isActive !== undefined && { isActive: opts.isActive }),
+    ...(opts.search   && {
+      OR: [
+        { fullName: { contains: opts.search, mode: 'insensitive' as const } },
+        { username: { contains: opts.search, mode: 'insensitive' as const } },
+      ],
+    }),
+  }
+
+  const [users, total] = await Promise.all([
+    prisma.user.findMany({
+      where,
+      skip:    (page - 1) * limit,
+      take:    limit,
+      select:  USER_SELECT,
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.user.count({ where }),
+  ])
+
+  return { users, total, page, totalPages: Math.ceil(total / limit) }
+}
+
+export async function getUser(id: string) {
+  return prisma.user.findUnique({ where: { id }, select: USER_SELECT })
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function sanitize(user: {

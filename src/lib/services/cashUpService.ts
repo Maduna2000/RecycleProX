@@ -213,6 +213,73 @@ export async function approveCashUp(
   return updated
 }
 
+// ─── Live stats for the cash-up page ─────────────────────────────────────────
+// Returns real-time transaction totals for a given session date.
+export async function getLiveStats(sessionDate: Date) {
+  const start = new Date(sessionDate); start.setHours(0, 0, 0, 0)
+  const end   = new Date(sessionDate); end.setHours(23, 59, 59, 999)
+
+  const [
+    salesCashAgg,
+    purchasesAgg,
+    paymentsAgg,
+    loanTotals,
+    expenses,
+    unpaidTodayAgg,
+    unpaidAllTimeAgg,
+    approvedVariances,
+  ] = await Promise.all([
+    prisma.sale.aggregate({
+      _sum: { totalAmount: true },
+      where: { paymentMethod: 'cash', status: 'completed', createdAt: { gte: start, lte: end } },
+    }),
+    prisma.purchase.aggregate({
+      _sum: { totalAmount: true },
+      where: { paymentMethod: 'cash', status: 'completed', createdAt: { gte: start, lte: end } },
+    }),
+    prisma.payment.aggregate({
+      _sum: { amount: true },
+      where: { paymentMethod: 'cash', voidedAt: null, createdAt: { gte: start, lte: end } },
+    }),
+    getLoanTotalsForDate(sessionDate),
+    getExpenseTotalsForDate(sessionDate),
+    prisma.$queryRaw<{ total: string; count: bigint }[]>`
+      SELECT COALESCE(SUM("totalAmount" - COALESCE("loanDeductionAmount", 0) - "amountPaid"), 0)::text AS total,
+             COUNT(*)::bigint AS count
+      FROM "Purchase"
+      WHERE status = 'pending' AND "createdAt" >= ${start} AND "createdAt" <= ${end}
+    `,
+    prisma.$queryRaw<{ total: string; count: bigint }[]>`
+      SELECT COALESCE(SUM("totalAmount" - COALESCE("loanDeductionAmount", 0) - "amountPaid"), 0)::text AS total,
+             COUNT(*)::bigint AS count
+      FROM "Purchase"
+      WHERE status = 'pending'
+    `,
+    prisma.cashUp.aggregate({
+      _sum: { variance: true },
+      where: { status: 'approved' },
+    }),
+  ])
+
+  return {
+    cashSales:     new Decimal(salesCashAgg._sum.totalAmount?.toString()  ?? '0').toFixed(2),
+    cashPurchases: new Decimal(purchasesAgg._sum.totalAmount?.toString()  ?? '0').toFixed(2),
+    cashPayments:  new Decimal(paymentsAgg._sum.amount?.toString()        ?? '0').toFixed(2),
+    expenses:      expenses.toFixed(2),
+    loanAdvance:   loanTotals.advanced,
+    loanRepayment: loanTotals.repaid,
+    unpaidToday: {
+      total: new Decimal(unpaidTodayAgg[0]?.total   ?? '0').toFixed(2),
+      count: Number(unpaidTodayAgg[0]?.count   ?? 0),
+    },
+    unpaidAllTime: {
+      total: new Decimal(unpaidAllTimeAgg[0]?.total ?? '0').toFixed(2),
+      count: Number(unpaidAllTimeAgg[0]?.count ?? 0),
+    },
+    finPeriodCumulative: new Decimal(approvedVariances._sum.variance?.toString() ?? '0').toFixed(2),
+  }
+}
+
 // ─── Get by ID ────────────────────────────────────────────────────────────────
 export async function getCashUp(id: string) {
   return prisma.cashUp.findUnique({ where: { id } })

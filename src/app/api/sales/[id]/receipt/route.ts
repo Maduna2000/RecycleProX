@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { getSale } from '@/lib/services/saleService'
+import { getAllSettings } from '@/lib/services/settingsService'
 import { generateTransactionSlip } from '@/lib/pdf/slip'
-import { prisma } from '@/lib/db/prisma'
 
 /**
  * GET /api/sales/[id]/receipt?format=pdf|thermal
@@ -20,15 +20,10 @@ export async function GET(
   const format = req.nextUrl.searchParams.get('format') ?? 'pdf'
 
   try {
-    const [sale, settingsRows] = await Promise.all([
+    const [sale, settings] = await Promise.all([
       getSale(params.id),
-      prisma.systemSettings.findMany({
-        where: { key: { in: ['yardName', 'yardAddress', 'yardPhone', 'vatNumber', 'receiptFooter'] } },
-      }),
+      getAllSettings(),
     ])
-
-    const settings: Record<string, string> = {}
-    for (const row of settingsRows) settings[row.key] = row.value
 
     const lines = sale.lines.map((l) => ({
       productName: l.product.name,

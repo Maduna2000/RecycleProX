@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
-import { prisma } from '@/lib/db/prisma'
-import { generatePoliceRegister, type RegisterEntry } from '@/lib/pdf/policeRegister'
-import { fetchR2Bytes } from '@/lib/r2'
+import { generatePoliceRegister } from '@/lib/pdf/policeRegister'
+import { getPurchasesForRegister } from '@/lib/services/policeVisitService'
 
 /**
  * GET /api/police-register?date=YYYY-MM-DD
@@ -13,9 +12,7 @@ import { fetchR2Bytes } from '@/lib/r2'
 export async function GET(req: NextRequest) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const role = session.user.role
-  if (!['admin', 'manager'].includes(role)) {
+  if (!['admin', 'manager'].includes(session.user.role)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
@@ -25,57 +22,16 @@ export async function GET(req: NextRequest) {
   }
 
   const [y, m, d] = dateParam.split('-').map(Number)
-  const start = new Date(y!, m! - 1, d!)
-  start.setHours(0, 0, 0, 0)
-  const end = new Date(start)
-  end.setHours(23, 59, 59, 999)
+  const date = new Date(y!, m! - 1, d!)
 
   try {
-    const purchases = await prisma.purchase.findMany({
-      where: {
-        status: 'completed',
-        createdAt: { gte: start, lte: end },
-      },
-      include: {
-        customer: true,
-        lines: { include: { product: true } },
-      },
-      orderBy: { createdAt: 'asc' },
-    })
-
-    // Fetch customer ID photos from R2 in parallel (best-effort)
-    const photoMap = new Map<string, Uint8Array | null>()
-    await Promise.all(
-      purchases
-        .filter((p) => p.customer.idPhotoR2Key)
-        .map(async (p) => {
-          const bytes = await fetchR2Bytes(p.customer.idPhotoR2Key!)
-          photoMap.set(p.customer.id, bytes)
-        })
-    )
-
-    const entries: RegisterEntry[] = purchases.map((p, i) => ({
-      rowNumber:    i + 1,
-      createdAt:    p.createdAt,
-      refNumber:    p.refNumber,
-      supplierName: `${p.customer.firstName} ${p.customer.lastName}`,
-      idNumber:     p.customer.idNumber,
-      dateOfBirth:  p.customer.dateOfBirth,
-      policeRegNo:  p.customer.policeRegisterNo,
-      address:      p.customer.physicalAddress ?? p.customer.postalAddress ?? '—',
-      items:        p.lines.map((l) => `${l.product.name} (${l.quantity}${l.product.unit})`).join(', '),
-      totalAmount:  p.totalAmount.toString(),
-      idPhotoBytes: photoMap.get(p.customer.id) ?? null,
-    }))
-
-    const settings = await prisma.systemSettings.findMany()
-    const settingsMap = Object.fromEntries(settings.map((s) => [s.key, s.value]))
+    const { entries, settings } = await getPurchasesForRegister(date)
 
     const pdfBytes = await generatePoliceRegister({
-      date:          start,
+      date,
       entries,
-      dealerName:    settingsMap['yardName']    ?? 'Renovo Pro',
-      dealerAddress: settingsMap['yardAddress'] ?? 'Mbabane, Eswatini',
+      dealerName:    settings['yardName']    ?? 'Renovo Pro',
+      dealerAddress: settings['yardAddress'] ?? 'Mbabane, Eswatini',
       generatedAt:   new Date(),
     })
 

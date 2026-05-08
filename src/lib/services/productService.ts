@@ -298,3 +298,37 @@ export async function setGroupOverrides(groupId: string, data: SetGroupOverrides
 
   logger.info({ priceGroupId: groupId, count: data.overrides.length, updatedById }, 'priceGroup.overridesUpdated')
 }
+
+// ─── Copy Default Prices to a Price Group ─────────────────────────────────────
+
+export async function copyDefaultsToPriceGroup(
+  priceGroupId: string,
+  productIds?: string[]
+) {
+  const group = await prisma.priceGroup.findUnique({ where: { id: priceGroupId } })
+  if (!group) throw new PriceGroupNotFoundError(priceGroupId)
+
+  const products = await prisma.product.findMany({
+    where: {
+      isActive: true,
+      ...(productIds?.length ? { id: { in: productIds } } : {}),
+    },
+    select: { id: true, defaultBuyPrice: true, defaultSellPrice: true },
+  })
+
+  const upserted = await prisma.$transaction(async (tx) => {
+    let count = 0
+    for (const product of products) {
+      await tx.priceGroupProductOverride.upsert({
+        where:  { priceGroupId_productId: { priceGroupId, productId: product.id } },
+        create: { priceGroupId, productId: product.id, buyPrice: product.defaultBuyPrice, sellPrice: product.defaultSellPrice },
+        update: { buyPrice: product.defaultBuyPrice, sellPrice: product.defaultSellPrice },
+      })
+      count++
+    }
+    return count
+  })
+
+  logger.info({ priceGroupId, upserted }, 'price-group.defaults-copied')
+  return upserted
+}
