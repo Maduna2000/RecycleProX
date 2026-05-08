@@ -31,6 +31,37 @@ interface Props {
   onSelect: (customer: SelectedCustomer) => void
 }
 
+// ─── Client-side image compression ───────────────────────────────────────────
+// Resizes to max 1600 px wide and re-encodes as JPEG before uploading.
+// Keeps OCR accuracy while staying well under Vercel's 4.5 MB payload limit.
+
+async function compressImage(file: File, maxPx = 1600, quality = 0.85): Promise<File> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      const scale  = Math.min(1, maxPx / Math.max(img.width, img.height))
+      const canvas = document.createElement('canvas')
+      canvas.width  = Math.round(img.width  * scale)
+      canvas.height = Math.round(img.height * scale)
+      const ctx = canvas.getContext('2d')
+      if (!ctx) { resolve(file); return }
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) { resolve(file); return }
+          resolve(new File([blob], file.name.replace(/\.\w+$/, '.jpg'), { type: 'image/jpeg' }))
+        },
+        'image/jpeg',
+        quality,
+      )
+    }
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Image load failed')) }
+    img.src = url
+  })
+}
+
 // ─── CasualSelectorPanel ──────────────────────────────────────────────────────
 
 export function CasualSelectorPanel({ onSelect }: Props) {
@@ -98,15 +129,25 @@ export function CasualSelectorPanel({ onSelect }: Props) {
     setScanStatus('scanning')
     setScanR2Key(null)
     try {
+      // Compress before upload — phone camera photos can be 10+ MB; Vercel limit is 4.5 MB
+      const compressed = await compressImage(file)
+
       const fd = new FormData()
-      fd.append('file', file)
+      fd.append('file', compressed)
       const res = await fetch('/api/id-scan', { method: 'POST', body: fd })
-      const data = await res.json() as {
-        idNumber: string | null; firstName: string | null; lastName: string | null
-        scanR2Key: string; error?: string
+
+      // Guard against non-JSON responses (e.g. 413 "Request Entity Too Large" from proxy)
+      let data: { idNumber: string | null; firstName: string | null; lastName: string | null; scanR2Key: string; error?: string } | null = null
+      try {
+        data = await res.json()
+      } catch {
+        toast.error(`Upload failed (${res.status}) — please enter details manually`)
+        setScanStatus('error')
+        return
       }
-      if (!res.ok) {
-        toast.error(data.error ?? 'Scan failed — please enter details manually')
+
+      if (!res.ok || !data) {
+        toast.error(data?.error ?? 'Scan failed — please enter details manually')
         setScanStatus('error')
         return
       }
