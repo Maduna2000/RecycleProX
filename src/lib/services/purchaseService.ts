@@ -5,6 +5,10 @@ import Decimal from 'decimal.js'
 import { resolvePrice } from '@/lib/services/productService'
 import { recordMovement, recordVoidReversal } from '@/lib/services/stockService'
 import { applyRepaymentTx } from '@/lib/services/loanService'
+import { getAllSettings } from '@/lib/services/settingsService'
+import { generateVat264 } from '@/lib/pdf/vat264'
+import { generateTransactionSlip } from '@/lib/pdf/slip'
+import { uploadBytes, purchaseVat264Key, purchaseNoteKey } from '@/lib/r2'
 import type { CreatePurchaseInput, VoidPurchaseInput } from '@/lib/schemas/purchase'
 
 // ─── Typed Errors ─────────────────────────────────────────────────────────────
@@ -66,6 +70,89 @@ async function withSerializableRetry<T>(fn: () => Promise<T>): Promise<T> {
     }
   }
   throw new Error('unreachable')
+}
+
+// ─── Auto-generate PDFs post-creation ────────────────────────────────────────
+// Fire-and-forget — called after createPurchase transaction. Errors are logged
+// but do not fail the purchase. The on-demand routes remain as fallbacks.
+
+type PurchaseWithCustomerAndLines = Prisma.PurchaseGetPayload<{
+  include: { customer: true; lines: { include: { product: true } } }
+}>
+
+async function generateAndStorePurchasePdfs(purchase: PurchaseWithCustomerAndLines): Promise<void> {
+  const settings = await getAllSettings()
+
+  const vat264Lines = purchase.lines.map((l) => ({
+    description: l.product.name,
+    quantity:    l.quantity.toString(),
+    unit:        l.product.unit,
+    unitPrice:   l.unitPrice.toString(),
+    lineTotal:   l.lineTotal.toString(),
+  }))
+
+  // VAT264
+  try {
+    const bytes = await generateVat264({
+      dealerName:     settings.yardName    ?? 'Renovo Pro',
+      dealerAddress:  settings.yardAddress ?? 'Pretoria, South Africa',
+      dealerVatNo:    settings.vatNumber   ?? '',
+      dealerPhone:    settings.dealerPhone,
+      refNumber:      purchase.refNumber,
+      date:           new Date(purchase.createdAt),
+      sellerName:     `${purchase.customer.firstName} ${purchase.customer.lastName}`,
+      sellerIdNumber: purchase.customer.idNumber,
+      sellerAddress:  purchase.customer.physicalAddress ?? undefined,
+      sellerPhone:    purchase.customer.phone,
+      lines:          vat264Lines,
+      totalAmount:    purchase.totalAmount.toString(),
+      paymentMethod:  purchase.paymentMethod,
+    })
+    const key = purchaseVat264Key(purchase.id)
+    await uploadBytes(key, bytes, 'application/pdf')
+    await prisma.purchase.update({ where: { id: purchase.id }, data: { vat264R2Key: key } })
+    logger.info({ purchaseId: purchase.id, key }, 'purchase.vat264.stored')
+  } catch (err) {
+    logger.error({ err, purchaseId: purchase.id }, 'purchase.vat264.generation.failed')
+  }
+
+  // Purchase note (slip)
+  try {
+    const slipLines = purchase.lines.map((l) => ({
+      productName: l.product.name,
+      qty:         Number(l.quantity),
+      unitPrice:   l.unitPrice.toString(),
+      lineTotal:   l.lineTotal.toString(),
+      grossQty:    l.grossQty  ? Number(l.grossQty)  : undefined,
+      tareQty:     l.tareQty   ? Number(l.tareQty)   : undefined,
+      tareReason:  l.tareReason ?? undefined,
+    }))
+    const bytes = await generateTransactionSlip({
+      type:           'PURCHASE',
+      refNumber:      purchase.refNumber,
+      date:           new Date(purchase.createdAt),
+      partyLabel:     'Supplier',
+      partyName:      `${purchase.customer.firstName} ${purchase.customer.lastName}`,
+      partyIdNumber:  purchase.customer.idNumber,
+      partyPhone:     purchase.customer.phone ?? undefined,
+      lines:          slipLines,
+      totalAmount:    purchase.totalAmount.toString(),
+      loanDeduction:  purchase.loanDeductionAmount?.toString(),
+      paymentMethod:  purchase.paymentMethod,
+      cashierName:    'System',
+      notes:          purchase.notes ?? undefined,
+      companyName:    settings.yardName,
+      companyAddress: settings.yardAddress,
+      companyPhone:   settings.yardPhone,
+      vatNumber:      settings.vatNumber,
+    })
+    const key = purchaseNoteKey(purchase.id)
+    await uploadBytes(key, bytes, 'application/pdf')
+    await prisma.purchase.update({ where: { id: purchase.id }, data: { purchaseNoteR2Key: key } })
+    logger.info({ purchaseId: purchase.id, key }, 'purchase.note.stored')
+  } catch (err) {
+    logger.error({ err, purchaseId: purchase.id }, 'purchase.note.generation.failed')
+  }
 }
 
 // ─── Create Purchase ──────────────────────────────────────────────────────────
@@ -163,6 +250,10 @@ export async function createPurchase(data: CreatePurchaseInput, createdByUserId?
   )
 
   logger.info({ purchaseId: purchase.id, refNumber: purchase.refNumber, customerId: data.customerId, totalAmount: totalAmount.toFixed(2), createdByUserId }, 'purchase.created')
+
+  // Fire-and-forget: generate VAT264 + purchase note PDFs and store in R2
+  void generateAndStorePurchasePdfs(purchase)
+
   return purchase
 }
 

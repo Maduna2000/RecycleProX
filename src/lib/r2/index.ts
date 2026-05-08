@@ -3,6 +3,18 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { getR2Client, R2_BUCKET } from '@/lib/r2/client'
 import { randomUUID } from 'crypto'
 
+// ─── Direct server-side upload ────────────────────────────────────────────────
+
+export async function uploadBytes(key: string, bytes: Uint8Array, contentType: string): Promise<void> {
+  const client = getR2Client()
+  await client.send(new PutObjectCommand({
+    Bucket:      R2_BUCKET,
+    Key:         key,
+    Body:        bytes,
+    ContentType: contentType,
+  }))
+}
+
 // ─── Key generators ───────────────────────────────────────────────────────────
 // All paths use R2 keys (never local filesystem). Stored in DB as-is.
 
@@ -20,6 +32,14 @@ export function customerDocumentKey(customerId: string, ext: string): string {
 
 export function expenseAttachmentKey(expenseId: string, ext: string): string {
   return `expenses/${expenseId}/attachments/${randomUUID()}.${ext}`
+}
+
+export function purchaseVat264Key(purchaseId: string): string {
+  return `purchases/${purchaseId}/vat264.pdf`
+}
+
+export function purchaseNoteKey(purchaseId: string): string {
+  return `purchases/${purchaseId}/purchase-note.pdf`
 }
 
 // ─── Presigned upload URL (PUT) ───────────────────────────────────────────────
