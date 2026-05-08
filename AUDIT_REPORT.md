@@ -227,7 +227,7 @@
 - **Status:** PASS. Multi-table writes in `purchaseService.ts` and `saleService.ts` are inside single transactions.
 
 ### B6. Integer IDs
-- **Status:** PASS. Business models use UUID. `AuditLog.id` uses `BigInt @default(autoincrement())` which is acceptable.
+- **Status:** PASS. All business models use UUID. `AuditLog.id` uses `BigInt @default(autoincrement())` which is acceptable for audit sequencing.
 
 ---
 
@@ -255,51 +255,24 @@
 - **MediaFile:** (Model missing entirely)
 
 ### C4. Enum vs String
-- `StockMovement.source`: Stored as `String` (should be Enum).
-- `StockMovement.direction`: Stored as `StockDirection` enum (correct).
-- `Purchase.status`: Stored as `TxStatus` enum (correct).
+- `StockMovement.source`: Stored as `String` (should be Enum: purchase, sale, adjustment).
+- `PurchaseLine.priceSource`: Stored as `String` (should be Enum).
 
 ---
 
 ## SECTION D — API COMPLETENESS
 
-### D1. Customers
-- GET `/api/customers/[id]/balance` — **MISSING**
-- GET `/api/customers/lookup` — **MISSING** (Note: `customerService.lookupByIdNumber` exists but no dedicated route found)
-
-### D2. Purchases
-- GET `/api/purchases/[id]/receipt` — **PARTIAL** (Exists, but thermal logic is limited to PDF)
-- PATCH `/api/purchases/[id]/mark-paid` — **EXISTS**
-
-### D3. Sales
-- GET `/api/sales/[id]/packing-list` — **MISSING**
-
-### D4. Stock
-- POST `/api/stock/transfer` — **MISSING**
-- GET `/api/stock/export` — **MISSING** (Note: `/api/stock/grid/export` exists)
-- GET `/api/stock/low-stock` — **MISSING**
-
-### D5. Cash-Up
-- GET `/api/cashup/[id]/totals` — **MISSING** (Logic is inside `submit` but no standalone GET for live computation)
-
-### D6. Float
-- GET `/api/float/current` — **MISSING**
-- GET `/api/float/history` — **MISSING**
-- POST `/api/float/top-up` — **MISSING**
-- POST `/api/float/withdraw` — **MISSING**
-
-### D7. Loans
-- GET `/api/loans/[id]/statement` — **MISSING**
-- GET `/api/loans/customer/[customerId]/outstanding` — **MISSING** (Note: `/api/customers/[id]/loans` exists but is a summary)
-
-### D9. Reports
-- GET `/api/reports/cash-loans` — **MISSING**
-- GET `/api/reports/cancelled` — **MISSING**
-- GET `/api/reports/profit-summary` — **MISSING**
-
-### D10. Photo Viewer
-- GET `/api/photo-viewer` — **MISSING**
-- GET `/api/photo-viewer/signed-url` — **MISSING**
+| Route | Status | Findings |
+| :--- | :--- | :--- |
+| **D1. Customers** | **PARTIAL** | MISSING: `/api/customers/[id]/balance`, `/api/customers/lookup` |
+| **D2. Purchases** | **PARTIAL** | MISSING: `/api/purchases/[id]/receipt` (thermal logic incomplete) |
+| **D3. Sales** | **PARTIAL** | MISSING: `/api/sales/[id]/packing-list` |
+| **D4. Stock** | **PARTIAL** | MISSING: `/api/stock/transfer`, `/api/stock/export` |
+| **D5. Cash-Up** | **PARTIAL** | MISSING: `/api/cashup/[id]/totals` (live computed) |
+| **D6. Float** | **PARTIAL** | MISSING: `/api/float/current`, `/api/float/history`, `/api/float/top-up`, `/api/float/withdraw` |
+| **D7. Loans** | **PARTIAL** | MISSING: `/api/loans/[id]/statement`, `/api/loans/customer/[customerId]/outstanding` |
+| **D9. Reports** | **PARTIAL** | MISSING: `/api/reports/cash-loans`, `/api/reports/cancelled`, `/api/reports/profit-summary` |
+| **D10. Photo Viewer** | **MISSING** | MISSING: `/api/photo-viewer`, `/api/photo-viewer/signed-url` |
 
 ---
 
@@ -328,7 +301,7 @@
 - **F4. FormPanel usage:** **CRITICAL.** `FormPanel` component is missing. Forms use raw `Dialog` or `Sheet` components.
 - **F5. Design token violations:**
   - `src/app/app/(portal)/dashboard/page.tsx`: hardcoded `bg-[#217346]`, `bg-[#C9A020]`, `bg-[#185ABD]`, `bg-[#1B3A6B]`, `bg-[#C0392B]`.
-  - `src/app/app/(modules)/purchases/new/page.tsx`: hardcoded colors in `PosLabel` (`#8BA4D4`), `inputStyle`, `total` display (`#F2AB1A`).
+  - `src/app/app/(modules)/purchases/new/page.tsx`: hardcoded colors in `PosLabel` (`#8BA4D4`), `inputStyle`, `total\" display (`#F2AB1A`).
 - **F6. Missing states:**
   - `DataTable` in `purchases/page.tsx` is missing `error` prop connection.
   - `DataTable` in `customers/page.tsx` is missing `error` prop.
@@ -340,7 +313,7 @@
 - **G1. Purchase → Stock wiring:** **PASS.** `recordMovement` called INSIDE `prisma.$transaction`.
 - **G2. Purchase → CashUp wiring:** **PASS.** `calcSystemTotals` queries `Purchase` records directly where `paymentMethod='cash'` and filters by current date.
 - **G3. Expense → CashUp wiring:** **PASS.** `getExpenseTotalsForDate()` is called from `cashUpService.calcSystemTotals()`.
-- **G4. Float → CashUp wiring:** **PASS.** `cashUpService.openCashUp()` calls `getFloatForDate()` and stores it as `openingBalance`.
+- **G4. Float → CashUp wiring:** `PASS.` `cashUpService.openCashUp()` calls `getFloatForDate()` and stores it as `openingBalance`.
 - **G5. Loan → Purchase popup wiring:** **PASS.** Implemented in `NewPurchasePage.tsx` using `useSWR` to `/api/customers/${customer.id}/loans`.
 - **G6. CashUp approval → Float wiring:** **PASS.** `approveCashUp()` calls `updateClosingAmount()` which updates the `CashFloat` record.
 
