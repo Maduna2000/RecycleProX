@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
       const { data: { text } } = await worker.recognize(Buffer.from(bytes))
       const lines = text.split('\n').map((l) => l.trim()).filter(Boolean)
 
-      function extractAfterLabel(labels: string[]): string | null {
+      const extractAfterLabel = (labels: string[]): string | null => {
         for (const label of labels) {
           const upper = label.toUpperCase()
           const idx = lines.findIndex((l) => l.toUpperCase().startsWith(upper))
