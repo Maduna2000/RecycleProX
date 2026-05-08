@@ -31,61 +31,6 @@ interface Props {
   onSelect: (customer: SelectedCustomer) => void
 }
 
-// ─── OCR extraction using Tesseract.js ────────────────────────────────────────
-
-const OCR_TIMEOUT_MS = 45_000
-
-async function extractFromIdImage(
-  file: File
-): Promise<{ idNumber: string | null; firstName: string | null; lastName: string | null }> {
-  const { createWorker } = await import('tesseract.js')
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let worker: any = null
-
-  const ocrPromise = (async () => {
-    worker = await createWorker('eng', 1, { logger: () => {} })
-    const { data: { text } } = await worker.recognize(file)
-    return text as string
-  })()
-
-  const timeoutPromise = new Promise<never>((_, reject) =>
-    setTimeout(() => reject(new Error('OCR timed out after 45 s')), OCR_TIMEOUT_MS)
-  )
-
-  let text: string
-  try {
-    text = await Promise.race([ocrPromise, timeoutPromise])
-  } finally {
-    if (worker) await worker.terminate().catch(() => {})
-  }
-
-  const lines = text.split('\n').map((l) => l.trim()).filter(Boolean)
-
-  function extractAfterLabel(labels: string[]): string | null {
-    for (const label of labels) {
-      const idx = lines.findIndex((l) => l.toUpperCase().startsWith(label))
-      if (idx !== -1) {
-        const sameLine = lines[idx]!.substring(label.length).replace(/^[:\s]+/, '').trim()
-        if (sameLine.length > 1) return sameLine
-        if (lines[idx + 1]) return lines[idx + 1]!.trim()
-      }
-    }
-    return null
-  }
-
-  const idRaw =
-    extractAfterLabel(['ID NO', 'ID NUMBER', 'NATIONAL ID', 'IDENTITY NUMBER', 'ID:']) ??
-    lines.find((l) => /^[A-Z0-9]{2,}[/\-][A-Z0-9]+/i.test(l)) ??
-    null
-
-  return {
-    idNumber:  idRaw ? idRaw.replace(/\s/g, '').toUpperCase() : null,
-    firstName: extractAfterLabel(['NAMES', 'FIRST NAME', 'GIVEN NAME', 'FORENAMES', 'FIRST NAMES']),
-    lastName:  extractAfterLabel(['SURNAME', 'LAST NAME', 'FAMILY NAME']),
-  }
-}
-
 // ─── CasualSelectorPanel ──────────────────────────────────────────────────────
 
 export function CasualSelectorPanel({ onSelect }: Props) {
@@ -97,6 +42,7 @@ export function CasualSelectorPanel({ onSelect }: Props) {
   const [existingCustomer, setExisting]     = useState<SelectedCustomer | null>(null)
   const [isLocked,         setIsLocked]     = useState(false)
   const [confirming,       setConfirming]   = useState(false)
+  const [scanR2Key,        setScanR2Key]    = useState<string | null>(null)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const debounceRef  = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -146,25 +92,49 @@ export function CasualSelectorPanel({ onSelect }: Props) {
     }
   }
 
-  // ── ID scan (Tesseract OCR) ────────────────────────────────────────────────
+  // ── ID scan — server-side OCR ─────────────────────────────────────────────
 
   async function handleScan(file: File) {
     setScanStatus('scanning')
+    setScanR2Key(null)
     try {
-      const extracted = await extractFromIdImage(file)
+      const fd = new FormData()
+      fd.append('file', file)
+      const res = await fetch('/api/id-scan', { method: 'POST', body: fd })
+      const data = await res.json() as {
+        idNumber: string | null; firstName: string | null; lastName: string | null
+        scanR2Key: string; error?: string
+      }
+      if (!res.ok) {
+        toast.error(data.error ?? 'Scan failed — please enter details manually')
+        setScanStatus('error')
+        return
+      }
+
+      // Store the R2 key — linked to customer on confirm
+      setScanR2Key(data.scanR2Key)
+
+      // Fill whichever fields were extracted
       setForm((f) => ({
         ...f,
-        idNumber:  extracted.idNumber  ?? f.idNumber,
-        firstName: extracted.firstName ?? f.firstName,
-        lastName:  extracted.lastName  ?? f.lastName,
+        idNumber:  data.idNumber  ?? f.idNumber,
+        firstName: data.firstName ?? f.firstName,
+        lastName:  data.lastName  ?? f.lastName,
       }))
-      if (extracted.idNumber && extracted.idNumber.length >= 5) {
-        performLookup(extracted.idNumber)
+
+      if (data.idNumber && data.idNumber.length >= 5) {
+        performLookup(data.idNumber)
       }
-      toast.success('ID scanned — please verify the details')
+
+      if (data.idNumber || data.firstName || data.lastName) {
+        toast.success('ID scanned — please verify the details')
+      } else {
+        toast.warning('Photo saved but text could not be read — please enter details manually')
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Scan failed'
       toast.error(`${msg} — please enter details manually`)
+      setScanStatus('error')
     } finally {
       setScanStatus('idle')
     }
@@ -179,31 +149,44 @@ export function CasualSelectorPanel({ onSelect }: Props) {
     if (!form.lastName.trim())  { toast.error('Last name is required'); return }
     if (!form.phone.trim())     { toast.error('Phone number is required'); return }
 
-    if (existingCustomer) {
-      onSelect(existingCustomer)
-      return
-    }
-
     setConfirming(true)
     try {
-      const res = await fetch('/api/customers/quick-create', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({
-          idNumber:        form.idNumber,
-          firstName:       form.firstName.trim(),
-          lastName:        form.lastName.trim(),
-          phone:           form.phone.trim(),
-          physicalAddress: form.physicalAddress.trim() || undefined,
-        }),
-      })
-      if (!res.ok) {
-        const j = await res.json() as { error?: string; issues?: { message: string }[] }
-        const msg = j.issues?.[0]?.message ?? j.error ?? 'Failed to register customer'
-        toast.error(msg)
-        return
+      let customer: SelectedCustomer
+
+      if (existingCustomer) {
+        customer = existingCustomer
+      } else {
+        const res = await fetch('/api/customers/quick-create', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({
+            idNumber:        form.idNumber,
+            firstName:       form.firstName.trim(),
+            lastName:        form.lastName.trim(),
+            phone:           form.phone.trim(),
+            physicalAddress: form.physicalAddress.trim() || undefined,
+          }),
+        })
+        if (!res.ok) {
+          const j = await res.json() as { error?: string; issues?: { message: string }[] }
+          const msg = j.issues?.[0]?.message ?? j.error ?? 'Failed to register customer'
+          toast.error(msg)
+          return
+        }
+        customer = await res.json() as SelectedCustomer
       }
-      const customer = await res.json() as SelectedCustomer
+
+      // Link the scanned ID photo to this customer (fire-and-forget)
+      if (scanR2Key) {
+        fetch(`/api/customers/${customer.id}`, {
+          method:  'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ idPhotoR2Key: scanR2Key }),
+        }).catch(() => {
+          toast.warning('ID photo could not be linked — photo is saved but not yet attached')
+        })
+      }
+
       onSelect(customer)
     } catch {
       toast.error('Network error — please try again')
@@ -237,7 +220,7 @@ export function CasualSelectorPanel({ onSelect }: Props) {
         )}
       </div>
 
-      {/* Row 2: Scan ID button — full width, clearly labeled */}
+      {/* Row 2: Scan ID button */}
       <button
         type="button"
         disabled={scanStatus === 'scanning'}
@@ -249,12 +232,12 @@ export function CasualSelectorPanel({ onSelect }: Props) {
         {scanStatus === 'scanning' ? (
           <>
             <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            Reading ID document… (this may take up to 30 s)
+            Scanning ID document… (10–20 s)
           </>
         ) : (
           <>
             <ScanLine className="w-3.5 h-3.5" />
-            Scan ID Document — upload a photo of the ID
+            {scanR2Key ? 'Re-scan ID Document' : 'Scan ID Document — upload a photo of the ID'}
           </>
         )}
       </button>
@@ -328,6 +311,11 @@ export function CasualSelectorPanel({ onSelect }: Props) {
           {isBlacklisted && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-red-100 text-red-700">
               <AlertTriangle className="w-3 h-3" /> Blacklisted — cannot process
+            </span>
+          )}
+          {scanR2Key && lookupStatus !== 'found' && !isBlacklisted && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-purple-100 text-purple-700">
+              ID photo saved
             </span>
           )}
         </div>
