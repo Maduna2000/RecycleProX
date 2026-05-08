@@ -161,6 +161,49 @@ export async function listMovements(opts?: {
   return { movements, total, page, pageSize }
 }
 
+// ─── Stock transfer between two products ─────────────────────────────────────
+
+export async function stockTransfer(opts: {
+  sourceProductId: string
+  destProductId:   string
+  quantity:        string
+  notes?:          string
+  createdByUserId?: string
+}) {
+  const [source, dest] = await Promise.all([
+    prisma.product.findUnique({ where: { id: opts.sourceProductId } }),
+    prisma.product.findUnique({ where: { id: opts.destProductId } }),
+  ])
+  if (!source) throw new ProductNotFoundError(opts.sourceProductId)
+  if (!dest)   throw new ProductNotFoundError(opts.destProductId)
+
+  const qty = new Decimal(opts.quantity)
+  if (qty.lte(0)) throw new Error('Quantity must be positive')
+
+  const [outMovement, inMovement] = await prisma.$transaction(async (tx) => {
+    const out = await recordMovement(tx, {
+      productId: opts.sourceProductId,
+      direction: 'out',
+      quantity:  qty,
+      source:    'manual_adjustment',
+      notes:     opts.notes ?? `Transfer to ${dest.name}`,
+      createdByUserId: opts.createdByUserId,
+    })
+    const inMov = await recordMovement(tx, {
+      productId: opts.destProductId,
+      direction: 'in',
+      quantity:  qty,
+      source:    'manual_adjustment',
+      notes:     opts.notes ?? `Transfer from ${source.name}`,
+      createdByUserId: opts.createdByUserId,
+    })
+    return [out, inMov]
+  })
+
+  logger.info({ sourceProductId: opts.sourceProductId, destProductId: opts.destProductId, quantity: qty.toFixed(3), createdByUserId: opts.createdByUserId }, 'stock.transfer')
+  return { outMovement, inMovement, quantity: qty.toFixed(3), sourceProduct: source, destProduct: dest }
+}
+
 // ─── Void reversal — called when purchase or sale is voided ──────────────────
 
 export async function recordVoidReversal(

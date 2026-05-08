@@ -108,6 +108,127 @@ export async function getDateRangeReport(from: Date, to: Date) {
   }
 }
 
+export async function getCashLoansReport(from: Date, to: Date) {
+  const [loansAgg, repaymentsAgg, loans] = await Promise.all([
+    prisma.loan.aggregate({
+      _sum:   { principalAmount: true },
+      _count: { _all: true },
+      where: { status: { not: 'voided' }, createdAt: { gte: from, lte: to } },
+    }),
+    prisma.loanRepayment.aggregate({
+      _sum:   { amount: true },
+      _count: { _all: true },
+      where: { createdAt: { gte: from, lte: to } },
+    }),
+    prisma.loan.findMany({
+      where: { status: { not: 'voided' }, createdAt: { gte: from, lte: to } },
+      include: {
+        customer: { select: { id: true, firstName: true, lastName: true, idNumber: true } },
+        _count:   { select: { repayments: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+    }),
+  ])
+
+  const totalAdvanced  = new Decimal(loansAgg._sum.principalAmount?.toString() ?? '0')
+  const totalRepaid    = new Decimal(repaymentsAgg._sum.amount?.toString()      ?? '0')
+
+  return {
+    summary: {
+      totalAdvanced:   totalAdvanced.toFixed(2),
+      totalRepaid:     totalRepaid.toFixed(2),
+      netOutstanding:  totalAdvanced.minus(totalRepaid).toFixed(2),
+      advanceCount:    loansAgg._count._all,
+      repaymentCount:  repaymentsAgg._count._all,
+    },
+    loans,
+  }
+}
+
+export async function getCancelledReport(from: Date, to: Date) {
+  const [voidedPurchases, voidedSales] = await Promise.all([
+    prisma.purchase.findMany({
+      where: { status: 'voided', voidedAt: { gte: from, lte: to } },
+      include: {
+        customer: { select: { id: true, firstName: true, lastName: true } },
+        lines:    { include: { product: { select: { name: true, unit: true } } } },
+      },
+      orderBy: { voidedAt: 'desc' },
+    }),
+    prisma.sale.findMany({
+      where: { status: 'voided', voidedAt: { gte: from, lte: to } },
+      include: {
+        lines: { include: { product: { select: { name: true, unit: true } } } },
+      },
+      orderBy: { voidedAt: 'desc' },
+    }),
+  ])
+
+  const totalVoidedPurchases = voidedPurchases.reduce(
+    (s, p) => s.plus(new Decimal(p.totalAmount.toString())), new Decimal(0)
+  )
+  const totalVoidedSales = voidedSales.reduce(
+    (s, v) => s.plus(new Decimal(v.totalAmount.toString())), new Decimal(0)
+  )
+
+  return {
+    summary: {
+      purchases: { count: voidedPurchases.length, total: totalVoidedPurchases.toFixed(2) },
+      sales:     { count: voidedSales.length,     total: totalVoidedSales.toFixed(2) },
+    },
+    voidedPurchases,
+    voidedSales,
+  }
+}
+
+export async function getProfitSummary(from: Date, to: Date) {
+  const [salesAgg, purchasesAgg, expensesAgg, loansAdvancedAgg, loansRepaidAgg] = await Promise.all([
+    prisma.sale.aggregate({
+      _sum: { totalAmount: true },
+      where: { status: 'completed', createdAt: { gte: from, lte: to } },
+    }),
+    prisma.purchase.aggregate({
+      _sum: { totalAmount: true },
+      where: { status: 'completed', createdAt: { gte: from, lte: to } },
+    }),
+    prisma.expense.aggregate({
+      _sum: { amount: true },
+      where: { status: 'approved', createdAt: { gte: from, lte: to } },
+    }),
+    prisma.loan.aggregate({
+      _sum: { principalAmount: true },
+      where: { status: { not: 'voided' }, createdAt: { gte: from, lte: to } },
+    }),
+    prisma.loanRepayment.aggregate({
+      _sum: { amount: true },
+      where: { createdAt: { gte: from, lte: to } },
+    }),
+  ])
+
+  const revenue     = new Decimal(salesAgg._sum.totalAmount?.toString()      ?? '0')
+  const costOfGoods = new Decimal(purchasesAgg._sum.totalAmount?.toString()  ?? '0')
+  const expenses    = new Decimal(expensesAgg._sum.amount?.toString()         ?? '0')
+  const grossProfit = revenue.minus(costOfGoods)
+  const netProfit   = grossProfit.minus(expenses)
+  const advanced    = new Decimal(loansAdvancedAgg._sum.principalAmount?.toString() ?? '0')
+  const repaid      = new Decimal(loansRepaidAgg._sum.amount?.toString()            ?? '0')
+
+  return {
+    revenue:     revenue.toFixed(2),
+    costOfGoods: costOfGoods.toFixed(2),
+    grossProfit: grossProfit.toFixed(2),
+    expenses:    expenses.toFixed(2),
+    netProfit:   netProfit.toFixed(2),
+    margin:      revenue.isZero() ? '0.00' : grossProfit.div(revenue).times(100).toFixed(2),
+    loans: {
+      advanced: advanced.toFixed(2),
+      repaid:   repaid.toFixed(2),
+      net:      advanced.minus(repaid).toFixed(2),
+    },
+  }
+}
+
 export async function getTodayStats() {
   const now   = new Date()
   const start = new Date(now); start.setHours(0, 0, 0, 0)
