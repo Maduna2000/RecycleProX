@@ -70,6 +70,8 @@ export function CasualSelectorPanel({ onSelect }: Props) {
   })
   const [lookupStatus,     setLookupStatus] = useState<LookupStatus>('idle')
   const [scanStatus,       setScanStatus]   = useState<ScanStatus>('idle')
+  const [scanPhase,        setScanPhase]    = useState<'upload' | 'ocr'>('upload')
+  const [scanProgress,     setScanProgress] = useState<number | null>(null)
   const [existingCustomer, setExisting]     = useState<SelectedCustomer | null>(null)
   const [isLocked,         setIsLocked]     = useState(false)
   const [confirming,       setConfirming]   = useState(false)
@@ -123,51 +125,117 @@ export function CasualSelectorPanel({ onSelect }: Props) {
     }
   }
 
-  // ── ID scan — server-side OCR ─────────────────────────────────────────────
+  // ── ID scan — upload to R2 then client-side OCR ──────────────────────────
 
   async function handleScan(file: File) {
     setScanStatus('scanning')
+    setScanPhase('upload')
+    setScanProgress(null)
     setScanR2Key(null)
+
+    let worker: import('tesseract.js').Worker | null = null
+
     try {
-      // Compress before upload — phone camera photos can be 10+ MB; Vercel limit is 4.5 MB
+      // 1. Compress before upload — phone camera photos can be 10+ MB; Vercel limit is 4.5 MB
       const compressed = await compressImage(file)
 
-      const fd = new FormData()
-      fd.append('file', compressed)
-      const res = await fetch('/api/id-scan', { method: 'POST', body: fd })
+      // 2. Upload to R2 with 15 s hard timeout
+      const uploadAbort = new AbortController()
+      const uploadTimer = setTimeout(() => uploadAbort.abort(), 15_000)
+      let uploadRes: Response
+      try {
+        const fd = new FormData()
+        fd.append('file', compressed)
+        uploadRes = await fetch('/api/id-scan', { method: 'POST', body: fd, signal: uploadAbort.signal })
+      } catch (err) {
+        const msg = (err instanceof Error && err.name === 'AbortError') ? 'Upload timed out' : 'Upload failed'
+        toast.error(`${msg} — please enter details manually`)
+        setScanStatus('error')
+        return
+      } finally {
+        clearTimeout(uploadTimer)
+      }
 
       // Guard against non-JSON responses (e.g. 413 "Request Entity Too Large" from proxy)
-      let data: { idNumber: string | null; firstName: string | null; lastName: string | null; scanR2Key: string; error?: string } | null = null
+      let uploadData: { scanR2Key: string; error?: string } | null = null
       try {
-        data = await res.json()
+        uploadData = await uploadRes.json()
       } catch {
-        toast.error(`Upload failed (${res.status}) — please enter details manually`)
+        toast.error(`Upload failed (${uploadRes.status}) — please enter details manually`)
         setScanStatus('error')
         return
       }
 
-      if (!res.ok || !data) {
-        toast.error(data?.error ?? 'Scan failed — please enter details manually')
+      if (!uploadRes.ok || !uploadData?.scanR2Key) {
+        toast.error(uploadData?.error ?? 'Upload failed — please enter details manually')
         setScanStatus('error')
         return
       }
 
-      // Store the R2 key — linked to customer on confirm
-      setScanR2Key(data.scanR2Key)
+      // 3. Photo saved — switch to OCR phase
+      setScanR2Key(uploadData.scanR2Key)
+      setScanPhase('ocr')
+      toast.info('Photo saved — now reading ID text…')
 
-      // Fill whichever fields were extracted
+      // 4. Run Tesseract client-side with progress + 40 s hard timeout
+      const { createWorker } = await import('tesseract.js')
+      worker = await createWorker('eng', 1, {
+        logger: (m: { status: string; progress: number }) => {
+          if (m.status === 'recognizing text') {
+            setScanProgress(Math.round(m.progress * 100))
+          }
+        },
+      })
+
+      const ocrTimeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('OCR_TIMEOUT')), 40_000),
+      )
+
+      let ocrText = ''
+      try {
+        const result = await Promise.race([
+          worker.recognize(compressed),
+          ocrTimeout,
+        ]) as Awaited<ReturnType<typeof worker.recognize>>
+        ocrText = result.data.text
+      } catch (err) {
+        if (err instanceof Error && err.message === 'OCR_TIMEOUT') {
+          toast.warning('ID text could not be read — photo is saved, please enter details manually')
+        } else {
+          toast.warning('OCR failed — photo is saved, please enter details manually')
+        }
+        return
+      }
+
+      // 5. Extract fields
+      const idMatch = ocrText.match(/\b(\d{13})\b/)
+      const idNumber = idMatch ? idMatch[1] : null
+
+      const extractAfterLabel = (labels: string[]): string | null => {
+        for (const label of labels) {
+          const pattern = new RegExp(`${label}[:\\s]+([A-Z][A-Za-z\\s]{1,40})`, 'i')
+          const m = ocrText.match(pattern)
+          if (m?.[1]) return m[1].trim()
+        }
+        return null
+      }
+
+      const firstName = extractAfterLabel(['NAMES', 'NAME', 'FORENAMES', 'FORENAME', 'FIRST NAME', 'GIVEN NAMES'])
+      const lastName  = extractAfterLabel(['SURNAME', 'VAN', 'LAST NAME', 'FAMILY NAME'])
+
+      // 6. Fill form fields
       setForm((f) => ({
         ...f,
-        idNumber:  data.idNumber  ?? f.idNumber,
-        firstName: data.firstName ?? f.firstName,
-        lastName:  data.lastName  ?? f.lastName,
+        idNumber:  idNumber  ?? f.idNumber,
+        firstName: firstName ?? f.firstName,
+        lastName:  lastName  ?? f.lastName,
       }))
 
-      if (data.idNumber && data.idNumber.length >= 5) {
-        performLookup(data.idNumber)
+      if (idNumber && idNumber.length >= 5) {
+        performLookup(idNumber)
       }
 
-      if (data.idNumber || data.firstName || data.lastName) {
+      if (idNumber || firstName || lastName) {
         toast.success('ID scanned — please verify the details')
       } else {
         toast.warning('Photo saved but text could not be read — please enter details manually')
@@ -177,6 +245,9 @@ export function CasualSelectorPanel({ onSelect }: Props) {
       toast.error(`${msg} — please enter details manually`)
       setScanStatus('error')
     } finally {
+      // 8. Always clean up
+      if (worker) { try { await worker.terminate() } catch { /* ignore */ } }
+      setScanProgress(null)
       setScanStatus('idle')
     }
   }
@@ -273,7 +344,11 @@ export function CasualSelectorPanel({ onSelect }: Props) {
         {scanStatus === 'scanning' ? (
           <>
             <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            Scanning ID document… (10–20 s)
+            {scanPhase === 'upload'
+              ? 'Uploading photo…'
+              : scanProgress !== null
+                ? `Reading ID… ${scanProgress}%`
+                : 'Reading ID text… (up to 40 s)'}
           </>
         ) : (
           <>
