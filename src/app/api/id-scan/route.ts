@@ -31,6 +31,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'File too large — maximum 10 MB' }, { status: 422 })
   }
 
+  // Fail fast with a clear message if R2 is not configured in this environment
+  const r2AccountId = process.env.R2_ACCOUNT_ID
+  const r2AccessKey = process.env.R2_ACCESS_KEY_ID
+  const r2SecretKey = process.env.R2_SECRET_ACCESS_KEY
+  const r2Bucket    = process.env.R2_BUCKET ?? process.env.R2_BUCKET_NAME
+  if (!r2AccountId || !r2AccessKey || !r2SecretKey || !r2Bucket) {
+    const missing = [
+      !r2AccountId && 'R2_ACCOUNT_ID',
+      !r2AccessKey && 'R2_ACCESS_KEY_ID',
+      !r2SecretKey && 'R2_SECRET_ACCESS_KEY',
+      !r2Bucket    && 'R2_BUCKET',
+    ].filter(Boolean).join(', ')
+    logger.error({ missing }, 'id-scan: R2 env vars not set')
+    return NextResponse.json({ error: `R2 not configured — set ${missing} in Vercel environment variables` }, { status: 500 })
+  }
+
   const bytes      = new Uint8Array(await file.arrayBuffer())
   const ext        = mimeToExt(file.type)
   const scanR2Key  = `customers/scan-staging/${randomUUID()}.${ext}`
@@ -40,7 +56,8 @@ export async function POST(req: NextRequest) {
     logger.info({ userId: session.user.id, scanR2Key, bytes: file.size }, 'id-scan upload ok')
     return NextResponse.json({ scanR2Key })
   } catch (err) {
-    logger.error({ err }, 'POST /api/id-scan — R2 upload failed')
-    return NextResponse.json({ error: 'Photo upload failed' }, { status: 500 })
+    const errMsg = err instanceof Error ? err.message : String(err)
+    logger.error({ err, scanR2Key }, 'POST /api/id-scan — R2 upload failed')
+    return NextResponse.json({ error: `Photo upload failed: ${errMsg}` }, { status: 500 })
   }
 }
