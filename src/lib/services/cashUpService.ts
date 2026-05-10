@@ -151,6 +151,14 @@ export async function submitCashUp(
   const fullExpected = openingBalance.plus(totals.cashExpected)
   const variance = declared.minus(fullExpected)
 
+  // Cumulative variance = sum of all previously approved cash-up variances + this one
+  const priorApproved = await prisma.cashUp.aggregate({
+    where: { status: 'approved' },
+    _sum: { variance: true },
+  })
+  const priorCumulative = new Decimal(priorApproved._sum.variance?.toString() ?? '0')
+  const finPeriodCumulative = priorCumulative.plus(variance)
+
   const updated = await prisma.cashUp.update({
     where: { id: cashUpId },
     data: {
@@ -167,6 +175,7 @@ export async function submitCashUp(
       loansTotal,
       declaredCash:        declared,
       variance,
+      finPeriodCumulative,
       denominations:       input.denominations ?? {},
       notes:               input.notes ?? null,
     },
