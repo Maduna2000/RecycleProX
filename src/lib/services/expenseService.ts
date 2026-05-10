@@ -49,6 +49,10 @@ export async function createExpense(data: CreateExpenseInput, userId: string) {
     where: { sessionDate: today, status: { in: ['open', 'submitted'] } },
   })
 
+  // Auto-approve cash expenses when a cashup session is open — petty cash is self-evidently real
+  const isCash = (data.paymentMethod ?? 'cash') === 'cash'
+  const autoApprove = isCash && openSession != null
+
   const expense = await prisma.expense.create({
     data: {
       refNumber,
@@ -61,6 +65,7 @@ export async function createExpense(data: CreateExpenseInput, userId: string) {
       chequeNo:        data.chequeNo,
       cashUpId:        openSession?.id ?? null,
       createdByUserId: userId,
+      ...(autoApprove && { status: 'approved', approvedById: userId, approvedAt: new Date() }),
     },
     include: { expenseType: true },
   })

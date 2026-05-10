@@ -221,6 +221,7 @@ export async function getLiveStats(sessionDate: Date) {
 
   const [
     salesCashAgg,
+    salesCardAgg,
     purchasesAgg,
     paymentsAgg,
     loanTotals,
@@ -232,6 +233,10 @@ export async function getLiveStats(sessionDate: Date) {
     prisma.sale.aggregate({
       _sum: { totalAmount: true },
       where: { paymentMethod: 'cash', status: 'completed', createdAt: { gte: start, lte: end } },
+    }),
+    prisma.sale.aggregate({
+      _sum: { totalAmount: true },
+      where: { paymentMethod: { in: ['eft', 'cheque'] }, status: 'completed', createdAt: { gte: start, lte: end } },
     }),
     prisma.purchase.aggregate({
       _sum: { totalAmount: true },
@@ -263,6 +268,7 @@ export async function getLiveStats(sessionDate: Date) {
 
   return {
     cashSales:     new Decimal(salesCashAgg._sum.totalAmount?.toString()  ?? '0').toFixed(2),
+    cardSales:     new Decimal(salesCardAgg._sum.totalAmount?.toString()  ?? '0').toFixed(2),
     cashPurchases: new Decimal(purchasesAgg._sum.totalAmount?.toString()  ?? '0').toFixed(2),
     cashPayments:  new Decimal(paymentsAgg._sum.amount?.toString()        ?? '0').toFixed(2),
     expenses:      expenses.toFixed(2),

@@ -829,15 +829,8 @@ export default function NewPurchasePage() {
           refNumber={photoDialog.refNumber}
           onDone={() => {
             const { purchaseId, refNumber } = photoDialog
-            const cashAmount = deductLoan && deductionAmount && parseFloat(deductionAmount) > 0
-              ? Decimal.max(total.minus(new Decimal(deductionAmount)), new Decimal(0)).toFixed(2)
-              : total.toFixed(2)
             setPhotoDialog(null)
-            setPayoutDialog({
-              purchaseId, refNumber, amount: cashAmount, method: paymentMethod,
-              customerId: customer!.id,
-              customerName: `${customer!.firstName} ${customer!.lastName}`,
-            })
+            setPrintDialog({ id: purchaseId, refNumber })
           }}
         />
       )}

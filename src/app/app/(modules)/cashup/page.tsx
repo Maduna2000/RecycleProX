@@ -45,6 +45,7 @@ type CashUp = {
 
 type LiveStats = {
   cashSales:     string
+  cardSales:     string
   cashPurchases: string
   cashPayments:  string
   expenses:      string
@@ -53,6 +54,12 @@ type LiveStats = {
   unpaidToday:   { total: string; count: number }
   unpaidAllTime: { total: string; count: number }
   finPeriodCumulative: string
+}
+
+type ExpenseItem = {
+  id: string; refNumber: string; description: string
+  amount: string; paymentMethod: string; status: string
+  expenseType: { name: string }
 }
 
 // ─── Denomination input row ───────────────────────────────────────────────────
@@ -145,12 +152,28 @@ export default function CashUpPage() {
 
   const CASHUP_KEY   = '/api/cashup?today=1'
   const STATS_KEY    = `/api/cashup/live-stats?date=${today}`
+  const EXPENSES_KEY = `/api/expenses?from=${today}&to=${today}&page=1`
 
   const { data,      isLoading }      = useSWR<{ cashUp: CashUp | null }>(CASHUP_KEY, fetcher)
   const { data: statsData, mutate: refreshStats } = useSWR<LiveStats>(STATS_KEY, fetcher)
+  const { data: expensesData, mutate: refreshExpenses } = useSWR<{ expenses: ExpenseItem[] }>(EXPENSES_KEY, fetcher)
 
-  const cashUp = data?.cashUp ?? null
-  const stats  = statsData
+  const cashUp   = data?.cashUp ?? null
+  const stats    = statsData
+  const expenses = expensesData?.expenses ?? []
+
+  const [approvingExpense, setApprovingExpense] = useState<string | null>(null)
+
+  async function handleApproveExpense(id: string) {
+    setApprovingExpense(id)
+    try {
+      const res = await fetch(`/api/expenses/${id}/approve`, { method: 'POST' })
+      if (res.ok) { refreshExpenses(); refreshStats() }
+      else { const j = await res.json() as { error?: string }; toast.error(j.error ?? 'Failed to approve expense') }
+    } finally {
+      setApprovingExpense(null)
+    }
+  }
 
   const [opening,    setOpening]    = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -262,6 +285,16 @@ export default function CashUpPage() {
 
         {cashUp && (
           <>
+            {/* Zero-float warning */}
+            {cashUp.status === 'open' && new Decimal(cashUp.openingBalance ?? '0').isZero() && (
+              <div className="flex items-center gap-2 rounded px-3 py-2 text-sm" style={{ background: colors.warningBg, color: colors.warning }}>
+                <span className="font-semibold">⚠ Opening balance is R 0.00.</span>
+                <span>If this is incorrect, set today&apos;s float in the</span>
+                <a href="/app/float" className="underline font-medium">Float module</a>
+                <span>before submitting.</span>
+              </div>
+            )}
+
             {/* Status banner */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -330,6 +363,9 @@ export default function CashUpPage() {
                       {/* Transactions */}
                       <div className="pt-1 space-y-1.5 border-t" style={{ borderColor: colors.border }}>
                         <ReconRow label="Cash Received / Sales (+)" value={cashSales.toFixed(2)} positive />
+                        {isOpen && new Decimal(stats?.cardSales ?? '0').gt(0) && (
+                          <ReconRow label="Card / EFT Sales (not in drawer)" value={new Decimal(stats?.cardSales ?? '0').toFixed(2)} muted />
+                        )}
                         <ReconRow label="Cash Purchases (−)"        value={cashPurch.toFixed(2)} negative />
                         <ReconRow label="Account Payments (−)"      value={cashPay.toFixed(2)}   negative />
                         <ReconRow label="Expenses (−)"              value={expenses.toFixed(2)}  negative />
@@ -455,6 +491,38 @@ export default function CashUpPage() {
                     <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: colors.textSecondary }}>Card / EFT Sales</p>
                     <p className="font-mono font-bold" style={{ color: colors.process }}>R {new Decimal(cashUp.cardPaymentsTotal).toFixed(2)}</p>
                     <p className="text-xs mt-1" style={{ color: colors.textSecondary }}>Excluded from cash reconciliation</p>
+                  </div>
+                )}
+
+                {/* Today's Expenses */}
+                {expenses.length > 0 && (
+                  <div className="rounded-lg border p-4 bg-white space-y-2" style={{ borderColor: colors.border }}>
+                    <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: colors.textSecondary }}>Today&apos;s Expenses</p>
+                    {expenses.map((e) => (
+                      <div key={e.id} className="flex items-start justify-between gap-2 text-xs">
+                        <div className="min-w-0">
+                          <p className="font-medium truncate" style={{ color: colors.textPrimary }}>{e.description || e.expenseType.name}</p>
+                          <p style={{ color: colors.textSecondary }}>{e.expenseType.name} · {e.paymentMethod}</p>
+                        </div>
+                        <div className="shrink-0 text-right">
+                          <p className="font-mono font-semibold" style={{ color: colors.danger }}>R {new Decimal(e.amount).toFixed(2)}</p>
+                          {e.status === 'approved' ? (
+                            <span className="text-[10px] font-medium" style={{ color: colors.action }}>✓ approved</span>
+                          ) : isManager ? (
+                            <button
+                              onClick={() => handleApproveExpense(e.id)}
+                              disabled={approvingExpense === e.id}
+                              className="text-[10px] font-medium underline disabled:opacity-50"
+                              style={{ color: colors.warning }}
+                            >
+                              {approvingExpense === e.id ? 'Approving…' : 'Approve'}
+                            </button>
+                          ) : (
+                            <span className="text-[10px]" style={{ color: colors.textSecondary }}>pending</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
