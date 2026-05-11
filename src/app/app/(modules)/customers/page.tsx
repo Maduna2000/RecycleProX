@@ -6,6 +6,7 @@ import useSWR, { mutate } from 'swr'
 import { AlertTriangle, Loader2, Eye, ShieldBan, ShieldCheck, UserX, Trash2, UserMinus } from 'lucide-react'
 import { DataTable, Avatar, StatusBadge, type Column, type RowAction } from '@/components/ui/DataTable'
 import { CreateCustomerModal } from '@/components/customers/CreateCustomerModal'
+import { CustomerProfileModal } from '@/components/customers/CustomerProfileModal'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -18,12 +19,17 @@ const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 type Customer = {
   id: string; firstName: string; lastName: string; idNumber: string
-  phone: string; customerType: string; primaryFunction: string; isActive: boolean; blacklisted: boolean
+  phone: string; landline?: string | null; email?: string | null
+  customerType: string; primaryFunction: string; isActive: boolean; blacklisted: boolean
   createdAt: string; priceGroup?: { id: string; name: string } | null
   dealerCategory?: string | null
   companyName?: string | null
   zeroRated: boolean
   accountCode?: string | null
+  gender?: string | null
+  nationality?: string | null
+  dateOfBirth?: string | null
+  physicalAddress?: string | null
 }
 
 // ─── Blacklist modal ───────────────────────────────────────────────────────────
@@ -105,7 +111,6 @@ function DealerCategoryBadge({ cat }: { cat?: string | null }) {
 
 // ─── Accounts list ─────────────────────────────────────────────────────────────
 function AccountsList({ onAddCustomer }: { onAddCustomer: () => void }) {
-  const router = useRouter()
   const { data: session } = useSession()
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
 
@@ -113,6 +118,7 @@ function AccountsList({ onAddCustomer }: { onAddCustomer: () => void }) {
   const [showBlacklisted, setShowBlacklisted] = useState('')
   const [dealerCategory,  setDealerCategory]  = useState('')
   const [primaryFunction, setPrimaryFunction] = useState('')
+  const [profileId,       setProfileId]       = useState<string | null>(null)
   const [blacklistId,     setBlacklistId]     = useState<string | null>(null)
   const [deleteId,        setDeleteId]        = useState<string | null>(null)
   const [deleteLoading,   setDeleteLoading]   = useState(false)
@@ -239,6 +245,46 @@ function AccountsList({ onAddCustomer }: { onAddCustomer: () => void }) {
       render: (r) => <span style={{ fontSize: 12, color: colors.textSecondary }}>{r.phone}</span>,
     },
     {
+      key: 'email',
+      header: 'Email',
+      width: '180px',
+      render: (r) => r.email
+        ? <span style={{ fontSize: 12, color: colors.textSecondary }}>{r.email}</span>
+        : <span style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>—</span>,
+    },
+    {
+      key: 'gender',
+      header: 'Gender',
+      width: '80px',
+      render: (r) => r.gender
+        ? <span className="capitalize" style={{ fontSize: 12, color: colors.textPrimary }}>{r.gender}</span>
+        : <span style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>—</span>,
+    },
+    {
+      key: 'nationality',
+      header: 'Nationality',
+      width: '110px',
+      render: (r) => r.nationality
+        ? <span style={{ fontSize: 12, color: colors.textPrimary }}>{r.nationality}</span>
+        : <span style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>—</span>,
+    },
+    {
+      key: 'dateOfBirth',
+      header: 'DOB',
+      width: '100px',
+      render: (r) => r.dateOfBirth
+        ? <span style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>{new Date(r.dateOfBirth).toLocaleDateString('en-ZA')}</span>
+        : <span style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>—</span>,
+    },
+    {
+      key: 'physicalAddress',
+      header: 'Address',
+      width: '180px',
+      render: (r) => r.physicalAddress
+        ? <span className="truncate block max-w-[165px]" title={r.physicalAddress} style={{ fontSize: 12, color: colors.textSecondary }}>{r.physicalAddress}</span>
+        : <span style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>—</span>,
+    },
+    {
       key: 'zeroRated',
       header: 'Zero VAT',
       width: '80px',
@@ -277,7 +323,7 @@ function AccountsList({ onAddCustomer }: { onAddCustomer: () => void }) {
     {
       label: 'View Profile',
       icon: Eye,
-      onClick: (r) => router.push(`/app/customers/${r.id}`),
+      onClick: (r) => setProfileId(r.id),
     },
     {
       label: 'Blacklist',
@@ -388,6 +434,12 @@ function AccountsList({ onAddCustomer }: { onAddCustomer: () => void }) {
           emptyAction={{ label: '+ Add Account Customer', onClick: onAddCustomer }}
         />
       </div>
+
+      {/* Profile modal */}
+      <CustomerProfileModal
+        customerId={profileId}
+        onClose={() => { setProfileId(null); refreshList() }}
+      />
 
       {/* Blacklist modal */}
       {blacklistId && blacklistTarget && (
