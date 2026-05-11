@@ -21,7 +21,7 @@ import {
   type UpdateCustomerFormInput,
   type BlacklistInput,
 } from '@/lib/schemas/customer'
-import { colors, fontSize } from '@/lib/design-tokens'
+import { colors } from '@/lib/design-tokens'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
