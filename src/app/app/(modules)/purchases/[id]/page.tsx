@@ -22,6 +22,10 @@ type PurchaseLine = {
   unitPrice: string
   lineTotal: string
   priceSource: string
+  grossQty?: string | null
+  tareQty?: string | null
+  deductionQty?: string | null
+  deductionReason?: string | null
   product: { id: string; code: string; name: string; unit: string; category: string }
 }
 
@@ -131,19 +135,35 @@ export default function PurchaseDetailPage() {
             </tr>
           </thead>
           <tbody className="divide-y">
-            {purchase.lines.map((line) => (
-              <tr key={line.id}>
-                <td className="px-4 py-3">
-                  <p className="font-medium text-gray-900">{line.product.name}</p>
-                  <p className="text-xs text-gray-400 font-mono">{line.product.code}</p>
-                </td>
-                <td className="px-4 py-3 font-mono text-gray-700">
-                  {Number(line.quantity).toFixed(3)} {line.product.unit}
-                </td>
-                <td className="px-4 py-3 font-mono text-gray-700">R {Number(line.unitPrice).toFixed(2)}</td>
-                <td className="px-4 py-3 font-mono font-semibold text-gray-900">R {Number(line.lineTotal).toFixed(2)}</td>
-              </tr>
-            ))}
+            {purchase.lines.map((line) => {
+              const hasWeightData = Number(line.grossQty ?? 0) > 0
+              const hasDeduction  = Number(line.deductionQty ?? 0) > 0
+              return (
+                <tr key={line.id}>
+                  <td className="px-4 py-3">
+                    <p className="font-medium text-gray-900">{line.product.name}</p>
+                    <p className="text-xs text-gray-400 font-mono">{line.product.code}</p>
+                  </td>
+                  <td className="px-4 py-3">
+                    <p className="font-mono text-gray-700">
+                      {Number(line.quantity).toFixed(3)} {line.product.unit}
+                    </p>
+                    {hasWeightData && (
+                      <p className="text-[11px] text-gray-400 font-mono mt-0.5">
+                        {`Gross ${Number(line.grossQty).toFixed(3)}`}
+                        {Number(line.tareQty ?? 0) > 0 && ` · Tare ${Number(line.tareQty).toFixed(3)}`}
+                        {hasDeduction && ` · Ded. ${Number(line.deductionQty).toFixed(3)}`}
+                        {hasDeduction && line.deductionReason && (
+                          <span className="text-amber-600"> ({line.deductionReason})</span>
+                        )}
+                      </p>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 font-mono text-gray-700">R {Number(line.unitPrice).toFixed(2)}</td>
+                  <td className="px-4 py-3 font-mono font-semibold text-gray-900">R {Number(line.lineTotal).toFixed(2)}</td>
+                </tr>
+              )
+            })}
           </tbody>
           <tfoot className="border-t bg-gray-50">
             {purchase.loanDeductionAmount && Number(purchase.loanDeductionAmount) > 0 ? (

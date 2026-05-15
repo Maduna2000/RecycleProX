@@ -61,6 +61,8 @@ type LineItem = {
   grossQty: string
   tareQty: string
   tareReason: string
+  deductionQty: string
+  deductionReason: string
   unitPrice: string
   weighMode: boolean
   selectedScale: '1' | '2' | '3'
@@ -75,8 +77,8 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 const emptyLine = (key: number): LineItem => ({
   key, productId: '', product: null, quantity: '', grossQty: '', tareQty: '',
-  tareReason: '', unitPrice: '', weighMode: false, selectedScale: '1',
-  weighingGross: false, weighingTare: false,
+  tareReason: '', deductionQty: '', deductionReason: '', unitPrice: '',
+  weighMode: false, selectedScale: '1', weighingGross: false, weighingTare: false,
 })
 
 // ─── useScaleRead ─────────────────────────────────────────────────────────────
@@ -127,6 +129,7 @@ export default function NewPurchasePage() {
   const [deductLoan,      setDeductLoan]      = useState(false)
   const [deductionAmount, setDeductionAmount] = useState('')
   const [showAllProducts, setShowAllProducts] = useState(false)
+  const [showIdPhoto,     setShowIdPhoto]     = useState(false)
 
   const { data: productsData } = useSWR<{ products: Product[] }>('/api/products?active=true', fetcher)
   const products = productsData?.products ?? []
@@ -135,8 +138,14 @@ export default function NewPurchasePage() {
     customer ? `/api/customers/${customer.id}/loans?pageSize=1` : null,
     fetcher
   )
-  const hasOutstandingLoan   = loanData?.summary?.hasOutstanding ?? false
-  const outstandingLoanAmount = loanData?.summary?.outstanding ?? '0'
+  const hasOutstandingLoan    = loanData?.summary?.hasOutstanding ?? false
+  const outstandingLoanAmount = loanData?.summary?.outstanding    ?? '0'
+
+  const { data: idPhotoData } = useSWR<{ url: string | null }>(
+    customer ? `/api/customers/${customer.id}/id-photo-url` : null,
+    fetcher
+  )
+  const idPhotoUrl = idPhotoData?.url ?? null
 
   const visibleProducts = (() => {
     const commodities = customer?.tradeCommodities
@@ -172,11 +181,13 @@ export default function NewPurchasePage() {
     setLines((prev) => prev.map((l) => l.key === key ? { ...l, ...patch } : l))
   }
 
-  function recomputeNet(key: number, grossStr: string, tareStr: string) {
-    const gross = new Decimal(grossStr || '0')
-    const tare  = new Decimal(tareStr  || '0')
-    const net   = Decimal.max(gross.minus(tare), new Decimal('0'))
-    patchLine(key, { quantity: net.toFixed(3), grossQty: grossStr, tareQty: tareStr })
+  function recomputeNet(key: number, grossStr: string, tareStr: string, deductionStr = '') {
+    const gross     = new Decimal(grossStr     || '0')
+    const tare      = new Decimal(tareStr      || '0')
+    const deduction = new Decimal(deductionStr || '0')
+    const net       = Decimal.max(gross.minus(tare), new Decimal('0'))
+    const paid      = Decimal.max(net.minus(deduction), new Decimal('0'))
+    patchLine(key, { quantity: paid.toFixed(3), grossQty: grossStr, tareQty: tareStr })
   }
 
   async function onProductSelect(key: number, productId: string) {
@@ -198,7 +209,7 @@ export default function NewPurchasePage() {
     patchLine(line.key, { weighingGross: true })
     try {
       const weight = await readScale(line.selectedScale)
-      recomputeNet(line.key, weight, line.tareQty)
+      recomputeNet(line.key, weight, line.tareQty, line.deductionQty)
       toast.success(`Gross: ${weight} kg`)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Scale not responding')
@@ -211,7 +222,7 @@ export default function NewPurchasePage() {
     patchLine(line.key, { weighingTare: true })
     try {
       const weight = await readScale(line.selectedScale)
-      recomputeNet(line.key, line.grossQty, weight)
+      recomputeNet(line.key, line.grossQty, weight, line.deductionQty)
       toast.success(`Tare: ${weight} kg`)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Scale not responding')
@@ -245,10 +256,12 @@ export default function NewPurchasePage() {
       notes: notes || undefined,
       ...(deduction ? { loanDeductionAmount: deduction } : {}),
       lines: validLines.map((l) => ({
-        productId:  l.productId, quantity: l.quantity, unitPrice: l.unitPrice,
-        ...(l.grossQty   ? { grossQty:   l.grossQty   } : {}),
-        ...(l.tareQty    ? { tareQty:    l.tareQty    } : {}),
-        ...(l.tareReason ? { tareReason: l.tareReason } : {}),
+        productId: l.productId, quantity: l.quantity, unitPrice: l.unitPrice,
+        ...(l.grossQty      ? { grossQty:        l.grossQty        } : {}),
+        ...(l.tareQty       ? { tareQty:         l.tareQty         } : {}),
+        ...(l.tareReason    ? { tareReason:      l.tareReason      } : {}),
+        ...(parseFloat(l.deductionQty || '0') > 0 ? { deductionQty: l.deductionQty } : {}),
+        ...(l.deductionReason ? { deductionReason: l.deductionReason } : {}),
       })),
     }
     const localId = `local_${crypto.randomUUID()}`
@@ -390,12 +403,29 @@ export default function NewPurchasePage() {
               </div>
             ) : (
               <div className="flex items-center gap-2.5 px-3 py-2">
-                <div
-                  className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[11px] font-bold shrink-0"
-                  style={{ background: colors.primary }}
-                >
-                  {customer.firstName[0]?.toUpperCase()}
-                </div>
+                {/* ID photo thumbnail — click to verify full ID */}
+                {idPhotoUrl ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowIdPhoto(true)}
+                    title="View ID document"
+                    className="shrink-0"
+                  >
+                    <img
+                      src={idPhotoUrl}
+                      alt="ID"
+                      className="w-9 h-9 rounded object-cover border-2"
+                      style={{ borderColor: colors.process }}
+                    />
+                  </button>
+                ) : (
+                  <div
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[11px] font-bold shrink-0"
+                    style={{ background: colors.primary }}
+                  >
+                    {customer.firstName[0]?.toUpperCase()}
+                  </div>
+                )}
                 <div className="min-w-0 flex-1">
                   <p className="text-[13px] font-semibold leading-none truncate" style={{ color: colors.textPrimary }}>
                     {customer.firstName} {customer.lastName}
@@ -625,7 +655,7 @@ export default function NewPurchasePage() {
                             step="0.001"
                             placeholder="0.000"
                             value={line.grossQty}
-                            onChange={(e) => recomputeNet(line.key, e.target.value, line.tareQty)}
+                            onChange={(e) => recomputeNet(line.key, e.target.value, line.tareQty, line.deductionQty)}
                             className="h-7 w-20 rounded border px-2 text-[11px] font-mono focus:outline-none"
                             style={{ borderColor: colors.border }}
                           />
@@ -651,7 +681,7 @@ export default function NewPurchasePage() {
                             step="0.001"
                             placeholder="0.000"
                             value={line.tareQty}
-                            onChange={(e) => recomputeNet(line.key, line.grossQty, e.target.value)}
+                            onChange={(e) => recomputeNet(line.key, line.grossQty, e.target.value, line.deductionQty)}
                             className="h-7 w-20 rounded border px-2 text-[11px] font-mono focus:outline-none"
                             style={{ borderColor: colors.border }}
                           />
@@ -669,15 +699,57 @@ export default function NewPurchasePage() {
                         </div>
                       </div>
 
+                      {/* Net display (gross − tare) */}
                       <div className="flex flex-col gap-0.5">
                         <span className="text-[10px] font-medium" style={{ color: colors.textSecondary }}>Net (kg)</span>
                         <div
                           className="h-7 flex items-center px-2 rounded border font-mono text-[12px] font-bold min-w-[64px]"
                           style={{ borderColor: colors.netWeightBorder, background: colors.netWeightBg, color: colors.netWeightText }}
                         >
-                          {line.quantity || '0.000'}
+                          {(() => {
+                            const net = Decimal.max(
+                              new Decimal(line.grossQty || '0').minus(new Decimal(line.tareQty || '0')),
+                              new Decimal('0'),
+                            )
+                            return net.toFixed(3)
+                          })()}
                         </div>
                       </div>
+
+                      {/* Deduction input */}
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-[10px] font-medium" style={{ color: colors.textSecondary }}>Deduction (kg)</span>
+                        <input
+                          type="number"
+                          step="0.001"
+                          min="0"
+                          placeholder="0.000"
+                          value={line.deductionQty}
+                          onChange={(e) => {
+                            const net = Decimal.max(
+                              new Decimal(line.grossQty || '0').minus(new Decimal(line.tareQty || '0')),
+                              new Decimal('0'),
+                            )
+                            const paid = Decimal.max(net.minus(new Decimal(e.target.value || '0')), new Decimal('0'))
+                            patchLine(line.key, { deductionQty: e.target.value, quantity: paid.toFixed(3) })
+                          }}
+                          className="h-7 w-20 rounded border px-2 text-[11px] font-mono focus:outline-none"
+                          style={{ borderColor: colors.border }}
+                        />
+                      </div>
+
+                      {/* Paid Qty display — only shown when deduction > 0 */}
+                      {parseFloat(line.deductionQty || '0') > 0 && (
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-[10px] font-semibold" style={{ color: colors.process }}>Paid Qty (kg)</span>
+                          <div
+                            className="h-7 flex items-center px-2 rounded border font-mono text-[12px] font-bold min-w-[64px]"
+                            style={{ border: `1px solid ${colors.process}`, background: '#F0FDF4', color: colors.process }}
+                          >
+                            {line.quantity || '0.000'}
+                          </div>
+                        </div>
+                      )}
 
                       {line.tareQty && parseFloat(line.tareQty) > 0 && (
                         <div className="flex flex-col gap-0.5">
@@ -687,6 +759,19 @@ export default function NewPurchasePage() {
                             value={line.tareReason}
                             onChange={(e) => patchLine(line.key, { tareReason: e.target.value })}
                             className="h-7 w-32 rounded border px-2 text-[11px] focus:outline-none"
+                            style={{ borderColor: colors.border }}
+                          />
+                        </div>
+                      )}
+
+                      {parseFloat(line.deductionQty || '0') > 0 && (
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-[10px] font-medium" style={{ color: colors.textSecondary }}>Deduction Reason</span>
+                          <input
+                            placeholder="e.g. Contamination, Moisture…"
+                            value={line.deductionReason}
+                            onChange={(e) => patchLine(line.key, { deductionReason: e.target.value })}
+                            className="h-7 w-36 rounded border px-2 text-[11px] focus:outline-none"
                             style={{ borderColor: colors.border }}
                           />
                         </div>
@@ -809,6 +894,18 @@ export default function NewPurchasePage() {
           </div>
         </div>
       </div>
+
+      {/* ── ID Photo Lightbox ── */}
+      {showIdPhoto && idPhotoUrl && customer && (
+        <Dialog open onOpenChange={() => setShowIdPhoto(false)}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>ID Document — {customer.firstName} {customer.lastName}</DialogTitle>
+            </DialogHeader>
+            <img src={idPhotoUrl} alt="ID Document" className="w-full rounded mt-2" />
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* ── Dialogs ── */}
       {sigDialog && (

@@ -17,11 +17,21 @@ export const PurchaseLineSchema = z.object({
   grossQty: optionalQty,
   tareQty:  optionalQty,
   tareReason: z.string().max(100).optional(),
+  deductionQty: optionalQty,
+  deductionReason: z.string().max(100).optional(),
   unitPrice: z
     .string()
     .min(1, 'Required')
     .regex(/^\d+(\.\d{1,2})?$/, 'Must be a valid price')
     .refine((v) => parseFloat(v) >= 0, 'Price cannot be negative'),
+}).superRefine((line, ctx) => {
+  if (line.deductionQty && parseFloat(line.deductionQty) > 0 && !line.deductionReason) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Deduction reason is required when a deduction amount is set',
+      path: ['deductionReason'],
+    })
+  }
 })
 
 export const CreatePurchaseSchema = z.object({
