@@ -61,6 +61,18 @@ type LineItem = {
   weighingTare: boolean
 }
 
+type PendingPurchase = {
+  id: string
+  refNumber: string
+  customer: { id: string; firstName: string; lastName: string }
+  lines: { id: string }[]
+  subTotal: string
+  vatAmount: string
+  totalAmount: string
+  paymentMethod: string
+  createdAt: string
+}
+
 const CATEGORY_LABELS: Record<string, string> = {
   ferrous: 'Ferrous', non_ferrous: 'Non-Ferrous', copper: 'Copper',
   aluminium: 'Aluminium', plastic: 'Plastic', paper: 'Paper', e_waste: 'E-Waste', other: 'Other',
@@ -71,6 +83,14 @@ const emptyLine = (key: number): LineItem => ({
   tareReason: '', deductionQty: '', deductionReason: '', unitPrice: '',
   weighMode: false, selectedScale: '1', weighingGross: false, weighingTare: false,
 })
+
+function timeAgo(iso: string): string {
+  const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
+  if (diff < 60)    return 'Just now'
+  if (diff < 3600)  return `${Math.floor(diff / 60)}m ago`
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
+  return `${Math.floor(diff / 86400)}d ago`
+}
 
 function useScaleRead() {
   return async (scaleNumber: '1' | '2' | '3'): Promise<string> => {
@@ -105,6 +125,15 @@ export default function NewPurchasePage() {
   const [deductionAmount, setDeductionAmount] = useState('')
   const [showAllProducts, setShowAllProducts] = useState(false)
 
+  // ── Pending purchases action state ──────────────────────────────────────
+  const [actionMenuId,  setActionMenuId]  = useState<string | null>(null)
+  const [markPaidId,    setMarkPaidId]    = useState<string | null>(null)
+  const [markPaidAmt,   setMarkPaidAmt]   = useState('')
+  const [markPaidPM,    setMarkPaidPM]    = useState<'cash' | 'eft' | 'cheque' | 'amplopay'>('cash')
+  const [voidId,        setVoidId]        = useState<string | null>(null)
+  const [voidReason,    setVoidReason]    = useState('')
+  const [actionLoading, setActionLoading] = useState(false)
+
   // ── Photo state ──────────────────────────────────────────────────────────
   const [photoFile,    setPhotoFile]    = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
@@ -122,6 +151,13 @@ export default function NewPurchasePage() {
   // ── Data fetching ────────────────────────────────────────────────────────
   const { data: productsData } = useSWR<{ products: Product[] }>('/api/products?active=true', fetcher)
   const products = productsData?.products ?? []
+
+  const { data: pendingData, mutate: mutatePending } = useSWR<{ purchases: PendingPurchase[] }>(
+    '/api/purchases?status=pending&pageSize=20',
+    fetcher,
+    { refreshInterval: 30_000 },
+  )
+  const pendingPurchases = pendingData?.purchases ?? []
 
   const { data: loanData } = useSWR<{ summary: { outstanding: string; hasOutstanding: boolean } }>(
     customer ? `/api/customers/${customer.id}/loans?pageSize=1` : null,
@@ -372,6 +408,41 @@ export default function NewPurchasePage() {
     }
   }
 
+  // ── Pending purchase actions ─────────────────────────────────────────────
+  async function handleMarkPaid(id: string) {
+    if (!markPaidAmt || parseFloat(markPaidAmt) <= 0) { toast.error('Enter a valid amount'); return }
+    setActionLoading(true)
+    try {
+      const res = await fetch(`/api/purchases/${id}/mark-paid`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: markPaidAmt, paymentMethod: markPaidPM }),
+      })
+      if (!res.ok) { const e = await res.json() as { error?: string }; toast.error(e.error ?? 'Failed'); return }
+      toast.success('Purchase marked as paid')
+      setMarkPaidId(null); setMarkPaidAmt(''); setMarkPaidPM('cash')
+      mutatePending()
+    } catch { toast.error('Network error') }
+    finally { setActionLoading(false) }
+  }
+
+  async function handleVoidPurchase(id: string) {
+    if (voidReason.trim().length < 5) { toast.error('Reason must be at least 5 characters'); return }
+    setActionLoading(true)
+    try {
+      const res = await fetch(`/api/purchases/${id}/void`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: voidReason }),
+      })
+      if (!res.ok) { const e = await res.json() as { error?: string }; toast.error(e.error ?? 'Failed'); return }
+      toast.success('Purchase reversed')
+      setVoidId(null); setVoidReason('')
+      mutatePending()
+    } catch { toast.error('Network error') }
+    finally { setActionLoading(false) }
+  }
+
   // ─── Shared styles ────────────────────────────────────────────────────────
   const cellInput      = 'w-full px-1.5 py-0.5 text-[11px] font-mono border rounded-[2px] bg-white focus:outline-none focus:border-[#0078D7]'
   const cellInputStyle = { borderColor: '#ABABAB', color: '#212529' }
@@ -385,7 +456,7 @@ export default function NewPurchasePage() {
       <div style={{ display: 'flex', flex: 1, minHeight: 0, background: '#fff', border: '1px solid #B0B0B0', borderRadius: 2, overflow: 'hidden' }}>
 
         {/* ── LEFT COLUMN ──────────────────────────────────────────────── */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflowY: 'auto', overflowX: 'hidden' }}>
 
           {/* Title bar — Customer Name label + Casual/Account toggle + GRV/Invoice */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', borderBottom: '2px solid #B0B0B0', background: 'linear-gradient(180deg,#EAEAEA 0%,#D4D4D4 100%)', flexShrink: 0 }}>
@@ -548,7 +619,7 @@ export default function NewPurchasePage() {
           </div>
 
           {/* ── Product Grid ─────────────────────────────────────────────── */}
-          <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', border: '1px solid #B0B0B0', margin: '0 10px 0' }}>
+          <div style={{ maxHeight: 260, flexShrink: 0, display: 'flex', flexDirection: 'column', border: '1px solid #B0B0B0', margin: '0 10px 0' }}>
 
             {/* Grid header */}
             <div
@@ -566,7 +637,7 @@ export default function NewPurchasePage() {
               ))}
             </div>
 
-            {/* Scrollable lines */}
+            {/* Scrollable lines + Add Line at bottom of scroll */}
             <div style={{ flex: 1, overflowY: 'auto' }}>
               {lines.map((line) => {
                 const qty      = new Decimal(line.quantity  || '0')
@@ -794,17 +865,172 @@ export default function NewPurchasePage() {
                   </div>
                 )
               })}
+              {/* Add Line — at bottom of scroll */}
+              <div style={{ padding: '5px 8px', borderTop: '1px solid #E0E0E0' }}>
+                <button
+                  type="button"
+                  onClick={addLine}
+                  style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 500, color: '#185ABD', background: 'none', border: 'none', cursor: 'pointer' }}
+                >
+                  <Plus style={{ width: 12, height: 12 }} /> Add Line
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Pending Purchases ──────────────────────────────────────────── */}
+          <div style={{ flexShrink: 0, margin: '0 10px 0', border: '1px solid #B0B0B0', display: 'flex', flexDirection: 'column', minHeight: 160 }}>
+
+            {/* Header */}
+            <div style={{ ...headerBg, padding: '4px 8px', display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: '#1B3A6B' }}>Pending Purchases</span>
+              {pendingPurchases.length > 0 && (
+                <span style={{ fontSize: 10, fontWeight: 700, background: '#F59E0B', color: '#fff', borderRadius: 10, padding: '0 5px', minWidth: 18, textAlign: 'center' }}>
+                  {pendingPurchases.length}
+                </span>
+              )}
+              <div style={{ flex: 1 }} />
+              <button
+                onClick={() => mutatePending()}
+                style={{ fontSize: 10, padding: '1px 6px', background: '#E0E0E0', border: '1px solid #999', borderRadius: 2, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}
+              >
+                <RefreshCw style={{ width: 9, height: 9 }} /> Refresh
+              </button>
             </div>
 
-            {/* Add line */}
-            <div style={{ padding: '5px 8px', borderTop: '1px solid #E0E0E0', background: '#FAFAFA', flexShrink: 0 }}>
-              <button
-                type="button"
-                onClick={addLine}
-                style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 500, color: '#185ABD', background: 'none', border: 'none', cursor: 'pointer' }}
-              >
-                <Plus style={{ width: 12, height: 12 }} /> Add Line
-              </button>
+            {/* Column headers */}
+            <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr 48px 80px 70px 80px 70px 60px 28px', gap: 4, padding: '3px 8px', background: '#F8F9FA', borderBottom: '1px solid #D0D0D0', flexShrink: 0 }}>
+              {['Ref #', 'Customer', 'Lines', 'Sub Total', 'VAT', 'Total', 'Payment', 'Time', ''].map((h, i) => (
+                <span key={i} style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#6C757D' }}>{h}</span>
+              ))}
+            </div>
+
+            {/* Rows */}
+            <div style={{ overflowY: 'auto', flex: 1 }}>
+              {pendingPurchases.length === 0 ? (
+                <div style={{ padding: '16px 8px', textAlign: 'center', fontSize: 11, color: '#9CA3AF' }}>
+                  No pending purchases
+                </div>
+              ) : pendingPurchases.map((p) => (
+                <div key={p.id} style={{ borderTop: '1px solid #E8E8E8' }}>
+
+                  {/* Main row */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr 48px 80px 70px 80px 70px 60px 28px', gap: 4, padding: '4px 8px', alignItems: 'center', background: markPaidId === p.id || voidId === p.id ? '#FFFBEB' : 'transparent' }}>
+                    <span style={{ fontSize: 10, fontFamily: 'monospace', color: '#1B3A6B', fontWeight: 600 }}>{p.refNumber}</span>
+                    <span style={{ fontSize: 11, color: '#212529', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.customer.firstName} {p.customer.lastName}</span>
+                    <span style={{ fontSize: 10, color: '#6C757D', textAlign: 'center' }}>{p.lines.length}</span>
+                    <span style={{ fontSize: 10, fontFamily: 'monospace', color: '#212529' }}>R {new Decimal(p.subTotal ?? p.totalAmount).toFixed(2)}</span>
+                    <span style={{ fontSize: 10, fontFamily: 'monospace', color: '#6C757D' }}>R {new Decimal(p.vatAmount ?? '0').toFixed(2)}</span>
+                    <span style={{ fontSize: 10, fontFamily: 'monospace', fontWeight: 600, color: '#217346' }}>R {new Decimal(p.totalAmount).toFixed(2)}</span>
+                    <span style={{ fontSize: 10, color: '#374151', textTransform: 'capitalize' }}>{p.paymentMethod}</span>
+                    <span style={{ fontSize: 10, color: '#9CA3AF' }}>{timeAgo(p.createdAt)}</span>
+
+                    {/* ⋮ action menu */}
+                    <div style={{ position: 'relative' }}>
+                      <button
+                        onClick={() => setActionMenuId(actionMenuId === p.id ? null : p.id)}
+                        style={{ height: 22, width: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #C0C0C0', borderRadius: 2, background: actionMenuId === p.id ? '#E8E8E8' : 'transparent', cursor: 'pointer', fontSize: 14, color: '#374151', lineHeight: 1 }}
+                      >
+                        ⋮
+                      </button>
+
+                      {actionMenuId === p.id && (
+                        <div style={{ position: 'absolute', right: 0, top: 24, zIndex: 50, background: '#fff', border: '1px solid #C0C0C0', borderRadius: 3, boxShadow: '0 4px 12px rgba(0,0,0,0.15)', minWidth: 190 }}>
+                          {([
+                            { label: 'Mark as Paid',          action: () => { setMarkPaidId(p.id); setActionMenuId(null) } },
+                            { label: 'Edit / Amend',           action: () => { router.push(`/app/purchases/${p.id}/edit`); setActionMenuId(null) } },
+                            { label: 'Print Slip',             action: () => { setPrintDialog({ id: p.id, refNumber: p.refNumber }); setActionMenuId(null) } },
+                            { label: 'Attach Photo',           action: () => { router.push(`/app/purchases/${p.id}?attach=photo`); setActionMenuId(null) } },
+                            { label: 'Send Receipt',           action: () => { router.push(`/app/purchases/${p.id}?action=receipt`); setActionMenuId(null) } },
+                            { label: 'View Full Details',      action: () => { router.push(`/app/purchases/${p.id}`); setActionMenuId(null) } },
+                            { label: 'View Customer History',  action: () => { router.push(`/app/customers/${p.customer.id}`); setActionMenuId(null) } },
+                            { label: 'Log to Police Register', action: () => { router.push(`/app/police-register/new?purchaseId=${p.id}`); setActionMenuId(null) } },
+                            { label: 'Reverse Purchase', destructive: true, action: () => { setVoidId(p.id); setActionMenuId(null) } },
+                          ] as { label: string; action: () => void; destructive?: boolean }[]).map((item, idx) => (
+                            <button
+                              key={idx}
+                              onClick={item.action}
+                              style={{ display: 'block', width: '100%', padding: '6px 12px', textAlign: 'left', fontSize: 12, border: 'none', background: 'none', cursor: 'pointer', color: item.destructive ? '#EF4444' : '#212529', borderTop: idx === 8 ? '1px solid #E0E0E0' : 'none' }}
+                              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = item.destructive ? '#FEF2F2' : '#F3F4F6' }}
+                              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'none' }}
+                            >
+                              {item.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Mark as Paid inline form */}
+                  {markPaidId === p.id && (
+                    <div style={{ padding: '6px 12px', background: '#F0FDF4', borderTop: '1px solid #BBF7D0', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: '#166534' }}>Mark as Paid:</span>
+                      <input
+                        type="number" min="0" step="0.01" placeholder="Amount (R)"
+                        value={markPaidAmt}
+                        onChange={(e) => setMarkPaidAmt(e.target.value)}
+                        style={{ height: 24, width: 90, fontSize: 11, border: '1px solid #86EFAC', borderRadius: 2, padding: '0 6px', outline: 'none' }}
+                        autoFocus
+                      />
+                      <select
+                        value={markPaidPM}
+                        onChange={(e) => setMarkPaidPM(e.target.value as typeof markPaidPM)}
+                        style={{ height: 24, fontSize: 11, border: '1px solid #86EFAC', borderRadius: 2, padding: '0 4px', outline: 'none' }}
+                      >
+                        <option value="cash">Cash</option>
+                        <option value="eft">EFT</option>
+                        <option value="cheque">Cheque</option>
+                        <option value="amplopay">AmploPay</option>
+                      </select>
+                      <button
+                        disabled={actionLoading}
+                        onClick={() => handleMarkPaid(p.id)}
+                        style={{ height: 24, padding: '0 10px', fontSize: 11, fontWeight: 600, background: '#217346', color: '#fff', border: 'none', borderRadius: 2, cursor: 'pointer', opacity: actionLoading ? 0.6 : 1 }}
+                      >
+                        {actionLoading ? '…' : 'Confirm'}
+                      </button>
+                      <button
+                        onClick={() => { setMarkPaidId(null); setMarkPaidAmt(''); setMarkPaidPM('cash') }}
+                        style={{ height: 24, padding: '0 8px', fontSize: 11, background: 'none', border: '1px solid #ABABAB', borderRadius: 2, cursor: 'pointer', color: '#6C757D' }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Reverse Purchase inline form */}
+                  {voidId === p.id && (
+                    <div style={{ padding: '6px 12px', background: '#FFF5F5', borderTop: '1px solid #FECACA', display: 'flex', alignItems: 'flex-start', gap: 8, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: '#991B1B', paddingTop: 4 }}>Reverse reason:</span>
+                      <textarea
+                        value={voidReason}
+                        onChange={(e) => setVoidReason(e.target.value)}
+                        placeholder="Reason (min 5 characters)…"
+                        rows={2}
+                        style={{ flex: 1, minWidth: 180, fontSize: 11, border: '1px solid #FECACA', borderRadius: 2, padding: '3px 6px', outline: 'none', resize: 'vertical' }}
+                        autoFocus
+                      />
+                      <div style={{ display: 'flex', gap: 6, paddingTop: 2 }}>
+                        <button
+                          disabled={actionLoading || voidReason.trim().length < 5}
+                          onClick={() => handleVoidPurchase(p.id)}
+                          style={{ height: 24, padding: '0 10px', fontSize: 11, fontWeight: 600, background: '#DC2626', color: '#fff', border: 'none', borderRadius: 2, cursor: 'pointer', opacity: actionLoading || voidReason.trim().length < 5 ? 0.5 : 1 }}
+                        >
+                          {actionLoading ? '…' : 'Reverse'}
+                        </button>
+                        <button
+                          onClick={() => { setVoidId(null); setVoidReason('') }}
+                          style={{ height: 24, padding: '0 8px', fontSize: 11, background: 'none', border: '1px solid #ABABAB', borderRadius: 2, cursor: 'pointer', color: '#6C757D' }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                </div>
+              ))}
             </div>
           </div>
 
@@ -968,6 +1194,14 @@ export default function NewPurchasePage() {
             : `Save · R ${cashToPay.toFixed(2)}`}
         </button>
       </div>
+
+      {/* Overlay to close action menu on outside click */}
+      {actionMenuId && (
+        <div
+          style={{ position: 'fixed', inset: 0, zIndex: 40 }}
+          onClick={() => setActionMenuId(null)}
+        />
+      )}
 
       {/* Print result dialog */}
       {printDialog && (
