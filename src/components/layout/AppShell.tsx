@@ -8,7 +8,7 @@ import {
   RefreshCw, Search, Plus, Printer,
   BarChart2, ClipboardCheck, FileSpreadsheet,
   Download, LogOut, Settings,
-  Minus, Square, X as XIcon, Tag,
+  Minus, X as XIcon, Tag,
   Users, UserPlus, ChevronRight,
   Archive, Landmark,
   Wifi, WifiOff,
@@ -55,10 +55,8 @@ const MODULE_NAMES: Record<string, string> = {
 }
 
 function getModuleName(pathname: string): string {
-  // Exact match first
   const exact = MODULE_NAMES[pathname]
   if (exact) return exact
-  // Prefix match (e.g. /app/customers/abc → Accounts)
   const sorted = Object.keys(MODULE_NAMES).sort((a, b) => b.length - a.length)
   for (const key of sorted) {
     const name = MODULE_NAMES[key]
@@ -67,7 +65,7 @@ function getModuleName(pathname: string): string {
   return 'Renovo Pro'
 }
 
-// ─── Toolbar configs — fully pathname-driven ──────────────────────────────────
+// ─── Toolbar configs ──────────────────────────────────────────────────────────
 
 function useToolbarButtons(pathname: string, role: string): ToolbarButton[] {
   const isMgr  = role === 'admin' || role === 'manager'
@@ -270,20 +268,70 @@ function OfflineChip() {
 
 // ─── WindowControls ───────────────────────────────────────────────────────────
 
-function WindowControls() {
+function WindowControls({ onNavigateDashboard }: { onNavigateDashboard: () => void }) {
   const isElectron = typeof window !== 'undefined' && !!window.electronAPI?.isElectron
-  if (!isElectron) return null
+
   return (
-    <div className="flex items-center ml-2 shrink-0" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
-      <button title="Minimise" className="w-9 h-full flex items-center justify-center hover:bg-white/10 transition-colors" onClick={() => window.electronAPI?.minimize()}>
-        <Minus className="w-3 h-3 text-white/80" />
+    <div className="flex items-center ml-1 shrink-0 border-l border-white/10" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+      <button
+        title="Minimise"
+        className="w-8 h-full flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+        onClick={() => isElectron ? window.electronAPI?.minimize() : onNavigateDashboard()}
+      >
+        <Minus className="w-3 h-3" />
       </button>
-      <button title="Maximise" className="w-9 h-full flex items-center justify-center hover:bg-white/10 transition-colors" onClick={() => window.electronAPI?.maximize()}>
-        <Square className="w-3 h-3 text-white/80" />
+      <button
+        title="Close"
+        className="w-8 h-full flex items-center justify-center text-white/70 hover:text-white hover:bg-red-600 transition-colors"
+        onClick={() => isElectron ? window.electronAPI?.close() : onNavigateDashboard()}
+      >
+        <XIcon className="w-3 h-3" />
       </button>
-      <button title="Close" className="w-9 h-full flex items-center justify-center hover:bg-red-600 transition-colors" onClick={() => window.electronAPI?.close()}>
-        <XIcon className="w-3 h-3 text-white/80" />
-      </button>
+    </div>
+  )
+}
+
+// ─── Taskbar ──────────────────────────────────────────────────────────────────
+
+function Taskbar({ moduleName, onMinimize }: { moduleName: string; onMinimize: () => void }) {
+  const [time, setTime] = useState(() => {
+    const now = new Date()
+    return `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
+  })
+
+  useEffect(() => {
+    const tick = () => {
+      const now = new Date()
+      setTime(`${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`)
+    }
+    const msUntilNextMinute = 60000 - (Date.now() % 60000)
+    let interval: ReturnType<typeof setInterval>
+    const timeout = setTimeout(() => {
+      tick()
+      interval = setInterval(tick, 60000)
+    }, msUntilNextMinute)
+    return () => { clearTimeout(timeout); clearInterval(interval) }
+  }, [])
+
+  return (
+    <div
+      className="flex items-center px-3 gap-3 shrink-0 border-t border-white/10"
+      style={{ height: 28, background: 'rgba(27,58,107,0.95)' }}
+    >
+      <span className="text-[10px] text-white/35 shrink-0 font-semibold tracking-widest select-none">
+        RENOVO PRO
+      </span>
+      <div className="flex-1 flex items-center">
+        <button
+          onClick={onMinimize}
+          className="flex items-center gap-1.5 px-2.5 rounded-sm border border-white/25 bg-white/15 hover:bg-white/25 transition-colors text-white text-[11px] font-medium"
+          style={{ height: 20 }}
+        >
+          <RefreshCw className="w-2.5 h-2.5 text-[#F2AB1A] shrink-0" />
+          <span className="truncate max-w-[180px]">{moduleName}</span>
+        </button>
+      </div>
+      <span className="text-[11px] text-white/55 shrink-0 font-mono tabular-nums">{time}</span>
     </div>
   )
 }
@@ -305,13 +353,14 @@ export function AppShell({
   const moduleName  = getModuleName(pathname)
   const [search, setSearch] = useState('')
 
-  // Keyboard shortcut: Alt+H → portal
+  const goHome = useCallback(() => router.push('/app/dashboard'), [router])
+
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.altKey && e.key.toLowerCase() === 'h') {
       e.preventDefault()
-      router.push('/app/dashboard')
+      goHome()
     }
-  }, [router])
+  }, [goHome])
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown)
@@ -326,7 +375,7 @@ export function AppShell({
       {/* ── ZONE 1: Title Bar ─────────────────────────────────── */}
       <header
         className="flex items-center shrink-0 px-3 gap-0 border-b border-white/[0.08]"
-        style={{ height: 'var(--rpx-titlebar-h, 36px)', background: 'var(--rpx-navy, #1B3A6B)' }}
+        style={{ height: 40, background: 'var(--rpx-navy, #1B3A6B)' }}
       >
         {/* Logo mark */}
         <div className="flex items-center gap-2 pr-3 border-r border-white/15 shrink-0">
@@ -345,7 +394,7 @@ export function AppShell({
             Portal
           </Link>
           <ChevronRight className="w-3 h-3 text-white/20 shrink-0" />
-          <span className="text-white text-[12px] font-semibold tracking-wide truncate">
+          <span className="text-white text-[14px] font-bold tracking-wide truncate">
             {moduleName}
           </span>
         </nav>
@@ -354,7 +403,7 @@ export function AppShell({
         <div className="flex items-center gap-1 pl-2 shrink-0">
           <OfflineChip />
           <UserMenu role={role} fullName={fullName} />
-          <WindowControls />
+          <WindowControls onNavigateDashboard={goHome} />
         </div>
       </header>
 
@@ -394,11 +443,14 @@ export function AppShell({
       </div>
 
       {/* ── ZONE 3: Content Area ──────────────────────────────── */}
-      <main className="flex-1 min-h-0 flex flex-col overflow-hidden bg-[#F1F3F4]">
+      <main className="rpx-content flex-1 min-h-0 flex flex-col overflow-hidden bg-[#F1F3F4]">
         <div className="flex flex-col flex-1 min-h-0 w-full max-w-[1600px] mx-auto px-5 pt-4 pb-4 overflow-y-auto">
           {children}
         </div>
       </main>
+
+      {/* ── ZONE 4: Taskbar ───────────────────────────────────── */}
+      <Taskbar moduleName={moduleName} onMinimize={goHome} />
     </div>
   )
 }

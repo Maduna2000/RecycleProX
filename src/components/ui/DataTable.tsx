@@ -114,7 +114,7 @@ function ActionsDropdown<T>({ row, actions }: { row: T; actions: RowAction<T>[] 
   return (
     <div className="relative flex justify-end">
       <button
-        className="p-1 rounded hover:bg-[#F1F3F4] text-[#6C757D] hover:text-[#212529] transition-colors"
+        className="p-1 rounded-sm hover:bg-[#D6E8FF] text-[#6C757D] hover:text-[#00205B] transition-colors"
         onClick={(e) => { e.stopPropagation(); setOpen((o) => !o) }}
       >
         <MoreHorizontal className="w-4 h-4" />
@@ -122,15 +122,15 @@ function ActionsDropdown<T>({ row, actions }: { row: T; actions: RowAction<T>[] 
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full mt-0.5 w-40 bg-white rounded-lg shadow-xl border border-[#E0E0E0] py-1 z-20">
+          <div className="absolute right-0 top-full mt-0.5 w-44 bg-white shadow-xl border border-[#B0B0B0] py-0.5 z-20" style={{ borderRadius: 2 }}>
             {visible.map((action, i) => (
               <button
                 key={i}
                 className={cn(
-                  'w-full flex items-center gap-2 px-3 py-1.5 text-xs transition-colors',
+                  'w-full flex items-center gap-2 px-3 py-1.5 text-[12px] transition-colors',
                   action.danger
                     ? 'text-[#C0392B] hover:bg-red-50'
-                    : 'text-[#212529] hover:bg-[#F1F3F4]',
+                    : 'text-[#212529] hover:bg-[#D6E8FF]',
                 )}
                 onClick={(e) => { e.stopPropagation(); setOpen(false); action.onClick(row) }}
               >
@@ -176,51 +176,68 @@ export function DataTable<T>({
     }
   }
 
-  const totalPages = total ? Math.ceil(total / pageSize) : 1
-  const showing    = total ? `Showing ${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, total)} of ${total}` : `${rows.length} records`
+  const totalPages  = total ? Math.ceil(total / pageSize) : 1
+  const showing     = total ? `Showing ${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, total)} of ${total}` : `${rows.length} records`
+  const hasActions  = rowActions && rowActions.length > 0
+  const totalCols   = columns.length + (hasActions ? 1 : 0)
+
+  // Column separator: all columns except last data column get a right border
+  function colBorder(isLast: boolean): string {
+    return isLast ? 'none' : '1px solid #D0D0D0'
+  }
 
   return (
     <div className="flex flex-col h-full">
-      {/* Table wrapper */}
-      <div className="flex-1 overflow-auto rounded-lg border border-[#E0E0E0] bg-white">
+      {/* Table wrapper — square corners, legacy border */}
+      <div className="flex-1 overflow-auto border border-[#B0B0B0] bg-white" style={{ borderRadius: 0 }}>
         <table className="w-full text-sm border-collapse">
           {/* Header */}
           <thead className="sticky top-0 z-10">
-            <tr style={{ background: '#F8F9FA' }}>
-              {columns.map((col) => (
-                <th
-                  key={col.key}
-                  className={cn(
-                    'text-left px-4 border-b border-[#E0E0E0]',
-                    col.sortable && 'cursor-pointer select-none hover:bg-[#EBF3FC]',
-                  )}
-                  style={{
-                    fontSize:      12,
-                    fontWeight:    600,
-                    letterSpacing: '0.05em',
-                    color:         '#6C757D',
-                    textTransform: 'uppercase',
-                    height:        40,
-                    width:         col.width,
-                  }}
-                  onClick={() => col.sortable && handleSort(col.key)}
-                >
-                  <span className="flex items-center gap-1">
-                    {col.header}
-                    {col.sortable && (
-                      sortKey === col.key
-                        ? sortDir === 'asc'
-                          ? <ChevronUp className="w-3 h-3" />
-                          : sortDir === 'desc'
-                            ? <ChevronDown className="w-3 h-3" />
-                            : <ChevronsUpDown className="w-3 h-3 opacity-40" />
-                        : <ChevronsUpDown className="w-3 h-3 opacity-40" />
+            <tr style={{
+              background: 'linear-gradient(180deg, #FFFFFF 0%, #E8E8E8 100%)',
+              borderBottom: '2px solid #B0B0B0',
+            }}>
+              {columns.map((col, colIdx) => {
+                const isLastData = colIdx === columns.length - 1 && !hasActions
+                return (
+                  <th
+                    key={col.key}
+                    className={cn(
+                      'text-left px-3',
+                      col.sortable && 'cursor-pointer select-none hover:bg-[#D6E8FF]/60',
                     )}
-                  </span>
-                </th>
-              ))}
-              {rowActions && rowActions.length > 0 && (
-                <th className="w-12 border-b border-[#E0E0E0]" />
+                    style={{
+                      fontSize:      11,
+                      fontWeight:    600,
+                      letterSpacing: '0.06em',
+                      color:         '#374151',
+                      textTransform: 'uppercase',
+                      height:        32,
+                      width:         col.width,
+                      borderRight:   colBorder(isLastData),
+                    }}
+                    onClick={() => col.sortable && handleSort(col.key)}
+                  >
+                    <span className="flex items-center gap-1">
+                      {col.header}
+                      {col.sortable && (
+                        sortKey === col.key
+                          ? sortDir === 'asc'
+                            ? <ChevronUp className="w-3 h-3" />
+                            : sortDir === 'desc'
+                              ? <ChevronDown className="w-3 h-3" />
+                              : <ChevronsUpDown className="w-3 h-3 opacity-40" />
+                          : <ChevronsUpDown className="w-3 h-3 opacity-40" />
+                      )}
+                    </span>
+                  </th>
+                )
+              })}
+              {hasActions && (
+                <th
+                  className="w-10"
+                  style={{ height: 32, borderRight: 'none' }}
+                />
               )}
             </tr>
           </thead>
@@ -229,7 +246,7 @@ export function DataTable<T>({
           <tbody>
             {error ? (
               <tr>
-                <td colSpan={columns.length + (rowActions ? 1 : 0)} className="py-16 text-center">
+                <td colSpan={totalCols} className="py-12 text-center">
                   <p className="text-sm" style={{ color: colors.danger }}>
                     {typeof error === 'string' ? error : 'Failed to load data. Please try again.'}
                   </p>
@@ -237,7 +254,7 @@ export function DataTable<T>({
               </tr>
             ) : loading ? (
               <tr>
-                <td colSpan={columns.length + (rowActions ? 1 : 0)} className="py-16 text-center text-[#6C757D]">
+                <td colSpan={totalCols} className="py-12 text-center text-[#6C757D]">
                   <div className="flex items-center justify-center gap-2">
                     <Loader2 className="w-4 h-4 animate-spin" />
                     <span className="text-sm">Loading...</span>
@@ -246,7 +263,7 @@ export function DataTable<T>({
               </tr>
             ) : rows.length === 0 ? (
               <tr>
-                <td colSpan={columns.length + (rowActions ? 1 : 0)} className="py-16 text-center">
+                <td colSpan={totalCols} className="py-12 text-center">
                   <p className="text-sm text-[#6C757D]">{emptyMessage}</p>
                   {emptyAction && (
                     <button
@@ -260,9 +277,9 @@ export function DataTable<T>({
               </tr>
             ) : (
               rows.map((row, idx) => {
-                const key      = rowKey(row)
+                const key        = rowKey(row)
                 const isSelected = selectedKey === key
-                const isEven   = idx % 2 === 1
+                const isEven     = idx % 2 === 1
 
                 return (
                   <tr
@@ -270,31 +287,46 @@ export function DataTable<T>({
                     className={cn(
                       'transition-colors',
                       onRowClick && 'cursor-pointer',
-                      isSelected
-                        ? 'bg-[#EBF3FC]'
-                        : isEven
-                          ? 'bg-[#F8F9FA] hover:bg-[#EBF3FC]'
-                          : 'bg-white hover:bg-[#EBF3FC]',
                     )}
-                    style={isSelected ? { borderLeft: '3px solid #185ABD' } : { borderLeft: '3px solid transparent' }}
+                    style={{
+                      background: isSelected
+                        ? '#C8D9F0'
+                        : isEven
+                          ? '#F5F5F5'
+                          : '#FFFFFF',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isSelected) (e.currentTarget as HTMLTableRowElement).style.background = '#D6E8FF'
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isSelected) (e.currentTarget as HTMLTableRowElement).style.background = isEven ? '#F5F5F5' : '#FFFFFF'
+                    }}
                     onClick={() => onRowClick?.(row)}
                   >
-                    {columns.map((col) => (
-                      <td
-                        key={col.key}
-                        className="px-4 border-b border-[#E0E0E0]"
-                        style={{ height: 40, fontSize: 13, color: '#212529' }}
-                      >
-                        {col.render(row, idx)}
-                      </td>
-                    ))}
-                    {rowActions && rowActions.length > 0 && (
+                    {columns.map((col, colIdx) => {
+                      const isLastData = colIdx === columns.length - 1 && !hasActions
+                      return (
+                        <td
+                          key={col.key}
+                          className="px-3 border-b border-[#E0E0E0]"
+                          style={{
+                            height:      32,
+                            fontSize:    12,
+                            color:       isSelected ? '#00205B' : '#212529',
+                            borderRight: colBorder(isLastData),
+                          }}
+                        >
+                          {col.render(row, idx)}
+                        </td>
+                      )
+                    })}
+                    {hasActions && (
                       <td
                         className="px-2 border-b border-[#E0E0E0]"
-                        style={{ height: 40 }}
+                        style={{ height: 32, borderRight: 'none' }}
                         onClick={(e) => e.stopPropagation()}
                       >
-                        <ActionsDropdown row={row} actions={rowActions} />
+                        <ActionsDropdown row={row} actions={rowActions!} />
                       </td>
                     )}
                   </tr>
@@ -307,15 +339,15 @@ export function DataTable<T>({
 
       {/* Pagination */}
       {(total !== undefined && onPageChange) && (
-        <div className="flex items-center justify-between pt-3 shrink-0">
-          <span className="text-xs text-[#6C757D]">{showing}</span>
-          <div className="flex items-center gap-1">
+        <div className="flex items-center justify-between pt-2.5 shrink-0">
+          <span className="text-[11px] text-[#6C757D]">{showing}</span>
+          <div className="flex items-center gap-0.5">
             <button
-              className="p-1 rounded border border-[#E0E0E0] hover:bg-[#F1F3F4] disabled:opacity-40 disabled:cursor-not-allowed"
+              className="px-2 h-6 rounded-sm border border-[#B0B0B0] hover:bg-[#E8E8E8] disabled:opacity-40 disabled:cursor-not-allowed text-[11px] transition-colors"
               disabled={page <= 1}
               onClick={() => onPageChange(page - 1)}
             >
-              <ChevronLeft className="w-3.5 h-3.5" />
+              <ChevronLeft className="w-3 h-3" />
             </button>
             {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
               const p = i + 1
@@ -323,10 +355,10 @@ export function DataTable<T>({
                 <button
                   key={p}
                   className={cn(
-                    'w-7 h-7 rounded text-xs transition-colors',
+                    'w-6 h-6 rounded-sm text-[11px] transition-colors border',
                     p === page
-                      ? 'bg-[#185ABD] text-white'
-                      : 'border border-[#E0E0E0] hover:bg-[#F1F3F4] text-[#212529]',
+                      ? 'bg-[#1B3A6B] text-white border-[#1B3A6B]'
+                      : 'border-[#B0B0B0] hover:bg-[#E8E8E8] text-[#212529]',
                   )}
                   onClick={() => onPageChange(p)}
                 >
@@ -335,11 +367,11 @@ export function DataTable<T>({
               )
             })}
             <button
-              className="p-1 rounded border border-[#E0E0E0] hover:bg-[#F1F3F4] disabled:opacity-40 disabled:cursor-not-allowed"
+              className="px-2 h-6 rounded-sm border border-[#B0B0B0] hover:bg-[#E8E8E8] disabled:opacity-40 disabled:cursor-not-allowed text-[11px] transition-colors"
               disabled={page >= totalPages}
               onClick={() => onPageChange(page + 1)}
             >
-              <ChevronRight className="w-3.5 h-3.5" />
+              <ChevronRight className="w-3 h-3" />
             </button>
           </div>
         </div>
