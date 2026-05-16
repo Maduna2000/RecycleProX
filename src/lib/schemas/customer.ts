@@ -80,6 +80,7 @@ export const CreateCustomerSchema = z.object({
   marketSector:     z.enum(['formal', 'informal']).optional(),
   dealerCategory:   z.enum(['casual', 'dealer_1', 'dealer_2', 'dealer_3']).optional(),
   zeroRated:        z.boolean().optional().default(false),
+  isActive:         z.boolean().optional().default(true),
 })
 
 // Lenient phone for casual quick-create: normalise Eswatini numbers, accept any ≥7-digit number as-is
