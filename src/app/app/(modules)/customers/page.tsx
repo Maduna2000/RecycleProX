@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { PageShell } from '@/components/layout/PageShell'
-import { colors, fontSize } from '@/lib/design-tokens'
+import { colors } from '@/lib/design-tokens'
 import { toast } from 'sonner'
 import { useSession } from 'next-auth/react'
 
@@ -98,7 +98,7 @@ function PrimaryFunctionBadge({ fn }: { fn: string }) {
 
 // ─── Dealer category badge ─────────────────────────────────────────────────────
 function DealerCategoryBadge({ cat }: { cat?: string | null }) {
-  if (!cat) return <span style={{ color: colors.textSecondary, fontSize: fontSize.xs }}>—</span>
+  if (!cat) return <span style={{ color: colors.textSecondary, fontSize: 11 }}>—</span>
   const map: Record<string, { label: string; bg: string; color: string }> = {
     casual:   { label: 'Casual',   bg: colors.neutralBg, color: colors.textSecondary },
     dealer_1: { label: 'Dealer 1', bg: colors.processBg, color: colors.process },
@@ -184,37 +184,22 @@ function AccountsList({ onAddCustomer }: { onAddCustomer: () => void }) {
 
   const columns: Column<Customer>[] = [
     {
-      key: 'accountCode',
-      header: 'Acc Code',
-      width: '90px',
-      render: (r) => <span className="font-mono text-xs font-semibold" style={{ color: colors.process }}>{r.accountCode ?? '—'}</span>,
-    },
-    {
       key: 'idNumber',
       header: 'ID Number',
       width: '150px',
-      render: (r) => <span className="font-mono text-xs" style={{ color: colors.textSecondary }}>{r.idNumber}</span>,
+      render: (r) => <span className="font-mono text-[11px]" style={{ color: colors.textSecondary }}>{r.idNumber}</span>,
     },
     {
       key: 'name',
       header: 'Name',
-      width: '200px',
       render: (r) => (
-        <div className="flex items-center gap-2">
-          <Avatar name={`${r.firstName} ${r.lastName}`} size={26} />
-          <div>
-            <div className="flex items-center gap-1.5">
-              <span style={{ fontSize: 12, fontWeight: 500, color: colors.textPrimary }}>
-                {r.firstName} {r.lastName}
-              </span>
-              {r.blacklisted && (
-                <AlertTriangle className="w-3.5 h-3.5 shrink-0" style={{ color: colors.danger }} aria-label="Blacklisted" />
-              )}
-            </div>
-            {r.companyName && (
-              <span style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>{r.companyName}</span>
-            )}
-          </div>
+        <div className="flex items-center gap-2 min-w-0">
+          <Avatar name={`${r.firstName} ${r.lastName}`} size={22} />
+          <span className="truncate" style={{ fontSize: 12, fontWeight: 500, color: colors.textPrimary }}>
+            {r.firstName} {r.lastName}
+            {r.companyName && <span style={{ color: colors.textSecondary, fontWeight: 400 }}> · {r.companyName}</span>}
+            {r.blacklisted && <AlertTriangle className="w-3 h-3 inline ml-1 text-red-500" />}
+          </span>
         </div>
       ),
     },
@@ -227,84 +212,29 @@ function AccountsList({ onAddCustomer }: { onAddCustomer: () => void }) {
     {
       key: 'primaryFunction',
       header: 'Function',
-      width: '110px',
+      width: '100px',
       render: (r) => <PrimaryFunctionBadge fn={r.primaryFunction} />,
     },
     {
       key: 'priceGroup',
       header: 'Price Group',
-      width: '130px',
+      width: '120px',
       render: (r) => r.priceGroup
-        ? <span className="text-xs font-medium" style={{ color: colors.process }}>{r.priceGroup.name}</span>
-        : <span className="text-xs" style={{ color: colors.textSecondary }}>—</span>,
+        ? <span className="text-[11px] font-medium" style={{ color: colors.process }}>{r.priceGroup.name}</span>
+        : <span className="text-[11px]" style={{ color: colors.textSecondary }}>—</span>,
     },
     {
       key: 'phone',
       header: 'Phone',
       width: '130px',
-      render: (r) => <span style={{ fontSize: 12, color: colors.textSecondary }}>{r.phone}</span>,
-    },
-    {
-      key: 'email',
-      header: 'Email',
-      width: '180px',
-      render: (r) => r.email
-        ? <span style={{ fontSize: 12, color: colors.textSecondary }}>{r.email}</span>
-        : <span style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>—</span>,
-    },
-    {
-      key: 'gender',
-      header: 'Gender',
-      width: '80px',
-      render: (r) => r.gender
-        ? <span className="capitalize" style={{ fontSize: 12, color: colors.textPrimary }}>{r.gender}</span>
-        : <span style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>—</span>,
-    },
-    {
-      key: 'nationality',
-      header: 'Nationality',
-      width: '110px',
-      render: (r) => r.nationality
-        ? <span style={{ fontSize: 12, color: colors.textPrimary }}>{r.nationality}</span>
-        : <span style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>—</span>,
-    },
-    {
-      key: 'dateOfBirth',
-      header: 'DOB',
-      width: '100px',
-      render: (r) => r.dateOfBirth
-        ? <span style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>{new Date(r.dateOfBirth).toLocaleDateString('en-ZA')}</span>
-        : <span style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>—</span>,
-    },
-    {
-      key: 'physicalAddress',
-      header: 'Address',
-      width: '180px',
-      render: (r) => r.physicalAddress
-        ? <span className="truncate block max-w-[165px]" title={r.physicalAddress} style={{ fontSize: 12, color: colors.textSecondary }}>{r.physicalAddress}</span>
-        : <span style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>—</span>,
-    },
-    {
-      key: 'zeroRated',
-      header: 'Zero VAT',
-      width: '80px',
-      render: (r) => (
-        <span
-          className="px-2 py-0.5 rounded text-xs font-medium"
-          style={r.zeroRated
-            ? { background: colors.warningBg, color: colors.warning }
-            : { color: colors.textSecondary }}
-        >
-          {r.zeroRated ? 'Y' : 'N'}
-        </span>
-      ),
+      render: (r) => <span className="font-mono text-[11px]" style={{ color: colors.textSecondary }}>{r.phone}</span>,
     },
     {
       key: 'createdAt',
       header: 'Registered',
-      width: '100px',
+      width: '95px',
       render: (r) => (
-        <span style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>
+        <span className="font-mono text-[11px]" style={{ color: colors.textSecondary }}>
           {new Date(r.createdAt).toLocaleDateString('en-ZA')}
         </span>
       ),
@@ -312,7 +242,7 @@ function AccountsList({ onAddCustomer }: { onAddCustomer: () => void }) {
     {
       key: 'status',
       header: 'Status',
-      width: '110px',
+      width: '100px',
       render: (r) => (
         <StatusBadge status={r.blacklisted ? 'blacklisted' : r.isActive ? 'active' : 'inactive'} />
       ),
@@ -522,10 +452,7 @@ export default function AccountsPage() {
   }, [searchParams, router])
 
   return (
-    <PageShell
-      title="Accounts"
-      subtitle="Manage account customers and dealers"
-    >
+    <PageShell>
       <AccountsList onAddCustomer={() => setCreateOpen(true)} />
 
       <CreateCustomerModal

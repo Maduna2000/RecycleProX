@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { signOut } from 'next-auth/react'
 import { useState, useEffect, useCallback } from 'react'
 import {
-  RefreshCw, Search, Plus, Printer,
+  RefreshCw, Plus, Printer,
   BarChart2, ClipboardCheck, FileSpreadsheet,
   Download, LogOut, Settings,
   Minus, X as XIcon, Tag,
@@ -171,14 +171,15 @@ function useToolbarButtons(pathname: string, role: string): ToolbarButton[] {
 
 function ToolbarBtn({ btn }: { btn: ToolbarButton }) {
   const base = cn(
-    'flex items-center gap-1.5 px-3 py-1.5 rounded text-[11px] font-medium',
-    'transition-all duration-150 focus:outline-none whitespace-nowrap min-h-[28px]',
+    'flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium',
+    'transition-all duration-100 focus:outline-none whitespace-nowrap',
+    'border rounded-sm',
   )
   const variants: Record<string, string> = {
-    primary:   'bg-[#217346] text-white hover:bg-[#1a5c38] shadow-sm',
-    secondary: 'border border-[#185ABD] text-[#185ABD] bg-white hover:bg-blue-50',
-    danger:    'border border-[#C0392B] text-[#C0392B] bg-white hover:bg-red-50',
-    ghost:     'text-[#6C757D] hover:bg-white hover:text-[#212529]',
+    primary:   'border-[#217346] text-[#217346] bg-transparent hover:bg-[#E6F2EC]',
+    secondary: 'border-[#185ABD] text-[#185ABD] bg-transparent hover:bg-[#EBF3FC]',
+    danger:    'border-[#C0392B] text-[#C0392B] bg-transparent hover:bg-red-50',
+    ghost:     'border-transparent text-[#6C757D] hover:border-[#D0D0D0] hover:bg-white hover:text-[#212529]',
   }
   const cls = cn(base, variants[btn.variant])
   const inner = (
@@ -351,7 +352,6 @@ export function AppShell({
   const router      = useRouter()
   const toolbarBtns = useToolbarButtons(pathname, role)
   const moduleName  = getModuleName(pathname)
-  const [search, setSearch] = useState('')
 
   const goHome = useCallback(() => router.push('/app/dashboard'), [router])
 
@@ -408,39 +408,20 @@ export function AppShell({
       </header>
 
       {/* ── ZONE 2: Contextual Toolbar ────────────────────────── */}
-      <div
-        className="flex items-center gap-1 px-3 shrink-0 border-b"
-        style={{
-          height:      'var(--rpx-toolbar-h, 36px)',
-          background:  'var(--rpx-ribbon-grey, #F8F9FA)',
-          borderColor: 'var(--rpx-border, #E0E0E0)',
-        }}
-      >
-        {/* Action buttons */}
-        <div className="flex items-center gap-1 flex-1 overflow-hidden">
+      {toolbarBtns.length > 0 && (
+        <div
+          className="flex items-center gap-1 px-3 shrink-0 border-b"
+          style={{
+            height:      'var(--rpx-toolbar-h, 32px)',
+            background:  'var(--rpx-ribbon-grey, #F8F9FA)',
+            borderColor: 'var(--rpx-border, #E0E0E0)',
+          }}
+        >
           {toolbarBtns.map((btn, i) => (
             <ToolbarBtn key={i} btn={btn} />
           ))}
         </div>
-
-        {/* Separator */}
-        {toolbarBtns.length > 0 && (
-          <div className="w-px h-4 bg-[#E0E0E0] mx-1 shrink-0" />
-        )}
-
-        {/* Search */}
-        <div className="relative shrink-0">
-          <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-[#6C757D]" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search…"
-            aria-label="Search"
-            className="pl-7 pr-3 py-1 text-[11px] rounded border border-[#E0E0E0] bg-white
-                       focus:outline-none focus:border-[#185ABD] w-40 transition-colors"
-          />
-        </div>
-      </div>
+      )}
 
       {/* ── ZONE 3: Content Area ──────────────────────────────── */}
       <main className="rpx-content flex-1 min-h-0 flex flex-col overflow-hidden bg-[#F1F3F4]">
