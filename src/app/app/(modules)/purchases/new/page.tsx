@@ -456,7 +456,7 @@ export default function NewPurchasePage() {
       <div style={{ display: 'flex', flex: 1, minHeight: 0, background: '#fff', border: '1px solid #B0B0B0', borderRadius: 2, overflow: 'hidden' }}>
 
         {/* ── LEFT COLUMN ──────────────────────────────────────────────── */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflowY: 'auto', overflowX: 'hidden' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
 
           {/* Title bar — Customer Name label + Casual/Account toggle + GRV/Invoice */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', borderBottom: '2px solid #B0B0B0', background: 'linear-gradient(180deg,#EAEAEA 0%,#D4D4D4 100%)', flexShrink: 0 }}>
@@ -501,6 +501,12 @@ export default function NewPurchasePage() {
               style={{ width: 72, fontSize: 11, padding: '2px 6px', border: '1px solid #ABABAB', borderRadius: 2, outline: 'none' }}
             />
           </div>
+
+          {/* ── Two-column body ───────────────────────────────────────────── */}
+          <div style={{ flex: 1, minHeight: 0, display: 'flex', overflow: 'hidden' }}>
+
+          {/* Customer sub-panel (left) */}
+          <div style={{ width: 310, flexShrink: 0, display: 'flex', flexDirection: 'column', borderRight: '1px solid #C0C0C0', overflowY: 'auto' }}>
 
           {/* Customer selector area */}
           <div style={{ flexShrink: 0, padding: '8px 10px', borderBottom: '1px solid #E0E0E0' }}>
@@ -599,10 +605,10 @@ export default function NewPurchasePage() {
           </div>
 
           {/* Payment Type */}
-          <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 14, padding: '4px 10px', borderBottom: '1px solid #E0E0E0' }}>
-            <label style={{ fontSize: 11, fontWeight: 600, color: '#374151', whiteSpace: 'nowrap' }}>Payment Type:</label>
+          <div style={{ flexShrink: 0, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px 10px', padding: '6px 10px' }}>
+            <label style={{ fontSize: 11, fontWeight: 600, color: '#374151', whiteSpace: 'nowrap', width: '100%' }}>Payment Type:</label>
             {(['unpaid', 'cash', 'cheque', 'eft', 'amplopay'] as const).map((type) => (
-              <label key={type} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#374151', cursor: 'pointer' }}>
+              <label key={type} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#374151', cursor: 'pointer' }}>
                 <input
                   type="radio"
                   name="paymentType"
@@ -618,8 +624,14 @@ export default function NewPurchasePage() {
             ))}
           </div>
 
+          </div>
+          {/* end Customer sub-panel */}
+
+          {/* Product sub-panel (right) */}
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+
           {/* ── Product Grid ─────────────────────────────────────────────── */}
-          <div style={{ maxHeight: 260, flexShrink: 0, display: 'flex', flexDirection: 'column', border: '1px solid #B0B0B0', margin: '0 10px 0' }}>
+          <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', borderBottom: '1px solid #C0C0C0' }}>
 
             {/* Grid header */}
             <div
@@ -878,8 +890,14 @@ export default function NewPurchasePage() {
             </div>
           </div>
 
+          </div>
+          {/* end Product sub-panel */}
+
+          </div>
+          {/* end Two-column body */}
+
           {/* ── Pending Purchases ──────────────────────────────────────────── */}
-          <div style={{ flexShrink: 0, margin: '0 10px 0', border: '1px solid #B0B0B0', display: 'flex', flexDirection: 'column', minHeight: 160 }}>
+          <div style={{ flexShrink: 0, borderTop: '2px solid #B0B0B0', display: 'flex', flexDirection: 'column', height: 165 }}>
 
             {/* Header */}
             <div style={{ ...headerBg, padding: '4px 8px', display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
