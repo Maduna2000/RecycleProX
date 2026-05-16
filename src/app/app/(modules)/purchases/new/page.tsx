@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Plus, Trash2, Loader2, AlertTriangle, Scale, RefreshCw } from 'lucide-react'
+import { Plus, Trash2, Loader2, AlertTriangle, Scale, RefreshCw, Camera } from 'lucide-react'
 import { toast } from 'sonner'
 import useSWR from 'swr'
-import { CasualSelectorPanel } from '@/components/customers/CasualSelectorPanel'
+import { CasualSelectorPanel, type CasualSelectorPanelRef } from '@/components/customers/CasualSelectorPanel'
 import { AccountSelectorPanel } from '@/components/customers/AccountSelectorPanel'
 import { PrintResultModal } from '@/components/PrintResultModal'
 import Decimal from 'decimal.js'
@@ -90,8 +90,9 @@ export default function NewPurchasePage() {
   const readScale = useScaleRead()
   const { mutate: offlineMutate } = useOfflineMutation()
 
+  // ── Core purchase state ──────────────────────────────────────────────────
   const [customer,        setCustomer]        = useState<SelectedCustomer | null>(null)
-  const [customerType,    setCustomerType]    = useState<'casual' | 'account' | ''>('')
+  const [customerType,    setCustomerType]    = useState<'casual' | 'account'>('casual')
   const [lines,           setLines]           = useState<LineItem[]>([emptyLine(1)])
   const [paymentType,     setPaymentType]     = useState<'unpaid' | 'cash' | 'eft' | 'cheque' | 'amplopay'>('cash')
   const [notes,           setNotes]           = useState('')
@@ -104,6 +105,21 @@ export default function NewPurchasePage() {
   const [deductionAmount, setDeductionAmount] = useState('')
   const [showAllProducts, setShowAllProducts] = useState(false)
 
+  // ── Photo state ──────────────────────────────────────────────────────────
+  const [photoFile,    setPhotoFile]    = useState<File | null>(null)
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
+  const photoInputRef = useRef<HTMLInputElement>(null)
+
+  // ── Scale display state ──────────────────────────────────────────────────
+  const [scale1,        setScale1]        = useState<string | null>(null)
+  const [scale2,        setScale2]        = useState<string | null>(null)
+  const [readingScale1, setReadingScale1] = useState(false)
+  const [readingScale2, setReadingScale2] = useState(false)
+
+  // ── Casual panel ref (for auto-confirm on Save) ──────────────────────────
+  const casualPanelRef = useRef<CasualSelectorPanelRef>(null)
+
+  // ── Data fetching ────────────────────────────────────────────────────────
   const { data: productsData } = useSWR<{ products: Product[] }>('/api/products?active=true', fetcher)
   const products = productsData?.products ?? []
 
@@ -114,6 +130,7 @@ export default function NewPurchasePage() {
   const hasOutstandingLoan    = loanData?.summary?.hasOutstanding ?? false
   const outstandingLoanAmount = loanData?.summary?.outstanding    ?? '0'
 
+  // ── Derived calculations ─────────────────────────────────────────────────
   const vatRate = customer?.zeroRated ? new Decimal(0) : new Decimal('0.15')
 
   const visibleProducts = (() => {
@@ -140,6 +157,7 @@ export default function NewPurchasePage() {
     : new Decimal(0)
   const cashToPay = Decimal.max(grandTotal.minus(loanDeduct), new Decimal(0))
 
+  // ── Line management ──────────────────────────────────────────────────────
   function addLine() {
     setLines((prev) => [...prev, emptyLine(keyCounter)])
     setKeyCounter((k) => k + 1)
@@ -162,6 +180,7 @@ export default function NewPurchasePage() {
     patchLine(key, { quantity: paid.toFixed(3), grossQty: grossStr, tareQty: tareStr })
   }
 
+  // ── Product selection ────────────────────────────────────────────────────
   async function onProductSelect(key: number, productId: string) {
     const product = products.find((p) => p.id === productId) ?? null
     let unitPrice = product ? new Decimal(product.defaultBuyPrice).toFixed(2) : ''
@@ -177,6 +196,7 @@ export default function NewPurchasePage() {
     patchLine(key, { productId, product, unitPrice })
   }
 
+  // ── Scale (per-line weigh mode) ──────────────────────────────────────────
   async function handleWeighGross(line: LineItem) {
     patchLine(line.key, { weighingGross: true })
     try {
@@ -203,6 +223,32 @@ export default function NewPurchasePage() {
     }
   }
 
+  // ── Scale panel (right column reads) ────────────────────────────────────
+  async function handleScale1Read() {
+    setReadingScale1(true)
+    try {
+      const w = await readScale('1')
+      setScale1(w)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Scale 1 not responding')
+    } finally {
+      setReadingScale1(false)
+    }
+  }
+
+  async function handleScale2Read() {
+    setReadingScale2(true)
+    try {
+      const w = await readScale('2')
+      setScale2(w)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Scale 2 not responding')
+    } finally {
+      setReadingScale2(false)
+    }
+  }
+
+  // ── Customer selection ───────────────────────────────────────────────────
   const handleCustomerSelect = useCallback((c: SelectedCustomer) => {
     setCustomer(c)
     setDeductLoan(false)
@@ -210,9 +256,28 @@ export default function NewPurchasePage() {
     setShowAllProducts(false)
   }, [])
 
+  function switchCustomerType(type: 'casual' | 'account') {
+    setCustomerType(type)
+    setCustomer(null)
+    setShowAllProducts(false)
+  }
+
+  // ── Submit ───────────────────────────────────────────────────────────────
   async function submitPurchase(isPending: boolean) {
-    if (!customer) { toast.error('Please select a customer'); return }
-    if (customer.blacklisted) { toast.error('Customer is blacklisted'); return }
+    // For casual mode, if no customer is confirmed yet, auto-confirm via ref
+    let resolvedCustomer = customer
+    if (customerType === 'casual' && !resolvedCustomer) {
+      if (!casualPanelRef.current) {
+        toast.error('Please fill in customer details first')
+        return
+      }
+      resolvedCustomer = await casualPanelRef.current.confirm()
+      if (!resolvedCustomer) return  // validation/creation failed — error already shown
+    }
+
+    if (!resolvedCustomer) { toast.error('Please select a customer'); return }
+    if (resolvedCustomer.blacklisted) { toast.error('Customer is blacklisted'); return }
+
     const validLines = lines.filter((l) => l.productId && l.quantity && l.unitPrice)
     if (validLines.length === 0) { toast.error('Add at least one product line'); return }
     for (const l of validLines) {
@@ -236,7 +301,7 @@ export default function NewPurchasePage() {
     const status        = isPending ? 'pending' : 'completed'
 
     const body = {
-      customerId: customer.id, paymentMethod, status,
+      customerId: resolvedCustomer.id, paymentMethod, status,
       notes: combinedNotes,
       ...(deduction ? { loanDeductionAmount: deduction } : {}),
       lines: validLines.map((l) => ({
@@ -248,13 +313,14 @@ export default function NewPurchasePage() {
         ...(l.deductionReason ? { deductionReason:  l.deductionReason } : {}),
       })),
     }
+
     const localId = `local_${crypto.randomUUID()}`
     setSubmitting(true)
     try {
       const { queued, data } = await offlineMutate({ method: 'POST', url: '/api/purchases', body, localId })
       if (queued) {
         await offlineDB.purchases.add({
-          id: localId, refNumber: `OFF-${Date.now()}`, customerId: customer.id,
+          id: localId, refNumber: `OFF-${Date.now()}`, customerId: resolvedCustomer.id,
           status, totalAmount: grandTotal.toFixed(2), paymentMethod,
           notes: combinedNotes, createdAt: new Date().toISOString(), _offlineCreated: true,
         })
@@ -272,6 +338,26 @@ export default function NewPurchasePage() {
         router.push('/app/purchases')
       } else {
         const purchase = data as { id: string; refNumber: string }
+
+        // Upload product photo if one was staged (non-blocking)
+        if (photoFile) {
+          try {
+            const fd = new FormData()
+            fd.append('context', 'purchase_photo')
+            fd.append('referenceId', purchase.id)
+            fd.append('file', photoFile)
+            const upRes = await fetch('/api/r2/upload', { method: 'POST', body: fd })
+            if (upRes.ok) {
+              const { key } = await upRes.json() as { key: string }
+              await fetch(`/api/purchases/${purchase.id}/photos`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ add: key }),
+              })
+            }
+          } catch { /* photo upload failure is non-blocking */ }
+        }
+
         if (status === 'pending') {
           toast.success(`Purchase ${purchase.refNumber} saved as unpaid`)
           router.push('/app/purchases/unpaid')
@@ -286,264 +372,202 @@ export default function NewPurchasePage() {
     }
   }
 
-  // ─── Shared input style ───────────────────────────────────────────────────────
-  const cellInput = 'w-full px-1.5 py-0.5 text-[11px] font-mono border rounded-[2px] bg-white focus:outline-none focus:border-[#0078D7]'
+  // ─── Shared styles ────────────────────────────────────────────────────────
+  const cellInput      = 'w-full px-1.5 py-0.5 text-[11px] font-mono border rounded-[2px] bg-white focus:outline-none focus:border-[#0078D7]'
   const cellInputStyle = { borderColor: '#ABABAB', color: '#212529' }
-  const headerBg = { background: 'linear-gradient(180deg,#FFFFFF 0%,#E8E8E8 100%)', borderBottom: '2px solid #B0B0B0' }
+  const headerBg       = { background: 'linear-gradient(180deg,#FFFFFF 0%,#E8E8E8 100%)', borderBottom: '2px solid #B0B0B0' }
 
-  // ─── Render ──────────────────────────────────────────────────────────────────
+  // ─── Render ───────────────────────────────────────────────────────────────
   return (
-    <div className="flex flex-col flex-1 min-h-0">
-      <div className="flex flex-col flex-1 min-h-0 bg-white border" style={{ borderColor: '#B0B0B0', borderRadius: 2 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
 
-        {/* ── Panel title bar ─────────────────────────────── */}
-        <div
-          className="shrink-0 flex items-center justify-between px-3 py-1.5 border-b"
-          style={{ borderColor: '#C0C0C0', background: 'linear-gradient(180deg,#EAEAEA 0%,#D4D4D4 100%)' }}
-        >
-          <span className="text-[12px] font-bold" style={{ color: '#1B3A6B' }}>New Purchase</span>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-1.5">
-              <label className="text-[11px] font-semibold" style={{ color: '#374151' }}>GRV No</label>
-              <input
-                value={grvNumber}
-                onChange={(e) => setGrvNumber(e.target.value)}
-                className="w-24 px-2 py-0.5 text-[11px] border rounded-[2px] bg-white focus:outline-none focus:border-[#0078D7]"
-                style={{ borderColor: '#ABABAB' }}
-              />
-            </div>
-            <div className="flex items-center gap-1.5">
-              <label className="text-[11px] font-semibold" style={{ color: '#374151' }}>Invoice No</label>
-              <input
-                value={invoiceNo}
-                onChange={(e) => setInvoiceNo(e.target.value)}
-                className="w-24 px-2 py-0.5 text-[11px] border rounded-[2px] bg-white focus:outline-none focus:border-[#0078D7]"
-                style={{ borderColor: '#ABABAB' }}
-              />
-            </div>
+      {/* Outer bordered container */}
+      <div style={{ display: 'flex', flex: 1, minHeight: 0, background: '#fff', border: '1px solid #B0B0B0', borderRadius: 2, overflow: 'hidden' }}>
+
+        {/* ── LEFT COLUMN ──────────────────────────────────────────────── */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
+
+          {/* Title bar — Customer Name label + Casual/Account toggle + GRV/Invoice */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', borderBottom: '2px solid #B0B0B0', background: 'linear-gradient(180deg,#EAEAEA 0%,#D4D4D4 100%)', flexShrink: 0 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#1B3A6B', marginRight: 2 }}>Customer Name</span>
+
+            {/* Casual / Account toggle */}
+            <button
+              onClick={() => switchCustomerType('casual')}
+              style={{
+                fontSize: 11, padding: '2px 10px', borderRadius: 2, cursor: 'pointer',
+                border: '1px solid #888',
+                background: customerType === 'casual' ? '#1B3A6B' : '#E8E8E8',
+                color:      customerType === 'casual' ? '#FFF'    : '#333',
+              }}
+            >
+              Casual
+            </button>
+            <button
+              onClick={() => switchCustomerType('account')}
+              style={{
+                fontSize: 11, padding: '2px 10px', borderRadius: 2, cursor: 'pointer',
+                border: '1px solid #888',
+                background: customerType === 'account' ? '#1B3A6B' : '#E8E8E8',
+                color:      customerType === 'account' ? '#FFF'    : '#333',
+              }}
+            >
+              Account
+            </button>
+
+            {/* GRV No + Invoice No pushed to right */}
+            <div style={{ flex: 1 }} />
+            <label style={{ fontSize: 11, fontWeight: 600, color: '#374151' }}>GRV No</label>
+            <input
+              value={grvNumber}
+              onChange={(e) => setGrvNumber(e.target.value)}
+              style={{ width: 72, fontSize: 11, padding: '2px 6px', border: '1px solid #ABABAB', borderRadius: 2, outline: 'none' }}
+            />
+            <label style={{ fontSize: 11, fontWeight: 600, color: '#374151' }}>Invoice No</label>
+            <input
+              value={invoiceNo}
+              onChange={(e) => setInvoiceNo(e.target.value)}
+              style={{ width: 72, fontSize: 11, padding: '2px 6px', border: '1px solid #ABABAB', borderRadius: 2, outline: 'none' }}
+            />
           </div>
-        </div>
 
-        {/* ── Scrollable body ──────────────────────────────── */}
-        <div className="flex-1 min-h-0 overflow-y-auto">
-          <div className="p-3 space-y-3">
+          {/* Customer selector area */}
+          <div style={{ flexShrink: 0, padding: '8px 10px', borderBottom: '1px solid #E0E0E0' }}>
 
-            {/* Customer Type selector + customer section + totals */}
-            <div className="space-y-2">
+            {/* Casual panel — always shown in casual mode until customer confirmed */}
+            {customerType === 'casual' && !customer && (
+              <CasualSelectorPanel ref={casualPanelRef} onSelect={handleCustomerSelect} hideConfirmButton />
+            )}
 
-              {/* Type dropdown row */}
-              <div className="flex items-center gap-2">
-                <label className="text-[11px] font-semibold" style={{ color: '#374151' }}>Customer Type:</label>
-                <select
-                  value={customerType}
-                  onChange={(e) => {
-                    const v = e.target.value as '' | 'casual' | 'account'
-                    setCustomerType(v)
-                    setCustomer(null)
-                    setShowAllProducts(false)
-                  }}
-                  className="px-2 py-0.5 text-[12px] border rounded-[2px] bg-white focus:outline-none focus:border-[#0078D7]"
-                  style={{ borderColor: '#ABABAB', color: '#212529' }}
-                >
-                  <option value="">— Select —</option>
-                  <option value="casual">Casual</option>
-                  <option value="account">Account Customer</option>
-                </select>
-              </div>
+            {/* Account panel */}
+            {customerType === 'account' && !customer && (
+              <AccountSelectorPanel onSelect={handleCustomerSelect} />
+            )}
 
-              {/* Customer panel + Totals row */}
-              <div className="flex gap-3 items-start">
-
-                {/* Left: customer selector / card */}
-                <div
-                  className="flex-[3] min-w-0 border rounded-[2px] p-2"
-                  style={{ borderColor: '#C0C0C0', minHeight: 64 }}
-                >
-                  {!customerType && (
-                    <p className="text-[11px]" style={{ color: colors.textSecondary }}>Select a customer type above to begin.</p>
-                  )}
-
-                  {customerType && !customer && customerType === 'casual' && (
-                    <CasualSelectorPanel onSelect={handleCustomerSelect} />
-                  )}
-                  {customerType && !customer && customerType === 'account' && (
-                    <AccountSelectorPanel onSelect={handleCustomerSelect} />
-                  )}
-
-                  {customer && (
-                    <div className="flex items-center gap-3">
-                      <div
-                        className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[12px] font-bold shrink-0"
-                        style={{ background: colors.primary }}
-                      >
-                        {customer.firstName[0]?.toUpperCase()}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[13px] font-semibold" style={{ color: colors.textPrimary }}>
-                          {customer.firstName} {customer.lastName}
-                          {customer.blacklisted && (
-                            <span className="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-100 text-red-700">
-                              <AlertTriangle className="w-3 h-3" /> Blacklisted
-                            </span>
-                          )}
-                        </p>
-                        <p className="font-mono text-[11px]" style={{ color: colors.textSecondary }}>
-                          {customer.idNumber} · {customer.phone}
-                        </p>
-                        <div className="flex gap-1.5 mt-0.5 flex-wrap">
-                          {customer.priceGroupId && (
-                            <span className="px-1.5 py-0 rounded text-[10px] font-semibold bg-blue-100 text-blue-700">Custom Pricing</span>
-                          )}
-                          {customer.zeroRated && (
-                            <span className="px-1.5 py-0 rounded text-[10px] font-semibold bg-yellow-100 text-yellow-800">Zero Rated</span>
-                          )}
-                          {!showAllProducts && (customer.tradeCommodities?.length ?? 0) > 0 && (
-                            <button
-                              type="button"
-                              onClick={() => setShowAllProducts(true)}
-                              className="px-1.5 py-0 rounded border text-[10px]"
-                              style={{ borderColor: colors.border, color: colors.textSecondary }}
-                            >
-                              Show All Products
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => { setCustomer(null) }}
-                        className="px-2 py-0.5 rounded border text-[11px] shrink-0"
-                        style={{ borderColor: '#ABABAB', color: colors.textSecondary }}
-                      >
-                        Change
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                {/* Right: Totals */}
-                <div className="flex-[2] border rounded-[2px] p-2" style={{ borderColor: '#C0C0C0' }}>
-                  <div className="space-y-0.5">
-                    <div className="flex justify-between text-[11px]">
-                      <span style={{ color: colors.textSecondary }}>Sub Total</span>
-                      <span className="font-mono tabular-nums" style={{ color: colors.textPrimary }}>R {subTotal.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between text-[11px]">
-                      <span style={{ color: colors.textSecondary }}>
-                        VAT ({customer?.zeroRated ? '0%' : '15%'})
-                      </span>
-                      <span className="font-mono tabular-nums" style={{ color: colors.textSecondary }}>R {vatAmount.toFixed(2)}</span>
-                    </div>
-                    <div className="h-px my-1" style={{ background: '#C0C0C0' }} />
-                    <div className="flex justify-between text-[12px]">
-                      <span className="font-bold" style={{ color: colors.textPrimary }}>Total</span>
-                      <span className="font-mono font-bold tabular-nums" style={{ color: '#217346' }}>R {grandTotal.toFixed(2)}</span>
-                    </div>
-                    {deductLoan && loanDeduct.gt(0) && (
-                      <>
-                        <div className="flex justify-between text-[11px]">
-                          <span style={{ color: '#92400E' }}>Loan Deduction</span>
-                          <span className="font-mono tabular-nums" style={{ color: '#92400E' }}>− R {loanDeduct.toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between text-[12px]">
-                          <span className="font-bold" style={{ color: '#1B3A6B' }}>Cash to Pay</span>
-                          <span className="font-mono font-bold tabular-nums" style={{ color: '#185ABD' }}>R {cashToPay.toFixed(2)}</span>
-                        </div>
-                      </>
+            {/* Selected customer details */}
+            {customer && (
+              <div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto 1fr', gap: '3px 14px', alignItems: 'center', marginBottom: 4 }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: '#1B3A6B' }}>Name</span>
+                  <span style={{ fontSize: 11, color: '#212529' }}>
+                    {customer.firstName} {customer.lastName}
+                    {customer.blacklisted && (
+                      <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 700, color: '#EF4444' }}>⚠ Blacklisted</span>
                     )}
+                  </span>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: '#1B3A6B' }}>ID Num</span>
+                  <span style={{ fontSize: 11, fontFamily: 'monospace', color: '#212529' }}>{customer.idNumber}</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: '#1B3A6B' }}>Tel</span>
+                  <span style={{ fontSize: 11, color: '#212529' }}>{customer.phone}</span>
+                  <span />
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    {customer.priceGroupId && (
+                      <span style={{ fontSize: 10, padding: '1px 5px', background: '#DBEAFE', color: '#1D4ED8', borderRadius: 2 }}>Custom Pricing</span>
+                    )}
+                    {customer.zeroRated && (
+                      <span style={{ fontSize: 10, padding: '1px 5px', background: '#FEF9C3', color: '#854D0E', borderRadius: 2 }}>Zero Rated</span>
+                    )}
+                    {!showAllProducts && (customer.tradeCommodities?.length ?? 0) > 0 && (
+                      <button onClick={() => setShowAllProducts(true)}
+                        style={{ fontSize: 10, padding: '1px 6px', border: '1px solid #ABABAB', borderRadius: 2, color: '#6C757D', background: 'none', cursor: 'pointer' }}>
+                        Show All Products
+                      </button>
+                    )}
+                    <button onClick={() => setCustomer(null)}
+                      style={{ fontSize: 10, padding: '1px 8px', border: '1px solid #ABABAB', borderRadius: 2, color: '#6C757D', background: 'none', cursor: 'pointer', marginLeft: 'auto' }}>
+                      Change
+                    </button>
                   </div>
-
-                  {/* Outstanding loan */}
-                  {customer && hasOutstandingLoan && (
-                    <div className="mt-2 p-1.5 rounded-[2px] border text-[11px]" style={{ borderColor: '#F59E0B', background: '#FFFBEB' }}>
-                      <div className="flex items-center gap-1 font-semibold" style={{ color: '#92400E' }}>
-                        <AlertTriangle className="w-3 h-3" />
-                        Outstanding loan: R {new Decimal(outstandingLoanAmount).toFixed(2)}
-                      </div>
-                      <label className="flex items-center gap-1.5 mt-1 cursor-pointer" style={{ color: '#78350F' }}>
-                        <input
-                          type="checkbox"
-                          className="w-3 h-3 accent-amber-600"
-                          checked={deductLoan}
-                          disabled={paymentType === 'unpaid'}
-                          onChange={(e) => {
-                            setDeductLoan(e.target.checked)
-                            if (e.target.checked) {
-                              setDeductionAmount(Decimal.min(new Decimal(outstandingLoanAmount), grandTotal).toFixed(2))
-                            } else {
-                              setDeductionAmount('')
-                            }
-                          }}
-                        />
-                        Deduct from payout
-                        {deductLoan && (
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={deductionAmount}
-                            onChange={(e) => setDeductionAmount(e.target.value)}
-                            className="ml-1 w-20 px-1 py-0 rounded border font-mono text-[11px] focus:outline-none"
-                            style={{ borderColor: '#D97706' }}
-                          />
-                        )}
-                      </label>
-                    </div>
-                  )}
                 </div>
               </div>
-            </div>
+            )}
+          </div>
 
-            {/* Comments */}
-            <div className="flex items-center gap-2">
-              <label className="text-[11px] font-semibold shrink-0" style={{ color: '#374151' }}>Comments:</label>
-              <input
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Any remarks…"
-                className="flex-1 px-2 py-0.5 text-[12px] border rounded-[2px] bg-white focus:outline-none focus:border-[#0078D7]"
-                style={{ borderColor: '#ABABAB', color: '#212529' }}
-              />
-            </div>
-
-            {/* Payment Type radios */}
-            <div className="flex items-center gap-4">
-              <label className="text-[11px] font-semibold shrink-0" style={{ color: '#374151' }}>Payment Type:</label>
-              {(['unpaid', 'cash', 'cheque', 'eft', 'amplopay'] as const).map((type) => (
-                <label key={type} className="flex items-center gap-1.5 text-[12px] cursor-pointer" style={{ color: '#374151' }}>
+          {/* Outstanding loan warning */}
+          {customer && hasOutstandingLoan && (
+            <div style={{ flexShrink: 0, margin: '0 10px 4px', padding: '5px 8px', border: '1px solid #F59E0B', borderRadius: 2, background: '#FFFBEB' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, color: '#92400E' }}>
+                <AlertTriangle style={{ width: 12, height: 12 }} />
+                Outstanding loan: R {new Decimal(outstandingLoanAmount).toFixed(2)}
+              </div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#78350F', cursor: 'pointer', marginTop: 3 }}>
+                <input
+                  type="checkbox"
+                  checked={deductLoan}
+                  disabled={paymentType === 'unpaid'}
+                  onChange={(e) => {
+                    setDeductLoan(e.target.checked)
+                    if (e.target.checked) {
+                      setDeductionAmount(Decimal.min(new Decimal(outstandingLoanAmount), grandTotal).toFixed(2))
+                    } else {
+                      setDeductionAmount('')
+                    }
+                  }}
+                />
+                Deduct from payout
+                {deductLoan && (
                   <input
-                    type="radio"
-                    name="paymentType"
-                    checked={paymentType === type}
-                    onChange={() => {
-                      setPaymentType(type)
-                      if (type === 'unpaid') { setDeductLoan(false); setDeductionAmount('') }
-                    }}
-                    className="w-3.5 h-3.5"
+                    type="number" min="0" step="0.01" value={deductionAmount}
+                    onChange={(e) => setDeductionAmount(e.target.value)}
+                    style={{ width: 80, fontSize: 11, border: '1px solid #D97706', borderRadius: 2, padding: '1px 4px', outline: 'none' }}
                   />
-                  {type === 'unpaid' ? 'Unpaid' : type === 'eft' ? 'EFT' : type === 'amplopay' ? 'AmploPay' : type.charAt(0).toUpperCase() + type.slice(1)}
-                </label>
+                )}
+              </label>
+            </div>
+          )}
+
+          {/* Comments */}
+          <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8, padding: '5px 10px', borderBottom: '1px solid #E0E0E0' }}>
+            <label style={{ fontSize: 11, fontWeight: 600, color: '#374151', whiteSpace: 'nowrap' }}>Comments:</label>
+            <input
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Any remarks…"
+              style={{ flex: 1, fontSize: 12, padding: '3px 8px', border: '1px solid #ABABAB', borderRadius: 2, color: '#212529', outline: 'none' }}
+            />
+          </div>
+
+          {/* Payment Type */}
+          <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 14, padding: '4px 10px', borderBottom: '1px solid #E0E0E0' }}>
+            <label style={{ fontSize: 11, fontWeight: 600, color: '#374151', whiteSpace: 'nowrap' }}>Payment Type:</label>
+            {(['unpaid', 'cash', 'cheque', 'eft', 'amplopay'] as const).map((type) => (
+              <label key={type} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#374151', cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="paymentType"
+                  checked={paymentType === type}
+                  onChange={() => {
+                    setPaymentType(type)
+                    if (type === 'unpaid') { setDeductLoan(false); setDeductionAmount('') }
+                  }}
+                  style={{ width: 13, height: 13 }}
+                />
+                {type === 'unpaid' ? 'Unpaid' : type === 'eft' ? 'EFT' : type === 'amplopay' ? 'AmploPay' : type.charAt(0).toUpperCase() + type.slice(1)}
+              </label>
+            ))}
+          </div>
+
+          {/* ── Product Grid ─────────────────────────────────────────────── */}
+          <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', border: '1px solid #B0B0B0', margin: '0 10px 0' }}>
+
+            {/* Grid header */}
+            <div
+              style={{
+                ...headerBg,
+                display: 'grid',
+                gridTemplateColumns: '1fr 72px 80px 80px 70px 80px 28px 26px',
+                gap: 4,
+                padding: '4px 8px',
+                flexShrink: 0,
+              }}
+            >
+              {['Product', 'Qty (kg)', 'Price (R)', 'Sub Total', 'VAT', 'Total', '', ''].map((h, i) => (
+                <span key={i} style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#374151' }}>{h}</span>
               ))}
             </div>
 
-            {/* ── Product Entry ──────────────────────────────────────── */}
-            <div className="border" style={{ borderColor: '#B0B0B0' }}>
-
-              {/* Grid header */}
-              <div
-                className="grid items-center px-2 py-1"
-                style={{
-                  ...headerBg,
-                  gridTemplateColumns: '1fr 72px 80px 80px 70px 80px 28px 26px',
-                  gap: '4px',
-                }}
-              >
-                {['Product', 'Qty (kg)', 'Price (R)', 'Sub Total', 'VAT', 'Total', '', ''].map((h, i) => (
-                  <span key={i} className="text-[10px] font-bold uppercase tracking-wide" style={{ color: '#374151' }}>{h}</span>
-                ))}
-              </div>
-
-              {/* Lines */}
+            {/* Scrollable lines */}
+            <div style={{ flex: 1, overflowY: 'auto' }}>
               {lines.map((line) => {
                 const qty      = new Decimal(line.quantity  || '0')
                 const price    = new Decimal(line.unitPrice || '0')
@@ -555,13 +579,18 @@ export default function NewPurchasePage() {
                   <div key={line.key} style={{ borderTop: '1px solid #E0E0E0' }}>
                     {/* Main row */}
                     <div
-                      className="grid items-center px-2 py-1"
-                      style={{ gridTemplateColumns: '1fr 72px 80px 80px 70px 80px 28px 26px', gap: '4px', minHeight: 32 }}
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: '1fr 72px 80px 80px 70px 80px 28px 26px',
+                        gap: 4,
+                        padding: '4px 8px',
+                        alignItems: 'center',
+                        minHeight: 32,
+                      }}
                     >
                       {/* Product */}
                       <select
-                        className="h-6 w-full rounded-[2px] border px-1 text-[11px] bg-white focus:outline-none"
-                        style={{ borderColor: '#ABABAB', color: '#212529' }}
+                        style={{ height: 24, width: '100%', borderRadius: 2, border: '1px solid #ABABAB', padding: '0 4px', fontSize: 11, color: '#212529', background: '#fff', outline: 'none' }}
                         value={line.productId}
                         onChange={(e) => onProductSelect(line.key, e.target.value)}
                       >
@@ -580,8 +609,7 @@ export default function NewPurchasePage() {
                         type="number" step="0.001" min="0" placeholder="0.000"
                         value={line.quantity}
                         onChange={(e) => patchLine(line.key, { quantity: e.target.value })}
-                        className={cellInput}
-                        style={cellInputStyle}
+                        className={cellInput} style={cellInputStyle}
                       />
 
                       {/* Price */}
@@ -589,22 +617,21 @@ export default function NewPurchasePage() {
                         type="number" step="0.01" min="0" placeholder="0.00"
                         value={line.unitPrice}
                         onChange={(e) => patchLine(line.key, { unitPrice: e.target.value })}
-                        className={cellInput}
-                        style={cellInputStyle}
+                        className={cellInput} style={cellInputStyle}
                       />
 
                       {/* Sub Total */}
-                      <span className="text-[11px] font-mono tabular-nums px-1" style={{ color: qty.gt(0) ? '#212529' : '#9CA3AF' }}>
+                      <span style={{ fontSize: 11, fontFamily: 'monospace', padding: '0 4px', color: qty.gt(0) ? '#212529' : '#9CA3AF' }}>
                         {qty.gt(0) ? `R ${lineSub.toFixed(2)}` : '—'}
                       </span>
 
                       {/* VAT */}
-                      <span className="text-[11px] font-mono tabular-nums px-1" style={{ color: qty.gt(0) ? '#212529' : '#9CA3AF' }}>
+                      <span style={{ fontSize: 11, fontFamily: 'monospace', padding: '0 4px', color: qty.gt(0) ? '#212529' : '#9CA3AF' }}>
                         {qty.gt(0) ? `R ${lineVat.toFixed(2)}` : '—'}
                       </span>
 
                       {/* Total */}
-                      <span className="text-[11px] font-mono tabular-nums px-1 font-semibold" style={{ color: qty.gt(0) ? '#217346' : '#9CA3AF' }}>
+                      <span style={{ fontSize: 11, fontFamily: 'monospace', fontWeight: 600, padding: '0 4px', color: qty.gt(0) ? '#217346' : '#9CA3AF' }}>
                         {qty.gt(0) ? `R ${lineTot.toFixed(2)}` : '—'}
                       </span>
 
@@ -613,12 +640,14 @@ export default function NewPurchasePage() {
                         type="button"
                         title="Toggle weighing"
                         onClick={() => patchLine(line.key, { weighMode: !line.weighMode })}
-                        className="h-6 w-6 flex items-center justify-center rounded-[2px]"
-                        style={line.weighMode
-                          ? { background: '#185ABD', color: '#fff' }
-                          : { border: '1px solid #ABABAB', color: '#6C757D' }}
+                        style={{
+                          height: 24, width: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 2, cursor: 'pointer',
+                          ...(line.weighMode
+                            ? { background: '#185ABD', color: '#fff', border: 'none' }
+                            : { border: '1px solid #ABABAB', color: '#6C757D', background: 'transparent' }),
+                        }}
                       >
-                        <Scale className="w-3 h-3" />
+                        <Scale style={{ width: 12, height: 12 }} />
                       </button>
 
                       {/* Delete */}
@@ -626,24 +655,22 @@ export default function NewPurchasePage() {
                         type="button"
                         onClick={() => removeLine(line.key)}
                         disabled={lines.length === 1}
-                        className="h-6 w-6 flex items-center justify-center rounded-[2px] disabled:opacity-25"
-                        style={{ color: '#9CA3AF' }}
+                        style={{ height: 24, width: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 2, background: 'transparent', border: 'none', color: '#9CA3AF', cursor: lines.length === 1 ? 'not-allowed' : 'pointer', opacity: lines.length === 1 ? 0.25 : 1 }}
                         onMouseEnter={(e) => { if (lines.length > 1) (e.currentTarget as HTMLButtonElement).style.color = '#EF4444' }}
                         onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = '#9CA3AF' }}
                       >
-                        <Trash2 className="w-3 h-3" />
+                        <Trash2 style={{ width: 12, height: 12 }} />
                       </button>
                     </div>
 
                     {/* Weigh sub-row */}
                     {line.weighMode && (
                       <div
-                        className="px-3 pb-2 pt-1.5 flex items-end gap-3 flex-wrap"
-                        style={{ background: '#EFF6FF', borderTop: '1px solid #BFDBFE' }}
+                        style={{ padding: '6px 12px', display: 'flex', alignItems: 'flex-end', gap: 12, flexWrap: 'wrap', background: '#EFF6FF', borderTop: '1px solid #BFDBFE' }}
                       >
                         {/* Scale selector */}
-                        <div className="flex flex-col gap-0.5">
-                          <span className="text-[10px] font-medium" style={{ color: colors.textSecondary }}>Scale</span>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                          <span style={{ fontSize: 10, fontWeight: 500, color: colors.textSecondary }}>Scale</span>
                           <Select
                             value={line.selectedScale}
                             onValueChange={(v) => patchLine(line.key, { selectedScale: v as '1' | '2' | '3' })}
@@ -660,58 +687,51 @@ export default function NewPurchasePage() {
                         </div>
 
                         {/* Gross */}
-                        <div className="flex flex-col gap-0.5">
-                          <span className="text-[10px] font-medium" style={{ color: colors.textSecondary }}>Gross (kg)</span>
-                          <div className="flex gap-1">
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                          <span style={{ fontSize: 10, fontWeight: 500, color: colors.textSecondary }}>Gross (kg)</span>
+                          <div style={{ display: 'flex', gap: 4 }}>
                             <input
                               type="number" step="0.001" placeholder="0.000"
                               value={line.grossQty}
                               onChange={(e) => recomputeNet(line.key, e.target.value, line.tareQty, line.deductionQty)}
-                              className="h-6 w-20 rounded-[2px] border px-1.5 text-[11px] font-mono focus:outline-none"
-                              style={{ borderColor: '#ABABAB' }}
+                              style={{ height: 24, width: 76, borderRadius: 2, border: '1px solid #ABABAB', padding: '0 6px', fontSize: 11, fontFamily: 'monospace', outline: 'none' }}
                             />
                             <button
                               type="button"
                               disabled={line.weighingGross}
                               onClick={() => handleWeighGross(line)}
-                              className="h-6 px-1.5 rounded-[2px] text-white flex items-center disabled:opacity-60"
-                              style={{ background: '#185ABD' }}
+                              style={{ height: 24, padding: '0 6px', borderRadius: 2, background: '#185ABD', border: 'none', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', opacity: line.weighingGross ? 0.6 : 1 }}
                             >
-                              {line.weighingGross ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                              {line.weighingGross ? <Loader2 style={{ width: 12, height: 12, animation: 'spin 1s linear infinite' }} /> : <RefreshCw style={{ width: 12, height: 12 }} />}
                             </button>
                           </div>
                         </div>
 
                         {/* Tare */}
-                        <div className="flex flex-col gap-0.5">
-                          <span className="text-[10px] font-medium" style={{ color: colors.textSecondary }}>Tare (kg)</span>
-                          <div className="flex gap-1">
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                          <span style={{ fontSize: 10, fontWeight: 500, color: colors.textSecondary }}>Tare (kg)</span>
+                          <div style={{ display: 'flex', gap: 4 }}>
                             <input
                               type="number" step="0.001" placeholder="0.000"
                               value={line.tareQty}
                               onChange={(e) => recomputeNet(line.key, line.grossQty, e.target.value, line.deductionQty)}
-                              className="h-6 w-20 rounded-[2px] border px-1.5 text-[11px] font-mono focus:outline-none"
-                              style={{ borderColor: '#ABABAB' }}
+                              style={{ height: 24, width: 76, borderRadius: 2, border: '1px solid #ABABAB', padding: '0 6px', fontSize: 11, fontFamily: 'monospace', outline: 'none' }}
                             />
                             <button
                               type="button"
                               disabled={line.weighingTare}
                               onClick={() => handleWeighTare(line)}
-                              className="h-6 px-1.5 rounded-[2px] flex items-center disabled:opacity-60"
-                              style={{ border: '1px solid #ABABAB', color: '#6C757D' }}
+                              style={{ height: 24, padding: '0 6px', borderRadius: 2, border: '1px solid #ABABAB', background: '#fff', color: '#6C757D', cursor: 'pointer', display: 'flex', alignItems: 'center', opacity: line.weighingTare ? 0.6 : 1 }}
                             >
-                              {line.weighingTare ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                              {line.weighingTare ? <Loader2 style={{ width: 12, height: 12, animation: 'spin 1s linear infinite' }} /> : <RefreshCw style={{ width: 12, height: 12 }} />}
                             </button>
                           </div>
                         </div>
 
                         {/* Net display */}
-                        <div className="flex flex-col gap-0.5">
-                          <span className="text-[10px] font-medium" style={{ color: colors.textSecondary }}>Net (kg)</span>
-                          <div
-                            className="h-6 flex items-center px-1.5 rounded-[2px] border font-mono text-[11px] font-bold min-w-[56px]"
-                            style={{ borderColor: colors.netWeightBorder, background: colors.netWeightBg, color: colors.netWeightText }}
-                          >
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                          <span style={{ fontSize: 10, fontWeight: 500, color: colors.textSecondary }}>Net (kg)</span>
+                          <div style={{ height: 24, display: 'flex', alignItems: 'center', padding: '0 6px', borderRadius: 2, border: `1px solid ${colors.netWeightBorder}`, background: colors.netWeightBg, fontFamily: 'monospace', fontSize: 11, fontWeight: 700, color: colors.netWeightText, minWidth: 56 }}>
                             {Decimal.max(
                               new Decimal(line.grossQty || '0').minus(new Decimal(line.tareQty || '0')),
                               new Decimal('0'),
@@ -720,8 +740,8 @@ export default function NewPurchasePage() {
                         </div>
 
                         {/* Deduction */}
-                        <div className="flex flex-col gap-0.5">
-                          <span className="text-[10px] font-medium" style={{ color: colors.textSecondary }}>Deduction (kg)</span>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                          <span style={{ fontSize: 10, fontWeight: 500, color: colors.textSecondary }}>Deduction (kg)</span>
                           <input
                             type="number" step="0.001" min="0" placeholder="0.000"
                             value={line.deductionQty}
@@ -733,45 +753,39 @@ export default function NewPurchasePage() {
                               const paid = Decimal.max(net.minus(new Decimal(e.target.value || '0')), new Decimal('0'))
                               patchLine(line.key, { deductionQty: e.target.value, quantity: paid.toFixed(3) })
                             }}
-                            className="h-6 w-20 rounded-[2px] border px-1.5 text-[11px] font-mono focus:outline-none"
-                            style={{ borderColor: '#ABABAB' }}
+                            style={{ height: 24, width: 76, borderRadius: 2, border: '1px solid #ABABAB', padding: '0 6px', fontSize: 11, fontFamily: 'monospace', outline: 'none' }}
                           />
                         </div>
 
                         {parseFloat(line.deductionQty || '0') > 0 && (
-                          <div className="flex flex-col gap-0.5">
-                            <span className="text-[10px] font-semibold" style={{ color: '#217346' }}>Paid Qty (kg)</span>
-                            <div
-                              className="h-6 flex items-center px-1.5 rounded-[2px] border font-mono text-[11px] font-bold min-w-[56px]"
-                              style={{ border: '1px solid #217346', background: '#F0FDF4', color: '#217346' }}
-                            >
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            <span style={{ fontSize: 10, fontWeight: 600, color: '#217346' }}>Paid Qty (kg)</span>
+                            <div style={{ height: 24, display: 'flex', alignItems: 'center', padding: '0 6px', borderRadius: 2, border: '1px solid #217346', background: '#F0FDF4', fontFamily: 'monospace', fontSize: 11, fontWeight: 700, color: '#217346', minWidth: 56 }}>
                               {line.quantity || '0.000'}
                             </div>
                           </div>
                         )}
 
                         {line.tareQty && parseFloat(line.tareQty) > 0 && (
-                          <div className="flex flex-col gap-0.5">
-                            <span className="text-[10px] font-medium" style={{ color: colors.textSecondary }}>Tare Reason</span>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            <span style={{ fontSize: 10, fontWeight: 500, color: colors.textSecondary }}>Tare Reason</span>
                             <input
                               placeholder="e.g. Bag…"
                               value={line.tareReason}
                               onChange={(e) => patchLine(line.key, { tareReason: e.target.value })}
-                              className="h-6 w-28 rounded-[2px] border px-1.5 text-[11px] focus:outline-none"
-                              style={{ borderColor: '#ABABAB' }}
+                              style={{ height: 24, width: 100, borderRadius: 2, border: '1px solid #ABABAB', padding: '0 6px', fontSize: 11, outline: 'none' }}
                             />
                           </div>
                         )}
 
                         {parseFloat(line.deductionQty || '0') > 0 && (
-                          <div className="flex flex-col gap-0.5">
-                            <span className="text-[10px] font-medium" style={{ color: colors.textSecondary }}>Deduction Reason</span>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            <span style={{ fontSize: 10, fontWeight: 500, color: colors.textSecondary }}>Deduction Reason</span>
                             <input
                               placeholder="e.g. Contamination…"
                               value={line.deductionReason}
                               onChange={(e) => patchLine(line.key, { deductionReason: e.target.value })}
-                              className="h-6 w-32 rounded-[2px] border px-1.5 text-[11px] focus:outline-none"
-                              style={{ borderColor: '#ABABAB' }}
+                              style={{ height: 24, width: 120, borderRadius: 2, border: '1px solid #ABABAB', padding: '0 6px', fontSize: 11, outline: 'none' }}
                             />
                           </div>
                         )}
@@ -780,49 +794,179 @@ export default function NewPurchasePage() {
                   </div>
                 )
               })}
-
-              {/* Add line */}
-              <div className="px-2 py-1.5" style={{ borderTop: '1px solid #E0E0E0', background: '#FAFAFA' }}>
-                <button
-                  type="button"
-                  onClick={addLine}
-                  className="flex items-center gap-1 text-[11px] font-medium"
-                  style={{ color: '#185ABD' }}
-                >
-                  <Plus className="w-3 h-3" /> Add Line
-                </button>
-              </div>
             </div>
 
+            {/* Add line */}
+            <div style={{ padding: '5px 8px', borderTop: '1px solid #E0E0E0', background: '#FAFAFA', flexShrink: 0 }}>
+              <button
+                type="button"
+                onClick={addLine}
+                style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 500, color: '#185ABD', background: 'none', border: 'none', cursor: 'pointer' }}
+              >
+                <Plus style={{ width: 12, height: 12 }} /> Add Line
+              </button>
+            </div>
           </div>
-        </div>
 
-        {/* ── Action bar ────────────────────────────────────── */}
-        <div
-          className="shrink-0 flex items-center justify-between px-4 py-2 border-t"
-          style={{ borderColor: '#B0B0B0', background: 'linear-gradient(180deg,#F5F5F5 0%,#E8E8E8 100%)' }}
-        >
-          <button
-            type="button"
-            onClick={() => submitPurchase(true)}
-            disabled={submitting || !customer || !!customer.blacklisted}
-            className="h-7 px-5 rounded-sm text-[12px] font-medium disabled:opacity-40"
-            style={{ background: '#FFFFFF', border: '1px solid #C9A020', color: '#92400E' }}
-          >
-            {submitting ? <Loader2 className="w-3.5 h-3.5 animate-spin inline" /> : 'Save as Unpaid'}
-          </button>
-          <button
-            type="button"
-            onClick={() => submitPurchase(false)}
-            disabled={submitting || !customer || !!customer.blacklisted || paymentType === 'unpaid'}
-            className="h-7 px-6 rounded-sm text-[12px] font-bold text-white disabled:opacity-40 flex items-center gap-2"
-            style={{ background: '#217346', border: '1px solid #176338' }}
-          >
-            {submitting
-              ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Saving…</>
-              : `Save · R ${cashToPay.toFixed(2)}`}
-          </button>
+          {/* Totals */}
+          <div style={{ flexShrink: 0, padding: '6px 10px', borderTop: '2px solid #B0B0B0', background: '#F8F9FA', display: 'flex', justifyContent: 'flex-end' }}>
+            <div style={{ minWidth: 220, display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
+                <span style={{ color: '#6C757D' }}>Sub Total</span>
+                <span style={{ fontFamily: 'monospace', color: '#212529' }}>R {subTotal.toFixed(2)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
+                <span style={{ color: '#6C757D' }}>VAT ({customer?.zeroRated ? '0%' : '15%'})</span>
+                <span style={{ fontFamily: 'monospace', color: '#6C757D' }}>R {vatAmount.toFixed(2)}</span>
+              </div>
+              <div style={{ height: 1, background: '#C0C0C0', margin: '2px 0' }} />
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 700 }}>
+                <span style={{ color: '#212529' }}>Total</span>
+                <span style={{ fontFamily: 'monospace', color: '#217346' }}>R {grandTotal.toFixed(2)}</span>
+              </div>
+              {deductLoan && loanDeduct.gt(0) && (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
+                    <span style={{ color: '#92400E' }}>Loan Deduction</span>
+                    <span style={{ fontFamily: 'monospace', color: '#92400E' }}>− R {loanDeduct.toFixed(2)}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 700 }}>
+                    <span style={{ color: '#1B3A6B' }}>Cash to Pay</span>
+                    <span style={{ fontFamily: 'monospace', color: '#185ABD' }}>R {cashToPay.toFixed(2)}</span>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
         </div>
+        {/* end LEFT COLUMN */}
+
+        {/* ── RIGHT COLUMN — Scales + Photo ────────────────────────────── */}
+        <div style={{ width: 250, display: 'flex', flexDirection: 'column', borderLeft: '1px solid #C0C0C0', flexShrink: 0 }}>
+
+          {/* Scale 1 */}
+          <div style={{ padding: '8px 10px', borderBottom: '1px solid #C0C0C0' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: '#1B3A6B' }}>Scale 1:</span>
+              <button
+                onClick={handleScale1Read}
+                disabled={readingScale1}
+                style={{ fontSize: 10, padding: '1px 8px', background: '#E0E0E0', border: '1px solid #999', borderRadius: 2, cursor: readingScale1 ? 'not-allowed' : 'pointer', opacity: readingScale1 ? 0.6 : 1 }}
+              >
+                {readingScale1 ? <Loader2 style={{ width: 10, height: 10, display: 'inline', animation: 'spin 1s linear infinite' }} /> : 'Read'}
+              </button>
+            </div>
+            <div style={{ background: '#0A1628', color: '#00FF88', fontFamily: 'monospace', fontSize: 26, fontWeight: 700, textAlign: 'center', padding: '6px 4px', borderRadius: 3, letterSpacing: 3 }}>
+              {scale1 !== null ? `${scale1} kg` : '─'}
+            </div>
+          </div>
+
+          {/* Scale 2 */}
+          <div style={{ padding: '8px 10px', borderBottom: '1px solid #C0C0C0' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: '#1B3A6B' }}>Scale 2:</span>
+              <button
+                onClick={handleScale2Read}
+                disabled={readingScale2}
+                style={{ fontSize: 10, padding: '1px 8px', background: '#E0E0E0', border: '1px solid #999', borderRadius: 2, cursor: readingScale2 ? 'not-allowed' : 'pointer', opacity: readingScale2 ? 0.6 : 1 }}
+              >
+                {readingScale2 ? <Loader2 style={{ width: 10, height: 10, display: 'inline', animation: 'spin 1s linear infinite' }} /> : 'Read'}
+              </button>
+            </div>
+            <div style={{ background: '#0A1628', color: '#00FF88', fontFamily: 'monospace', fontSize: 26, fontWeight: 700, textAlign: 'center', padding: '6px 4px', borderRadius: 3, letterSpacing: 3 }}>
+              {scale2 !== null ? `${scale2} kg` : '─'}
+            </div>
+          </div>
+
+          {/* Product Photo */}
+          <div style={{ flex: 1, padding: '8px 10px', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: '#1B3A6B' }}>Product Photo</span>
+              {photoPreview && (
+                <button
+                  onClick={() => { setPhotoFile(null); setPhotoPreview(null) }}
+                  style={{ fontSize: 10, color: '#EF4444', background: 'none', border: 'none', cursor: 'pointer' }}
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+
+            <label
+              style={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                border: photoPreview ? '1px solid #C0C0C0' : '2px dashed #ABABAB',
+                borderRadius: 2,
+                cursor: 'pointer',
+                minHeight: 140,
+                overflow: 'hidden',
+                position: 'relative',
+                background: '#FAFAFA',
+              }}
+            >
+              {photoPreview ? (
+                <img
+                  src={photoPreview}
+                  alt="Product"
+                  style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'contain' }}
+                />
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                  <Camera style={{ width: 28, height: 28, color: '#9CA3AF' }} />
+                  <span style={{ fontSize: 11, color: '#6C757D', textAlign: 'center', lineHeight: 1.4 }}>
+                    Click to add<br />product photo
+                  </span>
+                </div>
+              )}
+              <input
+                ref={photoInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  const f = e.target.files?.[0]
+                  if (!f) return
+                  setPhotoFile(f)
+                  setPhotoPreview(URL.createObjectURL(f))
+                  e.target.value = ''
+                }}
+              />
+            </label>
+          </div>
+
+        </div>
+        {/* end RIGHT COLUMN */}
+
+      </div>
+      {/* end outer bordered container */}
+
+      {/* ── Action bar ────────────────────────────────────────────────────── */}
+      <div
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 16px', borderTop: '2px solid #B0B0B0', background: 'linear-gradient(180deg,#F5F5F5 0%,#E8E8E8 100%)', flexShrink: 0 }}
+      >
+        <button
+          type="button"
+          onClick={() => submitPurchase(true)}
+          disabled={submitting || (!!customer && !!customer.blacklisted)}
+          style={{ height: 28, padding: '0 20px', borderRadius: 2, fontSize: 12, fontWeight: 500, background: '#FFF', border: '1px solid #C9A020', color: '#92400E', cursor: 'pointer', opacity: submitting || (!!customer && !!customer.blacklisted) ? 0.4 : 1 }}
+        >
+          {submitting ? <Loader2 style={{ width: 13, height: 13, display: 'inline', animation: 'spin 1s linear infinite' }} /> : 'Save as Unpaid'}
+        </button>
+        <button
+          type="button"
+          onClick={() => submitPurchase(false)}
+          disabled={submitting || (!!customer && !!customer.blacklisted) || paymentType === 'unpaid'}
+          style={{ height: 28, padding: '0 24px', borderRadius: 2, fontSize: 12, fontWeight: 700, background: '#217346', border: '1px solid #176338', color: '#FFF', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, opacity: submitting || (!!customer && !!customer.blacklisted) || paymentType === 'unpaid' ? 0.4 : 1 }}
+        >
+          {submitting
+            ? <><Loader2 style={{ width: 13, height: 13, animation: 'spin 1s linear infinite' }} /> Saving…</>
+            : `Save · R ${cashToPay.toFixed(2)}`}
+        </button>
       </div>
 
       {/* Print result dialog */}
@@ -836,6 +980,7 @@ export default function NewPurchasePage() {
           onDone={() => router.push('/app/dashboard')}
         />
       )}
+
     </div>
   )
 }
