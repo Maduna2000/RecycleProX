@@ -1,10 +1,10 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import { useRouter, usePathname } from 'next/navigation'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Loader2, UserPlus, Search } from 'lucide-react'
-import { CreateCustomerModal } from '@/components/customers/CreateCustomerModal'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -28,11 +28,12 @@ interface Props {
 // ─── AccountSelectorPanel ─────────────────────────────────────────────────────
 
 export function AccountSelectorPanel({ onSelect }: Props) {
-  const [query,      setQuery]   = useState('')
-  const [results,    setResults] = useState<AccountCustomer[]>([])
-  const [loading,    setLoading] = useState(false)
-  const [searched,   setSearched] = useState(false)
-  const [createOpen, setCreate]  = useState(false)
+  const router    = useRouter()
+  const pathname  = usePathname()
+  const [query,    setQuery]   = useState('')
+  const [results,  setResults] = useState<AccountCustomer[]>([])
+  const [loading,  setLoading] = useState(false)
+  const [searched, setSearched] = useState(false)
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -139,7 +140,7 @@ export function AccountSelectorPanel({ onSelect }: Props) {
         </p>
       )}
 
-      {/* Create new account */}
+      {/* Create new account — navigates to the standalone form; returnTo brings user back here */}
       <div className="flex items-center justify-between pt-0.5">
         <p className="text-[10px]" style={{ color: '#6C757D' }}>
           {query.length < 2 ? 'Type 2+ characters to search' : ''}
@@ -148,35 +149,12 @@ export function AccountSelectorPanel({ onSelect }: Props) {
           type="button"
           size="sm"
           variant="outline"
-          onClick={() => setCreate(true)}
+          onClick={() => router.push(`/app/customers/new?returnTo=${encodeURIComponent(pathname)}`)}
           className="h-7 px-2 text-[11px] flex items-center gap-1"
         >
           <UserPlus className="w-3.5 h-3.5" /> Create New Account
         </Button>
       </div>
-
-      {/* Create account modal */}
-      <CreateCustomerModal
-        open={createOpen}
-        defaultType="account"
-        onClose={() => setCreate(false)}
-        onSuccess={(customer) => {
-          setCreate(false)
-          if (customer) {
-            onSelect({
-              id:              customer.id,
-              firstName:       customer.firstName,
-              lastName:        customer.lastName,
-              idNumber:        customer.idNumber,
-              phone:           customer.phone,
-              blacklisted:     customer.blacklisted,
-              priceGroupId:    customer.priceGroupId,
-              tradeCommodities: null,
-              zeroRated:       customer.zeroRated,
-            })
-          }
-        }}
-      />
     </div>
   )
 }

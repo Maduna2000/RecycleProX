@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import useSWR from 'swr'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -52,7 +52,9 @@ function SectionLine({ label }: { label: string }) {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function NewAccountPage() {
-  const router  = useRouter()
+  const router      = useRouter()
+  const searchParams = useSearchParams()
+  const returnTo    = searchParams.get('returnTo')
   const [loading,      setLoading]      = useState(false)
   const [dupLink,      setDupLink]      = useState<string | null>(null)
   const [bankOpen,     setBankOpen]     = useState(false)
@@ -110,7 +112,7 @@ export default function NewAccountPage() {
         return
       }
       toast.success('Account created successfully')
-      router.push('/app/customers')
+      router.push(returnTo ?? '/app/customers')
     } finally {
       setLoading(false)
     }
@@ -469,7 +471,7 @@ export default function NewAccountPage() {
           </button>
           <button
             type="button"
-            onClick={() => router.push('/app/customers')}
+            onClick={() => router.push(returnTo ?? '/app/customers')}
             disabled={loading}
             className="h-7 px-5 rounded-sm text-[12px] font-medium"
             style={{ background: '#FFFFFF', border: '1px solid #ABABAB', color: '#374151' }}
