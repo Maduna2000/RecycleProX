@@ -31,6 +31,12 @@ yarn-error.log*
 # vercel
 .vercel
 
+# next-pwa generated service worker files — regenerated fresh on every build
+/public/sw.js
+/public/sw.js.map
+/public/workbox-*.js
+/public/workbox-*.js.map
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
