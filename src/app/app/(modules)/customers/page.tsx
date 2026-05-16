@@ -1,11 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import useSWR, { mutate } from 'swr'
 import { AlertTriangle, Loader2, Eye, ShieldBan, ShieldCheck, UserX, Trash2, UserMinus } from 'lucide-react'
 import { DataTable, Avatar, StatusBadge, type Column, type RowAction } from '@/components/ui/DataTable'
-import { CreateCustomerModal } from '@/components/customers/CreateCustomerModal'
 import { CustomerProfileModal } from '@/components/customers/CustomerProfileModal'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -184,17 +183,26 @@ function AccountsList({ onAddCustomer }: { onAddCustomer: () => void }) {
 
   const columns: Column<Customer>[] = [
     {
+      key: 'accountCode',
+      header: 'Acc Code',
+      width: '80px',
+      render: (r) => r.accountCode
+        ? <span className="font-mono text-[11px] font-semibold" style={{ color: '#185ABD' }}>{r.accountCode}</span>
+        : <span className="text-[11px]" style={{ color: colors.textSecondary }}>—</span>,
+    },
+    {
       key: 'idNumber',
       header: 'ID Number',
-      width: '150px',
+      width: '140px',
       render: (r) => <span className="font-mono text-[11px]" style={{ color: colors.textSecondary }}>{r.idNumber}</span>,
     },
     {
       key: 'name',
       header: 'Name',
+      width: '200px',
       render: (r) => (
         <div className="flex items-center gap-2 min-w-0">
-          <Avatar name={`${r.firstName} ${r.lastName}`} size={22} />
+          <Avatar name={`${r.firstName} ${r.lastName}`} size={20} />
           <span className="truncate" style={{ fontSize: 12, fontWeight: 500, color: colors.textPrimary }}>
             {r.firstName} {r.lastName}
             {r.companyName && <span style={{ color: colors.textSecondary, fontWeight: 400 }}> · {r.companyName}</span>}
@@ -206,19 +214,19 @@ function AccountsList({ onAddCustomer }: { onAddCustomer: () => void }) {
     {
       key: 'dealerCategory',
       header: 'Category',
-      width: '110px',
+      width: '100px',
       render: (r) => <DealerCategoryBadge cat={r.dealerCategory} />,
     },
     {
       key: 'primaryFunction',
       header: 'Function',
-      width: '100px',
+      width: '95px',
       render: (r) => <PrimaryFunctionBadge fn={r.primaryFunction} />,
     },
     {
       key: 'priceGroup',
       header: 'Price Group',
-      width: '120px',
+      width: '110px',
       render: (r) => r.priceGroup
         ? <span className="text-[11px] font-medium" style={{ color: colors.process }}>{r.priceGroup.name}</span>
         : <span className="text-[11px]" style={{ color: colors.textSecondary }}>—</span>,
@@ -226,13 +234,61 @@ function AccountsList({ onAddCustomer }: { onAddCustomer: () => void }) {
     {
       key: 'phone',
       header: 'Phone',
-      width: '130px',
+      width: '120px',
       render: (r) => <span className="font-mono text-[11px]" style={{ color: colors.textSecondary }}>{r.phone}</span>,
+    },
+    {
+      key: 'email',
+      header: 'Email',
+      width: '160px',
+      render: (r) => r.email
+        ? <span className="text-[11px] truncate block" style={{ color: colors.textSecondary }}>{r.email}</span>
+        : <span className="text-[11px]" style={{ color: colors.textSecondary }}>—</span>,
+    },
+    {
+      key: 'gender',
+      header: 'Gender',
+      width: '75px',
+      render: (r) => <span className="text-[11px]" style={{ color: colors.textSecondary }}>
+        {r.gender ? r.gender.charAt(0).toUpperCase() + r.gender.slice(1) : '—'}
+      </span>,
+    },
+    {
+      key: 'nationality',
+      header: 'Nationality',
+      width: '100px',
+      render: (r) => <span className="text-[11px]" style={{ color: colors.textSecondary }}>{r.nationality ?? '—'}</span>,
+    },
+    {
+      key: 'dateOfBirth',
+      header: 'DOB',
+      width: '90px',
+      render: (r) => (
+        <span className="font-mono text-[11px]" style={{ color: colors.textSecondary }}>
+          {r.dateOfBirth ? new Date(r.dateOfBirth).toLocaleDateString('en-ZA') : '—'}
+        </span>
+      ),
+    },
+    {
+      key: 'physicalAddress',
+      header: 'Address',
+      width: '170px',
+      render: (r) => r.physicalAddress
+        ? <span className="text-[11px] truncate block" title={r.physicalAddress} style={{ color: colors.textSecondary }}>{r.physicalAddress}</span>
+        : <span className="text-[11px]" style={{ color: colors.textSecondary }}>—</span>,
+    },
+    {
+      key: 'zeroRated',
+      header: 'Zero VAT',
+      width: '75px',
+      render: (r) => r.zeroRated
+        ? <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold" style={{ background: '#FEF3C7', color: '#92400E' }}>Y</span>
+        : <span className="text-[11px]" style={{ color: colors.textSecondary }}>N</span>,
     },
     {
       key: 'createdAt',
       header: 'Registered',
-      width: '95px',
+      width: '90px',
       render: (r) => (
         <span className="font-mono text-[11px]" style={{ color: colors.textSecondary }}>
           {new Date(r.createdAt).toLocaleDateString('en-ZA')}
@@ -438,32 +494,11 @@ function AccountsList({ onAddCustomer }: { onAddCustomer: () => void }) {
 
 // ─── Page ──────────────────────────────────────────────────────────────────────
 export default function AccountsPage() {
-  const router       = useRouter()
-  const searchParams = useSearchParams()
-
-  const [createOpen, setCreateOpen] = useState(false)
-
-  // Auto-open create modal from toolbar ?create=1
-  useEffect(() => {
-    if (searchParams.get('create') === '1') {
-      setCreateOpen(true)
-      router.replace('/app/customers')
-    }
-  }, [searchParams, router])
+  const router = useRouter()
 
   return (
     <PageShell>
-      <AccountsList onAddCustomer={() => setCreateOpen(true)} />
-
-      <CreateCustomerModal
-        open={createOpen}
-        defaultType="account"
-        onClose={() => setCreateOpen(false)}
-        onSuccess={() => {
-          mutate((key) => typeof key === 'string' && key.includes('/api/customers'), undefined, { revalidate: true })
-          setCreateOpen(false)
-        }}
-      />
+      <AccountsList onAddCustomer={() => router.push('/app/customers/new')} />
     </PageShell>
   )
 }

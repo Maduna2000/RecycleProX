@@ -1,23 +1,14 @@
 'use client'
 
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import {
-  ArrowLeft, Plus, Trash2, Loader2, AlertTriangle,
-  PenLine, FileText, Scale, RefreshCw, Camera,
-} from 'lucide-react'
+import { Plus, Trash2, Loader2, AlertTriangle, Scale, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import useSWR from 'swr'
 import { CasualSelectorPanel } from '@/components/customers/CasualSelectorPanel'
 import { AccountSelectorPanel } from '@/components/customers/AccountSelectorPanel'
-import { SignatureCanvas, SignatureCanvasHandle } from '@/components/SignatureCanvas'
 import { PrintResultModal } from '@/components/PrintResultModal'
-import { PhotoUploader } from '@/components/PhotoUploader'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import Decimal from 'decimal.js'
 import { colors } from '@/lib/design-tokens'
 import { useOfflineMutation } from '@/hooks/useOfflineFetch'
@@ -37,20 +28,20 @@ type SelectedCustomer = {
 }
 
 const COMMODITY_MAP: Record<string, string[]> = {
-  'Copper':                 ['copper'],
-  'Aluminium':              ['aluminium'],
-  'Steel (Ferrous)':        ['ferrous'],
-  'Non-Ferrous Metals':     ['non_ferrous'],
-  'Stainless Steel':        ['ferrous', 'non_ferrous'],
-  'Lead':                   ['non_ferrous'],
-  'Brass':                  ['non_ferrous'],
-  'Iron':                   ['ferrous'],
-  'E-Waste (Electronics)':  ['e_waste'],
-  'Plastic':                ['plastic'],
-  'Paper / Cardboard':      ['paper'],
-  'Catalytic Converters':   ['other'],
-  'Batteries':              ['other'],
-  'Other':                  ['other'],
+  'Copper':                ['copper'],
+  'Aluminium':             ['aluminium'],
+  'Steel (Ferrous)':       ['ferrous'],
+  'Non-Ferrous Metals':    ['non_ferrous'],
+  'Stainless Steel':       ['ferrous', 'non_ferrous'],
+  'Lead':                  ['non_ferrous'],
+  'Brass':                 ['non_ferrous'],
+  'Iron':                  ['ferrous'],
+  'E-Waste (Electronics)': ['e_waste'],
+  'Plastic':               ['plastic'],
+  'Paper / Cardboard':     ['paper'],
+  'Catalytic Converters':  ['other'],
+  'Batteries':             ['other'],
+  'Other':                 ['other'],
 }
 
 type LineItem = {
@@ -81,8 +72,6 @@ const emptyLine = (key: number): LineItem => ({
   weighMode: false, selectedScale: '1', weighingGross: false, weighingTare: false,
 })
 
-// ─── useScaleRead ─────────────────────────────────────────────────────────────
-
 function useScaleRead() {
   return async (scaleNumber: '1' | '2' | '3'): Promise<string> => {
     const res = await fetch(`/api/scales/${scaleNumber}/read`)
@@ -95,57 +84,37 @@ function useScaleRead() {
   }
 }
 
-// ─── Field label helper ───────────────────────────────────────────────────────
-
-function PosLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: colors.tabMuted }}>
-      {children}
-    </p>
-  )
-}
-
 // ─── NewPurchasePage ──────────────────────────────────────────────────────────
-
 export default function NewPurchasePage() {
   const router    = useRouter()
   const readScale = useScaleRead()
   const { mutate: offlineMutate } = useOfflineMutation()
 
   const [customer,        setCustomer]        = useState<SelectedCustomer | null>(null)
-  const [customerType,    setCustomerType]    = useState<'casual' | 'account' | null>(null)
+  const [customerType,    setCustomerType]    = useState<'casual' | 'account' | ''>('')
   const [lines,           setLines]           = useState<LineItem[]>([emptyLine(1)])
-  const [paymentMethod,   setPaymentMethod]   = useState<'cash' | 'eft' | 'cheque' | 'amplopay'>('cash')
+  const [paymentType,     setPaymentType]     = useState<'unpaid' | 'cash' | 'eft' | 'cheque' | 'amplopay'>('cash')
   const [notes,           setNotes]           = useState('')
+  const [grvNumber,       setGrvNumber]       = useState('')
+  const [invoiceNo,       setInvoiceNo]       = useState('')
   const [submitting,      setSubmitting]      = useState(false)
   const [keyCounter,      setKeyCounter]      = useState(2)
-  const [sigDialog,       setSigDialog]       = useState<{ purchaseId: string; refNumber: string } | null>(null)
-  const [photoDialog,     setPhotoDialog]     = useState<{ purchaseId: string; refNumber: string } | null>(null)
-  const [payoutDialog,    setPayoutDialog]    = useState<{
-    purchaseId: string; refNumber: string; amount: string; method: string
-    customerId: string; customerName: string
-  } | null>(null)
   const [printDialog,     setPrintDialog]     = useState<{ id: string; refNumber: string } | null>(null)
   const [deductLoan,      setDeductLoan]      = useState(false)
   const [deductionAmount, setDeductionAmount] = useState('')
   const [showAllProducts, setShowAllProducts] = useState(false)
-  const [showIdPhoto,     setShowIdPhoto]     = useState(false)
 
   const { data: productsData } = useSWR<{ products: Product[] }>('/api/products?active=true', fetcher)
   const products = productsData?.products ?? []
 
   const { data: loanData } = useSWR<{ summary: { outstanding: string; hasOutstanding: boolean } }>(
     customer ? `/api/customers/${customer.id}/loans?pageSize=1` : null,
-    fetcher
+    fetcher,
   )
   const hasOutstandingLoan    = loanData?.summary?.hasOutstanding ?? false
   const outstandingLoanAmount = loanData?.summary?.outstanding    ?? '0'
 
-  const { data: idPhotoData } = useSWR<{ url: string | null }>(
-    customer ? `/api/customers/${customer.id}/id-photo-url` : null,
-    fetcher
-  )
-  const idPhotoUrl = idPhotoData?.url ?? null
+  const vatRate = customer?.zeroRated ? new Decimal(0) : new Decimal('0.15')
 
   const visibleProducts = (() => {
     const commodities = customer?.tradeCommodities
@@ -160,13 +129,16 @@ export default function NewPurchasePage() {
     return acc
   }, {})
 
-  const total = lines.reduce((sum, l) => {
+  const subTotal = lines.reduce((sum, l) => {
     return sum.plus(new Decimal(l.quantity || '0').times(new Decimal(l.unitPrice || '0')))
   }, new Decimal(0))
+  const vatAmount  = subTotal.times(vatRate)
+  const grandTotal = subTotal.plus(vatAmount)
 
-  const cashToPay = deductLoan && deductionAmount && parseFloat(deductionAmount) > 0
-    ? Decimal.max(total.minus(new Decimal(deductionAmount || '0')), new Decimal(0))
-    : total
+  const loanDeduct = deductLoan && deductionAmount && parseFloat(deductionAmount) > 0
+    ? new Decimal(deductionAmount || '0')
+    : new Decimal(0)
+  const cashToPay = Decimal.max(grandTotal.minus(loanDeduct), new Decimal(0))
 
   function addLine() {
     setLines((prev) => [...prev, emptyLine(keyCounter)])
@@ -238,30 +210,42 @@ export default function NewPurchasePage() {
     setShowAllProducts(false)
   }, [])
 
-  async function submitPurchase(status: 'completed' | 'pending') {
+  async function submitPurchase(isPending: boolean) {
     if (!customer) { toast.error('Please select a customer'); return }
+    if (customer.blacklisted) { toast.error('Customer is blacklisted'); return }
     const validLines = lines.filter((l) => l.productId && l.quantity && l.unitPrice)
     if (validLines.length === 0) { toast.error('Add at least one product line'); return }
     for (const l of validLines) {
       if (parseFloat(l.quantity) <= 0) { toast.error('Quantity must be greater than 0'); return }
       if (parseFloat(l.unitPrice) < 0)  { toast.error('Unit price cannot be negative'); return }
     }
-    const deduction = deductLoan && deductionAmount && parseFloat(deductionAmount) > 0
+
+    const deduction = deductLoan && deductionAmount && parseFloat(deductionAmount) > 0 && !isPending
       ? deductionAmount : undefined
-    if (deduction && new Decimal(deduction).greaterThan(total)) {
-      toast.error('Loan deduction cannot exceed the gross payout total'); return
+    if (deduction && new Decimal(deduction).greaterThan(grandTotal)) {
+      toast.error('Loan deduction cannot exceed the total payout'); return
     }
+
+    const noteParts: string[] = []
+    if (grvNumber) noteParts.push(`GRV:${grvNumber}`)
+    if (invoiceNo)  noteParts.push(`INV:${invoiceNo}`)
+    if (notes)      noteParts.push(notes)
+    const combinedNotes = noteParts.join(' | ') || undefined
+
+    const paymentMethod = isPending ? 'cash' : paymentType as 'cash' | 'eft' | 'cheque' | 'amplopay'
+    const status        = isPending ? 'pending' : 'completed'
+
     const body = {
       customerId: customer.id, paymentMethod, status,
-      notes: notes || undefined,
+      notes: combinedNotes,
       ...(deduction ? { loanDeductionAmount: deduction } : {}),
       lines: validLines.map((l) => ({
         productId: l.productId, quantity: l.quantity, unitPrice: l.unitPrice,
-        ...(l.grossQty      ? { grossQty:        l.grossQty        } : {}),
-        ...(l.tareQty       ? { tareQty:         l.tareQty         } : {}),
-        ...(l.tareReason    ? { tareReason:      l.tareReason      } : {}),
+        ...(l.grossQty        ? { grossQty:        l.grossQty        } : {}),
+        ...(l.tareQty         ? { tareQty:          l.tareQty         } : {}),
+        ...(l.tareReason      ? { tareReason:       l.tareReason      } : {}),
         ...(parseFloat(l.deductionQty || '0') > 0 ? { deductionQty: l.deductionQty } : {}),
-        ...(l.deductionReason ? { deductionReason: l.deductionReason } : {}),
+        ...(l.deductionReason ? { deductionReason:  l.deductionReason } : {}),
       })),
     }
     const localId = `local_${crypto.randomUUID()}`
@@ -271,8 +255,8 @@ export default function NewPurchasePage() {
       if (queued) {
         await offlineDB.purchases.add({
           id: localId, refNumber: `OFF-${Date.now()}`, customerId: customer.id,
-          status, totalAmount: total.toFixed(2), paymentMethod,
-          notes: notes || undefined, createdAt: new Date().toISOString(), _offlineCreated: true,
+          status, totalAmount: grandTotal.toFixed(2), paymentMethod,
+          notes: combinedNotes, createdAt: new Date().toISOString(), _offlineCreated: true,
         })
         for (const l of validLines) {
           await offlineDB.purchaseLines.add({
@@ -292,7 +276,7 @@ export default function NewPurchasePage() {
           toast.success(`Purchase ${purchase.refNumber} saved as unpaid`)
           router.push('/app/purchases/unpaid')
         } else {
-          setSigDialog({ purchaseId: purchase.id, refNumber: purchase.refNumber })
+          setPrintDialog({ id: purchase.id, refNumber: purchase.refNumber })
         }
       }
     } catch {
@@ -302,652 +286,546 @@ export default function NewPurchasePage() {
     }
   }
 
-  // ─── Render ─────────────────────────────────────────────────────────────────
+  // ─── Shared input style ───────────────────────────────────────────────────────
+  const cellInput = 'w-full px-1.5 py-0.5 text-[11px] font-mono border rounded-[2px] bg-white focus:outline-none focus:border-[#0078D7]'
+  const cellInputStyle = { borderColor: '#ABABAB', color: '#212529' }
+  const headerBg = { background: 'linear-gradient(180deg,#FFFFFF 0%,#E8E8E8 100%)', borderBottom: '2px solid #B0B0B0' }
 
+  // ─── Render ──────────────────────────────────────────────────────────────────
   return (
-    <div className="h-full flex flex-col min-h-0 overflow-hidden">
+    <div className="flex flex-col flex-1 min-h-0">
+      <div className="flex flex-col flex-1 min-h-0 bg-white border" style={{ borderColor: '#B0B0B0', borderRadius: 2 }}>
 
-      {/* Top strip */}
-      <div className="flex items-center gap-3 shrink-0 pb-2">
-        <button
-          type="button"
-          onClick={() => router.back()}
-          className="flex items-center gap-1 text-xs transition-colors"
-          style={{ color: colors.textSecondary }}
+        {/* ── Panel title bar ─────────────────────────────── */}
+        <div
+          className="shrink-0 flex items-center justify-between px-3 py-1.5 border-b"
+          style={{ borderColor: '#C0C0C0', background: 'linear-gradient(180deg,#EAEAEA 0%,#D4D4D4 100%)' }}
         >
-          <ArrowLeft className="w-3.5 h-3.5" /> Purchases
-        </button>
-        <span className="text-sm font-semibold" style={{ color: colors.textPrimary }}>New Purchase</span>
-        {customer?.blacklisted && (
-          <span className="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-red-100 text-red-700">
-            <AlertTriangle className="w-3 h-3" /> Blacklisted — cannot process
-          </span>
-        )}
-      </div>
-
-      {/* ── POS Split Panel ── */}
-      <div
-        className="flex-1 min-h-0 flex overflow-hidden rounded-xl border"
-        style={{ borderColor: colors.border, boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}
-      >
-
-        {/* ─── LEFT: Entry ──────────────────────────────────────── */}
-        <div className="flex-1 flex flex-col min-w-0 bg-white" style={{ borderRight: `1px solid ${colors.border}` }}>
-
-          {/* Customer strip */}
-          <div className="shrink-0" style={{ borderBottom: `1px solid ${colors.border}`, background: colors.toolbar }}>
-            {!customer ? (
-              <div className="px-3 py-2">
-
-                {/* Mode selector */}
-                {customerType === null && (
-                  <div className="flex items-center gap-2">
-                    <p className="text-[10px] font-semibold uppercase tracking-wider shrink-0" style={{ color: colors.tabMuted }}>
-                      Seller type
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => setCustomerType('casual')}
-                      className="px-3 py-1 rounded border text-[11px] font-medium transition-colors hover:bg-white"
-                      style={{ borderColor: colors.border, color: colors.textPrimary, background: '#fff' }}
-                    >
-                      Casual
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setCustomerType('account')}
-                      className="px-3 py-1 rounded border text-[11px] font-medium transition-colors hover:bg-white"
-                      style={{ borderColor: colors.border, color: colors.textPrimary, background: '#fff' }}
-                    >
-                      Account Customer
-                    </button>
-                  </div>
-                )}
-
-                {/* Casual panel */}
-                {customerType === 'casual' && (
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <button
-                        type="button"
-                        onClick={() => setCustomerType(null)}
-                        className="text-[11px] transition-colors"
-                        style={{ color: colors.textSecondary }}
-                      >
-                        ← Back
-                      </button>
-                      <span className="text-[11px] font-semibold" style={{ color: colors.textPrimary }}>Casual</span>
-                    </div>
-                    <CasualSelectorPanel onSelect={handleCustomerSelect} />
-                  </div>
-                )}
-
-                {/* Account panel */}
-                {customerType === 'account' && (
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <button
-                        type="button"
-                        onClick={() => setCustomerType(null)}
-                        className="text-[11px] transition-colors"
-                        style={{ color: colors.textSecondary }}
-                      >
-                        ← Back
-                      </button>
-                      <span className="text-[11px] font-semibold" style={{ color: colors.textPrimary }}>Account Customer</span>
-                    </div>
-                    <AccountSelectorPanel onSelect={handleCustomerSelect} />
-                  </div>
-                )}
-
-              </div>
-            ) : (
-              <div className="flex items-center gap-2.5 px-3 py-2">
-                {/* ID photo thumbnail — click to verify full ID */}
-                {idPhotoUrl ? (
-                  <button
-                    type="button"
-                    onClick={() => setShowIdPhoto(true)}
-                    title="View ID document"
-                    className="shrink-0"
-                  >
-                    <img
-                      src={idPhotoUrl}
-                      alt="ID"
-                      className="w-9 h-9 rounded object-cover border-2"
-                      style={{ borderColor: colors.process }}
-                    />
-                  </button>
-                ) : (
-                  <div
-                    className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[11px] font-bold shrink-0"
-                    style={{ background: colors.primary }}
-                  >
-                    {customer.firstName[0]?.toUpperCase()}
-                  </div>
-                )}
-                <div className="min-w-0 flex-1">
-                  <p className="text-[13px] font-semibold leading-none truncate" style={{ color: colors.textPrimary }}>
-                    {customer.firstName} {customer.lastName}
-                  </p>
-                  <p className="text-[11px] font-mono mt-0.5 truncate" style={{ color: colors.textSecondary }}>
-                    {customer.idNumber} · {customer.phone}
-                  </p>
-                </div>
-                <div className="flex items-center gap-1.5 shrink-0">
-                  {customer.priceGroupId && (
-                    <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-700">
-                      Custom Pricing
-                    </span>
-                  )}
-                  {customer.zeroRated && (
-                    <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-yellow-100 text-yellow-800">
-                      Zero Rated
-                    </span>
-                  )}
-                  {!showAllProducts && (customer.tradeCommodities?.length ?? 0) > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setShowAllProducts(true)}
-                      className="px-1.5 py-0.5 rounded border text-[10px] transition-colors hover:bg-white"
-                      style={{ borderColor: colors.border, color: colors.textSecondary }}
-                    >
-                      All Products
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => { setCustomer(null); setCustomerType(null) }}
-                    className="px-2 py-0.5 rounded border text-[11px] transition-colors hover:bg-white"
-                    style={{ borderColor: colors.border, color: colors.textSecondary }}
-                  >
-                    Change
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Loan banner */}
-          {customer && hasOutstandingLoan && (
-            <div
-              className="shrink-0 flex items-center gap-3 px-3 py-2 flex-wrap"
-              style={{ background: colors.alertBg, borderBottom: `1px solid ${colors.alertBorder}` }}
-            >
-              <AlertTriangle className="w-3.5 h-3.5 shrink-0" style={{ color: colors.alertIcon }} />
-              <span className="text-[12px]" style={{ color: colors.alertText }}>
-                Outstanding loan: <strong className="font-mono">R {new Decimal(outstandingLoanAmount).toFixed(2)}</strong>
-              </span>
-              <label className="flex items-center gap-1.5 cursor-pointer select-none text-[12px]" style={{ color: colors.alertText }}>
-                <input
-                  type="checkbox"
-                  className="w-3.5 h-3.5 accent-amber-600"
-                  checked={deductLoan}
-                  onChange={(e) => {
-                    const checked = e.target.checked
-                    setDeductLoan(checked)
-                    if (checked) {
-                      const maxDeduct = Decimal.min(new Decimal(outstandingLoanAmount), total)
-                      setDeductionAmount(maxDeduct.toFixed(2))
-                    } else {
-                      setDeductionAmount('')
-                    }
-                  }}
-                />
-                Deduct from payout
-              </label>
-              {deductLoan && (
-                <div className="flex items-center gap-1">
-                  <span className="text-[12px]" style={{ color: colors.alertText }}>R</span>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    className="w-24 px-2 py-0.5 rounded border font-mono text-[12px] focus:outline-none"
-                    style={{ borderColor: colors.alertInputBorder, color: colors.alertText, background: colors.alertInput }}
-                    value={deductionAmount}
-                    onChange={(e) => setDeductionAmount(e.target.value)}
-                  />
-                  <span className="text-[11px]" style={{ color: colors.alertIcon }}>
-                    max R {Decimal.min(new Decimal(outstandingLoanAmount), total).toFixed(2)}
-                  </span>
-                </div>
-              )}
+          <span className="text-[12px] font-bold" style={{ color: '#1B3A6B' }}>New Purchase</span>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-1.5">
+              <label className="text-[11px] font-semibold" style={{ color: '#374151' }}>GRV No</label>
+              <input
+                value={grvNumber}
+                onChange={(e) => setGrvNumber(e.target.value)}
+                className="w-24 px-2 py-0.5 text-[11px] border rounded-[2px] bg-white focus:outline-none focus:border-[#0078D7]"
+                style={{ borderColor: '#ABABAB' }}
+              />
             </div>
-          )}
-
-          {/* Column headers */}
-          <div
-            className="shrink-0 grid items-center px-3 py-1.5"
-            style={{
-              gridTemplateColumns: '1fr 104px 104px 92px 36px 28px',
-              gap: '8px',
-              background: colors.toolbar,
-              borderBottom: `1px solid ${colors.border}`,
-            }}
-          >
-            <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: colors.textSecondary }}>Product</p>
-            <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: colors.textSecondary }}>Net Qty (kg)</p>
-            <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: colors.textSecondary }}>Buy Price (R)</p>
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-right" style={{ color: colors.textSecondary }}>Total</p>
-            <span />
-            <span />
+            <div className="flex items-center gap-1.5">
+              <label className="text-[11px] font-semibold" style={{ color: '#374151' }}>Invoice No</label>
+              <input
+                value={invoiceNo}
+                onChange={(e) => setInvoiceNo(e.target.value)}
+                className="w-24 px-2 py-0.5 text-[11px] border rounded-[2px] bg-white focus:outline-none focus:border-[#0078D7]"
+                style={{ borderColor: '#ABABAB' }}
+              />
+            </div>
           </div>
+        </div>
 
-          {/* Items list — only scrollable zone */}
-          <div className="flex-1 min-h-0 overflow-y-auto" style={{ borderBottom: `1px solid ${colors.border}` }}>
-            {lines.map((line) => {
-              const qty       = new Decimal(line.quantity  || '0')
-              const price     = new Decimal(line.unitPrice || '0')
-              const lineTotal = qty.times(price)
-              const busyGross = line.weighingGross
-              const busyTare  = line.weighingTare
+        {/* ── Scrollable body ──────────────────────────────── */}
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          <div className="p-3 space-y-3">
 
-              const inputCls = 'h-8 w-full rounded border px-2 text-[12px] font-mono focus:outline-none transition-colors'
-              const inputStyle = { borderColor: colors.border, color: colors.textPrimary, background: '#fff' }
+            {/* Customer Type selector + customer section + totals */}
+            <div className="space-y-2">
 
-              return (
-                <div key={line.key} style={{ borderBottom: `1px solid ${colors.rowDivider}` }}>
-                  {/* Main row */}
-                  <div
-                    className="grid items-center px-3 py-1.5"
-                    style={{ gridTemplateColumns: '1fr 104px 104px 92px 36px 28px', gap: '8px', minHeight: 44 }}
-                  >
-                    <select
-                      className="h-8 w-full rounded border px-2 text-[12px] focus:outline-none transition-colors bg-white"
-                      style={{ borderColor: colors.border, color: colors.textPrimary }}
-                      value={line.productId}
-                      onChange={(e) => onProductSelect(line.key, e.target.value)}
-                    >
-                      <option value="">Select product…</option>
-                      {Object.entries(productsByCategory).map(([cat, prods]) => (
-                        <optgroup key={cat} label={CATEGORY_LABELS[cat] ?? cat}>
-                          {prods.map((p) => (
-                            <option key={p.id} value={p.id}>{p.name} ({p.unit})</option>
-                          ))}
-                        </optgroup>
-                      ))}
-                    </select>
+              {/* Type dropdown row */}
+              <div className="flex items-center gap-2">
+                <label className="text-[11px] font-semibold" style={{ color: '#374151' }}>Customer Type:</label>
+                <select
+                  value={customerType}
+                  onChange={(e) => {
+                    const v = e.target.value as '' | 'casual' | 'account'
+                    setCustomerType(v)
+                    setCustomer(null)
+                    setShowAllProducts(false)
+                  }}
+                  className="px-2 py-0.5 text-[12px] border rounded-[2px] bg-white focus:outline-none focus:border-[#0078D7]"
+                  style={{ borderColor: '#ABABAB', color: '#212529' }}
+                >
+                  <option value="">— Select —</option>
+                  <option value="casual">Casual</option>
+                  <option value="account">Account Customer</option>
+                </select>
+              </div>
 
-                    <input
-                      type="number"
-                      step="0.001"
-                      min="0"
-                      placeholder="0.000"
-                      value={line.quantity}
-                      onChange={(e) => patchLine(line.key, { quantity: e.target.value })}
-                      className={inputCls}
-                      style={inputStyle}
-                    />
+              {/* Customer panel + Totals row */}
+              <div className="flex gap-3 items-start">
 
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      placeholder="0.00"
-                      value={line.unitPrice}
-                      onChange={(e) => patchLine(line.key, { unitPrice: e.target.value })}
-                      className={inputCls}
-                      style={inputStyle}
-                    />
+                {/* Left: customer selector / card */}
+                <div
+                  className="flex-[3] min-w-0 border rounded-[2px] p-2"
+                  style={{ borderColor: '#C0C0C0', minHeight: 64 }}
+                >
+                  {!customerType && (
+                    <p className="text-[11px]" style={{ color: colors.textSecondary }}>Select a customer type above to begin.</p>
+                  )}
 
-                    <p
-                      className="text-[13px] font-mono font-semibold text-right tabular-nums pr-1"
-                      style={{ color: qty.gt(0) && price.gt(0) ? colors.textPrimary : colors.disabled }}
-                    >
-                      {qty.gt(0) && price.gt(0) ? `R ${lineTotal.toFixed(2)}` : '—'}
-                    </p>
+                  {customerType && !customer && customerType === 'casual' && (
+                    <CasualSelectorPanel onSelect={handleCustomerSelect} />
+                  )}
+                  {customerType && !customer && customerType === 'account' && (
+                    <AccountSelectorPanel onSelect={handleCustomerSelect} />
+                  )}
 
-                    <button
-                      type="button"
-                      title="Toggle weighing mode"
-                      onClick={() => patchLine(line.key, { weighMode: !line.weighMode })}
-                      className="h-8 w-8 rounded flex items-center justify-center transition-colors"
-                      style={line.weighMode
-                        ? { background: colors.process, color: '#fff' }
-                        : { border: `1px solid ${colors.border}`, color: colors.textSecondary }
-                      }
-                    >
-                      <Scale className="w-3.5 h-3.5" />
-                    </button>
+                  {customer && (
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[12px] font-bold shrink-0"
+                        style={{ background: colors.primary }}
+                      >
+                        {customer.firstName[0]?.toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13px] font-semibold" style={{ color: colors.textPrimary }}>
+                          {customer.firstName} {customer.lastName}
+                          {customer.blacklisted && (
+                            <span className="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-100 text-red-700">
+                              <AlertTriangle className="w-3 h-3" /> Blacklisted
+                            </span>
+                          )}
+                        </p>
+                        <p className="font-mono text-[11px]" style={{ color: colors.textSecondary }}>
+                          {customer.idNumber} · {customer.phone}
+                        </p>
+                        <div className="flex gap-1.5 mt-0.5 flex-wrap">
+                          {customer.priceGroupId && (
+                            <span className="px-1.5 py-0 rounded text-[10px] font-semibold bg-blue-100 text-blue-700">Custom Pricing</span>
+                          )}
+                          {customer.zeroRated && (
+                            <span className="px-1.5 py-0 rounded text-[10px] font-semibold bg-yellow-100 text-yellow-800">Zero Rated</span>
+                          )}
+                          {!showAllProducts && (customer.tradeCommodities?.length ?? 0) > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setShowAllProducts(true)}
+                              className="px-1.5 py-0 rounded border text-[10px]"
+                              style={{ borderColor: colors.border, color: colors.textSecondary }}
+                            >
+                              Show All Products
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => { setCustomer(null) }}
+                        className="px-2 py-0.5 rounded border text-[11px] shrink-0"
+                        style={{ borderColor: '#ABABAB', color: colors.textSecondary }}
+                      >
+                        Change
+                      </button>
+                    </div>
+                  )}
+                </div>
 
-                    <button
-                      type="button"
-                      onClick={() => removeLine(line.key)}
-                      disabled={lines.length === 1}
-                      className="h-8 w-7 rounded flex items-center justify-center transition-colors disabled:opacity-25 disabled:cursor-not-allowed"
-                      style={{ color: colors.disabled }}
-                      onMouseEnter={(e) => { if (lines.length > 1) (e.currentTarget as HTMLButtonElement).style.color = '#EF4444' }}
-                      onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = colors.disabled }}
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                {/* Right: Totals */}
+                <div className="flex-[2] border rounded-[2px] p-2" style={{ borderColor: '#C0C0C0' }}>
+                  <div className="space-y-0.5">
+                    <div className="flex justify-between text-[11px]">
+                      <span style={{ color: colors.textSecondary }}>Sub Total</span>
+                      <span className="font-mono tabular-nums" style={{ color: colors.textPrimary }}>R {subTotal.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-[11px]">
+                      <span style={{ color: colors.textSecondary }}>
+                        VAT ({customer?.zeroRated ? '0%' : '15%'})
+                      </span>
+                      <span className="font-mono tabular-nums" style={{ color: colors.textSecondary }}>R {vatAmount.toFixed(2)}</span>
+                    </div>
+                    <div className="h-px my-1" style={{ background: '#C0C0C0' }} />
+                    <div className="flex justify-between text-[12px]">
+                      <span className="font-bold" style={{ color: colors.textPrimary }}>Total</span>
+                      <span className="font-mono font-bold tabular-nums" style={{ color: '#217346' }}>R {grandTotal.toFixed(2)}</span>
+                    </div>
+                    {deductLoan && loanDeduct.gt(0) && (
+                      <>
+                        <div className="flex justify-between text-[11px]">
+                          <span style={{ color: '#92400E' }}>Loan Deduction</span>
+                          <span className="font-mono tabular-nums" style={{ color: '#92400E' }}>− R {loanDeduct.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between text-[12px]">
+                          <span className="font-bold" style={{ color: '#1B3A6B' }}>Cash to Pay</span>
+                          <span className="font-mono font-bold tabular-nums" style={{ color: '#185ABD' }}>R {cashToPay.toFixed(2)}</span>
+                        </div>
+                      </>
+                    )}
                   </div>
 
-                  {/* Weigh mode sub-row */}
-                  {line.weighMode && (
-                    <div
-                      className="px-3 pb-2.5 pt-1.5 flex items-end gap-3 flex-wrap"
-                      style={{ background: '#EFF6FF', borderTop: '1px solid #BFDBFE' }}
-                    >
-                      <div className="flex flex-col gap-0.5">
-                        <span className="text-[10px] font-medium" style={{ color: colors.textSecondary }}>Scale</span>
-                        <Select
-                          value={line.selectedScale}
-                          onValueChange={(v) => patchLine(line.key, { selectedScale: v as '1' | '2' | '3' })}
-                        >
-                          <SelectTrigger className="h-7 w-24 text-[11px]" style={{ borderColor: colors.border }}>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="1">Scale 1</SelectItem>
-                            <SelectItem value="2">Scale 2</SelectItem>
-                            <SelectItem value="3">Scale 3</SelectItem>
-                          </SelectContent>
-                        </Select>
+                  {/* Outstanding loan */}
+                  {customer && hasOutstandingLoan && (
+                    <div className="mt-2 p-1.5 rounded-[2px] border text-[11px]" style={{ borderColor: '#F59E0B', background: '#FFFBEB' }}>
+                      <div className="flex items-center gap-1 font-semibold" style={{ color: '#92400E' }}>
+                        <AlertTriangle className="w-3 h-3" />
+                        Outstanding loan: R {new Decimal(outstandingLoanAmount).toFixed(2)}
                       </div>
-
-                      <div className="flex flex-col gap-0.5">
-                        <span className="text-[10px] font-medium" style={{ color: colors.textSecondary }}>Gross (kg)</span>
-                        <div className="flex gap-1">
-                          <input
-                            type="number"
-                            step="0.001"
-                            placeholder="0.000"
-                            value={line.grossQty}
-                            onChange={(e) => recomputeNet(line.key, e.target.value, line.tareQty, line.deductionQty)}
-                            className="h-7 w-20 rounded border px-2 text-[11px] font-mono focus:outline-none"
-                            style={{ borderColor: colors.border }}
-                          />
-                          <button
-                            type="button"
-                            disabled={busyGross}
-                            onClick={() => handleWeighGross(line)}
-                            className="h-7 px-2 rounded text-white flex items-center justify-center disabled:opacity-60"
-                            style={{ background: colors.process }}
-                          >
-                            {busyGross
-                              ? <Loader2 className="w-3 h-3 animate-spin" />
-                              : <RefreshCw className="w-3 h-3" />}
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-col gap-0.5">
-                        <span className="text-[10px] font-medium" style={{ color: colors.textSecondary }}>Tare (kg)</span>
-                        <div className="flex gap-1">
-                          <input
-                            type="number"
-                            step="0.001"
-                            placeholder="0.000"
-                            value={line.tareQty}
-                            onChange={(e) => recomputeNet(line.key, line.grossQty, e.target.value, line.deductionQty)}
-                            className="h-7 w-20 rounded border px-2 text-[11px] font-mono focus:outline-none"
-                            style={{ borderColor: colors.border }}
-                          />
-                          <button
-                            type="button"
-                            disabled={busyTare}
-                            onClick={() => handleWeighTare(line)}
-                            className="h-7 px-2 rounded flex items-center justify-center disabled:opacity-60 transition-colors"
-                            style={{ border: `1px solid ${colors.border}`, color: colors.textSecondary, background: '#fff' }}
-                          >
-                            {busyTare
-                              ? <Loader2 className="w-3 h-3 animate-spin" />
-                              : <RefreshCw className="w-3 h-3" />}
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Net display (gross − tare) */}
-                      <div className="flex flex-col gap-0.5">
-                        <span className="text-[10px] font-medium" style={{ color: colors.textSecondary }}>Net (kg)</span>
-                        <div
-                          className="h-7 flex items-center px-2 rounded border font-mono text-[12px] font-bold min-w-[64px]"
-                          style={{ borderColor: colors.netWeightBorder, background: colors.netWeightBg, color: colors.netWeightText }}
-                        >
-                          {(() => {
-                            const net = Decimal.max(
-                              new Decimal(line.grossQty || '0').minus(new Decimal(line.tareQty || '0')),
-                              new Decimal('0'),
-                            )
-                            return net.toFixed(3)
-                          })()}
-                        </div>
-                      </div>
-
-                      {/* Deduction input */}
-                      <div className="flex flex-col gap-0.5">
-                        <span className="text-[10px] font-medium" style={{ color: colors.textSecondary }}>Deduction (kg)</span>
+                      <label className="flex items-center gap-1.5 mt-1 cursor-pointer" style={{ color: '#78350F' }}>
                         <input
-                          type="number"
-                          step="0.001"
-                          min="0"
-                          placeholder="0.000"
-                          value={line.deductionQty}
+                          type="checkbox"
+                          className="w-3 h-3 accent-amber-600"
+                          checked={deductLoan}
+                          disabled={paymentType === 'unpaid'}
                           onChange={(e) => {
-                            const net = Decimal.max(
-                              new Decimal(line.grossQty || '0').minus(new Decimal(line.tareQty || '0')),
-                              new Decimal('0'),
-                            )
-                            const paid = Decimal.max(net.minus(new Decimal(e.target.value || '0')), new Decimal('0'))
-                            patchLine(line.key, { deductionQty: e.target.value, quantity: paid.toFixed(3) })
+                            setDeductLoan(e.target.checked)
+                            if (e.target.checked) {
+                              setDeductionAmount(Decimal.min(new Decimal(outstandingLoanAmount), grandTotal).toFixed(2))
+                            } else {
+                              setDeductionAmount('')
+                            }
                           }}
-                          className="h-7 w-20 rounded border px-2 text-[11px] font-mono focus:outline-none"
-                          style={{ borderColor: colors.border }}
                         />
-                      </div>
+                        Deduct from payout
+                        {deductLoan && (
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={deductionAmount}
+                            onChange={(e) => setDeductionAmount(e.target.value)}
+                            className="ml-1 w-20 px-1 py-0 rounded border font-mono text-[11px] focus:outline-none"
+                            style={{ borderColor: '#D97706' }}
+                          />
+                        )}
+                      </label>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
 
-                      {/* Paid Qty display — only shown when deduction > 0 */}
-                      {parseFloat(line.deductionQty || '0') > 0 && (
+            {/* Comments */}
+            <div className="flex items-center gap-2">
+              <label className="text-[11px] font-semibold shrink-0" style={{ color: '#374151' }}>Comments:</label>
+              <input
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Any remarks…"
+                className="flex-1 px-2 py-0.5 text-[12px] border rounded-[2px] bg-white focus:outline-none focus:border-[#0078D7]"
+                style={{ borderColor: '#ABABAB', color: '#212529' }}
+              />
+            </div>
+
+            {/* Payment Type radios */}
+            <div className="flex items-center gap-4">
+              <label className="text-[11px] font-semibold shrink-0" style={{ color: '#374151' }}>Payment Type:</label>
+              {(['unpaid', 'cash', 'cheque', 'eft', 'amplopay'] as const).map((type) => (
+                <label key={type} className="flex items-center gap-1.5 text-[12px] cursor-pointer" style={{ color: '#374151' }}>
+                  <input
+                    type="radio"
+                    name="paymentType"
+                    checked={paymentType === type}
+                    onChange={() => {
+                      setPaymentType(type)
+                      if (type === 'unpaid') { setDeductLoan(false); setDeductionAmount('') }
+                    }}
+                    className="w-3.5 h-3.5"
+                  />
+                  {type === 'unpaid' ? 'Unpaid' : type === 'eft' ? 'EFT' : type === 'amplopay' ? 'AmploPay' : type.charAt(0).toUpperCase() + type.slice(1)}
+                </label>
+              ))}
+            </div>
+
+            {/* ── Product Entry ──────────────────────────────────────── */}
+            <div className="border" style={{ borderColor: '#B0B0B0' }}>
+
+              {/* Grid header */}
+              <div
+                className="grid items-center px-2 py-1"
+                style={{
+                  ...headerBg,
+                  gridTemplateColumns: '1fr 72px 80px 80px 70px 80px 28px 26px',
+                  gap: '4px',
+                }}
+              >
+                {['Product', 'Qty (kg)', 'Price (R)', 'Sub Total', 'VAT', 'Total', '', ''].map((h, i) => (
+                  <span key={i} className="text-[10px] font-bold uppercase tracking-wide" style={{ color: '#374151' }}>{h}</span>
+                ))}
+              </div>
+
+              {/* Lines */}
+              {lines.map((line) => {
+                const qty      = new Decimal(line.quantity  || '0')
+                const price    = new Decimal(line.unitPrice || '0')
+                const lineSub  = qty.times(price)
+                const lineVat  = lineSub.times(vatRate)
+                const lineTot  = lineSub.plus(lineVat)
+
+                return (
+                  <div key={line.key} style={{ borderTop: '1px solid #E0E0E0' }}>
+                    {/* Main row */}
+                    <div
+                      className="grid items-center px-2 py-1"
+                      style={{ gridTemplateColumns: '1fr 72px 80px 80px 70px 80px 28px 26px', gap: '4px', minHeight: 32 }}
+                    >
+                      {/* Product */}
+                      <select
+                        className="h-6 w-full rounded-[2px] border px-1 text-[11px] bg-white focus:outline-none"
+                        style={{ borderColor: '#ABABAB', color: '#212529' }}
+                        value={line.productId}
+                        onChange={(e) => onProductSelect(line.key, e.target.value)}
+                      >
+                        <option value="">Select…</option>
+                        {Object.entries(productsByCategory).map(([cat, prods]) => (
+                          <optgroup key={cat} label={CATEGORY_LABELS[cat] ?? cat}>
+                            {prods.map((p) => (
+                              <option key={p.id} value={p.id}>{p.name} ({p.unit})</option>
+                            ))}
+                          </optgroup>
+                        ))}
+                      </select>
+
+                      {/* Qty */}
+                      <input
+                        type="number" step="0.001" min="0" placeholder="0.000"
+                        value={line.quantity}
+                        onChange={(e) => patchLine(line.key, { quantity: e.target.value })}
+                        className={cellInput}
+                        style={cellInputStyle}
+                      />
+
+                      {/* Price */}
+                      <input
+                        type="number" step="0.01" min="0" placeholder="0.00"
+                        value={line.unitPrice}
+                        onChange={(e) => patchLine(line.key, { unitPrice: e.target.value })}
+                        className={cellInput}
+                        style={cellInputStyle}
+                      />
+
+                      {/* Sub Total */}
+                      <span className="text-[11px] font-mono tabular-nums px-1" style={{ color: qty.gt(0) ? '#212529' : '#9CA3AF' }}>
+                        {qty.gt(0) ? `R ${lineSub.toFixed(2)}` : '—'}
+                      </span>
+
+                      {/* VAT */}
+                      <span className="text-[11px] font-mono tabular-nums px-1" style={{ color: qty.gt(0) ? '#212529' : '#9CA3AF' }}>
+                        {qty.gt(0) ? `R ${lineVat.toFixed(2)}` : '—'}
+                      </span>
+
+                      {/* Total */}
+                      <span className="text-[11px] font-mono tabular-nums px-1 font-semibold" style={{ color: qty.gt(0) ? '#217346' : '#9CA3AF' }}>
+                        {qty.gt(0) ? `R ${lineTot.toFixed(2)}` : '—'}
+                      </span>
+
+                      {/* Scale toggle */}
+                      <button
+                        type="button"
+                        title="Toggle weighing"
+                        onClick={() => patchLine(line.key, { weighMode: !line.weighMode })}
+                        className="h-6 w-6 flex items-center justify-center rounded-[2px]"
+                        style={line.weighMode
+                          ? { background: '#185ABD', color: '#fff' }
+                          : { border: '1px solid #ABABAB', color: '#6C757D' }}
+                      >
+                        <Scale className="w-3 h-3" />
+                      </button>
+
+                      {/* Delete */}
+                      <button
+                        type="button"
+                        onClick={() => removeLine(line.key)}
+                        disabled={lines.length === 1}
+                        className="h-6 w-6 flex items-center justify-center rounded-[2px] disabled:opacity-25"
+                        style={{ color: '#9CA3AF' }}
+                        onMouseEnter={(e) => { if (lines.length > 1) (e.currentTarget as HTMLButtonElement).style.color = '#EF4444' }}
+                        onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = '#9CA3AF' }}
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+
+                    {/* Weigh sub-row */}
+                    {line.weighMode && (
+                      <div
+                        className="px-3 pb-2 pt-1.5 flex items-end gap-3 flex-wrap"
+                        style={{ background: '#EFF6FF', borderTop: '1px solid #BFDBFE' }}
+                      >
+                        {/* Scale selector */}
                         <div className="flex flex-col gap-0.5">
-                          <span className="text-[10px] font-semibold" style={{ color: colors.process }}>Paid Qty (kg)</span>
-                          <div
-                            className="h-7 flex items-center px-2 rounded border font-mono text-[12px] font-bold min-w-[64px]"
-                            style={{ border: `1px solid ${colors.process}`, background: '#F0FDF4', color: colors.process }}
+                          <span className="text-[10px] font-medium" style={{ color: colors.textSecondary }}>Scale</span>
+                          <Select
+                            value={line.selectedScale}
+                            onValueChange={(v) => patchLine(line.key, { selectedScale: v as '1' | '2' | '3' })}
                           >
-                            {line.quantity || '0.000'}
+                            <SelectTrigger className="h-6 w-24 text-[11px]" style={{ borderColor: '#ABABAB' }}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="1">Scale 1</SelectItem>
+                              <SelectItem value="2">Scale 2</SelectItem>
+                              <SelectItem value="3">Scale 3</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {/* Gross */}
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-[10px] font-medium" style={{ color: colors.textSecondary }}>Gross (kg)</span>
+                          <div className="flex gap-1">
+                            <input
+                              type="number" step="0.001" placeholder="0.000"
+                              value={line.grossQty}
+                              onChange={(e) => recomputeNet(line.key, e.target.value, line.tareQty, line.deductionQty)}
+                              className="h-6 w-20 rounded-[2px] border px-1.5 text-[11px] font-mono focus:outline-none"
+                              style={{ borderColor: '#ABABAB' }}
+                            />
+                            <button
+                              type="button"
+                              disabled={line.weighingGross}
+                              onClick={() => handleWeighGross(line)}
+                              className="h-6 px-1.5 rounded-[2px] text-white flex items-center disabled:opacity-60"
+                              style={{ background: '#185ABD' }}
+                            >
+                              {line.weighingGross ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                            </button>
                           </div>
                         </div>
-                      )}
 
-                      {line.tareQty && parseFloat(line.tareQty) > 0 && (
+                        {/* Tare */}
                         <div className="flex flex-col gap-0.5">
-                          <span className="text-[10px] font-medium" style={{ color: colors.textSecondary }}>Tare Reason</span>
+                          <span className="text-[10px] font-medium" style={{ color: colors.textSecondary }}>Tare (kg)</span>
+                          <div className="flex gap-1">
+                            <input
+                              type="number" step="0.001" placeholder="0.000"
+                              value={line.tareQty}
+                              onChange={(e) => recomputeNet(line.key, line.grossQty, e.target.value, line.deductionQty)}
+                              className="h-6 w-20 rounded-[2px] border px-1.5 text-[11px] font-mono focus:outline-none"
+                              style={{ borderColor: '#ABABAB' }}
+                            />
+                            <button
+                              type="button"
+                              disabled={line.weighingTare}
+                              onClick={() => handleWeighTare(line)}
+                              className="h-6 px-1.5 rounded-[2px] flex items-center disabled:opacity-60"
+                              style={{ border: '1px solid #ABABAB', color: '#6C757D' }}
+                            >
+                              {line.weighingTare ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Net display */}
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-[10px] font-medium" style={{ color: colors.textSecondary }}>Net (kg)</span>
+                          <div
+                            className="h-6 flex items-center px-1.5 rounded-[2px] border font-mono text-[11px] font-bold min-w-[56px]"
+                            style={{ borderColor: colors.netWeightBorder, background: colors.netWeightBg, color: colors.netWeightText }}
+                          >
+                            {Decimal.max(
+                              new Decimal(line.grossQty || '0').minus(new Decimal(line.tareQty || '0')),
+                              new Decimal('0'),
+                            ).toFixed(3)}
+                          </div>
+                        </div>
+
+                        {/* Deduction */}
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-[10px] font-medium" style={{ color: colors.textSecondary }}>Deduction (kg)</span>
                           <input
-                            placeholder="e.g. Bag, Pallet…"
-                            value={line.tareReason}
-                            onChange={(e) => patchLine(line.key, { tareReason: e.target.value })}
-                            className="h-7 w-32 rounded border px-2 text-[11px] focus:outline-none"
-                            style={{ borderColor: colors.border }}
+                            type="number" step="0.001" min="0" placeholder="0.000"
+                            value={line.deductionQty}
+                            onChange={(e) => {
+                              const net  = Decimal.max(
+                                new Decimal(line.grossQty || '0').minus(new Decimal(line.tareQty || '0')),
+                                new Decimal('0'),
+                              )
+                              const paid = Decimal.max(net.minus(new Decimal(e.target.value || '0')), new Decimal('0'))
+                              patchLine(line.key, { deductionQty: e.target.value, quantity: paid.toFixed(3) })
+                            }}
+                            className="h-6 w-20 rounded-[2px] border px-1.5 text-[11px] font-mono focus:outline-none"
+                            style={{ borderColor: '#ABABAB' }}
                           />
                         </div>
-                      )}
 
-                      {parseFloat(line.deductionQty || '0') > 0 && (
-                        <div className="flex flex-col gap-0.5">
-                          <span className="text-[10px] font-medium" style={{ color: colors.textSecondary }}>Deduction Reason</span>
-                          <input
-                            placeholder="e.g. Contamination, Moisture…"
-                            value={line.deductionReason}
-                            onChange={(e) => patchLine(line.key, { deductionReason: e.target.value })}
-                            className="h-7 w-36 rounded border px-2 text-[11px] focus:outline-none"
-                            style={{ borderColor: colors.border }}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
+                        {parseFloat(line.deductionQty || '0') > 0 && (
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-[10px] font-semibold" style={{ color: '#217346' }}>Paid Qty (kg)</span>
+                            <div
+                              className="h-6 flex items-center px-1.5 rounded-[2px] border font-mono text-[11px] font-bold min-w-[56px]"
+                              style={{ border: '1px solid #217346', background: '#F0FDF4', color: '#217346' }}
+                            >
+                              {line.quantity || '0.000'}
+                            </div>
+                          </div>
+                        )}
 
-            {/* Add line */}
-            <div className="px-3 py-2">
-              <button
-                type="button"
-                onClick={addLine}
-                className="flex items-center gap-1.5 text-[12px] font-medium transition-colors"
-                style={{ color: colors.process }}
-              >
-                <Plus className="w-3.5 h-3.5" /> Add Line
-              </button>
+                        {line.tareQty && parseFloat(line.tareQty) > 0 && (
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-[10px] font-medium" style={{ color: colors.textSecondary }}>Tare Reason</span>
+                            <input
+                              placeholder="e.g. Bag…"
+                              value={line.tareReason}
+                              onChange={(e) => patchLine(line.key, { tareReason: e.target.value })}
+                              className="h-6 w-28 rounded-[2px] border px-1.5 text-[11px] focus:outline-none"
+                              style={{ borderColor: '#ABABAB' }}
+                            />
+                          </div>
+                        )}
+
+                        {parseFloat(line.deductionQty || '0') > 0 && (
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-[10px] font-medium" style={{ color: colors.textSecondary }}>Deduction Reason</span>
+                            <input
+                              placeholder="e.g. Contamination…"
+                              value={line.deductionReason}
+                              onChange={(e) => patchLine(line.key, { deductionReason: e.target.value })}
+                              className="h-6 w-32 rounded-[2px] border px-1.5 text-[11px] focus:outline-none"
+                              style={{ borderColor: '#ABABAB' }}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+
+              {/* Add line */}
+              <div className="px-2 py-1.5" style={{ borderTop: '1px solid #E0E0E0', background: '#FAFAFA' }}>
+                <button
+                  type="button"
+                  onClick={addLine}
+                  className="flex items-center gap-1 text-[11px] font-medium"
+                  style={{ color: '#185ABD' }}
+                >
+                  <Plus className="w-3 h-3" /> Add Line
+                </button>
+              </div>
             </div>
+
           </div>
         </div>
 
-        {/* ─── RIGHT: Totals & Actions ──────────────────────────── */}
+        {/* ── Action bar ────────────────────────────────────── */}
         <div
-          className="w-[260px] shrink-0 flex flex-col"
-          style={{ background: colors.primary }}
+          className="shrink-0 flex items-center justify-between px-4 py-2 border-t"
+          style={{ borderColor: '#B0B0B0', background: 'linear-gradient(180deg,#F5F5F5 0%,#E8E8E8 100%)' }}
         >
-          {/* Payment method */}
-          <div className="px-4 pt-4 pb-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-            <PosLabel>Payment Method</PosLabel>
-            <select
-              value={paymentMethod}
-              onChange={(e) => setPaymentMethod(e.target.value as typeof paymentMethod)}
-              className="w-full h-9 rounded px-2.5 text-[12px] text-white focus:outline-none appearance-none"
-              style={{ background: 'rgba(255,255,255,0.10)', border: '1px solid rgba(255,255,255,0.20)' }}
-            >
-              <option value="cash"     className="bg-white text-[#212529]">Cash</option>
-              <option value="eft"      className="bg-white text-[#212529]">EFT</option>
-              <option value="cheque"   className="bg-white text-[#212529]">Cheque</option>
-              <option value="amplopay" className="bg-white text-[#212529]">AmploPay</option>
-            </select>
-          </div>
-
-          {/* Notes */}
-          <div className="px-4 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-            <PosLabel>Notes (optional)</PosLabel>
-            <input
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Any remarks…"
-              className="w-full h-8 rounded px-2.5 text-[12px] text-white focus:outline-none"
-              style={{
-                background: 'rgba(255,255,255,0.10)',
-                border: '1px solid rgba(255,255,255,0.20)',
-                color: '#fff',
-              }}
-            />
-          </div>
-
-          {/* Total */}
-          <div className="flex-1 flex flex-col items-center justify-center px-4">
-            {deductLoan && deductionAmount && parseFloat(deductionAmount) > 0 ? (
-              <div className="w-full space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-[11px]" style={{ color: colors.tabMuted }}>Gross Payout</span>
-                  <span className="text-[13px] font-mono tabular-nums text-white">{total.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-[11px] text-amber-300">Loan Deduction</span>
-                  <span className="text-[13px] font-mono tabular-nums text-amber-300">
-                    − R {new Decimal(deductionAmount || '0').toFixed(2)}
-                  </span>
-                </div>
-                <div className="h-px" style={{ background: 'rgba(255,255,255,0.15)' }} />
-                <div className="text-center pt-1">
-                  <p className="text-[10px] uppercase tracking-wider" style={{ color: colors.tabMuted }}>Cash to Pay</p>
-                  <p className="font-bold tabular-nums mt-1" style={{ color: colors.tabAccent, fontSize: 34, lineHeight: 1.1 }}>
-                    R {cashToPay.toFixed(2)}
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div className="text-center">
-                <p className="text-[10px] uppercase tracking-wider mb-2" style={{ color: colors.tabMuted }}>
-                  Total Payout
-                </p>
-                <p className="font-bold tabular-nums" style={{ color: colors.tabAccent, fontSize: 42, lineHeight: 1 }}>
-                  R {total.toFixed(2)}
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* Action buttons */}
-          <div className="px-4 pb-4 space-y-2 shrink-0">
-            <button
-              type="button"
-              onClick={() => submitPurchase('pending')}
-              disabled={submitting || !customer || customer.blacklisted}
-              className="w-full h-10 rounded text-[12px] font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-              style={{ border: `1px solid ${colors.warning}`, color: colors.warning }}
-            >
-              {submitting
-                ? <Loader2 className="w-4 h-4 animate-spin mx-auto" />
-                : 'Save as Unpaid'}
-            </button>
-            <button
-              type="button"
-              onClick={() => submitPurchase('completed')}
-              disabled={submitting || !customer || customer.blacklisted}
-              className="w-full h-12 rounded text-[13px] font-bold text-white transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              style={{ background: colors.action }}
-            >
-              {submitting
-                ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</>
-                : `Confirm · R ${cashToPay.toFixed(2)}`}
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => submitPurchase(true)}
+            disabled={submitting || !customer || !!customer.blacklisted}
+            className="h-7 px-5 rounded-sm text-[12px] font-medium disabled:opacity-40"
+            style={{ background: '#FFFFFF', border: '1px solid #C9A020', color: '#92400E' }}
+          >
+            {submitting ? <Loader2 className="w-3.5 h-3.5 animate-spin inline" /> : 'Save as Unpaid'}
+          </button>
+          <button
+            type="button"
+            onClick={() => submitPurchase(false)}
+            disabled={submitting || !customer || !!customer.blacklisted || paymentType === 'unpaid'}
+            className="h-7 px-6 rounded-sm text-[12px] font-bold text-white disabled:opacity-40 flex items-center gap-2"
+            style={{ background: '#217346', border: '1px solid #176338' }}
+          >
+            {submitting
+              ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Saving…</>
+              : `Save · R ${cashToPay.toFixed(2)}`}
+          </button>
         </div>
       </div>
 
-      {/* ── ID Photo Lightbox ── */}
-      {showIdPhoto && idPhotoUrl && customer && (
-        <Dialog open onOpenChange={() => setShowIdPhoto(false)}>
-          <DialogContent className="sm:max-w-lg">
-            <DialogHeader>
-              <DialogTitle>ID Document — {customer.firstName} {customer.lastName}</DialogTitle>
-            </DialogHeader>
-            <img src={idPhotoUrl} alt="ID Document" className="w-full rounded mt-2" />
-          </DialogContent>
-        </Dialog>
-      )}
-
-      {/* ── Dialogs ── */}
-      {sigDialog && (
-        <SignatureDialog
-          purchaseId={sigDialog.purchaseId}
-          refNumber={sigDialog.refNumber}
-          onDone={() => {
-            const { purchaseId, refNumber } = sigDialog
-            setSigDialog(null)
-            setPhotoDialog({ purchaseId, refNumber })
-          }}
-        />
-      )}
-
-      {photoDialog && (
-        <PhotoUploadStep
-          purchaseId={photoDialog.purchaseId}
-          refNumber={photoDialog.refNumber}
-          onDone={() => {
-            const { purchaseId, refNumber } = photoDialog
-            setPhotoDialog(null)
-            setPrintDialog({ id: purchaseId, refNumber })
-          }}
-        />
-      )}
-
-      {payoutDialog && (
-        <RecordPayoutStep
-          purchaseId={payoutDialog.purchaseId}
-          refNumber={payoutDialog.refNumber}
-          amount={payoutDialog.amount}
-          method={payoutDialog.method}
-          customerId={payoutDialog.customerId}
-          customerName={payoutDialog.customerName}
-          onDone={() => {
-            const { purchaseId, refNumber } = payoutDialog
-            setPayoutDialog(null)
-            setPrintDialog({ id: purchaseId, refNumber })
-          }}
-        />
-      )}
-
+      {/* Print result dialog */}
       {printDialog && (
         <PrintResultModal
           type="purchase"
@@ -959,203 +837,5 @@ export default function NewPurchasePage() {
         />
       )}
     </div>
-  )
-}
-
-// ─── Signature Dialog ─────────────────────────────────────────────────────────
-function SignatureDialog({
-  purchaseId, refNumber, onDone,
-}: { purchaseId: string; refNumber: string; onDone: () => void }) {
-  const sigRef  = useRef<SignatureCanvasHandle>(null)
-  const [saving, setSaving] = useState(false)
-
-  async function handleConfirm() {
-    const blob = await sigRef.current?.getBlob()
-    if (!blob) { onDone(); return }
-    setSaving(true)
-    try {
-      const fd = new FormData()
-      fd.append('context', 'purchase_signature')
-      fd.append('referenceId', purchaseId)
-      fd.append('file', blob, 'signature.png')
-      const uploadRes = await fetch('/api/r2/upload', { method: 'POST', body: fd })
-      if (!uploadRes.ok) throw new Error('Failed to upload signature')
-      const { key } = await uploadRes.json() as { key: string }
-      const patchRes = await fetch(`/api/purchases/${purchaseId}/signature`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ signatureR2Key: key }),
-      })
-      if (!patchRes.ok) throw new Error('Failed to save signature reference')
-      toast.success('Signature captured')
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Signature upload failed')
-    } finally {
-      setSaving(false)
-      onDone()
-    }
-  }
-
-  return (
-    <Dialog open>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <PenLine className="w-5 h-5 text-green-600" />
-            Seller Signature — {refNumber}
-          </DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4 mt-2">
-          <p className="text-sm text-gray-600">
-            Please ask the seller to sign below to confirm the sale of goods.
-            This signature will appear on the VAT264 declaration.
-          </p>
-          <SignatureCanvas ref={sigRef} width={450} height={130} />
-          <div className="flex justify-between items-center pt-1">
-            <Button type="button" variant="ghost" size="sm" onClick={() => sigRef.current?.clear()} disabled={saving}>
-              Clear
-            </Button>
-            <div className="flex gap-2">
-              <Button type="button" variant="outline" onClick={onDone} disabled={saving}>Skip</Button>
-              <Button type="button" className="bg-green-600 hover:bg-green-700" onClick={handleConfirm} disabled={saving}>
-                {saving
-                  ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving…</>
-                  : <><FileText className="w-4 h-4 mr-2" />Confirm &amp; View Purchase</>}
-              </Button>
-            </div>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-// ─── Photo Upload Step ────────────────────────────────────────────────────────
-function PhotoUploadStep({
-  purchaseId, refNumber, onDone,
-}: { purchaseId: string; refNumber: string; onDone: () => void }) {
-  const [keys, setKeys] = useState<string[]>([])
-
-  async function handleUploaded(key: string) {
-    await fetch(`/api/purchases/${purchaseId}/photos`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ add: key }),
-    })
-    setKeys((prev) => [...prev, key])
-  }
-
-  return (
-    <Dialog open>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Camera className="w-5 h-5 text-green-600" />
-            Add Product Photos
-          </DialogTitle>
-        </DialogHeader>
-        <p className="text-sm text-gray-500 mb-3">
-          {refNumber} — Capture photos of the stock before printing the receipt.
-        </p>
-        <div className="space-y-2">
-          {keys.map((k, i) => (
-            <p key={k} className="text-xs text-green-700 font-mono truncate">
-              Photo {i + 1} uploaded ✓
-            </p>
-          ))}
-          <PhotoUploader
-            context="purchase_photo"
-            referenceId={purchaseId}
-            label="Add Photo"
-            onUploaded={handleUploaded}
-          />
-        </div>
-        <div className="flex justify-end mt-4">
-          <Button className="bg-green-600 hover:bg-green-700" onClick={onDone}>
-            {keys.length === 0 ? 'Skip →' : `Next (${keys.length} photo${keys.length > 1 ? 's' : ''}) →`}
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-// ─── Record Payout Step ───────────────────────────────────────────────────────
-function RecordPayoutStep({
-  refNumber, amount, method, customerId, customerName, onDone,
-}: {
-  purchaseId: string; refNumber: string; amount: string; method: string
-  customerId: string; customerName: string; onDone: () => void
-}) {
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'eft' | 'cheque' | 'amplopay'>(method as 'cash' | 'eft' | 'cheque' | 'amplopay')
-  const [notes,   setNotes]   = useState('')
-  const [loading, setLoading] = useState(false)
-
-  async function handleRecord() {
-    setLoading(true)
-    try {
-      const res = await fetch('/api/payments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ customerId, amount, paymentMethod, notes: notes || undefined }),
-      })
-      if (!res.ok) {
-        const j = await res.json() as { error?: string }
-        toast.error(j.error ?? 'Failed to record payout')
-        return
-      }
-      const data = await res.json() as { refNumber: string }
-      toast.success(`Payout ${data.refNumber} recorded`)
-      onDone()
-    } catch {
-      toast.error('Failed to record payout')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  return (
-    <Dialog open>
-      <DialogContent className="sm:max-w-sm">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <FileText className="w-5 h-5 text-green-600" />
-            Record Payout — {refNumber}
-          </DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4 mt-2">
-          <div className="rounded-xl bg-green-50 border border-green-200 p-4 text-center">
-            <p className="text-xs text-gray-500 mb-0.5">Pay to</p>
-            <p className="font-semibold text-gray-900">{customerName}</p>
-            <p className="text-3xl font-bold text-green-700 font-mono mt-2">R {amount}</p>
-          </div>
-          <div>
-            <Label>Payment Method</Label>
-            <Select value={paymentMethod} onValueChange={(v) => setPaymentMethod(v as typeof paymentMethod)}>
-              <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="cash">Cash</SelectItem>
-                <SelectItem value="eft">EFT</SelectItem>
-                <SelectItem value="cheque">Cheque</SelectItem>
-                <SelectItem value="amplopay">AmploPay</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label>Notes <span className="text-gray-400 font-normal">(optional)</span></Label>
-            <Input value={notes} onChange={(e) => setNotes(e.target.value)} className="mt-1" placeholder="Any remarks..." disabled={loading} />
-          </div>
-          <Button
-            className="w-full bg-green-600 hover:bg-green-700 h-11 text-base font-semibold"
-            onClick={handleRecord}
-            disabled={loading}
-          >
-            {loading
-              ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Recording…</>
-              : 'Confirm Payout & Print Receipt'}
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
   )
 }

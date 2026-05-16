@@ -2,15 +2,15 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import useSWR from 'swr'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { ArrowLeft, ChevronDown, ChevronRight, Loader2 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { CreateCustomerSchema, type CreateCustomerFormInput, type CreateCustomerInput } from '@/lib/schemas/customer'
+import { colors } from '@/lib/design-tokens'
+
+const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 const COMMODITY_OPTIONS = [
   'Copper', 'Aluminium', 'Steel (Ferrous)', 'Non-Ferrous Metals',
@@ -18,65 +18,50 @@ const COMMODITY_OPTIONS = [
   'Plastic', 'Paper / Cardboard', 'Catalytic Converters', 'Batteries', 'Other',
 ]
 
-const DEALER_PRICE_GROUP_HINT: Record<string, string> = {
-  dealer_1: 'Dealer 1', dealer_2: 'Dealer 2', dealer_3: 'Dealer 3',
-}
-
-function Section({
-  title, emoji, optional = false, defaultOpen = false, children,
-}: {
-  title: string; emoji: string; optional?: boolean; defaultOpen?: boolean; children: React.ReactNode
-}) {
-  const [open, setOpen] = useState(defaultOpen)
-  if (!optional) {
-    return (
-      <div className="bg-white rounded-xl border-2 border-blue-400 overflow-hidden">
-        <div className="bg-blue-50 px-5 py-3 flex items-center gap-2">
-          <span>{emoji}</span>
-          <span className="font-semibold text-blue-800 text-sm">{title}</span>
-          <span className="text-blue-500 text-xs font-normal ml-1">— required</span>
-        </div>
-        <div className="p-5">{children}</div>
-      </div>
-    )
-  }
+// ─── Label + field helper ──────────────────────────────────────────────────────
+function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
   return (
-    <div className="bg-white rounded-xl border overflow-hidden">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="w-full bg-gray-50 px-5 py-3 flex items-center justify-between hover:bg-gray-100 transition-colors"
-      >
-        <div className="flex items-center gap-2">
-          <span>{emoji}</span>
-          <span className="font-semibold text-gray-700 text-sm">{title}</span>
-          <span className="text-gray-400 text-xs font-normal ml-1">— optional</span>
-        </div>
-        {open ? <ChevronDown className="w-4 h-4 text-gray-400" /> : <ChevronRight className="w-4 h-4 text-gray-400" />}
-      </button>
-      {open && <div className="p-5">{children}</div>}
+    <div className="flex flex-col gap-0.5 mb-2">
+      <label className="text-[11px] font-semibold" style={{ color: '#374151' }}>{label}</label>
+      {children}
+      {error && <span className="text-[10px]" style={{ color: colors.danger }}>{error}</span>}
     </div>
   )
 }
 
+// ─── Windows-style panel section heading ──────────────────────────────────────
+function SectionHead({ label }: { label: string }) {
+  return (
+    <div className="flex items-center gap-2 mb-2 mt-1">
+      <span className="text-[11px] font-bold uppercase tracking-wide" style={{ color: '#1B3A6B' }}>{label}</span>
+      <div className="flex-1 h-px" style={{ background: '#C0C0C0' }} />
+    </div>
+  )
+}
+
+// ─── Page ──────────────────────────────────────────────────────────────────────
 export default function NewAccountPage() {
-  const router = useRouter()
+  const router  = useRouter()
   const [loading, setLoading] = useState(false)
   const [dupLink, setDupLink] = useState<string | null>(null)
+
+  const { data: pgData } = useSWR<{ priceGroups: { id: string; name: string }[] }>('/api/price-groups', fetcher)
+  const priceGroups = pgData?.priceGroups ?? []
 
   const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<CreateCustomerFormInput, unknown, CreateCustomerInput>({
     resolver: zodResolver(CreateCustomerSchema),
     defaultValues: {
-      customerType:    'account',
-      primaryFunction: 'supplier',
+      customerType:     'account',
+      primaryFunction:  'supplier',
       tradeCommodities: [],
-      zeroRated: false,
+      zeroRated:        false,
     },
   })
 
   const tradeCommodities = (watch('tradeCommodities') as string[] | undefined) ?? []
-  const dealerCategory = watch('dealerCategory')
-  const marketSector = watch('marketSector')
+  const dealerCategory   = watch('dealerCategory')
+  const marketSector     = watch('marketSector')
+  const zeroRated        = watch('zeroRated') ?? false
 
   function toggleCommodity(val: string) {
     if (tradeCommodities.includes(val)) {
@@ -106,240 +91,282 @@ export default function NewAccountPage() {
         toast.error(j.error ?? 'Failed to create account')
         return
       }
-      const { id } = await res.json()
       toast.success('Account created successfully')
-      router.push(`/app/customers/${id}`)
+      router.push('/app/customers')
     } finally {
       setLoading(false)
     }
   }
 
+  // Shared input style
+  const inputCls = "w-full px-2 py-1 text-[12px] border rounded-[2px] bg-white focus:outline-none focus:border-[#0078D7]"
+  const inputStyle = { borderColor: '#ABABAB', color: '#212529', boxShadow: 'inset 1px 1px 2px rgba(0,0,0,0.10)' }
+  const selectCls = "w-full px-2 py-1 text-[12px] border rounded-[2px] bg-white focus:outline-none focus:border-[#0078D7] cursor-pointer"
+
   return (
-    <div className="max-w-2xl mx-auto pb-12">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={() => router.push('/app/customers')} type="button">
-            <ArrowLeft className="w-4 h-4 mr-1" /> Customers
-          </Button>
-          <span className="text-gray-300">/</span>
-          <span className="text-sm font-semibold text-gray-700">New Account</span>
+    <div className="flex flex-col flex-1 min-h-0">
+      {/* ── Panel ─────────────────────────────────────────────── */}
+      <div className="flex flex-col flex-1 min-h-0 bg-white border" style={{ borderColor: '#B0B0B0', borderRadius: 2 }}>
+
+        {/* Panel title bar */}
+        <div className="shrink-0 px-3 py-1.5 flex items-center justify-between border-b" style={{ borderColor: '#C0C0C0', background: 'linear-gradient(180deg,#EAEAEA 0%,#D4D4D4 100%)' }}>
+          <span className="text-[12px] font-bold" style={{ color: '#1B3A6B' }}>Customer / Vendor Details</span>
+          {dupLink && (
+            <button
+              type="button"
+              className="text-[11px] underline"
+              style={{ color: '#185ABD' }}
+              onClick={() => router.push(`/app/customers/${dupLink}`)}
+            >
+              Duplicate ID — view existing →
+            </button>
+          )}
         </div>
-        <Button
-          type="button"
-          className="bg-green-600 hover:bg-green-700"
-          disabled={loading}
-          onClick={handleSubmit(onSubmit)}
-        >
-          {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving…</> : 'Save Account'}
-        </Button>
-      </div>
 
-      {dupLink && (
-        <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg text-sm">
-          <span className="font-semibold text-amber-800">Duplicate ID number. </span>
-          <button
-            type="button"
-            className="text-blue-600 underline"
-            onClick={() => router.push(`/app/customers/${dupLink}`)}
-          >
-            View existing customer →
-          </button>
-        </div>
-      )}
+        {/* ── 2-column form body ─── */}
+        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-1 min-h-0 overflow-auto">
+          <div className="flex flex-1 p-4 gap-6 items-start">
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            {/* ──── LEFT COLUMN (60%) ──────────────────────────── */}
+            <div className="flex-[3] min-w-0 space-y-0">
 
-        {/* ── REQUIRED ── */}
-        <Section title="Required Details" emoji="★" defaultOpen>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-2">
-              <Label>ID Number <span className="text-red-500">*</span></Label>
-              <Input {...register('idNumber')} className="mt-1" placeholder="e.g. 9001015800086" disabled={loading} />
-              {errors.idNumber && <p className="text-xs text-red-600 mt-1">{errors.idNumber.message}</p>}
-            </div>
-            <div>
-              <Label>First Name <span className="text-red-500">*</span></Label>
-              <Input {...register('firstName')} className="mt-1" disabled={loading} />
-              {errors.firstName && <p className="text-xs text-red-600 mt-1">{errors.firstName.message}</p>}
-            </div>
-            <div>
-              <Label>Last Name <span className="text-red-500">*</span></Label>
-              <Input {...register('lastName')} className="mt-1" disabled={loading} />
-              {errors.lastName && <p className="text-xs text-red-600 mt-1">{errors.lastName.message}</p>}
-            </div>
-            <div className="col-span-2">
-              <Label>Phone <span className="text-red-500">*</span></Label>
-              <Input {...register('phone')} className="mt-1" placeholder="+268 or 8-digit local" disabled={loading} />
-              {errors.phone && <p className="text-xs text-red-600 mt-1">{errors.phone.message}</p>}
-            </div>
-            <div>
-              <Label>Market Sector <span className="text-red-500">*</span></Label>
-              <div className="flex gap-2 mt-1">
-                {(['formal', 'informal'] as const).map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    onClick={() => setValue('marketSector', s)}
-                    className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors ${
-                      marketSector === s
-                        ? 'bg-blue-600 text-white border-blue-600'
-                        : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
-                    }`}
+              <SectionHead label="Identity" />
+
+              <div className="grid grid-cols-2 gap-x-3">
+                <Field label="First Name *" error={errors.firstName?.message}>
+                  <input {...register('firstName')} className={inputCls} style={inputStyle} disabled={loading} />
+                </Field>
+                <Field label="Last Name (Surname) *" error={errors.lastName?.message}>
+                  <input {...register('lastName')} className={inputCls} style={inputStyle} disabled={loading} />
+                </Field>
+              </div>
+
+              <Field label="ID Number (13 digits) *" error={errors.idNumber?.message}>
+                <input {...register('idNumber')} className={inputCls} style={inputStyle} placeholder="e.g. 9001015800086" disabled={loading} />
+              </Field>
+
+              <div className="grid grid-cols-3 gap-x-3">
+                <Field label="Date of Birth">
+                  <input {...register('dateOfBirth')} type="date" className={inputCls} style={inputStyle} disabled={loading} />
+                </Field>
+                <Field label="Gender">
+                  <select {...register('gender')} className={selectCls} style={inputStyle} disabled={loading}>
+                    <option value="">— Select —</option>
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                    <option value="other">Other</option>
+                  </select>
+                </Field>
+                <Field label="Nationality">
+                  <input {...register('nationality')} className={inputCls} style={inputStyle} placeholder="e.g. South African" disabled={loading} />
+                </Field>
+              </div>
+
+              <SectionHead label="Contact" />
+
+              <div className="grid grid-cols-2 gap-x-3">
+                <Field label="Cell Number *" error={errors.phone?.message}>
+                  <input {...register('phone')} className={inputCls} style={inputStyle} placeholder="+268XXXXXXXX" disabled={loading} />
+                </Field>
+                <Field label="Tel Number (Landline)">
+                  <input {...register('landline')} className={inputCls} style={inputStyle} disabled={loading} />
+                </Field>
+              </div>
+
+              <Field label="E-Mail" error={errors.email?.message}>
+                <input {...register('email')} type="email" className={inputCls} style={inputStyle} disabled={loading} />
+              </Field>
+
+              <SectionHead label="Company / Business" />
+
+              <Field label="Company / Vendor Name">
+                <input {...register('companyName')} className={inputCls} style={inputStyle} disabled={loading} />
+              </Field>
+
+              <div className="grid grid-cols-2 gap-x-3">
+                <Field label="Company Reg No">
+                  <input {...register('companyRegNumber')} className={inputCls} style={inputStyle} disabled={loading} />
+                </Field>
+                <Field label="VAT No" error={errors.vatNumber?.message}>
+                  <input {...register('vatNumber')} className={inputCls} style={inputStyle} placeholder="7–15 digits" disabled={loading} />
+                </Field>
+              </div>
+
+              <Field label="Police Reg No">
+                <input {...register('policeRegisterNo')} className={inputCls} style={inputStyle} disabled={loading} />
+              </Field>
+
+              <SectionHead label="Classification" />
+
+              <div className="grid grid-cols-2 gap-x-3">
+                <Field label="Default Pricing Group">
+                  <select
+                    className={selectCls}
+                    style={inputStyle}
+                    disabled={loading}
+                    onChange={(e) => setValue('priceGroupId', e.target.value || undefined)}
+                    defaultValue=""
                   >
+                    <option value="">— None —</option>
+                    {priceGroups.map((pg) => (
+                      <option key={pg.id} value={pg.id}>{pg.name}</option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Primary Function">
+                  <select {...register('primaryFunction')} className={selectCls} style={inputStyle} disabled={loading}>
+                    <option value="supplier">Supplier (sells to us)</option>
+                    <option value="customer">Customer (buys from us)</option>
+                    <option value="both">Both</option>
+                  </select>
+                </Field>
+              </div>
+
+              <div className="flex items-center gap-4 py-1">
+                <label className="flex items-center gap-1.5 cursor-pointer text-[11px]" style={{ color: '#374151' }}>
+                  <input
+                    type="checkbox"
+                    checked={zeroRated}
+                    onChange={(e) => setValue('zeroRated', e.target.checked)}
+                    className="w-3.5 h-3.5"
+                    disabled={loading}
+                  />
+                  Zero Rated VAT
+                </label>
+              </div>
+
+              <SectionHead label="Banking" />
+              <div className="grid grid-cols-3 gap-x-3">
+                <Field label="Bank Name">
+                  <input {...register('bankName')} className={inputCls} style={inputStyle} placeholder="e.g. FNB, ABSA" disabled={loading} />
+                </Field>
+                <Field label="Account Number">
+                  <input {...register('bankAccountNo')} className={inputCls} style={inputStyle} disabled={loading} />
+                </Field>
+                <Field label="Branch Code">
+                  <input {...register('bankBranchCode')} className={inputCls} style={inputStyle} placeholder="6 digits" disabled={loading} />
+                </Field>
+              </div>
+
+            </div>
+
+            {/* ──── RIGHT COLUMN (40%) ─────────────────────────── */}
+            <div className="flex-[2] min-w-0 space-y-0">
+
+              <SectionHead label="Market Sector" />
+              <div className="flex gap-4 mb-3 py-1">
+                {(['formal', 'informal'] as const).map((s) => (
+                  <label key={s} className="flex items-center gap-1.5 cursor-pointer text-[12px]" style={{ color: '#374151' }}>
+                    <input
+                      type="radio"
+                      name="marketSector"
+                      checked={marketSector === s}
+                      onChange={() => setValue('marketSector', s)}
+                      className="w-3.5 h-3.5"
+                      disabled={loading}
+                    />
                     {s === 'formal' ? 'Formal' : 'Informal'}
-                  </button>
+                  </label>
                 ))}
               </div>
-              <p className="text-xs text-gray-400 mt-1">Formal = registered scrap yard · Informal = street seller</p>
-            </div>
-            <div>
-              <Label>Dealer Category</Label>
-              <Select
-                onValueChange={(v) => setValue('dealerCategory', v as 'casual' | 'dealer_1' | 'dealer_2' | 'dealer_3')}
-                defaultValue=""
-              >
-                <SelectTrigger className="mt-1"><SelectValue placeholder="Select category…" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="casual">Casual</SelectItem>
-                  <SelectItem value="dealer_1">Dealer 1</SelectItem>
-                  <SelectItem value="dealer_2">Dealer 2</SelectItem>
-                  <SelectItem value="dealer_3">Dealer 3</SelectItem>
-                </SelectContent>
-              </Select>
-              {dealerCategory && DEALER_PRICE_GROUP_HINT[dealerCategory] && (
-                <p className="text-xs text-green-700 mt-1 font-medium">
-                  → Will be assigned Price Group: {DEALER_PRICE_GROUP_HINT[dealerCategory]}
-                </p>
-              )}
-            </div>
-          </div>
-        </Section>
 
-        {/* ── COMPANY DETAILS ── */}
-        <Section title="Company Details" emoji="🏢" optional>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>Company Name</Label>
-              <Input {...register('companyName')} className="mt-1" placeholder="e.g. xTimely Pty Ltd" disabled={loading} />
-            </div>
-            <div>
-              <Label>Contact Person</Label>
-              <Input {...register('contactPerson')} className="mt-1" placeholder="e.g. James Smith" disabled={loading} />
-            </div>
-            <div>
-              <Label>VAT Number</Label>
-              <Input {...register('vatNumber')} className="mt-1" placeholder="7–15 digits" disabled={loading} />
-              {errors.vatNumber && <p className="text-xs text-red-600 mt-1">{errors.vatNumber.message}</p>}
-            </div>
-            <div>
-              <Label>Email</Label>
-              <Input {...register('email')} type="email" className="mt-1" disabled={loading} />
-            </div>
-          </div>
-        </Section>
+              <Field label="Customer Category">
+                <select
+                  className={selectCls}
+                  style={inputStyle}
+                  disabled={loading}
+                  value={dealerCategory ?? ''}
+                  onChange={(e) => setValue('dealerCategory', (e.target.value || undefined) as typeof dealerCategory)}
+                >
+                  <option value="">— Select —</option>
+                  <option value="casual">Casual</option>
+                  <option value="dealer_1">Dealer 1</option>
+                  <option value="dealer_2">Dealer 2</option>
+                  <option value="dealer_3">Dealer 3</option>
+                </select>
+              </Field>
 
-        {/* ── CLASSIFICATION & VAT ── */}
-        <Section title="Classification & VAT" emoji="🏷️" optional>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between p-4 rounded-lg bg-yellow-50 border border-yellow-200">
-              <div>
-                <p className="font-semibold text-yellow-800 text-sm">Zero-Rated VAT</p>
-                <p className="text-xs text-yellow-700 mt-0.5">No VAT will be charged on this account&apos;s transactions</p>
+              <SectionHead label="Trade Commodities" />
+              <div className="space-y-1 mb-3">
+                {COMMODITY_OPTIONS.map((opt) => (
+                  <label key={opt} className="flex items-center gap-2 cursor-pointer text-[11px] py-0.5" style={{ color: '#374151' }}>
+                    <input
+                      type="checkbox"
+                      checked={tradeCommodities.includes(opt)}
+                      onChange={() => toggleCommodity(opt)}
+                      className="w-3.5 h-3.5"
+                      disabled={loading}
+                    />
+                    {opt}
+                  </label>
+                ))}
               </div>
-              <input
-                type="checkbox"
-                checked={watch('zeroRated') ?? false}
-                onChange={(e) => setValue('zeroRated', e.target.checked)}
-                className="w-5 h-5 rounded border-gray-300 text-green-600 cursor-pointer"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Primary Function</Label>
-                <Select onValueChange={(v) => setValue('primaryFunction', v as 'customer' | 'supplier' | 'both')} defaultValue="supplier">
-                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="supplier">Supplier (sells to us)</SelectItem>
-                    <SelectItem value="customer">Customer (buys from us)</SelectItem>
-                    <SelectItem value="both">Both</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Credit Limit (R)</Label>
-                <Input {...register('creditLimit')} type="number" step="0.01" min="0" className="mt-1" placeholder="0.00" disabled={loading} />
-              </div>
-            </div>
-          </div>
-        </Section>
 
-        {/* ── TRADE COMMODITIES ── */}
-        <Section title="Trade Commodities" emoji="🪙" optional>
-          <p className="text-xs text-gray-500 mb-3">Tick the materials this account trades in. Only those products will appear at the purchase screen.</p>
-          <div className="grid grid-cols-2 gap-2">
-            {COMMODITY_OPTIONS.map((opt) => (
-              <label key={opt} className={`flex items-center gap-2 text-sm cursor-pointer px-3 py-2 rounded-lg border transition-colors ${
-                tradeCommodities.includes(opt)
-                  ? 'bg-green-50 border-green-300 text-green-800'
-                  : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'
-              }`}>
-                <input
-                  type="checkbox"
-                  checked={tradeCommodities.includes(opt)}
-                  onChange={() => toggleCommodity(opt)}
-                  className="w-4 h-4 rounded border-gray-300 text-green-600"
+              <SectionHead label="Physical Address" />
+              <Field label="Street / Area">
+                <textarea
+                  {...register('physicalAddress')}
+                  rows={3}
+                  className={inputCls}
+                  style={{ ...inputStyle, resize: 'none' }}
+                  disabled={loading}
                 />
-                {opt}
-              </label>
-            ))}
-          </div>
-        </Section>
+              </Field>
 
-        {/* ── BANKING ── */}
-        <Section title="Banking Details" emoji="🏦" optional>
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <Label>Bank Name</Label>
-              <Input {...register('bankName')} className="mt-1" placeholder="e.g. FNB, ABSA" disabled={loading} />
-            </div>
-            <div>
-              <Label>Account Number</Label>
-              <Input {...register('bankAccountNo')} className="mt-1" disabled={loading} />
-            </div>
-            <div>
-              <Label>Branch Code</Label>
-              <Input {...register('bankBranchCode')} className="mt-1" placeholder="6 digits" disabled={loading} />
-            </div>
-          </div>
-        </Section>
+              <SectionHead label="Postal Address" />
+              <Field label="PO Box / Postal">
+                <textarea
+                  {...register('postalAddress')}
+                  rows={3}
+                  className={inputCls}
+                  style={{ ...inputStyle, resize: 'none' }}
+                  disabled={loading}
+                />
+              </Field>
 
-        {/* ── DOCUMENTS (locked) ── */}
-        <div className="bg-white rounded-xl border overflow-hidden">
-          <div className="bg-gray-50 px-5 py-3 flex items-center gap-2">
-            <span>📎</span>
-            <span className="font-semibold text-gray-500 text-sm">Compliance Documents</span>
-            <span className="text-gray-400 text-xs font-normal ml-1">— upload after saving</span>
-          </div>
-          <div className="p-5">
-            <p className="text-sm text-gray-400">
-              Save this account first, then upload trading licences, SARS certificates and other documents from the customer profile page.
-            </p>
-          </div>
-        </div>
+              <SectionHead label="Notes" />
+              <Field label="Internal Notes">
+                <textarea
+                  {...register('customerNotes')}
+                  rows={3}
+                  className={inputCls}
+                  style={{ ...inputStyle, resize: 'none' }}
+                  disabled={loading}
+                />
+              </Field>
 
-        {/* Save button (bottom) */}
-        <div className="flex justify-end pt-2">
-          <Button
-            type="submit"
-            className="bg-green-600 hover:bg-green-700 min-w-[140px]"
+            </div>
+          </div>
+        </form>
+
+        {/* ── Action bar ────────────────────────────────────── */}
+        <div
+          className="shrink-0 flex items-center gap-2 px-4 py-2 border-t"
+          style={{ borderColor: '#B0B0B0', background: 'linear-gradient(180deg,#F5F5F5 0%,#E8E8E8 100%)' }}
+        >
+          <button
+            type="button"
+            onClick={handleSubmit(onSubmit)}
             disabled={loading}
+            className="h-7 px-5 rounded-sm text-[12px] font-semibold text-white disabled:opacity-50 flex items-center gap-1.5"
+            style={{ background: '#217346', border: '1px solid #176338' }}
           >
-            {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving…</> : 'Save Account'}
-          </Button>
+            {loading ? <><Loader2 className="w-3 h-3 animate-spin" />Saving…</> : 'Save'}
+          </button>
+          <button
+            type="button"
+            onClick={() => router.push('/app/customers')}
+            disabled={loading}
+            className="h-7 px-5 rounded-sm text-[12px] font-medium"
+            style={{ background: '#FFFFFF', border: '1px solid #ABABAB', color: '#374151' }}
+          >
+            Cancel
+          </button>
+          <span className="ml-auto text-[10px]" style={{ color: colors.textSecondary }}>
+            Account Code assigned automatically on save
+          </span>
         </div>
-
-      </form>
+      </div>
     </div>
   )
 }
