@@ -86,10 +86,32 @@ export default function CustomerDetailPage() {
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
-        <Button variant="ghost" size="sm" onClick={() => router.back()}>
-          <ArrowLeft className="w-4 h-4 mr-1" /> Back
-        </Button>
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="sm" onClick={() => router.back()}>
+            <ArrowLeft className="w-4 h-4 mr-1" /> Customers
+          </Button>
+          <div>
+            <h1 className="text-xl font-bold" style={{ color: '#212529' }}>{fullName}</h1>
+            <p className="text-sm" style={{ color: '#6C757D' }}>
+              {customer.customerType === 'account' ? 'Account Customer' : 'Casual Customer'}
+              {customer.accountCode ? ` · ${customer.accountCode}` : ''}
+              {' · '}{customer.idNumber}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={() => setEditOpen(true)}>
+            <Pencil className="w-3.5 h-3.5 mr-1.5" /> Edit
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => router.push('/app/purchases/new')}
+            style={{ background: '#217346', color: '#fff' }}
+          >
+            New Purchase
+          </Button>
+        </div>
       </div>
 
       {/* Blacklist banner */}

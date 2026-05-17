@@ -9,6 +9,7 @@ import useSWR from 'swr'
 import { CasualSelectorPanel, type CasualSelectorPanelRef } from '@/components/customers/CasualSelectorPanel'
 import { AccountSelectorPanel } from '@/components/customers/AccountSelectorPanel'
 import { PrintResultModal } from '@/components/PrintResultModal'
+import { ProcessPaymentModal, type PayTarget } from '@/components/purchases/ProcessPaymentModal'
 import Decimal from 'decimal.js'
 import { colors } from '@/lib/design-tokens'
 import { useOfflineMutation } from '@/hooks/useOfflineFetch'
@@ -70,6 +71,8 @@ type PendingPurchase = {
   subTotal: string
   vatAmount: string
   totalAmount: string
+  amountPaid: string
+  loanDeductionAmount?: string
   paymentMethod: string
   createdAt: string
 }
@@ -128,9 +131,7 @@ export default function NewPurchasePage() {
 
   // ── Pending purchases action state ──────────────────────────────────────
   const [actionMenuId,  setActionMenuId]  = useState<string | null>(null)
-  const [markPaidId,    setMarkPaidId]    = useState<string | null>(null)
-  const [markPaidAmt,   setMarkPaidAmt]   = useState('')
-  const [markPaidPM,    setMarkPaidPM]    = useState<'cash' | 'eft' | 'cheque' | 'amplopay'>('cash')
+  const [payTarget,     setPayTarget]     = useState<PayTarget | null>(null)
   const [voidId,        setVoidId]        = useState<string | null>(null)
   const [voidReason,    setVoidReason]    = useState('')
   const [actionLoading, setActionLoading] = useState(false)
@@ -410,23 +411,6 @@ export default function NewPurchasePage() {
   }
 
   // ── Pending purchase actions ─────────────────────────────────────────────
-  async function handleMarkPaid(id: string) {
-    if (!markPaidAmt || parseFloat(markPaidAmt) <= 0) { toast.error('Enter a valid amount'); return }
-    setActionLoading(true)
-    try {
-      const res = await fetch(`/api/purchases/${id}/mark-paid`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: markPaidAmt, paymentMethod: markPaidPM }),
-      })
-      if (!res.ok) { const e = await res.json() as { error?: string }; toast.error(e.error ?? 'Failed'); return }
-      toast.success('Purchase marked as paid')
-      setMarkPaidId(null); setMarkPaidAmt(''); setMarkPaidPM('cash')
-      mutatePending()
-    } catch { toast.error('Network error') }
-    finally { setActionLoading(false) }
-  }
-
   async function handleVoidPurchase(id: string) {
     if (voidReason.trim().length < 5) { toast.error('Reason must be at least 5 characters'); return }
     setActionLoading(true)
@@ -647,7 +631,7 @@ export default function NewPurchasePage() {
               style={{
                 ...headerBg,
                 display: 'grid',
-                gridTemplateColumns: 'minmax(120px, 200px) 72px 80px 80px 70px 80px 28px 26px',
+                gridTemplateColumns: '1fr 72px 80px 80px 70px 80px 28px 26px',
                 gap: 4,
                 padding: '4px 8px',
                 flexShrink: 0,
@@ -673,7 +657,7 @@ export default function NewPurchasePage() {
                     <div
                       style={{
                         display: 'grid',
-                        gridTemplateColumns: 'minmax(120px, 200px) 72px 80px 80px 70px 80px 28px 26px',
+                        gridTemplateColumns: '1fr 72px 80px 80px 70px 80px 28px 26px',
                         gap: 4,
                         padding: '4px 8px',
                         alignItems: 'center',
@@ -926,8 +910,8 @@ export default function NewPurchasePage() {
             </div>
 
             {/* Column headers */}
-            <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr 48px 80px 70px 80px 70px 60px 28px', gap: 4, padding: '3px 8px', background: '#F8F9FA', borderBottom: '1px solid #D0D0D0', flexShrink: 0 }}>
-              {['Ref #', 'Customer', 'Lines', 'Sub Total', 'VAT', 'Total', 'Payment', 'Time', ''].map((h, i) => (
+            <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr 48px 80px 80px 80px 60px 28px', gap: 4, padding: '3px 8px', background: '#F8F9FA', borderBottom: '1px solid #D0D0D0', flexShrink: 0 }}>
+              {['Ref #', 'Customer', 'Lines', 'Total', 'Paid', 'Balance', 'Time', ''].map((h, i) => (
                 <span key={i} style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#6C757D' }}>{h}</span>
               ))}
             </div>
@@ -942,14 +926,13 @@ export default function NewPurchasePage() {
                 <div key={p.id} style={{ borderTop: '1px solid #E8E8E8' }}>
 
                   {/* Main row */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr 48px 80px 70px 80px 70px 60px 28px', gap: 4, padding: '4px 8px', alignItems: 'center', background: markPaidId === p.id || voidId === p.id ? '#FFFBEB' : 'transparent' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr 48px 80px 80px 80px 60px 28px', gap: 4, padding: '4px 8px', alignItems: 'center', background: voidId === p.id ? '#FFFBEB' : 'transparent' }}>
                     <span style={{ fontSize: 10, fontFamily: 'monospace', color: '#1B3A6B', fontWeight: 600 }}>{p.refNumber}</span>
                     <span style={{ fontSize: 11, color: '#212529', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.customer.firstName} {p.customer.lastName}</span>
                     <span style={{ fontSize: 10, color: '#6C757D', textAlign: 'center' }}>{p.lines.length}</span>
-                    <span style={{ fontSize: 10, fontFamily: 'monospace', color: '#212529' }}>R {new Decimal(p.subTotal ?? p.totalAmount).toFixed(2)}</span>
-                    <span style={{ fontSize: 10, fontFamily: 'monospace', color: '#6C757D' }}>R {new Decimal(p.vatAmount ?? '0').toFixed(2)}</span>
-                    <span style={{ fontSize: 10, fontFamily: 'monospace', fontWeight: 600, color: '#217346' }}>R {new Decimal(p.totalAmount).toFixed(2)}</span>
-                    <span style={{ fontSize: 10, color: '#374151', textTransform: 'capitalize' }}>{p.paymentMethod}</span>
+                    <span style={{ fontSize: 10, fontFamily: 'monospace', color: '#217346', fontWeight: 600 }}>R {new Decimal(p.totalAmount).toFixed(2)}</span>
+                    {(() => { const paid = new Decimal(p.amountPaid ?? '0'); return <span style={{ fontSize: 10, fontFamily: 'monospace', color: paid.gt(0) ? '#217346' : '#9CA3AF' }}>{paid.gt(0) ? `R ${paid.toFixed(2)}` : '—'}</span> })()}
+                    {(() => { const bal = new Decimal(p.totalAmount).minus(new Decimal(p.loanDeductionAmount ?? '0')).minus(new Decimal(p.amountPaid ?? '0')); const partial = new Decimal(p.amountPaid ?? '0').gt(0); return <span style={{ fontSize: 10, fontFamily: 'monospace', fontWeight: 600, color: partial ? '#C9A020' : '#217346' }}>R {bal.toFixed(2)}</span> })()}
                     <span style={{ fontSize: 10, color: '#9CA3AF' }}>{timeAgo(p.createdAt)}</span>
 
                     {/* ⋮ action menu */}
@@ -962,10 +945,9 @@ export default function NewPurchasePage() {
                       </button>
 
                       {actionMenuId === p.id && (
-                        <div style={{ position: 'absolute', right: 0, top: 24, zIndex: 50, background: '#fff', border: '1px solid #C0C0C0', borderRadius: 3, boxShadow: '0 4px 12px rgba(0,0,0,0.15)', minWidth: 190 }}>
+                        <div style={{ position: 'absolute', right: 0, bottom: 26, zIndex: 9999, background: '#fff', border: '1px solid #C0C0C0', borderRadius: 3, boxShadow: '0 4px 12px rgba(0,0,0,0.15)', minWidth: 190 }}>
                           {([
-                            { label: 'Mark as Paid',          action: () => { setMarkPaidId(p.id); setActionMenuId(null) } },
-                            { label: 'Edit / Amend',           action: () => { router.push(`/app/purchases/${p.id}/edit`); setActionMenuId(null) } },
+                            { label: 'Process Payment',        action: () => { setPayTarget({ id: p.id, ref: p.refNumber, totalAmount: p.totalAmount, loanDeductionAmount: p.loanDeductionAmount ?? '0', amountPaid: p.amountPaid }); setActionMenuId(null) } },
                             { label: 'Print Slip',             action: () => { setPrintDialog({ id: p.id, refNumber: p.refNumber }); setActionMenuId(null) } },
                             { label: 'Attach Photo',           action: () => { router.push(`/app/purchases/${p.id}?attach=photo`); setActionMenuId(null) } },
                             { label: 'Send Receipt',           action: () => { router.push(`/app/purchases/${p.id}?action=receipt`); setActionMenuId(null) } },
@@ -988,43 +970,6 @@ export default function NewPurchasePage() {
                       )}
                     </div>
                   </div>
-
-                  {/* Mark as Paid inline form */}
-                  {markPaidId === p.id && (
-                    <div style={{ padding: '6px 12px', background: '#F0FDF4', borderTop: '1px solid #BBF7D0', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: 11, fontWeight: 600, color: '#166534' }}>Mark as Paid:</span>
-                      <input
-                        type="number" min="0" step="0.01" placeholder="Amount (R)"
-                        value={markPaidAmt}
-                        onChange={(e) => setMarkPaidAmt(e.target.value)}
-                        style={{ height: 24, width: 90, fontSize: 11, border: '1px solid #86EFAC', borderRadius: 2, padding: '0 6px', outline: 'none' }}
-                        autoFocus
-                      />
-                      <select
-                        value={markPaidPM}
-                        onChange={(e) => setMarkPaidPM(e.target.value as typeof markPaidPM)}
-                        style={{ height: 24, fontSize: 11, border: '1px solid #86EFAC', borderRadius: 2, padding: '0 4px', outline: 'none' }}
-                      >
-                        <option value="cash">Cash</option>
-                        <option value="eft">EFT</option>
-                        <option value="cheque">Cheque</option>
-                        <option value="amplopay">AmploPay</option>
-                      </select>
-                      <button
-                        disabled={actionLoading}
-                        onClick={() => handleMarkPaid(p.id)}
-                        style={{ height: 24, padding: '0 10px', fontSize: 11, fontWeight: 600, background: '#217346', color: '#fff', border: 'none', borderRadius: 2, cursor: 'pointer', opacity: actionLoading ? 0.6 : 1 }}
-                      >
-                        {actionLoading ? '…' : 'Confirm'}
-                      </button>
-                      <button
-                        onClick={() => { setMarkPaidId(null); setMarkPaidAmt(''); setMarkPaidPM('cash') }}
-                        style={{ height: 24, padding: '0 8px', fontSize: 11, background: 'none', border: '1px solid #ABABAB', borderRadius: 2, cursor: 'pointer', color: '#6C757D' }}
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  )}
 
                   {/* Reverse Purchase inline form */}
                   {voidId === p.id && (
@@ -1225,8 +1170,17 @@ export default function NewPurchasePage() {
       {/* Overlay to close action menu on outside click */}
       {actionMenuId && (
         <div
-          style={{ position: 'fixed', inset: 0, zIndex: 40 }}
+          style={{ position: 'fixed', inset: 0, zIndex: 9998 }}
           onClick={() => setActionMenuId(null)}
+        />
+      )}
+
+      {/* Process Payment modal (from pending purchases action menu) */}
+      {payTarget && (
+        <ProcessPaymentModal
+          purchase={payTarget}
+          onClose={() => setPayTarget(null)}
+          onSuccess={() => { mutatePending(); setPayTarget(null) }}
         />
       )}
 

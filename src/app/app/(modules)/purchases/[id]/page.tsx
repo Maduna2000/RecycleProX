@@ -68,11 +68,11 @@ export default function PurchaseDetailPage() {
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="sm" onClick={() => router.push('/app/purchases')}>
-            <ArrowLeft className="w-4 h-4 mr-1" /> Purchases
+            <ArrowLeft className="w-4 h-4 mr-1" /> Back to Purchases
           </Button>
           <div>
-            <h1 className="text-xl font-bold text-gray-900 font-mono">{purchase.refNumber}</h1>
-            <p className="text-xs text-gray-400">{format.datetime(purchase.createdAt)}</p>
+            <h1 className="text-xl font-bold font-mono" style={{ color: '#212529' }}>{purchase.refNumber}</h1>
+            <p className="text-sm" style={{ color: '#6C757D' }}>{format.datetime(purchase.createdAt)}</p>
           </div>
         </div>
         <Button className="bg-green-600 hover:bg-green-700" onClick={() => router.push('/app/purchases/new')}>
@@ -92,14 +92,11 @@ export default function PurchaseDetailPage() {
       {/* Purchase card */}
       <div className="bg-white rounded-xl border p-6 mb-4">
         <div className="flex items-start justify-between">
-          <div>
-            <p className="text-xs text-gray-400 uppercase tracking-wide font-semibold">Purchase</p>
-            <h1 className="text-2xl font-bold text-gray-900 font-mono mt-0.5">{purchase.refNumber}</h1>
-            <p className="text-sm text-gray-500 mt-1">{format.datetime(purchase.createdAt)}</p>
-          </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {purchase.status === 'completed'
               ? <Badge className="bg-green-100 text-green-700">Completed</Badge>
+              : purchase.status === 'pending'
+              ? <Badge className="bg-amber-100 text-amber-700">Pending Payment</Badge>
               : <Badge variant="destructive">Voided</Badge>}
             <Badge variant="outline" className="capitalize">{purchase.paymentMethod}</Badge>
           </div>
