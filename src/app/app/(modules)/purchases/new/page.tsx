@@ -638,7 +638,7 @@ export default function NewPurchasePage() {
               style={{
                 ...headerBg,
                 display: 'grid',
-                gridTemplateColumns: '1fr 72px 80px 80px 70px 80px 28px 26px',
+                gridTemplateColumns: 'minmax(120px, 200px) 72px 80px 80px 70px 80px 28px 26px',
                 gap: 4,
                 padding: '4px 8px',
                 flexShrink: 0,
@@ -664,7 +664,7 @@ export default function NewPurchasePage() {
                     <div
                       style={{
                         display: 'grid',
-                        gridTemplateColumns: '1fr 72px 80px 80px 70px 80px 28px 26px',
+                        gridTemplateColumns: 'minmax(120px, 200px) 72px 80px 80px 70px 80px 28px 26px',
                         gap: 4,
                         padding: '4px 8px',
                         alignItems: 'center',
