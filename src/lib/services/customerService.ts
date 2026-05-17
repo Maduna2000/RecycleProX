@@ -147,11 +147,13 @@ export async function searchCustomers(
     ...(filters.priceGroupId    && { priceGroupId:    filters.priceGroupId }),
     ...(query && {
       OR: [
-        { lastName:    { contains: query, mode: 'insensitive' as const } },
-        { firstName:   { contains: query, mode: 'insensitive' as const } },
-        { idNumber:    query },
-        { phone:       { contains: query } },
-        { accountCode: { contains: query, mode: 'insensitive' as const } },
+        { lastName:      { contains: query, mode: 'insensitive' as const } },
+        { firstName:     { contains: query, mode: 'insensitive' as const } },
+        { companyName:   { contains: query, mode: 'insensitive' as const } },
+        { contactPerson: { contains: query, mode: 'insensitive' as const } },
+        { idNumber:      query },
+        { phone:         { contains: query } },
+        { accountCode:   { contains: query, mode: 'insensitive' as const } },
       ],
     }),
   }

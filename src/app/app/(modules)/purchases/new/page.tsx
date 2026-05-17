@@ -25,6 +25,7 @@ type SelectedCustomer = {
   id: string; firstName: string; lastName: string; idNumber: string
   phone: string; blacklisted: boolean; priceGroupId?: string | null
   tradeCommodities?: string[] | null; zeroRated?: boolean
+  companyName?: string | null; contactPerson?: string | null
 }
 
 const COMMODITY_MAP: Record<string, string[]> = {
@@ -525,6 +526,14 @@ export default function NewPurchasePage() {
             {customer && (
               <div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto 1fr', gap: '3px 14px', alignItems: 'center', marginBottom: 4 }}>
+                  {customer.companyName && (
+                    <>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: '#1B3A6B' }}>Vendor</span>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: '#212529', gridColumn: 'span 3' }}>{customer.companyName}</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: '#1B3A6B' }}>Parent</span>
+                      <span style={{ fontSize: 11, color: '#212529', gridColumn: 'span 3' }}>{customer.contactPerson || '—'}</span>
+                    </>
+                  )}
                   <span style={{ fontSize: 10, fontWeight: 700, color: '#1B3A6B' }}>Name</span>
                   <span style={{ fontSize: 11, color: '#212529' }}>
                     {customer.firstName} {customer.lastName}

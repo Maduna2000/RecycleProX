@@ -12,6 +12,7 @@ type SelectedCustomer = {
   id: string; firstName: string; lastName: string; idNumber: string
   phone: string; blacklisted: boolean; priceGroupId?: string | null
   tradeCommodities?: string[] | null; zeroRated?: boolean
+  companyName?: string | null; contactPerson?: string | null
 }
 
 type AccountCustomer = {
@@ -19,6 +20,7 @@ type AccountCustomer = {
   phone: string; accountCode: string | null; blacklisted: boolean
   blacklistReason?: string | null; priceGroupId?: string | null
   tradeCommodities?: string[] | null; zeroRated?: boolean
+  companyName?: string | null; contactPerson?: string | null
 }
 
 interface Props {
@@ -67,15 +69,17 @@ export function AccountSelectorPanel({ onSelect }: Props) {
   function handleSelect(c: AccountCustomer) {
     if (c.blacklisted) return
     onSelect({
-      id:              c.id,
-      firstName:       c.firstName,
-      lastName:        c.lastName,
-      idNumber:        c.idNumber,
-      phone:           c.phone,
-      blacklisted:     c.blacklisted,
-      priceGroupId:    c.priceGroupId ?? null,
+      id:               c.id,
+      firstName:        c.firstName,
+      lastName:         c.lastName,
+      idNumber:         c.idNumber,
+      phone:            c.phone,
+      blacklisted:      c.blacklisted,
+      priceGroupId:     c.priceGroupId ?? null,
       tradeCommodities: c.tradeCommodities ?? null,
-      zeroRated:       c.zeroRated ?? false,
+      zeroRated:        c.zeroRated ?? false,
+      companyName:      c.companyName ?? null,
+      contactPerson:    c.contactPerson ?? null,
     })
   }
 
@@ -112,10 +116,17 @@ export function AccountSelectorPanel({ onSelect }: Props) {
                       {c.accountCode}
                     </span>
                   )}
-                  <p className="text-[12px] font-medium truncate" style={{ color: '#212529' }}>
-                    {c.firstName} {c.lastName}
+                  <p className="text-[12px] font-semibold truncate" style={{ color: '#212529' }}>
+                    {c.companyName ?? `${c.firstName} ${c.lastName}`}
                   </p>
                 </div>
+                {c.companyName && (
+                  <p className="text-[11px] mt-0.5" style={{ color: '#374151' }}>
+                    {c.contactPerson
+                      ? <>Parent: <span style={{ fontWeight: 500 }}>{c.contactPerson}</span></>
+                      : <>{c.firstName} {c.lastName}</>}
+                  </p>
+                )}
                 <p className="text-[11px] mt-0.5" style={{ color: '#6C757D' }}>{c.phone}</p>
               </div>
               <Button
