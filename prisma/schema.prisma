@@ -215,6 +215,8 @@ model Customer {
   @@index([phone])
   @@index([lastName])
   @@index([customerType])
+  @@index([companyName])
+  @@index([contactPerson])
 }
 
 model CustomerDocument {

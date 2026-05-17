@@ -476,11 +476,11 @@ export async function listPurchases(opts?: {
     }),
   }
 
-  const [purchases, total] = await Promise.all([
+  const [rawPurchases, total] = await Promise.all([
     prisma.purchase.findMany({
       where,
       include: {
-        customer: { select: { id: true, firstName: true, lastName: true, idNumber: true } },
+        customer: { select: { id: true, firstName: true, lastName: true, idNumber: true, zeroRated: true } },
         lines: { select: { id: true } },
       },
       orderBy: { createdAt: 'desc' },
@@ -489,6 +489,14 @@ export async function listPurchases(opts?: {
     }),
     prisma.purchase.count({ where }),
   ])
+
+  const VAT_DIVISOR = new Decimal('1.15')
+  const purchases = rawPurchases.map((p) => {
+    const total = new Decimal(p.totalAmount.toString())
+    const subTotal = p.customer.zeroRated ? total : total.div(VAT_DIVISOR).toDecimalPlaces(2)
+    const vatAmount = total.minus(subTotal).toDecimalPlaces(2)
+    return { ...p, subTotal: subTotal.toFixed(2), vatAmount: vatAmount.toFixed(2) }
+  })
 
   return { purchases, total, page, pageSize, pageCount: Math.ceil(total / pageSize) }
 }
