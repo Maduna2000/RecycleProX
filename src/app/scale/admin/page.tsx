@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { Scale, ClipboardList, Layers, Package, TrendingUp, Clock, CheckCircle2, XCircle } from 'lucide-react'
 import { getScaleStats } from '@/lib/services/scaleService'
 import { listScaleOrders } from '@/lib/services/scaleService'
+import { StatusBadge } from './components/StatusBadge'
 
 async function StatsCards() {
   const stats = await getScaleStats()
@@ -61,19 +62,6 @@ function StatCard({ icon, label, value, color }: { icon: React.ReactNode; label:
       <div className="flex items-center gap-2">{icon}<span className="text-xs font-medium text-slate-600">{label}</span></div>
       <p className="text-2xl font-bold text-slate-800">{value}</p>
     </div>
-  )
-}
-
-export function StatusBadge({ status }: { status: string }) {
-  const map: Record<string, string> = {
-    pending:   'bg-amber-100 text-amber-700',
-    processed: 'bg-green-100 text-green-700',
-    voided:    'bg-red-100 text-red-600',
-  }
-  return (
-    <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${map[status] ?? 'bg-slate-100 text-slate-600'}`}>
-      {status}
-    </span>
   )
 }
 
