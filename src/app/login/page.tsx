@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { signIn } from 'next-auth/react'
+import { signIn, getSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -42,7 +42,12 @@ export default function LoginPage() {
       return
     }
 
-    router.push('/app/dashboard')
+    const sess = await getSession()
+    if (sess?.user?.role === 'scale_operator') {
+      router.push('/scale')
+    } else {
+      router.push('/app/dashboard')
+    }
     router.refresh()
   }
 

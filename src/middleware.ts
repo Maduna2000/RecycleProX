@@ -14,7 +14,8 @@ export default auth((req: NextRequest & { auth: { user?: { role?: string; forceP
   const session = req.auth
 
   // Public routes — always allow
-  if (pathname.startsWith('/login') || pathname.startsWith('/police') || pathname === '/api/r2/test') {
+  if (pathname.startsWith('/login') || pathname.startsWith('/police') ||
+      pathname === '/api/r2/test' || pathname === '/scale/login') {
     return NextResponse.next()
   }
 
@@ -28,7 +29,7 @@ export default auth((req: NextRequest & { auth: { user?: { role?: string; forceP
 
   // Scale station operator routes — restricted to scale_operator + admin + manager
   if (pathname.startsWith('/scale') && !pathname.startsWith('/scale/admin')) {
-    if (!session) return NextResponse.redirect(new URL('/login', req.url))
+    if (!session) return NextResponse.redirect(new URL('/scale/login', req.url))
     const role = session.user?.role
     if (!['scale_operator', 'admin', 'manager'].includes(role ?? '')) {
       return NextResponse.redirect(new URL('/app/dashboard', req.url))
