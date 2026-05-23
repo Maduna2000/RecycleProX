@@ -4,7 +4,7 @@ import logger from '@/lib/logger'
 import { z } from 'zod'
 import {
   getUploadUrl, customerIdPhotoKey, customerDocumentKey, expenseAttachmentKey, purchasePhotoKey,
-  mimeToExt, ALLOWED_PHOTO_TYPES, MAX_PHOTO_BYTES,
+  scaleOrderPhotoKey, mimeToExt, ALLOWED_PHOTO_TYPES, MAX_PHOTO_BYTES,
 } from '@/lib/r2'
 import { randomUUID } from 'crypto'
 
@@ -12,7 +12,7 @@ const ALLOWED_DOCUMENT_TYPES = [...ALLOWED_PHOTO_TYPES, 'application/pdf']
 const MAX_DOCUMENT_BYTES = 20 * 1024 * 1024  // 20 MB
 
 const Schema = z.object({
-  context: z.enum(['customer_id', 'purchase_photo', 'police_signature', 'stocktake_entry', 'customer_document', 'expense_attachment']),
+  context: z.enum(['customer_id', 'purchase_photo', 'police_signature', 'stocktake_entry', 'customer_document', 'expense_attachment', 'scale_order']),
   referenceId: z.string().uuid(),
   contentType: z.string(),
   fileSize: z.number().int().positive(),
@@ -41,6 +41,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const ext = mimeToExt(contentType)
+    const photoIndex = typeof body.photoIndex === 'number' ? body.photoIndex : 0
     const key = context === 'customer_id'
       ? customerIdPhotoKey(referenceId, ext)
       : context === 'customer_document'
@@ -51,7 +52,9 @@ export async function POST(req: NextRequest) {
             ? `police-visits/${referenceId}/signature-${randomUUID()}.${ext}`
             : context === 'stocktake_entry'
               ? `stocktakes/${referenceId}/photo-${randomUUID()}.${ext}`
-              : purchasePhotoKey(referenceId, ext)
+              : context === 'scale_order'
+                ? scaleOrderPhotoKey(referenceId, photoIndex, ext)
+                : purchasePhotoKey(referenceId, ext)
 
     const uploadUrl = await getUploadUrl({ key, contentType, maxBytes: fileSize })
 

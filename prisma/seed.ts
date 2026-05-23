@@ -95,6 +95,35 @@ async function main() {
   }
   console.log(`Seeded ${PRODUCTS.length} products`)
 
+  // ── Scale Station categories + products ──────────────────────────────────
+  const SCALE_CATEGORIES = [
+    { name: 'Ferrous Metals',    colorHex: '#ef4444', iconName: 'Package',  products: ['Mild Steel', 'Cast Iron', 'Sheet Metal'] },
+    { name: 'Copper',            colorHex: '#f97316', iconName: 'Zap',      products: ['Copper Wire', 'Copper Pipe', 'Copper Fittings'] },
+    { name: 'Aluminium',         colorHex: '#3b82f6', iconName: 'Layers',   products: ['Aluminium Cans', 'Aluminium Extrusions', 'Cast Aluminium'] },
+    { name: 'Stainless Steel',   colorHex: '#6366f1', iconName: 'Archive',  products: ['304 Stainless', '316 Stainless'] },
+    { name: 'Plastic',           colorHex: '#22c55e', iconName: 'Box',      products: ['HDPE Plastic', 'PET Plastic', 'Mixed Plastic'] },
+    { name: 'Paper & Cardboard', colorHex: '#eab308', iconName: 'Layers',   products: ['Cardboard', 'White Paper', 'Mixed Paper'] },
+    { name: 'E-Waste',           colorHex: '#a855f7', iconName: 'Database', products: ['Computers', 'Cables & Wiring', 'Circuit Boards'] },
+    { name: 'Brass & Bronze',    colorHex: '#f59e0b', iconName: 'Package',  products: ['Brass Fittings', 'Bronze Bushings'] },
+  ]
+
+  for (const cat of SCALE_CATEGORIES) {
+    const existing = await prisma.scaleCategory.findUnique({ where: { name: cat.name } })
+    if (!existing) {
+      const created = await prisma.scaleCategory.create({
+        data: { name: cat.name, colorHex: cat.colorHex, iconName: cat.iconName },
+      })
+      let sortIdx = 0
+      for (const productName of cat.products) {
+        await prisma.scaleProduct.create({
+          data: { categoryId: created.id, name: productName, unit: 'kg', sortOrder: sortIdx },
+        })
+        sortIdx++
+      }
+    }
+  }
+  console.log(`Seeded ${SCALE_CATEGORIES.length} scale categories`)
+
   // Seed default admin if not exists
   const adminExists = await prisma.user.findFirst({ where: { role: 'admin' } })
   if (!adminExists) {

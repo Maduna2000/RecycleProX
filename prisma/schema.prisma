@@ -18,6 +18,13 @@ enum UserRole {
   admin
   manager
   cashier
+  scale_operator
+}
+
+enum ScaleOrderStatus {
+  pending
+  processed
+  voided
 }
 
 enum CustomerType {
@@ -131,7 +138,9 @@ model User {
   updatedAt            DateTime  @updatedAt
   createdByUserId      String?
 
-  stocktakes           Stocktake[] @relation("StocktakeCreatedBy")
+  stocktakes              Stocktake[]  @relation("StocktakeCreatedBy")
+  operatedScaleOrders     ScaleOrder[] @relation("ScaleOrderOperator")
+  voidedScaleOrders       ScaleOrder[] @relation("ScaleOrderVoidedBy")
 }
 
 model AuditLog {
@@ -210,6 +219,7 @@ model Customer {
 
   documents            CustomerDocument[]
   transactionPayments  TransactionPayment[]
+  scaleOrders          ScaleOrder[]
 
   @@index([idNumber])
   @@index([phone])
@@ -766,4 +776,65 @@ model TransactionPaymentLink {
 
   @@unique([transactionPaymentId, purchaseId])
   @@index([purchaseId])
+}
+
+// ─── Scale Station ────────────────────────────────────────────────────────────
+
+model ScaleCategory {
+  id          String         @id @default(uuid())
+  name        String         @unique
+  description String?
+  colorHex    String?
+  iconName    String?
+  sortOrder   Int            @default(0)
+  isActive    Boolean        @default(true)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  products    ScaleProduct[]
+}
+
+model ScaleProduct {
+  id         String        @id @default(uuid())
+  categoryId String
+  name       String
+  unit       UnitOfMeasure @default(kg)
+  isActive   Boolean       @default(true)
+  sortOrder  Int           @default(0)
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  category   ScaleCategory @relation(fields: [categoryId], references: [id])
+  orders     ScaleOrder[]
+
+  @@index([categoryId])
+}
+
+model ScaleOrder {
+  id          String           @id @default(uuid())
+  orderNumber String           @unique
+  customerId  String
+  productId   String
+  weight      Decimal          @db.Decimal(18, 3)
+  photoR2Keys String[]
+  slipR2Key   String?
+  status      ScaleOrderStatus @default(pending)
+  operatorId  String
+  notes       String?
+  voidedAt    DateTime?
+  voidedById  String?
+  voidReason  String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  customer   Customer      @relation(fields: [customerId], references: [id])
+  product    ScaleProduct  @relation(fields: [productId], references: [id])
+  operator   User          @relation("ScaleOrderOperator", fields: [operatorId], references: [id])
+  voidedBy   User?         @relation("ScaleOrderVoidedBy", fields: [voidedById], references: [id])
+
+  @@index([customerId])
+  @@index([productId])
+  @@index([operatorId])
+  @@index([status])
+  @@index([createdAt])
 }

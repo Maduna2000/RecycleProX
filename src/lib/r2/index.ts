@@ -42,6 +42,14 @@ export function purchaseNoteKey(purchaseId: string): string {
   return `purchases/${purchaseId}/purchase-note.pdf`
 }
 
+export function scaleOrderPhotoKey(orderId: string, index: number, ext: string): string {
+  return `scale-orders/${orderId}/photo-${index}-${randomUUID()}.${ext}`
+}
+
+export function scaleOrderSlipKey(orderId: string): string {
+  return `scale-orders/${orderId}/slip.pdf`
+}
+
 // ─── Presigned upload URL (PUT) ───────────────────────────────────────────────
 // Client uploads directly to R2 — server never handles the binary.
 

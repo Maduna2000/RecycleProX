@@ -26,6 +26,26 @@ export default auth((req: NextRequest & { auth: { user?: { role?: string; forceP
     return NextResponse.next()
   }
 
+  // Scale station operator routes — restricted to scale_operator + admin + manager
+  if (pathname.startsWith('/scale') && !pathname.startsWith('/scale/admin')) {
+    if (!session) return NextResponse.redirect(new URL('/login', req.url))
+    const role = session.user?.role
+    if (!['scale_operator', 'admin', 'manager'].includes(role ?? '')) {
+      return NextResponse.redirect(new URL('/app/dashboard', req.url))
+    }
+    return NextResponse.next()
+  }
+
+  // Scale admin routes — admin + manager only
+  if (pathname.startsWith('/scale/admin')) {
+    if (!session) return NextResponse.redirect(new URL('/login', req.url))
+    const role = session.user?.role
+    if (!['admin', 'manager'].includes(role ?? '')) {
+      return NextResponse.redirect(new URL('/app/dashboard', req.url))
+    }
+    return NextResponse.next()
+  }
+
   // App routes — redirect to login if no session
   if (pathname.startsWith('/app')) {
     if (!session) {
@@ -44,5 +64,5 @@ export default auth((req: NextRequest & { auth: { user?: { role?: string; forceP
 })
 
 export const config = {
-  matcher: ['/app/:path*', '/api/:path*'],
+  matcher: ['/app/:path*', '/scale/:path*', '/api/:path*'],
 }
