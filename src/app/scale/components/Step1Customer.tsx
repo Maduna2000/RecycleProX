@@ -1,10 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Search, UserPlus, Users, ArrowRight, Loader2 } from 'lucide-react'
+import { Search, UserPlus, Users, ArrowRight, Loader2, AlertCircle } from 'lucide-react'
 
 const CasualSchema = z.object({
   firstName: z.string().min(1, 'Required'),
@@ -32,10 +32,43 @@ export default function Step1Customer({ onSelect }: Props) {
   const [mode, setMode] = useState<'choose' | 'casual' | 'account'>('choose')
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<SelectedCustomer[]>([])
-  const [searching, setSearching]   = useState(false)
-  const [submitting, setSubmitting] = useState(false)
+  const [searching, setSearching]     = useState(false)
+  const [searchError, setSearchError] = useState<string | null>(null)
+  const [submitting, setSubmitting]   = useState(false)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const form = useForm<CasualForm>({ resolver: zodResolver(CasualSchema) })
+
+  async function runSearch(query: string) {
+    setSearching(true)
+    setSearchError(null)
+    try {
+      const res = await fetch(`/api/customers?search=${encodeURIComponent(query)}&limit=20`)
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error ?? `Server error (${res.status})`)
+      }
+      const data = await res.json()
+      const list: SelectedCustomer[] = (data.customers ?? []).map((c: Record<string, string>) => ({
+        id: c.id, firstName: c.firstName, lastName: c.lastName, phone: c.phone,
+      }))
+      setSearchResults(list)
+    } catch (err) {
+      setSearchError(err instanceof Error ? err.message : 'Search failed')
+      setSearchResults([])
+    } finally {
+      setSearching(false)
+    }
+  }
+
+  // Load all customers when entering account mode, then debounce on query change
+  useEffect(() => {
+    if (mode !== 'account') return
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => runSearch(searchQuery), searchQuery ? 350 : 0)
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, searchQuery])
 
   async function handleCasualSubmit(data: CasualForm) {
     setSubmitting(true)
@@ -51,30 +84,16 @@ export default function Step1Customer({ onSelect }: Props) {
           physicalAddress: data.address,
         }),
       })
-      if (!res.ok) throw new Error('Failed to create customer')
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error ?? 'Failed to create customer')
+      }
       const customer = await res.json()
       onSelect({ id: customer.id, firstName: customer.firstName, lastName: customer.lastName, phone: customer.phone, isNew: true })
-    } catch {
-      form.setError('root', { message: 'Failed to save customer. Please try again.' })
+    } catch (err) {
+      form.setError('root', { message: err instanceof Error ? err.message : 'Failed to save customer. Please try again.' })
     } finally {
       setSubmitting(false)
-    }
-  }
-
-  async function handleSearch() {
-    if (searchQuery.trim().length < 2) return
-    setSearching(true)
-    try {
-      const res = await fetch(`/api/customers?search=${encodeURIComponent(searchQuery)}&pageSize=10`)
-      if (!res.ok) throw new Error()
-      const data = await res.json()
-      setSearchResults((data.customers ?? data).map((c: SelectedCustomer & { id: string }) => ({
-        id: c.id, firstName: c.firstName, lastName: c.lastName, phone: c.phone,
-      })))
-    } catch {
-      setSearchResults([])
-    } finally {
-      setSearching(false)
     }
   }
 
@@ -206,26 +225,30 @@ export default function Step1Customer({ onSelect }: Props) {
     <div className="flex-1 flex flex-col p-5 max-w-lg mx-auto w-full">
       <button onClick={() => setMode('choose')} className="text-slate-500 text-sm mb-4 self-start">← Back</button>
       <h2 className="text-2xl font-bold text-slate-800 mb-1">Account Customer</h2>
-      <p className="text-slate-500 mb-6">Search by ID number, name, or phone</p>
+      <p className="text-slate-500 mb-6">Search by name, ID number or phone</p>
 
-      <div className="flex gap-2 mb-4">
+      <div className="relative mb-4">
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
         <input
           value={searchQuery}
           onChange={e => setSearchQuery(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && handleSearch()}
-          className="flex-1 border border-slate-300 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-emerald-500"
-          placeholder="Name, ID number or phone..."
+          className="w-full border border-slate-300 rounded-xl pl-11 pr-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          placeholder="Start typing a name, ID or phone..."
+          autoFocus
         />
-        <button
-          onClick={handleSearch}
-          disabled={searching}
-          className="bg-emerald-600 text-white px-4 rounded-xl flex items-center justify-center"
-        >
-          {searching ? <Loader2 className="w-5 h-5 animate-spin" /> : <Search className="w-5 h-5" />}
-        </button>
+        {searching && (
+          <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 animate-spin" />
+        )}
       </div>
 
-      <div className="flex flex-col gap-3">
+      {searchError && (
+        <div className="flex items-center gap-2 text-red-600 bg-red-50 rounded-xl p-3 mb-4 text-sm">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          {searchError}
+        </div>
+      )}
+
+      <div className="flex flex-col gap-3 overflow-y-auto">
         {searchResults.map(c => (
           <button
             key={c.id}
@@ -239,8 +262,10 @@ export default function Step1Customer({ onSelect }: Props) {
             <ArrowRight className="w-5 h-5 text-slate-400" />
           </button>
         ))}
-        {searchResults.length === 0 && searchQuery && !searching && (
-          <p className="text-center text-slate-400 py-8">No customers found</p>
+        {!searching && !searchError && searchResults.length === 0 && (
+          <p className="text-center text-slate-400 py-8">
+            {searchQuery ? 'No customers found' : 'No customers in database'}
+          </p>
         )}
       </div>
     </div>
