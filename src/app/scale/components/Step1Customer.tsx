@@ -10,6 +10,7 @@ const CasualSchema = z.object({
   firstName: z.string().min(1, 'Required'),
   lastName:  z.string().min(1, 'Required'),
   phone:     z.string().min(7, 'Enter a valid phone number'),
+  idNumber:  z.string().optional(),
   address:   z.string().optional(),
 })
 
@@ -46,9 +47,8 @@ export default function Step1Customer({ onSelect }: Props) {
           firstName:       data.firstName,
           lastName:        data.lastName,
           phone:           data.phone,
+          ...(data.idNumber ? { idNumber: data.idNumber } : {}),
           physicalAddress: data.address,
-          customerType:    'casual',
-          primaryFunction: 'supplier',
         }),
       })
       if (!res.ok) throw new Error('Failed to create customer')
@@ -164,6 +164,15 @@ export default function Step1Customer({ onSelect }: Props) {
             {form.formState.errors.phone && (
               <p className="text-red-500 text-xs mt-1">{form.formState.errors.phone.message}</p>
             )}
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-slate-700 block mb-1">National ID / Passport <span className="text-slate-400 font-normal">(optional)</span></label>
+            <input
+              {...form.register('idNumber')}
+              className="w-full border border-slate-300 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              placeholder="e.g. A123456 or 9001015009087"
+            />
           </div>
 
           <div>

@@ -172,7 +172,7 @@ model Customer {
   id               String          @id @default(uuid())
   customerType     CustomerType    @default(casual)
   primaryFunction  PrimaryFunction @default(supplier)
-  idNumber         String          @unique
+  idNumber         String?         @unique
   firstName        String
   lastName         String
   dateOfBirth      DateTime?

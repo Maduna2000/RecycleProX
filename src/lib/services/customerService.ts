@@ -78,9 +78,11 @@ export async function createCustomer(data: CreateCustomerInput, userId: string) 
 }
 
 export async function quickCreate(data: QuickCreateInput, userId: string) {
-  // Return existing customer if duplicate
-  const existing = await prisma.customer.findUnique({ where: { idNumber: data.idNumber } })
-  if (existing) return existing
+  // Return existing customer if duplicate (only when ID number is provided)
+  if (data.idNumber) {
+    const existing = await prisma.customer.findUnique({ where: { idNumber: data.idNumber } })
+    if (existing) return existing
+  }
 
   const customer = await prisma.customer.create({
     data: { ...data, customerType: 'casual', createdByUserId: userId },
