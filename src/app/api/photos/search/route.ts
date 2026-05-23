@@ -87,7 +87,7 @@ export async function GET(req: NextRequest) {
             r2Key: p.signatureR2Key,
             viewUrl: await getViewUrl(p.signatureR2Key),
             createdAt: p.createdAt.toISOString(),
-            customer: p.customer ?? undefined,
+            customer: p.customer ? { ...p.customer, idNumber: p.customer.idNumber ?? '' } : undefined,
           })
         }
         if (p.vat264R2Key) {
@@ -98,7 +98,7 @@ export async function GET(req: NextRequest) {
             r2Key: p.vat264R2Key,
             viewUrl: await getViewUrl(p.vat264R2Key),
             createdAt: p.createdAt.toISOString(),
-            customer: p.customer ?? undefined,
+            customer: p.customer ? { ...p.customer, idNumber: p.customer.idNumber ?? '' } : undefined,
           })
         }
         for (const key of (p.photoR2Keys ?? [])) {
@@ -109,7 +109,7 @@ export async function GET(req: NextRequest) {
             r2Key: key,
             viewUrl: await getViewUrl(key),
             createdAt: p.createdAt.toISOString(),
-            customer: p.customer ?? undefined,
+            customer: p.customer ? { ...p.customer, idNumber: p.customer.idNumber ?? '' } : undefined,
           })
         }
       }

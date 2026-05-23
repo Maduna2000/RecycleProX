@@ -85,7 +85,7 @@ export async function quickCreate(data: QuickCreateInput, userId: string) {
   }
 
   const customer = await prisma.customer.create({
-    data: { ...data, customerType: 'casual', createdByUserId: userId },
+    data: { ...data, idNumber: data.idNumber ?? null, customerType: 'casual', createdByUserId: userId },
   })
   logger.info({ customerId: customer.id, userId }, 'Customer quick-created')
   return customer

@@ -13,7 +13,7 @@ import { toast } from 'sonner'
 import { validateSaId } from '@/lib/utils/saId'
 
 type Customer = {
-  id: string; firstName: string; lastName: string; idNumber: string
+  id: string; firstName: string; lastName: string; idNumber: string | null
   phone: string; customerType: string; blacklisted: boolean
 }
 
@@ -30,7 +30,7 @@ export function QuickCreateModal({ open, prefillQuery, onClose, onSuccess }: Pro
     resolver: zodResolver(QuickCreateSchema),
   })
 
-  const idNumber = watch('idNumber', '')
+  const idNumber = watch('idNumber') ?? ''
   const idValidation = idNumber.length >= 5 ? validateSaId(idNumber) : null
 
   useEffect(() => {
