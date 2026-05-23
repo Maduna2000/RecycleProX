@@ -124,7 +124,7 @@ export default function Step1Customer({ onSelect }: Props) {
       <div className="flex-1 flex flex-col p-5 max-w-lg mx-auto w-full">
         <button onClick={() => setMode('choose')} className="text-slate-500 text-sm mb-4 self-start">← Back</button>
         <h2 className="text-2xl font-bold text-slate-800 mb-1">Customer Details</h2>
-        <p className="text-slate-500 mb-6">Enter the walk-in customer's information</p>
+        <p className="text-slate-500 mb-6">Enter the walk-in customer&apos;s information</p>
 
         <form onSubmit={form.handleSubmit(handleCasualSubmit)} className="flex flex-col gap-4">
           <div className="grid grid-cols-2 gap-3">

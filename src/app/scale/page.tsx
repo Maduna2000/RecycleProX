@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { randomUUID } from 'crypto'
 import Step1Customer, { type SelectedCustomer } from './components/Step1Customer'
 import Step2Product,  { type SelectedProduct }  from './components/Step2Product'
 import Step3Weight  from './components/Step3Weight'

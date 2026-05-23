@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { getScaleStats } from '@/lib/services/scaleService'
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   const session = await auth()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!['admin', 'manager', 'cashier'].includes(session.user.role)) {

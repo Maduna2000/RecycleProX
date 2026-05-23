@@ -20,7 +20,6 @@ export interface ScaleSlipData {
 // ─── Layout constants (80 mm paper) ──────────────────────────────────────────
 const W      = 227
 const MARGIN = 10
-const BODY_W = W - MARGIN * 2
 const LINE_H = 12
 const SMALL  = 7
 const NORMAL = 8
@@ -29,11 +28,6 @@ const HUGE   = 13
 
 const BLACK = rgb(0, 0, 0)
 const GRAY  = rgb(0.45, 0.45, 0.45)
-
-function pad(str: string, width: number, align: 'left' | 'right' = 'left'): string {
-  if (str.length >= width) return str.substring(0, width)
-  return align === 'left' ? str.padEnd(width) : str.padStart(width)
-}
 
 function formatDate(d: Date): string {
   return d.toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' })
