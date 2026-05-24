@@ -1,0 +1,62 @@
+'use client'
+
+import { usePathname, useRouter } from 'next/navigation'
+import { Minus, X } from 'lucide-react'
+import { getModuleName } from '@/lib/module-names'
+import { useWindowStore } from '@/stores/windowStore'
+
+export function PageTitleBar() {
+  const pathname = usePathname()
+  const router   = useRouter()
+  const { windows, closeWindow } = useWindowStore()
+
+  const entry = windows.find(w => w.href === pathname)
+
+  function handleMinimize() {
+    const idx = windows.findIndex(w => w.href === pathname)
+    if (windows.length <= 1 || idx === -1) {
+      router.push('/app/dashboard')
+    } else {
+      const target = windows[idx > 0 ? idx - 1 : 1]
+      router.push(target.href)
+    }
+  }
+
+  function handleClose() {
+    if (!entry) { router.push('/app/dashboard'); return }
+    closeWindow(entry.id, (href) => router.push(href))
+  }
+
+  return (
+    <div
+      className="flex items-center justify-between shrink-0 px-3 border-b select-none"
+      style={{
+        height:      28,
+        background:  'rgba(27,58,107,0.05)',
+        borderColor: 'rgba(0,0,0,0.07)',
+      }}
+    >
+      <span className="text-[12px] font-semibold text-[#374151]">
+        {getModuleName(pathname)}
+      </span>
+      <div className="flex items-center gap-0.5">
+        <button
+          onClick={handleMinimize}
+          title="Minimise"
+          aria-label="Minimise page"
+          className="w-7 h-7 flex items-center justify-center rounded text-[#6B7280] hover:text-[#374151] hover:bg-black/5 transition-colors"
+        >
+          <Minus className="w-3.5 h-3.5" />
+        </button>
+        <button
+          onClick={handleClose}
+          title="Close"
+          aria-label="Close page"
+          className="w-7 h-7 flex items-center justify-center rounded text-[#6B7280] hover:text-red-600 hover:bg-red-50 transition-colors"
+        >
+          <X className="w-3.5 h-3.5" />
+        </button>
+      </div>
+    </div>
+  )
+}

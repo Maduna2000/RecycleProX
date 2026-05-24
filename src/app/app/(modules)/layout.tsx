@@ -5,6 +5,7 @@ import { AppShell } from '@/components/layout/AppShell'
 import { PinLockOverlay } from '@/components/PinLockOverlay'
 import { OfflineProvider } from '@/components/OfflineProvider'
 import { Toaster } from '@/components/ui/sonner'
+import { WindowedContent } from '@/components/layout/WindowedContent'
 
 export default async function ModulesLayout({ children }: { children: React.ReactNode }) {
   const session = await auth()
@@ -18,7 +19,9 @@ export default async function ModulesLayout({ children }: { children: React.Reac
             role={session.user.role}
             fullName={session.user.fullName ?? session.user.username ?? 'User'}
           >
-            {children}
+            <WindowedContent>
+              {children}
+            </WindowedContent>
           </AppShell>
           <Toaster richColors />
         </PinLockOverlay>

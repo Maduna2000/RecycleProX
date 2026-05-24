@@ -10,14 +10,15 @@ import {
   RefreshCw, Plus, Printer,
   BarChart2, ClipboardCheck, FileSpreadsheet,
   Download, LogOut, Settings,
-  Minus, X as XIcon, Tag,
-  Users, UserPlus, ChevronRight,
+  Tag, Users, UserPlus, ChevronRight,
   Archive, Landmark,
   Wifi, WifiOff,
   Scale, ClipboardList,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useOfflineStore } from '@/stores/offlineStore'
+import { getModuleName } from '@/lib/module-names'
+import { WindowTaskbar } from '@/components/ui/WindowTaskbar'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -28,46 +29,6 @@ interface ToolbarButton {
   onClick?: () => void
   variant:  'primary' | 'secondary' | 'danger' | 'ghost'
   iconOnly?: boolean
-}
-
-// ─── Module name map ──────────────────────────────────────────────────────────
-
-const MODULE_NAMES: Record<string, string> = {
-  '/app/dashboard':        'Dashboard',
-  '/app/customers':        'Accounts',
-  '/app/casual':           'Casual Details',
-  '/app/purchases':        'Purchases',
-  '/app/purchases/unpaid': 'Unpaid Purchases',
-  '/app/purchases/new':    'New Purchase',
-  '/app/sales':            'Sales',
-  '/app/sales/new':        'New Sale',
-  '/app/payments':         'Payments',
-  '/app/expenses':         'Expenses',
-  '/app/cashup':           'Cash Up',
-  '/app/float':            'Float',
-  '/app/stock':            'Stock',
-  '/app/stocktake':        'Stocktake',
-  '/app/products':         'Products',
-  '/app/price-groups':     'Price Groups',
-  '/app/reports':          'Reports',
-  '/app/settings':         'Settings',
-  '/app/loans':            'Loans',
-  '/app/photos':           'Photo Viewer',
-  '/app/police-register':  'Police Register',
-  '/app/audit-log':        'Audit Log',
-  '/app/change-password':  'Change Password',
-  '/app/scale':            'Scale Station',
-}
-
-function getModuleName(pathname: string): string {
-  const exact = MODULE_NAMES[pathname]
-  if (exact) return exact
-  const sorted = Object.keys(MODULE_NAMES).sort((a, b) => b.length - a.length)
-  for (const key of sorted) {
-    const name = MODULE_NAMES[key]
-    if (name && pathname.startsWith(key + '/')) return name
-  }
-  return 'Renovo Pro'
 }
 
 // ─── Toolbar configs ──────────────────────────────────────────────────────────
@@ -280,7 +241,7 @@ function ScalePopup() {
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 top-full mt-1 w-56 bg-white rounded-sm shadow-2xl border border-[#E0E0E0] py-1.5 z-50">
+          <div className="absolute right-0 top-full mt-1 w-56 bg-white rounded-sm shadow-2xl border border-[#E0E0E0] py-1.5 z-50">
             <p className="px-3 pb-1.5 pt-0.5 text-[10px] font-semibold text-[#6C757D] uppercase tracking-widest border-b border-[#F1F3F4]">
               Scale Station
             </p>
@@ -330,34 +291,9 @@ function OfflineChip() {
   )
 }
 
-// ─── WindowControls ───────────────────────────────────────────────────────────
-
-function WindowControls({ onNavigateDashboard }: { onNavigateDashboard: () => void }) {
-  const isElectron = typeof window !== 'undefined' && !!window.electronAPI?.isElectron
-
-  return (
-    <div className="flex items-center ml-1 shrink-0 border-l border-white/10" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
-      <button
-        title="Minimise"
-        className="w-8 h-full flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 transition-colors"
-        onClick={() => isElectron ? window.electronAPI?.minimize() : onNavigateDashboard()}
-      >
-        <Minus className="w-3 h-3" />
-      </button>
-      <button
-        title="Close"
-        className="w-8 h-full flex items-center justify-center text-white/70 hover:text-white hover:bg-red-600 transition-colors"
-        onClick={() => isElectron ? window.electronAPI?.close() : onNavigateDashboard()}
-      >
-        <XIcon className="w-3 h-3" />
-      </button>
-    </div>
-  )
-}
-
 // ─── Taskbar ──────────────────────────────────────────────────────────────────
 
-function Taskbar({ moduleName, onMinimize }: { moduleName: string; onMinimize: () => void }) {
+function Taskbar() {
   const [time, setTime] = useState(() => {
     const now = new Date()
     return `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
@@ -379,22 +315,12 @@ function Taskbar({ moduleName, onMinimize }: { moduleName: string; onMinimize: (
 
   return (
     <div
-      className="flex items-center px-3 gap-3 shrink-0 border-t border-white/10"
+      className="flex items-center px-3 shrink-0 border-t border-white/10"
       style={{ height: 28, background: 'rgba(27,58,107,0.95)' }}
     >
-      <span className="text-[10px] text-white/40 shrink-0 font-medium tracking-wide select-none whitespace-nowrap">
-        Renovo Pro Management Software &nbsp;·&nbsp; V3.0
+      <span className="flex-1 text-center text-[10px] text-white/50 font-medium tracking-wide select-none whitespace-nowrap">
+        Renovo Pro Management Software &nbsp;·&nbsp; V1.0
       </span>
-      <div className="flex-1 flex items-center">
-        <button
-          onClick={onMinimize}
-          className="flex items-center gap-1.5 px-2.5 rounded-sm border border-white/25 bg-white/15 hover:bg-white/25 transition-colors text-white text-[11px] font-medium"
-          style={{ height: 20 }}
-        >
-          <RefreshCw className="w-2.5 h-2.5 text-[#F2AB1A] shrink-0" />
-          <span className="truncate max-w-[180px]">{moduleName}</span>
-        </button>
-      </div>
       <span className="text-[11px] text-white/55 shrink-0 font-mono tabular-nums">{time}</span>
     </div>
   )
@@ -548,7 +474,6 @@ export function AppShell({
         <div className="flex items-center gap-1 pl-2 shrink-0">
           <OfflineChip />
           <UserMenu role={role} fullName={fullName} />
-          <WindowControls onNavigateDashboard={goHome} />
         </div>
       </header>
 
@@ -563,7 +488,7 @@ export function AppShell({
             className="flex items-center gap-1 px-3 shrink-0 border-b"
             style={{
               height:      'var(--rpx-toolbar-h, 32px)',
-              background:  'var(--rpx-ribbon-grey, #F8F9FA)',
+              background:  'rgba(27,58,107,0.09)',
               borderColor: 'var(--rpx-border, #E0E0E0)',
             }}
           >
@@ -580,8 +505,11 @@ export function AppShell({
         </div>
       </main>
 
-      {/* ── ZONE 4: Taskbar ───────────────────────────────────── */}
-      <Taskbar moduleName={moduleName} onMinimize={goHome} />
+      {/* ── ZONE 4b: Open Windows Taskbar ────────────────────── */}
+      <WindowTaskbar />
+
+      {/* ── ZONE 4a: Footer ───────────────────────────────────── */}
+      <Taskbar />
     </div>
   )
 }
