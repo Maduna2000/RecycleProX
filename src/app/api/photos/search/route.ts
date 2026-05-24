@@ -157,9 +157,11 @@ export async function GET(req: NextRequest) {
             r2Key: s.photoR2Key,
             viewUrl: await getViewUrl(s.photoR2Key),
             createdAt: s.createdAt.toISOString(),
-            customer: s.customer ?? (s.buyerName
-              ? { id: '', firstName: s.buyerName, lastName: '', idNumber: s.buyerIdNumber ?? '' }
-              : undefined),
+            customer: s.customer
+              ? { ...s.customer, idNumber: s.customer.idNumber ?? '' }
+              : (s.buyerName
+                ? { id: '', firstName: s.buyerName, lastName: '', idNumber: s.buyerIdNumber ?? '' }
+                : undefined),
           })
         }
       }
@@ -233,7 +235,7 @@ export async function GET(req: NextRequest) {
             r2Key: c.idPhotoR2Key,
             viewUrl: await getViewUrl(c.idPhotoR2Key),
             createdAt: c.createdAt.toISOString(),
-            customer: { id: c.id, firstName: c.firstName, lastName: c.lastName, idNumber: c.idNumber },
+            customer: { id: c.id, firstName: c.firstName, lastName: c.lastName, idNumber: c.idNumber ?? '' },
           })
         }
       }
