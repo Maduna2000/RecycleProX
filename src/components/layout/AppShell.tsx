@@ -31,6 +31,7 @@ interface ToolbarButton {
 // ─── Module name map ──────────────────────────────────────────────────────────
 
 const MODULE_NAMES: Record<string, string> = {
+  '/app/dashboard':        'Dashboard',
   '/app/customers':        'Accounts',
   '/app/casual':           'Casual Details',
   '/app/purchases':        'Purchases',

@@ -1,6 +1,9 @@
 import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
 import { SessionProvider } from 'next-auth/react'
+import { AppShell } from '@/components/layout/AppShell'
+import { PinLockOverlay } from '@/components/PinLockOverlay'
+import { OfflineProvider } from '@/components/OfflineProvider'
 import { Toaster } from '@/components/ui/sonner'
 
 export default async function PortalLayout({ children }: { children: React.ReactNode }) {
@@ -9,8 +12,17 @@ export default async function PortalLayout({ children }: { children: React.React
 
   return (
     <SessionProvider session={session}>
-      {children}
-      <Toaster richColors />
+      <OfflineProvider>
+        <PinLockOverlay>
+          <AppShell
+            role={session.user.role}
+            fullName={session.user.fullName ?? session.user.username ?? 'User'}
+          >
+            {children}
+          </AppShell>
+          <Toaster richColors />
+        </PinLockOverlay>
+      </OfflineProvider>
     </SessionProvider>
   )
 }

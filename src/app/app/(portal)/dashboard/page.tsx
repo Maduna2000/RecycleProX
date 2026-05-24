@@ -1,8 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { signOut, useSession } from 'next-auth/react'
-import { useEffect, useState } from 'react'
+import { useSession } from 'next-auth/react'
 import useSWR from 'swr'
 import Decimal from 'decimal.js'
 import {
@@ -10,11 +9,9 @@ import {
   Tag, CreditCard, ImageIcon, Scale,
   Package, ClipboardList, TrendingUp, BarChart2,
   Archive, Wallet, Landmark, Settings,
-  LogOut, RefreshCw, Wifi, WifiOff,
+  ChevronRight,
 } from 'lucide-react'
-import { cn } from '@/lib/utils'
-import { useOfflineStore } from '@/stores/offlineStore'
-import { colors } from '@/lib/design-tokens'
+import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -37,257 +34,221 @@ interface Tile {
 
 // ─── Tile registry ────────────────────────────────────────────────────────────
 
-const TILES: Tile[] = [
-  // Navy — Customers & Transactions
-  { label: 'Accounts',           subtitle: 'Customers & Dealers',  icon: Users,         href: '/app/customers',         group: 'navy'  },
-  { label: 'Casual Details',     subtitle: 'Walk-in Sellers',      icon: UserRound,     href: '/app/casual',            group: 'navy'  },
-  { label: 'Purchases',          subtitle: 'Buy Scrap',            icon: ShoppingCart,  href: '/app/purchases',         group: 'navy'  },
-  { label: 'Unpaid Purchases',   subtitle: 'Outstanding Balances', icon: AlertCircle,   href: '/app/purchases/unpaid',  group: 'navy'  },
-  // Blue — Sales & Media
-  { label: 'Sales',              subtitle: 'Sell Stock',           icon: Tag,           href: '/app/sales',             group: 'blue'  },
-  { label: 'Sales Payments',     subtitle: 'Record Payments',      icon: CreditCard,    href: '/app/payments',          group: 'blue'  },
-  { label: 'Photo Viewer',       subtitle: 'ID & Purchase Photos', icon: ImageIcon,     href: '/app/photos',            group: 'blue'  },
-  { label: 'Weighbridge',        subtitle: 'Scale Integration',    icon: Scale,         href: '/app/weighbridge',       group: 'blue',  comingSoon: true },
-  // Green — Stock & Products
-  { label: 'Stock Level Grid',   subtitle: 'Inventory View',       icon: Package,       href: '/app/stock',             group: 'green' },
-  { label: 'Products',           subtitle: 'Catalogue & Pricing',  icon: ClipboardList, href: '/app/products',          group: 'green' },
-  { label: 'Top Product Prices', subtitle: 'Price Groups',         icon: TrendingUp,    href: '/app/price-groups',      group: 'green' },
-  { label: 'Reports',            subtitle: 'Analytics & Exports',  icon: BarChart2,     href: '/app/reports',           group: 'green' },
-  // Amber — Finance
-  { label: 'Cash Up',            subtitle: 'Daily Reconciliation', icon: Archive,       href: '/app/cashup',            group: 'amber' },
-  { label: 'Expenses',           subtitle: 'Record & Approve',     icon: Wallet,        href: '/app/expenses',          group: 'amber' },
-  { label: 'Float',              subtitle: 'Opening & Closing',    icon: Landmark,      href: '/app/float',             group: 'amber' },
-  // Grey — System
-  { label: 'Settings',           subtitle: 'System Configuration', icon: Settings,      href: '/app/settings',          group: 'grey'  },
+const TILE_SECTIONS: { heading: string; tiles: Tile[] }[] = [
+  {
+    heading: 'Transactions',
+    tiles: [
+      { label: 'Accounts',         subtitle: 'Customers & Dealers',  icon: Users,        href: '/app/customers',        group: 'navy'  },
+      { label: 'Casual Details',   subtitle: 'Walk-in Sellers',      icon: UserRound,    href: '/app/casual',           group: 'navy'  },
+      { label: 'Purchases',        subtitle: 'Buy Scrap',            icon: ShoppingCart, href: '/app/purchases',        group: 'navy'  },
+      { label: 'Unpaid Purchases', subtitle: 'Outstanding Balances', icon: AlertCircle,  href: '/app/purchases/unpaid', group: 'navy'  },
+    ],
+  },
+  {
+    heading: 'Sales & Media',
+    tiles: [
+      { label: 'Sales',          subtitle: 'Sell Stock',           icon: Tag,          href: '/app/sales',     group: 'blue' },
+      { label: 'Sales Payments', subtitle: 'Record Payments',      icon: CreditCard,   href: '/app/payments',  group: 'blue' },
+      { label: 'Photo Viewer',   subtitle: 'ID & Purchase Photos', icon: ImageIcon,    href: '/app/photos',    group: 'blue' },
+      { label: 'Weighbridge',    subtitle: 'Scale Integration',    icon: Scale,        href: '/app/weighbridge', group: 'blue', comingSoon: true },
+    ],
+  },
+  {
+    heading: 'Inventory',
+    tiles: [
+      { label: 'Stock Level Grid',   subtitle: 'Inventory View',       icon: Package,       href: '/app/stock',        group: 'green' },
+      { label: 'Products',           subtitle: 'Catalogue & Pricing',  icon: ClipboardList, href: '/app/products',     group: 'green' },
+      { label: 'Top Product Prices', subtitle: 'Price Groups',         icon: TrendingUp,    href: '/app/price-groups', group: 'green' },
+      { label: 'Reports',            subtitle: 'Analytics & Exports',  icon: BarChart2,     href: '/app/reports',      group: 'green' },
+    ],
+  },
+  {
+    heading: 'Finance',
+    tiles: [
+      { label: 'Cash Up',  subtitle: 'Daily Reconciliation', icon: Archive,  href: '/app/cashup',   group: 'amber' },
+      { label: 'Expenses', subtitle: 'Record & Approve',     icon: Wallet,   href: '/app/expenses', group: 'amber' },
+      { label: 'Float',    subtitle: 'Opening & Closing',    icon: Landmark, href: '/app/float',    group: 'amber' },
+      { label: 'Settings', subtitle: 'System Configuration', icon: Settings, href: '/app/settings', group: 'grey'  },
+    ],
+  },
 ]
 
-// ─── Design maps ──────────────────────────────────────────────────────────────
+// ─── Group accent colours (light-theme) ──────────────────────────────────────
 
-const GRADIENT: Record<TileGroup, string> = {
-  navy:  'from-rpx-navy-light to-rpx-navy',
-  blue:  'from-rpx-blue-light to-rpx-blue',
-  green: 'from-rpx-green-light to-rpx-green',
-  amber: 'from-rpx-amber-light to-rpx-amber',
-  grey:  'from-[#4a5568] to-[#374151]',
+const ICON_BG: Record<TileGroup, string>    = {
+  navy:  '#E8EFF8',
+  blue:  '#E8F0FB',
+  green: '#E6F4EC',
+  amber: '#FEF6E0',
+  grey:  '#F1F3F4',
+}
+const ICON_COLOR: Record<TileGroup, string> = {
+  navy:  '#1B3A6B',
+  blue:  '#185ABD',
+  green: '#217346',
+  amber: '#C9A020',
+  grey:  '#6C757D',
+}
+const TILE_BORDER: Record<TileGroup, string> = {
+  navy:  '#C5D5EC',
+  blue:  '#C0D6F5',
+  green: '#B8DECA',
+  amber: '#F5D98A',
+  grey:  '#D0D0D0',
 }
 
-const GRADIENT_HOVER: Record<TileGroup, string> = {
-  navy:  'hover:from-rpx-navy-hover hover:to-rpx-navy-light',
-  blue:  'hover:from-rpx-blue-hover hover:to-rpx-blue-light',
-  green: 'hover:from-rpx-green-hover hover:to-rpx-green-light',
-  amber: 'hover:from-rpx-amber-hover hover:to-rpx-amber-light',
-  grey:  'hover:from-[#5a6578] hover:to-[#4a5568]',
-}
+// ─── Stat card ────────────────────────────────────────────────────────────────
 
-const SUBTITLE_COLOR: Record<TileGroup, string> = {
-  navy:  'text-rpx-tabmuted',
-  blue:  'text-[#a8c8f0]',
-  green: 'text-[#a8d4b8]',
-  amber: 'text-[#fde9a0]',
-  grey:  'text-white/50',
-}
-
-// ─── Small helpers ────────────────────────────────────────────────────────────
-
-function StatSkeleton() {
-  return <div className="h-3.5 w-20 rounded bg-white/10 animate-pulse" />
-}
-
-function OfflineChip() {
-  const { isOnline, pendingCount } = useOfflineStore()
-  if (isOnline && pendingCount === 0) return null
+function StatCard({ label, value, sub, accent }: {
+  label:  string
+  value:  string
+  sub?:   string
+  accent: string
+}) {
   return (
-    <div className={cn(
-      'flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium',
-      isOnline ? 'bg-amber-400/20 text-amber-300' : 'bg-red-500/20 text-red-300',
-    )}>
-      {isOnline ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
-      {isOnline ? `Syncing ${pendingCount}` : 'Offline'}
+    <div
+      className="bg-white border border-[#E0E0E0] rounded-sm px-4 py-3 flex flex-col gap-1"
+      style={{ borderLeft: `3px solid ${accent}` }}
+    >
+      <p style={{ fontSize: fontSize.xs, color: colors.textSecondary, fontWeight: fontWeight.medium, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        {label}
+      </p>
+      <p style={{ fontSize: 20, fontWeight: fontWeight.bold, color: colors.textPrimary, lineHeight: 1.1 }}>
+        {value}
+      </p>
+      {sub && (
+        <p style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>{sub}</p>
+      )}
     </div>
   )
 }
 
-function LiveClock() {
-  const [time, setTime] = useState(() => new Date())
-  useEffect(() => {
-    const id = setInterval(() => setTime(new Date()), 60_000)
-    return () => clearInterval(id)
-  }, [])
-  const dateStr = time.toLocaleDateString('en-ZA', { year: 'numeric', month: '2-digit', day: '2-digit' })
-  const timeStr = time.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit', hour12: false })
+// ─── Tile ─────────────────────────────────────────────────────────────────────
+
+function DashTile({ tile, onClick }: { tile: Tile; onClick: () => void }) {
+  const Icon = tile.icon
   return (
-    <span className="text-rpx-tabmuted text-[11px] tabular-nums">{dateStr} · {timeStr}</span>
+    <button
+      onClick={onClick}
+      disabled={!!tile.comingSoon}
+      title={tile.comingSoon ? `${tile.label} — Coming Soon` : tile.label}
+      className="group flex items-center gap-3 bg-white border rounded-sm px-4 py-3 text-left transition-all duration-100 disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none hover:shadow-sm"
+      style={{
+        borderColor:  TILE_BORDER[tile.group],
+        cursor: tile.comingSoon ? 'not-allowed' : 'pointer',
+      }}
+      onMouseEnter={e => { if (!tile.comingSoon) (e.currentTarget as HTMLButtonElement).style.borderColor = ICON_COLOR[tile.group] }}
+      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = TILE_BORDER[tile.group] }}
+    >
+      <div
+        className="w-9 h-9 rounded-sm flex items-center justify-center shrink-0"
+        style={{ background: ICON_BG[tile.group] }}
+      >
+        <Icon className="w-4.5 h-4.5" style={{ width: 18, height: 18, color: ICON_COLOR[tile.group] }} strokeWidth={1.75} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p style={{ fontSize: fontSize.sm, fontWeight: fontWeight.semibold, color: colors.textPrimary, lineHeight: 1.2 }}>
+          {tile.label}
+        </p>
+        <p style={{ fontSize: fontSize.xs, color: colors.textSecondary, marginTop: 1 }}>
+          {tile.comingSoon ? 'Coming Soon' : tile.subtitle}
+        </p>
+      </div>
+      {!tile.comingSoon && (
+        <ChevronRight className="w-3.5 h-3.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: ICON_COLOR[tile.group] }} />
+      )}
+    </button>
   )
 }
 
-// ─── Portal Page ──────────────────────────────────────────────────────────────
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json())
+const fetcher = (url: string) => fetch(url).then(r => r.json())
 
-export default function PortalPage() {
+export default function DashboardPage() {
   const router = useRouter()
   const { data: session } = useSession()
-  const { data: stats, isLoading } = useSWR<TodayStats>('/api/reports/today', fetcher, {
-    refreshInterval: 30_000,
-  })
+  const { data: stats, isLoading } = useSWR<TodayStats>('/api/reports/today', fetcher, { refreshInterval: 30_000 })
 
-  const fullName = session?.user?.fullName ?? session?.user?.username ?? 'User'
-  const role     = session?.user?.role ?? ''
+  const role      = session?.user?.role ?? ''
+  const isManager = ['admin', 'manager'].includes(role)
 
   const cashUpLabel =
-    stats?.cashUpStatus === 'approved'  ? 'Approved' :
-    stats?.cashUpStatus === 'submitted' ? 'Awaiting' :
+    stats?.cashUpStatus === 'approved'  ? 'Approved ✓' :
+    stats?.cashUpStatus === 'submitted' ? 'Awaiting Review' :
     stats?.cashUpStatus === 'open'      ? 'Open' : 'Not Started'
 
-  const cashUpBadge =
-    stats?.cashUpStatus === 'approved'  ? 'bg-rpx-green text-white' :
-    stats?.cashUpStatus === 'submitted' ? 'bg-rpx-amber text-[#1a1a1a]' :
-    stats?.cashUpStatus === 'open'      ? 'bg-rpx-blue text-white' :
-                                          'bg-white/10 text-white/50'
+  const cashUpAccent =
+    stats?.cashUpStatus === 'approved'  ? colors.action  :
+    stats?.cashUpStatus === 'submitted' ? colors.warning  :
+    stats?.cashUpStatus === 'open'      ? colors.process  : colors.textSecondary
 
   return (
-    <div
-      className="flex flex-col overflow-hidden"
-      style={{ height: '100dvh', background: colors.dashBg, fontFamily: 'var(--rpx-font, system-ui)' }}
-    >
-      {/* ── TOP BAR ────────────────────────────────────────────── */}
-      <header
-        className="flex items-center shrink-0 px-4 gap-4 border-b border-white/[0.08]"
-        style={{ height: 40, background: colors.dashSurface }}
-      >
-        <div className="flex items-center gap-2 shrink-0">
-          <div className="w-6 h-6 rounded bg-rpx-navy flex items-center justify-center shrink-0">
-            <RefreshCw className="w-3.5 h-3.5 text-rpx-accent" />
-          </div>
-          <span className="text-rpx-accent font-bold text-[13px] tracking-wide select-none">Renovo Pro</span>
+    <div className="flex flex-col flex-1 min-h-0 gap-4">
+      {/* Page header */}
+      <div className="flex items-baseline justify-between shrink-0">
+        <div>
+          <h1 style={{ fontSize: fontSize.lg, fontWeight: fontWeight.semibold, color: colors.textPrimary, lineHeight: 1.3 }}>
+            Dashboard
+          </h1>
+          <p style={{ fontSize: fontSize.sm, color: colors.textSecondary, marginTop: 2 }}>
+            Welcome back{session?.user?.fullName ? `, ${session.user.fullName}` : ''}
+          </p>
         </div>
-
-        <div className="w-px h-5 bg-white/10 shrink-0" />
-
-        <div className="flex-1" />
-
-        <OfflineChip />
-
-        <div className="flex items-center gap-1.5">
-          <span className="text-rpx-tabmuted text-[11px] select-none">
-            {fullName}
-            {role && <span className="text-white/25 ml-1">· {role}</span>}
-          </span>
-        </div>
-
-        <button
-          onClick={() => signOut({ callbackUrl: '/login' })}
-          className="flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-medium
-                     bg-rpx-red/80 text-white hover:bg-rpx-red active:scale-95
-                     transition-all duration-150 shrink-0"
-          aria-label="Sign out"
-        >
-          <LogOut className="w-3 h-3" />
-          Log Out
-        </button>
-      </header>
-
-      {/* ── STATS STRIP ────────────────────────────────────────── */}
-      <div
-        className="flex items-center shrink-0 px-4 gap-0 border-b border-white/[0.06]"
-        style={{ height: 34, background: colors.dashStrip }}
-      >
-        {/* Purchases */}
-        <div className="flex items-center gap-2 pr-5">
-          <span className="text-rpx-tabmuted text-[11px] select-none">Today&apos;s Purchases</span>
-          {isLoading
-            ? <StatSkeleton />
-            : <span className="text-rpx-accent text-[12px] font-bold tabular-nums">
-                R {new Decimal(stats?.purchases?.total ?? '0').toFixed(2)}
-              </span>
-          }
-        </div>
-
-        <div className="w-px h-4 bg-white/10 shrink-0 mx-3" />
-
-        {/* Cash-Up */}
-        <div className="flex items-center gap-2 px-0">
-          <span className="text-rpx-tabmuted text-[11px] select-none">Cash-Up</span>
-          {isLoading
-            ? <StatSkeleton />
-            : <span className={cn('text-[10px] font-semibold px-2 py-0.5 rounded-full select-none', cashUpBadge)}>
-                {cashUpLabel}
-              </span>
-          }
-        </div>
-
-        <div className="w-px h-4 bg-white/10 shrink-0 mx-3" />
-
-        {/* Sales */}
-        <div className="flex items-center gap-2 pl-0">
-          <span className="text-rpx-tabmuted text-[11px] select-none">Today&apos;s Sales</span>
-          {isLoading
-            ? <StatSkeleton />
-            : <span className="text-rpx-accent text-[12px] font-bold tabular-nums">
-                R {new Decimal(stats?.sales?.total ?? '0').toFixed(2)}
-              </span>
-          }
-        </div>
-
-        <div className="flex-1" />
-        <LiveClock />
       </div>
 
-      {/* ── TILE GRID ────────────────────────────────────────────── */}
-      <main
-        className="flex-1 min-h-0 p-3 grid gap-3"
-        style={{ gridTemplateColumns: 'repeat(4, 1fr)', gridTemplateRows: 'repeat(4, 1fr)' }}
-      >
-        {TILES.map((tile) => {
-          const Icon       = tile.icon
-          const isDisabled = !!tile.comingSoon
+      {/* Stats strip — manager/admin only */}
+      {isManager && (
+        <div className="grid grid-cols-3 gap-3 shrink-0">
+          <StatCard
+            label="Today's Purchases"
+            value={isLoading ? '—' : `R ${new Decimal(stats?.purchases?.total ?? '0').toFixed(2)}`}
+            sub={isLoading ? undefined : `${stats?.purchases?.count ?? 0} transaction${stats?.purchases?.count !== 1 ? 's' : ''}`}
+            accent={colors.primary}
+          />
+          <StatCard
+            label="Today's Sales"
+            value={isLoading ? '—' : `R ${new Decimal(stats?.sales?.total ?? '0').toFixed(2)}`}
+            sub={isLoading ? undefined : `${stats?.sales?.count ?? 0} transaction${stats?.sales?.count !== 1 ? 's' : ''}`}
+            accent={colors.action}
+          />
+          <StatCard
+            label="Cash-Up Status"
+            value={isLoading ? '—' : cashUpLabel}
+            accent={cashUpAccent}
+          />
+        </div>
+      )}
 
-          return (
-            <button
-              key={tile.label}
-              onClick={() => !isDisabled && router.push(tile.href)}
-              disabled={isDisabled}
-              aria-label={isDisabled ? `${tile.label} — Coming Soon` : tile.label}
-              className={cn(
-                'flex flex-col items-center justify-center gap-2.5 rounded-xl border border-white/[0.12]',
-                'bg-gradient-to-br transition-all duration-150 ease-out cursor-pointer',
-                'focus:outline-none focus-visible:ring-2 focus-visible:ring-rpx-accent/70',
-                GRADIENT[tile.group],
-                isDisabled
-                  ? 'opacity-30 cursor-not-allowed'
-                  : cn(
-                      GRADIENT_HOVER[tile.group],
-                      'hover:border-white/25 hover:shadow-xl hover:shadow-black/40 hover:scale-[1.02]',
-                      'active:scale-[0.97] active:brightness-95',
-                    ),
-              )}
-            >
-              {/* Icon */}
-              <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center shrink-0">
-                <Icon className="w-5 h-5 text-white" strokeWidth={1.75} />
+      {/* Tile grid */}
+      <div className="flex-1 min-h-0 overflow-y-auto">
+        <div className="grid grid-cols-2 gap-6 pb-4" style={{ gridTemplateColumns: '1fr 1fr' }}>
+          {TILE_SECTIONS.map(section => (
+            <div key={section.heading} className="flex flex-col gap-2">
+              <p style={{
+                fontSize:      fontSize.xs,
+                fontWeight:    fontWeight.semibold,
+                color:         colors.textSecondary,
+                textTransform: 'uppercase',
+                letterSpacing: '0.07em',
+                paddingBottom: 4,
+                borderBottom:  `1px solid ${colors.border}`,
+              }}>
+                {section.heading}
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                {section.tiles.map(tile => (
+                  <DashTile
+                    key={tile.label}
+                    tile={tile}
+                    onClick={() => !tile.comingSoon && router.push(tile.href)}
+                  />
+                ))}
               </div>
-
-              {/* Text */}
-              <div className="text-center px-3 leading-none">
-                <p className="text-white text-[12px] font-semibold tracking-wide">{tile.label}</p>
-                <p className={cn('text-[10px] mt-1', SUBTITLE_COLOR[tile.group])}>
-                  {tile.comingSoon ? '— Coming Soon —' : tile.subtitle}
-                </p>
-              </div>
-            </button>
-          )
-        })}
-      </main>
-
-      {/* ── FOOTER ───────────────────────────────────────────────── */}
-      <footer
-        className="shrink-0 flex items-center justify-center border-t border-white/[0.06]"
-        style={{ height: 26, background: colors.dashSurface }}
-      >
-        <span className="text-white/20 text-[10px] tracking-widest uppercase select-none">
-          Renovo Pro Management Software &nbsp;·&nbsp; Version 3.0
-        </span>
-      </footer>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   )
 }
