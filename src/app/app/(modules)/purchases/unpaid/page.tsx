@@ -18,7 +18,7 @@ type Purchase = {
 }
 
 type GroupedCustomer = {
-  customerId: string; customerName: string; idNumber: string
+  customerId: string; customerName: string; idNumber: string | null
   purchases: Purchase[]; total: Decimal
 }
 
