@@ -38,7 +38,7 @@ export function getModuleName(pathname: string): string {
   const match = Object.keys(MODULE_NAMES)
     .filter(k => pathname.startsWith(k + '/'))
     .sort((a, b) => b.length - a.length)[0]
-  return match ? MODULE_NAMES[match] : 'Renovo Pro'
+  return match ? (MODULE_NAMES[match] ?? 'Renovo Pro') : 'Renovo Pro'
 }
 
 export const HREF_TO_ICON: Record<string, LucideIcon> = {

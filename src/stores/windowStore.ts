@@ -38,7 +38,7 @@ export const useWindowStore = create<WindowStore>()((set, get) => ({
       navigate('/app/dashboard')
     } else {
       const target = next[Math.max(0, idx - 1)]
-      navigate(target.href)
+      navigate(target?.href ?? '/app/dashboard')
     }
   },
 
