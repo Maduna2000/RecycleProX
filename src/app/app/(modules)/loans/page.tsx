@@ -36,7 +36,7 @@ type Loan = {
 }
 
 type SelectedCustomer = {
-  id: string; firstName: string; lastName: string; idNumber: string
+  id: string; firstName: string; lastName: string; idNumber: string | null
   phone: string; customerType: string; blacklisted: boolean; priceGroupId?: string | null
 }
 

@@ -23,7 +23,7 @@ type Product = {
 }
 
 type SelectedCustomer = {
-  id: string; firstName: string; lastName: string; idNumber: string
+  id: string; firstName: string; lastName: string; idNumber: string | null
   phone: string; blacklisted: boolean; priceGroupId?: string | null
   tradeCommodities?: string[] | null; zeroRated?: boolean
   companyName?: string | null; contactPerson?: string | null
