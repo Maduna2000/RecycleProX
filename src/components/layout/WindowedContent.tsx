@@ -13,6 +13,8 @@ export function WindowedContent({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (pathname === '/app/dashboard') return
     openWindow(pathname, getModuleName(pathname), getModuleIcon(pathname))
+    // openWindow is a stable Zustand action — safe to omit from deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname])
 
   return (

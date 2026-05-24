@@ -16,10 +16,11 @@ export function PageTitleBar() {
     const idx = windows.findIndex(w => w.href === pathname)
     if (windows.length <= 1 || idx === -1) {
       router.push('/app/dashboard')
-    } else {
-      const target = windows[idx > 0 ? idx - 1 : 1]
-      router.push(target.href)
+      return
     }
+    const targetIdx = idx > 0 ? idx - 1 : 1
+    const target    = windows[targetIdx]
+    router.push(target?.href ?? '/app/dashboard')
   }
 
   function handleClose() {
