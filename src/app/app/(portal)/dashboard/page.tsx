@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
+import { useEffect, useState } from 'react'
 import useSWR from 'swr'
 import Decimal from 'decimal.js'
 import {
@@ -9,8 +10,10 @@ import {
   Tag, CreditCard, ImageIcon, Scale,
   Package, ClipboardList, TrendingUp, BarChart2,
   Archive, Wallet, Landmark, Settings,
+  Wifi, WifiOff,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useOfflineStore } from '@/stores/offlineStore'
 import { colors } from '@/lib/design-tokens'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -79,10 +82,37 @@ const SUBTITLE_COLOR: Record<TileGroup, string> = {
   grey:  'text-white/50',
 }
 
-// ─── Stats strip ──────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function StatSkeleton() {
   return <div className="h-3.5 w-20 rounded bg-white/10 animate-pulse" />
+}
+
+function OfflineChip() {
+  const { isOnline, pendingCount } = useOfflineStore()
+  if (isOnline && pendingCount === 0) return null
+  return (
+    <div className={cn(
+      'flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium',
+      isOnline ? 'bg-amber-400/20 text-amber-300' : 'bg-red-500/20 text-red-300',
+    )}>
+      {isOnline ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
+      {isOnline ? `Syncing ${pendingCount}` : 'Offline'}
+    </div>
+  )
+}
+
+function LiveClock() {
+  const [time, setTime] = useState(() => new Date())
+  useEffect(() => {
+    const id = setInterval(() => setTime(new Date()), 60_000)
+    return () => clearInterval(id)
+  }, [])
+  const dateStr = time.toLocaleDateString('en-ZA', { year: 'numeric', month: '2-digit', day: '2-digit' })
+  const timeStr = time.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit', hour12: false })
+  return (
+    <span className="text-rpx-tabmuted text-[11px] tabular-nums">{dateStr} · {timeStr}</span>
+  )
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -96,7 +126,8 @@ export default function DashboardPage() {
     refreshInterval: 30_000,
   })
 
-  const role      = session?.user?.role ?? ''
+  const fullName = session?.user?.fullName ?? session?.user?.username ?? 'User'
+  const role     = session?.user?.role ?? ''
   const isManager = ['admin', 'manager'].includes(role)
 
   const cashUpLabel =
@@ -111,51 +142,74 @@ export default function DashboardPage() {
                                           'bg-white/10 text-white/50'
 
   return (
-    <div className="flex flex-col flex-1 min-h-0">
-      {/* Stats strip — manager / admin only */}
-      {isManager && (
-        <div
-          className="flex items-center shrink-0 px-3 gap-0 border-b border-white/[0.06] mb-3"
-          style={{ height: 34, background: colors.dashSurface, borderRadius: 4 }}
-        >
-          <div className="flex items-center gap-2 pr-5">
-            <span className="text-rpx-tabmuted text-[11px] select-none">Today&apos;s Purchases</span>
-            {isLoading
-              ? <StatSkeleton />
-              : <span className="text-rpx-accent text-[12px] font-bold tabular-nums">
-                  R {new Decimal(stats?.purchases?.total ?? '0').toFixed(2)}
-                </span>
-            }
-          </div>
-
-          <div className="w-px h-4 bg-white/10 shrink-0 mx-3" />
-
-          <div className="flex items-center gap-2">
-            <span className="text-rpx-tabmuted text-[11px] select-none">Cash-Up</span>
-            {isLoading
-              ? <StatSkeleton />
-              : <span className={cn('text-[10px] font-semibold px-2 py-0.5 rounded-full select-none', cashUpBadge)}>
-                  {cashUpLabel}
-                </span>
-            }
-          </div>
-
-          <div className="w-px h-4 bg-white/10 shrink-0 mx-3" />
-
-          <div className="flex items-center gap-2">
-            <span className="text-rpx-tabmuted text-[11px] select-none">Today&apos;s Sales</span>
-            {isLoading
-              ? <StatSkeleton />
-              : <span className="text-rpx-accent text-[12px] font-bold tabular-nums">
-                  R {new Decimal(stats?.sales?.total ?? '0').toFixed(2)}
-                </span>
-            }
-          </div>
-        </div>
-      )}
-
-      {/* Tile grid — original layout and styling */}
+    <div
+      className="flex flex-col flex-1 min-h-0"
+      style={{ background: colors.dashBg, margin: '-16px -20px -16px -20px' }}
+    >
+      {/* ── WELCOME / STATS STRIP ──────────────────────────────── */}
       <div
+        className="flex items-center shrink-0 px-4 gap-0 border-b border-white/[0.06]"
+        style={{ height: 34, background: colors.dashSurface }}
+      >
+        {/* User greeting */}
+        <div className="flex items-center gap-2 pr-5 border-r border-white/10">
+          <span className="text-rpx-tabmuted text-[11px] select-none">
+            Welcome,&nbsp;
+            <span className="text-white/80 font-semibold">{fullName}</span>
+            {role && <span className="text-white/25 ml-1">· {role}</span>}
+          </span>
+        </div>
+
+        {isManager && (
+          <>
+            {/* Purchases */}
+            <div className="flex items-center gap-2 px-5">
+              <span className="text-rpx-tabmuted text-[11px] select-none">Today&apos;s Purchases</span>
+              {isLoading
+                ? <StatSkeleton />
+                : <span className="text-rpx-accent text-[12px] font-bold tabular-nums">
+                    R {new Decimal(stats?.purchases?.total ?? '0').toFixed(2)}
+                  </span>
+              }
+            </div>
+
+            <div className="w-px h-4 bg-white/10 shrink-0" />
+
+            {/* Cash-Up */}
+            <div className="flex items-center gap-2 px-5">
+              <span className="text-rpx-tabmuted text-[11px] select-none">Cash-Up</span>
+              {isLoading
+                ? <StatSkeleton />
+                : <span className={cn('text-[10px] font-semibold px-2 py-0.5 rounded-full select-none', cashUpBadge)}>
+                    {cashUpLabel}
+                  </span>
+              }
+            </div>
+
+            <div className="w-px h-4 bg-white/10 shrink-0" />
+
+            {/* Sales */}
+            <div className="flex items-center gap-2 px-5">
+              <span className="text-rpx-tabmuted text-[11px] select-none">Today&apos;s Sales</span>
+              {isLoading
+                ? <StatSkeleton />
+                : <span className="text-rpx-accent text-[12px] font-bold tabular-nums">
+                    R {new Decimal(stats?.sales?.total ?? '0').toFixed(2)}
+                  </span>
+              }
+            </div>
+          </>
+        )}
+
+        <div className="flex-1" />
+        <OfflineChip />
+        <div className="ml-3">
+          <LiveClock />
+        </div>
+      </div>
+
+      {/* ── TILE GRID ────────────────────────────────────────────── */}
+      <main
         className="flex-1 min-h-0 p-3 grid gap-3"
         style={{ gridTemplateColumns: 'repeat(4, 1fr)', gridTemplateRows: 'repeat(4, 1fr)' }}
       >
@@ -195,7 +249,17 @@ export default function DashboardPage() {
             </button>
           )
         })}
-      </div>
+      </main>
+
+      {/* ── FOOTER ───────────────────────────────────────────────── */}
+      <footer
+        className="shrink-0 flex items-center justify-center border-t border-white/[0.06]"
+        style={{ height: 26, background: colors.dashSurface }}
+      >
+        <span className="text-white/20 text-[10px] tracking-widest uppercase select-none">
+          Renovo Pro Management Software &nbsp;·&nbsp; Version 3.0
+        </span>
+      </footer>
     </div>
   )
 }
