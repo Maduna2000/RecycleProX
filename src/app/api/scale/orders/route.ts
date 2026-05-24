@@ -10,21 +10,22 @@ import {
 export async function GET(req: NextRequest) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!['admin', 'manager', 'cashier'].includes(session.user.role)) {
+  if (!['admin', 'manager', 'cashier', 'scale_operator'].includes(session.user.role)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
   const p = req.nextUrl.searchParams
   const result = await listScaleOrders({
-    dateFrom:   p.get('dateFrom')   ?? undefined,
-    dateTo:     p.get('dateTo')     ?? undefined,
-    status:     (p.get('status')    ?? undefined) as 'pending' | 'processed' | 'voided' | undefined,
-    operatorId: p.get('operatorId') ?? undefined,
-    productId:  p.get('productId')  ?? undefined,
-    categoryId: p.get('categoryId') ?? undefined,
-    search:     p.get('search')     ?? undefined,
-    page:       p.get('page')       ? Number(p.get('page'))     : undefined,
-    pageSize:   p.get('pageSize')   ? Number(p.get('pageSize')) : undefined,
+    dateFrom:     p.get('dateFrom')     ?? undefined,
+    dateTo:       p.get('dateTo')       ?? undefined,
+    status:       (p.get('status')      ?? undefined) as 'pending' | 'processed' | 'voided' | undefined,
+    operatorId:   p.get('operatorId')   ?? undefined,
+    productId:    p.get('productId')    ?? undefined,
+    categoryId:   p.get('categoryId')   ?? undefined,
+    customerType: (p.get('customerType') ?? undefined) as 'casual' | 'account' | undefined,
+    search:       p.get('search')       ?? undefined,
+    page:         p.get('page')         ? Number(p.get('page'))     : undefined,
+    pageSize:     p.get('pageSize')     ? Number(p.get('pageSize')) : undefined,
   })
   return NextResponse.json(result)
 }

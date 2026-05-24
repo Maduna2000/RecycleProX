@@ -20,7 +20,7 @@ export const CreateUserSchema = z.object({
     .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
     .regex(/[0-9]/, 'Password must contain at least one number')
     .regex(/[^a-zA-Z0-9]/, 'Password must contain at least one special character'),
-  role: z.enum(['admin', 'manager', 'cashier']),
+  role: z.enum(['admin', 'manager', 'cashier', 'scale_operator']),
   isActive: z.boolean().default(true).optional(),
 })
 

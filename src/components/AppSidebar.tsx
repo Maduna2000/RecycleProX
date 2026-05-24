@@ -8,7 +8,7 @@ import {
   Package, BarChart2, Settings, LogOut, RefreshCw,
   Warehouse, DollarSign, Tag, Banknote, ShieldCheck, ShieldAlert,
   Receipt, Coins, UserCheck, ClipboardList, HandCoins, Images,
-  AlertCircle, Scale, Layers,
+  AlertCircle, Scale,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -64,10 +64,9 @@ const RECORDS: NavGroup = {
 const SCALE_ADMIN: NavGroup = {
   heading: 'Scale Station',
   items: [
-    { label: 'Dashboard',   href: '/scale/admin',            icon: Scale },
-    { label: 'Orders',      href: '/scale/admin/orders',     icon: ClipboardList },
-    { label: 'Categories',  href: '/scale/admin/categories', icon: Layers },
-    { label: 'Products',    href: '/scale/admin/products',   icon: Package },
+    { label: 'Orders',    href: '/app/scale',               icon: ClipboardList },
+    { label: 'Operators', href: '/app/scale?tab=operators', icon: Users },
+    { label: 'Station',   href: '/scale',                   icon: Scale },
   ],
 }
 
@@ -84,7 +83,7 @@ const ADMIN: NavGroup = {
 
 function isActive(pathname: string, href: string): boolean {
   // Exact match only for paths that are a prefix of deeper routes
-  if (href === '/app/settings' || href === '/app/purchases' || href === '/scale/admin') {
+  if (href === '/app/settings' || href === '/app/purchases' || href === '/app/scale') {
     return pathname === href || pathname === href + '/'
   }
   return pathname.startsWith(href)

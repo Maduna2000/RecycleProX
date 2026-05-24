@@ -12,6 +12,7 @@ import {
   Users, UserPlus, ChevronRight,
   Archive, Landmark,
   Wifi, WifiOff,
+  Scale, ClipboardList,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useOfflineStore } from '@/stores/offlineStore'
@@ -52,6 +53,7 @@ const MODULE_NAMES: Record<string, string> = {
   '/app/police-register':  'Police Register',
   '/app/audit-log':        'Audit Log',
   '/app/change-password':  'Change Password',
+  '/app/scale':            'Scale Station',
 }
 
 function getModuleName(pathname: string): string {
@@ -249,6 +251,63 @@ function UserMenu({ role, fullName }: { role: string; fullName: string }) {
   )
 }
 
+// ─── ScalePopup ───────────────────────────────────────────────────────────────
+
+function ScalePopup() {
+  const [open, setOpen] = useState(false)
+
+  const tiles = [
+    { label: 'Scale Orders',    icon: ClipboardList, href: '/app/scale',                  desc: 'View & manage orders' },
+    { label: 'Scale Operators', icon: Users,         href: '/app/scale?tab=operators',    desc: 'Manage operator accounts' },
+    { label: 'Scale Station',   icon: Scale,         href: '/scale',                      desc: 'Open tablet app', external: true },
+  ]
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="flex items-center gap-1 px-2 py-1 rounded hover:bg-white/10 transition-colors"
+        title="Scale Station"
+        aria-label="Scale Station shortcuts"
+      >
+        <Scale className="w-4 h-4 text-white/80 hover:text-white" />
+      </button>
+
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-full mt-1.5 w-56 bg-white rounded-sm shadow-2xl border border-[#E0E0E0] py-1.5 z-50">
+            <p className="px-3 pb-1.5 pt-0.5 text-[10px] font-semibold text-[#6C757D] uppercase tracking-widest border-b border-[#F1F3F4]">
+              Scale Station
+            </p>
+            {tiles.map((t) => (
+              <Link
+                key={t.href}
+                href={t.href}
+                target={t.external ? '_blank' : undefined}
+                rel={t.external ? 'noopener noreferrer' : undefined}
+                onClick={() => setOpen(false)}
+                className="flex items-start gap-2.5 px-3 py-2 hover:bg-[#EBF3FC] transition-colors"
+              >
+                <div
+                  className="w-7 h-7 rounded flex items-center justify-center shrink-0 mt-0.5"
+                  style={{ background: '#EBF3FC' }}
+                >
+                  <t.icon className="w-3.5 h-3.5" style={{ color: '#185ABD' }} />
+                </div>
+                <div>
+                  <p className="text-[12px] font-medium text-[#212529]">{t.label}</p>
+                  <p className="text-[10px] text-[#6C757D]">{t.desc}</p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 // ─── OfflineChip ──────────────────────────────────────────────────────────────
 
 function OfflineChip() {
@@ -402,6 +461,7 @@ export function AppShell({
         {/* Right side */}
         <div className="flex items-center gap-1 pl-2 shrink-0">
           <OfflineChip />
+          {(role === 'admin' || role === 'manager') && <ScalePopup />}
           <UserMenu role={role} fullName={fullName} />
           <WindowControls onNavigateDashboard={goHome} />
         </div>

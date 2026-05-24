@@ -31,15 +31,16 @@ export class ScaleProductInactiveError extends Error {
 type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
 
 export interface ScaleOrderFilters {
-  dateFrom?:   string
-  dateTo?:     string
-  status?:     'pending' | 'processed' | 'voided'
-  operatorId?: string
-  productId?:  string
-  categoryId?: string
-  search?:     string
-  page?:       number
-  pageSize?:   number
+  dateFrom?:     string
+  dateTo?:       string
+  status?:       'pending' | 'processed' | 'voided'
+  operatorId?:   string
+  productId?:    string
+  categoryId?:   string
+  customerType?: 'casual' | 'account'
+  search?:       string
+  page?:         number
+  pageSize?:     number
 }
 
 // ─── Order number generator (atomic inside transaction) ───────────────────────
@@ -138,10 +139,11 @@ export async function listScaleOrders(filters: ScaleOrderFilters) {
 
   const where: Prisma.ScaleOrderWhereInput = {}
 
-  if (filters.status)     where.status     = filters.status
-  if (filters.operatorId) where.operatorId = filters.operatorId
-  if (filters.productId)  where.productId  = filters.productId
-  if (filters.categoryId) where.product    = { categoryId: filters.categoryId }
+  if (filters.status)       where.status     = filters.status
+  if (filters.operatorId)   where.operatorId = filters.operatorId
+  if (filters.productId)    where.productId  = filters.productId
+  if (filters.categoryId)   where.product    = { categoryId: filters.categoryId }
+  if (filters.customerType) where.customer   = { customerType: filters.customerType as import('@prisma/client').CustomerType }
 
   if (filters.dateFrom || filters.dateTo) {
     where.createdAt = {
@@ -163,7 +165,7 @@ export async function listScaleOrders(filters: ScaleOrderFilters) {
     prisma.scaleOrder.findMany({
       where,
       include: {
-        customer: { select: { id: true, firstName: true, lastName: true, phone: true } },
+        customer: { select: { id: true, firstName: true, lastName: true, phone: true, customerType: true } },
         product:  { include: { category: true } },
         operator: { select: { id: true, fullName: true } },
       },
