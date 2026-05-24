@@ -18,7 +18,7 @@ export interface RegisterEntry {
   createdAt:       Date
   refNumber:       string
   supplierName:    string
-  idNumber:        string
+  idNumber:        string | null
   dateOfBirth?:    Date | null
   policeRegNo?:    string | null
   address:         string
@@ -165,7 +165,7 @@ export async function generatePoliceRegister(data: PoliceRegisterData): Promise<
         ['time',    timeStr],
         ['ref',     entry.refNumber],
         ['name',    truncate(entry.supplierName, 22)],
-        ['idno',    entry.idNumber],
+        ['idno',    entry.idNumber ?? ''],
         ['dob',     dobStr],
         ['address', truncate(entry.address, 20)],
         ['items',   truncate(entry.items, 22)],
