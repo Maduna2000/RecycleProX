@@ -266,17 +266,18 @@ function ScalePopup() {
     <div className="relative">
       <button
         onClick={() => setOpen(o => !o)}
-        className="flex items-center gap-1 px-2 py-1 rounded hover:bg-white/10 transition-colors"
+        className="flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium transition-all duration-100 focus:outline-none whitespace-nowrap border rounded-sm border-[#185ABD] text-[#185ABD] bg-transparent hover:bg-[#EBF3FC]"
         title="Scale Station"
         aria-label="Scale Station shortcuts"
       >
-        <Scale className="w-4 h-4 text-white/80 hover:text-white" />
+        <Scale className="w-3.5 h-3.5 shrink-0" />
+        <span>Scale</span>
       </button>
 
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full mt-1.5 w-56 bg-white rounded-sm shadow-2xl border border-[#E0E0E0] py-1.5 z-50">
+          <div className="absolute left-0 top-full mt-1 w-56 bg-white rounded-sm shadow-2xl border border-[#E0E0E0] py-1.5 z-50">
             <p className="px-3 pb-1.5 pt-0.5 text-[10px] font-semibold text-[#6C757D] uppercase tracking-widest border-b border-[#F1F3F4]">
               Scale Station
             </p>
@@ -461,27 +462,31 @@ export function AppShell({
         {/* Right side */}
         <div className="flex items-center gap-1 pl-2 shrink-0">
           <OfflineChip />
-          {(role === 'admin' || role === 'manager') && <ScalePopup />}
           <UserMenu role={role} fullName={fullName} />
           <WindowControls onNavigateDashboard={goHome} />
         </div>
       </header>
 
       {/* ── ZONE 2: Contextual Toolbar ────────────────────────── */}
-      {toolbarBtns.length > 0 && (
-        <div
-          className="flex items-center gap-1 px-3 shrink-0 border-b"
-          style={{
-            height:      'var(--rpx-toolbar-h, 32px)',
-            background:  'var(--rpx-ribbon-grey, #F8F9FA)',
-            borderColor: 'var(--rpx-border, #E0E0E0)',
-          }}
-        >
-          {toolbarBtns.map((btn, i) => (
-            <ToolbarBtn key={i} btn={btn} />
-          ))}
-        </div>
-      )}
+      {(() => {
+        const isDashboard   = pathname === '/app/dashboard'
+        const showScaleBtn  = isDashboard && (role === 'admin' || role === 'manager')
+        const showToolbar   = toolbarBtns.length > 0 || showScaleBtn
+        if (!showToolbar) return null
+        return (
+          <div
+            className="flex items-center gap-1 px-3 shrink-0 border-b"
+            style={{
+              height:      'var(--rpx-toolbar-h, 32px)',
+              background:  'var(--rpx-ribbon-grey, #F8F9FA)',
+              borderColor: 'var(--rpx-border, #E0E0E0)',
+            }}
+          >
+            {toolbarBtns.map((btn, i) => <ToolbarBtn key={i} btn={btn} />)}
+            {showScaleBtn && <ScalePopup />}
+          </div>
+        )
+      })()}
 
       {/* ── ZONE 3: Content Area ──────────────────────────────── */}
       <main className="rpx-content flex-1 min-h-0 flex flex-col overflow-hidden bg-[#F1F3F4]">
