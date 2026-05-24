@@ -43,7 +43,7 @@ export default function Step1Customer({ onSelect }: Props) {
     setSearching(true)
     setSearchError(null)
     try {
-      const res = await fetch(`/api/customers?search=${encodeURIComponent(query)}&limit=20`)
+      const res = await fetch(`/api/customers?search=${encodeURIComponent(query)}&type=account&limit=20`)
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
         throw new Error(err.error ?? `Server error (${res.status})`)
@@ -61,11 +61,12 @@ export default function Step1Customer({ onSelect }: Props) {
     }
   }
 
-  // Load all customers when entering account mode, then debounce on query change
+  // Only search when the user has typed at least 2 characters
   useEffect(() => {
     if (mode !== 'account') return
+    if (searchQuery.trim().length < 2) { setSearchResults([]); return }
     if (debounceRef.current) clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => runSearch(searchQuery), searchQuery ? 350 : 0)
+    debounceRef.current = setTimeout(() => runSearch(searchQuery.trim()), 350)
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, searchQuery])
@@ -225,7 +226,7 @@ export default function Step1Customer({ onSelect }: Props) {
     <div className="flex-1 flex flex-col p-5 max-w-lg mx-auto w-full">
       <button onClick={() => setMode('choose')} className="text-slate-500 text-sm mb-4 self-start">← Back</button>
       <h2 className="text-2xl font-bold text-slate-800 mb-1">Account Customer</h2>
-      <p className="text-slate-500 mb-6">Search by name, ID number or phone</p>
+      <p className="text-slate-500 mb-6">Search by name, ID number or account code</p>
 
       <div className="relative mb-4">
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
@@ -233,7 +234,7 @@ export default function Step1Customer({ onSelect }: Props) {
           value={searchQuery}
           onChange={e => setSearchQuery(e.target.value)}
           className="w-full border border-slate-300 rounded-xl pl-11 pr-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-emerald-500"
-          placeholder="Start typing a name, ID or phone..."
+          placeholder="Name, ID number or account code…"
           autoFocus
         />
         {searching && (
@@ -264,7 +265,7 @@ export default function Step1Customer({ onSelect }: Props) {
         ))}
         {!searching && !searchError && searchResults.length === 0 && (
           <p className="text-center text-slate-400 py-8">
-            {searchQuery ? 'No customers found' : 'No customers in database'}
+            {searchQuery.trim().length >= 2 ? 'No account customers found' : 'Type at least 2 characters to search'}
           </p>
         )}
       </div>
