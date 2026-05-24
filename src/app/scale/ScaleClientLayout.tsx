@@ -15,7 +15,10 @@ export default function ScaleClientLayout({ children }: { children: React.ReactN
 
   if (status === 'loading') {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+      <div
+        className="min-h-dvh bg-slate-900 flex items-center justify-center"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+      >
         <div className="text-white text-lg">Loading…</div>
       </div>
     )
@@ -27,8 +30,11 @@ export default function ScaleClientLayout({ children }: { children: React.ReactN
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
-      <header className="bg-slate-900 text-white px-4 py-3 flex items-center justify-between shadow-lg">
+    <div
+      className="min-h-dvh bg-slate-50 flex flex-col"
+      style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+    >
+      <header className="bg-slate-900 text-white px-4 py-3 flex items-center justify-between shadow-lg sticky top-0 z-10">
         <div className="flex items-center gap-2">
           <Scale className="w-5 h-5 text-emerald-400" />
           <span className="font-bold text-lg tracking-tight">Scale Station</span>

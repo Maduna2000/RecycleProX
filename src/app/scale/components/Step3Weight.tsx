@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { X } from 'lucide-react'
 
 interface Props {
   unit: string
@@ -28,6 +29,15 @@ export default function Step3Weight({ unit, onConfirm }: Props) {
     onConfirm(value)
   }
 
+  const numVal  = parseFloat(value)
+  const isValid = !!value && !isNaN(numVal) && numVal > 0
+
+  const borderCls = error
+    ? 'border-red-400 focus:border-red-500'
+    : isValid
+      ? 'border-emerald-500 focus:border-emerald-500'
+      : 'border-slate-300 focus:border-emerald-500'
+
   return (
     <div className="flex-1 flex flex-col items-center justify-center p-6 max-w-md mx-auto w-full">
       <h2 className="text-2xl font-bold text-slate-800 mb-1 text-center">Enter Weight</h2>
@@ -37,12 +47,27 @@ export default function Step3Weight({ unit, onConfirm }: Props) {
         <input
           type="number"
           inputMode="decimal"
+          autoComplete="off"
           value={value}
           onChange={handleChange}
           placeholder="0.000"
           autoFocus
-          className="w-full border-2 border-slate-300 rounded-2xl px-5 py-5 text-4xl font-bold text-center text-slate-800 focus:outline-none focus:border-emerald-500 transition-colors pr-24"
+          className={`w-full border-2 rounded-2xl py-5 text-4xl md:text-6xl font-bold text-center text-slate-800 focus:outline-none transition-colors ${value ? 'pl-12 pr-24' : 'px-5 pr-24'} ${borderCls}`}
         />
+
+        {/* Clear button — appears when value is non-empty */}
+        {value && (
+          <button
+            type="button"
+            onClick={() => { setValue(''); setError('') }}
+            className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg transition-colors"
+            aria-label="Clear weight"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
+
+        {/* Unit badge */}
         <span className="absolute right-5 top-1/2 -translate-y-1/2 text-2xl font-bold text-slate-400">
           {unit}
         </span>

@@ -62,7 +62,7 @@ export default function Step2Product({ onSelect }: Props) {
   if (selectedCat) {
     return (
       <div className="flex-1 flex flex-col p-5 max-w-lg mx-auto w-full">
-        <button onClick={() => { setSelectedCat(null); setProducts([]) }} className="text-slate-500 text-sm mb-4 flex items-center gap-1 self-start">
+        <button onClick={() => { setSelectedCat(null); setProducts([]) }} className="flex items-center gap-1 text-slate-500 text-sm mb-4 self-start min-h-[44px] px-2 -ml-2 rounded-lg hover:text-slate-800 hover:bg-slate-100 transition-colors">
           <ArrowLeft className="w-4 h-4" /> Categories
         </button>
         <h2 className="text-2xl font-bold text-slate-800 mb-1">{selectedCat.name}</h2>
@@ -78,7 +78,7 @@ export default function Step2Product({ onSelect }: Props) {
               <button
                 key={p.id}
                 onClick={() => onSelect({ id: p.id, name: p.name, unit: p.unit, categoryId: p.categoryId, categoryName: selectedCat.name })}
-                className="flex items-center justify-between bg-white rounded-xl shadow-sm p-4 border-2 border-transparent hover:border-emerald-500 active:scale-95 transition-all text-left"
+                className="flex items-center justify-between bg-white rounded-xl shadow-sm p-4 border-2 border-transparent hover:border-emerald-500 active:scale-95 transition-all text-left min-h-[56px]"
               >
                 <div>
                   <div className="font-semibold text-slate-800 text-lg">{p.name}</div>

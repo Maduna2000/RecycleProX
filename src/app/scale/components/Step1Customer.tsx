@@ -142,7 +142,7 @@ export default function Step1Customer({ onSelect }: Props) {
   if (mode === 'casual') {
     return (
       <div className="flex-1 flex flex-col p-5 max-w-lg mx-auto w-full">
-        <button onClick={() => setMode('choose')} className="text-slate-500 text-sm mb-4 self-start">← Back</button>
+        <button onClick={() => setMode('choose')} className="flex items-center gap-1 text-slate-500 text-sm mb-4 self-start min-h-[44px] px-2 -ml-2 rounded-lg hover:text-slate-800 hover:bg-slate-100 transition-colors">← Back</button>
         <h2 className="text-2xl font-bold text-slate-800 mb-1">Customer Details</h2>
         <p className="text-slate-500 mb-6">Enter the walk-in customer&apos;s information</p>
 
@@ -152,6 +152,7 @@ export default function Step1Customer({ onSelect }: Props) {
               <label className="text-sm font-medium text-slate-700 block mb-1">First Name *</label>
               <input
                 {...form.register('firstName')}
+                autoComplete="given-name"
                 className="w-full border border-slate-300 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 placeholder="John"
               />
@@ -163,6 +164,7 @@ export default function Step1Customer({ onSelect }: Props) {
               <label className="text-sm font-medium text-slate-700 block mb-1">Last Name *</label>
               <input
                 {...form.register('lastName')}
+                autoComplete="family-name"
                 className="w-full border border-slate-300 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 placeholder="Smith"
               />
@@ -178,6 +180,7 @@ export default function Step1Customer({ onSelect }: Props) {
               {...form.register('phone')}
               type="tel"
               inputMode="tel"
+              autoComplete="tel"
               className="w-full border border-slate-300 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-emerald-500"
               placeholder="+27 82 123 4567"
             />
@@ -190,6 +193,7 @@ export default function Step1Customer({ onSelect }: Props) {
             <label className="text-sm font-medium text-slate-700 block mb-1">National ID / Passport <span className="text-slate-400 font-normal">(optional)</span></label>
             <input
               {...form.register('idNumber')}
+              autoComplete="off"
               className="w-full border border-slate-300 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-emerald-500"
               placeholder="e.g. A123456 or 9001015009087"
             />
@@ -224,7 +228,7 @@ export default function Step1Customer({ onSelect }: Props) {
   // ── Mode: account search ──────────────────────────────────────────────────
   return (
     <div className="flex-1 flex flex-col p-5 max-w-lg mx-auto w-full">
-      <button onClick={() => setMode('choose')} className="text-slate-500 text-sm mb-4 self-start">← Back</button>
+      <button onClick={() => setMode('choose')} className="flex items-center gap-1 text-slate-500 text-sm mb-4 self-start min-h-[44px] px-2 -ml-2 rounded-lg hover:text-slate-800 hover:bg-slate-100 transition-colors">← Back</button>
       <h2 className="text-2xl font-bold text-slate-800 mb-1">Account Customer</h2>
       <p className="text-slate-500 mb-6">Search by name, ID number or account code</p>
 

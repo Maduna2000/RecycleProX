@@ -50,15 +50,21 @@ export default function Step4Photos({ orderId, onConfirm }: Props) {
     { label: 'Scale Reading', key: null, preview: null, uploading: false },
     { label: 'Product / Load', key: null, preview: null, uploading: false },
   ])
+  const [uploadErrors, setUploadErrors] = useState<(string | null)[]>([null, null])
   const inputRefs = [useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null)]
 
   function updateSlot(index: number, patch: Partial<PhotoSlot>) {
     setSlots(prev => prev.map((s, i) => i === index ? { ...s, ...patch } : s))
   }
 
+  function clearUploadError(index: number) {
+    setUploadErrors(prev => prev.map((e, i) => i === index ? null : e))
+  }
+
   async function handleFile(index: number, file: File) {
     const preview = URL.createObjectURL(file)
     updateSlot(index, { uploading: true, preview })
+    clearUploadError(index)
 
     try {
       const compressed = await compressImage(file)
@@ -78,7 +84,11 @@ export default function Step4Photos({ orderId, onConfirm }: Props) {
       updateSlot(index, { key, uploading: false })
     } catch (err) {
       updateSlot(index, { uploading: false, preview: null })
-      alert(err instanceof Error ? err.message : `Failed to upload photo ${index + 1}. Please try again.`)
+      setUploadErrors(prev => prev.map((e, i) =>
+        i === index
+          ? (err instanceof Error ? err.message : `Failed to upload photo ${index + 1}. Please try again.`)
+          : e,
+      ))
     }
   }
 
@@ -99,7 +109,8 @@ export default function Step4Photos({ orderId, onConfirm }: Props) {
       <h2 className="text-2xl font-bold text-slate-800 mb-1">Capture Photos</h2>
       <p className="text-slate-500 mb-6">Take a photo of the scale reading and the product/load</p>
 
-      <div className="flex flex-col gap-5">
+      {/* Side-by-side on tablet (sm+), stacked on mobile */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
         {slots.map((slot, i) => (
           <div key={i} className="bg-white rounded-2xl shadow-md p-4">
             <div className="flex items-center justify-between mb-3">
@@ -110,7 +121,7 @@ export default function Step4Photos({ orderId, onConfirm }: Props) {
             {slot.preview ? (
               <div className="relative">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={slot.preview} alt={slot.label} className="w-full h-48 object-cover rounded-xl" />
+                <img src={slot.preview} alt={slot.label} className="w-full h-40 sm:h-48 object-cover rounded-xl" />
                 {slot.uploading && (
                   <div className="absolute inset-0 bg-black/40 rounded-xl flex items-center justify-center gap-2">
                     <Loader2 className="w-8 h-8 text-white animate-spin" />
@@ -119,7 +130,7 @@ export default function Step4Photos({ orderId, onConfirm }: Props) {
                 )}
                 {!slot.uploading && (
                   <button
-                    onClick={() => { updateSlot(i, { key: null, preview: null }); inputRefs[i]?.current?.click() }}
+                    onClick={() => { updateSlot(i, { key: null, preview: null }); clearUploadError(i); inputRefs[i]?.current?.click() }}
                     className="absolute top-2 right-2 bg-white/90 rounded-full p-1.5 shadow"
                   >
                     <RefreshCw className="w-4 h-4 text-slate-600" />
@@ -128,12 +139,19 @@ export default function Step4Photos({ orderId, onConfirm }: Props) {
               </div>
             ) : (
               <button
-                onClick={() => inputRefs[i]?.current?.click()}
-                className="w-full h-48 border-2 border-dashed border-slate-300 rounded-xl flex flex-col items-center justify-center gap-3 hover:border-emerald-400 transition-colors"
+                onClick={() => { clearUploadError(i); inputRefs[i]?.current?.click() }}
+                className="w-full h-40 sm:h-48 border-2 border-dashed border-slate-300 rounded-xl flex flex-col items-center justify-center gap-3 hover:border-emerald-400 transition-colors"
               >
                 <Camera className="w-10 h-10 text-slate-400" />
                 <span className="text-slate-500 font-medium">Tap to take photo</span>
               </button>
+            )}
+
+            {/* Inline upload error */}
+            {uploadErrors[i] && (
+              <p className="mt-2 text-red-600 text-sm bg-red-50 rounded-xl px-3 py-2">
+                {uploadErrors[i]}
+              </p>
             )}
 
             <input
