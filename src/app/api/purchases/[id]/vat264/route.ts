@@ -57,7 +57,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
       refNumber:     purchase.refNumber,
       date:          new Date(purchase.createdAt),
       sellerName:    `${purchase.customer.firstName} ${purchase.customer.lastName}`,
-      sellerIdNumber: purchase.customer.idNumber,
+      sellerIdNumber: purchase.customer.idNumber ?? '',
       sellerAddress: purchase.customer.physicalAddress ?? undefined,
       sellerPhone:   purchase.customer.phone,
       lines,
