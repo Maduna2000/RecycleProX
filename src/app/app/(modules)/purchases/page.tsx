@@ -26,7 +26,7 @@ type Purchase = {
   totalAmount: string
   paymentMethod: string
   createdAt: string
-  customer: { id: string; firstName: string; lastName: string; idNumber: string }
+  customer: { id: string; firstName: string; lastName: string; idNumber: string | null }
   lines: { id: string }[]
 }
 

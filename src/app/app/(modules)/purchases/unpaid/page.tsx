@@ -13,7 +13,7 @@ const fetcher = (url: string) => fetch(url).then((r) => r.json())
 type Purchase = {
   id: string; refNumber: string; totalAmount: string; amountPaid: string
   loanDeductionAmount?: string; createdAt: string; notes?: string
-  customer: { id: string; firstName: string; lastName: string; idNumber: string }
+  customer: { id: string; firstName: string; lastName: string; idNumber: string | null }
   lines: { id: string }[]
 }
 

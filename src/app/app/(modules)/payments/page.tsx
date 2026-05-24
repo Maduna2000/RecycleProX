@@ -27,7 +27,7 @@ type Payment = {
   notes?: string
   voidedAt?: string
   createdAt: string
-  customer: { id: string; firstName: string; lastName: string; idNumber: string }
+  customer: { id: string; firstName: string; lastName: string; idNumber: string | null }
 }
 
 type AccountBalance = {

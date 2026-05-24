@@ -8,7 +8,7 @@ import { Search, UserX, UserCheck, Plus, Loader2 } from 'lucide-react'
 import { QuickCreateModal } from '@/components/customers/QuickCreateModal'
 
 type Customer = {
-  id: string; firstName: string; lastName: string; idNumber: string
+  id: string; firstName: string; lastName: string; idNumber: string | null
   phone: string; customerType: string; blacklisted: boolean; blacklistReason?: string | null
   priceGroupId?: string | null
   tradeCommodities?: string[] | null

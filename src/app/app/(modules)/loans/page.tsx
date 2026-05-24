@@ -21,7 +21,7 @@ import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
-type Customer = { id: string; firstName: string; lastName: string; idNumber: string }
+type Customer = { id: string; firstName: string; lastName: string; idNumber: string | null }
 
 type Repayment = {
   id: string; refNumber: string; amount: string
