@@ -9,13 +9,10 @@ import Step5Review  from './components/Step5Review'
 
 const STEPS = ['Customer', 'Product', 'Weight', 'Photos', 'Review']
 
-// A stable temporary ID used for R2 key prefixing during photo upload.
+// A stable temporary UUID used for R2 key prefixing during photo upload.
 // The real order ID is generated server-side on submit.
 function useTempId() {
-  const [id] = useState(() => {
-    // Use a simple random string since crypto.randomUUID is not available client-side in all environments
-    return Math.random().toString(36).substring(2) + Date.now().toString(36)
-  })
+  const [id] = useState(() => crypto.randomUUID())
   return id
 }
 
