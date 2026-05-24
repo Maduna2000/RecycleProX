@@ -42,13 +42,33 @@ export async function generateScaleOrderSlip(data: ScaleSlipData): Promise<Uint8
   const bold = await doc.embedFont(StandardFonts.HelveticaBold)
   const reg  = await doc.embedFont(StandardFonts.Helvetica)
 
-  // Estimate height
-  let h = 14 + HUGE + 4 + LINE_H + 8   // header
-  h += LINE_H + LINE_H + 8              // order # + date
-  h += LINE_H * 2 + 8                   // customer
-  h += LINE_H * 2 + 8                   // product + weight
-  h += LINE_H + 8                       // operator
-  h += LINE_H * 3 + 14                  // footer
+  // Exact height — each line mirrors the y-decrement operations below
+  let h = 14                             // y starts at h-14
+  h += HUGE + 2                          // yard name
+  h += LINE_H + 4                        // slip title
+  h += 8                                 // divider gap
+
+  h += LINE_H                            // ORDER # row
+  h += LINE_H + 4                        // date
+  h += 8                                 // divider gap
+
+  h += LINE_H - 2                        // CUSTOMER label
+  h += LINE_H                            // customer name
+  h += LINE_H + 4                        // phone
+  h += 8                                 // divider gap
+
+  h += LINE_H - 2                        // PRODUCT label
+  h += LINE_H - 1                        // product name
+  h += LINE_H + 1                        // category
+  h += LINE_H + 4                        // WEIGHT row
+  h += 8                                 // divider gap
+
+  h += LINE_H + 8                        // operator
+  h += 8                                 // divider gap
+
+  h += LINE_H                            // footer line 1
+  h += LINE_H + 2                        // footer line 2
+  h += LINE_H + 10                       // footer line 3 + bottom margin
 
   const page = doc.addPage([W, h])
   let y = h - 14
