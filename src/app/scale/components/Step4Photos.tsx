@@ -4,15 +4,45 @@ import { useState, useRef } from 'react'
 import { Camera, CheckCircle2, Loader2, RefreshCw } from 'lucide-react'
 
 interface PhotoSlot {
-  label:    string
-  key:      string | null
-  preview:  string | null
+  label:     string
+  key:       string | null
+  preview:   string | null
   uploading: boolean
 }
 
 interface Props {
-  orderId:   string   // temporary UUID for key generation
+  orderId:   string
   onConfirm: (photoR2Keys: string[]) => void
+}
+
+// Compress image to JPEG via Canvas, max 1280px on longest side, 82% quality.
+// Keeps photos well under Vercel's 4.5 MB body limit.
+async function compressImage(file: File): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      const MAX = 1280
+      let { width, height } = img
+      if (width > MAX || height > MAX) {
+        if (width > height) { height = Math.round((height / width) * MAX); width = MAX }
+        else                { width  = Math.round((width / height) * MAX); height = MAX }
+      }
+      const canvas = document.createElement('canvas')
+      canvas.width  = width
+      canvas.height = height
+      const ctx = canvas.getContext('2d')!
+      ctx.drawImage(img, 0, 0, width, height)
+      canvas.toBlob(
+        (blob) => blob ? resolve(blob) : reject(new Error('Canvas compression failed')),
+        'image/jpeg',
+        0.82,
+      )
+    }
+    img.onerror = reject
+    img.src = url
+  })
 }
 
 export default function Step4Photos({ orderId, onConfirm }: Props) {
@@ -27,32 +57,28 @@ export default function Step4Photos({ orderId, onConfirm }: Props) {
   }
 
   async function handleFile(index: number, file: File) {
-    updateSlot(index, { uploading: true, preview: URL.createObjectURL(file) })
+    const preview = URL.createObjectURL(file)
+    updateSlot(index, { uploading: true, preview })
 
     try {
-      // Get presigned upload URL
-      const urlRes = await fetch('/api/r2/upload-url', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          context:     'scale_order',
-          referenceId: orderId,
-          contentType: file.type,
-          fileSize:    file.size,
-          photoIndex:  index,
-        }),
-      })
-      if (!urlRes.ok) throw new Error('Failed to get upload URL')
-      const { uploadUrl, key } = await urlRes.json()
+      const compressed = await compressImage(file)
 
-      // Upload directly to R2
-      const putRes = await fetch(uploadUrl, { method: 'PUT', body: file, headers: { 'Content-Type': file.type } })
-      if (!putRes.ok) throw new Error('Upload failed')
+      const form = new FormData()
+      form.append('context',     'scale_order')
+      form.append('referenceId', orderId)
+      form.append('photoIndex',  String(index))
+      form.append('file',        compressed, `photo-${index}.jpg`)
 
+      const res = await fetch('/api/r2/upload', { method: 'POST', body: form })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error ?? `Upload failed (${res.status})`)
+      }
+      const { key } = await res.json()
       updateSlot(index, { key, uploading: false })
-    } catch {
+    } catch (err) {
       updateSlot(index, { uploading: false, preview: null })
-      alert(`Failed to upload photo ${index + 1}. Please try again.`)
+      alert(err instanceof Error ? err.message : `Failed to upload photo ${index + 1}. Please try again.`)
     }
   }
 
@@ -86,8 +112,9 @@ export default function Step4Photos({ orderId, onConfirm }: Props) {
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={slot.preview} alt={slot.label} className="w-full h-48 object-cover rounded-xl" />
                 {slot.uploading && (
-                  <div className="absolute inset-0 bg-black/40 rounded-xl flex items-center justify-center">
+                  <div className="absolute inset-0 bg-black/40 rounded-xl flex items-center justify-center gap-2">
                     <Loader2 className="w-8 h-8 text-white animate-spin" />
+                    <span className="text-white font-medium">Uploading…</span>
                   </div>
                 )}
                 {!slot.uploading && (

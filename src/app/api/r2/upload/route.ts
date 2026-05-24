@@ -6,16 +6,17 @@ import { mimeToExt, ALLOWED_PHOTO_TYPES, MAX_PHOTO_BYTES } from '@/lib/r2'
 import { randomUUID } from 'crypto'
 import logger from '@/lib/logger'
 
-const CONTEXTS = ['customer_id', 'purchase_photo', 'purchase_signature', 'police_signature', 'stocktake_entry'] as const
+const CONTEXTS = ['customer_id', 'purchase_photo', 'purchase_signature', 'police_signature', 'stocktake_entry', 'scale_order'] as const
 type UploadContext = typeof CONTEXTS[number]
 
-function buildKey(context: UploadContext, referenceId: string, ext: string): string {
+function buildKey(context: UploadContext, referenceId: string, ext: string, photoIndex?: number): string {
   switch (context) {
     case 'customer_id':        return `customers/${referenceId}/id-photo-${randomUUID()}.${ext}`
     case 'purchase_photo':     return `purchases/${referenceId}/photo-${randomUUID()}.${ext}`
     case 'purchase_signature': return `purchases/${referenceId}/signature-${randomUUID()}.${ext}`
     case 'police_signature':   return `police-visits/${referenceId}/signature-${randomUUID()}.${ext}`
     case 'stocktake_entry':    return `stocktakes/${referenceId}/photo-${randomUUID()}.${ext}`
+    case 'scale_order':        return `scale-orders/${referenceId}/photo-${photoIndex ?? 0}-${randomUUID()}.${ext}`
   }
 }
 
@@ -35,6 +36,7 @@ export async function POST(req: NextRequest) {
   const context     = formData.get('context') as string | null
   const referenceId = formData.get('referenceId') as string | null
   const file        = formData.get('file') as File | null
+  const photoIndex  = formData.get('photoIndex') !== null ? Number(formData.get('photoIndex')) : undefined
 
   if (!context || !CONTEXTS.includes(context as UploadContext)) {
     return NextResponse.json({ error: `context must be one of: ${CONTEXTS.join(', ')}` }, { status: 422 })
@@ -57,7 +59,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const ext  = mimeToExt(file.type)
-    const key  = buildKey(context as UploadContext, referenceId, ext)
+    const key  = buildKey(context as UploadContext, referenceId, ext, photoIndex)
     const body = Buffer.from(await file.arrayBuffer())
 
     await getR2Client().send(new PutObjectCommand({
