@@ -4,6 +4,8 @@ import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { signOut } from 'next-auth/react'
 import { useState, useEffect, useCallback } from 'react'
+import useSWR from 'swr'
+import Decimal from 'decimal.js'
 import {
   RefreshCw, Plus, Printer,
   BarChart2, ClipboardCheck, FileSpreadsheet,
@@ -380,8 +382,8 @@ function Taskbar({ moduleName, onMinimize }: { moduleName: string; onMinimize: (
       className="flex items-center px-3 gap-3 shrink-0 border-t border-white/10"
       style={{ height: 28, background: 'rgba(27,58,107,0.95)' }}
     >
-      <span className="text-[10px] text-white/35 shrink-0 font-semibold tracking-widest select-none">
-        RENOVO PRO
+      <span className="text-[10px] text-white/40 shrink-0 font-medium tracking-wide select-none whitespace-nowrap">
+        Renovo Pro Management Software &nbsp;·&nbsp; V3.0
       </span>
       <div className="flex-1 flex items-center">
         <button
@@ -395,6 +397,88 @@ function Taskbar({ moduleName, onMinimize }: { moduleName: string; onMinimize: (
       </div>
       <span className="text-[11px] text-white/55 shrink-0 font-mono tabular-nums">{time}</span>
     </div>
+  )
+}
+
+// ─── Dashboard stats bar (renders inside Zone 2 on dashboard) ────────────────
+
+type TodayStats = {
+  purchases:    { total: string; count: number }
+  sales:        { total: string; count: number }
+  cashUpStatus: 'open' | 'submitted' | 'approved' | null
+}
+
+const statsFetcher = (url: string) => fetch(url).then(r => r.json())
+
+function DashboardStatsBar({ fullName, role }: { fullName: string; role: string }) {
+  const { data: stats, isLoading } = useSWR<TodayStats>('/api/reports/today', statsFetcher, {
+    refreshInterval: 30_000,
+  })
+  const isManager = ['admin', 'manager'].includes(role)
+
+  const cashUpLabel =
+    stats?.cashUpStatus === 'approved'  ? 'Approved'  :
+    stats?.cashUpStatus === 'submitted' ? 'Awaiting'  :
+    stats?.cashUpStatus === 'open'      ? 'Open'      : 'Not Started'
+
+  const cashUpBadge =
+    stats?.cashUpStatus === 'approved'  ? 'bg-green-100 text-green-700 border-green-200' :
+    stats?.cashUpStatus === 'submitted' ? 'bg-amber-100 text-amber-700 border-amber-200' :
+    stats?.cashUpStatus === 'open'      ? 'bg-blue-100 text-blue-700 border-blue-200'   :
+                                          'bg-gray-100 text-gray-500 border-gray-200'
+
+  return (
+    <>
+      {/* Welcome */}
+      <div className="flex items-center gap-1.5 pr-3 border-r border-[#E0E0E0] shrink-0">
+        <span className="text-[#374151] text-[11px] select-none">
+          Welcome,&nbsp;<span className="font-semibold">{fullName}</span>
+          {role && <span className="text-[#9CA3AF] ml-1">· {role}</span>}
+        </span>
+      </div>
+
+      {isManager && (
+        <>
+          {/* Purchases */}
+          <div className="flex items-center gap-2 px-3 border-r border-[#E0E0E0] shrink-0">
+            <span className="text-[#6B7280] text-[11px] select-none">Purchases</span>
+            {isLoading
+              ? <div className="h-3 w-16 rounded bg-gray-200 animate-pulse" />
+              : <span className="text-[#1B3A6B] text-[12px] font-bold tabular-nums">
+                  R {new Decimal(stats?.purchases?.total ?? '0').toFixed(2)}
+                </span>
+            }
+          </div>
+
+          {/* Cash-Up */}
+          <div className="flex items-center gap-2 px-3 border-r border-[#E0E0E0] shrink-0">
+            <span className="text-[#6B7280] text-[11px] select-none">Cash-Up</span>
+            {isLoading
+              ? <div className="h-3 w-14 rounded bg-gray-200 animate-pulse" />
+              : <span className={cn('text-[10px] font-semibold px-2 py-0.5 rounded-full border select-none', cashUpBadge)}>
+                  {cashUpLabel}
+                </span>
+            }
+          </div>
+
+          {/* Sales */}
+          <div className="flex items-center gap-2 px-3 shrink-0">
+            <span className="text-[#6B7280] text-[11px] select-none">Sales</span>
+            {isLoading
+              ? <div className="h-3 w-16 rounded bg-gray-200 animate-pulse" />
+              : <span className="text-[#1B3A6B] text-[12px] font-bold tabular-nums">
+                  R {new Decimal(stats?.sales?.total ?? '0').toFixed(2)}
+                </span>
+            }
+          </div>
+        </>
+      )}
+
+      <div className="flex-1" />
+
+      {/* Scale popup — far right */}
+      <ScalePopup />
+    </>
   )
 }
 
@@ -484,7 +568,7 @@ export function AppShell({
             }}
           >
             {toolbarBtns.map((btn, i) => <ToolbarBtn key={i} btn={btn} />)}
-            {showScaleBtn && <ScalePopup />}
+            {showScaleBtn && <DashboardStatsBar fullName={fullName} role={role} />}
           </div>
         )
       })()}
