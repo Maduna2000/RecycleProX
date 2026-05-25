@@ -104,7 +104,7 @@ export default function ProductsPage() {
 
   async function handleBulkDeactivate() {
     setBulkLoading('deactivate')
-    await Promise.all([...selectedKeys].map(id =>
+    await Promise.all(Array.from(selectedKeys).map(id =>
       fetch(`/api/products/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ isActive: false }) })
     ))
     toast.success(`${selectedKeys.size} product${selectedKeys.size !== 1 ? 's' : ''} deactivated`)
@@ -115,7 +115,7 @@ export default function ProductsPage() {
 
   async function handleBulkReactivate() {
     setBulkLoading('reactivate')
-    await Promise.all([...selectedKeys].map(id =>
+    await Promise.all(Array.from(selectedKeys).map(id =>
       fetch(`/api/products/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ isActive: true }) })
     ))
     toast.success(`${selectedKeys.size} product${selectedKeys.size !== 1 ? 's' : ''} reactivated`)
@@ -368,7 +368,7 @@ export default function ProductsPage() {
       )}
       {bulkDelOpen && (
         <BulkDeleteModal
-          ids={[...selectedKeys]}
+          ids={Array.from(selectedKeys)}
           products={products}
           onClose={() => setBulkDelOpen(false)}
           onSuccess={() => { revalidate(); setSelectedKeys(new Set()); setBulkDelOpen(false) }}
