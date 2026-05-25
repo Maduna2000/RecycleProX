@@ -229,6 +229,7 @@ export async function listScaleOrders(filters: ScaleOrderFilters) {
         customer: { select: { id: true, firstName: true, lastName: true, phone: true, customerType: true } },
         product:  { include: { category: true } },
         operator: { select: { id: true, fullName: true } },
+        lines:    { include: { product: { select: { name: true, unit: true } } }, orderBy: { createdAt: 'asc' } },
       },
       orderBy: { createdAt: 'desc' },
       skip,

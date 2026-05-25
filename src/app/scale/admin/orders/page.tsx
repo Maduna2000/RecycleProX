@@ -5,12 +5,18 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Search, Download, Eye, CheckCircle2, XCircle, Loader2, X } from 'lucide-react'
 import { StatusBadge } from '../components/StatusBadge'
 
+interface OrderLine {
+  product: { name: string; unit: string; category?: { name: string } }
+  weight: string
+}
+
 interface Order {
   id: string; orderNumber: string; createdAt: string
   customer: { firstName: string; lastName: string; phone: string } | null
   casualFirstName?: string | null; casualLastName?: string | null; casualPhone?: string | null
   product:  { name: string; unit: string; category: { name: string } }
   weight: string; status: string; operator: { fullName: string }
+  lines?: OrderLine[]
   photoUrls?: string[]; slipUrl?: string; notes?: string; voidReason?: string
 }
 
@@ -136,8 +142,26 @@ export default function ScaleOrdersPage() {
                   {new Date(o.createdAt).toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' })}
                 </td>
                 <td className="px-4 py-3 text-slate-800">{customerName(o)}</td>
-                <td className="px-4 py-3 text-slate-600 hidden lg:table-cell">{o.product.name}</td>
-                <td className="px-4 py-3 text-right font-mono text-slate-700 hidden md:table-cell">{Number(o.weight).toFixed(3)} {o.product.unit}</td>
+                <td className="px-4 py-3 text-slate-600 hidden lg:table-cell">
+                  {o.lines && o.lines.length > 1 ? (
+                    <div className="space-y-0.5">
+                      {o.lines.map((l, i) => (
+                        <div key={i} className="flex items-baseline gap-1.5 text-xs">
+                          <span className="font-medium text-slate-700">{l.product.name}</span>
+                          <span className="text-slate-400 font-mono">{Number(l.weight).toFixed(3)} {l.product.unit}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    o.product.name
+                  )}
+                </td>
+                <td className="px-4 py-3 text-right font-mono text-slate-700 hidden md:table-cell">
+                  {o.lines && o.lines.length > 1
+                    ? <span className="text-slate-400 text-xs">see products</span>
+                    : <>{Number(o.weight).toFixed(3)} {o.product.unit}</>
+                  }
+                </td>
                 <td className="px-4 py-3 text-center"><StatusBadge status={o.status} /></td>
                 <td className="px-4 py-3 text-slate-500 hidden xl:table-cell">{o.operator.fullName}</td>
                 <td className="px-4 py-3">
@@ -210,9 +234,28 @@ export default function ScaleOrdersPage() {
               <DetailRow label="Status"    value={<StatusBadge status={detail.status} />} />
               <DetailRow label="Date/Time" value={new Date(detail.createdAt).toLocaleString('en-ZA')} />
               <DetailRow label="Customer"  value={`${customerName(detail)} — ${customerContact(detail)}`} />
-              <DetailRow label="Category"  value={detail.product.category.name} />
-              <DetailRow label="Product"   value={detail.product.name} />
-              <DetailRow label="Weight"    value={`${Number(detail.weight).toFixed(3)} ${detail.product.unit}`} />
+              {detail.lines && detail.lines.length > 1 ? (
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Products</p>
+                  <div className="space-y-1.5">
+                    {detail.lines.map((l, i) => (
+                      <div key={i} className="flex justify-between items-baseline text-sm">
+                        <div>
+                          <span className="text-slate-800 font-medium">{l.product.name}</span>
+                          {l.product.category && <span className="text-xs text-slate-400 ml-1.5">({l.product.category.name})</span>}
+                        </div>
+                        <span className="font-mono text-slate-700">{Number(l.weight).toFixed(3)} {l.product.unit}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <DetailRow label="Category" value={detail.product.category.name} />
+                  <DetailRow label="Product"  value={detail.product.name} />
+                  <DetailRow label="Weight"   value={`${Number(detail.weight).toFixed(3)} ${detail.product.unit}`} />
+                </>
+              )}
               <DetailRow label="Operator"  value={detail.operator.fullName} />
               {detail.notes     && <DetailRow label="Notes"       value={detail.notes} />}
               {detail.voidReason && <DetailRow label="Void Reason" value={detail.voidReason} />}
