@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, ModalTitleBar } from '@/components/ui/dialog'
 import { ArrowLeft, Ban, Loader2, Plus, Printer, Camera, FileText } from 'lucide-react'
 import { toast } from 'sonner'
 import { useSession } from 'next-auth/react'
@@ -316,10 +316,8 @@ function VoidModal({ purchase, onClose, onSuccess }: { purchase: Purchase; onClo
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="text-red-600">Void Purchase</DialogTitle>
-        </DialogHeader>
+      <DialogContent className="sm:max-w-md" showCloseButton={false}>
+        <ModalTitleBar title="Void Purchase" onClose={onClose} />
         <div className="space-y-4 mt-2">
           <p className="text-sm text-gray-600">
             You are about to void <span className="font-semibold">{purchase.refNumber}</span> (R {Number(purchase.totalAmount).toFixed(2)}).

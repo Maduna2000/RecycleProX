@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Loader2, CreditCard } from 'lucide-react'
 import { toast } from 'sonner'
 import Decimal from 'decimal.js'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, ModalTitleBar } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 
@@ -66,10 +66,8 @@ export function ProcessPaymentModal({
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-sm">
-        <DialogHeader>
-          <DialogTitle style={{ color: '#212529' }}>Process Payment</DialogTitle>
-        </DialogHeader>
+      <DialogContent className="sm:max-w-sm" showCloseButton={false}>
+        <ModalTitleBar title="Process Payment" onClose={onClose} />
         <div className="space-y-4 mt-2">
           {/* Balance summary */}
           <div className="px-3 py-2.5 rounded-lg space-y-1" style={{ background: '#F8F9FA', border: '1px solid #E0E0E0' }}>

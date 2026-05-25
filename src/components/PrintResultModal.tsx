@@ -1,6 +1,6 @@
 'use client'
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, ModalTitleBar } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Printer, FileText, CheckCircle, Plus, ExternalLink } from 'lucide-react'
 import { toast } from 'sonner'
@@ -41,13 +41,8 @@ export function PrintResultModal({ type, id, refNumber, onClose, onViewPurchase,
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-sm">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <CheckCircle className="w-5 h-5 text-green-600" />
-            {type === 'purchase' ? 'Purchase' : 'Sale'} Complete
-          </DialogTitle>
-        </DialogHeader>
+      <DialogContent className="sm:max-w-sm" showCloseButton={false}>
+        <ModalTitleBar title={`${type === 'purchase' ? 'Purchase' : 'Sale'} Complete`} onClose={onClose} />
 
         <div className="space-y-4 mt-2">
           <div className="text-center py-2 bg-green-50 rounded-lg border border-green-100">

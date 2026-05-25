@@ -9,7 +9,7 @@ import { toast } from 'sonner'
 import Decimal from 'decimal.js'
 import { DataTable, StatusBadge, Avatar, type Column, type RowAction, type SortDir } from '@/components/ui/DataTable'
 import { InlineDetailPanel } from '@/components/ui/InlineDetailPanel'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, ModalTitleBar } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -429,10 +429,8 @@ function VoidDialog({
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle style={{ color: colors.danger }}>Void Purchase</DialogTitle>
-        </DialogHeader>
+      <DialogContent className="sm:max-w-md" showCloseButton={false}>
+        <ModalTitleBar title="Void Purchase" onClose={onClose} />
         <div className="space-y-4 mt-2">
           <p className="text-sm" style={{ color: colors.textSecondary }}>
             You are about to void{' '}

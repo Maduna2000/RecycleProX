@@ -166,7 +166,7 @@ export default function Step1Customer({ onSelect }: Props) {
           </div>
 
           <div>
-            <label className="text-sm font-medium text-slate-700 block mb-1">National ID / Passport <span className="text-slate-400 font-normal">(optional)</span></label>
+            <label className="text-sm font-medium text-slate-700 block mb-1">National ID / Passport</label>
             <input
               {...form.register('idNumber')}
               autoComplete="off"

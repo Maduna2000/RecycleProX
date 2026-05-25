@@ -5,7 +5,7 @@ import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { XIcon } from "lucide-react"
+import { XIcon, Minus, X } from "lucide-react"
 
 function Dialog({ ...props }: DialogPrimitive.Root.Props) {
   return <DialogPrimitive.Root data-slot="dialog" {...props} />
@@ -146,6 +146,40 @@ function DialogDescription({
   )
 }
 
+function ModalTitleBar({ title, onClose }: { title: React.ReactNode; onClose: () => void }) {
+  return (
+    <div
+      className="-mx-4 -mt-4 mb-2 flex items-center justify-between px-3 select-none"
+      style={{
+        height: 28,
+        background: 'rgba(27,58,107,0.05)',
+        borderBottom: '1px solid rgba(0,0,0,0.07)',
+        borderRadius: '12px 12px 0 0',
+      }}
+    >
+      <span className="text-[12px] font-semibold text-[#374151]">{title}</span>
+      <div className="flex items-center gap-0.5">
+        <button
+          onClick={onClose}
+          title="Dismiss"
+          aria-label="Dismiss"
+          className="w-7 h-7 flex items-center justify-center rounded text-[#6B7280] hover:text-[#374151] hover:bg-black/5 transition-colors"
+        >
+          <Minus className="w-3.5 h-3.5" />
+        </button>
+        <button
+          onClick={onClose}
+          title="Close"
+          aria-label="Close"
+          className="w-7 h-7 flex items-center justify-center rounded text-[#6B7280] hover:text-red-600 hover:bg-red-50 transition-colors"
+        >
+          <X className="w-3.5 h-3.5" />
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export {
   Dialog,
   DialogClose,
@@ -157,4 +191,5 @@ export {
   DialogPortal,
   DialogTitle,
   DialogTrigger,
+  ModalTitleBar,
 }
