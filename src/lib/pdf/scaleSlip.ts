@@ -66,7 +66,7 @@ export async function generateScaleOrderSlip(data: ScaleSlipData): Promise<Uint8
   // Product(s) section — one block per line
   if (multiLine) {
     h += LINE_H - 2                      // PRODUCTS label
-    for (const _line of data.lines) {
+    for (let i = 0; i < data.lines.length; i++) {
       h += LINE_H - 1                    // product name
       h += LINE_H - 1                    // category
       h += LINE_H + 2                    // WEIGHT row
