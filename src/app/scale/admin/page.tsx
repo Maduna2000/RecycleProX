@@ -39,7 +39,11 @@ async function RecentOrders() {
           {orders.map(o => (
             <tr key={o.id} className="hover:bg-slate-50 transition-colors">
               <td className="px-4 py-3 font-mono text-xs text-slate-700">{o.orderNumber}</td>
-              <td className="px-4 py-3 text-slate-800">{o.customer.firstName} {o.customer.lastName}</td>
+              <td className="px-4 py-3 text-slate-800">
+                {o.customer
+                  ? `${o.customer.firstName} ${o.customer.lastName}`
+                  : `${o.casualFirstName ?? ''} ${o.casualLastName ?? ''}`.trim() || 'Walk-in'}
+              </td>
               <td className="px-4 py-3 text-slate-600 hidden md:table-cell">{o.product.name}</td>
               <td className="px-4 py-3 text-right text-slate-600 hidden sm:table-cell font-mono">{Number(o.weight).toFixed(3)} {o.product.unit}</td>
               <td className="px-4 py-3 text-center">
