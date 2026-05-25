@@ -81,36 +81,55 @@ export async function createScaleOrder(data: CreateScaleOrderInput, operatorId: 
     if (!customer) throw new ScaleCustomerNotFoundError()
   }
 
-  const product = await prisma.scaleProduct.findUnique({ where: { id: data.productId } })
-  if (!product || !product.isActive) throw new ScaleProductInactiveError()
+  for (const line of data.lines) {
+    const product = await prisma.scaleProduct.findUnique({ where: { id: line.productId } })
+    if (!product || !product.isActive) throw new ScaleProductInactiveError()
+  }
 
-  const weight = new Decimal(data.weight)
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+  const firstLine   = data.lines[0]!
+  const firstWeight = new Decimal(firstLine.weight)
 
   const order = await prisma.$transaction(async (tx) => {
     const orderNumber = await generateOrderNumber(tx, new Date())
-    return tx.scaleOrder.create({
+    const created = await tx.scaleOrder.create({
       data: {
         orderNumber,
         customerId:      data.customerId ?? null,
         casualFirstName: data.customerId ? null : (data.casualFirstName ?? null),
         casualLastName:  data.customerId ? null : (data.casualLastName  ?? null),
         casualPhone:     data.customerId ? null : (data.casualPhone     ?? null),
-        productId:       data.productId,
-        weight:          weight.toDecimalPlaces(3),
-        photoR2Keys:     data.photoR2Keys,
+        productId:       firstLine.productId,
+        weight:          firstWeight.toDecimalPlaces(3),
+        photoR2Keys:     firstLine.photoR2Keys,
+        lineCount:       data.lines.length,
         status:          'pending',
         operatorId,
         notes:           data.notes,
       },
+    })
+
+    await tx.scaleOrderLine.createMany({
+      data: data.lines.map(line => ({
+        orderId:     created.id,
+        productId:   line.productId,
+        weight:      new Decimal(line.weight).toDecimalPlaces(3),
+        photoR2Keys: line.photoR2Keys,
+      })),
+    })
+
+    return tx.scaleOrder.findUniqueOrThrow({
+      where:   { id: created.id },
       include: {
         customer: true,
         product:  { include: { category: true } },
         operator: true,
+        lines:    { include: { product: { include: { category: true } } }, orderBy: { createdAt: 'asc' } },
       },
     })
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
 
-  logger.info({ orderId: order.id, orderNumber: order.orderNumber, operatorId }, 'scaleOrder.created')
+  logger.info({ orderId: order.id, orderNumber: order.orderNumber, operatorId, lineCount: data.lines.length }, 'scaleOrder.created')
   return order
 }
 
@@ -231,6 +250,7 @@ export async function getScaleOrderById(id: string) {
       product:  { include: { category: true } },
       operator: { select: { id: true, fullName: true } },
       voidedBy: { select: { id: true, fullName: true } },
+      lines:    { include: { product: { include: { category: true } } }, orderBy: { createdAt: 'asc' } },
     },
   })
   if (!order) throw new ScaleOrderNotFoundError(id)

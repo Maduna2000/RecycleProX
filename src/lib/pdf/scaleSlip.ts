@@ -1,18 +1,22 @@
 /**
  * Scale Order Slip — 80 mm receipt-style PDF.
- * Shows order number, customer, product, weight. NO price.
+ * Shows order number, customer, products with weights. NO price.
  * Server-side only.
  */
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
+
+export interface ScaleSlipLine {
+  productName:  string
+  categoryName: string
+  weight:       string  // formatted string e.g. "12.750 kg"
+}
 
 export interface ScaleSlipData {
   orderNumber:   string
   createdAt:     Date
   customerName:  string
   customerPhone: string
-  productName:   string
-  categoryName:  string
-  weight:        string   // formatted string e.g. "12.750 kg"
+  lines:         ScaleSlipLine[]
   operatorName:  string
   yardName:      string
 }
@@ -42,7 +46,9 @@ export async function generateScaleOrderSlip(data: ScaleSlipData): Promise<Uint8
   const bold = await doc.embedFont(StandardFonts.HelveticaBold)
   const reg  = await doc.embedFont(StandardFonts.Helvetica)
 
-  // Exact height — each line mirrors the y-decrement operations below
+  const multiLine = data.lines.length > 1
+
+  // Calculate dynamic height
   let h = 14                             // y starts at h-14
   h += HUGE + 2                          // yard name
   h += LINE_H + 4                        // slip title
@@ -57,10 +63,21 @@ export async function generateScaleOrderSlip(data: ScaleSlipData): Promise<Uint8
   h += LINE_H + 4                        // phone
   h += 8                                 // divider gap
 
-  h += LINE_H - 2                        // PRODUCT label
-  h += LINE_H - 1                        // product name
-  h += LINE_H + 1                        // category
-  h += LINE_H + 4                        // WEIGHT row
+  // Product(s) section — one block per line
+  if (multiLine) {
+    h += LINE_H - 2                      // PRODUCTS label
+    for (const line of data.lines) {
+      h += LINE_H - 1                    // product name
+      h += LINE_H - 1                    // category
+      h += LINE_H + 2                    // WEIGHT row
+      h += 4                             // gap between items
+    }
+  } else {
+    h += LINE_H - 2                      // PRODUCT label
+    h += LINE_H - 1                      // product name
+    h += LINE_H + 1                      // category
+    h += LINE_H + 4                      // WEIGHT row
+  }
   h += 8                                 // divider gap
 
   h += LINE_H + 8                        // operator
@@ -121,17 +138,35 @@ export async function generateScaleOrderSlip(data: ScaleSlipData): Promise<Uint8
   y -= LINE_H + 4
   drawDivider(y); y -= 8
 
-  // ── Product & Weight ───────────────────────────────────────────────────────
-  drawText('PRODUCT', { size: SMALL, font: bold, color: GRAY })
-  y -= LINE_H - 2
-  drawText(data.productName, { size: NORMAL, font: bold })
-  y -= LINE_H - 1
-  drawText(`Category: ${data.categoryName}`, { size: SMALL, color: GRAY })
-  y -= LINE_H + 1
+  // ── Product(s) & Weight(s) ─────────────────────────────────────────────────
+  if (multiLine) {
+    drawText(`PRODUCTS (${data.lines.length})`, { size: SMALL, font: bold, color: GRAY })
+    y -= LINE_H - 2
 
-  drawText('WEIGHT', { size: SMALL, font: bold, color: GRAY })
-  drawText(data.weight, { size: LARGE, font: bold, align: 'right' })
-  y -= LINE_H + 4
+    data.lines.forEach((line, i) => {
+      drawText(`${i + 1}. ${line.productName}`, { size: NORMAL, font: bold })
+      y -= LINE_H - 1
+      drawText(`   ${line.categoryName}`, { size: SMALL, color: GRAY })
+      y -= LINE_H - 1
+      drawText('WEIGHT', { size: SMALL, font: bold, color: GRAY })
+      drawText(line.weight, { size: LARGE, font: bold, align: 'right' })
+      y -= LINE_H + 2
+      if (i < data.lines.length - 1) y -= 4
+    })
+  } else {
+    const line = data.lines[0]!
+    drawText('PRODUCT', { size: SMALL, font: bold, color: GRAY })
+    y -= LINE_H - 2
+    drawText(line.productName, { size: NORMAL, font: bold })
+    y -= LINE_H - 1
+    drawText(`Category: ${line.categoryName}`, { size: SMALL, color: GRAY })
+    y -= LINE_H + 1
+
+    drawText('WEIGHT', { size: SMALL, font: bold, color: GRAY })
+    drawText(line.weight, { size: LARGE, font: bold, align: 'right' })
+    y -= LINE_H + 4
+  }
+
   drawDivider(y); y -= 8
 
   // ── Operator ───────────────────────────────────────────────────────────────

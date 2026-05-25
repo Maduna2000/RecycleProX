@@ -16,16 +16,24 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     const settings = await getAllSettings()
     const yardName = settings.yard_name ?? settings.company_name ?? 'Renovo Pro'
 
-    const weight = new Decimal(order.weight.toString()).toFixed(3)
+    const slipLines = order.lines.length > 0
+      ? order.lines.map(l => ({
+          productName:  l.product.name,
+          categoryName: l.product.category.name,
+          weight:       `${new Decimal(l.weight.toString()).toFixed(3)} ${l.product.unit}`,
+        }))
+      : [{
+          productName:  order.product.name,
+          categoryName: order.product.category.name,
+          weight:       `${new Decimal(order.weight.toString()).toFixed(3)} ${order.product.unit}`,
+        }]
 
     const pdfBytes = await generateScaleOrderSlip({
       orderNumber:   order.orderNumber,
       createdAt:     order.createdAt,
       customerName:  resolveCustomerName(order),
       customerPhone: resolveCustomerPhone(order),
-      productName:   order.product.name,
-      categoryName:  order.product.category.name,
-      weight:        `${weight} ${order.product.unit}`,
+      lines:         slipLines,
       operatorName:  order.operator.fullName,
       yardName,
     })

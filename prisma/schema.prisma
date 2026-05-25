@@ -804,8 +804,9 @@ model ScaleProduct {
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
 
-  category   ScaleCategory @relation(fields: [categoryId], references: [id])
+  category   ScaleCategory  @relation(fields: [categoryId], references: [id])
   orders     ScaleOrder[]
+  orderLines ScaleOrderLine[]
 
   @@index([categoryId])
 }
@@ -820,6 +821,7 @@ model ScaleOrder {
   productId       String
   weight          Decimal          @db.Decimal(18, 3)
   photoR2Keys     String[]
+  lineCount       Int              @default(1)
   slipR2Key       String?
   status          ScaleOrderStatus @default(pending)
   operatorId      String
@@ -830,14 +832,29 @@ model ScaleOrder {
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
-  customer   Customer?     @relation(fields: [customerId], references: [id])
-  product    ScaleProduct  @relation(fields: [productId], references: [id])
-  operator   User          @relation("ScaleOrderOperator", fields: [operatorId], references: [id])
-  voidedBy   User?         @relation("ScaleOrderVoidedBy", fields: [voidedById], references: [id])
+  customer   Customer?       @relation(fields: [customerId], references: [id])
+  product    ScaleProduct    @relation(fields: [productId], references: [id])
+  operator   User            @relation("ScaleOrderOperator", fields: [operatorId], references: [id])
+  voidedBy   User?           @relation("ScaleOrderVoidedBy", fields: [voidedById], references: [id])
+  lines      ScaleOrderLine[]
 
   @@index([customerId])
   @@index([productId])
   @@index([operatorId])
   @@index([status])
   @@index([createdAt])
+}
+
+model ScaleOrderLine {
+  id          String       @id @default(uuid())
+  orderId     String
+  order       ScaleOrder   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId   String
+  product     ScaleProduct @relation(fields: [productId], references: [id])
+  weight      Decimal      @db.Decimal(18, 3)
+  photoR2Keys String[]
+  createdAt   DateTime     @default(now())
+
+  @@index([orderId])
+  @@index([productId])
 }

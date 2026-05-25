@@ -9,8 +9,8 @@ import { Search, UserPlus, Users, ArrowRight, Loader2, AlertCircle } from 'lucid
 const CasualSchema = z.object({
   firstName: z.string().min(1, 'Required'),
   lastName:  z.string().min(1, 'Required'),
-  phone:     z.string().min(7, 'Enter a valid phone number'),
-  idNumber:  z.string().optional(),
+  phone:     z.string().regex(/^[72]\d{7}$/, 'Must be 8 digits, starting with 7 (mobile) or 2 (landline)'),
+  idNumber:  z.string().optional().refine(v => !v || /^\d{13}$/.test(v), 'Must be exactly 13 digits'),
   address:   z.string().optional(),
 })
 
@@ -158,7 +158,7 @@ export default function Step1Customer({ onSelect }: Props) {
               inputMode="tel"
               autoComplete="tel"
               className="w-full border border-slate-300 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              placeholder="+27 82 123 4567"
+              placeholder="76123456"
             />
             {form.formState.errors.phone && (
               <p className="text-red-500 text-xs mt-1">{form.formState.errors.phone.message}</p>
@@ -171,7 +171,7 @@ export default function Step1Customer({ onSelect }: Props) {
               {...form.register('idNumber')}
               autoComplete="off"
               className="w-full border border-slate-300 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              placeholder="e.g. A123456 or 9001015009087"
+              placeholder="13-digit national ID (optional)"
             />
           </div>
 
