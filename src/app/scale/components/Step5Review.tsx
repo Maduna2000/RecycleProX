@@ -25,10 +25,14 @@ export default function Step5Review({ customer, product, weight, photoR2Keys, on
 
     try {
       // Create the order
+      const payload = customer.id
+        ? { customerId: customer.id, productId: product.id, weight, photoR2Keys }
+        : { casualFirstName: customer.firstName, casualLastName: customer.lastName, casualPhone: customer.phone, productId: product.id, weight, photoR2Keys }
+
       const res = await fetch('/api/scale/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ customerId: customer.id, productId: product.id, weight, photoR2Keys }),
+        body: JSON.stringify(payload),
       })
       if (!res.ok) {
         const err = await res.json()

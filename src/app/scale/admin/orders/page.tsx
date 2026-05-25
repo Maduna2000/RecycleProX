@@ -7,10 +7,20 @@ import { StatusBadge } from '../components/StatusBadge'
 
 interface Order {
   id: string; orderNumber: string; createdAt: string
-  customer: { firstName: string; lastName: string; phone: string }
+  customer: { firstName: string; lastName: string; phone: string } | null
+  casualFirstName?: string | null; casualLastName?: string | null; casualPhone?: string | null
   product:  { name: string; unit: string; category: { name: string } }
   weight: string; status: string; operator: { fullName: string }
   photoUrls?: string[]; slipUrl?: string; notes?: string; voidReason?: string
+}
+
+function customerName(o: Order): string {
+  if (o.customer) return `${o.customer.firstName} ${o.customer.lastName}`
+  return `${o.casualFirstName ?? ''} ${o.casualLastName ?? ''}`.trim() || 'Walk-in'
+}
+
+function customerContact(o: Order): string {
+  return o.customer?.phone ?? o.casualPhone ?? ''
 }
 
 interface Filters {
@@ -125,7 +135,7 @@ export default function ScaleOrdersPage() {
                   {new Date(o.createdAt).toLocaleDateString('en-ZA')}<br />
                   {new Date(o.createdAt).toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' })}
                 </td>
-                <td className="px-4 py-3 text-slate-800">{o.customer.firstName} {o.customer.lastName}</td>
+                <td className="px-4 py-3 text-slate-800">{customerName(o)}</td>
                 <td className="px-4 py-3 text-slate-600 hidden lg:table-cell">{o.product.name}</td>
                 <td className="px-4 py-3 text-right font-mono text-slate-700 hidden md:table-cell">{Number(o.weight).toFixed(3)} {o.product.unit}</td>
                 <td className="px-4 py-3 text-center"><StatusBadge status={o.status} /></td>
@@ -199,7 +209,7 @@ export default function ScaleOrdersPage() {
             <div className="space-y-3 text-sm">
               <DetailRow label="Status"    value={<StatusBadge status={detail.status} />} />
               <DetailRow label="Date/Time" value={new Date(detail.createdAt).toLocaleString('en-ZA')} />
-              <DetailRow label="Customer"  value={`${detail.customer.firstName} ${detail.customer.lastName} — ${detail.customer.phone}`} />
+              <DetailRow label="Customer"  value={`${customerName(detail)} — ${customerContact(detail)}`} />
               <DetailRow label="Category"  value={detail.product.category.name} />
               <DetailRow label="Product"   value={detail.product.name} />
               <DetailRow label="Weight"    value={`${Number(detail.weight).toFixed(3)} ${detail.product.unit}`} />

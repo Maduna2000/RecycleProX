@@ -55,11 +55,31 @@ async function generateOrderNumber(tx: TxClient, date: Date): Promise<string> {
   return `${prefix}-${String(count + 1).padStart(4, '0')}`
 }
 
+// ─── Customer display helpers ─────────────────────────────────────────────────
+
+type OrderWithCustomer = {
+  customer:        { firstName: string; lastName: string; phone: string } | null
+  casualFirstName: string | null
+  casualLastName:  string | null
+  casualPhone:     string | null
+}
+
+export function resolveCustomerName(o: OrderWithCustomer): string {
+  if (o.customer) return `${o.customer.firstName} ${o.customer.lastName}`
+  return `${o.casualFirstName ?? ''} ${o.casualLastName ?? ''}`.trim() || 'Walk-in'
+}
+
+export function resolveCustomerPhone(o: OrderWithCustomer): string {
+  return o.customer?.phone ?? o.casualPhone ?? ''
+}
+
 // ─── Create ───────────────────────────────────────────────────────────────────
 
 export async function createScaleOrder(data: CreateScaleOrderInput, operatorId: string) {
-  const customer = await prisma.customer.findUnique({ where: { id: data.customerId } })
-  if (!customer) throw new ScaleCustomerNotFoundError()
+  if (data.customerId) {
+    const customer = await prisma.customer.findUnique({ where: { id: data.customerId } })
+    if (!customer) throw new ScaleCustomerNotFoundError()
+  }
 
   const product = await prisma.scaleProduct.findUnique({ where: { id: data.productId } })
   if (!product || !product.isActive) throw new ScaleProductInactiveError()
@@ -71,13 +91,16 @@ export async function createScaleOrder(data: CreateScaleOrderInput, operatorId: 
     return tx.scaleOrder.create({
       data: {
         orderNumber,
-        customerId:  data.customerId,
-        productId:   data.productId,
-        weight:      weight.toDecimalPlaces(3),
-        photoR2Keys: data.photoR2Keys,
-        status:      'pending',
+        customerId:      data.customerId ?? null,
+        casualFirstName: data.customerId ? null : (data.casualFirstName ?? null),
+        casualLastName:  data.customerId ? null : (data.casualLastName  ?? null),
+        casualPhone:     data.customerId ? null : (data.casualPhone     ?? null),
+        productId:       data.productId,
+        weight:          weight.toDecimalPlaces(3),
+        photoR2Keys:     data.photoR2Keys,
+        status:          'pending',
         operatorId,
-        notes:       data.notes,
+        notes:           data.notes,
       },
       include: {
         customer: true,
@@ -139,11 +162,24 @@ export async function listScaleOrders(filters: ScaleOrderFilters) {
 
   const where: Prisma.ScaleOrderWhereInput = {}
 
-  if (filters.status)       where.status     = filters.status
-  if (filters.operatorId)   where.operatorId = filters.operatorId
-  if (filters.productId)    where.productId  = filters.productId
-  if (filters.categoryId)   where.product    = { categoryId: filters.categoryId }
-  if (filters.customerType) where.customer   = { customerType: filters.customerType as import('@prisma/client').CustomerType }
+  const andConditions: Prisma.ScaleOrderWhereInput[] = []
+
+  if (filters.status)     where.status     = filters.status
+  if (filters.operatorId) where.operatorId = filters.operatorId
+  if (filters.productId)  where.productId  = filters.productId
+  if (filters.categoryId) where.product    = { categoryId: filters.categoryId }
+
+  if (filters.customerType === 'account') {
+    andConditions.push({ customerId: { not: null } })
+    andConditions.push({ customer: { customerType: 'account' } })
+  } else if (filters.customerType === 'casual') {
+    andConditions.push({
+      OR: [
+        { customerId: null },
+        { customer: { customerType: 'casual' } },
+      ],
+    })
+  }
 
   if (filters.dateFrom || filters.dateTo) {
     where.createdAt = {
@@ -154,12 +190,18 @@ export async function listScaleOrders(filters: ScaleOrderFilters) {
 
   if (filters.search) {
     const s = filters.search.trim()
-    where.OR = [
-      { orderNumber: { contains: s, mode: 'insensitive' } },
-      { customer: { firstName: { contains: s, mode: 'insensitive' } } },
-      { customer: { lastName:  { contains: s, mode: 'insensitive' } } },
-    ]
+    andConditions.push({
+      OR: [
+        { orderNumber:      { contains: s, mode: 'insensitive' } },
+        { casualFirstName:  { contains: s, mode: 'insensitive' } },
+        { casualLastName:   { contains: s, mode: 'insensitive' } },
+        { customer: { firstName: { contains: s, mode: 'insensitive' } } },
+        { customer: { lastName:  { contains: s, mode: 'insensitive' } } },
+      ],
+    })
   }
+
+  if (andConditions.length > 0) where.AND = andConditions
 
   const [orders, total] = await prisma.$transaction([
     prisma.scaleOrder.findMany({

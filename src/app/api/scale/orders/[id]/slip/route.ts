@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
-import { getScaleOrderById, saveSlipKey, ScaleOrderNotFoundError } from '@/lib/services/scaleService'
+import { getScaleOrderById, saveSlipKey, resolveCustomerName, resolveCustomerPhone, ScaleOrderNotFoundError } from '@/lib/services/scaleService'
 import { getAllSettings } from '@/lib/services/settingsService'
 import { generateScaleOrderSlip } from '@/lib/pdf/scaleSlip'
 import { uploadBytes, scaleOrderSlipKey } from '@/lib/r2'
@@ -21,8 +21,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     const pdfBytes = await generateScaleOrderSlip({
       orderNumber:   order.orderNumber,
       createdAt:     order.createdAt,
-      customerName:  `${order.customer.firstName} ${order.customer.lastName}`,
-      customerPhone: order.customer.phone,
+      customerName:  resolveCustomerName(order),
+      customerPhone: resolveCustomerPhone(order),
       productName:   order.product.name,
       categoryName:  order.product.category.name,
       weight:        `${weight} ${order.product.unit}`,

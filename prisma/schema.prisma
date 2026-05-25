@@ -811,23 +811,26 @@ model ScaleProduct {
 }
 
 model ScaleOrder {
-  id          String           @id @default(uuid())
-  orderNumber String           @unique
-  customerId  String
-  productId   String
-  weight      Decimal          @db.Decimal(18, 3)
-  photoR2Keys String[]
-  slipR2Key   String?
-  status      ScaleOrderStatus @default(pending)
-  operatorId  String
-  notes       String?
-  voidedAt    DateTime?
-  voidedById  String?
-  voidReason  String?
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+  id              String           @id @default(uuid())
+  orderNumber     String           @unique
+  customerId      String?
+  casualFirstName String?
+  casualLastName  String?
+  casualPhone     String?
+  productId       String
+  weight          Decimal          @db.Decimal(18, 3)
+  photoR2Keys     String[]
+  slipR2Key       String?
+  status          ScaleOrderStatus @default(pending)
+  operatorId      String
+  notes           String?
+  voidedAt        DateTime?
+  voidedById      String?
+  voidReason      String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
 
-  customer   Customer      @relation(fields: [customerId], references: [id])
+  customer   Customer?     @relation(fields: [customerId], references: [id])
   product    ScaleProduct  @relation(fields: [productId], references: [id])
   operator   User          @relation("ScaleOrderOperator", fields: [operatorId], references: [id])
   voidedBy   User?         @relation("ScaleOrderVoidedBy", fields: [voidedById], references: [id])

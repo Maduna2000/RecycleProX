@@ -17,7 +17,7 @@ const CasualSchema = z.object({
 type CasualForm = z.infer<typeof CasualSchema>
 
 export interface SelectedCustomer {
-  id:        string
+  id:        string | null  // null = walk-in (no Customer row created)
   firstName: string
   lastName:  string
   phone:     string
@@ -34,7 +34,6 @@ export default function Step1Customer({ onSelect }: Props) {
   const [searchResults, setSearchResults] = useState<SelectedCustomer[]>([])
   const [searching, setSearching]     = useState(false)
   const [searchError, setSearchError] = useState<string | null>(null)
-  const [submitting, setSubmitting]   = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const form = useForm<CasualForm>({ resolver: zodResolver(CasualSchema) })
@@ -71,31 +70,8 @@ export default function Step1Customer({ onSelect }: Props) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, searchQuery])
 
-  async function handleCasualSubmit(data: CasualForm) {
-    setSubmitting(true)
-    try {
-      const res = await fetch('/api/customers/quick-create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          firstName:       data.firstName,
-          lastName:        data.lastName,
-          phone:           data.phone,
-          ...(data.idNumber ? { idNumber: data.idNumber } : {}),
-          physicalAddress: data.address,
-        }),
-      })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err.error ?? 'Failed to create customer')
-      }
-      const customer = await res.json()
-      onSelect({ id: customer.id, firstName: customer.firstName, lastName: customer.lastName, phone: customer.phone, isNew: true })
-    } catch (err) {
-      form.setError('root', { message: err instanceof Error ? err.message : 'Failed to save customer. Please try again.' })
-    } finally {
-      setSubmitting(false)
-    }
+  function handleCasualSubmit(data: CasualForm) {
+    onSelect({ id: null, firstName: data.firstName, lastName: data.lastName, phone: data.phone, isNew: true })
   }
 
   // ── Mode: choose ──────────────────────────────────────────────────────────
@@ -208,17 +184,11 @@ export default function Step1Customer({ onSelect }: Props) {
             />
           </div>
 
-          {form.formState.errors.root && (
-            <p className="text-red-500 text-sm bg-red-50 rounded-xl p-3">{form.formState.errors.root.message}</p>
-          )}
-
           <button
             type="submit"
-            disabled={submitting}
-            className="mt-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-lg font-semibold h-14 rounded-xl flex items-center justify-center gap-2 transition-colors"
+            className="mt-2 bg-emerald-600 hover:bg-emerald-700 text-white text-lg font-semibold h-14 rounded-xl flex items-center justify-center gap-2 transition-colors"
           >
-            {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
-            {submitting ? 'Saving...' : 'Continue →'}
+            Continue →
           </button>
         </form>
       </div>

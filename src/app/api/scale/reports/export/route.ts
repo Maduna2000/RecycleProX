@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
-import { getAllScaleOrdersForExport } from '@/lib/services/scaleService'
+import { getAllScaleOrdersForExport, resolveCustomerName, resolveCustomerPhone } from '@/lib/services/scaleService'
 import * as XLSX from 'xlsx'
 import Decimal from 'decimal.js'
 
@@ -29,8 +29,8 @@ export async function GET(req: NextRequest) {
     'Order #':       o.orderNumber,
     'Date':          new Date(o.createdAt).toLocaleDateString('en-ZA'),
     'Time':          new Date(o.createdAt).toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' }),
-    'Customer':      `${o.customer.firstName} ${o.customer.lastName}`,
-    'Phone':         o.customer.phone,
+    'Customer':      resolveCustomerName(o),
+    'Phone':         resolveCustomerPhone(o),
     'Category':      o.product.category.name,
     'Product':       o.product.name,
     'Weight':        new Decimal(o.weight.toString()).toFixed(3),
