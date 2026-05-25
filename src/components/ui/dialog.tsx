@@ -5,7 +5,7 @@ import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { XIcon, Minus, X } from "lucide-react"
+import { XIcon, Minus, X, Loader2 } from "lucide-react"
 
 function Dialog({ ...props }: DialogPrimitive.Root.Props) {
   return <DialogPrimitive.Root data-slot="dialog" {...props} />
@@ -180,6 +180,52 @@ function ModalTitleBar({ title, onClose }: { title: React.ReactNode; onClose: ()
   )
 }
 
+type ModalBtnVariant = 'primary' | 'outline' | 'danger'
+
+function ModalBtn({
+  variant = 'outline', onClick, type = 'button', disabled, loading, icon, children,
+}: {
+  variant?:  ModalBtnVariant
+  onClick?:  () => void
+  type?:     'button' | 'submit'
+  disabled?: boolean
+  loading?:  boolean
+  icon?:     React.ReactNode
+  children:  React.ReactNode
+}) {
+  const base: React.CSSProperties = {
+    display: 'inline-flex', alignItems: 'center', gap: 5,
+    padding: '5px 12px', fontSize: 12, fontWeight: 600,
+    borderRadius: 2, cursor: disabled || loading ? 'not-allowed' : 'pointer',
+    opacity: disabled || loading ? 0.55 : 1, transition: 'background 0.1s',
+    lineHeight: 1.4,
+  }
+  const variants: Record<ModalBtnVariant, React.CSSProperties> = {
+    primary: { background: '#217346', color: '#fff',     border: 'none' },
+    outline: { background: '#fff',     color: '#212529', border: '1px solid #E0E0E0' },
+    danger:  { background: '#DC3545', color: '#fff',     border: 'none' },
+  }
+  const hovers: Record<ModalBtnVariant, string> = {
+    primary: '#185D38',
+    outline: '#F8F9FA',
+    danger:  '#C82333',
+  }
+  const isDisabled = disabled || loading
+  return (
+    <button
+      type={type}
+      onClick={onClick}
+      disabled={isDisabled}
+      style={{ ...base, ...variants[variant] }}
+      onMouseEnter={isDisabled ? undefined : (e) => { (e.currentTarget as HTMLButtonElement).style.background = hovers[variant] }}
+      onMouseLeave={isDisabled ? undefined : (e) => { (e.currentTarget as HTMLButtonElement).style.background = (variants[variant].background as string) }}
+    >
+      {loading ? <Loader2 style={{ width: 13, height: 13, animation: 'spin 1s linear infinite' }} /> : icon}
+      {children}
+    </button>
+  )
+}
+
 export {
   Dialog,
   DialogClose,
@@ -191,5 +237,6 @@ export {
   DialogPortal,
   DialogTitle,
   DialogTrigger,
+  ModalBtn,
   ModalTitleBar,
 }

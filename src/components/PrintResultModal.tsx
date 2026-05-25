@@ -1,26 +1,24 @@
 'use client'
 
-import { Dialog, DialogContent, ModalTitleBar } from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
-import { Printer, FileText, CheckCircle, Plus, ExternalLink } from 'lucide-react'
+import { Dialog, DialogContent, ModalTitleBar, ModalBtn } from '@/components/ui/dialog'
+import { Printer, FileText, CheckCircle2, Plus, ExternalLink, Download } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface PrintResultModalProps {
-  type:             'purchase' | 'sale'
-  id:               string
-  refNumber:        string
-  onClose:          () => void          // "New Purchase/Sale" — primary action
-  onViewPurchase?:  () => void          // "View this transaction" — secondary
-  onDone?:          () => void          // "Done" — go to dashboard
+  type:            'purchase' | 'sale'
+  id:              string
+  refNumber:       string
+  onClose:         () => void
+  onViewPurchase?: () => void
+  onDone?:         () => void
 }
 
 export function PrintResultModal({ type, id, refNumber, onClose, onViewPurchase, onDone }: PrintResultModalProps) {
   const receiptUrl = `/api/${type}s/${id}/receipt?format=pdf`
   const vat264Url  = `/api/purchases/${id}/vat264`
+  const label      = type === 'purchase' ? 'Purchase' : 'Sale'
 
-  function openPdf(url: string) {
-    window.open(url, '_blank')
-  }
+  function openPdf(url: string) { window.open(url, '_blank') }
 
   async function printThermal() {
     try {
@@ -29,70 +27,83 @@ export function PrintResultModal({ type, id, refNumber, onClose, onViewPurchase,
       const blob = await res.blob()
       const url  = URL.createObjectURL(blob)
       const a    = document.createElement('a')
-      a.href = url
-      a.download = `receipt-${refNumber}.bin`
-      a.click()
+      a.href = url; a.download = `receipt-${refNumber}.bin`; a.click()
       URL.revokeObjectURL(url)
       toast.success('Thermal receipt downloaded — send to printer')
-    } catch {
-      toast.error('Failed to download thermal receipt')
-    }
+    } catch { toast.error('Failed to download thermal receipt') }
   }
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="sm:max-w-sm" showCloseButton={false}>
-        <ModalTitleBar title={`${type === 'purchase' ? 'Purchase' : 'Sale'} Complete`} onClose={onClose} />
+        <ModalTitleBar title={`${label} Complete`} onClose={onClose} />
 
-        <div className="space-y-4 mt-2">
-          <div className="text-center py-2 bg-green-50 rounded-lg border border-green-100">
-            <p className="text-xs text-gray-500 uppercase tracking-wide">Reference</p>
-            <p className="text-xl font-bold font-mono text-gray-900 mt-0.5">{refNumber}</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4 }}>
+
+          {/* Reference panel */}
+          <div style={{ background: '#F8F9FA', border: '1px solid #E0E0E0', borderRadius: 3, padding: '8px 12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 5 }}>
+              <CheckCircle2 style={{ width: 13, height: 13, color: '#217346', flexShrink: 0 }} />
+              <span style={{ fontSize: 11, fontWeight: 600, color: '#217346' }}>Transaction recorded successfully</span>
+            </div>
+            <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#6C757D', marginBottom: 2 }}>Reference Number</div>
+            <div style={{ fontSize: 15, fontFamily: 'monospace', fontWeight: 700, color: '#1B3A6B' }}>{refNumber}</div>
           </div>
 
-          <p className="text-sm text-gray-500 text-center">Print a receipt before starting the next transaction.</p>
+          <p style={{ fontSize: 11, color: '#6C757D', textAlign: 'center', margin: 0 }}>
+            Print a receipt before starting the next transaction.
+          </p>
 
-          <div className="space-y-2">
-            <Button className="w-full bg-green-600 hover:bg-green-700" onClick={() => openPdf(receiptUrl)}>
-              <Printer className="w-4 h-4 mr-2" /> Print PDF Slip
-            </Button>
-
-            <Button variant="outline" className="w-full" onClick={printThermal}>
-              <Printer className="w-4 h-4 mr-2" /> Download Thermal Receipt
-            </Button>
-
+          {/* Print / download actions */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+            <button
+              onClick={() => openPdf(receiptUrl)}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%', padding: '6px 12px', background: '#217346', color: '#fff', border: 'none', borderRadius: 2, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#185D38' }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#217346' }}
+            >
+              <Printer style={{ width: 13, height: 13 }} /> Print PDF Slip
+            </button>
+            <button
+              onClick={printThermal}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%', padding: '6px 12px', background: '#fff', color: '#212529', border: '1px solid #E0E0E0', borderRadius: 2, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#F8F9FA' }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#fff' }}
+            >
+              <Download style={{ width: 13, height: 13 }} /> Download Thermal Receipt
+            </button>
             {type === 'purchase' && (
-              <Button
-                variant="outline"
-                className="w-full border-blue-200 text-blue-700 hover:bg-blue-50"
+              <button
                 onClick={() => openPdf(vat264Url)}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%', padding: '6px 12px', background: '#fff', color: '#212529', border: '1px solid #E0E0E0', borderRadius: 2, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#F8F9FA' }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#fff' }}
               >
-                <FileText className="w-4 h-4 mr-2" /> Download VAT264
-              </Button>
+                <FileText style={{ width: 13, height: 13 }} /> Download VAT264
+              </button>
             )}
           </div>
 
-          <div className="border-t pt-3 flex items-center justify-between gap-2">
-            {onViewPurchase && (
-              <Button variant="ghost" size="sm" className="text-gray-500" onClick={onViewPurchase}>
-                <ExternalLink className="w-3.5 h-3.5 mr-1" /> View Transaction
-              </Button>
-            )}
-            <div className="ml-auto flex items-center gap-2">
-              {onDone && (
-                <Button variant="outline" size="sm" onClick={onDone}>
-                  <CheckCircle className="w-3.5 h-3.5 mr-1" /> Done
-                </Button>
-              )}
-              <Button
-                className="bg-green-600 hover:bg-green-700 min-w-[140px]"
-                onClick={onClose}
+          {/* Footer */}
+          <div style={{ borderTop: '1px solid #E0E0E0', paddingTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+            {onViewPurchase ? (
+              <button
+                onClick={onViewPurchase}
+                style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#6C757D', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 6px', borderRadius: 2 }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = '#212529' }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = '#6C757D' }}
               >
-                <Plus className="w-4 h-4 mr-1.5" />
-                {type === 'purchase' ? 'New Purchase' : 'New Sale'}
-              </Button>
+                <ExternalLink style={{ width: 12, height: 12 }} /> View Transaction
+              </button>
+            ) : <span />}
+            <div style={{ display: 'flex', gap: 6 }}>
+              {onDone && <ModalBtn variant="outline" onClick={onDone}>Done</ModalBtn>}
+              <ModalBtn variant="primary" icon={<Plus style={{ width: 13, height: 13 }} />} onClick={onClose}>
+                New {label}
+              </ModalBtn>
             </div>
           </div>
+
         </div>
       </DialogContent>
     </Dialog>

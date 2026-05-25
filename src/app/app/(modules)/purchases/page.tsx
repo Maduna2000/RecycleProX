@@ -9,8 +9,7 @@ import { toast } from 'sonner'
 import Decimal from 'decimal.js'
 import { DataTable, StatusBadge, Avatar, type Column, type RowAction, type SortDir } from '@/components/ui/DataTable'
 import { InlineDetailPanel } from '@/components/ui/InlineDetailPanel'
-import { Dialog, DialogContent, ModalTitleBar } from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, ModalTitleBar, ModalBtn } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { format } from '@/lib/utils/format'
@@ -448,16 +447,10 @@ function VoidDialog({
             />
           </div>
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
-            <Button
-              variant="destructive"
-              onClick={onConfirm}
-              disabled={loading || reason.trim().length < 5}
-            >
-              {loading
-                ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Voiding…</>
-                : 'Confirm Void'}
-            </Button>
+            <ModalBtn onClick={onClose} disabled={loading}>Cancel</ModalBtn>
+            <ModalBtn variant="danger" onClick={onConfirm} disabled={loading || reason.trim().length < 5} loading={loading}>
+              Confirm Void
+            </ModalBtn>
           </div>
         </div>
       </DialogContent>

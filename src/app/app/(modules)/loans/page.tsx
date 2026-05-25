@@ -8,8 +8,7 @@ import { toast } from 'sonner'
 import Decimal from 'decimal.js'
 import { DataTable, Avatar, StatusBadge, type Column, type RowAction } from '@/components/ui/DataTable'
 import { InlineDetailPanel } from '@/components/ui/InlineDetailPanel'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, ModalTitleBar, ModalBtn } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -433,8 +432,8 @@ function NewLoanDialog({ onClose, onSuccess }: { onClose: () => void; onSuccess:
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader><DialogTitle>New Loan Advance</DialogTitle></DialogHeader>
+      <DialogContent className="max-w-lg" showCloseButton={false}>
+        <ModalTitleBar title="New Loan Advance" onClose={onClose} />
         <div className="space-y-4 pt-2">
           <div>
             <Label className="mb-1 block">Customer</Label>
@@ -463,10 +462,10 @@ function NewLoanDialog({ onClose, onSuccess }: { onClose: () => void; onSuccess:
             <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="mt-1" />
           </div>
           <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
-            <Button style={{ background: colors.action }} className="hover:opacity-90" onClick={onSubmit} disabled={loading || !customer || !amount}>
-              {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Creating…</> : 'Create Loan'}
-            </Button>
+            <ModalBtn onClick={onClose} disabled={loading}>Cancel</ModalBtn>
+            <ModalBtn variant="primary" onClick={onSubmit} disabled={loading || !customer || !amount} loading={loading}>
+              Create Loan
+            </ModalBtn>
           </div>
         </div>
       </DialogContent>
@@ -496,8 +495,8 @@ function RepayDialog({ loan, onClose, onSuccess }: { loan: Loan; onClose: () => 
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="max-w-md">
-        <DialogHeader><DialogTitle>Record Repayment</DialogTitle></DialogHeader>
+      <DialogContent className="max-w-md" showCloseButton={false}>
+        <ModalTitleBar title="Record Repayment" onClose={onClose} />
         <div className="space-y-4 pt-2">
           <div className="rounded-lg p-3 text-sm space-y-1" style={{ background: colors.toolbar, border: `1px solid ${colors.border}` }}>
             <p className="font-medium" style={{ color: colors.textPrimary }}>{loan.customer.firstName} {loan.customer.lastName}</p>
@@ -525,10 +524,10 @@ function RepayDialog({ loan, onClose, onSuccess }: { loan: Loan; onClose: () => 
             <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="mt-1" />
           </div>
           <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
-            <Button style={{ background: colors.action }} className="hover:opacity-90" onClick={onSubmit} disabled={loading || !amount}>
-              {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving…</> : 'Record Repayment'}
-            </Button>
+            <ModalBtn onClick={onClose} disabled={loading}>Cancel</ModalBtn>
+            <ModalBtn variant="primary" onClick={onSubmit} disabled={loading || !amount} loading={loading}>
+              Record Repayment
+            </ModalBtn>
           </div>
         </div>
       </DialogContent>
@@ -556,8 +555,8 @@ function VoidLoanDialog({ loan, onClose, onSuccess }: { loan: Loan; onClose: () 
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="max-w-md">
-        <DialogHeader><DialogTitle style={{ color: colors.danger }}>Void Loan</DialogTitle></DialogHeader>
+      <DialogContent className="max-w-md" showCloseButton={false}>
+        <ModalTitleBar title="Void Loan" onClose={onClose} />
         <div className="space-y-4 pt-2">
           <div className="rounded-lg p-3 text-sm" style={{ background: colors.dangerBg, border: `1px solid ${colors.danger}30` }}>
             <p className="font-medium" style={{ color: colors.danger }}>
@@ -578,10 +577,10 @@ function VoidLoanDialog({ loan, onClose, onSuccess }: { loan: Loan; onClose: () 
             />
           </div>
           <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
-            <Button variant="destructive" onClick={onSubmit} disabled={loading || reason.length < 5}>
-              {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Voiding…</> : 'Void Loan'}
-            </Button>
+            <ModalBtn onClick={onClose} disabled={loading}>Cancel</ModalBtn>
+            <ModalBtn variant="danger" onClick={onSubmit} disabled={loading || reason.length < 5} loading={loading}>
+              Void Loan
+            </ModalBtn>
           </div>
         </div>
       </DialogContent>

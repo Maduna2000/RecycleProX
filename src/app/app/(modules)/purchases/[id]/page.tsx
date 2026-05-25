@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Dialog, DialogContent, ModalTitleBar } from '@/components/ui/dialog'
+import { Dialog, DialogContent, ModalTitleBar, ModalBtn } from '@/components/ui/dialog'
 import { ArrowLeft, Ban, Loader2, Plus, Printer, Camera, FileText } from 'lucide-react'
 import { toast } from 'sonner'
 import { useSession } from 'next-auth/react'
@@ -334,10 +334,10 @@ function VoidModal({ purchase, onClose, onSuccess }: { purchase: Purchase; onClo
             />
           </div>
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
-            <Button variant="destructive" onClick={onConfirm} disabled={loading || reason.trim().length < 5}>
-              {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Voiding...</> : 'Confirm Void'}
-            </Button>
+            <ModalBtn onClick={onClose} disabled={loading}>Cancel</ModalBtn>
+            <ModalBtn variant="danger" onClick={onConfirm} disabled={loading || reason.trim().length < 5} loading={loading}>
+              Confirm Void
+            </ModalBtn>
           </div>
         </div>
       </DialogContent>
