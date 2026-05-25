@@ -40,6 +40,13 @@ export class DuplicatePriceGroupNameError extends Error {
   }
 }
 
+export class ProductInUseError extends Error {
+  constructor(public counts: { purchases: number; sales: number; stock: number }) {
+    super('Product is referenced by existing transactions')
+    this.name = 'ProductInUseError'
+  }
+}
+
 // ─── Product CRUD ─────────────────────────────────────────────────────────────
 
 export async function createProduct(data: CreateProductInput, createdById?: string) {
@@ -99,6 +106,32 @@ export async function updateProduct(id: string, data: UpdateProductInput, update
 
   logger.info({ productId: id, updatedById }, 'product.updated')
   return updated
+}
+
+export async function deleteProduct(id: string) {
+  const product = await prisma.product.findUnique({
+    where: { id },
+    include: {
+      _count: { select: { purchaseLines: true, saleLines: true, stockMovements: true } },
+    },
+  })
+  if (!product) throw new ProductNotFoundError(id)
+
+  const counts = {
+    purchases: product._count.purchaseLines,
+    sales:     product._count.saleLines,
+    stock:     product._count.stockMovements,
+  }
+  if (counts.purchases > 0 || counts.sales > 0 || counts.stock > 0) {
+    throw new ProductInUseError(counts)
+  }
+
+  await prisma.$transaction([
+    prisma.priceHistory.deleteMany({ where: { productId: id } }),
+    prisma.priceGroupProductOverride.deleteMany({ where: { productId: id } }),
+    prisma.product.delete({ where: { id } }),
+  ])
+  logger.info({ productId: id }, 'product.deleted')
 }
 
 export async function listProducts(opts?: { category?: string; isActive?: boolean; search?: string }) {

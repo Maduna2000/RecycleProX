@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { UpdateProductSchema } from '@/lib/schemas/product'
-import { getProduct, updateProduct, ProductNotFoundError } from '@/lib/services/productService'
+import { getProduct, updateProduct, deleteProduct, ProductNotFoundError, ProductInUseError } from '@/lib/services/productService'
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   const session = await auth()
@@ -36,5 +36,23 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     if (err instanceof ProductNotFoundError) return NextResponse.json({ error: err.message }, { status: 404 })
     logger.error({ err }, 'PUT /api/products/[id] failed')
     return NextResponse.json({ error: 'Failed to update product' }, { status: 500 })
+  }
+}
+
+export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+  const session = await auth()
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!['admin', 'manager'].includes(session.user.role)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  try {
+    await deleteProduct(params.id)
+    return NextResponse.json({ ok: true })
+  } catch (err) {
+    if (err instanceof ProductNotFoundError) return NextResponse.json({ error: err.message }, { status: 404 })
+    if (err instanceof ProductInUseError)    return NextResponse.json({ error: 'Product is used in existing transactions and cannot be deleted. Deactivate it instead.' }, { status: 409 })
+    logger.error({ err }, 'DELETE /api/products/[id] failed')
+    return NextResponse.json({ error: 'Failed to delete product' }, { status: 500 })
   }
 }
