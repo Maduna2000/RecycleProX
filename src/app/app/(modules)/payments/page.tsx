@@ -250,11 +250,11 @@ export default function PaymentsPage() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search ref or customer..."
-                className="pl-7 pr-3 py-1 text-xs rounded border bg-white focus:outline-none w-52 border-rpx-border focus:border-rpx-blue"
+                className="pl-7 pr-3 h-7 text-xs rounded border bg-white focus:outline-none w-52 border-[#E0E0E0] focus:border-[#185ABD]"
               />
             </div>
             <select
-              className="border rounded px-2 py-1 text-xs bg-white focus:outline-none border-rpx-border focus:border-rpx-blue"
+              className="h-7 border rounded px-2 text-xs bg-white focus:outline-none border-[#E0E0E0] focus:border-[#185ABD]"
               style={{ color: colors.textPrimary }}
               value={paymentMethod}
               onChange={(e) => setPaymentMethod(e.target.value)}
@@ -269,7 +269,7 @@ export default function PaymentsPage() {
               type="date"
               value={from}
               onChange={(e) => setFrom(e.target.value)}
-              className="border rounded px-2 py-1 text-xs bg-white focus:outline-none border-rpx-border focus:border-rpx-blue"
+              className="h-7 border rounded px-2 text-xs bg-white focus:outline-none border-[#E0E0E0] focus:border-[#185ABD]"
               style={{ color: from ? colors.textPrimary : colors.textSecondary }}
               title="From date"
             />
@@ -277,7 +277,7 @@ export default function PaymentsPage() {
               type="date"
               value={to}
               onChange={(e) => setTo(e.target.value)}
-              className="border rounded px-2 py-1 text-xs bg-white focus:outline-none border-rpx-border focus:border-rpx-blue"
+              className="h-7 border rounded px-2 text-xs bg-white focus:outline-none border-[#E0E0E0] focus:border-[#185ABD]"
               style={{ color: to ? colors.textPrimary : colors.textSecondary }}
               title="To date"
             />
@@ -296,8 +296,8 @@ export default function PaymentsPage() {
             {hasFilters && (
               <button
                 onClick={clearFilters}
-                className="flex items-center gap-1 text-xs hover:text-[#212529] transition-colors"
-                style={{ color: colors.textSecondary }}
+                className="h-7 px-2.5 text-xs flex items-center gap-1 border rounded hover:bg-[#F1F3F4] transition-colors"
+                style={{ borderColor: colors.border, color: colors.textSecondary }}
               >
                 <X className="w-3 h-3" /> Clear
               </button>

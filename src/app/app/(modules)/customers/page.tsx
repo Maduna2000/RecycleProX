@@ -364,14 +364,14 @@ function AccountsList({ onAddCustomer }: { onAddCustomer: () => void }) {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search name, ID, phone…"
-            className="w-full pl-7 pr-3 py-1 text-xs rounded border bg-white focus:outline-none"
+            className="w-full pl-7 pr-3 h-7 text-xs rounded border bg-white focus:outline-none"
             style={{ borderColor: colors.border }}
             onFocus={(e) => (e.currentTarget.style.borderColor = colors.borderFocus)}
             onBlur={(e)  => (e.currentTarget.style.borderColor = colors.border)}
           />
         </div>
         <select
-          className="rounded px-2 py-1 text-xs bg-white focus:outline-none border"
+          className="h-7 rounded px-2 text-xs bg-white focus:outline-none border"
           style={{ color: colors.textPrimary, borderColor: colors.border }}
           value={showBlacklisted}
           onChange={(e) => setShowBlacklisted(e.target.value)}
@@ -381,7 +381,7 @@ function AccountsList({ onAddCustomer }: { onAddCustomer: () => void }) {
           <option value="true">Blacklisted Only</option>
         </select>
         <select
-          className="rounded px-2 py-1 text-xs bg-white focus:outline-none border"
+          className="h-7 rounded px-2 text-xs bg-white focus:outline-none border"
           style={{ color: colors.textPrimary, borderColor: colors.border }}
           value={dealerCategory}
           onChange={(e) => setDealerCategory(e.target.value)}
@@ -393,7 +393,7 @@ function AccountsList({ onAddCustomer }: { onAddCustomer: () => void }) {
           <option value="dealer_3">Dealer 3</option>
         </select>
         <select
-          className="rounded px-2 py-1 text-xs bg-white focus:outline-none border"
+          className="h-7 rounded px-2 text-xs bg-white focus:outline-none border"
           style={{ color: colors.textPrimary, borderColor: colors.border }}
           value={primaryFunction}
           onChange={(e) => setPrimaryFunction(e.target.value)}

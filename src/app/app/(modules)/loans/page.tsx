@@ -248,7 +248,7 @@ export default function LoansPage() {
                 value={activeSearch}
                 onChange={(e) => setActiveSearch(e.target.value)}
                 placeholder="Search by name, ID or ref…"
-                className="pl-7 pr-3 py-1 text-xs rounded border bg-white focus:outline-none w-full border-rpx-border focus:border-rpx-blue"
+                className="pl-7 pr-3 h-7 text-xs rounded border bg-white focus:outline-none w-full border-[#E0E0E0] focus:border-[#185ABD]"
               />
             </div>
           </div>
@@ -349,20 +349,20 @@ export default function LoansPage() {
                 value={histSearch}
                 onChange={(e) => setHistSearch(e.target.value)}
                 placeholder="Search by name, ID or ref…"
-                className="pl-7 pr-3 py-1 text-xs rounded border bg-white focus:outline-none w-56 border-rpx-border focus:border-rpx-blue"
+                className="pl-7 pr-3 h-7 text-xs rounded border bg-white focus:outline-none w-56 border-[#E0E0E0] focus:border-[#185ABD]"
               />
             </div>
             <input
               type="date"
               value={histFrom}
               onChange={(e) => setHistFrom(e.target.value)}
-              className="border rounded px-2 py-1 text-xs bg-white focus:outline-none border-rpx-border focus:border-rpx-blue"
+              className="h-7 border rounded px-2 text-xs bg-white focus:outline-none border-[#E0E0E0] focus:border-[#185ABD]"
             />
             <input
               type="date"
               value={histTo}
               onChange={(e) => setHistTo(e.target.value)}
-              className="border rounded px-2 py-1 text-xs bg-white focus:outline-none border-rpx-border focus:border-rpx-blue"
+              className="h-7 border rounded px-2 text-xs bg-white focus:outline-none border-[#E0E0E0] focus:border-[#185ABD]"
             />
           </div>
           <div className="flex-1 min-h-0">

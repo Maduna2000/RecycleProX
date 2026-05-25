@@ -6,11 +6,12 @@ import { useRouter } from 'next/navigation'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Search, Loader2, Upload, Download, CheckCircle2, AlertCircle, MoreVertical, Eye, ShieldBan, ShieldCheck, UserX, Trash2, UserCheck } from 'lucide-react'
+import { Search, Loader2, Upload, Download, CheckCircle2, AlertCircle, ShieldBan, ShieldCheck, UserX, Trash2, UserCheck, Eye } from 'lucide-react'
 import { toast } from 'sonner'
 import { useSession } from 'next-auth/react'
 import { PageShell } from '@/components/layout/PageShell'
-import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
+import { DataTable, StatusBadge, Column, RowAction } from '@/components/ui/DataTable'
+import { colors, fontSize, layout } from '@/lib/design-tokens'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -21,12 +22,10 @@ type Customer = {
 
 const ALPHA = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
 
-function statusBadge(c: Customer) {
-  if (c.blacklisted)
-    return <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: colors.dangerBg, color: colors.danger }}>Blacklisted</span>
-  if (c.isActive)
-    return <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: colors.actionBg, color: colors.action }}>Active</span>
-  return <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: colors.neutralBg, color: colors.textSecondary }}>Suspended</span>
+function customerStatus(c: Customer): string {
+  if (c.blacklisted) return 'blacklisted'
+  if (c.isActive) return 'active'
+  return 'suspended'
 }
 
 export default function CasualsPage() {
@@ -37,7 +36,6 @@ export default function CasualsPage() {
   const [search, setSearch]               = useState('')
   const [letter, setLetter]               = useState<string | null>(null)
   const [importOpen, setImportOpen]       = useState(false)
-  const [menuOpen, setMenuOpen]           = useState<string | null>(null)
   const [blacklistId, setBlacklistId]     = useState<string | null>(null)
   const [deleteId, setDeleteId]           = useState<string | null>(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
@@ -62,7 +60,6 @@ export default function CasualsPage() {
   }
 
   async function handleSuspend(c: Customer) {
-    setMenuOpen(null)
     const res = await fetch(`/api/customers/${c.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -90,37 +87,132 @@ export default function CasualsPage() {
     }
   }
 
-  const deleteTarget = customers.find((c) => c.id === deleteId)
+  const deleteTarget   = customers.find((c) => c.id === deleteId)
   const blacklistTarget = customers.find((c) => c.id === blacklistId)
+
+  const columns: Column<Customer>[] = [
+    {
+      key:    'name',
+      header: 'Name',
+      render: (r) => (
+        <span style={{ color: colors.process, fontWeight: 500 }}>
+          {r.lastName}, {r.firstName}
+        </span>
+      ),
+    },
+    {
+      key:    'idNumber',
+      header: 'ID / Passport',
+      render: (r) => (
+        <span style={{ fontFamily: 'monospace', color: colors.textSecondary, fontSize: fontSize.xs }}>
+          {r.idNumber}
+        </span>
+      ),
+    },
+    {
+      key:    'phone',
+      header: 'Phone',
+      render: (r) => r.phone,
+    },
+    {
+      key:    'createdAt',
+      header: 'Registered',
+      render: (r) => (
+        <span style={{ color: colors.textSecondary }}>
+          {new Date(r.createdAt).toLocaleDateString('en-ZA')}
+        </span>
+      ),
+    },
+    {
+      key:    'status',
+      header: 'Status',
+      width:  '110px',
+      render: (r) => <StatusBadge status={customerStatus(r)} />,
+    },
+  ]
+
+  const rowActions: RowAction<Customer>[] = [
+    {
+      label:   'View Profile',
+      icon:    Eye,
+      onClick: (c) => router.push(`/app/customers/${c.id}`),
+    },
+    {
+      label:   'Promote to Account',
+      icon:    UserCheck,
+      hidden:  () => !isManager,
+      onClick: (c) => setPromoteId(c.id),
+    },
+    {
+      label:   'Blacklist',
+      icon:    ShieldBan,
+      danger:  true,
+      hidden:  (c) => c.blacklisted || !isManager,
+      onClick: (c) => setBlacklistId(c.id),
+    },
+    {
+      label:   'Remove Blacklist',
+      icon:    ShieldCheck,
+      hidden:  (c) => !c.blacklisted || !isManager,
+      onClick: async (c) => {
+        const res = await fetch(`/api/customers/${c.id}/unblacklist`, { method: 'POST' })
+        if (res.ok) { toast.success('Customer unblacklisted'); refreshList() }
+        else toast.error('Failed to unblacklist')
+      },
+    },
+    {
+      label:   'Suspend',
+      icon:    UserX,
+      hidden:  (c) => !c.isActive || !isManager,
+      onClick: (c) => handleSuspend(c),
+    },
+    {
+      label:   'Reactivate',
+      icon:    UserX,
+      hidden:  (c) => c.isActive || !isManager,
+      onClick: (c) => handleSuspend(c),
+    },
+    {
+      label:   'Delete',
+      icon:    Trash2,
+      danger:  true,
+      hidden:  () => !isManager,
+      onClick: (c) => setDeleteId(c.id),
+    },
+  ]
 
   return (
     <PageShell title="Casuals" subtitle={subtitle}>
-      <div className="flex flex-col flex-1 min-h-0 gap-3" onClick={() => setMenuOpen(null)}>
+      <div className="flex flex-col flex-1 min-h-0 gap-3">
 
-        {/* Actions row */}
-        {isManager && (
-          <div className="flex justify-end shrink-0">
-            <button
-              onClick={(e) => { e.stopPropagation(); setImportOpen(true) }}
-              className="flex items-center gap-1.5 h-8 px-3 rounded text-xs font-medium transition-colors"
-              style={{ border: `1px solid ${colors.border}`, color: colors.textPrimary, background: colors.surface }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = colors.toolbar)}
-              onMouseLeave={(e) => (e.currentTarget.style.background = colors.surface)}
-            >
-              <Upload className="w-3.5 h-3.5" /> Import CSV
-            </button>
+        {/* Filter bar */}
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <div className="relative">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: colors.textMuted }} />
+            <input
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setLetter(null) }}
+              placeholder="Search by name or ID number…"
+              className="pl-7 h-7 text-xs border rounded bg-white focus:outline-none"
+              style={{ borderColor: colors.border, borderRadius: layout.inputRadius, width: 240 }}
+              onFocus={(e) => (e.currentTarget.style.borderColor = colors.borderFocus)}
+              onBlur={(e)  => (e.currentTarget.style.borderColor = colors.border)}
+            />
           </div>
-        )}
 
-        {/* Search */}
-        <div className="relative shrink-0">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3" style={{ color: colors.textSecondary }} />
-          <Input
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setLetter(null) }}
-            placeholder="Search by name or ID number…"
-            className="pl-7 h-7 text-xs border-[#E0E0E0]"
-          />
+          {isManager && (
+            <div className="ml-auto">
+              <button
+                onClick={() => setImportOpen(true)}
+                className="flex items-center gap-1.5 h-7 px-3 text-xs font-medium transition-colors"
+                style={{ border: `1px solid ${colors.border}`, color: colors.textPrimary, background: colors.surface, borderRadius: layout.btnRadius }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = colors.toolbar)}
+                onMouseLeave={(e) => (e.currentTarget.style.background = colors.surface)}
+              >
+                <Upload className="w-3.5 h-3.5" /> Import CSV
+              </button>
+            </div>
+          )}
         </div>
 
         {/* A–Z quick filter */}
@@ -148,120 +240,21 @@ export default function CasualsPage() {
           ))}
         </div>
 
-        {/* Table */}
-        <div className="flex-1 min-h-0 overflow-y-auto rounded-lg" style={{ border: `1px solid ${colors.border}` }}>
-          {isLoading ? (
-            <div className="flex items-center justify-center p-10" style={{ color: colors.textSecondary }}>
-              <Loader2 className="w-4 h-4 animate-spin mr-2" /> Loading…
-            </div>
-          ) : !customers.length ? (
-            <div className="text-center p-10 text-sm" style={{ color: colors.textSecondary }}>
-              {letter
-                ? `No casual customers with surname starting with "${letter}"`
-                : 'No casual customers found'}
-            </div>
-          ) : (
-            <table className="w-full bg-white">
-              <thead style={{ background: colors.toolbar, borderBottom: `1px solid ${colors.border}` }}>
-                <tr>
-                  {['Name', 'ID Number', 'Phone', 'Registered', 'Status', ''].map((h, i) => (
-                    <th key={i} className="text-left px-4 py-2" style={{ fontSize: fontSize.xs, fontWeight: fontWeight.semibold, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.04em', width: h === '' ? '48px' : undefined }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {customers.map((c, i) => (
-                  <tr
-                    key={c.id}
-                    style={{ borderBottom: i < customers.length - 1 ? `1px solid ${colors.neutralBg}` : 'none' }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = colors.toolbar)}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                  >
-                    <td
-                      className="px-4 py-2.5 font-medium cursor-pointer"
-                      style={{ fontSize: fontSize.sm, color: colors.textPrimary }}
-                      onClick={() => router.push(`/app/customers/${c.id}`)}
-                    >
-                      {c.lastName}, {c.firstName}
-                    </td>
-                    <td className="px-4 py-2.5 font-mono cursor-pointer" style={{ fontSize: fontSize.xs, color: colors.textSecondary }} onClick={() => router.push(`/app/customers/${c.id}`)}>{c.idNumber}</td>
-                    <td className="px-4 py-2.5 cursor-pointer" style={{ fontSize: fontSize.sm, color: colors.textSecondary }} onClick={() => router.push(`/app/customers/${c.id}`)}>{c.phone}</td>
-                    <td className="px-4 py-2.5 cursor-pointer" style={{ fontSize: fontSize.xs, color: colors.textSecondary }} onClick={() => router.push(`/app/customers/${c.id}`)}>
-                      {new Date(c.createdAt).toLocaleDateString('en-ZA')}
-                    </td>
-                    <td className="px-4 py-2.5 cursor-pointer" onClick={() => router.push(`/app/customers/${c.id}`)}>{statusBadge(c)}</td>
-
-                    {/* Action menu cell */}
-                    <td className="px-2 py-2.5 relative" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 transition-colors"
-                        style={{ color: colors.textSecondary }}
-                        onClick={(e) => { e.stopPropagation(); setMenuOpen(menuOpen === c.id ? null : c.id) }}
-                        title="Actions"
-                      >
-                        <MoreVertical className="w-4 h-4" />
-                      </button>
-
-                      {menuOpen === c.id && (
-                        <div
-                          className="absolute right-2 top-9 z-50 rounded-lg shadow-lg py-1 min-w-[160px]"
-                          style={{ background: colors.surface, border: `1px solid ${colors.border}` }}
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <MenuItem icon={<Eye className="w-3.5 h-3.5" />} label="View Profile" onClick={() => { setMenuOpen(null); router.push(`/app/customers/${c.id}`) }} />
-                          <MenuItem
-                            icon={<UserCheck className="w-3.5 h-3.5" />}
-                            label="Promote to Account"
-                            disabled={!isManager}
-                            onClick={() => { setMenuOpen(null); setPromoteId(c.id) }}
-                          />
-                          <div style={{ borderTop: `1px solid ${colors.border}`, margin: '4px 0' }} />
-                          {!c.blacklisted ? (
-                            <MenuItem
-                              icon={<ShieldBan className="w-3.5 h-3.5" />}
-                              label="Blacklist"
-                              danger
-                              disabled={!isManager}
-                              onClick={() => { setMenuOpen(null); setBlacklistId(c.id) }}
-                            />
-                          ) : (
-                            <MenuItem
-                              icon={<ShieldCheck className="w-3.5 h-3.5" />}
-                              label="Remove Blacklist"
-                              disabled={!isManager}
-                              onClick={async () => {
-                                setMenuOpen(null)
-                                const res = await fetch(`/api/customers/${c.id}/unblacklist`, { method: 'POST' })
-                                if (res.ok) { toast.success('Customer unblacklisted'); refreshList() }
-                                else toast.error('Failed to unblacklist')
-                              }}
-                            />
-                          )}
-                          <MenuItem
-                            icon={<UserX className="w-3.5 h-3.5" />}
-                            label={c.isActive ? 'Suspend' : 'Reactivate'}
-                            disabled={!isManager}
-                            onClick={() => handleSuspend(c)}
-                          />
-                          <div style={{ borderTop: `1px solid ${colors.border}`, margin: '4px 0' }} />
-                          <MenuItem
-                            icon={<Trash2 className="w-3.5 h-3.5" />}
-                            label="Delete"
-                            danger
-                            disabled={!isManager}
-                            onClick={() => { setMenuOpen(null); setDeleteId(c.id) }}
-                          />
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+        {/* DataTable */}
+        <div className="flex-1 min-h-0">
+          <DataTable
+            columns={columns}
+            rows={customers}
+            rowKey={(r) => r.id}
+            onRowClick={(r) => router.push(`/app/customers/${r.id}`)}
+            rowActions={rowActions}
+            loading={isLoading}
+            emptyMessage={letter
+              ? `No casual customers with surname starting with "${letter}"`
+              : 'No casual customers found'}
+          />
         </div>
 
-        {/* Import CSV Modal */}
         {importOpen && (
           <ImportCsvModal
             onClose={() => setImportOpen(false)}
@@ -269,7 +262,6 @@ export default function CasualsPage() {
           />
         )}
 
-        {/* Promote to Account Modal */}
         {promoteId && (
           <PromoteToAccountModal
             customerId={promoteId}
@@ -279,7 +271,6 @@ export default function CasualsPage() {
           />
         )}
 
-        {/* Blacklist Modal */}
         {blacklistId && blacklistTarget && (
           <BlacklistModal
             customer={blacklistTarget}
@@ -288,7 +279,6 @@ export default function CasualsPage() {
           />
         )}
 
-        {/* Delete Confirm Dialog */}
         {deleteId && deleteTarget && (
           <Dialog open onOpenChange={(o) => { if (!o) setDeleteId(null) }}>
             <DialogContent className="sm:max-w-md">
@@ -315,26 +305,6 @@ export default function CasualsPage() {
         )}
       </div>
     </PageShell>
-  )
-}
-
-// ─── Menu Item ─────────────────────────────────────────────────────────────────
-function MenuItem({ icon, label, onClick, danger, disabled }: {
-  icon: React.ReactNode; label: string; onClick: () => void; danger?: boolean; disabled?: boolean
-}) {
-  return (
-    <button
-      className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left transition-colors disabled:opacity-40"
-      style={{ color: danger ? colors.danger : colors.textPrimary }}
-      onClick={disabled ? undefined : onClick}
-      disabled={disabled}
-      onMouseEnter={(e) => !disabled && (e.currentTarget.style.background = colors.toolbar)}
-      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-    >
-      {icon}
-      {label}
-      {disabled && <span className="ml-auto text-xs" style={{ color: colors.textSecondary }}>(manager)</span>}
-    </button>
   )
 }
 

@@ -411,11 +411,11 @@ export default function StockPage() {
                 value={onHandSearch}
                 onChange={(e) => setOnHandSearch(e.target.value)}
                 placeholder="Search product..."
-                className="pl-7 pr-3 py-1 text-xs rounded border bg-white focus:outline-none w-44 border-rpx-border focus:border-rpx-blue"
+                className="pl-7 pr-3 h-7 text-xs rounded border bg-white focus:outline-none w-44 border-[#E0E0E0] focus:border-[#185ABD]"
               />
             </div>
             <select
-              className="border rounded px-2 py-1 text-xs bg-white focus:outline-none border-rpx-border focus:border-rpx-blue"
+              className="h-7 border rounded px-2 text-xs bg-white focus:outline-none border-[#E0E0E0] focus:border-[#185ABD]"
               style={{ color: colors.textPrimary }}
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
@@ -455,7 +455,7 @@ export default function StockPage() {
         <>
           <div className="flex gap-2 flex-wrap items-center shrink-0 mb-3">
             <select
-              className="border rounded px-2 py-1 text-xs bg-white focus:outline-none border-rpx-border focus:border-rpx-blue"
+              className="h-7 border rounded px-2 text-xs bg-white focus:outline-none border-[#E0E0E0] focus:border-[#185ABD]"
               style={{ color: colors.textPrimary }}
               value={movDirection}
               onChange={(e) => setMovDirection(e.target.value)}
@@ -465,7 +465,7 @@ export default function StockPage() {
               <option value="out">Out</option>
             </select>
             <select
-              className="border rounded px-2 py-1 text-xs bg-white focus:outline-none border-rpx-border focus:border-rpx-blue"
+              className="h-7 border rounded px-2 text-xs bg-white focus:outline-none border-[#E0E0E0] focus:border-[#185ABD]"
               style={{ color: colors.textPrimary }}
               value={movSource}
               onChange={(e) => setMovSource(e.target.value)}
@@ -480,7 +480,7 @@ export default function StockPage() {
               type="date"
               value={movFrom}
               onChange={(e) => setMovFrom(e.target.value)}
-              className="border rounded px-2 py-1 text-xs bg-white focus:outline-none border-rpx-border focus:border-rpx-blue"
+              className="h-7 border rounded px-2 text-xs bg-white focus:outline-none border-[#E0E0E0] focus:border-[#185ABD]"
               style={{ color: movFrom ? colors.textPrimary : colors.textSecondary }}
               title="From date"
             />
@@ -488,15 +488,15 @@ export default function StockPage() {
               type="date"
               value={movTo}
               onChange={(e) => setMovTo(e.target.value)}
-              className="border rounded px-2 py-1 text-xs bg-white focus:outline-none border-rpx-border focus:border-rpx-blue"
+              className="h-7 border rounded px-2 text-xs bg-white focus:outline-none border-[#E0E0E0] focus:border-[#185ABD]"
               style={{ color: movTo ? colors.textPrimary : colors.textSecondary }}
               title="To date"
             />
             {hasMovFilters && (
               <button
                 onClick={clearMovFilters}
-                className="flex items-center gap-1 text-xs hover:text-[#212529] transition-colors"
-                style={{ color: colors.textSecondary }}
+                className="h-7 px-2.5 text-xs flex items-center gap-1 border rounded hover:bg-[#F1F3F4] transition-colors"
+                style={{ borderColor: colors.border, color: colors.textSecondary }}
               >
                 <X className="w-3 h-3" /> Clear
               </button>
