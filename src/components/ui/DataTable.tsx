@@ -26,23 +26,26 @@ export interface RowAction<T> {
 }
 
 export interface DataTableProps<T> {
-  columns:       Column<T>[]
-  rows:          T[]
-  rowKey:        (row: T) => string
-  onRowClick?:   (row: T) => void
-  selectedKey?:  string | null
-  rowActions?:   RowAction<T>[]
-  loading?:      boolean
-  error?:        string | boolean
-  emptyMessage?: string
-  emptyAction?:  { label: string; onClick: () => void }
-  total?:        number
-  page?:         number
-  pageSize?:     number
-  onPageChange?: (page: number) => void
-  onSort?:       (key: string, dir: SortDir) => void
-  sortKey?:      string | null
-  sortDir?:      SortDir
+  columns:            Column<T>[]
+  rows:               T[]
+  rowKey:             (row: T) => string
+  onRowClick?:        (row: T) => void
+  selectedKey?:       string | null
+  rowActions?:        RowAction<T>[]
+  loading?:           boolean
+  error?:             string | boolean
+  emptyMessage?:      string
+  emptyAction?:       { label: string; onClick: () => void }
+  total?:             number
+  page?:              number
+  pageSize?:          number
+  onPageChange?:      (page: number) => void
+  onSort?:            (key: string, dir: SortDir) => void
+  sortKey?:           string | null
+  sortDir?:           SortDir
+  // Multi-select
+  selectedKeys?:      Set<string>
+  onSelectionChange?: (keys: Set<string>) => void
 }
 
 // ─── Status Badge helper ──────────────────────────────────────────────────────
@@ -165,6 +168,8 @@ export function DataTable<T>({
   onSort,
   sortKey,
   sortDir,
+  selectedKeys,
+  onSelectionChange,
 }: DataTableProps<T>) {
 
   function handleSort(key: string) {
@@ -176,12 +181,15 @@ export function DataTable<T>({
     }
   }
 
+  const multiSelect  = !!onSelectionChange
+  const allSelected  = multiSelect && rows.length > 0 && rows.every(r => selectedKeys?.has(rowKey(r)))
+  const someSelected = multiSelect && rows.some(r => selectedKeys?.has(rowKey(r)))
+
   const totalPages  = total ? Math.ceil(total / pageSize) : 1
   const showing     = total ? `Showing ${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, total)} of ${total}` : `${rows.length} records`
   const hasActions  = rowActions && rowActions.length > 0
-  const totalCols   = columns.length + (hasActions ? 1 : 0)
+  const totalCols   = columns.length + (hasActions ? 1 : 0) + (multiSelect ? 1 : 0)
 
-  // Column separator: all columns except last data column get a right border
   function colBorder(isLast: boolean): string {
     return isLast ? 'none' : '1px solid #D0D0D0'
   }
@@ -197,6 +205,19 @@ export function DataTable<T>({
               background: 'linear-gradient(180deg, #FFFFFF 0%, #E8E8E8 100%)',
               borderBottom: '2px solid #B0B0B0',
             }}>
+              {multiSelect && (
+                <th style={{ width: 36, height: 32, padding: '0 10px', borderRight: '1px solid #D0D0D0' }}>
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    ref={(el) => { if (el) el.indeterminate = someSelected && !allSelected }}
+                    onChange={(e) => {
+                      onSelectionChange!(e.target.checked ? new Set(rows.map(r => rowKey(r))) : new Set())
+                    }}
+                    style={{ cursor: 'pointer', accentColor: '#1B3A6B' }}
+                  />
+                </th>
+              )}
               {columns.map((col, colIdx) => {
                 const isLastData = colIdx === columns.length - 1 && !hasActions
                 return (
@@ -234,10 +255,7 @@ export function DataTable<T>({
                 )
               })}
               {hasActions && (
-                <th
-                  className="w-10"
-                  style={{ height: 32, borderRight: 'none' }}
-                />
+                <th className="w-10" style={{ height: 32, borderRight: 'none' }} />
               )}
             </tr>
           </thead>
@@ -266,10 +284,7 @@ export function DataTable<T>({
                 <td colSpan={totalCols} className="py-12 text-center">
                   <p className="text-sm text-[#6C757D]">{emptyMessage}</p>
                   {emptyAction && (
-                    <button
-                      className="mt-3 text-xs text-[#185ABD] hover:underline"
-                      onClick={emptyAction.onClick}
-                    >
+                    <button className="mt-3 text-xs text-[#185ABD] hover:underline" onClick={emptyAction.onClick}>
                       {emptyAction.label}
                     </button>
                   )}
@@ -277,32 +292,49 @@ export function DataTable<T>({
               </tr>
             ) : (
               rows.map((row, idx) => {
-                const key        = rowKey(row)
-                const isSelected = selectedKey === key
-                const isEven     = idx % 2 === 1
+                const key          = rowKey(row)
+                const isSelected   = selectedKey === key
+                const isChecked    = selectedKeys?.has(key) ?? false
+                const isEven       = idx % 2 === 1
 
                 return (
                   <tr
                     key={key}
-                    className={cn(
-                      'transition-colors',
-                      onRowClick && 'cursor-pointer',
-                    )}
+                    className={cn('transition-colors', onRowClick && 'cursor-pointer')}
                     style={{
-                      background: isSelected
+                      background: isSelected || isChecked
                         ? '#C8D9F0'
-                        : isEven
-                          ? '#F5F5F5'
-                          : '#FFFFFF',
+                        : isEven ? '#F5F5F5' : '#FFFFFF',
                     }}
                     onMouseEnter={(e) => {
-                      if (!isSelected) (e.currentTarget as HTMLTableRowElement).style.background = '#D6E8FF'
+                      if (!isSelected && !isChecked)
+                        (e.currentTarget as HTMLTableRowElement).style.background = '#D6E8FF'
                     }}
                     onMouseLeave={(e) => {
-                      if (!isSelected) (e.currentTarget as HTMLTableRowElement).style.background = isEven ? '#F5F5F5' : '#FFFFFF'
+                      if (!isSelected && !isChecked)
+                        (e.currentTarget as HTMLTableRowElement).style.background = isEven ? '#F5F5F5' : '#FFFFFF'
                     }}
                     onClick={() => onRowClick?.(row)}
                   >
+                    {multiSelect && (
+                      <td
+                        className="border-b border-[#E0E0E0]"
+                        style={{ width: 36, height: 32, padding: '0 10px', borderRight: '1px solid #D0D0D0' }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={(e) => {
+                            const next = new Set(selectedKeys)
+                            if (e.target.checked) next.add(key)
+                            else next.delete(key)
+                            onSelectionChange!(next)
+                          }}
+                          style={{ cursor: 'pointer', accentColor: '#1B3A6B' }}
+                        />
+                      </td>
+                    )}
                     {columns.map((col, colIdx) => {
                       const isLastData = colIdx === columns.length - 1 && !hasActions
                       return (
@@ -312,7 +344,7 @@ export function DataTable<T>({
                           style={{
                             height:      32,
                             fontSize:    12,
-                            color:       isSelected ? '#00205B' : '#212529',
+                            color:       isSelected || isChecked ? '#00205B' : '#212529',
                             borderRight: colBorder(isLastData),
                           }}
                         >

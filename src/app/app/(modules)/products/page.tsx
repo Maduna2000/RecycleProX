@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, ModalTitleBar, ModalBtn } from '@/components/ui/dialog'
-import { Search, Pencil, TrendingUp, Plus, Eye, EyeOff, Trash2 } from 'lucide-react'
+import { Search, Pencil, TrendingUp, Plus, Eye, EyeOff, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -66,13 +66,16 @@ export default function ProductsPage() {
   const router       = useRouter()
   const searchParams = useSearchParams()
   const { data: session } = useSession()
-  const [search,       setSearch]      = useState('')
-  const [category,     setCategory]    = useState('')
-  const [statusFilter, setStatus]      = useState('active')
-  const [createOpen,   setCreateOpen]  = useState(false)
-  const [editTarget,   setEditTarget]  = useState<Product | null>(null)
-  const [deleteTarget, setDeleteTarget] = useState<Product | null>(null)
-  const [bulkOpen,     setBulkOpen]    = useState(false)
+  const [search,        setSearch]       = useState('')
+  const [category,      setCategory]     = useState('')
+  const [statusFilter,  setStatus]       = useState('active')
+  const [createOpen,    setCreateOpen]   = useState(false)
+  const [editTarget,    setEditTarget]   = useState<Product | null>(null)
+  const [deleteTarget,  setDeleteTarget] = useState<Product | null>(null)
+  const [bulkOpen,      setBulkOpen]     = useState(false)
+  const [selectedKeys,  setSelectedKeys] = useState<Set<string>>(new Set())
+  const [bulkDelOpen,   setBulkDelOpen]  = useState(false)
+  const [bulkLoading,   setBulkLoading]  = useState<'deactivate' | 'reactivate' | null>(null)
 
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
 
@@ -95,6 +98,31 @@ export default function ProductsPage() {
   const products = data?.products ?? []
 
   const revalidate = () => mutate(swrKey)
+
+  // Clear selection when filters change
+  useEffect(() => { setSelectedKeys(new Set()) }, [swrKey])
+
+  async function handleBulkDeactivate() {
+    setBulkLoading('deactivate')
+    await Promise.all([...selectedKeys].map(id =>
+      fetch(`/api/products/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ isActive: false }) })
+    ))
+    toast.success(`${selectedKeys.size} product${selectedKeys.size !== 1 ? 's' : ''} deactivated`)
+    setSelectedKeys(new Set())
+    revalidate()
+    setBulkLoading(null)
+  }
+
+  async function handleBulkReactivate() {
+    setBulkLoading('reactivate')
+    await Promise.all([...selectedKeys].map(id =>
+      fetch(`/api/products/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ isActive: true }) })
+    ))
+    toast.success(`${selectedKeys.size} product${selectedKeys.size !== 1 ? 's' : ''} reactivated`)
+    setSelectedKeys(new Set())
+    revalidate()
+    setBulkLoading(null)
+  }
 
   async function handleToggleActive(p: Product) {
     const res = await fetch(`/api/products/${p.id}`, {
@@ -273,6 +301,29 @@ export default function ProductsPage() {
         )}
       </div>
 
+      {/* Bulk action bar */}
+      {isManager && selectedKeys.size > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 10px', marginBottom: 6, background: '#EBF3FC', border: '1px solid #185ABD', borderRadius: 3 }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: '#185ABD' }}>{selectedKeys.size} selected</span>
+          <button
+            onClick={() => setSelectedKeys(new Set())}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, color: '#6C757D', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px' }}
+          >
+            <X style={{ width: 11, height: 11 }} /> Clear
+          </button>
+          <div style={{ flex: 1 }} />
+          <ModalBtn onClick={handleBulkReactivate} loading={bulkLoading === 'reactivate'} disabled={bulkLoading !== null}>
+            Reactivate
+          </ModalBtn>
+          <ModalBtn onClick={handleBulkDeactivate} loading={bulkLoading === 'deactivate'} disabled={bulkLoading !== null}>
+            Deactivate
+          </ModalBtn>
+          <ModalBtn variant="danger" onClick={() => setBulkDelOpen(true)} disabled={bulkLoading !== null}>
+            Delete
+          </ModalBtn>
+        </div>
+      )}
+
       {/* Table */}
       <div className="flex-1 min-h-0">
         <DataTable
@@ -283,6 +334,8 @@ export default function ProductsPage() {
           loading={isLoading}
           emptyMessage="No products found"
           emptyAction={isManager ? { label: '+ Add Product', onClick: () => setCreateOpen(true) } : undefined}
+          selectedKeys={isManager ? selectedKeys : undefined}
+          onSelectionChange={isManager ? setSelectedKeys : undefined}
         />
       </div>
 
@@ -311,6 +364,14 @@ export default function ProductsPage() {
           products={products.filter(p => p.isActive)}
           onClose={() => setBulkOpen(false)}
           onSuccess={() => { revalidate(); setBulkOpen(false) }}
+        />
+      )}
+      {bulkDelOpen && (
+        <BulkDeleteModal
+          ids={[...selectedKeys]}
+          products={products}
+          onClose={() => setBulkDelOpen(false)}
+          onSuccess={() => { revalidate(); setSelectedKeys(new Set()); setBulkDelOpen(false) }}
         />
       )}
     </PageShell>
@@ -654,6 +715,74 @@ function BulkPriceModal({ products, onClose, onSuccess }: { products: Product[];
             </div>
           </div>
         )}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ─── Bulk Delete Modal ────────────────────────────────────────────────────────
+function BulkDeleteModal({ ids, products, onClose, onSuccess }: {
+  ids: string[]; products: Product[]; onClose: () => void; onSuccess: () => void
+}) {
+  const [loading,  setLoading]  = useState(false)
+  const [results,  setResults]  = useState<{ name: string; ok: boolean }[] | null>(null)
+
+  const targets = products.filter(p => ids.includes(p.id))
+
+  async function onConfirm() {
+    setLoading(true)
+    const settled = await Promise.allSettled(
+      targets.map(p => fetch(`/api/products/${p.id}`, { method: 'DELETE' }).then(r => ({ name: p.name, ok: r.ok })))
+    )
+    setLoading(false)
+    const res = settled.map(s => s.status === 'fulfilled' ? s.value : { name: '?', ok: false })
+    const failed = res.filter(r => !r.ok)
+    if (failed.length === 0) {
+      toast.success(`${res.length} product${res.length !== 1 ? 's' : ''} deleted`)
+      onSuccess()
+    } else {
+      setResults(res)
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
+      <DialogContent className="sm:max-w-sm" showCloseButton={false}>
+        <ModalTitleBar title="Delete Products" onClose={onClose} />
+        <div className="space-y-4 mt-2">
+          {results ? (
+            <>
+              <p style={{ fontSize: 12, color: colors.textSecondary }}>Some products could not be deleted (they are in use):</p>
+              <div style={{ maxHeight: 160, overflowY: 'auto', fontSize: 12 }}>
+                {results.map((r, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 0', color: r.ok ? colors.action : colors.danger }}>
+                    <span>{r.ok ? '✓' : '✗'}</span>
+                    <span>{r.name}</span>
+                    {!r.ok && <span style={{ color: colors.textSecondary }}>— in use, deactivate instead</span>}
+                  </div>
+                ))}
+              </div>
+              <div className="flex justify-end">
+                <ModalBtn variant="primary" onClick={onSuccess}>Done</ModalBtn>
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{ background: colors.warningBg, border: `1px solid ${colors.warning}`, borderRadius: 3, padding: '10px 12px', fontSize: 12, color: '#92610A' }}>
+                Permanently delete <strong>{targets.length} product{targets.length !== 1 ? 's' : ''}</strong> and their price history? Products in use by existing transactions will be skipped.
+              </div>
+              <div style={{ maxHeight: 140, overflowY: 'auto', fontSize: 12, color: colors.textSecondary }}>
+                {targets.map(p => (
+                  <div key={p.id} style={{ padding: '2px 0' }}>• {p.name} <span style={{ fontFamily: 'monospace', fontSize: 11 }}>({p.code})</span></div>
+                ))}
+              </div>
+              <div className="flex justify-end gap-2">
+                <ModalBtn onClick={onClose} disabled={loading}>Cancel</ModalBtn>
+                <ModalBtn variant="danger" onClick={onConfirm} loading={loading}>Delete {targets.length} Product{targets.length !== 1 ? 's' : ''}</ModalBtn>
+              </div>
+            </>
+          )}
+        </div>
       </DialogContent>
     </Dialog>
   )
