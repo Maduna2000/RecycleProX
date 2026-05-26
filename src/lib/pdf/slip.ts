@@ -76,11 +76,12 @@ function estimateHeight(data: TransactionSlipData): number {
   h += LINE_H                       // column headers
   h += 4
   for (const line of data.lines) {
-    h += LINE_H                     // product name
-    h += LINE_H                     // qty × price = total
+    h += LINE_H                     // product name + qty + total
+    h += LINE_H                     // @ unit price
     if (line.grossQty && line.tareQty) h += LINE_H  // tare detail
     h += 3                          // small gap between items
   }
+  if (data.lines.length > 1) h += LINE_H  // Total Qty row
   h += 8                            // divider
   h += LINE_H + 3                   // TOTAL bold
   if (data.loanDeduction && parseFloat(data.loanDeduction) > 0) {
@@ -208,11 +209,12 @@ export async function generateTransactionSlip(data: TransactionSlipData): Promis
   cursor -= 6
 
   // ── Item column headers ───────────────────────────────────────────────────
-  const descW = BODY_W * 0.55
-  page.drawText('Description',    { x: MARGIN,              y: cursor, size: SMALL, font: bold, color: DGRAY })
-  page.drawText('Qty',            { x: MARGIN + descW,      y: cursor, size: SMALL, font: bold, color: DGRAY })
-  const totalHdrW = bold.widthOfTextAtSize('Total', SMALL)
-  page.drawText('Total',          { x: W - MARGIN - totalHdrW, y: cursor, size: SMALL, font: bold, color: DGRAY })
+  const QTY_RIGHT   = MARGIN + Math.floor(BODY_W * 0.72)
+  const qtyHdrW     = bold.widthOfTextAtSize('Qty', SMALL)
+  const totalHdrW   = bold.widthOfTextAtSize('Total', SMALL)
+  page.drawText('Description', { x: MARGIN,                    y: cursor, size: SMALL, font: bold, color: DGRAY })
+  page.drawText('Qty',         { x: QTY_RIGHT - qtyHdrW,       y: cursor, size: SMALL, font: bold, color: DGRAY })
+  page.drawText('Total',       { x: W - MARGIN - totalHdrW,    y: cursor, size: SMALL, font: bold, color: DGRAY })
   nextLine(SMALL, 4)
 
   // ── Line items ────────────────────────────────────────────────────────────
@@ -223,15 +225,18 @@ export async function generateTransactionSlip(data: TransactionSlipData): Promis
       ? line.productName.substring(0, maxNameChars - 1) + '…'
       : line.productName
 
-    // Row 1: name + total
+    // Row 1: name + qty in column + total
     const lineTotal = `E${new Decimal(line.lineTotal).toFixed(2)}`
-    const lw = bold.widthOfTextAtSize(lineTotal, NORMAL)
-    page.drawText(name,      { x: MARGIN,           y: cursor, size: NORMAL, font: reg,  color: BLACK })
-    page.drawText(lineTotal, { x: W - MARGIN - lw,  y: cursor, size: NORMAL, font: bold, color: BLACK })
+    const lw      = bold.widthOfTextAtSize(lineTotal, NORMAL)
+    const qtyStr  = new Decimal(line.qty).toFixed(3)
+    const qw      = reg.widthOfTextAtSize(qtyStr, NORMAL)
+    page.drawText(name,      { x: MARGIN,               y: cursor, size: NORMAL, font: reg,  color: BLACK })
+    page.drawText(qtyStr,    { x: QTY_RIGHT - qw,        y: cursor, size: NORMAL, font: reg,  color: DGRAY })
+    page.drawText(lineTotal, { x: W - MARGIN - lw,       y: cursor, size: NORMAL, font: bold, color: BLACK })
     nextLine(NORMAL, 1)
 
-    // Row 2: qty × unit price
-    const qtyLabel = `  ${new Decimal(line.qty).toFixed(3)} × E${new Decimal(line.unitPrice).toFixed(2)}`
+    // Row 2: unit price only (qty already shown in column above)
+    const qtyLabel = `  @ E${new Decimal(line.unitPrice).toFixed(2)}`
     page.drawText(qtyLabel, { x: MARGIN, y: cursor, size: SMALL, font: reg, color: GRAY })
     nextLine(SMALL)
 
@@ -243,6 +248,16 @@ export async function generateTransactionSlip(data: TransactionSlipData): Promis
     }
 
     cursor -= 2
+  }
+
+  // Total Qty row (multi-item only)
+  if (data.lines.length > 1) {
+    const totalQty    = data.lines.reduce((sum, l) => new Decimal(sum).plus(new Decimal(l.qty)).toNumber(), 0)
+    const totalQtyStr = new Decimal(totalQty).toFixed(3)
+    const tqw         = bold.widthOfTextAtSize(totalQtyStr, SMALL)
+    page.drawText('Total Qty:',  { x: MARGIN,          y: cursor, size: SMALL, font: reg,  color: DGRAY })
+    page.drawText(totalQtyStr,   { x: QTY_RIGHT - tqw, y: cursor, size: SMALL, font: bold, color: DGRAY })
+    nextLine(SMALL, 3)
   }
 
   cursor -= 2
