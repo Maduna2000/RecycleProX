@@ -3,11 +3,10 @@
 import { useState } from 'react'
 import useSWR, { mutate } from 'swr'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, ModalTitleBar, ModalBtn } from '@/components/ui/dialog'
 import { AlertTriangle, ShieldBan, ShieldCheck, Pencil, Loader2, Camera } from 'lucide-react'
 import { PhotoUploader, PhotoViewer } from '@/components/PhotoUploader'
 import { useSession } from 'next-auth/react'
@@ -101,26 +100,25 @@ export function CustomerProfileModal({
 
   return (
     <Dialog open={!!customerId} onOpenChange={(o) => { if (!o) handleClose() }}>
-      <DialogContent className="sm:max-w-5xl h-[92vh] flex flex-col p-0 gap-0 overflow-hidden">
-        <DialogHeader className="px-0 py-0 space-y-0">
-          {isLoading && (
-            <div className="flex items-center justify-center h-40">
-              <Loader2 className="w-6 h-6 animate-spin" style={{ color: colors.textSecondary }} />
-            </div>
-          )}
-          {!isLoading && !customer && (
-            <div className="flex items-center justify-center h-40 text-sm" style={{ color: colors.textSecondary }}>
-              Customer not found
-            </div>
-          )}
-          {customer && <ProfileHeader customer={customer} onEdit={() => setEditOpen(true)} />}
-        </DialogHeader>
+      <DialogContent className="sm:max-w-5xl h-[92vh] flex flex-col overflow-hidden" showCloseButton={false}>
+        <ModalTitleBar title="Customer Profile" onClose={handleClose} />
+        {isLoading && (
+          <div className="flex items-center justify-center h-40">
+            <Loader2 className="w-6 h-6 animate-spin" style={{ color: colors.textSecondary }} />
+          </div>
+        )}
+        {!isLoading && !customer && (
+          <div className="flex items-center justify-center h-40 text-sm" style={{ color: colors.textSecondary }}>
+            Customer not found
+          </div>
+        )}
+        {customer && <ProfileHeader customer={customer} onEdit={() => setEditOpen(true)} />}
 
         {customer && (
           <>
             {/* Blacklist banner */}
             {customer.blacklisted && (
-              <div className="mx-5 mt-3 flex items-start gap-3 p-3 bg-red-50 border border-red-200 rounded-lg shrink-0">
+              <div className="mt-3 flex items-start gap-3 p-3 bg-red-50 border border-red-200 rounded-lg shrink-0">
                 <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
                 <div>
                   <p className="text-sm font-semibold text-red-800">Customer is Blacklisted</p>
@@ -133,7 +131,7 @@ export function CustomerProfileModal({
             )}
 
             {/* Tabs */}
-            <div className="flex gap-0.5 border-b px-5 mt-3 shrink-0" style={{ borderColor: colors.border }}>
+            <div className="flex gap-0.5 border-b -mx-4 px-4 mt-3 shrink-0" style={{ borderColor: colors.border }}>
               {PROFILE_TABS.map((t) => (
                 <button
                   key={t}
@@ -149,7 +147,7 @@ export function CustomerProfileModal({
             </div>
 
             {/* Scrollable tab content */}
-            <div className="flex-1 overflow-y-auto px-5 py-4">
+            <div className="flex-1 overflow-y-auto py-4">
               {tab === 'Overview'      && <OverviewTab customer={customer} />}
               {tab === 'Transactions'  && <TransactionsTab customerId={customer.id} />}
               {tab === 'Documents'     && <DocumentsTab customer={customer} onPhotoSaved={refreshCustomer} />}
@@ -192,8 +190,7 @@ export function CustomerProfileModal({
 
 function ProfileHeader({ customer, onEdit }: { customer: Customer; onEdit: () => void }) {
   return (
-    <div className="px-5 pt-5 pb-4 border-b" style={{ borderColor: colors.border }}>
-      <DialogTitle className="sr-only">{customer.firstName} {customer.lastName}</DialogTitle>
+    <div className="px-1 pt-2 pb-3 border-b shrink-0" style={{ borderColor: colors.border }}>
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-3">
           <div
@@ -227,9 +224,7 @@ function ProfileHeader({ customer, onEdit }: { customer: Customer; onEdit: () =>
           {customer.blacklisted
             ? <Badge className="bg-red-100 text-red-700 border-0">Blacklisted</Badge>
             : <Badge className="bg-green-100 text-green-700 border-0">Active</Badge>}
-          <Button variant="outline" size="sm" onClick={onEdit}>
-            <Pencil className="w-3.5 h-3.5 mr-1.5" /> Edit
-          </Button>
+          <ModalBtn variant="outline" onClick={onEdit} icon={<Pencil style={{ width: 12, height: 12 }} />}>Edit</ModalBtn>
         </div>
       </div>
     </div>
@@ -548,16 +543,12 @@ function BlacklistTab({ customer, onAction, onUnblacklist }: {
               <p className="text-xs text-red-400 mt-1">Since {new Date(customer.blacklistedAt).toLocaleDateString('en-ZA')}</p>
             )}
           </div>
-          <Button variant="outline" className="border-green-300 text-green-700 hover:bg-green-50" onClick={onUnblacklist}>
-            <ShieldCheck className="w-4 h-4 mr-2" /> Remove from Blacklist
-          </Button>
+          <ModalBtn variant="outline" onClick={onUnblacklist} icon={<ShieldCheck style={{ width: 14, height: 14 }} />}>Remove from Blacklist</ModalBtn>
         </div>
       ) : (
         <div className="space-y-4">
           <p className="text-sm" style={{ color: colors.textSecondary }}>This customer is not blacklisted.</p>
-          <Button variant="destructive" onClick={onAction}>
-            <ShieldBan className="w-4 h-4 mr-2" /> Blacklist Customer
-          </Button>
+          <ModalBtn variant="danger" onClick={onAction} icon={<ShieldBan style={{ width: 14, height: 14 }} />}>Blacklist Customer</ModalBtn>
         </div>
       )}
     </div>
@@ -640,8 +631,8 @@ function EditCustomerModal({ customer, onClose, onSuccess }: {
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>Edit Customer</DialogTitle></DialogHeader>
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto" showCloseButton={false}>
+        <ModalTitleBar title="Edit Customer" onClose={onClose} />
         <div className="flex gap-1 border-b -mx-1 mb-4">
           {EDIT_TABS.map((t) => (
             <button
@@ -880,10 +871,8 @@ function EditCustomerModal({ customer, onClose, onSuccess }: {
           )}
 
           <div className="flex justify-end gap-2 pt-4 mt-4 border-t">
-            <Button type="button" variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
-            <Button type="submit" disabled={loading} style={{ background: colors.process }}>
-              {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving...</> : 'Save Changes'}
-            </Button>
+            <ModalBtn type="button" variant="outline" onClick={onClose} disabled={loading}>Cancel</ModalBtn>
+            <ModalBtn type="submit" variant="primary" loading={loading}>Save Changes</ModalBtn>
           </div>
         </form>
       </DialogContent>
@@ -915,8 +904,8 @@ function BlacklistModal({ customerId, onClose, onSuccess }: {
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader><DialogTitle>Blacklist Customer</DialogTitle></DialogHeader>
+      <DialogContent className="sm:max-w-md" showCloseButton={false}>
+        <ModalTitleBar title="Blacklist Customer" onClose={onClose} />
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-2">
           <div>
             <Label>Reason <span className="text-gray-400 font-normal">(min 10 chars)</span></Label>
@@ -924,10 +913,8 @@ function BlacklistModal({ customerId, onClose, onSuccess }: {
             {errors.reason && <p className="text-xs text-red-600 mt-1">{errors.reason.message}</p>}
           </div>
           <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
-            <Button type="submit" variant="destructive" disabled={loading}>
-              {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Blacklisting...</> : 'Blacklist Customer'}
-            </Button>
+            <ModalBtn type="button" variant="outline" onClick={onClose} disabled={loading}>Cancel</ModalBtn>
+            <ModalBtn type="submit" variant="danger" loading={loading}>Blacklist Customer</ModalBtn>
           </div>
         </form>
       </DialogContent>
