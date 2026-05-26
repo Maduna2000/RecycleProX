@@ -19,12 +19,12 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     const slipLines = order.lines.length > 0
       ? order.lines.map(l => ({
           productName:  l.product.name,
-          categoryName: l.product.category.name,
+          categoryName: l.product.category,
           weight:       `${new Decimal(l.weight.toString()).toFixed(3)} ${l.product.unit}`,
         }))
       : [{
           productName:  order.product.name,
-          categoryName: order.product.category.name,
+          categoryName: order.product.category,
           weight:       `${new Decimal(order.weight.toString()).toFixed(3)} ${order.product.unit}`,
         }]
 

@@ -47,6 +47,7 @@ export const SetGroupOverridesSchema = z.object({
 export const CreateCategorySchema = z.object({
   name:      z.string().min(1, 'Name is required').max(80),
   colorHex:  z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Invalid hex color').optional().or(z.literal('')),
+  iconName:  z.string().max(50).optional().or(z.literal('')),
   sortOrder: z.number().int().default(0),
 })
 export const UpdateCategorySchema = CreateCategorySchema.partial()

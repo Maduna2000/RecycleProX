@@ -11,11 +11,11 @@ interface Category {
 }
 
 interface Product {
-  id: string; name: string; unit: string; categoryId: string
+  id: string; name: string; unit: string; category: string
 }
 
 export interface SelectedProduct {
-  id: string; name: string; unit: string; categoryId: string; categoryName: string
+  id: string; name: string; unit: string; categoryName: string
 }
 
 interface Props {
@@ -44,7 +44,7 @@ export default function Step2Product({ onSelect }: Props) {
   async function selectCategory(cat: Category) {
     setSelectedCat(cat)
     setLoading(true)
-    const res = await fetch(`/api/scale/products?categoryId=${cat.id}`)
+    const res = await fetch(`/api/scale/products?category=${encodeURIComponent(cat.name)}`)
     const data = await res.json()
     setProducts(data)
     setLoading(false)
@@ -77,7 +77,7 @@ export default function Step2Product({ onSelect }: Props) {
             {products.map(p => (
               <button
                 key={p.id}
-                onClick={() => onSelect({ id: p.id, name: p.name, unit: p.unit, categoryId: p.categoryId, categoryName: selectedCat.name })}
+                onClick={() => onSelect({ id: p.id, name: p.name, unit: p.unit, categoryName: selectedCat.name })}
                 className="flex items-center justify-between bg-white rounded-xl shadow-sm p-4 border-2 border-transparent hover:border-emerald-500 active:scale-95 transition-all text-left min-h-[56px]"
               >
                 <div>

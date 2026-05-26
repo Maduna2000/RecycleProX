@@ -33,6 +33,7 @@ export async function POST(req: NextRequest) {
     data: {
       name:      parsed.data.name,
       colorHex:  parsed.data.colorHex || null,
+      iconName:  parsed.data.iconName  || null,
       sortOrder: parsed.data.sortOrder ?? 0,
     },
   })

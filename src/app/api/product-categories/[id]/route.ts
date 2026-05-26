@@ -26,8 +26,9 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   const updated = await prisma.productCategory.update({
     where: { id: params.id },
     data: {
-      ...(parsed.data.name !== undefined && { name: parsed.data.name }),
-      ...(parsed.data.colorHex !== undefined && { colorHex: parsed.data.colorHex || null }),
+      ...(parsed.data.name      !== undefined && { name:      parsed.data.name }),
+      ...(parsed.data.colorHex  !== undefined && { colorHex:  parsed.data.colorHex  || null }),
+      ...(parsed.data.iconName  !== undefined && { iconName:  parsed.data.iconName   || null }),
       ...(parsed.data.sortOrder !== undefined && { sortOrder: parsed.data.sortOrder }),
     },
   })

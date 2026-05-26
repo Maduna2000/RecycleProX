@@ -256,6 +256,8 @@ model Product {
   saleLines           SaleLine[]
   stockMovements      StockMovement[]
   stocktakeEntries    StocktakeEntry[]
+  scaleOrders         ScaleOrder[]     @relation("ScaleOrderProduct")
+  scaleOrderLines     ScaleOrderLine[] @relation("ScaleOrderLineProduct")
 
   @@index([category])
   @@index([isActive])
@@ -311,6 +313,7 @@ model ProductCategory {
   id        String   @id @default(uuid())
   name      String   @unique
   colorHex  String?
+  iconName  String?
   sortOrder Int      @default(0)
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
@@ -782,37 +785,6 @@ model TransactionPaymentLink {
 
 // ─── Scale Station ────────────────────────────────────────────────────────────
 
-model ScaleCategory {
-  id          String         @id @default(uuid())
-  name        String         @unique
-  description String?
-  colorHex    String?
-  iconName    String?
-  sortOrder   Int            @default(0)
-  isActive    Boolean        @default(true)
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-
-  products    ScaleProduct[]
-}
-
-model ScaleProduct {
-  id         String        @id @default(uuid())
-  categoryId String
-  name       String
-  unit       UnitOfMeasure @default(kg)
-  isActive   Boolean       @default(true)
-  sortOrder  Int           @default(0)
-  createdAt  DateTime      @default(now())
-  updatedAt  DateTime      @updatedAt
-
-  category   ScaleCategory  @relation(fields: [categoryId], references: [id])
-  orders     ScaleOrder[]
-  orderLines ScaleOrderLine[]
-
-  @@index([categoryId])
-}
-
 model ScaleOrder {
   id              String           @id @default(uuid())
   orderNumber     String           @unique
@@ -834,10 +806,10 @@ model ScaleOrder {
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
-  customer   Customer?       @relation(fields: [customerId], references: [id])
-  product    ScaleProduct    @relation(fields: [productId], references: [id])
-  operator   User            @relation("ScaleOrderOperator", fields: [operatorId], references: [id])
-  voidedBy   User?           @relation("ScaleOrderVoidedBy", fields: [voidedById], references: [id])
+  customer   Customer?  @relation(fields: [customerId], references: [id])
+  product    Product    @relation("ScaleOrderProduct", fields: [productId], references: [id])
+  operator   User       @relation("ScaleOrderOperator", fields: [operatorId], references: [id])
+  voidedBy   User?      @relation("ScaleOrderVoidedBy", fields: [voidedById], references: [id])
   lines      ScaleOrderLine[]
 
   @@index([customerId])
@@ -848,14 +820,14 @@ model ScaleOrder {
 }
 
 model ScaleOrderLine {
-  id          String       @id @default(uuid())
+  id          String     @id @default(uuid())
   orderId     String
-  order       ScaleOrder   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order       ScaleOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
   productId   String
-  product     ScaleProduct @relation(fields: [productId], references: [id])
-  weight      Decimal      @db.Decimal(18, 3)
+  product     Product    @relation("ScaleOrderLineProduct", fields: [productId], references: [id])
+  weight      Decimal    @db.Decimal(18, 3)
   photoR2Keys String[]
-  createdAt   DateTime     @default(now())
+  createdAt   DateTime   @default(now())
 
   @@index([orderId])
   @@index([productId])

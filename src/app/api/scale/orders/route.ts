@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
     status:       (p.get('status')      ?? undefined) as 'pending' | 'processed' | 'voided' | undefined,
     operatorId:   p.get('operatorId')   ?? undefined,
     productId:    p.get('productId')    ?? undefined,
-    categoryId:   p.get('categoryId')   ?? undefined,
+    categoryName: p.get('categoryName')  ?? undefined,
     customerType: (p.get('customerType') ?? undefined) as 'casual' | 'account' | undefined,
     search:       p.get('search')       ?? undefined,
     page:         p.get('page')         ? Number(p.get('page'))     : undefined,

@@ -8,7 +8,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, ModalTitleBar, ModalBtn } from '@/components/ui/dialog'
-import { Search, Pencil, TrendingUp, Plus, Eye, EyeOff, Trash2, X, Settings2 } from 'lucide-react'
+import { Search, Pencil, TrendingUp, Plus, Eye, EyeOff, Trash2, X, Settings2, Package } from 'lucide-react'
+import * as LucideIcons from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -33,7 +35,7 @@ function calcMargin(buy: string, sell: string): { pct: string; color: string } {
   return { pct: formatted, color: colors.danger }
 }
 
-type CategoryItem = { id: string; name: string; colorHex: string | null; sortOrder: number; isActive: boolean }
+type CategoryItem = { id: string; name: string; colorHex: string | null; iconName: string | null; sortOrder: number; isActive: boolean }
 
 const FALLBACK_COLORS = ['#0066CC','#CC6600','#009966','#9933CC','#CC3300','#006699','#996600','#008080']
 
@@ -794,15 +796,47 @@ function BulkDeleteModal({ ids, products, onClose, onSuccess }: {
 }
 
 // ─── Manage Categories Modal ──────────────────────────────────────────────────
+const ICON_PRESETS = ['Layers','Zap','Cpu','Package','Archive','FileText','Monitor','Box','Recycle','Truck','Factory','Leaf']
+
+function CatIcon({ name, size = 14 }: { name: string | null; size?: number }) {
+  if (!name) return <Package style={{ width: size, height: size }} />
+  const Icon = (LucideIcons as unknown as Record<string, LucideIcon>)[name]
+  return Icon ? <Icon style={{ width: size, height: size }} /> : <Package style={{ width: size, height: size }} />
+}
+
+function IconPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
+      {ICON_PRESETS.map(name => (
+        <button
+          key={name}
+          type="button"
+          title={name}
+          onClick={() => onChange(value === name ? '' : name)}
+          style={{
+            width: 28, height: 28, borderRadius: 4, border: `1px solid ${value === name ? colors.action : colors.border}`,
+            background: value === name ? `${colors.action}18` : '#fff', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', color: value === name ? colors.action : colors.textSecondary,
+          }}
+        >
+          <CatIcon name={name} size={14} />
+        </button>
+      ))}
+    </div>
+  )
+}
+
 function ManageCategoriesModal({ categories, onClose, onSuccess }: {
   categories: CategoryItem[]; onClose: () => void; onSuccess: () => void
 }) {
   const [newName,    setNewName]    = useState('')
   const [newColor,   setNewColor]   = useState('#607D8B')
+  const [newIcon,    setNewIcon]    = useState('')
   const [adding,     setAdding]     = useState(false)
   const [editId,     setEditId]     = useState<string | null>(null)
   const [editName,   setEditName]   = useState('')
   const [editColor,  setEditColor]  = useState('')
+  const [editIcon,   setEditIcon]   = useState('')
   const [saving,     setSaving]     = useState(false)
   const [deleting,   setDeleting]   = useState<string | null>(null)
 
@@ -812,10 +846,10 @@ function ManageCategoriesModal({ categories, onClose, onSuccess }: {
     const res = await fetch('/api/product-categories', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newName.trim(), colorHex: newColor }),
+      body: JSON.stringify({ name: newName.trim(), colorHex: newColor, iconName: newIcon || null }),
     })
     setAdding(false)
-    if (res.ok) { toast.success('Category added'); setNewName(''); onSuccess() }
+    if (res.ok) { toast.success('Category added'); setNewName(''); setNewIcon(''); onSuccess() }
     else if (res.status === 409) toast.error('Category name already exists')
     else toast.error('Failed to add category')
   }
@@ -824,6 +858,7 @@ function ManageCategoriesModal({ categories, onClose, onSuccess }: {
     setEditId(cat.id)
     setEditName(cat.name)
     setEditColor(cat.colorHex ?? '#607D8B')
+    setEditIcon(cat.iconName ?? '')
   }
 
   async function handleSaveEdit(id: string) {
@@ -831,7 +866,7 @@ function ManageCategoriesModal({ categories, onClose, onSuccess }: {
     const res = await fetch(`/api/product-categories/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: editName.trim(), colorHex: editColor }),
+      body: JSON.stringify({ name: editName.trim(), colorHex: editColor, iconName: editIcon || null }),
     })
     setSaving(false)
     if (res.ok) { toast.success('Category updated'); setEditId(null); onSuccess() }
@@ -853,39 +888,40 @@ function ManageCategoriesModal({ categories, onClose, onSuccess }: {
         <ModalTitleBar title="Manage Categories" onClose={onClose} />
         <div className="space-y-3 mt-2">
           {/* Category list */}
-          <div style={{ maxHeight: 280, overflowY: 'auto', border: `1px solid ${colors.border}`, borderRadius: 3 }}>
+          <div style={{ maxHeight: 300, overflowY: 'auto', border: `1px solid ${colors.border}`, borderRadius: 3 }}>
             {categories.length === 0 ? (
               <p style={{ padding: '16px', textAlign: 'center', fontSize: 12, color: colors.textSecondary }}>No categories yet</p>
             ) : categories.map((cat) => (
-              <div key={cat.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderBottom: `1px solid ${colors.border}` }}>
+              <div key={cat.id} style={{ borderBottom: `1px solid ${colors.border}` }}>
                 {editId === cat.id ? (
-                  <>
-                    <input
-                      type="color"
-                      value={editColor}
-                      onChange={(e) => setEditColor(e.target.value)}
-                      style={{ width: 26, height: 26, borderRadius: 3, border: `1px solid ${colors.border}`, cursor: 'pointer', padding: 1 }}
-                    />
-                    <input
-                      value={editName}
-                      onChange={(e) => setEditName(e.target.value)}
-                      style={{ flex: 1, height: 26, border: `1px solid ${colors.border}`, borderRadius: 3, padding: '0 6px', fontSize: 12, outline: 'none' }}
-                      onKeyDown={(e) => { if (e.key === 'Enter') handleSaveEdit(cat.id); if (e.key === 'Escape') setEditId(null) }}
-                      autoFocus
-                    />
-                    <ModalBtn variant="primary" onClick={() => handleSaveEdit(cat.id)} loading={saving} disabled={!editName.trim()}>Save</ModalBtn>
-                    <ModalBtn onClick={() => setEditId(null)} disabled={saving}>Cancel</ModalBtn>
-                  </>
+                  <div style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <input
+                        type="color"
+                        value={editColor}
+                        onChange={(e) => setEditColor(e.target.value)}
+                        style={{ width: 26, height: 26, borderRadius: 3, border: `1px solid ${colors.border}`, cursor: 'pointer', padding: 1 }}
+                      />
+                      <input
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        style={{ flex: 1, height: 26, border: `1px solid ${colors.border}`, borderRadius: 3, padding: '0 6px', fontSize: 12, outline: 'none' }}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleSaveEdit(cat.id); if (e.key === 'Escape') setEditId(null) }}
+                        autoFocus
+                      />
+                    </div>
+                    <IconPicker value={editIcon} onChange={setEditIcon} />
+                    <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', marginTop: 2 }}>
+                      <ModalBtn variant="primary" onClick={() => handleSaveEdit(cat.id)} loading={saving} disabled={!editName.trim()}>Save</ModalBtn>
+                      <ModalBtn onClick={() => setEditId(null)} disabled={saving}>Cancel</ModalBtn>
+                    </div>
+                  </div>
                 ) : (
-                  <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px' }}>
                     <span style={{ width: 14, height: 14, borderRadius: 3, background: cat.colorHex ?? '#607D8B', display: 'inline-block', flexShrink: 0 }} />
+                    {cat.iconName && <CatIcon name={cat.iconName} size={13} />}
                     <span style={{ flex: 1, fontSize: 12, fontWeight: 500, color: colors.textPrimary }}>{cat.name}</span>
-                    <button
-                      onClick={() => startEdit(cat)}
-                      style={{ fontSize: 11, color: colors.process, background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px' }}
-                    >
-                      Edit
-                    </button>
+                    <button onClick={() => startEdit(cat)} style={{ fontSize: 11, color: colors.process, background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px' }}>Edit</button>
                     <button
                       onClick={() => handleDelete(cat)}
                       disabled={deleting === cat.id}
@@ -893,7 +929,7 @@ function ManageCategoriesModal({ categories, onClose, onSuccess }: {
                     >
                       {deleting === cat.id ? '…' : 'Delete'}
                     </button>
-                  </>
+                  </div>
                 )}
               </div>
             ))}
@@ -918,6 +954,7 @@ function ManageCategoriesModal({ categories, onClose, onSuccess }: {
               />
               <ModalBtn variant="primary" onClick={handleAdd} loading={adding} disabled={!newName.trim()}>Add</ModalBtn>
             </div>
+            <IconPicker value={newIcon} onChange={setNewIcon} />
           </div>
 
           <div className="flex justify-end">

@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
     status:     (p.get('status')    ?? undefined) as 'pending' | 'processed' | 'voided' | undefined,
     operatorId: p.get('operatorId') ?? undefined,
     productId:  p.get('productId')  ?? undefined,
-    categoryId: p.get('categoryId') ?? undefined,
+    categoryName: p.get('categoryName') ?? undefined,
     search:     p.get('search')     ?? undefined,
   })
 
@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
     'Time':          new Date(o.createdAt).toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' }),
     'Customer':      resolveCustomerName(o),
     'Phone':         resolveCustomerPhone(o),
-    'Category':      o.product.category.name,
+    'Category':      o.product.category,
     'Product':       o.product.name,
     'Weight':        new Decimal(o.weight.toString()).toFixed(3),
     'Unit':          o.product.unit,

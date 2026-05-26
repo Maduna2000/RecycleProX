@@ -10,3 +10,10 @@ BEGIN
     DROP TYPE "ProductCategory";
   END IF;
 END $$;
+
+-- Unify scale portal with main product catalog (wipe test data, idempotent)
+-- Must truncate child tables before dropping parent tables
+TRUNCATE TABLE "ScaleOrderLine" CASCADE;
+TRUNCATE TABLE "ScaleOrder"     CASCADE;
+DROP TABLE IF EXISTS "ScaleProduct" CASCADE;
+DROP TABLE IF EXISTS "ScaleCategory" CASCADE;

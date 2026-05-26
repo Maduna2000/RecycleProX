@@ -36,7 +36,7 @@ export interface ScaleOrderFilters {
   status?:       'pending' | 'processed' | 'voided'
   operatorId?:   string
   productId?:    string
-  categoryId?:   string
+  categoryName?: string
   customerType?: 'casual' | 'account'
   search?:       string
   page?:         number
@@ -82,7 +82,7 @@ export async function createScaleOrder(data: CreateScaleOrderInput, operatorId: 
   }
 
   for (const line of data.lines) {
-    const product = await prisma.scaleProduct.findUnique({ where: { id: line.productId } })
+    const product = await prisma.product.findUnique({ where: { id: line.productId } })
     if (!product || !product.isActive) throw new ScaleProductInactiveError()
   }
 
@@ -122,9 +122,9 @@ export async function createScaleOrder(data: CreateScaleOrderInput, operatorId: 
       where:   { id: created.id },
       include: {
         customer: true,
-        product:  { include: { category: true } },
+        product:  true,
         operator: true,
-        lines:    { include: { product: { include: { category: true } } }, orderBy: { createdAt: 'asc' } },
+        lines:    { include: { product: true }, orderBy: { createdAt: 'asc' } },
       },
     })
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
@@ -143,7 +143,7 @@ export async function voidScaleOrder(id: string, data: VoidScaleOrderInput, void
   const updated = await prisma.scaleOrder.update({
     where: { id },
     data: { status: 'voided', voidedAt: new Date(), voidedById, voidReason: data.voidReason },
-    include: { customer: true, product: { include: { category: true } }, operator: true },
+    include: { customer: true, product: true, operator: true },
   })
   logger.info({ orderId: id, voidedById }, 'scaleOrder.voided')
   return updated
@@ -160,7 +160,7 @@ export async function markProcessed(id: string, userId: string) {
   const updated = await prisma.scaleOrder.update({
     where: { id },
     data: { status: 'processed' },
-    include: { customer: true, product: { include: { category: true } }, operator: true },
+    include: { customer: true, product: true, operator: true },
   })
   logger.info({ orderId: id, userId }, 'scaleOrder.processed')
   return updated
@@ -186,7 +186,7 @@ export async function listScaleOrders(filters: ScaleOrderFilters) {
   if (filters.status)     where.status     = filters.status
   if (filters.operatorId) where.operatorId = filters.operatorId
   if (filters.productId)  where.productId  = filters.productId
-  if (filters.categoryId) where.product    = { categoryId: filters.categoryId }
+  if (filters.categoryName) where.product   = { category: filters.categoryName }
 
   if (filters.customerType === 'account') {
     andConditions.push({ customerId: { not: null } })
@@ -227,9 +227,9 @@ export async function listScaleOrders(filters: ScaleOrderFilters) {
       where,
       include: {
         customer: { select: { id: true, firstName: true, lastName: true, phone: true, customerType: true } },
-        product:  { include: { category: true } },
+        product:  { select: { id: true, name: true, unit: true, category: true } },
         operator: { select: { id: true, fullName: true } },
-        lines:    { include: { product: { select: { name: true, unit: true } } }, orderBy: { createdAt: 'asc' } },
+        lines:    { include: { product: { select: { name: true, unit: true, category: true } } }, orderBy: { createdAt: 'asc' } },
       },
       orderBy: { createdAt: 'desc' },
       skip,
@@ -248,10 +248,10 @@ export async function getScaleOrderById(id: string) {
     where: { id },
     include: {
       customer: true,
-      product:  { include: { category: true } },
+      product:  true,
       operator: { select: { id: true, fullName: true } },
       voidedBy: { select: { id: true, fullName: true } },
-      lines:    { include: { product: { include: { category: true } } }, orderBy: { createdAt: 'asc' } },
+      lines:    { include: { product: true }, orderBy: { createdAt: 'asc' } },
     },
   })
   if (!order) throw new ScaleOrderNotFoundError(id)

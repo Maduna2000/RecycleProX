@@ -6,7 +6,7 @@ import { Search, Download, Eye, CheckCircle2, XCircle, Loader2, X } from 'lucide
 import { StatusBadge } from '../components/StatusBadge'
 
 interface OrderLine {
-  product: { name: string; unit: string; category?: { name: string } }
+  product: { name: string; unit: string; category?: string }
   weight: string
 }
 
@@ -14,7 +14,7 @@ interface Order {
   id: string; orderNumber: string; createdAt: string
   customer: { firstName: string; lastName: string; phone: string } | null
   casualFirstName?: string | null; casualLastName?: string | null; casualPhone?: string | null
-  product:  { name: string; unit: string; category: { name: string } }
+  product:  { name: string; unit: string; category: string }
   weight: string; status: string; operator: { fullName: string }
   lines?: OrderLine[]
   photoUrls?: string[]; slipUrl?: string; notes?: string; voidReason?: string
@@ -242,7 +242,7 @@ export default function ScaleOrdersPage() {
                       <div key={i} className="flex justify-between items-baseline text-sm">
                         <div>
                           <span className="text-slate-800 font-medium">{l.product.name}</span>
-                          {l.product.category && <span className="text-xs text-slate-400 ml-1.5">({l.product.category.name})</span>}
+                          {l.product.category && <span className="text-xs text-slate-400 ml-1.5">({l.product.category})</span>}
                         </div>
                         <span className="font-mono text-slate-700">{Number(l.weight).toFixed(3)} {l.product.unit}</span>
                       </div>
@@ -251,7 +251,7 @@ export default function ScaleOrdersPage() {
                 </div>
               ) : (
                 <>
-                  <DetailRow label="Category" value={detail.product.category.name} />
+                  <DetailRow label="Category" value={detail.product.category} />
                   <DetailRow label="Product"  value={detail.product.name} />
                   <DetailRow label="Weight"   value={`${Number(detail.weight).toFixed(3)} ${detail.product.unit}`} />
                 </>
