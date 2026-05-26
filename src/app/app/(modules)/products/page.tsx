@@ -12,7 +12,7 @@ import { Search, Pencil, TrendingUp, Plus, Eye, EyeOff, Trash2, X, Settings2 } f
 import { toast } from 'sonner'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { CreateProductSchema, UpdateProductSchema, BulkPriceUpdateSchema, CreateCategorySchema, UpdateCategorySchema, type CreateProductInput, type CreateProductFormInput, type UpdateProductInput, type CreateCategoryInput, type UpdateCategoryInput } from '@/lib/schemas/product'
+import { CreateProductSchema, UpdateProductSchema, BulkPriceUpdateSchema, type CreateProductInput, type CreateProductFormInput, type UpdateProductInput } from '@/lib/schemas/product'
 import { useSession } from 'next-auth/react'
 import Decimal from 'decimal.js'
 import { PageShell } from '@/components/layout/PageShell'
