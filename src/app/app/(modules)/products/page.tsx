@@ -8,11 +8,11 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, ModalTitleBar, ModalBtn } from '@/components/ui/dialog'
-import { Search, Pencil, TrendingUp, Plus, Eye, EyeOff, Trash2, X } from 'lucide-react'
+import { Search, Pencil, TrendingUp, Plus, Eye, EyeOff, Trash2, X, Settings2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { CreateProductSchema, UpdateProductSchema, BulkPriceUpdateSchema, type CreateProductInput, type CreateProductFormInput, type UpdateProductInput } from '@/lib/schemas/product'
+import { CreateProductSchema, UpdateProductSchema, BulkPriceUpdateSchema, CreateCategorySchema, UpdateCategorySchema, type CreateProductInput, type CreateProductFormInput, type UpdateProductInput, type CreateCategoryInput, type UpdateCategoryInput } from '@/lib/schemas/product'
 import { useSession } from 'next-auth/react'
 import Decimal from 'decimal.js'
 import { PageShell } from '@/components/layout/PageShell'
@@ -33,29 +33,14 @@ function calcMargin(buy: string, sell: string): { pct: string; color: string } {
   return { pct: formatted, color: colors.danger }
 }
 
-const CATEGORIES = [
-  { value: 'ferrous',     label: 'Ferrous' },
-  { value: 'non_ferrous', label: 'Non-Ferrous' },
-  { value: 'copper',      label: 'Copper' },
-  { value: 'aluminium',   label: 'Aluminium' },
-  { value: 'plastic',     label: 'Plastic' },
-  { value: 'paper',       label: 'Paper' },
-  { value: 'e_waste',     label: 'E-Waste' },
-  { value: 'other',       label: 'Other' },
-]
+type CategoryItem = { id: string; name: string; colorHex: string | null; sortOrder: number; isActive: boolean }
 
-const CATEGORY_STYLES: Record<string, { background: string; color: string }> = {
-  ferrous:     { background: colors.neutralBg,  color: colors.textSecondary },
-  non_ferrous: { background: colors.processBg,  color: colors.process },
-  copper:      { background: '#FEF3E8',          color: '#C05621' },
-  aluminium:   { background: '#F3EBF9',          color: '#7B2D8B' },
-  plastic:     { background: colors.warningBg,  color: colors.warning },
-  paper:       { background: colors.actionBg,   color: colors.action },
-  e_waste:     { background: colors.dangerBg,   color: colors.danger },
-  other:       { background: colors.neutralBg,  color: colors.textSecondary },
+const FALLBACK_COLORS = ['#0066CC','#CC6600','#009966','#9933CC','#CC3300','#006699','#996600','#008080']
+
+function getCategoryStyle(hex: string | null | undefined, name: string): { background: string; color: string } {
+  const h = hex ?? FALLBACK_COLORS[Math.abs((name.charCodeAt(0) ?? 0)) % FALLBACK_COLORS.length]!
+  return { background: `${h}22`, color: h }
 }
-
-const CATEGORY_LABELS: Record<string, string> = Object.fromEntries(CATEGORIES.map(c => [c.value, c.label]))
 
 type Product = {
   id: string; code: string; name: string; category: string; unit: string
@@ -76,6 +61,7 @@ export default function ProductsPage() {
   const [selectedKeys,  setSelectedKeys] = useState<Set<string>>(new Set())
   const [bulkDelOpen,   setBulkDelOpen]  = useState(false)
   const [bulkLoading,   setBulkLoading]  = useState<'deactivate' | 'reactivate' | null>(null)
+  const [catManageOpen, setCatManageOpen] = useState(false)
 
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
 
@@ -96,6 +82,9 @@ export default function ProductsPage() {
   const swrKey = `/api/products?${query}`
   const { data, isLoading } = useSWR<{ products: Product[] }>(swrKey, fetcher)
   const products = data?.products ?? []
+
+  const { data: catData, mutate: mutateCats } = useSWR<{ categories: CategoryItem[] }>('/api/product-categories', fetcher)
+  const categories: CategoryItem[] = catData?.categories ?? []
 
   const revalidate = () => mutate(swrKey)
 
@@ -164,10 +153,11 @@ export default function ProductsPage() {
       header: 'Category',
       width: '130px',
       render: (row) => {
-        const style = CATEGORY_STYLES[row.category] ?? { background: colors.neutralBg, color: colors.textSecondary }
+        const cat = categories.find(c => c.name === row.category)
+        const style = getCategoryStyle(cat?.colorHex, row.category)
         return (
           <span style={{ ...style, display: 'inline-flex', padding: '2px 8px', borderRadius: 4, fontSize: fontSize.xs, fontWeight: fontWeight.medium }}>
-            {CATEGORY_LABELS[row.category] ?? row.category}
+            {row.category}
           </span>
         )
       },
@@ -271,7 +261,7 @@ export default function ProductsPage() {
           onChange={(e) => setCategory(e.target.value)}
         >
           <option value="">All Categories</option>
-          {CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+          {categories.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
         </select>
         <select
           className="h-7 border rounded px-2 text-xs bg-white focus:outline-none"
@@ -285,6 +275,12 @@ export default function ProductsPage() {
         </select>
         {isManager && (
           <div className="ml-auto flex gap-2">
+            <button
+              onClick={() => setCatManageOpen(true)}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', fontSize: 12, fontWeight: 600, borderRadius: 2, background: '#fff', border: `1px solid ${colors.border}`, color: colors.textPrimary, cursor: 'pointer' }}
+            >
+              <Settings2 style={{ width: 13, height: 13 }} /> Categories
+            </button>
             <button
               onClick={() => setBulkOpen(true)}
               style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', fontSize: 12, fontWeight: 600, borderRadius: 2, background: '#fff', border: `1px solid ${colors.border}`, color: colors.textPrimary, cursor: 'pointer' }}
@@ -341,6 +337,7 @@ export default function ProductsPage() {
 
       {createOpen && (
         <CreateProductModal
+          categories={categories}
           onClose={() => setCreateOpen(false)}
           onSuccess={() => { revalidate(); setCreateOpen(false) }}
         />
@@ -348,6 +345,7 @@ export default function ProductsPage() {
       {editTarget && (
         <EditProductModal
           product={editTarget}
+          categories={categories}
           onClose={() => setEditTarget(null)}
           onSuccess={() => { revalidate(); setEditTarget(null) }}
         />
@@ -366,6 +364,13 @@ export default function ProductsPage() {
           onSuccess={() => { revalidate(); setBulkOpen(false) }}
         />
       )}
+      {catManageOpen && (
+        <ManageCategoriesModal
+          categories={categories}
+          onClose={() => setCatManageOpen(false)}
+          onSuccess={() => mutateCats()}
+        />
+      )}
       {bulkDelOpen && (
         <BulkDeleteModal
           ids={Array.from(selectedKeys)}
@@ -379,7 +384,7 @@ export default function ProductsPage() {
 }
 
 // ─── Create Product Modal ─────────────────────────────────────────────────────
-function CreateProductModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
+function CreateProductModal({ categories, onClose, onSuccess }: { categories: CategoryItem[]; onClose: () => void; onSuccess: () => void }) {
   const [loading, setLoading] = useState(false)
   const { register, handleSubmit, setValue, formState: { errors } } = useForm<CreateProductFormInput, unknown, CreateProductInput>({
     resolver: zodResolver(CreateProductSchema),
@@ -426,10 +431,10 @@ function CreateProductModal({ onClose, onSuccess }: { onClose: () => void; onSuc
           </div>
           <div>
             <Label>Category</Label>
-            <Select onValueChange={(v) => setValue('category', v as CreateProductInput['category'])}>
+            <Select onValueChange={(v) => setValue('category', v as string)}>
               <SelectTrigger className="mt-1"><SelectValue placeholder="Select category" /></SelectTrigger>
               <SelectContent>
-                {CATEGORIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+                {categories.map((c) => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}
               </SelectContent>
             </Select>
             {errors.category && <p className="text-xs text-red-600 mt-1">{errors.category.message}</p>}
@@ -457,13 +462,13 @@ function CreateProductModal({ onClose, onSuccess }: { onClose: () => void; onSuc
 }
 
 // ─── Edit Product Modal ───────────────────────────────────────────────────────
-function EditProductModal({ product, onClose, onSuccess }: { product: Product; onClose: () => void; onSuccess: () => void }) {
+function EditProductModal({ product, categories, onClose, onSuccess }: { product: Product; categories: CategoryItem[]; onClose: () => void; onSuccess: () => void }) {
   const [loading, setLoading] = useState(false)
   const { register, handleSubmit, setValue, formState: { errors } } = useForm<UpdateProductInput>({
     resolver: zodResolver(UpdateProductSchema),
     defaultValues: {
       name: product.name,
-      category: product.category as UpdateProductInput['category'],
+      category: product.category,
       unit: product.unit as UpdateProductInput['unit'],
       defaultBuyPrice: Number(product.defaultBuyPrice).toFixed(2),
       defaultSellPrice: Number(product.defaultSellPrice).toFixed(2),
@@ -493,10 +498,10 @@ function EditProductModal({ product, onClose, onSuccess }: { product: Product; o
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label>Category</Label>
-              <Select onValueChange={(v) => setValue('category', v as UpdateProductInput['category'])} defaultValue={product.category}>
+              <Select onValueChange={(v) => setValue('category', v as string)} defaultValue={product.category}>
                 <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {CATEGORIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+                  {categories.map((c) => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -782,6 +787,142 @@ function BulkDeleteModal({ ids, products, onClose, onSuccess }: {
               </div>
             </>
           )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ─── Manage Categories Modal ──────────────────────────────────────────────────
+function ManageCategoriesModal({ categories, onClose, onSuccess }: {
+  categories: CategoryItem[]; onClose: () => void; onSuccess: () => void
+}) {
+  const [newName,    setNewName]    = useState('')
+  const [newColor,   setNewColor]   = useState('#607D8B')
+  const [adding,     setAdding]     = useState(false)
+  const [editId,     setEditId]     = useState<string | null>(null)
+  const [editName,   setEditName]   = useState('')
+  const [editColor,  setEditColor]  = useState('')
+  const [saving,     setSaving]     = useState(false)
+  const [deleting,   setDeleting]   = useState<string | null>(null)
+
+  async function handleAdd() {
+    if (!newName.trim()) return
+    setAdding(true)
+    const res = await fetch('/api/product-categories', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newName.trim(), colorHex: newColor }),
+    })
+    setAdding(false)
+    if (res.ok) { toast.success('Category added'); setNewName(''); onSuccess() }
+    else if (res.status === 409) toast.error('Category name already exists')
+    else toast.error('Failed to add category')
+  }
+
+  function startEdit(cat: CategoryItem) {
+    setEditId(cat.id)
+    setEditName(cat.name)
+    setEditColor(cat.colorHex ?? '#607D8B')
+  }
+
+  async function handleSaveEdit(id: string) {
+    setSaving(true)
+    const res = await fetch(`/api/product-categories/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: editName.trim(), colorHex: editColor }),
+    })
+    setSaving(false)
+    if (res.ok) { toast.success('Category updated'); setEditId(null); onSuccess() }
+    else if (res.status === 409) toast.error('Category name already exists')
+    else toast.error('Failed to update category')
+  }
+
+  async function handleDelete(cat: CategoryItem) {
+    setDeleting(cat.id)
+    const res = await fetch(`/api/product-categories/${cat.id}`, { method: 'DELETE' })
+    setDeleting(null)
+    if (res.ok) { toast.success('Category deleted'); onSuccess() }
+    else { const j = await res.json(); toast.error(j.error ?? 'Failed to delete category') }
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
+      <DialogContent className="sm:max-w-md" showCloseButton={false}>
+        <ModalTitleBar title="Manage Categories" onClose={onClose} />
+        <div className="space-y-3 mt-2">
+          {/* Category list */}
+          <div style={{ maxHeight: 280, overflowY: 'auto', border: `1px solid ${colors.border}`, borderRadius: 3 }}>
+            {categories.length === 0 ? (
+              <p style={{ padding: '16px', textAlign: 'center', fontSize: 12, color: colors.textSecondary }}>No categories yet</p>
+            ) : categories.map((cat) => (
+              <div key={cat.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderBottom: `1px solid ${colors.border}` }}>
+                {editId === cat.id ? (
+                  <>
+                    <input
+                      type="color"
+                      value={editColor}
+                      onChange={(e) => setEditColor(e.target.value)}
+                      style={{ width: 26, height: 26, borderRadius: 3, border: `1px solid ${colors.border}`, cursor: 'pointer', padding: 1 }}
+                    />
+                    <input
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      style={{ flex: 1, height: 26, border: `1px solid ${colors.border}`, borderRadius: 3, padding: '0 6px', fontSize: 12, outline: 'none' }}
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleSaveEdit(cat.id); if (e.key === 'Escape') setEditId(null) }}
+                      autoFocus
+                    />
+                    <ModalBtn variant="primary" onClick={() => handleSaveEdit(cat.id)} loading={saving} disabled={!editName.trim()}>Save</ModalBtn>
+                    <ModalBtn onClick={() => setEditId(null)} disabled={saving}>Cancel</ModalBtn>
+                  </>
+                ) : (
+                  <>
+                    <span style={{ width: 14, height: 14, borderRadius: 3, background: cat.colorHex ?? '#607D8B', display: 'inline-block', flexShrink: 0 }} />
+                    <span style={{ flex: 1, fontSize: 12, fontWeight: 500, color: colors.textPrimary }}>{cat.name}</span>
+                    <button
+                      onClick={() => startEdit(cat)}
+                      style={{ fontSize: 11, color: colors.process, background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px' }}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDelete(cat)}
+                      disabled={deleting === cat.id}
+                      style={{ fontSize: 11, color: colors.danger, background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px', opacity: deleting === cat.id ? 0.5 : 1 }}
+                    >
+                      {deleting === cat.id ? '…' : 'Delete'}
+                    </button>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Add new category */}
+          <div style={{ background: colors.neutralBg, border: `1px solid ${colors.border}`, borderRadius: 3, padding: '10px 12px' }}>
+            <p style={{ fontSize: 11, fontWeight: 600, color: colors.textSecondary, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Add Category</p>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <input
+                type="color"
+                value={newColor}
+                onChange={(e) => setNewColor(e.target.value)}
+                style={{ width: 32, height: 28, borderRadius: 3, border: `1px solid ${colors.border}`, cursor: 'pointer', padding: 2 }}
+              />
+              <input
+                placeholder="Category name…"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleAdd() }}
+                style={{ flex: 1, height: 28, border: `1px solid ${colors.border}`, borderRadius: 3, padding: '0 8px', fontSize: 12, outline: 'none', background: '#fff' }}
+              />
+              <ModalBtn variant="primary" onClick={handleAdd} loading={adding} disabled={!newName.trim()}>Add</ModalBtn>
+            </div>
+          </div>
+
+          <div className="flex justify-end">
+            <ModalBtn onClick={onClose}>Close</ModalBtn>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

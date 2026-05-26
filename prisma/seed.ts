@@ -3,6 +3,17 @@ import bcrypt from 'bcryptjs'
 
 const prisma = new PrismaClient()
 
+const DEFAULT_CATEGORIES = [
+  { name: 'Ferrous',     colorHex: '#607D8B', sortOrder: 0 },
+  { name: 'Non-Ferrous', colorHex: '#5C6BC0', sortOrder: 1 },
+  { name: 'Copper',      colorHex: '#FF6D00', sortOrder: 2 },
+  { name: 'Aluminium',   colorHex: '#7B1FA2', sortOrder: 3 },
+  { name: 'Plastic',     colorHex: '#F9A825', sortOrder: 4 },
+  { name: 'Paper',       colorHex: '#2E7D32', sortOrder: 5 },
+  { name: 'E-Waste',     colorHex: '#B71C1C', sortOrder: 6 },
+  { name: 'Other',       colorHex: '#757575', sortOrder: 7 },
+]
+
 async function main() {
   // Seed default admin if not exists
   const adminExists = await prisma.user.findFirst({ where: { role: 'admin' } })
@@ -21,6 +32,16 @@ async function main() {
   } else {
     console.log('Admin already exists — skipping')
   }
+
+  // Seed default product categories (idempotent)
+  for (const cat of DEFAULT_CATEGORIES) {
+    await prisma.productCategory.upsert({
+      where:  { name: cat.name },
+      update: {},
+      create: cat,
+    })
+  }
+  console.log('Product categories seeded')
 }
 
 main()

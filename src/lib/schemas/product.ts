@@ -9,7 +9,7 @@ const positiveDecimal = z
 export const CreateProductSchema = z.object({
   code: z.string().min(1, 'Product code is required').max(20).toUpperCase(),
   name: z.string().min(1, 'Product name is required').max(100),
-  category: z.enum(['ferrous', 'non_ferrous', 'copper', 'aluminium', 'plastic', 'paper', 'e_waste', 'other']),
+  category: z.string().min(1, 'Category is required'),
   unit: z.enum(['kg', 'ton', 'each', 'litre']).default('kg'),
   defaultBuyPrice: positiveDecimal,
   defaultSellPrice: positiveDecimal,
@@ -43,6 +43,15 @@ export const SetGroupOverridesSchema = z.object({
     sellPrice: positiveDecimal,
   })),
 })
+
+export const CreateCategorySchema = z.object({
+  name:      z.string().min(1, 'Name is required').max(80),
+  colorHex:  z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Invalid hex color').optional().or(z.literal('')),
+  sortOrder: z.number().int().default(0),
+})
+export const UpdateCategorySchema = CreateCategorySchema.partial()
+export type CreateCategoryInput = z.infer<typeof CreateCategorySchema>
+export type UpdateCategoryInput = z.infer<typeof UpdateCategorySchema>
 
 export type CreateProductInput = z.infer<typeof CreateProductSchema>
 export type CreateProductFormInput = z.input<typeof CreateProductSchema>

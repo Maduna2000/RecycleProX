@@ -45,16 +45,6 @@ enum PaymentMethod {
   amplopay
 }
 
-enum ProductCategory {
-  ferrous
-  non_ferrous
-  copper
-  aluminium
-  plastic
-  paper
-  e_waste
-  other
-}
 
 enum UnitOfMeasure {
   kg
@@ -249,7 +239,7 @@ model Product {
   id               String          @id @default(uuid())
   code             String          @unique
   name             String
-  category         ProductCategory
+  category         String
   unit             UnitOfMeasure   @default(kg)
   defaultBuyPrice  Decimal         @db.Decimal(18, 2)
   defaultSellPrice Decimal         @db.Decimal(18, 2)
@@ -313,6 +303,18 @@ model PriceHistory {
 
   @@index([productId])
   @@index([createdAt])
+}
+
+// ─── Product Categories (dynamic lookup) ─────────────────────────────────────
+
+model ProductCategory {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  colorHex  String?
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // ─── Purchases (M5) ───────────────────────────────────────────────────────────
