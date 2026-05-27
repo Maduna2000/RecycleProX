@@ -462,8 +462,8 @@ model StockMovement {
 model Payment {
   id              String        @id @default(uuid())
   refNumber       String        @unique
-  customerId      String
-  customer        Customer      @relation(fields: [customerId], references: [id])
+  customerId      String?
+  customer        Customer?     @relation(fields: [customerId], references: [id])
   amount          Decimal       @db.Decimal(18, 2)
   paymentMethod   PaymentMethod @default(cash)
   notes           String?

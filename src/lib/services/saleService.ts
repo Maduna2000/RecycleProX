@@ -252,12 +252,12 @@ export async function markSalePaid(
       await tx.payment.create({
         data: {
           refNumber,
-          customerId:      sale.customerId ?? undefined,
+          ...(sale.customerId ? { customerId: sale.customerId } : {}),
           amount:          settleAmount,
           paymentMethod:   data.paymentMethod as 'cash' | 'eft' | 'cheque' | 'amplopay',
           notes:           `Settlement of sale ${sale.refNumber}`,
           createdByUserId: userId,
-        },
+        } as Prisma.PaymentUncheckedCreateInput,
       })
 
       return { updated, isFullySettled }
