@@ -252,7 +252,7 @@ export async function markSalePaid(
       await tx.payment.create({
         data: {
           refNumber,
-          customerId:      sale.customerId,
+          customerId:      sale.customerId ?? undefined,
           amount:          settleAmount,
           paymentMethod:   data.paymentMethod as 'cash' | 'eft' | 'cheque' | 'amplopay',
           notes:           `Settlement of sale ${sale.refNumber}`,
