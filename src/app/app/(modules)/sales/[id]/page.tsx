@@ -180,18 +180,25 @@ export default function SaleDetailPage() {
       {sale.photoR2Keys && sale.photoR2Keys.length > 0 && (
         <div className="bg-white rounded-xl border p-6 mb-4">
           <h2 className="font-semibold text-gray-900 mb-3">Photos</h2>
-          <PhotoViewer
-            r2Keys={sale.photoR2Keys}
-            onRemove={async (key) => {
-              const res = await fetch(`/api/sales/${sale.id}/photos`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ remove: key }),
-              })
-              if (res.ok) mutate(`/api/sales/${id}`)
-              else toast.error('Failed to remove photo')
-            }}
-          />
+          <div className="space-y-3">
+            {sale.photoR2Keys.map((key) => (
+              <PhotoViewer
+                key={key}
+                r2Key={key}
+                alt="Sale photo"
+                canDelete={isManager}
+                onDelete={async () => {
+                  const res = await fetch(`/api/sales/${sale.id}/photos`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ remove: key }),
+                  })
+                  if (res.ok) mutate(`/api/sales/${id}`)
+                  else toast.error('Failed to remove photo')
+                }}
+              />
+            ))}
+          </div>
         </div>
       )}
 
