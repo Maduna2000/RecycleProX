@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
     const sale = await createSale(parsed.data, session.user.id)
     return NextResponse.json(sale, { status: 201 })
   } catch (err) {
-    if (err instanceof ProductInactiveError) return NextResponse.json({ error: err.message }, { status: 422 })
+    if (err instanceof ProductInactiveError)  return NextResponse.json({ error: err.message }, { status: 422 })
     if (err instanceof InsufficientStockError) return NextResponse.json({ error: err.message }, { status: 422 })
     logger.error({ err }, 'POST /api/sales failed')
     return NextResponse.json({ error: 'Failed to create sale' }, { status: 500 })

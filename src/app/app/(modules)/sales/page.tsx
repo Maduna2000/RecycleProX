@@ -9,8 +9,7 @@ import { toast } from 'sonner'
 import Decimal from 'decimal.js'
 import { DataTable, StatusBadge, type Column, type RowAction, type SortDir } from '@/components/ui/DataTable'
 import { InlineDetailPanel } from '@/components/ui/InlineDetailPanel'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, ModalTitleBar, ModalBtn } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { format } from '@/lib/utils/format'
@@ -117,11 +116,19 @@ export default function SalesPage() {
       key: 'buyerName',
       header: 'Buyer',
       render: (row) => (
-        <div>
-          <p style={{ fontSize: fontSize.sm, fontWeight: fontWeight.medium, color: colors.textPrimary }}>{row.buyerName}</p>
-          {row.buyerIdNumber && (
-            <p className="font-mono" style={{ fontSize: 10, color: colors.textSecondary }}>{row.buyerIdNumber}</p>
-          )}
+        <div className="flex items-center gap-2">
+          <div
+            className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0"
+            style={{ background: '#217346' }}
+          >
+            {(row.buyerName?.[0] ?? '?').toUpperCase()}
+          </div>
+          <div>
+            <p style={{ fontSize: fontSize.sm, fontWeight: fontWeight.medium, color: colors.textPrimary }}>{row.buyerName}</p>
+            {row.buyerIdNumber && (
+              <p className="font-mono" style={{ fontSize: 10, color: colors.textSecondary }}>{row.buyerIdNumber}</p>
+            )}
+          </div>
         </div>
       ),
     },
@@ -210,6 +217,7 @@ export default function SalesPage() {
           onChange={(e) => { setStatus(e.target.value); setPage(1) }}
         >
           <option value="">All Statuses</option>
+          <option value="pending">Pending</option>
           <option value="completed">Completed</option>
           <option value="voided">Voided</option>
         </select>
@@ -414,11 +422,9 @@ function VoidDialog({
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle style={{ color: colors.danger }}>Void Sale</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4 mt-2">
+      <DialogContent className="sm:max-w-md p-4" showCloseButton={false}>
+        <ModalTitleBar title="Void Sale" onClose={onClose} />
+        <div className="space-y-4 mt-3">
           <p className="text-sm" style={{ color: colors.textSecondary }}>
             You are about to void{' '}
             <span className="font-semibold" style={{ color: colors.textPrimary }}>{sale.refNumber}</span>
@@ -435,16 +441,16 @@ function VoidDialog({
             />
           </div>
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
-            <Button
-              variant="destructive"
+            <ModalBtn variant="outline" onClick={onClose} disabled={loading}>Cancel</ModalBtn>
+            <ModalBtn
+              variant="danger"
               onClick={onConfirm}
               disabled={loading || reason.trim().length < 5}
             >
               {loading
-                ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Voiding…</>
+                ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Voiding…</>
                 : 'Confirm Void'}
-            </Button>
+            </ModalBtn>
           </div>
         </div>
       </DialogContent>

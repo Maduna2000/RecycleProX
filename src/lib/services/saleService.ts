@@ -15,6 +15,17 @@ export class SaleAlreadyVoidedError extends Error {
   constructor(ref: string) { super(`Sale "${ref}" is already voided`); this.name = 'SaleAlreadyVoidedError' }
 }
 
+export class SaleNotPendingError extends Error {
+  constructor(status: string) { super(`Sale is not pending (status: ${status})`); this.name = 'SaleNotPendingError' }
+}
+
+export class SalePaymentExceedsBalanceError extends Error {
+  constructor(amount: string, balance: string) {
+    super(`Payment amount R${amount} exceeds remaining balance R${balance}`)
+    this.name = 'SalePaymentExceedsBalanceError'
+  }
+}
+
 export class ProductInactiveError extends Error {
   constructor(code: string) { super(`Product "${code}" is inactive`); this.name = 'ProductInactiveError' }
 }
@@ -64,7 +75,18 @@ export async function createSale(data: CreateSaleInput, createdByUserId?: string
       const quantity  = new Decimal(line.quantity)
       const lineTotal = unitPrice.times(quantity)
 
-      return { productId: line.productId, productName: product.name, quantity, unitPrice, lineTotal }
+      return {
+        productId:       line.productId,
+        productName:     product.name,
+        quantity,
+        unitPrice,
+        lineTotal,
+        grossQty:        line.grossQty        ? new Decimal(line.grossQty)        : undefined,
+        tareQty:         line.tareQty         ? new Decimal(line.tareQty)         : undefined,
+        tareReason:      line.tareReason,
+        deductionQty:    line.deductionQty    ? new Decimal(line.deductionQty)    : undefined,
+        deductionReason: line.deductionReason,
+      }
     })
   )
 
@@ -90,25 +112,34 @@ export async function createSale(data: CreateSaleInput, createdByUserId?: string
         if (line.quantity.gt(onHand)) throw new InsufficientStockError(line.productName)
       }
 
+      const isPending = data.status === 'pending'
+
       const s = await tx.sale.create({
         data: {
           refNumber,
-          customerId:    data.customerId,
-          buyerId:       data.buyerId,
-          buyerName:     data.buyerName,
-          buyerIdNumber: data.buyerIdNumber,
-          buyerPhone:    data.buyerPhone,
-          status:        'completed',
+          customerId:           data.customerId,
+          buyerId:              data.buyerId,
+          buyerName:            data.buyerName,
+          buyerIdNumber:        data.buyerIdNumber,
+          buyerPhone:           data.buyerPhone,
+          status:               isPending ? 'pending' : 'completed',
           totalAmount,
-          paymentMethod: data.paymentMethod ?? 'cash',
-          notes:         data.notes,
+          paymentMethod:        data.paymentMethod ?? 'cash',
+          amountPaid:           isPending ? new Decimal(0) : totalAmount,
+          hasOutstandingBalance: isPending,
+          notes:                data.notes,
           createdByUserId,
           lines: {
             create: resolvedLines.map((l) => ({
-              productId: l.productId,
-              quantity:  l.quantity,
-              unitPrice: l.unitPrice,
-              lineTotal: l.lineTotal,
+              productId:       l.productId,
+              quantity:        l.quantity,
+              unitPrice:       l.unitPrice,
+              lineTotal:       l.lineTotal,
+              grossQty:        l.grossQty,
+              tareQty:         l.tareQty,
+              tareReason:      l.tareReason,
+              deductionQty:    l.deductionQty,
+              deductionReason: l.deductionReason,
             })),
           },
         },
@@ -176,6 +207,94 @@ export async function getSale(id: string) {
   })
   if (!sale) throw new SaleNotFoundError(id)
   return sale
+}
+
+// ─── Mark Sale Paid ───────────────────────────────────────────────────────────
+
+export async function markSalePaid(
+  id: string,
+  data: { amount: string; paymentMethod: string },
+  userId: string
+) {
+  const result = await withSerializableRetry(() =>
+    prisma.$transaction(async (tx) => {
+      const sale = await tx.sale.findUniqueOrThrow({ where: { id } })
+      if (sale.status !== 'pending') throw new SaleNotPendingError(sale.status)
+
+      const totalAmount  = new Decimal(sale.totalAmount.toString())
+      const currentPaid  = new Decimal(sale.amountPaid?.toString() ?? '0')
+      const outstanding  = totalAmount.minus(currentPaid)
+      const settleAmount = new Decimal(data.amount)
+
+      if (settleAmount.greaterThan(outstanding)) {
+        throw new SalePaymentExceedsBalanceError(settleAmount.toFixed(2), outstanding.toFixed(2))
+      }
+
+      const isFullySettled = currentPaid.plus(settleAmount).gte(totalAmount)
+
+      const updated = await tx.sale.update({
+        where: { id },
+        data: {
+          amountPaid:           { increment: settleAmount },
+          paymentMethod:        data.paymentMethod as Prisma.SaleUpdateInput['paymentMethod'],
+          hasOutstandingBalance: !isFullySettled,
+          ...(isFullySettled ? { status: 'completed' } : {}),
+        },
+      })
+
+      // Payment record for cash-up
+      const today = new Date()
+      const prefix = `PAY-${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`
+      const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+      const payCount = await tx.payment.count({ where: { createdAt: { gte: startOfDay } } })
+      const refNumber = `${prefix}-${String(payCount + 1).padStart(4, '0')}`
+
+      await tx.payment.create({
+        data: {
+          refNumber,
+          customerId:      sale.customerId,
+          amount:          settleAmount,
+          paymentMethod:   data.paymentMethod as 'cash' | 'eft' | 'cheque' | 'amplopay',
+          notes:           `Settlement of sale ${sale.refNumber}`,
+          createdByUserId: userId,
+        },
+      })
+
+      return { updated, isFullySettled }
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+  )
+
+  logger.info(
+    { saleId: id, userId, settleAmount: data.amount, isFullySettled: result.isFullySettled },
+    'sale.payment.recorded'
+  )
+  return result
+}
+
+// ─── Update Sale Photos ───────────────────────────────────────────────────────
+
+export async function updateSalePhotos(
+  id: string,
+  action: { add?: string; remove?: string },
+  userId: string
+) {
+  const sale = await prisma.sale.findUnique({ where: { id }, select: { photoR2Keys: true } })
+  if (!sale) throw new SaleNotFoundError(id)
+
+  if (!action.add && !action.remove) throw new Error('Provide add or remove')
+
+  const keys = action.add
+    ? [...(sale.photoR2Keys ?? []), action.add]
+    : (sale.photoR2Keys ?? []).filter((k) => k !== action.remove)
+
+  const updated = await prisma.sale.update({
+    where:  { id },
+    data:   { photoR2Keys: keys },
+    select: { photoR2Keys: true },
+  })
+
+  logger.info({ saleId: id, userId, action: action.add ? 'photo_added' : 'photo_removed' }, 'sale.photos.updated')
+  return updated
 }
 
 // ─── List Sales ───────────────────────────────────────────────────────────────

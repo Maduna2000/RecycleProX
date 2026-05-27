@@ -12,17 +12,23 @@ const positivePrice = z
   .regex(/^\d+(\.\d{1,2})?$/, 'Must be a valid price')
   .refine((v) => parseFloat(v) >= 0, 'Price cannot be negative')
 
+const optionalDecimal = z.string().regex(/^\d+(\.\d{1,3})?$/).optional()
+
 export const SaleLineSchema = z.object({
-  productId: z.string().uuid('Invalid product'),
-  quantity: positiveQuantity,
-  unitPrice: positivePrice,
+  productId:       z.string().uuid('Invalid product'),
+  quantity:        positiveQuantity,
+  unitPrice:       positivePrice,
+  grossQty:        optionalDecimal,
+  tareQty:         optionalDecimal,
+  tareReason:      z.string().optional(),
+  deductionQty:    optionalDecimal,
+  deductionReason: z.string().optional(),
 })
 
 export const CreateSaleSchema = z.object({
-  // Buyer info — registered customer or walk-in
   customerId: z.string().uuid().optional(),
-  buyerId: z.string().uuid().optional(),
-  buyerName: z.string().min(1, 'Buyer name is required').max(100),
+  buyerId:    z.string().uuid().optional(),
+  buyerName:  z.string().min(1, 'Buyer name is required').max(100),
   buyerIdNumber: z
     .string()
     .min(5, 'National ID number is too short')
@@ -31,17 +37,18 @@ export const CreateSaleSchema = z.object({
     .optional()
     .or(z.literal(''))
     .transform((v) => v || undefined),
-  buyerPhone: z.string().optional().or(z.literal('')).transform((v) => v || undefined),
+  buyerPhone:    z.string().optional().or(z.literal('')).transform((v) => v || undefined),
   paymentMethod: z.enum(['cash', 'eft', 'cheque', 'amplopay']).default('cash'),
-  notes: z.string().max(500).optional(),
-  lines: z.array(SaleLineSchema).min(1, 'At least one product line is required'),
+  status:        z.enum(['pending', 'completed']).default('completed'),
+  notes:         z.string().max(500).optional(),
+  lines:         z.array(SaleLineSchema).min(1, 'At least one product line is required'),
 })
 
 export const VoidSaleSchema = z.object({
   reason: z.string().min(5, 'Void reason must be at least 5 characters'),
 })
 
-export type SaleLineInput = z.infer<typeof SaleLineSchema>
-export type CreateSaleInput = z.infer<typeof CreateSaleSchema>
+export type SaleLineInput    = z.infer<typeof SaleLineSchema>
+export type CreateSaleInput  = z.infer<typeof CreateSaleSchema>
 export type CreateSaleFormInput = z.input<typeof CreateSaleSchema>
-export type VoidSaleInput = z.infer<typeof VoidSaleSchema>
+export type VoidSaleInput    = z.infer<typeof VoidSaleSchema>

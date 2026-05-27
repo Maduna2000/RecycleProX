@@ -7,11 +7,13 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, ModalTitleBar, ModalBtn } from '@/components/ui/dialog'
 import { ArrowLeft, Ban, Loader2, Plus, Printer } from 'lucide-react'
 import { toast } from 'sonner'
 import { useSession } from 'next-auth/react'
 import { format } from '@/lib/utils/format'
+import Decimal from 'decimal.js'
+import { PhotoViewer } from '@/components/PhotoUploader'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -20,6 +22,8 @@ type SaleLine = {
   quantity: string
   unitPrice: string
   lineTotal: string
+  grossQty?: string
+  tareQty?: string
   product: { id: string; code: string; name: string; unit: string }
 }
 
@@ -28,6 +32,7 @@ type Sale = {
   refNumber: string
   status: 'completed' | 'voided' | 'pending'
   totalAmount: string
+  amountPaid?: string
   paymentMethod: string
   buyerName: string
   buyerIdNumber?: string
@@ -35,6 +40,7 @@ type Sale = {
   notes?: string
   voidedAt?: string
   voidReason?: string
+  photoR2Keys?: string[]
   createdAt: string
   lines: SaleLine[]
 }
@@ -50,6 +56,10 @@ export default function SaleDetailPage() {
 
   if (isLoading) return <div className="flex items-center justify-center h-64 text-gray-400">Loading...</div>
   if (!sale) return <div className="flex items-center justify-center h-64 text-gray-400">Sale not found</div>
+
+  const outstanding = sale.status === 'pending'
+    ? new Decimal(sale.totalAmount).minus(new Decimal(sale.amountPaid ?? '0'))
+    : new Decimal(0)
 
   return (
     <div className="max-w-3xl mx-auto w-full">
@@ -68,11 +78,25 @@ export default function SaleDetailPage() {
         </Button>
       </div>
 
+      {/* Voided banner */}
       {sale.status === 'voided' && (
         <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl">
           <p className="font-semibold text-red-700">This sale has been voided</p>
           {sale.voidReason && <p className="text-sm text-red-600 mt-0.5">Reason: {sale.voidReason}</p>}
           {sale.voidedAt && <p className="text-xs text-red-400 mt-1">{format.datetime(sale.voidedAt)}</p>}
+        </div>
+      )}
+
+      {/* Pending banner */}
+      {sale.status === 'pending' && (
+        <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+          <p className="font-semibold text-amber-700">Payment outstanding</p>
+          <p className="text-sm text-amber-600 mt-0.5">
+            Balance due: <span className="font-mono font-bold">R {outstanding.toFixed(2)}</span>
+            {sale.amountPaid && new Decimal(sale.amountPaid).gt(0) && (
+              <span className="ml-3 text-amber-500">({`R ${new Decimal(sale.amountPaid).toFixed(2)} paid`})</span>
+            )}
+          </p>
         </div>
       )}
 
@@ -85,9 +109,9 @@ export default function SaleDetailPage() {
             <p className="text-sm text-gray-500 mt-1">{format.datetime(sale.createdAt)}</p>
           </div>
           <div className="flex items-center gap-2">
-            {sale.status === 'completed'
-              ? <Badge className="bg-green-100 text-green-700">Completed</Badge>
-              : <Badge variant="destructive">Voided</Badge>}
+            {sale.status === 'completed' && <Badge className="bg-green-100 text-green-700">Completed</Badge>}
+            {sale.status === 'pending'   && <Badge className="bg-amber-100 text-amber-700">Pending</Badge>}
+            {sale.status === 'voided'    && <Badge variant="destructive">Voided</Badge>}
             <Badge variant="outline" className="capitalize">{sale.paymentMethod}</Badge>
           </div>
         </div>
@@ -129,7 +153,12 @@ export default function SaleDetailPage() {
                   <p className="text-xs text-gray-400 font-mono">{line.product.code}</p>
                 </td>
                 <td className="px-4 py-3 font-mono text-gray-700">
-                  {Number(line.quantity).toFixed(3)} {line.product.unit}
+                  <div>{Number(line.quantity).toFixed(3)} {line.product.unit}</div>
+                  {line.grossQty && line.tareQty && Number(line.tareQty) > 0 && (
+                    <div className="text-xs text-gray-400 mt-0.5">
+                      Gross: {Number(line.grossQty).toFixed(3)}  Tare: {Number(line.tareQty).toFixed(3)}
+                    </div>
+                  )}
                 </td>
                 <td className="px-4 py-3 font-mono text-gray-700">R {Number(line.unitPrice).toFixed(2)}</td>
                 <td className="px-4 py-3 font-mono font-semibold text-gray-900">R {Number(line.lineTotal).toFixed(2)}</td>
@@ -147,14 +176,35 @@ export default function SaleDetailPage() {
         </table>
       </div>
 
+      {/* Photos */}
+      {sale.photoR2Keys && sale.photoR2Keys.length > 0 && (
+        <div className="bg-white rounded-xl border p-6 mb-4">
+          <h2 className="font-semibold text-gray-900 mb-3">Photos</h2>
+          <PhotoViewer
+            r2Keys={sale.photoR2Keys}
+            onRemove={async (key) => {
+              const res = await fetch(`/api/sales/${sale.id}/photos`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ remove: key }),
+              })
+              if (res.ok) mutate(`/api/sales/${id}`)
+              else toast.error('Failed to remove photo')
+            }}
+          />
+        </div>
+      )}
+
       {/* Actions */}
       <div className="flex justify-between pb-6">
-        <Button
-          variant="outline"
-          onClick={() => window.open(`/api/sales/${sale.id}/receipt?format=pdf`, '_blank')}
-        >
-          <Printer className="w-4 h-4 mr-2" /> Print Receipt
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => window.open(`/api/sales/${sale.id}/receipt?format=pdf`, '_blank')}
+          >
+            <Printer className="w-4 h-4 mr-2" /> Print Receipt
+          </Button>
+        </div>
         {isManager && sale.status !== 'voided' && (
           <Button
             variant="outline"
@@ -196,11 +246,9 @@ function VoidModal({ sale, onClose, onSuccess }: { sale: Sale; onClose: () => vo
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="text-red-600">Void Sale</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4 mt-2">
+      <DialogContent className="sm:max-w-md p-4" showCloseButton={false}>
+        <ModalTitleBar title="Void Sale" onClose={onClose} />
+        <div className="space-y-4 mt-3">
           <p className="text-sm text-gray-600">
             You are about to void <span className="font-semibold">{sale.refNumber}</span> (R {Number(sale.totalAmount).toFixed(2)}).
             This action cannot be undone.
@@ -216,10 +264,10 @@ function VoidModal({ sale, onClose, onSuccess }: { sale: Sale; onClose: () => vo
             />
           </div>
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
-            <Button variant="destructive" onClick={onConfirm} disabled={loading || reason.trim().length < 5}>
-              {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Voiding...</> : 'Confirm Void'}
-            </Button>
+            <ModalBtn variant="outline" onClick={onClose} disabled={loading}>Cancel</ModalBtn>
+            <ModalBtn variant="danger" onClick={onConfirm} disabled={loading || reason.trim().length < 5}>
+              {loading ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />Voiding...</> : 'Confirm Void'}
+            </ModalBtn>
           </div>
         </div>
       </DialogContent>

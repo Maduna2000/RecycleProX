@@ -55,9 +55,13 @@ function useToolbarButtons(pathname: string, role: string): ToolbarButton[] {
       { label: 'New Purchase', icon: Plus, href: '/app/purchases/new', variant: 'primary' },
     ]
 
+  if (pathname.startsWith('/app/sales/unpaid'))
+    return []
+
   if (pathname === '/app/sales' || pathname.startsWith('/app/sales/'))
     return [
-      { label: 'New Sale', icon: Plus, href: '/app/sales/new', variant: 'primary' },
+      { label: 'New Sale',     icon: Plus, href: '/app/sales/new',    variant: 'primary' },
+      { label: 'Unpaid Sales', icon: Plus, href: '/app/sales/unpaid', variant: 'secondary' },
     ]
 
   if (pathname === '/app/payments' || pathname.startsWith('/app/payments/'))
