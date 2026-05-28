@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight, MoreHorizontal, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { colors, fontSize, fontWeight, layout } from '@/lib/design-tokens'
@@ -110,22 +110,41 @@ export function Avatar({ name, size = 32 }: { name: string; size?: number }) {
 // ─── Row Actions Dropdown ─────────────────────────────────────────────────────
 
 function ActionsDropdown<T>({ row, actions }: { row: T; actions: RowAction<T>[] }) {
-  const [open, setOpen] = useState(false)
+  const [open,       setOpen]       = useState(false)
+  const [openUpward, setOpenUpward] = useState(false)
+  const btnRef = useRef<HTMLButtonElement>(null)
   const visible = actions.filter((a) => !a.hidden?.(row))
   if (visible.length === 0) return null
+
+  function handleToggle(e: React.MouseEvent) {
+    e.stopPropagation()
+    if (!open && btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect()
+      const estimatedMenuH = visible.length * 32 + 8
+      setOpenUpward(rect.bottom + estimatedMenuH > window.innerHeight - 8)
+    }
+    setOpen((o) => !o)
+  }
 
   return (
     <div className="relative flex justify-end">
       <button
+        ref={btnRef}
         className="p-1 rounded-sm hover:bg-[#D6E8FF] text-[#6C757D] hover:text-[#00205B] transition-colors"
-        onClick={(e) => { e.stopPropagation(); setOpen((o) => !o) }}
+        onClick={handleToggle}
       >
         <MoreHorizontal className="w-4 h-4" />
       </button>
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full mt-0.5 w-44 bg-white shadow-xl border border-[#B0B0B0] py-0.5 z-20" style={{ borderRadius: 2 }}>
+          <div
+            className={cn(
+              'absolute right-0 w-44 bg-white shadow-xl border border-[#B0B0B0] py-0.5 z-20',
+              openUpward ? 'bottom-full mb-0.5' : 'top-full mt-0.5',
+            )}
+            style={{ borderRadius: 2 }}
+          >
             {visible.map((action, i) => (
               <button
                 key={i}
