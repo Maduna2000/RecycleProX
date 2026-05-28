@@ -17,7 +17,8 @@ const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 type Customer = {
   id: string; firstName: string; lastName: string; idNumber: string
-  phone: string; isActive: boolean; blacklisted: boolean; createdAt: string
+  phone: string; physicalAddress?: string | null
+  isActive: boolean; blacklisted: boolean; createdAt: string
 }
 
 const ALPHA = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
@@ -113,6 +114,15 @@ export default function CasualsPage() {
       key:    'phone',
       header: 'Phone',
       render: (r) => r.phone,
+    },
+    {
+      key:    'physicalAddress',
+      header: 'Address',
+      render: (r) => (
+        <span style={{ color: colors.textSecondary, fontSize: fontSize.xs }}>
+          {r.physicalAddress ?? '—'}
+        </span>
+      ),
     },
     {
       key:    'createdAt',
