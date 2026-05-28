@@ -131,21 +131,6 @@ function center(
   page.drawText(text, { x, y, size, font, color })
 }
 
-// ─── Left-right pair (item and price on same line) ────────────────────────────
-function leftRight(
-  page: ReturnType<PDFDocument['addPage']>,
-  left: string,
-  right: string,
-  y: number,
-  size: number,
-  leftFont: Awaited<ReturnType<PDFDocument['embedFont']>>,
-  rightFont: Awaited<ReturnType<PDFDocument['embedFont']>>,
-  color = DGRAY,
-) {
-  const rw = rightFont.widthOfTextAtSize(right, size)
-  page.drawText(left,  { x: MARGIN,           y, size, font: leftFont,  color })
-  page.drawText(right, { x: W - MARGIN - rw,  y, size, font: rightFont, color })
-}
 
 // ─── Main export ──────────────────────────────────────────────────────────────
 export async function generateTransactionSlip(data: TransactionSlipData): Promise<Uint8Array> {
