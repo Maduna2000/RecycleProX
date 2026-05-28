@@ -457,6 +457,9 @@ export function AppShell({
           <div className="w-6 h-6 rounded bg-white/10 flex items-center justify-center">
             <RefreshCw className="w-3.5 h-3.5 text-[#F2AB1A]" />
           </div>
+          <span className="text-white text-[13px] font-bold tracking-wide select-none whitespace-nowrap">
+            Renovo Pro
+          </span>
         </div>
 
         {/* Breadcrumb: Portal › Module */}
