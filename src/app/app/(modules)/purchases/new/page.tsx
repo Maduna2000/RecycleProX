@@ -398,8 +398,21 @@ export default function NewPurchasePage() {
         }
 
         if (status === 'pending') {
+          // Reset form so operator can continue making orders
+          setCustomer(null)
+          setCustomerType('casual')
+          setLines([emptyLine(keyCounter)])
+          setKeyCounter((k) => k + 1)
+          setPaymentType('cash')
+          setNotes('')
+          setGrvNumber('')
+          setInvoiceNo('')
+          setDeductLoan(false)
+          setDeductionAmount('')
+          setPhotoFile(null)
+          setPhotoPreview(null)
+          mutatePending()
           toast.success(`Purchase ${purchase.refNumber} saved as unpaid`)
-          router.push('/app/purchases/unpaid')
         } else {
           setPrintDialog({ id: purchase.id, refNumber: purchase.refNumber })
         }

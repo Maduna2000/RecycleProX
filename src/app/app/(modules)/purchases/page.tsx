@@ -174,7 +174,7 @@ export default function PurchasesPage() {
       onClick: (row) => router.push(`/app/purchases/${row.id}`),
     },
     {
-      label:   'Print Receipt',
+      label:   'Print Slip',
       icon:    Printer,
       onClick: (row) => window.open(`/api/purchases/${row.id}/receipt?format=pdf`, '_blank'),
     },
@@ -184,7 +184,7 @@ export default function PurchasesPage() {
       onClick: (row) => window.open(`/api/purchases/${row.id}/vat264`, '_blank'),
     },
     {
-      label:   'Void Purchase',
+      label:   'Reverse Purchase',
       icon:    Ban,
       danger:  true,
       hidden:  (row) => !isManager || row.status === 'voided',
@@ -429,7 +429,7 @@ function VoidDialog({
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="sm:max-w-md" showCloseButton={false}>
-        <ModalTitleBar title="Void Purchase" onClose={onClose} />
+        <ModalTitleBar title="Reverse Purchase" onClose={onClose} />
         <div className="space-y-4 mt-2">
           <p className="text-sm" style={{ color: colors.textSecondary }}>
             You are about to void{' '}
