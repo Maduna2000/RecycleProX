@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import useSWR, { mutate } from 'swr'
 import { useRouter } from 'next/navigation'
-import { Search, Eye, Printer, Ban, CreditCard, Loader2, X } from 'lucide-react'
+import { Search, Printer, Ban, CreditCard, Loader2, X } from 'lucide-react'
 import Decimal from 'decimal.js'
 import { DataTable, Avatar, type Column, type RowAction } from '@/components/ui/DataTable'
 import { InlineDetailPanel } from '@/components/ui/InlineDetailPanel'
@@ -179,11 +179,6 @@ export default function UnpaidPurchasesPage() {
       }),
     },
     {
-      label:   'View Full Detail',
-      icon:    Eye,
-      onClick: (row) => router.push(`/app/purchases/${row.id}`),
-    },
-    {
       label:   'Print Slip',
       icon:    Printer,
       onClick: (row) => window.open(`/api/purchases/${row.id}/receipt?format=pdf`, '_blank'),
@@ -349,12 +344,31 @@ export default function UnpaidPurchasesPage() {
                   ))}
                 </tbody>
                 <tfoot>
-                  <tr style={{ borderTop: `1px solid ${colors.border}` }}>
-                    <td colSpan={3} className="text-right font-semibold" style={{ padding: '6px 12px 0 0', color: colors.textSecondary }}>Total Payout</td>
-                    <td className="font-mono font-bold" style={{ padding: '6px 0 0', fontSize: fontSize.base, color: colors.textPrimary }}>
-                      R {new Decimal(detail.totalAmount).toFixed(2)}
-                    </td>
-                  </tr>
+                  {detail.loanDeductionAmount && new Decimal(detail.loanDeductionAmount).greaterThan(0) ? (
+                    <>
+                      <tr style={{ borderTop: `1px solid ${colors.border}` }}>
+                        <td colSpan={3} className="text-right" style={{ padding: '5px 12px 0 0', fontSize: fontSize.xs, color: colors.textSecondary }}>Gross Payout</td>
+                        <td className="font-mono" style={{ padding: '5px 0 0', fontSize: fontSize.xs, color: colors.textSecondary }}>R {new Decimal(detail.totalAmount).toFixed(2)}</td>
+                      </tr>
+                      <tr>
+                        <td colSpan={3} className="text-right" style={{ padding: '2px 12px 0 0', fontSize: fontSize.xs, color: colors.textSecondary }}>Loan Deduction</td>
+                        <td className="font-mono" style={{ padding: '2px 0 0', fontSize: fontSize.xs, color: colors.textSecondary }}>- R {new Decimal(detail.loanDeductionAmount).toFixed(2)}</td>
+                      </tr>
+                      <tr>
+                        <td colSpan={3} className="text-right font-semibold" style={{ padding: '2px 12px 0 0', color: colors.textSecondary }}>Cash Paid Out</td>
+                        <td className="font-mono font-bold" style={{ padding: '2px 0 0', fontSize: fontSize.base, color: colors.textPrimary }}>
+                          R {new Decimal(detail.totalAmount).minus(new Decimal(detail.loanDeductionAmount)).toFixed(2)}
+                        </td>
+                      </tr>
+                    </>
+                  ) : (
+                    <tr style={{ borderTop: `1px solid ${colors.border}` }}>
+                      <td colSpan={3} className="text-right font-semibold" style={{ padding: '6px 12px 0 0', color: colors.textSecondary }}>Total Payout</td>
+                      <td className="font-mono font-bold" style={{ padding: '6px 0 0', fontSize: fontSize.base, color: colors.textPrimary }}>
+                        R {new Decimal(detail.totalAmount).toFixed(2)}
+                      </td>
+                    </tr>
+                  )}
                 </tfoot>
               </table>
             </div>

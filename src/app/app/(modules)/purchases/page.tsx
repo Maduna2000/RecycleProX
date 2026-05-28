@@ -4,7 +4,7 @@ import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import useSWR, { mutate as swrMutate } from 'swr'
 import { useSession } from 'next-auth/react'
-import { Search, Eye, Ban, Printer, FileText, Loader2, X } from 'lucide-react'
+import { Search, Ban, Printer, FileText, Loader2, X, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
 import Decimal from 'decimal.js'
 import { DataTable, StatusBadge, Avatar, type Column, type RowAction, type SortDir } from '@/components/ui/DataTable'
@@ -42,6 +42,7 @@ type PurchaseDetail = {
   refNumber: string
   status: string
   totalAmount: string
+  loanDeductionAmount?: string
   paymentMethod: string
   notes?: string
   voidedAt?: string
@@ -52,7 +53,7 @@ type PurchaseDetail = {
 }
 
 export default function PurchasesPage() {
-  const router   = useRouter()
+  const router = useRouter()
   const { data: session } = useSession()
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
 
@@ -168,11 +169,6 @@ export default function PurchasesPage() {
   ]
 
   const rowActions: RowAction<Purchase>[] = [
-    {
-      label:   'View Full Detail',
-      icon:    Eye,
-      onClick: (row) => router.push(`/app/purchases/${row.id}`),
-    },
     {
       label:   'Print Slip',
       icon:    Printer,
@@ -297,7 +293,25 @@ export default function PurchasesPage() {
             <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading…
           </div>
         ) : (
-          <div className="flex gap-6 h-full">
+          <div className="flex flex-col gap-3 h-full">
+
+            {/* Voided banner */}
+            {detail.status === 'voided' && (
+              <div className="flex items-start gap-2 px-3 py-2 rounded shrink-0" style={{ background: '#FEF2F2', border: '1px solid #FECACA' }}>
+                <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" style={{ color: '#DC2626' }} />
+                <div>
+                  <p style={{ fontSize: fontSize.xs, fontWeight: fontWeight.semibold, color: '#DC2626' }}>Reversed Purchase</p>
+                  {detail.voidReason && (
+                    <p style={{ fontSize: fontSize.xs, color: '#B91C1C' }}>{detail.voidReason}</p>
+                  )}
+                  {detail.voidedAt && (
+                    <p style={{ fontSize: 10, color: '#B91C1C' }}>{format.datetime(detail.voidedAt)}</p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-6 flex-1 min-h-0">
 
             {/* Left: meta */}
             <div className="w-44 shrink-0 space-y-3">
@@ -363,16 +377,34 @@ export default function PurchasesPage() {
                   ))}
                 </tbody>
                 <tfoot>
-                  <tr style={{ borderTop: `1px solid ${colors.border}` }}>
-                    <td colSpan={3} className="text-right font-semibold" style={{ padding: '6px 12px 0 0', color: colors.textSecondary }}>
-                      Total Payout
-                    </td>
-                    <td className="font-mono font-bold" style={{ padding: '6px 0 0', fontSize: fontSize.base, color: colors.textPrimary }}>
-                      R {new Decimal(detail.totalAmount).toFixed(2)}
-                    </td>
-                  </tr>
+                  {detail.loanDeductionAmount && new Decimal(detail.loanDeductionAmount).greaterThan(0) ? (
+                    <>
+                      <tr style={{ borderTop: `1px solid ${colors.border}` }}>
+                        <td colSpan={3} className="text-right" style={{ padding: '5px 12px 0 0', fontSize: fontSize.xs, color: colors.textSecondary }}>Gross Payout</td>
+                        <td className="font-mono" style={{ padding: '5px 0 0', fontSize: fontSize.xs, color: colors.textSecondary }}>R {new Decimal(detail.totalAmount).toFixed(2)}</td>
+                      </tr>
+                      <tr>
+                        <td colSpan={3} className="text-right" style={{ padding: '2px 12px 0 0', fontSize: fontSize.xs, color: colors.textSecondary }}>Loan Deduction</td>
+                        <td className="font-mono" style={{ padding: '2px 0 0', fontSize: fontSize.xs, color: colors.textSecondary }}>- R {new Decimal(detail.loanDeductionAmount).toFixed(2)}</td>
+                      </tr>
+                      <tr>
+                        <td colSpan={3} className="text-right font-semibold" style={{ padding: '2px 12px 0 0', color: colors.textSecondary }}>Cash Paid Out</td>
+                        <td className="font-mono font-bold" style={{ padding: '2px 0 0', fontSize: fontSize.base, color: colors.textPrimary }}>
+                          R {new Decimal(detail.totalAmount).minus(new Decimal(detail.loanDeductionAmount)).toFixed(2)}
+                        </td>
+                      </tr>
+                    </>
+                  ) : (
+                    <tr style={{ borderTop: `1px solid ${colors.border}` }}>
+                      <td colSpan={3} className="text-right font-semibold" style={{ padding: '6px 12px 0 0', color: colors.textSecondary }}>Total Payout</td>
+                      <td className="font-mono font-bold" style={{ padding: '6px 0 0', fontSize: fontSize.base, color: colors.textPrimary }}>
+                        R {new Decimal(detail.totalAmount).toFixed(2)}
+                      </td>
+                    </tr>
+                  )}
                 </tfoot>
               </table>
+            </div>
             </div>
           </div>
         )}

@@ -965,9 +965,6 @@ export default function NewPurchasePage() {
                           {([
                             { label: 'Process Payment',        action: () => { setPayTarget({ id: p.id, ref: p.refNumber, totalAmount: p.totalAmount, loanDeductionAmount: p.loanDeductionAmount ?? '0', amountPaid: p.amountPaid }); setActionMenuId(null) } },
                             { label: 'Print Slip',             action: () => { setPrintDialog({ id: p.id, refNumber: p.refNumber }); setActionMenuId(null) } },
-                            { label: 'Attach Photo',           action: () => { router.push(`/app/purchases/${p.id}?attach=photo`); setActionMenuId(null) } },
-                            { label: 'Send Receipt',           action: () => { router.push(`/app/purchases/${p.id}?action=receipt`); setActionMenuId(null) } },
-                            { label: 'View Full Details',      action: () => { router.push(`/app/purchases/${p.id}`); setActionMenuId(null) } },
                             { label: 'View Customer History',  action: () => { router.push(`/app/customers/${p.customer.id}`); setActionMenuId(null) } },
                             { label: 'Log to Police Register', action: () => { router.push(`/app/police-register/new?purchaseId=${p.id}`); setActionMenuId(null) } },
                             { label: 'Reverse Purchase', destructive: true, action: () => { setVoidId(p.id); setActionMenuId(null) } },
@@ -1207,7 +1204,6 @@ export default function NewPurchasePage() {
           id={printDialog.id}
           refNumber={printDialog.refNumber}
           onClose={() => router.push(`/app/purchases/new?t=${Date.now()}`)}
-          onViewPurchase={() => router.push(`/app/purchases/${printDialog.id}`)}
           onDone={() => router.push('/app/dashboard')}
         />
       )}
