@@ -326,9 +326,7 @@ export default function NewPurchasePage() {
 
     const deduction = deductLoan && deductionAmount && parseFloat(deductionAmount) > 0 && !isPending
       ? deductionAmount : undefined
-    if (deduction && new Decimal(deduction).greaterThan(grandTotal)) {
-      toast.error('Loan deduction cannot exceed the total payout'); return
-    }
+    // Deduction is capped server-side — no client-side block needed
 
     const noteParts: string[] = []
     if (grvNumber) noteParts.push(`GRV:${grvNumber}`)

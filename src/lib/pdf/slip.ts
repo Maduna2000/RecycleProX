@@ -34,6 +34,10 @@ export interface TransactionSlipData {
   paymentMethod:  string
   cashierName:    string
   notes?:         string
+  // Payment status fields
+  amountPaid?:           string   // decimal string — actual amount received so far
+  status?:               'completed' | 'pending' | 'partial'
+  remainingLoanBalance?: string   // outstanding loan balance after this purchase's deduction
   // Company details from SystemSettings
   companyName?:   string
   companyAddress?:string
@@ -83,10 +87,16 @@ function estimateHeight(data: TransactionSlipData): number {
   }
   if (data.lines.length > 1) h += LINE_H  // Total Qty row
   h += 8                            // divider
-  h += LINE_H + 3                   // TOTAL bold
   if (data.loanDeduction && parseFloat(data.loanDeduction) > 0) {
-    h += LINE_H                     // loan deduction line
-    h += LINE_H                     // cash paid line
+    h += LINE_H + 2                 // gross payout line
+    h += LINE_H + 2                 // loan deduction line
+    if (data.remainingLoanBalance && parseFloat(data.remainingLoanBalance) > 0) {
+      h += LINE_H + 2               // loan balance remaining line
+    }
+    h += LINE_H + 3                 // CASH TO PAY line
+  } else {
+    h += LINE_H + 3                 // TOTAL / TOTAL PAID / AMOUNT DUE
+    if (data.status === 'partial') h += LINE_H + 3  // BALANCE DUE second line
   }
   h += LINE_H                       // payment method
   if (data.notes) h += LINE_H * 2
@@ -101,10 +111,10 @@ function estimateHeight(data: TransactionSlipData): number {
 
 // ─── Draw a dashed line ───────────────────────────────────────────────────────
 function dashes(page: ReturnType<PDFDocument['addPage']>, y: number, font: Awaited<ReturnType<PDFDocument['embedFont']>>) {
-  const text = '- '.repeat(22)
-  page.drawText(text.substring(0, 38), {
-    x: MARGIN, y, size: SMALL, font, color: GRAY,
-  })
+  const chunk  = '- '
+  const chunkW = font.widthOfTextAtSize(chunk, SMALL)
+  const count  = Math.floor(BODY_W / chunkW)
+  page.drawText(chunk.repeat(count), { x: MARGIN, y, size: SMALL, font, color: GRAY })
 }
 
 // ─── Center text ─────────────────────────────────────────────────────────────
@@ -268,27 +278,63 @@ export async function generateTransactionSlip(data: TransactionSlipData): Promis
   const grossTotal = `E${new Decimal(data.totalAmount).toFixed(2)}`
 
   if (data.loanDeduction && new Decimal(data.loanDeduction).greaterThan(0)) {
-    // Gross payout
-    leftRight(page, 'Gross Payout:', grossTotal, cursor, NORMAL, reg, reg, DGRAY)
+    // Gross payout — label reg/gray, amount bold/black
+    const gw = bold.widthOfTextAtSize(grossTotal, NORMAL)
+    page.drawText('Gross Payout:', { x: MARGIN,          y: cursor, size: NORMAL, font: reg,  color: DGRAY })
+    page.drawText(grossTotal,      { x: W - MARGIN - gw, y: cursor, size: NORMAL, font: bold, color: BLACK })
     nextLine(NORMAL, 2)
 
-    // Loan deduction
-    const deduction = `- E${new Decimal(data.loanDeduction).toFixed(2)}`
-    leftRight(page, 'Loan Deduction:', deduction, cursor, NORMAL, reg, reg, GRAY)
+    // Loan deduction — label reg/gray, amount bold/black
+    const deductionStr = `- E${new Decimal(data.loanDeduction).toFixed(2)}`
+    const dw = bold.widthOfTextAtSize(deductionStr, NORMAL)
+    page.drawText('Loan Deduction:', { x: MARGIN,          y: cursor, size: NORMAL, font: reg,  color: DGRAY })
+    page.drawText(deductionStr,      { x: W - MARGIN - dw, y: cursor, size: NORMAL, font: bold, color: BLACK })
     nextLine(NORMAL, 2)
 
-    // Cash to pay
+    // Loan balance remaining — only when outstanding > 0
+    if (data.remainingLoanBalance && new Decimal(data.remainingLoanBalance).greaterThan(0)) {
+      const remStr = `E${new Decimal(data.remainingLoanBalance).toFixed(2)}`
+      const rw = reg.widthOfTextAtSize(remStr, SMALL)
+      page.drawText('Loan Bal. Remaining:', { x: MARGIN,          y: cursor, size: SMALL, font: reg, color: DGRAY })
+      page.drawText(remStr,                 { x: W - MARGIN - rw, y: cursor, size: SMALL, font: reg, color: DGRAY })
+      nextLine(SMALL, 2)
+    }
+
+    // Cash to pay — label reg/gray, amount bold/LARGE/black
     const cashPaid = new Decimal(data.totalAmount).minus(new Decimal(data.loanDeduction))
     const cashStr  = `E${cashPaid.toFixed(2)}`
     const cw = bold.widthOfTextAtSize(cashStr, LARGE)
-    page.drawText('CASH TO PAY:', { x: MARGIN,          y: cursor, size: LARGE, font: bold, color: BLACK })
-    page.drawText(cashStr,        { x: W - MARGIN - cw, y: cursor, size: LARGE, font: bold, color: BLACK })
+    page.drawText('CASH TO PAY:', { x: MARGIN,          y: cursor, size: NORMAL, font: reg,  color: DGRAY })
+    page.drawText(cashStr,        { x: W - MARGIN - cw, y: cursor, size: LARGE,  font: bold, color: BLACK })
     nextLine(LARGE, 3)
   } else {
-    const tw = bold.widthOfTextAtSize(grossTotal, LARGE)
-    page.drawText('TOTAL:',    { x: MARGIN,          y: cursor, size: LARGE, font: bold, color: BLACK })
-    page.drawText(grossTotal,  { x: W - MARGIN - tw, y: cursor, size: LARGE, font: bold, color: BLACK })
+    // No loan deduction — show dynamic label based on payment status
+    const isPartial   = data.status === 'partial' && data.amountPaid
+    const isCompleted = data.status === 'completed'
+    const isPending   = data.status === 'pending'
+
+    const primaryLabel  = isCompleted ? 'TOTAL PAID:'
+      : isPending   ? 'AMOUNT DUE:'
+      : isPartial   ? 'TOTAL PAID:'
+      : 'TOTAL:'
+    const primaryAmount = isPartial
+      ? `E${new Decimal(data.amountPaid!).toFixed(2)}`
+      : grossTotal
+
+    const tw = bold.widthOfTextAtSize(primaryAmount, LARGE)
+    page.drawText(primaryLabel,  { x: MARGIN,          y: cursor, size: NORMAL, font: reg,  color: DGRAY })
+    page.drawText(primaryAmount, { x: W - MARGIN - tw, y: cursor, size: LARGE,  font: bold, color: BLACK })
     nextLine(LARGE, 3)
+
+    // Partial: also show balance due
+    if (isPartial) {
+      const balanceDue = new Decimal(data.totalAmount).minus(new Decimal(data.amountPaid!))
+      const balStr = `E${balanceDue.toFixed(2)}`
+      const bw = bold.widthOfTextAtSize(balStr, LARGE)
+      page.drawText('BALANCE DUE:', { x: MARGIN,          y: cursor, size: NORMAL, font: reg,  color: DGRAY })
+      page.drawText(balStr,         { x: W - MARGIN - bw, y: cursor, size: LARGE,  font: bold, color: BLACK })
+      nextLine(LARGE, 3)
+    }
   }
 
   page.drawText(`Payment: ${data.paymentMethod.toUpperCase()}`, { x: MARGIN, y: cursor, size: SMALL, font: reg, color: GRAY })

@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
+import Decimal from 'decimal.js'
 import { getPurchase } from '@/lib/services/purchaseService'
 import { getAllSettings } from '@/lib/services/settingsService'
+import { getCustomerLoanSummary } from '@/lib/services/loanService'
 import { generateTransactionSlip } from '@/lib/pdf/slip'
 
 /**
@@ -24,6 +26,27 @@ export async function GET(
       getPurchase(params.id),
       getAllSettings(),
     ])
+
+    const amountPaidDec = new Decimal(purchase.amountPaid.toString())
+    const loanDec       = purchase.loanDeductionAmount
+      ? new Decimal(purchase.loanDeductionAmount.toString())
+      : new Decimal(0)
+
+    const slipStatus: 'completed' | 'pending' | 'partial' =
+      purchase.status === 'completed'            ? 'completed'
+      : amountPaidDec.greaterThan(0)             ? 'partial'
+      : 'pending'
+
+    const slipAmountPaid = amountPaidDec.greaterThan(0) ? amountPaidDec.toFixed(2) : undefined
+
+    // Remaining loan balance (current outstanding after applied deduction)
+    let remainingLoanBalance: string | undefined
+    if (loanDec.greaterThan(0)) {
+      const loanSummary = await getCustomerLoanSummary(purchase.customerId)
+      if (new Decimal(loanSummary.outstanding).greaterThan(0)) {
+        remainingLoanBalance = loanSummary.outstanding
+      }
+    }
 
     const lines = purchase.lines.map((l) => ({
       productName: l.product.name,
@@ -70,6 +93,9 @@ export async function GET(
       paymentMethod:  purchase.paymentMethod,
       cashierName:    session.user.name ?? 'Cashier',
       notes:          purchase.notes ?? undefined,
+      status:              slipStatus,
+      amountPaid:          slipAmountPaid,
+      remainingLoanBalance,
       companyName:    settings.yardName,
       companyAddress: settings.yardAddress,
       companyPhone:   settings.yardPhone,

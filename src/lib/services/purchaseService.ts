@@ -33,9 +33,6 @@ export class ProductInactiveError extends Error {
   constructor(code: string) { super(`Product "${code}" is inactive`); this.name = 'ProductInactiveError' }
 }
 
-export class LoanDeductionExceedsTotalError extends Error {
-  constructor() { super('Loan deduction cannot exceed the gross payout total'); this.name = 'LoanDeductionExceedsTotalError' }
-}
 
 export class PurchaseNotPendingError extends Error {
   constructor(status: string) { super(`Purchase is already "${status}" and cannot be settled`); this.name = 'PurchaseNotPendingError' }
@@ -206,11 +203,9 @@ export async function createPurchase(data: CreatePurchaseInput, createdByUserId?
 
   const totalAmount = resolvedLines.reduce((sum, l) => sum.plus(l.lineTotal), new Decimal(0))
 
-  // Validate loan deduction amount
-  const deduction = data.loanDeductionAmount ? new Decimal(data.loanDeductionAmount) : null
-  if (deduction && deduction.greaterThan(totalAmount)) {
-    throw new LoanDeductionExceedsTotalError()
-  }
+  // Cap loan deduction at the total payout — never block the purchase
+  const requestedDeduction = data.loanDeductionAmount ? new Decimal(data.loanDeductionAmount) : null
+  const deduction = requestedDeduction ? Decimal.min(requestedDeduction, totalAmount) : null
 
   const purchase = await withSerializableRetry(() =>
     prisma.$transaction(async (tx) => {

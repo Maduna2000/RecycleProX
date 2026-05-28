@@ -5,7 +5,6 @@ import { CreatePurchaseSchema } from '@/lib/schemas/purchase'
 import {
   createPurchase, listPurchases,
   CustomerBlacklistedError, CustomerInactiveError, ProductInactiveError,
-  LoanDeductionExceedsTotalError,
 } from '@/lib/services/purchaseService'
 
 export async function GET(req: NextRequest) {
@@ -46,7 +45,6 @@ export async function POST(req: NextRequest) {
     if (err instanceof CustomerBlacklistedError) return NextResponse.json({ error: err.message }, { status: 422 })
     if (err instanceof CustomerInactiveError) return NextResponse.json({ error: err.message }, { status: 422 })
     if (err instanceof ProductInactiveError) return NextResponse.json({ error: err.message }, { status: 422 })
-    if (err instanceof LoanDeductionExceedsTotalError) return NextResponse.json({ error: err.message }, { status: 422 })
     logger.error({ err }, 'POST /api/purchases failed')
     return NextResponse.json({ error: 'Failed to create purchase' }, { status: 500 })
   }
