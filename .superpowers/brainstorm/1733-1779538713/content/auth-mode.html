@@ -1,0 +1,60 @@
+<h2>How does the scale operator log in?</h2>
+<p class="subtitle">The tablet stays at the scale all day. What level of access control do you need?</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Kiosk PIN — shared station code</h3>
+      <p>A single 4–6 digit PIN unlocks the station for the shift. The app auto-locks after inactivity. No individual user accounts needed on the tablet.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Pros</h4><ul>
+          <li>Fastest for operators — one PIN, done</li>
+          <li>Tablet never shows the main portal</li>
+          <li>PIN set by admin in settings</li>
+        </ul></div>
+        <div class="cons"><h4>Cons</h4><ul>
+          <li>No per-operator audit trail (just "scale station")</li>
+        </ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Standard login — new "scale_operator" role</h3>
+      <p>Each operator logs in with their own username + password. A new role <code>scale_operator</code> is added — restricted to the scale station routes only.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Pros</h4><ul>
+          <li>Full per-operator audit trail</li>
+          <li>Individual accountability</li>
+          <li>Fits the existing NextAuth user system</li>
+        </ul></div>
+        <div class="cons"><h4>Cons</h4><ul>
+          <li>Operators must type username + password on a touchscreen</li>
+          <li>Slightly more setup for admin</li>
+        </ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Hybrid — standard login + quick PIN re-lock</h3>
+      <p>Operator logs in once per shift with username + password. The screen then auto-locks with a personal PIN after inactivity — no full re-login needed mid-shift.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Pros</h4><ul>
+          <li>Best of both: individual accountability + fast unlock</li>
+          <li>Fits existing PinLockStore already in codebase</li>
+        </ul></div>
+        <div class="cons"><h4>Cons</h4><ul>
+          <li>Slightly more complex setup</li>
+        </ul></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:1.5rem">💡 My recommendation: <strong>Option B</strong> — a dedicated <code>scale_operator</code> role keeps the audit trail clean and reuses the existing auth system with minimal extra code.</p>

@@ -1,0 +1,45 @@
+<h2>How should product categories work?</h2>
+<p class="subtitle">The existing system uses a fixed enum for categories (ferrous, non_ferrous, copper, aluminium, plastic, paper, e_waste, other). You want admins to be able to create/edit/delete categories from the portal.</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>New manageable Category model (recommended)</h3>
+      <p>Add a <code>ScaleCategory</code> table to the database. Admins create, edit, deactivate categories from the portal. Scale station products belong to these categories.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Pros</h4><ul>
+          <li>Fully dynamic — add "Brass", "Stainless Steel" etc. without code changes</li>
+          <li>Admin can reorder, rename, deactivate categories</li>
+          <li>Completely independent from existing Purchase/Sale product categories</li>
+          <li>Clean separation between scale-station products and main inventory products</li>
+        </ul></div>
+        <div class="cons"><h4>Cons</h4><ul>
+          <li>Requires a new Prisma migration</li>
+          <li>Scale station has its own product list (separate from main products)</li>
+        </ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Reuse existing products + enum categories</h3>
+      <p>The scale station uses the same <code>Product</code> model and <code>ProductCategory</code> enum already in the database. No new tables needed.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Pros</h4><ul>
+          <li>Zero new DB models — reuses everything</li>
+          <li>Scale station orders can directly reference existing products</li>
+          <li>One place to manage products (existing Products admin page)</li>
+        </ul></div>
+        <div class="cons"><h4>Cons</h4><ul>
+          <li>Categories are fixed in code — can't add new ones without a migration</li>
+          <li>Admin must use the main product management page</li>
+        </ul></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:1.5rem">💡 My recommendation: <strong>Option A</strong> — a manageable <code>ScaleCategory</code> model is what you described (admin creates categories). It also keeps scale-station products separate from the main purchase/sale inventory, avoiding confusion.</p>

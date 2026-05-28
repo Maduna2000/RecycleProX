@@ -1,0 +1,41 @@
+<h2>Which customer types does the scale station handle?</h2>
+<p class="subtitle">The existing system has two customer types. What should the operator be able to select at the scale?</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Casual only</h3>
+      <p>The scale station always creates a quick walk-in customer record (name, surname, contact, address). No account lookup needed.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Pros</h4><ul>
+          <li>Simplest flow — no search or lookup step</li>
+          <li>Fastest for high-volume walk-in yards</li>
+        </ul></div>
+        <div class="cons"><h4>Cons</h4><ul>
+          <li>Can't link a weigh-in to an existing account customer</li>
+        </ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Casual + Account lookup</h3>
+      <p>Operator chooses: enter new casual details, OR search for an existing account customer by ID number / phone.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Pros</h4><ul>
+          <li>Handles regular dealers and account holders</li>
+          <li>Links weigh-in to existing customer profile</li>
+        </ul></div>
+        <div class="cons"><h4>Cons</h4><ul>
+          <li>Slightly more steps for account customers</li>
+          <li>Operator needs to know customer's ID/phone</li>
+        </ul></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:1.5rem">💡 My recommendation: <strong>Option B</strong> — even if 90% are casual, the ability to look up an account customer future-proofs the station and prevents duplicate records for regulars.</p>

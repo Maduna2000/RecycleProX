@@ -54,7 +54,10 @@
       "Bash(git commit -m ' *)",
       "Bash(git push *)",
       "Bash(python skills/ui-ux-pro-max/scripts/search.py \"industrial POS terminal recycling yard management\" --design-system -p \"Renovo Pro POS\" -f markdown)",
-      "Bash(npx claude-code-templates@latest --skill development/senior-architect)"
+      "Bash(npx claude-code-templates@latest --skill development/senior-architect)",
+      "Bash(awk '{print $1, $11}')",
+      "Bash(python .claude/skills/ui-ux-pro-max/scripts/search.py \"enterprise recycling management SaaS admin portal professional\" --design-system -p \"Renovo Pro\" -f markdown)",
+      "Bash(git commit *)"
     ]
   }
 }
