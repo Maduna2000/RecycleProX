@@ -2,12 +2,20 @@
 
 import { useState } from 'react'
 import useSWR, { mutate } from 'swr'
-import { Loader2, CreditCard } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Search, Printer, Ban, CreditCard, Loader2, X } from 'lucide-react'
 import Decimal from 'decimal.js'
-import { Avatar } from '@/components/ui/DataTable'
+import { DataTable, Avatar, type Column, type RowAction } from '@/components/ui/DataTable'
+import { InlineDetailPanel } from '@/components/ui/InlineDetailPanel'
+import { Dialog, DialogContent, ModalTitleBar, ModalBtn } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { PageShell } from '@/components/layout/PageShell'
 import { ProcessPaymentModal, type PayTarget } from '@/components/sales/ProcessPaymentModal'
-import { colors, fontSize, fontWeight, layout } from '@/lib/design-tokens'
+import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
+import { format } from '@/lib/utils/format'
+import { toast } from 'sonner'
+import { useSession } from 'next-auth/react'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -23,211 +31,403 @@ type Sale = {
   lines: { id: string }[]
 }
 
-type Group = {
-  key: string
-  name: string
-  idNumber?: string
-  customerId?: string
-  sales: Sale[]
-  total: Decimal
+type SaleLine = {
+  id: string
+  quantity: string
+  unitPrice: string
+  lineTotal: string
+  product: { id: string; code: string; name: string; unit: string }
 }
 
-function outstanding(s: Sale): Decimal {
+type SaleDetail = {
+  id: string
+  refNumber: string
+  totalAmount: string
+  amountPaid?: string
+  buyerName: string
+  buyerIdNumber?: string
+  notes?: string
+  createdAt: string
+  lines: SaleLine[]
+}
+
+function outstanding(s: { totalAmount: string; amountPaid?: string }): Decimal {
   return new Decimal(s.totalAmount).minus(new Decimal(s.amountPaid ?? '0'))
 }
 
 export default function UnpaidSalesPage() {
-  const KEY = '/api/sales?status=pending&pageSize=200'
+  const router = useRouter()
+  const { data: session } = useSession()
+  const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
+
+  const [search,     setSearch]     = useState('')
+  const [from,       setFrom]       = useState('')
+  const [to,         setTo]         = useState('')
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [payTarget,  setPayTarget]  = useState<PayTarget | null>(null)
+  const [voidTarget, setVoidTarget] = useState<Sale | null>(null)
+
+  const hasFilters = !!(search || from || to)
+  function clearFilters() { setSearch(''); setFrom(''); setTo('') }
+
+  const query = new URLSearchParams({ status: 'pending', pageSize: '200' })
+  if (search) query.set('search', search)
+  if (from)   query.set('from',   from)
+  if (to)     query.set('to',     to)
+
+  const KEY = `/api/sales?${query}`
   const { data, isLoading } = useSWR<{ sales: Sale[] }>(KEY, fetcher)
-  const [payTarget, setPayTarget] = useState<PayTarget | null>(null)
+  const sales = data?.sales ?? []
 
-  // Group by customerId (account buyers) then by buyerName (walk-in buyers)
-  const groups: Group[] = []
-  const seen = new Map<string, Group>()
+  const { data: detail, isLoading: detailLoading } = useSWR<SaleDetail>(
+    selectedId ? `/api/sales/${selectedId}` : null,
+    fetcher,
+  )
 
-  for (const s of data?.sales ?? []) {
-    const key = s.customerId ?? `walkin:${s.buyerName.toLowerCase().trim()}`
-    if (!seen.has(key)) {
-      const g: Group = {
-        key,
-        name:       s.buyerName,
-        idNumber:   s.buyerIdNumber,
-        customerId: s.customerId,
-        sales:      [],
-        total:      new Decimal(0),
-      }
-      seen.set(key, g)
-      groups.push(g)
-    }
-    const g = seen.get(key)!
-    g.sales.push(s)
-    g.total = g.total.plus(outstanding(s))
-  }
-
-  const grandTotal = groups.reduce((acc, g) => acc.plus(g.total), new Decimal(0))
-  const txCount    = data?.sales?.length ?? 0
+  const grandTotal = sales.reduce((acc, s) => acc.plus(outstanding(s)), new Decimal(0))
   const subtitle   = !isLoading
-    ? `${groups.length} buyer${groups.length !== 1 ? 's' : ''} · ${txCount} sale${txCount !== 1 ? 's' : ''}`
+    ? `${sales.length} unpaid sale${sales.length !== 1 ? 's' : ''}`
     : 'Deferred payment sales'
+
+  const columns: Column<Sale>[] = [
+    {
+      key:    'refNumber',
+      header: 'Ref #',
+      width:  '140px',
+      render: (row) => (
+        <span className="font-mono text-xs" style={{ color: colors.textSecondary }}>{row.refNumber}</span>
+      ),
+    },
+    {
+      key:    'buyerName',
+      header: 'Buyer',
+      render: (row) => (
+        <div className="flex items-center gap-2">
+          <Avatar name={row.buyerName} size={26} />
+          <div>
+            <p style={{ fontSize: fontSize.sm, fontWeight: fontWeight.medium, color: colors.textPrimary }}>
+              {row.buyerName}
+            </p>
+            {row.buyerIdNumber && (
+              <p className="font-mono" style={{ fontSize: 10, color: colors.textSecondary }}>{row.buyerIdNumber}</p>
+            )}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key:    'lines',
+      header: 'Items',
+      width:  '60px',
+      render: (row) => <span style={{ color: colors.textSecondary }}>{row.lines.length}</span>,
+    },
+    {
+      key:    'totalAmount',
+      header: 'Total',
+      width:  '110px',
+      render: (row) => (
+        <span className="font-mono font-semibold" style={{ color: colors.textPrimary }}>
+          R {new Decimal(row.totalAmount).toFixed(2)}
+        </span>
+      ),
+    },
+    {
+      key:    'amountPaid',
+      header: 'Paid',
+      width:  '110px',
+      render: (row) => {
+        const paid = new Decimal(row.amountPaid ?? '0')
+        return (
+          <span className="font-mono" style={{ color: paid.gt(0) ? colors.action : colors.textSecondary }}>
+            {paid.gt(0) ? `R ${paid.toFixed(2)}` : '—'}
+          </span>
+        )
+      },
+    },
+    {
+      key:    'balance',
+      header: 'Balance',
+      width:  '110px',
+      render: (row) => (
+        <span className="font-mono font-semibold" style={{ color: colors.warning }}>
+          R {outstanding(row).toFixed(2)}
+        </span>
+      ),
+    },
+    {
+      key:    'createdAt',
+      header: 'Date',
+      width:  '148px',
+      render: (row) => (
+        <span style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>{format.datetime(row.createdAt)}</span>
+      ),
+    },
+  ]
+
+  const rowActions: RowAction<Sale>[] = [
+    {
+      label:   'Process Payment',
+      icon:    CreditCard,
+      onClick: (row) => setPayTarget({
+        id:          row.id,
+        ref:         row.refNumber,
+        totalAmount: row.totalAmount,
+        amountPaid:  row.amountPaid ?? '0',
+      }),
+    },
+    {
+      label:   'Print Receipt',
+      icon:    Printer,
+      onClick: (row) => window.open(`/api/sales/${row.id}/receipt?format=pdf`, '_blank'),
+    },
+    {
+      label:   'Reverse Sale',
+      icon:    Ban,
+      danger:  true,
+      hidden:  () => !isManager,
+      onClick: (row) => setVoidTarget(row),
+    },
+  ]
 
   return (
     <PageShell title="Unpaid Sales" subtitle={subtitle}>
-      <div className="flex flex-col flex-1 min-h-0 gap-4 overflow-y-auto">
-        <div className="max-w-4xl mx-auto w-full space-y-4 pb-6">
 
-          {/* Grand total banner */}
-          {!isLoading && groups.length > 0 && (
-            <div
-              className="flex items-center gap-4 px-4 py-3 rounded-lg"
-              style={{ background: colors.alertBg, border: `1px solid ${colors.alertBorder}` }}
-            >
+      {/* Grand total banner */}
+      {!isLoading && sales.length > 0 && (
+        <div
+          className="flex items-center gap-4 px-4 py-3 shrink-0"
+          style={{ background: colors.alertBg, border: `1px solid ${colors.alertBorder}` }}
+        >
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: colors.alertIcon }}>
+              Total Outstanding
+            </p>
+            <p className="font-mono font-bold" style={{ fontSize: fontSize['2xl'], color: colors.alertText }}>
+              R {grandTotal.toFixed(2)}
+            </p>
+          </div>
+          <p className="ml-4 text-xs" style={{ color: colors.alertIcon }}>
+            {sales.length} unpaid sale{sales.length !== 1 ? 's' : ''}
+          </p>
+        </div>
+      )}
+
+      {/* Filter bar */}
+      <div className="flex gap-2 flex-wrap shrink-0 items-center">
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3" style={{ color: colors.textSecondary }} />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search ref, buyer or ID..."
+            className="pl-7 pr-3 h-7 text-xs rounded border bg-white focus:outline-none w-56 border-[#E0E0E0] focus:border-[#185ABD]"
+          />
+        </div>
+        <input
+          type="date"
+          value={from}
+          onChange={(e) => setFrom(e.target.value)}
+          className="h-7 border rounded px-2 text-xs bg-white focus:outline-none border-[#E0E0E0] focus:border-[#185ABD]"
+          style={{ color: from ? colors.textPrimary : colors.textSecondary }}
+          title="From date"
+        />
+        <input
+          type="date"
+          value={to}
+          onChange={(e) => setTo(e.target.value)}
+          className="h-7 border rounded px-2 text-xs bg-white focus:outline-none border-[#E0E0E0] focus:border-[#185ABD]"
+          style={{ color: to ? colors.textPrimary : colors.textSecondary }}
+          title="To date"
+        />
+        {hasFilters && (
+          <button
+            onClick={clearFilters}
+            className="h-7 px-2.5 text-xs flex items-center gap-1 border rounded hover:bg-[#F1F3F4] transition-colors"
+            style={{ borderColor: colors.border, color: colors.textSecondary }}
+          >
+            <X className="w-3 h-3" /> Clear
+          </button>
+        )}
+      </div>
+
+      {/* Table */}
+      <div className="flex-1 min-h-0">
+        <DataTable
+          columns={columns}
+          rows={sales}
+          rowKey={(r) => r.id}
+          onRowClick={(r) => setSelectedId(r.id === selectedId ? null : r.id)}
+          selectedKey={selectedId}
+          rowActions={rowActions}
+          loading={isLoading}
+          emptyMessage="No unpaid sales — all sales are settled."
+          emptyAction={{ label: '+ New Sale', onClick: () => router.push('/app/sales/new') }}
+        />
+      </div>
+
+      {/* Inline detail panel */}
+      <InlineDetailPanel
+        open={!!selectedId}
+        onClose={() => setSelectedId(null)}
+        title={
+          detail
+            ? `${detail.refNumber} · ${detail.buyerName}`
+            : 'Sale Detail'
+        }
+        height={300}
+      >
+        {detailLoading || !detail ? (
+          <div className="flex items-center gap-2" style={{ color: colors.textSecondary, fontSize: fontSize.sm }}>
+            <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading…
+          </div>
+        ) : (
+          <div className="flex gap-6 h-full">
+            <div className="w-44 shrink-0 space-y-3">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: colors.alertIcon }}>
-                  Total Outstanding
+                <p className="uppercase tracking-wide font-semibold mb-0.5" style={{ fontSize: 10, color: colors.textSecondary }}>Buyer</p>
+                <p style={{ fontSize: fontSize.sm, fontWeight: fontWeight.semibold, color: colors.textPrimary }}>
+                  {detail.buyerName}
                 </p>
-                <p className="font-mono font-bold" style={{ fontSize: fontSize['2xl'], color: colors.alertText }}>
-                  R {grandTotal.toFixed(2)}
+                {detail.buyerIdNumber && (
+                  <p className="font-mono" style={{ fontSize: 10, color: colors.textSecondary }}>{detail.buyerIdNumber}</p>
+                )}
+              </div>
+              <div>
+                <p className="uppercase tracking-wide font-semibold mb-0.5" style={{ fontSize: 10, color: colors.textSecondary }}>Balance Due</p>
+                <p className="font-mono font-bold" style={{ fontSize: fontSize.base, color: colors.warning }}>
+                  R {outstanding(detail).toFixed(2)}
                 </p>
               </div>
-              <div className="ml-4 text-xs" style={{ color: colors.alertIcon }}>
-                {groups.length} buyer{groups.length !== 1 ? 's' : ''} · {txCount} sale{txCount !== 1 ? 's' : ''}
+              <div>
+                <p className="uppercase tracking-wide font-semibold mb-0.5" style={{ fontSize: 10, color: colors.textSecondary }}>Date</p>
+                <p style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>{format.datetime(detail.createdAt)}</p>
               </div>
-            </div>
-          )}
-
-          {isLoading && (
-            <div className="flex items-center justify-center py-10 gap-2" style={{ color: colors.textSecondary, fontSize: fontSize.base }}>
-              <Loader2 className="w-4 h-4 animate-spin" /> Loading…
-            </div>
-          )}
-
-          {!isLoading && groups.length === 0 && (
-            <div
-              className="flex items-center justify-center py-10 rounded-lg text-sm"
-              style={{ background: colors.toolbar, border: `1px solid ${colors.border}`, color: colors.textSecondary }}
-            >
-              No unpaid sales — all sales are settled.
-            </div>
-          )}
-
-          {/* Buyer groups */}
-          {groups.map((g) => (
-            <div key={g.key} className="overflow-hidden" style={{ border: '1px solid #B0B0B0', borderRadius: 0 }}>
-              {/* Buyer header */}
-              <div
-                className="flex items-center justify-between px-4 py-2"
-                style={{ background: colors.toolbar, borderBottom: `1px solid ${colors.border}` }}
-              >
-                <div className="flex items-center gap-3">
-                  <Avatar name={g.name} size={28} />
-                  <div>
-                    <span
-                      className="font-semibold"
-                      style={{ fontSize: fontSize.base, color: colors.textPrimary }}
-                    >
-                      {g.name}
-                    </span>
-                    {g.idNumber && (
-                      <span className="ml-2 font-mono" style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>
-                        {g.idNumber}
-                      </span>
-                    )}
-                  </div>
+              {detail.notes && (
+                <div>
+                  <p className="uppercase tracking-wide font-semibold mb-0.5" style={{ fontSize: 10, color: colors.textSecondary }}>Notes</p>
+                  <p style={{ fontSize: fontSize.xs, color: colors.textPrimary }}>{detail.notes}</p>
                 </div>
-                <div className="flex items-center gap-3">
-                  <span className="font-mono font-bold" style={{ fontSize: fontSize.base, color: colors.warning }}>
-                    R {g.total.toFixed(2)}
-                  </span>
-                  <span
-                    style={{
-                      display: 'inline-flex', alignItems: 'center',
-                      padding: '2px 8px', borderRadius: layout.btnRadius,
-                      fontSize: fontSize.xs, fontWeight: fontWeight.medium,
-                      background: colors.warningBg, color: colors.warning,
-                    }}
-                  >
-                    {g.sales.length} unpaid
-                  </span>
-                </div>
-              </div>
-
-              {/* Sales table */}
-              <table className="w-full bg-white border-collapse">
+              )}
+            </div>
+            <div className="flex-1 overflow-auto">
+              <table className="w-full" style={{ fontSize: fontSize.sm, borderCollapse: 'collapse' }}>
                 <thead>
-                  <tr style={{ background: 'linear-gradient(180deg, #FFFFFF 0%, #E8E8E8 100%)', borderBottom: '2px solid #B0B0B0' }}>
-                    {['Ref #', 'Items', 'Total', 'Paid', 'Balance', 'Date', ''].map((h) => (
-                      <th
-                        key={h}
-                        className="text-left px-3"
-                        style={{ fontSize: 11, fontWeight: fontWeight.semibold, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.06em', height: 32 }}
-                      >
+                  <tr style={{ borderBottom: `1px solid ${colors.border}` }}>
+                    {['Product', 'Qty', 'Unit Price', 'Line Total'].map((h) => (
+                      <th key={h} className="text-left pb-1" style={{ fontSize: 10, fontWeight: fontWeight.semibold, textTransform: 'uppercase', letterSpacing: '0.05em', color: colors.textSecondary }}>
                         {h}
                       </th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {g.sales.map((s, i) => {
-                    const paid = new Decimal(s.amountPaid ?? '0')
-                    const bal  = outstanding(s)
-                    return (
-                      <tr
-                        key={s.id}
-                        style={{ background: i % 2 === 1 ? '#F5F5F5' : '#FFFFFF', borderBottom: '1px solid #E0E0E0' }}
-                        onMouseEnter={(e) => (e.currentTarget.style.background = '#D6E8FF')}
-                        onMouseLeave={(e) => (e.currentTarget.style.background = i % 2 === 1 ? '#F5F5F5' : '#FFFFFF')}
-                      >
-                        <td className="px-3" style={{ height: 32, fontSize: fontSize.xs, color: colors.textSecondary, fontFamily: 'monospace' }}>{s.refNumber}</td>
-                        <td className="px-3" style={{ height: 32, fontSize: fontSize.sm, color: colors.textSecondary }}>
-                          {s.lines.length} item{s.lines.length !== 1 ? 's' : ''}
-                        </td>
-                        <td className="px-3" style={{ height: 32, fontSize: fontSize.sm, color: colors.textSecondary, fontFamily: 'monospace' }}>
-                          R {new Decimal(s.totalAmount).toFixed(2)}
-                        </td>
-                        <td className="px-3" style={{ height: 32, fontSize: fontSize.sm, color: paid.gt(0) ? colors.action : colors.textSecondary, fontFamily: 'monospace' }}>
-                          {paid.gt(0) ? `R ${paid.toFixed(2)}` : '—'}
-                        </td>
-                        <td className="px-3" style={{ height: 32, fontSize: fontSize.sm, color: colors.warning, fontFamily: 'monospace', fontWeight: fontWeight.semibold }}>
-                          R {bal.toFixed(2)}
-                        </td>
-                        <td className="px-3" style={{ height: 32, fontSize: fontSize.xs, color: colors.textSecondary, whiteSpace: 'nowrap' }}>
-                          {new Date(s.createdAt).toLocaleDateString('en-ZA')}
-                        </td>
-                        <td className="px-3" style={{ height: 32 }}>
-                          <button
-                            onClick={() => setPayTarget({
-                              id:          s.id,
-                              ref:         s.refNumber,
-                              totalAmount: s.totalAmount,
-                              amountPaid:  s.amountPaid ?? '0',
-                            })}
-                            className="flex items-center gap-1 text-xs font-medium"
-                            style={{
-                              height: 24, paddingLeft: 8, paddingRight: 8,
-                              borderRadius: layout.btnRadius,
-                              background: colors.action, color: '#fff',
-                            }}
-                          >
-                            <CreditCard className="w-3 h-3" /> Pay
-                          </button>
-                        </td>
-                      </tr>
-                    )
-                  })}
+                  {detail.lines.map((line) => (
+                    <tr key={line.id} style={{ borderBottom: `1px solid ${colors.bg}` }}>
+                      <td style={{ padding: '4px 0' }}>
+                        <p style={{ fontWeight: fontWeight.medium, color: colors.textPrimary }}>{line.product.name}</p>
+                        <p className="font-mono" style={{ fontSize: 10, color: colors.textSecondary }}>{line.product.code}</p>
+                      </td>
+                      <td className="font-mono" style={{ padding: '4px 12px 4px 0', color: colors.textSecondary }}>
+                        {new Decimal(line.quantity).toFixed(3)} {line.product.unit}
+                      </td>
+                      <td className="font-mono" style={{ padding: '4px 12px 4px 0', color: colors.textSecondary }}>
+                        R {new Decimal(line.unitPrice).toFixed(2)}
+                      </td>
+                      <td className="font-mono font-semibold" style={{ padding: '4px 0', color: colors.textPrimary }}>
+                        R {new Decimal(line.lineTotal).toFixed(2)}
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
+                <tfoot>
+                  <tr style={{ borderTop: `1px solid ${colors.border}` }}>
+                    <td colSpan={3} className="text-right font-semibold" style={{ padding: '6px 12px 0 0', color: colors.textSecondary }}>Total</td>
+                    <td className="font-mono font-bold" style={{ padding: '6px 0 0', fontSize: fontSize.base, color: colors.textPrimary }}>
+                      R {new Decimal(detail.totalAmount).toFixed(2)}
+                    </td>
+                  </tr>
+                </tfoot>
               </table>
             </div>
-          ))}
-        </div>
-
-        {payTarget && (
-          <ProcessPaymentModal
-            sale={payTarget}
-            onClose={() => setPayTarget(null)}
-            onSuccess={() => { mutate(KEY); setPayTarget(null) }}
-          />
+          </div>
         )}
-      </div>
+      </InlineDetailPanel>
+
+      {payTarget && (
+        <ProcessPaymentModal
+          sale={payTarget}
+          onClose={() => setPayTarget(null)}
+          onSuccess={() => { mutate(KEY); setPayTarget(null) }}
+        />
+      )}
+
+      {voidTarget && (
+        <VoidDialog
+          sale={voidTarget}
+          onClose={() => setVoidTarget(null)}
+          onSuccess={() => { mutate(KEY); setVoidTarget(null); setSelectedId(null) }}
+        />
+      )}
+
     </PageShell>
+  )
+}
+
+// ─── Void Dialog ──────────────────────────────────────────────────────────────
+
+function VoidDialog({
+  sale,
+  onClose,
+  onSuccess,
+}: {
+  sale:      Sale
+  onClose:   () => void
+  onSuccess: () => void
+}) {
+  const [reason,  setReason]  = useState('')
+  const [loading, setLoading] = useState(false)
+
+  async function onConfirm() {
+    if (reason.trim().length < 5) { toast.error('Reason must be at least 5 characters'); return }
+    setLoading(true)
+    const res = await fetch(`/api/sales/${sale.id}/void`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ reason }),
+    })
+    setLoading(false)
+    if (res.ok) { toast.success('Sale reversed'); onSuccess() }
+    else { const j = await res.json() as { error?: string }; toast.error(j.error ?? 'Failed to reverse sale') }
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
+      <DialogContent className="sm:max-w-md" showCloseButton={false}>
+        <ModalTitleBar title="Reverse Sale" onClose={onClose} />
+        <div className="space-y-4 mt-2">
+          <p className="text-sm" style={{ color: colors.textSecondary }}>
+            You are about to reverse{' '}
+            <span className="font-semibold" style={{ color: colors.textPrimary }}>{sale.refNumber}</span>
+            {' '}(R {new Decimal(sale.totalAmount).toFixed(2)}). This cannot be undone.
+          </p>
+          <div>
+            <Label>Reason for reversal</Label>
+            <Input
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="Enter reason (min 5 characters)"
+              className="mt-1"
+              disabled={loading}
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <ModalBtn onClick={onClose} disabled={loading}>Cancel</ModalBtn>
+            <ModalBtn variant="danger" onClick={onConfirm} disabled={loading || reason.trim().length < 5} loading={loading}>
+              Confirm Reversal
+            </ModalBtn>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }
