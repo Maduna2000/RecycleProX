@@ -3,14 +3,11 @@
 import { useState, useRef, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import useSWR, { mutate } from 'swr'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { FileDown, Loader2, Pen, CheckCircle, ExternalLink, RotateCcw } from 'lucide-react'
 import { toast } from 'sonner'
-import { PageShell } from '@/components/layout/PageShell'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
@@ -31,6 +28,24 @@ const TABS = [
   { value: 'Generate Register', label: 'Generate Register' },
   { value: 'Visit History',     label: 'Visit History' },
 ] as const
+
+const inp: React.CSSProperties = {
+  height: 26, width: '100%', borderRadius: 2,
+  border: '1px solid #ABABAB', padding: '0 7px',
+  fontSize: 12, color: '#212529', outline: 'none',
+  background: '#fff', boxSizing: 'border-box',
+}
+const lbl: React.CSSProperties = {
+  display: 'block', fontSize: 10, fontWeight: 700,
+  textTransform: 'uppercase', letterSpacing: '0.04em',
+  color: '#6C757D', marginBottom: 3,
+}
+const TH: React.CSSProperties = {
+  textAlign: 'left', padding: '0 10px', height: 28,
+  fontSize: 10, fontWeight: 700, color: '#6C757D',
+  textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap',
+}
+const TD: React.CSSProperties = { padding: '0 10px', fontSize: 12, color: '#212529' }
 
 export default function PoliceRegisterPage() {
   const { data: session } = useSession()
@@ -61,7 +76,7 @@ export default function PoliceRegisterPage() {
 
   if (!isManager) {
     return (
-      <div className="flex items-center justify-center h-64 text-sm" style={{ color: colors.textSecondary }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 240, fontSize: 13, color: colors.textSecondary }}>
         Access restricted to managers and administrators.
       </div>
     )
@@ -95,11 +110,11 @@ export default function PoliceRegisterPage() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        visitDate: date,
+        visitDate:   date,
         officerName: officerName.trim(),
         badgeNumber: badgeNumber.trim() || undefined,
         stationName: stationName.trim() || undefined,
-        notes: notes.trim() || undefined,
+        notes:       notes.trim() || undefined,
       }),
     })
     setLoading(false)
@@ -116,70 +131,92 @@ export default function PoliceRegisterPage() {
   }
 
   return (
-    <PageShell
-      title="Police Register"
-      subtitle="Compliance reports"
-      tabs={TABS}
-      activeTab={tab}
-      onTabChange={(v) => setTab(v as typeof tab)}
-    >
-      <div className="flex flex-col flex-1 min-h-0">
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, background: '#fff', border: '1px solid #B0B0B0', borderRadius: 2, overflow: 'hidden' }}>
+
+        {/* Title bar with inline tabs */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 10px', borderBottom: '2px solid #B0B0B0', background: 'linear-gradient(180deg,#EAEAEA 0%,#D4D4D4 100%)', flexShrink: 0 }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: '#1B3A6B' }}>Police Register</span>
+          <span style={{ fontSize: 11, color: '#6C757D' }}>Compliance reports</span>
+          <div style={{ flex: 1 }} />
+          <div style={{ display: 'flex', gap: 1, background: '#B8B8B8', borderRadius: 3, padding: 1 }}>
+            {TABS.map((t) => (
+              <button
+                key={t.value}
+                onClick={() => setTab(t.value)}
+                style={{
+                  height: 22, padding: '0 10px', fontSize: 11, fontWeight: 600,
+                  borderRadius: 2, border: 'none', cursor: 'pointer',
+                  background: tab === t.value ? '#fff' : 'transparent',
+                  color: tab === t.value ? '#1B3A6B' : '#6C757D',
+                }}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Content */}
-        <div className="flex-1 min-h-0 overflow-y-auto">
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: tab === 'Generate Register' ? 16 : 0 }}>
+
           {tab === 'Generate Register' && (
-            <div className="max-w-xl mx-auto w-full space-y-4 pb-6">
-              <div className="rounded-lg p-5 space-y-4 bg-white" style={{ border: `1px solid ${colors.border}` }}>
-                <h2 className="font-semibold" style={{ fontSize: fontSize.md, color: colors.textPrimary }}>Officer Details</h2>
-
-                <div>
-                  <Label htmlFor="reg-date" style={{ color: colors.textPrimary }}>Register Date</Label>
-                  <Input id="reg-date" type="date" value={date} max={today} onChange={(e) => setDate(e.target.value)} className="mt-1 w-48" style={{ borderColor: colors.border }} />
+            <div style={{ maxWidth: 520 }}>
+              {/* Officer Details card */}
+              <div style={{ background: '#fff', border: '1px solid #D0D0D0', borderRadius: 2, overflow: 'hidden', marginBottom: 10 }}>
+                <div style={{ background: 'linear-gradient(180deg,#FFFFFF 0%,#E8E8E8 100%)', borderBottom: '1px solid #C0C0C0', padding: '4px 10px' }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: '#1B3A6B' }}>Officer Details</span>
                 </div>
-
-                <div>
-                  <Label htmlFor="officer-name" style={{ color: colors.textPrimary }}>
-                    Officer Name <span style={{ color: colors.danger }}>*</span>
-                  </Label>
-                  <Input id="officer-name" value={officerName} onChange={(e) => setOfficer(e.target.value)} className="mt-1" style={{ borderColor: colors.border }} placeholder="Constable J. Nkosi" />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
+                <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
                   <div>
-                    <Label htmlFor="badge-no" style={{ color: colors.textPrimary }}>Badge / Force Number</Label>
-                    <Input id="badge-no" value={badgeNumber} onChange={(e) => setBadge(e.target.value)} className="mt-1" style={{ borderColor: colors.border }} placeholder="12345" />
+                    <label style={lbl}>Register Date</label>
+                    <input type="date" value={date} max={today} onChange={(e) => setDate(e.target.value)} style={{ ...inp, width: 160 }} />
                   </div>
                   <div>
-                    <Label htmlFor="station" style={{ color: colors.textPrimary }}>Police Station</Label>
-                    <Input id="station" value={stationName} onChange={(e) => setStation(e.target.value)} className="mt-1" style={{ borderColor: colors.border }} placeholder="Pretoria Central" />
+                    <label style={lbl}>Officer Name <span style={{ color: colors.danger }}>*</span></label>
+                    <input value={officerName} onChange={(e) => setOfficer(e.target.value)} placeholder="Constable J. Nkosi" style={inp} />
                   </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    <div>
+                      <label style={lbl}>Badge / Force Number</label>
+                      <input value={badgeNumber} onChange={(e) => setBadge(e.target.value)} placeholder="12345" style={inp} />
+                    </div>
+                    <div>
+                      <label style={lbl}>Police Station</label>
+                      <input value={stationName} onChange={(e) => setStation(e.target.value)} placeholder="Pretoria Central" style={inp} />
+                    </div>
+                  </div>
+                  <div>
+                    <label style={lbl}>Notes (optional)</label>
+                    <textarea
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      placeholder="Routine inspection, routine audit, etc."
+                      rows={2}
+                      style={{ ...inp, height: 'auto', padding: '5px 7px', resize: 'vertical' }}
+                    />
+                  </div>
+                  {error && (
+                    <p style={{ fontSize: 12, padding: '6px 10px', borderRadius: 2, color: colors.danger, background: colors.dangerBg, margin: 0 }}>{error}</p>
+                  )}
+                  <button
+                    onClick={handleDownload}
+                    disabled={loading || !date || !officerName.trim()}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 12px', fontSize: 12, fontWeight: 600, borderRadius: 2, background: colors.process, border: 'none', color: '#fff', cursor: loading || !date || !officerName.trim() ? 'not-allowed' : 'pointer', opacity: loading || !date || !officerName.trim() ? 0.6 : 1, alignSelf: 'flex-start' }}
+                    onMouseEnter={(e) => !loading && (e.currentTarget.style.background = colors.processHover)}
+                    onMouseLeave={(e) => !loading && (e.currentTarget.style.background = colors.process)}
+                  >
+                    {loading
+                      ? <><Loader2 style={{ width: 13, height: 13 }} className="animate-spin" />Generating PDF…</>
+                      : <><FileDown style={{ width: 13, height: 13 }} />Generate &amp; Download PDF</>}
+                  </button>
                 </div>
-
-                <div>
-                  <Label htmlFor="visit-notes" style={{ color: colors.textPrimary }}>Notes (optional)</Label>
-                  <Textarea id="visit-notes" value={notes} onChange={(e) => setNotes(e.target.value)} className="mt-1" style={{ borderColor: colors.border }} rows={2} placeholder="Routine inspection, routine audit, etc." />
-                </div>
-
-                {error && (
-                  <p className="text-sm rounded px-3 py-2" style={{ color: colors.danger, background: colors.dangerBg }}>{error}</p>
-                )}
-
-                <button
-                  onClick={handleDownload}
-                  disabled={loading || !date || !officerName.trim()}
-                  className="flex items-center gap-1.5 h-9 px-4 rounded text-sm font-medium text-white transition-colors disabled:opacity-50"
-                  style={{ background: colors.process }}
-                  onMouseEnter={(e) => !loading && (e.currentTarget.style.background = colors.processHover)}
-                  onMouseLeave={(e) => !loading && (e.currentTarget.style.background = colors.process)}
-                >
-                  {loading
-                    ? <><Loader2 className="w-4 h-4 animate-spin" />Generating PDF…</>
-                    : <><FileDown className="w-4 h-4" />Generate &amp; Download PDF</>}
-                </button>
               </div>
 
-              <div className="rounded-lg p-4 text-sm space-y-1" style={{ background: colors.processBg, border: `1px solid ${colors.processBg}`, color: colors.process }}>
-                <p className="font-semibold">Legal requirement</p>
-                <p style={{ color: colors.processHover }}>
+              {/* Legal note */}
+              <div style={{ background: colors.processBg, border: `1px solid ${colors.process}`, borderRadius: 2, padding: '8px 12px', fontSize: 11 }}>
+                <p style={{ fontWeight: 700, color: colors.process, margin: '0 0 3px' }}>Legal requirement</p>
+                <p style={{ color: colors.processHover, margin: 0 }}>
                   This register must be kept for at least 5 years and made available to the Eswatini Police Service (EPS) on request.
                   Each page must be signed by the dealer.
                 </p>
@@ -188,58 +225,58 @@ export default function PoliceRegisterPage() {
           )}
 
           {tab === 'Visit History' && (
-            <div className="rounded-lg overflow-hidden" style={{ border: `1px solid ${colors.border}` }}>
-              {visitsLoading ? (
-                <div className="flex items-center justify-center p-10" style={{ color: colors.textSecondary }}>
-                  <Loader2 className="w-4 h-4 animate-spin mr-2" /> Loading…
-                </div>
-              ) : !visitsData?.visits?.length ? (
-                <div className="text-center p-10 text-sm" style={{ color: colors.textSecondary }}>No visits recorded yet</div>
-              ) : (
-                <table className="w-full bg-white">
-                  <thead style={{ background: colors.toolbar, borderBottom: `1px solid ${colors.border}` }}>
-                    <tr>
-                      {['Date', 'Officer', 'Badge', 'Station', 'Signature', 'Register', 'Recorded'].map((h) => (
-                        <th key={h} className="text-left px-4 py-2" style={{ fontSize: fontSize.xs, fontWeight: fontWeight.semibold, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {visitsData.visits.map((v, i) => (
-                      <tr key={v.id} style={{ borderBottom: i < visitsData.visits.length - 1 ? `1px solid ${colors.neutralBg}` : 'none' }}>
-                        <td className="px-4 py-2.5 font-medium whitespace-nowrap" style={{ fontSize: fontSize.sm, color: colors.textPrimary }}>
-                          {new Date(v.visitDate).toLocaleDateString('en-ZA')}
-                        </td>
-                        <td className="px-4 py-2.5" style={{ fontSize: fontSize.sm, color: colors.textPrimary }}>{v.officerName}</td>
-                        <td className="px-4 py-2.5" style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>{v.badgeNumber ?? '—'}</td>
-                        <td className="px-4 py-2.5" style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>{v.stationName ?? '—'}</td>
-                        <td className="px-4 py-2.5">
-                          {v.signatureUrl ? (
-                            <a href={v.signatureUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs hover:underline" style={{ color: colors.process }}>
-                              <ExternalLink className="w-3 h-3" /> View
-                            </a>
-                          ) : (
-                            <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: colors.warningBg, color: colors.warning }}>Pending</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-2.5">
-                          {v.registerUrl ? (
-                            <a href={v.registerUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs hover:underline" style={{ color: colors.process }}>
-                              <ExternalLink className="w-3 h-3" /> View PDF
-                            </a>
-                          ) : (
-                            <span style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>—</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-2.5 whitespace-nowrap" style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>
-                          {new Date(v.createdAt).toLocaleDateString('en-ZA')}
-                        </td>
-                      </tr>
+            visitsLoading ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 120, color: '#6C757D', fontSize: 12, gap: 8 }}>
+                <Loader2 style={{ width: 14, height: 14 }} className="animate-spin" /> Loading…
+              </div>
+            ) : !visitsData?.visits?.length ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 120, color: '#6C757D', fontSize: 12 }}>
+                No visits recorded yet
+              </div>
+            ) : (
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
+                  <tr style={{ background: 'linear-gradient(180deg,#FFFFFF 0%,#E8E8E8 100%)', borderBottom: '1px solid #C0C0C0' }}>
+                    {['Date', 'Officer', 'Badge', 'Station', 'Signature', 'Register', 'Recorded'].map((h) => (
+                      <th key={h} style={TH}>{h}</th>
                     ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visitsData.visits.map((v, i) => (
+                    <tr key={v.id} style={{ background: i % 2 === 1 ? '#FAFAFA' : '#fff', borderBottom: '1px solid #F0F0F0', height: 30 }}>
+                      <td style={{ ...TD, whiteSpace: 'nowrap', fontWeight: 600 }}>
+                        {new Date(v.visitDate).toLocaleDateString('en-ZA')}
+                      </td>
+                      <td style={TD}>{v.officerName}</td>
+                      <td style={{ ...TD, color: '#6C757D', fontSize: 11 }}>{v.badgeNumber ?? '—'}</td>
+                      <td style={{ ...TD, color: '#6C757D', fontSize: 11 }}>{v.stationName ?? '—'}</td>
+                      <td style={TD}>
+                        {v.signatureUrl ? (
+                          <a href={v.signatureUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: colors.process, textDecoration: 'none' }}>
+                            <ExternalLink style={{ width: 11, height: 11 }} /> View
+                          </a>
+                        ) : (
+                          <span style={{ display: 'inline-flex', padding: '1px 6px', borderRadius: 3, fontSize: 11, fontWeight: 600, background: colors.warningBg, color: colors.warning }}>Pending</span>
+                        )}
+                      </td>
+                      <td style={TD}>
+                        {v.registerUrl ? (
+                          <a href={v.registerUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: colors.process, textDecoration: 'none' }}>
+                            <ExternalLink style={{ width: 11, height: 11 }} /> View PDF
+                          </a>
+                        ) : (
+                          <span style={{ fontSize: 11, color: '#6C757D' }}>—</span>
+                        )}
+                      </td>
+                      <td style={{ ...TD, color: '#6C757D', fontSize: 11, whiteSpace: 'nowrap' }}>
+                        {new Date(v.createdAt).toLocaleDateString('en-ZA')}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )
           )}
         </div>
       </div>
@@ -251,7 +288,7 @@ export default function PoliceRegisterPage() {
           onSaved={() => { setSigDialogOpen(false); setPendingVisitId(null); mutate('/api/police-visits?limit=20'); toast.success('Signature saved') }}
         />
       )}
-    </PageShell>
+    </div>
   )
 }
 

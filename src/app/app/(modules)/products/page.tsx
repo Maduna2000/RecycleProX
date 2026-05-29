@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, ModalTitleBar, ModalBtn } from '@/components/ui/dialog'
-import { Search, Pencil, TrendingUp, Plus, Eye, EyeOff, Trash2, X, Settings2, Package } from 'lucide-react'
+import { Search, Pencil, TrendingUp, Plus, Eye, EyeOff, Trash2, X, Settings2, Package, Loader2 } from 'lucide-react'
 import * as LucideIcons from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { toast } from 'sonner'
@@ -17,9 +17,6 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { CreateProductSchema, UpdateProductSchema, BulkPriceUpdateSchema, type CreateProductInput, type CreateProductFormInput, type UpdateProductInput } from '@/lib/schemas/product'
 import { useSession } from 'next-auth/react'
 import Decimal from 'decimal.js'
-import { PageShell } from '@/components/layout/PageShell'
-import { DataTable, StatusBadge } from '@/components/ui/DataTable'
-import type { Column, RowAction } from '@/components/ui/DataTable'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
@@ -47,6 +44,24 @@ function getCategoryStyle(hex: string | null | undefined, name: string): { backg
 type Product = {
   id: string; code: string; name: string; category: string; unit: string
   defaultBuyPrice: string; defaultSellPrice: string; isActive: boolean; sortOrder: number
+}
+
+const TH: React.CSSProperties = {
+  textAlign: 'left', padding: '0 8px', height: 28,
+  fontSize: 10, fontWeight: 700, color: '#6C757D',
+  textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap',
+}
+const TD: React.CSSProperties = { padding: '0 8px', fontSize: 12 }
+
+const secBtn: React.CSSProperties = {
+  display: 'inline-flex', alignItems: 'center', gap: 4, height: 24,
+  padding: '0 8px', fontSize: 11, fontWeight: 600, borderRadius: 2,
+  background: '#fff', border: '1px solid #ABABAB', color: '#212529', cursor: 'pointer',
+}
+const priBtn: React.CSSProperties = {
+  display: 'inline-flex', alignItems: 'center', gap: 4, height: 24,
+  padding: '0 8px', fontSize: 11, fontWeight: 600, borderRadius: 2,
+  background: '#217346', border: '1px solid #176338', color: '#fff', cursor: 'pointer',
 }
 
 export default function ProductsPage() {
@@ -90,7 +105,6 @@ export default function ProductsPage() {
 
   const revalidate = () => mutate(swrKey)
 
-  // Clear selection when filters change
   useEffect(() => { setSelectedKeys(new Set()) }, [swrKey])
 
   async function handleBulkDeactivate() {
@@ -129,212 +143,182 @@ export default function ProductsPage() {
     }
   }
 
-  const columns: Column<Product>[] = [
-    {
-      key: 'code',
-      header: 'Code',
-      width: '130px',
-      render: (row) => (
-        <span className="font-mono" style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>
-          {row.code}
-        </span>
-      ),
-    },
-    {
-      key: 'name',
-      header: 'Name',
-      sortable: true,
-      render: (row) => (
-        <span style={{ fontSize: fontSize.sm, fontWeight: fontWeight.medium, color: colors.textPrimary }}>
-          {row.name}
-        </span>
-      ),
-    },
-    {
-      key: 'category',
-      header: 'Category',
-      width: '130px',
-      render: (row) => {
-        const cat = categories.find(c => c.name === row.category)
-        const style = getCategoryStyle(cat?.colorHex, row.category)
-        return (
-          <span style={{ ...style, display: 'inline-flex', padding: '2px 8px', borderRadius: 4, fontSize: fontSize.xs, fontWeight: fontWeight.medium }}>
-            {row.category}
-          </span>
-        )
-      },
-    },
-    {
-      key: 'unit',
-      header: 'Unit',
-      width: '70px',
-      render: (row) => (
-        <span style={{ fontSize: fontSize.xs, color: colors.textSecondary, textTransform: 'uppercase' }}>
-          {row.unit}
-        </span>
-      ),
-    },
-    {
-      key: 'defaultBuyPrice',
-      header: 'Buy Price',
-      width: '100px',
-      sortable: true,
-      render: (row) => (
-        <span className="font-mono" style={{ fontSize: fontSize.sm, color: colors.action }}>
-          R {new Decimal(row.defaultBuyPrice).toFixed(2)}
-        </span>
-      ),
-    },
-    {
-      key: 'defaultSellPrice',
-      header: 'Sell Price',
-      width: '100px',
-      sortable: true,
-      render: (row) => (
-        <span className="font-mono" style={{ fontSize: fontSize.sm, color: colors.process }}>
-          R {new Decimal(row.defaultSellPrice).toFixed(2)}
-        </span>
-      ),
-    },
-    {
-      key: 'margin',
-      header: 'Margin',
-      width: '80px',
-      render: (row) => {
-        const m = calcMargin(row.defaultBuyPrice, row.defaultSellPrice)
-        return <span className="font-mono font-semibold" style={{ fontSize: fontSize.sm, color: m.color }}>{m.pct}</span>
-      },
-    },
-    {
-      key: 'isActive',
-      header: 'Status',
-      width: '90px',
-      render: (row) => <StatusBadge status={row.isActive ? 'active' : 'inactive'} />,
-    },
-  ]
-
-  const rowActions: RowAction<Product>[] = [
-    {
-      label: 'Edit',
-      icon: Pencil,
-      hidden: () => !isManager,
-      onClick: (row) => setEditTarget(row),
-    },
-    {
-      label: 'Deactivate',
-      icon: EyeOff,
-      hidden: (row) => !isManager || !row.isActive,
-      onClick: (row) => handleToggleActive(row),
-    },
-    {
-      label: 'Reactivate',
-      icon: Eye,
-      hidden: (row) => !isManager || row.isActive,
-      onClick: (row) => handleToggleActive(row),
-    },
-    {
-      label: 'Delete',
-      icon: Trash2,
-      danger: true,
-      hidden: () => !isManager,
-      onClick: (row) => setDeleteTarget(row),
-    },
-  ]
+  const allSelected = products.length > 0 && selectedKeys.size === products.length
 
   return (
-    <PageShell title="Products" subtitle={`${products.length} products`}>
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, background: '#fff', border: '1px solid #B0B0B0', borderRadius: 2, overflow: 'hidden' }}>
 
-      {/* Filters */}
-      <div className="flex gap-2 flex-wrap items-center shrink-0 mb-3">
-        <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3" style={{ color: colors.textSecondary }} />
-          <input
-            placeholder="Search code or name…"
-            className="pl-7 pr-3 h-7 text-xs rounded border bg-white focus:outline-none w-56"
-            style={{ borderColor: colors.border, color: colors.textPrimary }}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+        {/* Title bar */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 10px', borderBottom: '2px solid #B0B0B0', background: 'linear-gradient(180deg,#EAEAEA 0%,#D4D4D4 100%)', flexShrink: 0 }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: '#1B3A6B' }}>Products</span>
+          <span style={{ fontSize: 11, color: '#6C757D' }}>{products.length} products</span>
+          <div style={{ flex: 1 }} />
+          {isManager && (
+            <>
+              <button onClick={() => setCatManageOpen(true)} style={secBtn}>
+                <Settings2 style={{ width: 11, height: 11 }} /> Categories
+              </button>
+              <button onClick={() => setBulkOpen(true)} style={secBtn}>
+                <TrendingUp style={{ width: 11, height: 11 }} /> Bulk Price
+              </button>
+              <button onClick={() => setCreateOpen(true)} style={priBtn}>
+                <Plus style={{ width: 11, height: 11 }} /> Add Product
+              </button>
+            </>
+          )}
         </div>
-        <select
-          className="h-7 border rounded px-2 text-xs bg-white focus:outline-none"
-          style={{ borderColor: colors.border, color: colors.textPrimary }}
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-        >
-          <option value="">All Categories</option>
-          {categories.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
-        </select>
-        <select
-          className="h-7 border rounded px-2 text-xs bg-white focus:outline-none"
-          style={{ borderColor: colors.border, color: colors.textPrimary }}
-          value={statusFilter}
-          onChange={(e) => setStatus(e.target.value)}
-        >
-          <option value="active">Active only</option>
-          <option value="inactive">Inactive only</option>
-          <option value="all">All statuses</option>
-        </select>
-        {isManager && (
-          <div className="ml-auto flex gap-2">
+
+        {/* Filter toolbar */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 8px', background: 'linear-gradient(180deg,#F5F5F5 0%,#ECECEC 100%)', borderBottom: '1px solid #C0C0C0', flexShrink: 0 }}>
+          <div style={{ position: 'relative' }}>
+            <Search style={{ position: 'absolute', left: 6, top: '50%', transform: 'translateY(-50%)', width: 11, height: 11, color: '#6C757D', pointerEvents: 'none' }} />
+            <input
+              placeholder="Search code or name…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              style={{ height: 24, paddingLeft: 22, paddingRight: 8, fontSize: 11, border: '1px solid #ABABAB', borderRadius: 2, outline: 'none', background: '#fff', width: 190, color: '#212529' }}
+            />
+          </div>
+          <select
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            style={{ height: 24, padding: '0 6px', fontSize: 11, border: '1px solid #ABABAB', borderRadius: 2, background: '#fff', color: '#212529', outline: 'none' }}
+          >
+            <option value="">All Categories</option>
+            {categories.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
+          </select>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatus(e.target.value)}
+            style={{ height: 24, padding: '0 6px', fontSize: 11, border: '1px solid #ABABAB', borderRadius: 2, background: '#fff', color: '#212529', outline: 'none' }}
+          >
+            <option value="active">Active only</option>
+            <option value="inactive">Inactive only</option>
+            <option value="all">All statuses</option>
+          </select>
+        </div>
+
+        {/* Bulk action bar */}
+        {isManager && selectedKeys.size > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 10px', background: '#EBF3FC', borderBottom: '1px solid #185ABD', flexShrink: 0 }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: '#185ABD' }}>{selectedKeys.size} selected</span>
             <button
-              onClick={() => setCatManageOpen(true)}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', fontSize: 12, fontWeight: 600, borderRadius: 2, background: '#fff', border: `1px solid ${colors.border}`, color: colors.textPrimary, cursor: 'pointer' }}
+              onClick={() => setSelectedKeys(new Set())}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, color: '#6C757D', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px' }}
             >
-              <Settings2 style={{ width: 13, height: 13 }} /> Categories
+              <X style={{ width: 11, height: 11 }} /> Clear
             </button>
-            <button
-              onClick={() => setBulkOpen(true)}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', fontSize: 12, fontWeight: 600, borderRadius: 2, background: '#fff', border: `1px solid ${colors.border}`, color: colors.textPrimary, cursor: 'pointer' }}
-            >
-              <TrendingUp style={{ width: 13, height: 13 }} /> Bulk Price Update
-            </button>
-            <button
-              onClick={() => setCreateOpen(true)}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', fontSize: 12, fontWeight: 600, borderRadius: 2, background: colors.action, border: 'none', color: '#fff', cursor: 'pointer' }}
-            >
-              <Plus style={{ width: 13, height: 13 }} /> Add Product
-            </button>
+            <div style={{ flex: 1 }} />
+            <ModalBtn onClick={handleBulkReactivate} loading={bulkLoading === 'reactivate'} disabled={bulkLoading !== null}>Reactivate</ModalBtn>
+            <ModalBtn onClick={handleBulkDeactivate} loading={bulkLoading === 'deactivate'} disabled={bulkLoading !== null}>Deactivate</ModalBtn>
+            <ModalBtn variant="danger" onClick={() => setBulkDelOpen(true)} disabled={bulkLoading !== null}>Delete</ModalBtn>
           </div>
         )}
-      </div>
 
-      {/* Bulk action bar */}
-      {isManager && selectedKeys.size > 0 && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 10px', marginBottom: 6, background: '#EBF3FC', border: '1px solid #185ABD', borderRadius: 3 }}>
-          <span style={{ fontSize: 12, fontWeight: 600, color: '#185ABD' }}>{selectedKeys.size} selected</span>
-          <button
-            onClick={() => setSelectedKeys(new Set())}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, color: '#6C757D', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px' }}
-          >
-            <X style={{ width: 11, height: 11 }} /> Clear
-          </button>
-          <div style={{ flex: 1 }} />
-          <ModalBtn onClick={handleBulkReactivate} loading={bulkLoading === 'reactivate'} disabled={bulkLoading !== null}>
-            Reactivate
-          </ModalBtn>
-          <ModalBtn onClick={handleBulkDeactivate} loading={bulkLoading === 'deactivate'} disabled={bulkLoading !== null}>
-            Deactivate
-          </ModalBtn>
-          <ModalBtn variant="danger" onClick={() => setBulkDelOpen(true)} disabled={bulkLoading !== null}>
-            Delete
-          </ModalBtn>
+        {/* Table */}
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+          {isLoading ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 120, color: '#6C757D', fontSize: 12, gap: 8 }}>
+              <Loader2 style={{ width: 14, height: 14 }} className="animate-spin" /> Loading…
+            </div>
+          ) : products.length === 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 120, color: '#6C757D', fontSize: 12, gap: 8 }}>
+              <span>No products found</span>
+              {isManager && (
+                <button onClick={() => setCreateOpen(true)} style={{ ...priBtn, height: 26, fontSize: 11 }}>
+                  <Plus style={{ width: 11, height: 11 }} /> Add Product
+                </button>
+              )}
+            </div>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
+                <tr style={{ background: 'linear-gradient(180deg,#FFFFFF 0%,#E8E8E8 100%)', borderBottom: '1px solid #C0C0C0' }}>
+                  {isManager && (
+                    <th style={{ ...TH, width: 32, textAlign: 'center' }}>
+                      <input
+                        type="checkbox"
+                        style={{ width: 12, height: 12, cursor: 'pointer' }}
+                        checked={allSelected}
+                        onChange={(e) => setSelectedKeys(e.target.checked ? new Set(products.map(p => p.id)) : new Set())}
+                      />
+                    </th>
+                  )}
+                  <th style={{ ...TH, width: 100 }}>Code</th>
+                  <th style={TH}>Name</th>
+                  <th style={{ ...TH, width: 120 }}>Category</th>
+                  <th style={{ ...TH, width: 56 }}>Unit</th>
+                  <th style={{ ...TH, width: 90 }}>Buy Price</th>
+                  <th style={{ ...TH, width: 90 }}>Sell Price</th>
+                  <th style={{ ...TH, width: 70 }}>Margin</th>
+                  <th style={{ ...TH, width: 76 }}>Status</th>
+                  {isManager && <th style={{ ...TH, width: 72 }}></th>}
+                </tr>
+              </thead>
+              <tbody>
+                {products.map((p, i) => {
+                  const m      = calcMargin(p.defaultBuyPrice, p.defaultSellPrice)
+                  const cat    = categories.find(c => c.name === p.category)
+                  const catSty = getCategoryStyle(cat?.colorHex, p.category)
+                  const rowBg  = i % 2 === 1 ? '#FAFAFA' : '#fff'
+                  return (
+                    <tr
+                      key={p.id}
+                      style={{ background: rowBg, borderBottom: '1px solid #F0F0F0', height: 30 }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = '#EEF4FB')}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = rowBg)}
+                    >
+                      {isManager && (
+                        <td style={{ ...TD, width: 32, textAlign: 'center' }}>
+                          <input
+                            type="checkbox"
+                            style={{ width: 12, height: 12, cursor: 'pointer' }}
+                            checked={selectedKeys.has(p.id)}
+                            onChange={(e) => {
+                              const next = new Set(selectedKeys)
+                              e.target.checked ? next.add(p.id) : next.delete(p.id)
+                              setSelectedKeys(next)
+                            }}
+                          />
+                        </td>
+                      )}
+                      <td style={{ ...TD, fontFamily: 'monospace', color: '#6C757D', fontSize: 11 }}>{p.code}</td>
+                      <td style={{ ...TD, fontWeight: 600, color: '#212529' }}>{p.name}</td>
+                      <td style={TD}>
+                        <span style={{ ...catSty, display: 'inline-flex', padding: '1px 6px', borderRadius: 3, fontSize: 11, fontWeight: 600 }}>{p.category}</span>
+                      </td>
+                      <td style={{ ...TD, textTransform: 'uppercase', color: '#6C757D', fontSize: 11 }}>{p.unit}</td>
+                      <td style={{ ...TD, fontFamily: 'monospace', color: colors.action }}>R {new Decimal(p.defaultBuyPrice).toFixed(2)}</td>
+                      <td style={{ ...TD, fontFamily: 'monospace', color: colors.process }}>R {new Decimal(p.defaultSellPrice).toFixed(2)}</td>
+                      <td style={{ ...TD, fontFamily: 'monospace', fontWeight: 600, color: m.color }}>{m.pct}</td>
+                      <td style={TD}>
+                        <span style={{ display: 'inline-flex', padding: '1px 6px', borderRadius: 3, fontSize: 11, fontWeight: 600, ...(p.isActive ? { background: colors.actionBg, color: colors.action } : { background: colors.neutralBg, color: colors.textSecondary }) }}>
+                          {p.isActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                      {isManager && (
+                        <td style={{ ...TD, textAlign: 'center' }}>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+                            <button title="Edit" onClick={() => setEditTarget(p)} style={{ width: 22, height: 22, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', cursor: 'pointer', borderRadius: 2, color: '#9AAABF' }} onMouseEnter={(e) => (e.currentTarget.style.color = colors.process)} onMouseLeave={(e) => (e.currentTarget.style.color = '#9AAABF')}>
+                              <Pencil style={{ width: 13, height: 13 }} />
+                            </button>
+                            <button title={p.isActive ? 'Deactivate' : 'Reactivate'} onClick={() => handleToggleActive(p)} style={{ width: 22, height: 22, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', cursor: 'pointer', borderRadius: 2, color: '#9AAABF' }} onMouseEnter={(e) => (e.currentTarget.style.color = colors.warning)} onMouseLeave={(e) => (e.currentTarget.style.color = '#9AAABF')}>
+                              {p.isActive ? <EyeOff style={{ width: 13, height: 13 }} /> : <Eye style={{ width: 13, height: 13 }} />}
+                            </button>
+                            <button title="Delete" onClick={() => setDeleteTarget(p)} style={{ width: 22, height: 22, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', cursor: 'pointer', borderRadius: 2, color: '#9AAABF' }} onMouseEnter={(e) => (e.currentTarget.style.color = colors.danger)} onMouseLeave={(e) => (e.currentTarget.style.color = '#9AAABF')}>
+                              <Trash2 style={{ width: 13, height: 13 }} />
+                            </button>
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          )}
         </div>
-      )}
-
-      {/* Table */}
-      <div className="flex-1 min-h-0">
-        <DataTable
-          columns={columns}
-          rows={products}
-          rowKey={(r) => r.id}
-          rowActions={rowActions}
-          loading={isLoading}
-          emptyMessage="No products found"
-          emptyAction={isManager ? { label: '+ Add Product', onClick: () => setCreateOpen(true) } : undefined}
-          selectedKeys={isManager ? selectedKeys : undefined}
-          onSelectionChange={isManager ? setSelectedKeys : undefined}
-        />
       </div>
 
       {createOpen && (
@@ -381,7 +365,7 @@ export default function ProductsPage() {
           onSuccess={() => { revalidate(); setSelectedKeys(new Set()); setBulkDelOpen(false) }}
         />
       )}
-    </PageShell>
+    </div>
   )
 }
 
@@ -887,7 +871,6 @@ function ManageCategoriesModal({ categories, onClose, onSuccess }: {
       <DialogContent className="sm:max-w-md" showCloseButton={false}>
         <ModalTitleBar title="Manage Categories" onClose={onClose} />
         <div className="space-y-3 mt-2">
-          {/* Category list */}
           <div style={{ maxHeight: 300, overflowY: 'auto', border: `1px solid ${colors.border}`, borderRadius: 3 }}>
             {categories.length === 0 ? (
               <p style={{ padding: '16px', textAlign: 'center', fontSize: 12, color: colors.textSecondary }}>No categories yet</p>
@@ -935,7 +918,6 @@ function ManageCategoriesModal({ categories, onClose, onSuccess }: {
             ))}
           </div>
 
-          {/* Add new category */}
           <div style={{ background: colors.neutralBg, border: `1px solid ${colors.border}`, borderRadius: 3, padding: '10px 12px' }}>
             <p style={{ fontSize: 11, fontWeight: 600, color: colors.textSecondary, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Add Category</p>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
