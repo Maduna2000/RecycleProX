@@ -277,7 +277,7 @@ export default function ProductsPage() {
                             checked={selectedKeys.has(p.id)}
                             onChange={(e) => {
                               const next = new Set(selectedKeys)
-                              e.target.checked ? next.add(p.id) : next.delete(p.id)
+                              if (e.target.checked) { next.add(p.id) } else { next.delete(p.id) }
                               setSelectedKeys(next)
                             }}
                           />

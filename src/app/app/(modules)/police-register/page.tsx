@@ -3,12 +3,11 @@
 import { useState, useRef, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import useSWR, { mutate } from 'swr'
-import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { FileDown, Loader2, Pen, CheckCircle, ExternalLink, RotateCcw } from 'lucide-react'
 import { toast } from 'sonner'
-import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
+import { colors } from '@/lib/design-tokens'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
