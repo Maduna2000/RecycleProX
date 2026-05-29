@@ -104,6 +104,22 @@ export const colors = {
   /** Amber-300 — deduction input border */
   alertInputBorder:  '#FCD34D',
 
+  // Role badges
+  /** Purple — admin role badge text */
+  purple:        '#7B2D8B',
+  /** Purple tint — admin role badge background */
+  purpleBg:      '#F3EBF9',
+  /** Violet — sale photo type tag text */
+  violet:        '#8B5CF6',
+  /** Violet tint — sale photo type tag background */
+  violetBg:      '#F3EFFF',
+
+  // Button hover darkens
+  /** Darker green — hover state for action/primary buttons */
+  actionHover:   '#185A38',
+  /** Darker blue — hover state for process/secondary buttons */
+  processHover:  '#1249A0',
+
   // Utility
   /** Disabled / placeholder icon colour */
   disabled:      '#C0C0C0',

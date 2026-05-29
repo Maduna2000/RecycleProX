@@ -47,7 +47,7 @@ export default function PriceGroupsPage() {
               onClick={() => setCreateOpen(true)}
               className="flex items-center gap-1.5 h-8 px-3 rounded text-xs font-medium text-white transition-colors"
               style={{ background: colors.action }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = '#185A38')}
+              onMouseEnter={(e) => (e.currentTarget.style.background = colors.actionHover)}
               onMouseLeave={(e) => (e.currentTarget.style.background = colors.action)}
             >
               <Plus className="w-3.5 h-3.5" /> New Group
@@ -132,12 +132,12 @@ function CreatePriceGroupModal({ onClose, onSuccess }: { onClose: () => void; on
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-2">
           <div>
             <Label style={{ color: colors.textPrimary }}>Group Name</Label>
-            <Input {...register('name')} className="mt-1 border-[#E0E0E0]" placeholder="e.g. Platinum Dealer" disabled={loading} />
+            <Input {...register('name')} className="mt-1 border-rpx-border" placeholder="e.g. Platinum Dealer" disabled={loading} />
             {errors.name && <p className="text-xs mt-1" style={{ color: colors.danger }}>{errors.name.message}</p>}
           </div>
           <div>
             <Label style={{ color: colors.textPrimary }}>Description <span className="font-normal" style={{ color: colors.textSecondary }}>(optional)</span></Label>
-            <Input {...register('description')} className="mt-1 border-[#E0E0E0]" disabled={loading} />
+            <Input {...register('description')} className="mt-1 border-rpx-border" disabled={loading} />
           </div>
           <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: colors.textPrimary }}>
             <input type="checkbox" onChange={(e) => setValue('isDefault', e.target.checked)} className="rounded" />

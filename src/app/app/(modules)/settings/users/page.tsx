@@ -43,7 +43,7 @@ function statusBadge(user: User) {
 }
 
 const ROLE_STYLES: Record<string, { background: string; color: string }> = {
-  admin:   { background: '#F3EBF9', color: '#7B2D8B' },
+  admin:   { background: colors.purpleBg, color: colors.purple },
   manager: { background: colors.processBg, color: colors.process },
   cashier: { background: colors.neutralBg, color: colors.textSecondary },
 }

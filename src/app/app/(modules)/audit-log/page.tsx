@@ -134,8 +134,10 @@ export default function AuditLogPage() {
           {hasFilters && (
             <button
               onClick={clearFilters}
-              className="h-7 px-2.5 text-xs flex items-center gap-1 border rounded hover:bg-[#F1F3F4]"
+              className="h-7 px-2.5 text-xs flex items-center gap-1 border rounded"
               style={{ borderColor: colors.border, color: colors.textSecondary, borderRadius: layout.btnRadius }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = colors.bg)}
+              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
             >
               <X className="w-3 h-3" /> Clear
             </button>
@@ -143,7 +145,7 @@ export default function AuditLogPage() {
         </div>
 
         {/* Table */}
-        <div className="flex-1 min-h-0 overflow-y-auto bg-white" style={{ border: '1px solid #B0B0B0', borderRadius: 0 }}>
+        <div className="flex-1 min-h-0 overflow-y-auto bg-white" style={{ border: `1px solid ${colors.border}`, borderRadius: layout.cardRadius }}>
           {isLoading ? (
             <div className="flex items-center justify-center h-40" style={{ color: colors.textSecondary }}>
               <Loader2 className="w-4 h-4 animate-spin mr-2" /> Loading…
@@ -151,12 +153,12 @@ export default function AuditLogPage() {
           ) : (
             <table className="w-full bg-white border-collapse">
               <thead className="sticky top-0 z-10">
-                <tr style={{ background: 'linear-gradient(180deg, #FFFFFF 0%, #E8E8E8 100%)', borderBottom: '2px solid #B0B0B0' }}>
+                <tr style={{ background: colors.toolbar, borderBottom: `1px solid ${colors.border}` }}>
                   {['Time', 'Action', 'Table', 'Record ID', 'User', 'IP', ''].map((h, i) => (
                     <th
                       key={i}
                       className="text-left px-3"
-                      style={{ fontSize: 11, fontWeight: fontWeight.semibold, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.06em', height: 32 }}
+                      style={{ fontSize: fontSize.xs, fontWeight: fontWeight.semibold, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.06em', height: 32 }}
                     >
                       {h}
                     </th>
@@ -172,10 +174,10 @@ export default function AuditLogPage() {
                     <tr
                       key={entry.id}
                       className="cursor-pointer"
-                      style={{ background: idx % 2 === 1 ? '#F5F5F5' : '#FFFFFF', borderBottom: '1px solid #E0E0E0' }}
+                      style={{ background: idx % 2 === 1 ? colors.neutralBg : colors.surface, borderBottom: `1px solid ${colors.border}` }}
                       onClick={() => setExpanded(expanded === entry.id ? null : entry.id)}
-                      onMouseEnter={(e) => (e.currentTarget.style.background = '#D6E8FF')}
-                      onMouseLeave={(e) => (e.currentTarget.style.background = idx % 2 === 1 ? '#F5F5F5' : '#FFFFFF')}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = colors.rowHover)}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = idx % 2 === 1 ? colors.neutralBg : colors.surface)}
                     >
                       <td className="px-3" style={{ height: 32, fontSize: fontSize.xs, color: colors.textSecondary, fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
                         {new Date(entry.createdAt).toLocaleString('en-ZA')}
@@ -201,7 +203,7 @@ export default function AuditLogPage() {
                       <td className="px-3 text-xs" style={{ height: 32, color: colors.textSecondary }}>{expanded === entry.id ? '▲' : '▼'}</td>
                     </tr>
                     {expanded === entry.id && (
-                      <tr key={`${entry.id}-detail`} style={{ background: colors.bg, borderBottom: '1px solid #E0E0E0', borderLeft: `3px solid ${colors.process}` }}>
+                      <tr key={`${entry.id}-detail`} style={{ background: colors.bg, borderBottom: `1px solid ${colors.border}`, borderLeft: `3px solid ${colors.process}` }}>
                         <td colSpan={7} className="px-4 py-3">
                           <div className="grid grid-cols-2 gap-4 text-xs">
                             <div>
@@ -235,16 +237,20 @@ export default function AuditLogPage() {
               <button
                 disabled={page <= 1}
                 onClick={() => setPage(p => p - 1)}
-                className="px-2 h-6 rounded-sm border hover:bg-[#E8E8E8] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                style={{ borderColor: '#B0B0B0' }}
+                className="px-2 h-6 rounded-sm border disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                style={{ borderColor: colors.border }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = colors.neutralBg)}
+                onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
               >
                 <ChevronLeft className="w-3 h-3" />
               </button>
               <button
                 disabled={page >= totalPages}
                 onClick={() => setPage(p => p + 1)}
-                className="px-2 h-6 rounded-sm border hover:bg-[#E8E8E8] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                style={{ borderColor: '#B0B0B0' }}
+                className="px-2 h-6 rounded-sm border disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                style={{ borderColor: colors.border }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = colors.neutralBg)}
+                onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
               >
                 <ChevronRight className="w-3 h-3" />
               </button>

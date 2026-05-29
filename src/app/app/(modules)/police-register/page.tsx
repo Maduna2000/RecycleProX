@@ -133,30 +133,30 @@ export default function PoliceRegisterPage() {
 
                 <div>
                   <Label htmlFor="reg-date" style={{ color: colors.textPrimary }}>Register Date</Label>
-                  <Input id="reg-date" type="date" value={date} max={today} onChange={(e) => setDate(e.target.value)} className="mt-1 w-48 border-[#E0E0E0]" />
+                  <Input id="reg-date" type="date" value={date} max={today} onChange={(e) => setDate(e.target.value)} className="mt-1 w-48" style={{ borderColor: colors.border }} />
                 </div>
 
                 <div>
                   <Label htmlFor="officer-name" style={{ color: colors.textPrimary }}>
                     Officer Name <span style={{ color: colors.danger }}>*</span>
                   </Label>
-                  <Input id="officer-name" value={officerName} onChange={(e) => setOfficer(e.target.value)} className="mt-1 border-[#E0E0E0]" placeholder="Constable J. Nkosi" />
+                  <Input id="officer-name" value={officerName} onChange={(e) => setOfficer(e.target.value)} className="mt-1" style={{ borderColor: colors.border }} placeholder="Constable J. Nkosi" />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label htmlFor="badge-no" style={{ color: colors.textPrimary }}>Badge / Force Number</Label>
-                    <Input id="badge-no" value={badgeNumber} onChange={(e) => setBadge(e.target.value)} className="mt-1 border-[#E0E0E0]" placeholder="12345" />
+                    <Input id="badge-no" value={badgeNumber} onChange={(e) => setBadge(e.target.value)} className="mt-1" style={{ borderColor: colors.border }} placeholder="12345" />
                   </div>
                   <div>
                     <Label htmlFor="station" style={{ color: colors.textPrimary }}>Police Station</Label>
-                    <Input id="station" value={stationName} onChange={(e) => setStation(e.target.value)} className="mt-1 border-[#E0E0E0]" placeholder="Pretoria Central" />
+                    <Input id="station" value={stationName} onChange={(e) => setStation(e.target.value)} className="mt-1" style={{ borderColor: colors.border }} placeholder="Pretoria Central" />
                   </div>
                 </div>
 
                 <div>
                   <Label htmlFor="visit-notes" style={{ color: colors.textPrimary }}>Notes (optional)</Label>
-                  <Textarea id="visit-notes" value={notes} onChange={(e) => setNotes(e.target.value)} className="mt-1 border-[#E0E0E0]" rows={2} placeholder="Routine inspection, routine audit, etc." />
+                  <Textarea id="visit-notes" value={notes} onChange={(e) => setNotes(e.target.value)} className="mt-1" style={{ borderColor: colors.border }} rows={2} placeholder="Routine inspection, routine audit, etc." />
                 </div>
 
                 {error && (
@@ -168,7 +168,7 @@ export default function PoliceRegisterPage() {
                   disabled={loading || !date || !officerName.trim()}
                   className="flex items-center gap-1.5 h-9 px-4 rounded text-sm font-medium text-white transition-colors disabled:opacity-50"
                   style={{ background: colors.process }}
-                  onMouseEnter={(e) => !loading && (e.currentTarget.style.background = '#1249A0')}
+                  onMouseEnter={(e) => !loading && (e.currentTarget.style.background = colors.processHover)}
                   onMouseLeave={(e) => !loading && (e.currentTarget.style.background = colors.process)}
                 >
                   {loading
@@ -177,9 +177,9 @@ export default function PoliceRegisterPage() {
                 </button>
               </div>
 
-              <div className="rounded-lg p-4 text-sm space-y-1" style={{ background: colors.processBg, border: '1px solid #C7DDF5', color: colors.process }}>
+              <div className="rounded-lg p-4 text-sm space-y-1" style={{ background: colors.processBg, border: `1px solid ${colors.processBg}`, color: colors.process }}>
                 <p className="font-semibold">Legal requirement</p>
-                <p style={{ color: '#1249A0' }}>
+                <p style={{ color: colors.processHover }}>
                   This register must be kept for at least 5 years and made available to the Eswatini Police Service (EPS) on request.
                   Each page must be signed by the dealer.
                 </p>
@@ -401,7 +401,7 @@ function SignatureDialog({
               disabled={saving || !hasStrokes}
               className="flex items-center gap-1.5 h-9 px-4 rounded text-sm font-medium text-white transition-colors disabled:opacity-50"
               style={{ background: colors.action }}
-              onMouseEnter={(e) => !saving && (e.currentTarget.style.background = '#185A38')}
+              onMouseEnter={(e) => !saving && (e.currentTarget.style.background = colors.actionHover)}
               onMouseLeave={(e) => !saving && (e.currentTarget.style.background = colors.action)}
             >
               {saving

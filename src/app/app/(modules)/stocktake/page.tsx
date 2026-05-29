@@ -78,7 +78,7 @@ export default function StocktakePage() {
             disabled={creating}
             className="flex items-center gap-1.5 h-8 px-3 rounded text-xs font-medium text-white transition-colors disabled:opacity-50"
             style={{ background: colors.action }}
-            onMouseEnter={(e) => !creating && (e.currentTarget.style.background = '#185A38')}
+            onMouseEnter={(e) => !creating && (e.currentTarget.style.background = colors.actionHover)}
             onMouseLeave={(e) => !creating && (e.currentTarget.style.background = colors.action)}
           >
             {creating

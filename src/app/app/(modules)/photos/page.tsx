@@ -26,8 +26,8 @@ type PhotosResponse = {
 const TYPE_META: Record<PhotoRecord['type'], { label: string; color: string; bg: string; icon: React.ElementType }> = {
   purchase_signature: { label: 'Signature',    color: colors.action,   bg: colors.actionBg,  icon: FileText    },
   purchase_vat264:    { label: 'VAT264 / SHG', color: colors.process,  bg: colors.processBg, icon: FileText    },
-  purchase_photo:     { label: 'Stock Photo',  color: '#059669',       bg: '#ECFDF5',        icon: ShoppingCart },
-  sale_photo:         { label: 'Sale Photo',   color: '#8B5CF6',       bg: '#F3EFFF',        icon: ShoppingCart },
+  purchase_photo:     { label: 'Stock Photo',  color: colors.netWeightText, bg: colors.netWeightBg, icon: ShoppingCart },
+  sale_photo:         { label: 'Sale Photo',   color: colors.violet,   bg: colors.violetBg,  icon: ShoppingCart },
   weighbridge:        { label: 'Scale Photo',  color: colors.warning,  bg: colors.warningBg, icon: Scale       },
   casual_id:          { label: 'ID Photo',     color: colors.process,  bg: colors.processBg, icon: IdCard      },
 }
@@ -398,8 +398,10 @@ function PhotoGrid({
         {hasFilters && (
           <button
             onClick={clearFilters}
-            className="flex items-center gap-1 text-xs hover:text-[#212529] transition-colors"
+            className="flex items-center gap-1 text-xs transition-colors"
             style={{ color: colors.textSecondary }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = colors.textPrimary)}
+            onMouseLeave={(e) => (e.currentTarget.style.color = colors.textSecondary)}
           >
             <X className="w-3 h-3" /> Clear
           </button>
