@@ -12,7 +12,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { CreateExpenseSchema, type CreateExpenseFormInput, type CreateExpenseInput } from '@/lib/schemas/expense'
 import { DataTable, StatusBadge, type Column, type RowAction } from '@/components/ui/DataTable'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, ModalTitleBar, ModalBtn } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -398,117 +398,111 @@ function AddExpenseModal({ onClose, onSuccess }: { onClose: () => void; onSucces
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader><DialogTitle>Add Expense</DialogTitle></DialogHeader>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-2">
+      <DialogContent className="sm:max-w-lg" showCloseButton={false}>
+        <ModalTitleBar title="Add Expense" onClose={onClose} />
+        <form onSubmit={handleSubmit(onSubmit)}>
+          <div style={{ padding: '12px 16px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
 
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <Label>Expense Category</Label>
-              <button
-                type="button"
-                onClick={() => setAddTypeOpen(true)}
-                className="text-xs hover:underline"
-                style={{ color: colors.action }}
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                <Label>Expense Category</Label>
+                <button
+                  type="button"
+                  onClick={() => setAddTypeOpen(true)}
+                  style={{ fontSize: 11, fontWeight: 600, color: colors.action, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                >
+                  + New category
+                </button>
+              </div>
+              <Select
+                value={expenseTypeId ?? ''}
+                onValueChange={(v) => setValue('expenseTypeId', v as string)}
               >
-                + New category
-              </button>
-            </div>
-            <Select
-              value={expenseTypeId ?? ''}
-              onValueChange={(v) => setValue('expenseTypeId', v as string)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select category…">
-                  {selectedTypeName ?? ''}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {(types ?? []).map((t) => (
-                  <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {errors.expenseTypeId && (
-              <p className="text-xs mt-1" style={{ color: colors.danger }}>{errors.expenseTypeId.message}</p>
-            )}
-          </div>
-
-          <div>
-            <Label>Description</Label>
-            <Input {...register('description')} className="mt-1" disabled={loading} placeholder="Brief description…" />
-            {errors.description && (
-              <p className="text-xs mt-1" style={{ color: colors.danger }}>{errors.description.message}</p>
-            )}
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label>Amount (R)</Label>
-              <Input {...register('amount')} type="number" step="0.01" min="0.01" className="mt-1" disabled={loading} />
-              {errors.amount && (
-                <p className="text-xs mt-1" style={{ color: colors.danger }}>{errors.amount.message}</p>
-              )}
-            </div>
-            <div>
-              <Label>Payment Method</Label>
-              <Select onValueChange={(v) => setValue('paymentMethod', v as 'cash' | 'eft' | 'cheque' | 'amplopay')} defaultValue="cash">
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select category…">
+                    {selectedTypeName ?? ''}
+                  </SelectValue>
+                </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="cash">Cash</SelectItem>
-                  <SelectItem value="eft">EFT</SelectItem>
-                  <SelectItem value="cheque">Cheque</SelectItem>
-                  <SelectItem value="amplopay">AmploPay</SelectItem>
+                  {(types ?? []).map((t) => (
+                    <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
+              {errors.expenseTypeId && (
+                <p style={{ fontSize: 11, marginTop: 3, color: colors.danger }}>{errors.expenseTypeId.message}</p>
+              )}
             </div>
-          </div>
 
-          {paymentMethod === 'cheque' && (
             <div>
-              <Label>Cheque Number</Label>
-              <Input {...register('chequeNo')} className="mt-1" disabled={loading} />
+              <Label style={{ display: 'block', marginBottom: 4 }}>Description</Label>
+              <Input {...register('description')} disabled={loading} placeholder="Brief description…" />
+              {errors.description && (
+                <p style={{ fontSize: 11, marginTop: 3, color: colors.danger }}>{errors.description.message}</p>
+              )}
             </div>
-          )}
 
-          <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: colors.textPrimary }}>
-            <input
-              type="checkbox"
-              checked={!!includesVat}
-              onChange={(e) => setValue('includesVat', e.target.checked)}
-              className="w-4 h-4 rounded"
-            />
-            Amount includes 15% VAT
-          </label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <div>
+                <Label style={{ display: 'block', marginBottom: 4 }}>Amount (R)</Label>
+                <Input {...register('amount')} type="number" step="0.01" min="0.01" disabled={loading} />
+                {errors.amount && (
+                  <p style={{ fontSize: 11, marginTop: 3, color: colors.danger }}>{errors.amount.message}</p>
+                )}
+              </div>
+              <div>
+                <Label style={{ display: 'block', marginBottom: 4 }}>Payment Method</Label>
+                <Select onValueChange={(v) => setValue('paymentMethod', v as 'cash' | 'eft' | 'cheque' | 'amplopay')} defaultValue="cash">
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">Cash</SelectItem>
+                    <SelectItem value="eft">EFT</SelectItem>
+                    <SelectItem value="cheque">Cheque</SelectItem>
+                    <SelectItem value="amplopay">AmploPay</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
 
-          {/* Slip / receipt upload */}
-          <div>
-            <Label>Slip / Receipt (optional)</Label>
-            <div className="mt-1">
+            {paymentMethod === 'cheque' && (
+              <div>
+                <Label style={{ display: 'block', marginBottom: 4 }}>Cheque Number</Label>
+                <Input {...register('chequeNo')} disabled={loading} />
+              </div>
+            )}
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: 'pointer', color: colors.textPrimary }}>
+              <input
+                type="checkbox"
+                checked={!!includesVat}
+                onChange={(e) => setValue('includesVat', e.target.checked)}
+                style={{ width: 13, height: 13 }}
+              />
+              Amount includes 15% VAT
+            </label>
+
+            <div>
+              <Label style={{ display: 'block', marginBottom: 4 }}>Slip / Receipt <span style={{ fontWeight: 400, color: colors.textSecondary }}>(optional)</span></Label>
               <input
                 ref={fileRef}
                 type="file"
                 accept=".pdf,.jpg,.jpeg,.png,.webp"
-                className="hidden"
+                style={{ display: 'none' }}
                 onChange={(e) => setSlipFile(e.target.files?.[0] ?? null)}
                 disabled={loading}
               />
               {slipFile ? (
-                <div
-                  className="flex items-center justify-between px-3 py-2 rounded border text-xs"
-                  style={{ borderColor: colors.border, color: colors.textPrimary }}
-                >
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <Paperclip className="w-3.5 h-3.5 shrink-0" style={{ color: colors.textSecondary }} />
-                    <span className="truncate">{slipFile.name}</span>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', border: `1px solid ${colors.border}`, borderRadius: 3, fontSize: 12, color: colors.textPrimary }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                    <Paperclip style={{ width: 13, height: 13, flexShrink: 0, color: colors.textSecondary }} />
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{slipFile.name}</span>
                   </div>
                   <button
                     type="button"
                     onClick={() => { setSlipFile(null); if (fileRef.current) fileRef.current.value = '' }}
-                    className="ml-2 shrink-0"
-                    style={{ color: colors.textSecondary }}
+                    style={{ marginLeft: 8, flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', color: colors.textSecondary, display: 'flex' }}
                   >
-                    <X className="w-3.5 h-3.5" />
+                    <X style={{ width: 13, height: 13 }} />
                   </button>
                 </div>
               ) : (
@@ -516,26 +510,18 @@ function AddExpenseModal({ onClose, onSuccess }: { onClose: () => void; onSucces
                   type="button"
                   onClick={() => fileRef.current?.click()}
                   disabled={loading}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded border border-dashed text-xs w-full hover:bg-gray-50 transition-colors"
-                  style={{ borderColor: colors.border, color: colors.textSecondary }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 10px', border: `1px dashed ${colors.border}`, borderRadius: 3, fontSize: 12, width: '100%', background: '#FAFAFA', color: colors.textSecondary, cursor: 'pointer' }}
                 >
-                  <Upload className="w-3.5 h-3.5" />
+                  <Upload style={{ width: 13, height: 13 }} />
                   Upload slip or photo (PDF, JPG, PNG — max 20 MB)
                 </button>
               )}
             </div>
-          </div>
 
-          <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
-            <Button
-              type="submit"
-              style={{ background: colors.action }}
-              className="hover:opacity-90"
-              disabled={loading}
-            >
-              {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving…</> : 'Record Expense'}
-            </Button>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
+              <ModalBtn onClick={onClose} disabled={loading}>Cancel</ModalBtn>
+              <ModalBtn type="submit" variant="primary" loading={loading}>Record Expense</ModalBtn>
+            </div>
           </div>
         </form>
       </DialogContent>
@@ -571,30 +557,24 @@ function AddTypeModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-sm">
-        <DialogHeader><DialogTitle>New Expense Category</DialogTitle></DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4 mt-2">
-          <div>
-            <Label>Category Name</Label>
-            <Input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="mt-1"
-              placeholder="e.g. Fuel, Wages, Repairs"
-              disabled={loading}
-              autoFocus
-            />
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
-            <Button
-              type="submit"
-              style={{ background: colors.action }}
-              className="hover:opacity-90"
-              disabled={loading || !name.trim()}
-            >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Create'}
-            </Button>
+      <DialogContent className="sm:max-w-sm" showCloseButton={false}>
+        <ModalTitleBar title="New Expense Category" onClose={onClose} />
+        <form onSubmit={handleSubmit}>
+          <div style={{ padding: '12px 16px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div>
+              <Label style={{ display: 'block', marginBottom: 4 }}>Category Name</Label>
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Fuel, Wages, Repairs"
+                disabled={loading}
+                autoFocus
+              />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <ModalBtn onClick={onClose} disabled={loading}>Cancel</ModalBtn>
+              <ModalBtn type="submit" variant="primary" loading={loading} disabled={loading || !name.trim()}>Create</ModalBtn>
+            </div>
           </div>
         </form>
       </DialogContent>
