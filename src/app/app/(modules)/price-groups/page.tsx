@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Plus, ChevronRight, Star, Loader2 } from 'lucide-react'
+import { Plus, Star, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -22,6 +22,13 @@ type PriceGroup = {
   isDefault: boolean; isActive: boolean
   _count: { customers: number; overrides: number }
 }
+
+const TH: React.CSSProperties = {
+  textAlign: 'left', padding: '0 10px', height: 28,
+  fontSize: 10, fontWeight: 700, color: '#6C757D',
+  textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap',
+}
+const TD: React.CSSProperties = { padding: '0 10px', fontSize: 12, color: '#212529' }
 
 export default function PriceGroupsPage() {
   const router = useRouter()
@@ -51,45 +58,53 @@ export default function PriceGroupsPage() {
           )}
         </div>
 
-        {/* List */}
-        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 8 }}>
+        {/* Table */}
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
           {groups.length === 0 ? (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 120, color: '#6C757D', fontSize: 12 }}>
               No price groups created yet
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {groups.map((g) => (
-                <div
-                  key={g.id}
-                  onClick={() => router.push(`/app/price-groups/${g.id}`)}
-                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: '#fff', border: '1px solid #E0E0E0', borderRadius: 2, cursor: 'pointer' }}
-                  onMouseEnter={(e) => (e.currentTarget.style.borderColor = colors.action)}
-                  onMouseLeave={(e) => (e.currentTarget.style.borderColor = '#E0E0E0')}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    {g.isDefault && <Star style={{ width: 14, height: 14, color: colors.warning, fill: colors.warning, flexShrink: 0 }} />}
-                    <div>
-                      <p style={{ fontSize: 12, fontWeight: 600, color: '#212529', margin: 0 }}>{g.name}</p>
-                      {g.description && <p style={{ fontSize: 11, color: '#6C757D', margin: '2px 0 0' }}>{g.description}</p>}
-                      <div style={{ display: 'flex', gap: 10, marginTop: 2 }}>
-                        <span style={{ fontSize: 11, color: '#6C757D' }}>{g._count.customers} customers</span>
-                        <span style={{ fontSize: 11, color: '#6C757D' }}>{g._count.overrides} price overrides</span>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
+                <tr style={{ background: 'linear-gradient(180deg,#FFFFFF 0%,#E8E8E8 100%)', borderBottom: '1px solid #C0C0C0' }}>
+                  {['Name', 'Description', 'Customers', 'Price Overrides', 'Default', 'Status'].map((h) => (
+                    <th key={h} style={TH}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {groups.map((g, i) => (
+                  <tr
+                    key={g.id}
+                    onClick={() => router.push(`/app/price-groups/${g.id}`)}
+                    style={{ background: i % 2 === 1 ? '#FAFAFA' : '#fff', borderBottom: '1px solid #F0F0F0', height: 30, cursor: 'pointer' }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = '#EEF4FB')}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = i % 2 === 1 ? '#FAFAFA' : '#fff')}
+                  >
+                    <td style={{ ...TD, fontWeight: 600 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        {g.isDefault && <Star style={{ width: 12, height: 12, color: colors.warning, fill: colors.warning, flexShrink: 0 }} />}
+                        {g.name}
                       </div>
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    {g.isDefault && (
-                      <span style={{ display: 'inline-flex', padding: '1px 6px', borderRadius: 3, fontSize: 11, fontWeight: 600, background: colors.warningBg, color: colors.warning }}>Default</span>
-                    )}
-                    <span style={{ display: 'inline-flex', padding: '1px 6px', borderRadius: 3, fontSize: 11, fontWeight: 600, ...(g.isActive ? { background: colors.actionBg, color: colors.action } : { background: colors.neutralBg, color: colors.textSecondary }) }}>
-                      {g.isActive ? 'Active' : 'Inactive'}
-                    </span>
-                    <ChevronRight style={{ width: 14, height: 14, color: '#6C757D' }} />
-                  </div>
-                </div>
-              ))}
-            </div>
+                    </td>
+                    <td style={{ ...TD, color: '#6C757D' }}>{g.description ?? '—'}</td>
+                    <td style={{ ...TD, color: '#6C757D' }}>{g._count.customers}</td>
+                    <td style={{ ...TD, color: '#6C757D' }}>{g._count.overrides}</td>
+                    <td style={TD}>
+                      {g.isDefault && (
+                        <span style={{ display: 'inline-flex', padding: '1px 6px', borderRadius: 3, fontSize: 11, fontWeight: 600, background: colors.warningBg, color: colors.warning }}>Default</span>
+                      )}
+                    </td>
+                    <td style={TD}>
+                      <span style={{ display: 'inline-flex', padding: '1px 6px', borderRadius: 3, fontSize: 11, fontWeight: 600, ...(g.isActive ? { background: colors.actionBg, color: colors.action } : { background: colors.neutralBg, color: colors.textSecondary }) }}>
+                        {g.isActive ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           )}
         </div>
       </div>
