@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, ModalTitleBar, ModalBtn } from '@/components/ui/dialog'
-import { Search, Pencil, TrendingUp, Plus, Eye, EyeOff, Trash2, X, Settings2, Package, Loader2 } from 'lucide-react'
+import { Search, Pencil, TrendingUp, Plus, Eye, EyeOff, Trash2, X, Settings2, Package, Loader2, MoreVertical } from 'lucide-react'
 import * as LucideIcons from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { toast } from 'sonner'
@@ -79,6 +79,7 @@ export default function ProductsPage() {
   const [bulkDelOpen,   setBulkDelOpen]  = useState(false)
   const [bulkLoading,   setBulkLoading]  = useState<'deactivate' | 'reactivate' | null>(null)
   const [catManageOpen, setCatManageOpen] = useState(false)
+  const [menuOpenId,    setMenuOpenId]   = useState<string | null>(null)
 
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
 
@@ -88,6 +89,13 @@ export default function ProductsPage() {
       router.replace('/app/products')
     }
   }, [searchParams, router])
+
+  useEffect(() => {
+    if (!menuOpenId) return
+    const close = () => setMenuOpenId(null)
+    document.addEventListener('click', close)
+    return () => document.removeEventListener('click', close)
+  }, [menuOpenId])
 
   const activeParam = statusFilter === 'active' ? 'true' : statusFilter === 'inactive' ? 'false' : undefined
   const query = new URLSearchParams({
@@ -298,17 +306,38 @@ export default function ProductsPage() {
                         </span>
                       </td>
                       {isManager && (
-                        <td style={{ ...TD, textAlign: 'center' }}>
-                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
-                            <button title="Edit" onClick={() => setEditTarget(p)} style={{ width: 22, height: 22, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', cursor: 'pointer', borderRadius: 2, color: '#9AAABF' }} onMouseEnter={(e) => (e.currentTarget.style.color = colors.process)} onMouseLeave={(e) => (e.currentTarget.style.color = '#9AAABF')}>
-                              <Pencil style={{ width: 13, height: 13 }} />
+                        <td style={{ ...TD, width: 32, textAlign: 'center' }}>
+                          <div style={{ position: 'relative', display: 'inline-block' }}>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setMenuOpenId(menuOpenId === p.id ? null : p.id) }}
+                              style={{ width: 22, height: 22, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', cursor: 'pointer', borderRadius: 2, color: '#9AAABF' }}
+                              onMouseEnter={(e) => (e.currentTarget.style.color = '#212529')}
+                              onMouseLeave={(e) => (e.currentTarget.style.color = '#9AAABF')}
+                            >
+                              <MoreVertical style={{ width: 14, height: 14 }} />
                             </button>
-                            <button title={p.isActive ? 'Deactivate' : 'Reactivate'} onClick={() => handleToggleActive(p)} style={{ width: 22, height: 22, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', cursor: 'pointer', borderRadius: 2, color: '#9AAABF' }} onMouseEnter={(e) => (e.currentTarget.style.color = colors.warning)} onMouseLeave={(e) => (e.currentTarget.style.color = '#9AAABF')}>
-                              {p.isActive ? <EyeOff style={{ width: 13, height: 13 }} /> : <Eye style={{ width: 13, height: 13 }} />}
-                            </button>
-                            <button title="Delete" onClick={() => setDeleteTarget(p)} style={{ width: 22, height: 22, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', cursor: 'pointer', borderRadius: 2, color: '#9AAABF' }} onMouseEnter={(e) => (e.currentTarget.style.color = colors.danger)} onMouseLeave={(e) => (e.currentTarget.style.color = '#9AAABF')}>
-                              <Trash2 style={{ width: 13, height: 13 }} />
-                            </button>
+                            {menuOpenId === p.id && (
+                              <div
+                                onClick={(e) => e.stopPropagation()}
+                                style={{ position: 'absolute', right: 0, top: 24, zIndex: 50, background: '#fff', border: '1px solid #D0D0D0', borderRadius: 3, boxShadow: '0 4px 12px rgba(0,0,0,0.12)', minWidth: 140, overflow: 'hidden' }}
+                              >
+                                {[
+                                  { label: 'Edit', icon: <Pencil style={{ width: 12, height: 12 }} />, color: colors.textPrimary, action: () => { setEditTarget(p); setMenuOpenId(null) } },
+                                  { label: p.isActive ? 'Deactivate' : 'Reactivate', icon: p.isActive ? <EyeOff style={{ width: 12, height: 12 }} /> : <Eye style={{ width: 12, height: 12 }} />, color: colors.warning, action: () => { handleToggleActive(p); setMenuOpenId(null) } },
+                                  { label: 'Delete', icon: <Trash2 style={{ width: 12, height: 12 }} />, color: colors.danger, action: () => { setDeleteTarget(p); setMenuOpenId(null) } },
+                                ].map((item) => (
+                                  <button
+                                    key={item.label}
+                                    onClick={item.action}
+                                    style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '7px 12px', fontSize: 12, background: 'none', border: 'none', cursor: 'pointer', color: item.color, textAlign: 'left' }}
+                                    onMouseEnter={(e) => (e.currentTarget.style.background = '#F5F5F5')}
+                                    onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
+                                  >
+                                    {item.icon}{item.label}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         </td>
                       )}
