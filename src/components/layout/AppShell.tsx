@@ -423,6 +423,13 @@ export function AppShell({
   const toolbarBtns = useToolbarButtons(pathname, role)
   const moduleName  = getModuleName(pathname)
 
+  const isPriceGroupDetail = pathname.startsWith('/app/price-groups/') && pathname !== '/app/price-groups/'
+  const priceGroupDetailId = isPriceGroupDetail ? pathname.split('/')[3] : null
+  const { data: priceGroupData } = useSWR<{ id: string; name: string }>(
+    priceGroupDetailId ? `/api/price-groups/${priceGroupDetailId}` : null,
+    (url: string) => fetch(url).then(r => r.json()),
+  )
+
   const goHome = useCallback(() => router.push('/app/dashboard'), [router])
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -457,7 +464,7 @@ export function AppShell({
           </span>
         </div>
 
-        {/* Breadcrumb: Portal › Module */}
+        {/* Breadcrumb: Portal › Module [› Detail] */}
         <nav className="flex items-center gap-1.5 px-3 flex-1 min-w-0" aria-label="Breadcrumb">
           <Link
             href="/app/dashboard"
@@ -467,9 +474,24 @@ export function AppShell({
             Portal
           </Link>
           <ChevronRight className="w-3 h-3 text-white/20 shrink-0" />
-          <span className="text-white text-[14px] font-bold tracking-wide truncate">
-            {moduleName}
-          </span>
+          {isPriceGroupDetail ? (
+            <>
+              <Link
+                href="/app/price-groups"
+                className="text-[#8BA4D4] text-[11px] font-medium hover:text-white transition-colors whitespace-nowrap shrink-0"
+              >
+                Price Groups
+              </Link>
+              <ChevronRight className="w-3 h-3 text-white/20 shrink-0" />
+              <span className="text-white text-[14px] font-bold tracking-wide truncate">
+                {priceGroupData?.name ?? '…'}
+              </span>
+            </>
+          ) : (
+            <span className="text-white text-[14px] font-bold tracking-wide truncate">
+              {moduleName}
+            </span>
+          )}
         </nav>
 
         {/* Right side */}

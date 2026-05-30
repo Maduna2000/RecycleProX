@@ -1,13 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import useSWR, { mutate } from 'swr'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Plus, Star, Loader2 } from 'lucide-react'
+import { Plus, Star, Loader2, MoreVertical, ExternalLink } from 'lucide-react'
 import { toast } from 'sonner'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -34,7 +34,14 @@ export default function PriceGroupsPage() {
   const router = useRouter()
   const { data: session } = useSession()
   const [createOpen, setCreateOpen] = useState(false)
+  const [menuOpenId, setMenuOpenId] = useState<string | null>(null)
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
+
+  useEffect(() => {
+    const close = () => setMenuOpenId(null)
+    document.addEventListener('click', close)
+    return () => document.removeEventListener('click', close)
+  }, [])
 
   const { data } = useSWR<{ groups: PriceGroup[] }>('/api/price-groups', fetcher)
   const groups = data?.groups ?? []
@@ -68,7 +75,7 @@ export default function PriceGroupsPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
                 <tr style={{ background: 'linear-gradient(180deg,#FFFFFF 0%,#E8E8E8 100%)', borderBottom: '1px solid #C0C0C0' }}>
-                  {['Name', 'Description', 'Customers', 'Price Overrides', 'Default', 'Status'].map((h) => (
+                  {['Name', 'Description', 'Customers', 'Price Overrides', 'Default', 'Status', ''].map((h) => (
                     <th key={h} style={TH}>{h}</th>
                   ))}
                 </tr>
@@ -100,6 +107,34 @@ export default function PriceGroupsPage() {
                       <span style={{ display: 'inline-flex', padding: '1px 6px', borderRadius: 3, fontSize: 11, fontWeight: 600, ...(g.isActive ? { background: colors.actionBg, color: colors.action } : { background: colors.neutralBg, color: colors.textSecondary }) }}>
                         {g.isActive ? 'Active' : 'Inactive'}
                       </span>
+                    </td>
+                    <td style={{ ...TD, width: 36, textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                      <div style={{ position: 'relative', display: 'inline-block' }}>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setMenuOpenId(menuOpenId === g.id ? null : g.id) }}
+                          style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: 2, border: 'none', background: 'transparent', cursor: 'pointer', color: '#6C757D' }}
+                          onMouseEnter={(e) => (e.currentTarget.style.background = '#E0E0E0')}
+                          onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                        >
+                          <MoreVertical style={{ width: 13, height: 13 }} />
+                        </button>
+                        {menuOpenId === g.id && (
+                          <div
+                            onClick={(e) => e.stopPropagation()}
+                            style={{ position: 'absolute', right: 0, top: 24, zIndex: 50, background: '#fff', border: '1px solid #D0D0D0', borderRadius: 3, boxShadow: '0 4px 12px rgba(0,0,0,0.12)', minWidth: 160, padding: '2px 0' }}
+                          >
+                            <button
+                              onClick={() => { setMenuOpenId(null); router.push(`/app/price-groups/${g.id}`) }}
+                              style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '6px 12px', fontSize: 12, color: '#212529', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+                              onMouseEnter={(e) => (e.currentTarget.style.background = '#F1F3F4')}
+                              onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
+                            >
+                              <ExternalLink style={{ width: 12, height: 12, color: '#6C757D', flexShrink: 0 }} />
+                              Open / Manage
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
