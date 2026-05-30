@@ -65,7 +65,7 @@ export default function PriceGroupsPage() {
               onClick={() => setCreateOpen(true)}
               style={{ display: 'inline-flex', alignItems: 'center', gap: 4, height: 24, padding: '0 8px', fontSize: 11, fontWeight: 600, borderRadius: 2, background: '#217346', border: '1px solid #176338', color: '#fff', cursor: 'pointer' }}
             >
-              <Plus style={{ width: 11, height: 11 }} /> New Group
+              <Plus style={{ width: 11, height: 11 }} /> Add Price Group
             </button>
           )}
         </div>

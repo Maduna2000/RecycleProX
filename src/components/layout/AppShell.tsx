@@ -100,9 +100,7 @@ function useToolbarButtons(pathname: string, role: string): ToolbarButton[] {
     ]
 
   if (pathname === '/app/price-groups' || pathname.startsWith('/app/price-groups/'))
-    return isMgr ? [
-      { label: 'Add Price Group', icon: Plus, href: '/app/price-groups', variant: 'primary' },
-    ] : []
+    return []
 
   if (pathname === '/app/loans' || pathname.startsWith('/app/loans/'))
     return [
