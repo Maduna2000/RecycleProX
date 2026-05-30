@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import useSWR, { mutate } from 'swr'
 import { Input } from '@/components/ui/input'
@@ -35,16 +35,21 @@ export default function PriceGroupsPage() {
   const { data: session } = useSession()
   const [createOpen, setCreateOpen] = useState(false)
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null)
+  const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
-
-  useEffect(() => {
-    const close = () => setMenuOpenId(null)
-    document.addEventListener('click', close)
-    return () => document.removeEventListener('click', close)
-  }, [])
 
   const { data } = useSWR<{ groups: PriceGroup[] }>('/api/price-groups', fetcher)
   const groups = data?.groups ?? []
+
+  function openMenu(e: React.MouseEvent<HTMLButtonElement>, groupId: string) {
+    e.stopPropagation()
+    if (menuOpenId === groupId) { setMenuOpenId(null); setMenuPos(null); return }
+    const rect = e.currentTarget.getBoundingClientRect()
+    setMenuPos({ top: rect.bottom + 2, right: window.innerWidth - rect.right })
+    setMenuOpenId(groupId)
+  }
+
+  function closeMenu() { setMenuOpenId(null); setMenuPos(null) }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
@@ -109,32 +114,14 @@ export default function PriceGroupsPage() {
                       </span>
                     </td>
                     <td style={{ ...TD, width: 36, textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
-                      <div style={{ position: 'relative', display: 'inline-block' }}>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setMenuOpenId(menuOpenId === g.id ? null : g.id) }}
-                          style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: 2, border: 'none', background: 'transparent', cursor: 'pointer', color: '#6C757D' }}
-                          onMouseEnter={(e) => (e.currentTarget.style.background = '#E0E0E0')}
-                          onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                        >
-                          <MoreVertical style={{ width: 13, height: 13 }} />
-                        </button>
-                        {menuOpenId === g.id && (
-                          <div
-                            onClick={(e) => e.stopPropagation()}
-                            style={{ position: 'absolute', right: 0, top: 24, zIndex: 50, background: '#fff', border: '1px solid #D0D0D0', borderRadius: 3, boxShadow: '0 4px 12px rgba(0,0,0,0.12)', minWidth: 160, padding: '2px 0' }}
-                          >
-                            <button
-                              onClick={() => { setMenuOpenId(null); router.push(`/app/price-groups/${g.id}`) }}
-                              style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '6px 12px', fontSize: 12, color: '#212529', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
-                              onMouseEnter={(e) => (e.currentTarget.style.background = '#F1F3F4')}
-                              onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
-                            >
-                              <ExternalLink style={{ width: 12, height: 12, color: '#6C757D', flexShrink: 0 }} />
-                              Open / Manage
-                            </button>
-                          </div>
-                        )}
-                      </div>
+                      <button
+                        onClick={(e) => openMenu(e, g.id)}
+                        style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: 2, border: 'none', background: 'transparent', cursor: 'pointer', color: '#6C757D' }}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = '#E0E0E0')}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                      >
+                        <MoreVertical style={{ width: 13, height: 13 }} />
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -143,6 +130,24 @@ export default function PriceGroupsPage() {
           )}
         </div>
       </div>
+
+      {/* Fixed dropdown — escapes overflow:hidden clipping */}
+      {menuOpenId && menuPos && (
+        <>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 49 }} onClick={closeMenu} />
+          <div style={{ position: 'fixed', top: menuPos.top, right: menuPos.right, zIndex: 50, background: '#fff', border: '1px solid #D0D0D0', borderRadius: 3, boxShadow: '0 4px 12px rgba(0,0,0,0.12)', minWidth: 160, padding: '2px 0' }}>
+            <button
+              onClick={() => { const id = menuOpenId; closeMenu(); router.push(`/app/price-groups/${id}`) }}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '6px 12px', fontSize: 12, color: '#212529', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = '#F1F3F4')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
+            >
+              <ExternalLink style={{ width: 12, height: 12, color: '#6C757D', flexShrink: 0 }} />
+              Open / Manage
+            </button>
+          </div>
+        </>
+      )}
 
       {createOpen && (
         <CreatePriceGroupModal
