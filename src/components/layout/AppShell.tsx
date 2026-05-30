@@ -99,11 +99,6 @@ function useToolbarButtons(pathname: string, role: string): ToolbarButton[] {
       { label: 'Export Excel', icon: FileSpreadsheet, variant: 'ghost', iconOnly: true },
     ]
 
-  if (pathname === '/app/products' || pathname.startsWith('/app/products/'))
-    return [
-      { label: 'Add Product', icon: Plus, href: '/app/products?add=1', variant: 'primary' },
-    ]
-
   if (pathname === '/app/price-groups' || pathname.startsWith('/app/price-groups/'))
     return isMgr ? [
       { label: 'Add Price Group', icon: Plus, href: '/app/price-groups', variant: 'primary' },
