@@ -3,13 +3,12 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import useSWR, { mutate } from 'swr'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Dialog, DialogContent, ModalTitleBar, ModalBtn } from '@/components/ui/dialog'
 import { ArrowLeft, Star, Save, Loader2, RotateCcw, Copy } from 'lucide-react'
 import { toast } from 'sonner'
 import { useSession } from 'next-auth/react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { colors } from '@/lib/design-tokens'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -34,9 +33,17 @@ type Product = {
   defaultBuyPrice: string; defaultSellPrice: string; unit: string
 }
 
-const CATEGORY_LABELS: Record<string, string> = {
-  ferrous: 'Ferrous', non_ferrous: 'Non-Ferrous', copper: 'Copper',
-  aluminium: 'Aluminium', plastic: 'Plastic', paper: 'Paper', e_waste: 'E-Waste', other: 'Other',
+const TH: React.CSSProperties = {
+  textAlign: 'left', padding: '0 10px', height: 28,
+  fontSize: 10, fontWeight: 700, color: '#6C757D',
+  textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap',
+}
+const TD: React.CSSProperties = { padding: '0 10px', fontSize: 12, color: '#212529' }
+
+const secBtn: React.CSSProperties = {
+  display: 'inline-flex', alignItems: 'center', gap: 4, height: 24,
+  padding: '0 8px', fontSize: 11, fontWeight: 600, borderRadius: 2,
+  background: '#fff', border: '1px solid #ABABAB', color: '#212529', cursor: 'pointer',
 }
 
 export default function PriceGroupDetailPage() {
@@ -48,24 +55,21 @@ export default function PriceGroupDetailPage() {
   const { data: group, isLoading: groupLoading } = useSWR<PriceGroup>(`/api/price-groups/${id}`, fetcher)
   const { data: productsData } = useSWR<{ products: Product[] }>('/api/products?active=true', fetcher)
 
-  // Local override state: productId → { buy, sell, enabled }
   const [overrides, setOverrides] = useState<Record<string, { buy: string; sell: string; enabled: boolean }>>({})
   const [saving, setSaving] = useState(false)
   const [dirty, setDirty] = useState(false)
   const [copying, setCopying] = useState(false)
   const [copyConfirmOpen, setCopyConfirmOpen] = useState(false)
 
-  // Initialise from group data
   useEffect(() => {
     if (!group || !productsData) return
     const init: Record<string, { buy: string; sell: string; enabled: boolean }> = {}
     const groupOverrideMap = Object.fromEntries(group.overrides.map((o) => [o.productId, o]))
-
     for (const p of productsData.products) {
       const existing = groupOverrideMap[p.id]
       init[p.id] = {
-        buy: existing ? Number(existing.buyPrice).toFixed(2) : Number(p.defaultBuyPrice).toFixed(2),
-        sell: existing ? Number(existing.sellPrice).toFixed(2) : Number(p.defaultSellPrice).toFixed(2),
+        buy:     existing ? Number(existing.buyPrice).toFixed(2)  : Number(p.defaultBuyPrice).toFixed(2),
+        sell:    existing ? Number(existing.sellPrice).toFixed(2) : Number(p.defaultSellPrice).toFixed(2),
         enabled: !!existing,
       }
     }
@@ -77,7 +81,6 @@ export default function PriceGroupDetailPage() {
     const activeOverrides = Object.entries(overrides)
       .filter(([, v]) => v.enabled)
       .map(([productId, v]) => ({ productId, buyPrice: v.buy, sellPrice: v.sell }))
-
     setSaving(true)
     const res = await fetch(`/api/price-groups/${id}/overrides`, {
       method: 'PUT',
@@ -85,21 +88,33 @@ export default function PriceGroupDetailPage() {
       body: JSON.stringify({ overrides: activeOverrides }),
     })
     setSaving(false)
-    if (res.ok) {
-      toast.success('Price overrides saved')
-      mutate(`/api/price-groups/${id}`)
-      setDirty(false)
-    } else {
-      const j = await res.json()
-      toast.error(j.error ?? 'Failed to save overrides')
+    if (res.ok) { toast.success('Price overrides saved'); mutate(`/api/price-groups/${id}`); setDirty(false) }
+    else { const j = await res.json(); toast.error((j as { error?: string }).error ?? 'Failed to save overrides') }
+  }
+
+  function onReset() {
+    if (!group || !productsData) return
+    const init: Record<string, { buy: string; sell: string; enabled: boolean }> = {}
+    const groupOverrideMap = Object.fromEntries(group.overrides.map((o) => [o.productId, o]))
+    for (const p of productsData.products) {
+      const existing = groupOverrideMap[p.id]
+      init[p.id] = {
+        buy:     existing ? Number(existing.buyPrice).toFixed(2)  : Number(p.defaultBuyPrice).toFixed(2),
+        sell:    existing ? Number(existing.sellPrice).toFixed(2) : Number(p.defaultSellPrice).toFixed(2),
+        enabled: !!existing,
+      }
     }
+    setOverrides(init)
+    setDirty(false)
   }
 
   async function onCopyFromDefaults() {
     setCopying(true)
     setCopyConfirmOpen(false)
     try {
-      const res = await fetch(`/api/price-groups/${id}/copy-from-defaults`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+      const res = await fetch(`/api/price-groups/${id}/copy-from-defaults`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+      })
       if (res.ok) {
         const j = await res.json() as { upserted: number }
         toast.success(`Copied default prices for ${j.upserted} products`)
@@ -108,148 +123,136 @@ export default function PriceGroupDetailPage() {
         const j = await res.json() as { error?: string }
         toast.error(j.error ?? 'Failed to copy prices')
       }
-    } finally {
-      setCopying(false)
-    }
+    } finally { setCopying(false) }
   }
 
-  if (groupLoading) return <div className="flex items-center justify-center h-64 text-gray-400">Loading...</div>
-  if (!group) return <div className="flex items-center justify-center h-64 text-gray-400">Price group not found</div>
+  if (groupLoading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 120, fontSize: 12, color: '#6C757D', gap: 8 }}>
+      <Loader2 style={{ width: 14, height: 14 }} className="animate-spin" /> Loading…
+    </div>
+  )
+  if (!group) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 120, fontSize: 12, color: '#6C757D' }}>
+      Price group not found
+    </div>
+  )
 
   const products = productsData?.products ?? []
-
-  // Group products by category
   const categories = Array.from(new Set(products.map((p) => p.category))).sort()
 
   return (
-    <div>
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
-        <Button variant="ghost" size="sm" onClick={() => router.back()}>
-          <ArrowLeft className="w-4 h-4 mr-1" /> Back
-        </Button>
-      </div>
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, background: '#fff', border: '1px solid #B0B0B0', borderRadius: 2, overflow: 'hidden' }}>
 
-      <div className="bg-white rounded-xl border p-6 mb-4">
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-3">
-            {group.isDefault && <Star className="w-5 h-5 text-yellow-500 fill-yellow-500 shrink-0" />}
-            <div>
-              <h1 className="text-xl font-bold text-gray-900">{group.name}</h1>
-              {group.description && <p className="text-sm text-gray-500 mt-0.5">{group.description}</p>}
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {group.isDefault && <Badge className="bg-yellow-100 text-yellow-700">Default</Badge>}
-            <Badge className={group.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}>
-              {group.isActive ? 'Active' : 'Inactive'}
-            </Badge>
-          </div>
-        </div>
-      </div>
-
-      {/* Override editor */}
-      <div className="bg-white rounded-xl border overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b">
-          <div>
-            <h2 className="font-semibold text-gray-900">Price Overrides</h2>
-            <p className="text-sm text-gray-500 mt-0.5">Enable products to set custom buy/sell prices for this group</p>
-          </div>
+        {/* Title bar */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 10px', borderBottom: '2px solid #B0B0B0', background: 'linear-gradient(180deg,#EAEAEA 0%,#D4D4D4 100%)', flexShrink: 0 }}>
+          <button onClick={() => router.back()} style={secBtn}>
+            <ArrowLeft style={{ width: 11, height: 11 }} /> Back
+          </button>
+          <div style={{ width: 1, height: 16, background: '#C0C0C0' }} />
+          {group.isDefault && <Star style={{ width: 13, height: 13, color: colors.warning, fill: colors.warning, flexShrink: 0 }} />}
+          <span style={{ fontSize: 13, fontWeight: 700, color: '#1B3A6B' }}>{group.name}</span>
+          {group.description && <span style={{ fontSize: 11, color: '#6C757D' }}>— {group.description}</span>}
+          {group.isDefault && (
+            <span style={{ display: 'inline-flex', padding: '1px 6px', borderRadius: 3, fontSize: 11, fontWeight: 600, background: colors.warningBg, color: colors.warning }}>Default</span>
+          )}
+          <span style={{ display: 'inline-flex', padding: '1px 6px', borderRadius: 3, fontSize: 11, fontWeight: 600, ...(group.isActive ? { background: colors.actionBg, color: colors.action } : { background: colors.neutralBg, color: colors.textSecondary }) }}>
+            {group.isActive ? 'Active' : 'Inactive'}
+          </span>
+          <div style={{ flex: 1 }} />
           {isManager && (
-            <div className="flex gap-2">
+            <div style={{ display: 'flex', gap: 4 }}>
+              <button
+                onClick={() => setCopyConfirmOpen(true)}
+                disabled={copying}
+                style={{ ...secBtn, opacity: copying ? 0.7 : 1, cursor: copying ? 'not-allowed' : 'pointer' }}
+              >
+                {copying ? <><Loader2 style={{ width: 11, height: 11 }} className="animate-spin" /> Copying…</> : <><Copy style={{ width: 11, height: 11 }} /> Copy Defaults</>}
+              </button>
               {dirty && (
-                <Button variant="outline" size="sm" onClick={() => {
-                  if (!group || !productsData) return
-                  const init: Record<string, { buy: string; sell: string; enabled: boolean }> = {}
-                  const groupOverrideMap = Object.fromEntries(group.overrides.map((o) => [o.productId, o]))
-                  for (const p of productsData.products) {
-                    const existing = groupOverrideMap[p.id]
-                    init[p.id] = {
-                      buy: existing ? Number(existing.buyPrice).toFixed(2) : Number(p.defaultBuyPrice).toFixed(2),
-                      sell: existing ? Number(existing.sellPrice).toFixed(2) : Number(p.defaultSellPrice).toFixed(2),
-                      enabled: !!existing,
-                    }
-                  }
-                  setOverrides(init)
-                  setDirty(false)
-                }}>
-                  <RotateCcw className="w-3.5 h-3.5 mr-1.5" /> Reset
-                </Button>
+                <button onClick={onReset} style={secBtn}>
+                  <RotateCcw style={{ width: 11, height: 11 }} /> Reset
+                </button>
               )}
-              <Button className="bg-green-600 hover:bg-green-700" size="sm" onClick={onSave} disabled={saving || !dirty}>
-                {saving ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />Saving...</> : <><Save className="w-3.5 h-3.5 mr-1.5" />Save</>}
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setCopyConfirmOpen(true)} disabled={copying}>
-                {copying ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />Copying...</> : <><Copy className="w-3.5 h-3.5 mr-1.5" />Copy Defaults</>}
-              </Button>
+              <button
+                onClick={onSave}
+                disabled={saving || !dirty}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 4, height: 24, padding: '0 8px', fontSize: 11, fontWeight: 600, borderRadius: 2, background: dirty ? '#217346' : '#ABABAB', border: `1px solid ${dirty ? '#176338' : '#9A9A9A'}`, color: '#fff', cursor: saving || !dirty ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1 }}
+              >
+                {saving ? <><Loader2 style={{ width: 11, height: 11 }} className="animate-spin" /> Saving…</> : <><Save style={{ width: 11, height: 11 }} /> Save</>}
+              </button>
             </div>
           )}
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b">
-              <tr>
+        {/* Table */}
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
+              <tr style={{ background: 'linear-gradient(180deg,#FFFFFF 0%,#E8E8E8 100%)', borderBottom: '1px solid #C0C0C0' }}>
                 {['Override', 'Product', 'Default Buy', 'Default Sell', 'Group Buy', 'Group Sell'].map((h) => (
-                  <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
+                  <th key={h} style={TH}>{h}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y">
+            <tbody>
               {categories.map((cat) => {
                 const catProducts = products.filter((p) => p.category === cat)
                 return (
                   <>
-                    <tr key={`cat-${cat}`} className="bg-gray-50">
-                      <td colSpan={6} className="px-4 py-1.5">
-                        <span className="text-xs font-semibold text-gray-500 uppercase">{CATEGORY_LABELS[cat] ?? cat}</span>
+                    <tr key={`cat-${cat}`}>
+                      <td colSpan={6} style={{ padding: '4px 10px', fontSize: 10, fontWeight: 700, color: '#6C757D', textTransform: 'uppercase', letterSpacing: '0.05em', background: '#F0F0F0', borderTop: '1px solid #E0E0E0', borderBottom: '1px solid #E0E0E0' }}>
+                        {cat}
                       </td>
                     </tr>
-                    {catProducts.map((p) => {
+                    {catProducts.map((p, i) => {
                       const ov = overrides[p.id]
                       const isEnabled = ov?.enabled ?? false
+                      const rowBg = isEnabled ? '#F0FAF4' : (i % 2 === 1 ? '#FAFAFA' : '#fff')
                       return (
-                        <tr key={p.id} className={isEnabled ? 'bg-green-50' : ''}>
-                          <td className="px-4 py-2.5">
+                        <tr key={p.id} style={{ background: rowBg, borderBottom: '1px solid #F0F0F0', height: 34 }}>
+                          <td style={{ ...TD, width: 50, textAlign: 'center' }}>
                             <input
                               type="checkbox"
                               checked={isEnabled}
                               disabled={!isManager}
+                              style={{ width: 12, height: 12, cursor: isManager ? 'pointer' : 'default' }}
                               onChange={(e) => {
                                 setOverrides((prev) => ({ ...prev, [p.id]: { ...prev[p.id]!, enabled: e.target.checked } }))
                                 setDirty(true)
                               }}
-                              className="rounded"
                             />
                           </td>
-                          <td className="px-4 py-2.5">
-                            <p className="font-medium text-gray-900">{p.name}</p>
-                            <p className="text-xs text-gray-400 font-mono">{p.code} · {p.unit}</p>
+                          <td style={TD}>
+                            <span style={{ fontWeight: 600 }}>{p.name}</span>
+                            <span style={{ fontSize: 10, color: '#6C757D', fontFamily: 'monospace', marginLeft: 6 }}>{p.code} · {p.unit}</span>
                           </td>
-                          <td className="px-4 py-2.5 font-mono text-xs text-gray-500">R {Number(p.defaultBuyPrice).toFixed(2)}</td>
-                          <td className="px-4 py-2.5 font-mono text-xs text-gray-500">R {Number(p.defaultSellPrice).toFixed(2)}</td>
-                          <td className="px-4 py-2.5">
+                          <td style={{ ...TD, fontFamily: 'monospace', color: '#6C757D' }}>R {Number(p.defaultBuyPrice).toFixed(2)}</td>
+                          <td style={{ ...TD, fontFamily: 'monospace', color: '#6C757D' }}>R {Number(p.defaultSellPrice).toFixed(2)}</td>
+                          <td style={{ ...TD, width: 120 }}>
                             {isEnabled ? (
                               <Input
                                 value={ov?.buy ?? ''}
                                 onChange={(e) => { setOverrides((prev) => ({ ...prev, [p.id]: { ...prev[p.id]!, buy: e.target.value } })); setDirty(true) }}
                                 disabled={!isManager}
-                                className="w-28 h-7 text-sm font-mono"
+                                className="h-6 text-xs font-mono border-[#ABABAB]"
+                                style={{ width: 100 }}
                               />
                             ) : (
-                              <span className="text-xs text-gray-300 font-mono">—</span>
+                              <span style={{ fontSize: 11, color: '#C0C0C0', fontFamily: 'monospace' }}>—</span>
                             )}
                           </td>
-                          <td className="px-4 py-2.5">
+                          <td style={{ ...TD, width: 120 }}>
                             {isEnabled ? (
                               <Input
                                 value={ov?.sell ?? ''}
                                 onChange={(e) => { setOverrides((prev) => ({ ...prev, [p.id]: { ...prev[p.id]!, sell: e.target.value } })); setDirty(true) }}
                                 disabled={!isManager}
-                                className="w-28 h-7 text-sm font-mono"
+                                className="h-6 text-xs font-mono border-[#ABABAB]"
+                                style={{ width: 100 }}
                               />
                             ) : (
-                              <span className="text-xs text-gray-300 font-mono">—</span>
+                              <span style={{ fontSize: 11, color: '#C0C0C0', fontFamily: 'monospace' }}>—</span>
                             )}
                           </td>
                         </tr>
@@ -263,23 +266,25 @@ export default function PriceGroupDetailPage() {
         </div>
       </div>
 
-      {/* Copy Defaults Confirmation Dialog */}
-      <Dialog open={copyConfirmOpen} onOpenChange={setCopyConfirmOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Copy Default Prices to This Group?</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-gray-600 mt-1">
-            This will overwrite all existing price overrides in <strong>{group.name}</strong> with the current default prices for every active product. This cannot be undone.
-          </p>
-          <div className="flex justify-end gap-2 pt-4">
-            <Button variant="outline" onClick={() => setCopyConfirmOpen(false)} disabled={copying}>Cancel</Button>
-            <Button className="bg-green-600 hover:bg-green-700" onClick={onCopyFromDefaults} disabled={copying}>
-              {copying ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Copying...</> : 'Yes, Copy Defaults'}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Copy Defaults Confirmation */}
+      {copyConfirmOpen && (
+        <Dialog open onOpenChange={(o) => { if (!o) setCopyConfirmOpen(false) }}>
+          <DialogContent className="sm:max-w-md" showCloseButton={false}>
+            <ModalTitleBar title="Copy Default Prices?" onClose={() => setCopyConfirmOpen(false)} />
+            <div style={{ padding: '12px 16px 16px' }}>
+              <p style={{ fontSize: 13, color: '#212529', lineHeight: 1.6 }}>
+                This will overwrite all existing price overrides in <strong>{group.name}</strong> with the current default prices for every active product. This cannot be undone.
+              </p>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
+                <ModalBtn variant="outline" onClick={() => setCopyConfirmOpen(false)} disabled={copying}>Cancel</ModalBtn>
+                <ModalBtn variant="primary" onClick={onCopyFromDefaults} disabled={copying}>
+                  {copying ? 'Copying…' : 'Yes, Copy Defaults'}
+                </ModalBtn>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   )
 }
