@@ -51,6 +51,7 @@ type LiveStats = {
   expenses:      string
   loanAdvance:   string
   loanRepayment: string
+  floatTopUps:   string
   unpaidToday:   { total: string; count: number }
   unpaidAllTime: { total: string; count: number }
   finPeriodCumulative: string
@@ -181,7 +182,6 @@ export default function CashUpPage() {
   const [submitting, setSubmitting] = useState(false)
   const [approving,  setApproving]  = useState(false)
   const [notes,      setNotes]      = useState('')
-  const [drawings,   setDrawings]   = useState('0')
   const [counts, setCounts] = useState<Record<number, number>>(() =>
     Object.fromEntries(DENOMINATIONS.map((d) => [d, 0]))
   )
@@ -215,10 +215,9 @@ export default function CashUpPage() {
       const { queued } = await offlineMutate({
         method: 'PUT', url: `/api/cashup/${cashUp.id}`,
         body: {
-          denominations:    denoms,
-          declaredCash:     declaredCash.toNumber(),
-          drawingsReceived: new Decimal(drawings || '0').toNumber(),
-          notes:            notes || undefined,
+          denominations: denoms,
+          declaredCash:  declaredCash.toNumber(),
+          notes:         notes || undefined,
         },
         localId: cashUp.id,
       })
@@ -302,7 +301,7 @@ export default function CashUpPage() {
             {(() => {
               const isOpen    = cashUp.status === 'open'
               const opening   = new Decimal(cashUp.openingBalance ?? '0')
-              const draw      = new Decimal(isOpen ? (drawings || '0') : (cashUp.drawingsReceived ?? '0'))
+              const draw      = new Decimal(isOpen ? (stats?.floatTopUps ?? '0') : (cashUp.drawingsReceived ?? '0'))
               const totalCash = opening.plus(draw)
               const cashSales = new Decimal(isOpen ? (stats?.cashSales    ?? '0') : cashUp.systemCashSales)
               const cashPurch = new Decimal(isOpen ? (stats?.cashPurchases ?? '0') : cashUp.systemCashPurchases)
@@ -327,20 +326,7 @@ export default function CashUpPage() {
 
                     {/* Opening + Drawings */}
                     <ReconRow label="Opening Balance" value={opening.toFixed(2)} positive />
-                    {isOpen ? (
-                      <div className="flex items-center justify-between text-sm">
-                        <span style={{ color: colors.textSecondary }}>Drawings Received (+)</span>
-                        <Input
-                          type="number" min="0" step="0.01"
-                          value={drawings}
-                          onChange={(e) => setDrawings(e.target.value)}
-                          className="w-28 text-right font-mono h-6 text-sm"
-                          disabled={submitting}
-                        />
-                      </div>
-                    ) : (
-                      <ReconRow label="Drawings Received (+)" value={draw.toFixed(2)} positive />
-                    )}
+                    <ReconRow label="Drawings Received (+)" value={draw.toFixed(2)} positive />
                     <ReconRow label="Total Cash" value={totalCash.toFixed(2)} subtotal />
 
                     {/* Transaction rows */}

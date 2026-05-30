@@ -62,20 +62,37 @@ export async function getMostRecentFloatBefore(date: Date) {
 /**
  * Write the closing amount on the CashFloat record for the given date.
  * Called by cashUpService.approveCashUp to record the declared cash as the closing balance.
+ * Creates the record if it doesn't exist (e.g. no manual float was set that day) so the
+ * carry-forward chain is never broken.
  */
 export async function updateClosingAmount(date: Date, amount: Decimal) {
   const d = new Date(date)
   d.setHours(0, 0, 0, 0)
 
-  // Only update if a float record exists for this date
   const existing = await prisma.cashFloat.findUnique({ where: { floatDate: d } })
-  if (!existing) return
-
-  await prisma.cashFloat.update({
-    where: { floatDate: d },
-    data:  { closingAmount: amount },
-  })
+  if (existing) {
+    await prisma.cashFloat.update({ where: { floatDate: d }, data: { closingAmount: amount } })
+  } else {
+    const prev = await getMostRecentFloatBefore(d)
+    const opening = new Decimal((prev?.closingAmount ?? prev?.openingAmount ?? 0).toString())
+    await prisma.cashFloat.create({
+      data: { floatDate: d, openingAmount: opening, closingAmount: amount },
+    })
+  }
   logger.info({ floatDate: d.toISOString(), closingAmount: amount.toFixed(2) }, 'CashFloat closing amount updated')
+}
+
+// ─── Sum of top-up movements for a given date (used by cashup formula) ───────
+
+export async function getFloatTopUpsForDate(date: Date): Promise<Decimal> {
+  const start = new Date(date); start.setHours(0, 0, 0, 0)
+  const end   = new Date(date); end.setHours(23, 59, 59, 999)
+
+  const result = await prisma.floatMovement.aggregate({
+    _sum: { amount: true },
+    where: { movementType: 'top_up', createdAt: { gte: start, lte: end } },
+  })
+  return new Decimal(result._sum.amount?.toString() ?? '0')
 }
 
 // ─── Get current float with balance and movements ─────────────────────────────

@@ -24,11 +24,9 @@ const denominationsSchema = z.record(
 ).optional()
 
 export const SubmitCashUpSchema = z.object({
-  denominations:    denominationsSchema,
-  declaredCash:     z.number().min(0, 'Declared cash must be non-negative'),
-  drawingsReceived: z.number().min(0).default(0),
-  loansTotal:       z.number().default(0),
-  notes:            z.string().max(500).optional(),
+  denominations: denominationsSchema,
+  declaredCash:  z.number().min(0, 'Declared cash must be non-negative'),
+  notes:         z.string().max(500).optional(),
 })
 
 export const ApproveCashUpSchema = z.object({

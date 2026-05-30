@@ -2,7 +2,7 @@ import Decimal from 'decimal.js'
 import { prisma } from '@/lib/db/prisma'
 import logger from '@/lib/logger'
 import { SubmitCashUpInput, ApproveCashUpInput } from '@/lib/schemas/cashup'
-import { getFloatForDate, getMostRecentFloatBefore, updateClosingAmount } from './floatService'
+import { getFloatForDate, getMostRecentFloatBefore, updateClosingAmount, getFloatTopUpsForDate } from './floatService'
 import { getExpenseTotalsForDate } from './expenseService'
 import { getLoanTotalsForDate } from './loanService'
 
@@ -34,22 +34,21 @@ export async function openCashUp(openedByUserId: string, sessionDateStr?: string
     return existing
   }
 
-  // Pull opening balance from today's float record.
-  // If no float has been manually set for today, carry forward the previous
-  // day's closing amount (or opening amount if never closed) so the balance
-  // never silently resets to zero.
-  const floatRecord = await getFloatForDate(sessionDate)
+  // Opening balance: previous day's closing ALWAYS takes priority over any
+  // manually-set float for today. A manual SetFloat is only the source of
+  // truth when there is genuinely no prior closing history (bootstrap day).
+  const prevFloat = await getMostRecentFloatBefore(sessionDate)
   let openingBalance: Decimal
-  if (floatRecord) {
-    openingBalance = new Decimal(floatRecord.openingAmount.toString())
+  if (prevFloat?.closingAmount) {
+    openingBalance = new Decimal(prevFloat.closingAmount.toString())
+    logger.info({ prevDate: prevFloat.floatDate, amount: openingBalance.toFixed(2) }, 'CashUp: using previous closing as opening balance')
   } else {
-    const prevFloat = await getMostRecentFloatBefore(sessionDate)
-    if (prevFloat?.closingAmount) {
-      openingBalance = new Decimal(prevFloat.closingAmount.toString())
-      logger.info({ prevDate: prevFloat.floatDate, amount: openingBalance.toFixed(2) }, 'CashUp: carrying forward previous closing as opening balance')
+    const floatRecord = await getFloatForDate(sessionDate)
+    if (floatRecord) {
+      openingBalance = new Decimal(floatRecord.openingAmount.toString())
     } else if (prevFloat?.openingAmount) {
       openingBalance = new Decimal(prevFloat.openingAmount.toString())
-      logger.info({ prevDate: prevFloat.floatDate, amount: openingBalance.toFixed(2) }, 'CashUp: carrying forward previous opening as opening balance (no closing set)')
+      logger.info({ prevDate: prevFloat.floatDate, amount: openingBalance.toFixed(2) }, 'CashUp: carrying forward previous opening (no closing set)')
     } else {
       openingBalance = new Decimal(0)
     }
@@ -132,17 +131,11 @@ export async function submitCashUp(
     throw new Error(`Cannot submit cash-up with status "${cashUp.status}"`)
   }
 
-  const drawingsReceived = new Decimal(input.drawingsReceived ?? 0)
-  // Auto-calculate net loan cash impact for the session date from Loan records.
-  // If the user manually provides a value (legacy), use that; otherwise derive from DB.
-  let loansTotal: Decimal
-  if (input.loansTotal !== undefined && input.loansTotal !== null) {
-    loansTotal = new Decimal(input.loansTotal)
-  } else {
-    const loanTotals = await getLoanTotalsForDate(cashUp.sessionDate)
-    // netCashOut is positive = cash went out as advances (reduces drawer), so we subtract it
-    loansTotal = new Decimal(loanTotals.netCashOut).negated()
-  }
+  // Both drawingsReceived and loansTotal are fully server-derived — never from user input.
+  const drawingsReceived = await getFloatTopUpsForDate(cashUp.sessionDate)
+  const loanTotals = await getLoanTotalsForDate(cashUp.sessionDate)
+  // netCashOut is positive = cash went out as advances (reduces drawer), so we subtract it
+  const loansTotal = new Decimal(loanTotals.netCashOut).negated()
   const totals = await calcSystemTotals(cashUp.sessionDate, drawingsReceived, loansTotal)
 
   const openingBalance = new Decimal(cashUp.openingBalance.toString())
@@ -238,6 +231,7 @@ export async function getLiveStats(sessionDate: Date) {
     unpaidTodayAgg,
     unpaidAllTimeAgg,
     approvedVariances,
+    floatTopUpsAgg,
   ] = await Promise.all([
     prisma.sale.aggregate({
       _sum: { totalAmount: true },
@@ -273,6 +267,10 @@ export async function getLiveStats(sessionDate: Date) {
       _sum: { variance: true },
       where: { status: 'approved' },
     }),
+    prisma.floatMovement.aggregate({
+      _sum: { amount: true },
+      where: { movementType: 'top_up', createdAt: { gte: start, lte: end } },
+    }),
   ])
 
   return {
@@ -283,6 +281,7 @@ export async function getLiveStats(sessionDate: Date) {
     expenses:      expenses.toFixed(2),
     loanAdvance:   loanTotals.advanced,
     loanRepayment: loanTotals.repaid,
+    floatTopUps:   new Decimal(floatTopUpsAgg._sum.amount?.toString()     ?? '0').toFixed(2),
     unpaidToday: {
       total: new Decimal(unpaidTodayAgg[0]?.total   ?? '0').toFixed(2),
       count: Number(unpaidTodayAgg[0]?.count   ?? 0),

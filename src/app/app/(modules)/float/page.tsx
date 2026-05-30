@@ -27,6 +27,19 @@ type CashFloat = {
   createdAt: string
 }
 
+type FloatMovement = {
+  id: string
+  movementType: 'top_up' | 'opening' | 'withdrawal' | 'adjustment'
+  amount: string
+  balanceAfter: string
+  referenceNote?: string | null
+  createdAt: string
+}
+
+type CurrentFloatResponse = {
+  float: (CashFloat & { movements: FloatMovement[]; currentBalance: string }) | null
+}
+
 type TodayFloatResponse = {
   today: CashFloat | null
   suggestedAmount: string | null
@@ -44,11 +57,13 @@ export default function FloatPage() {
 
   const { data: todayData, isLoading: loadingToday } = useSWR<TodayFloatResponse>('/api/float/today', fetcher)
   const { data: history, isLoading: loadingHistory } = useSWR<CashFloat[]>('/api/float', fetcher)
+  const { data: currentData } = useSWR<CurrentFloatResponse>('/api/float/current', fetcher, { refreshInterval: 30000 })
   const [saving, setSaving] = useState(false)
 
   const todayFloat        = todayData?.today ?? null
   const suggestedAmount   = todayData?.suggestedAmount ?? null
   const suggestedDate     = todayData?.suggestedDate ?? null
+  const movements         = currentData?.float?.movements ?? []
 
   const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm<SetFloatFormInput, unknown, SetFloatInput>({
     resolver: zodResolver(SetFloatSchema),
@@ -211,6 +226,55 @@ export default function FloatPage() {
             )}
           </div>
         </div>
+
+        {/* Today's Movements */}
+        {movements.length > 0 && (
+          <div className="rounded-lg border bg-white" style={{ borderColor: colors.border }}>
+            <div className="flex items-center justify-between px-5 py-3" style={{ borderBottom: `1px solid ${colors.border}` }}>
+              <h2 className="text-sm font-semibold" style={{ color: colors.textPrimary }}>Today&apos;s Float Movements</h2>
+              <span className="text-xs" style={{ color: colors.textSecondary }}>{movements.length} movement{movements.length !== 1 ? 's' : ''}</span>
+            </div>
+            <div className="overflow-x-auto">
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ background: '#F5F5F5', borderBottom: `1px solid ${colors.border}` }}>
+                    {['Time', 'Type', 'Amount', 'Balance After', 'Note'].map((h) => (
+                      <th key={h} style={{ textAlign: 'left', padding: '6px 12px', fontSize: 10, fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {movements.map((m, i) => (
+                    <tr key={m.id} style={{ background: i % 2 === 0 ? '#fff' : '#FAFAFA', borderBottom: `1px solid #F0F0F0` }}>
+                      <td style={{ padding: '6px 12px', fontSize: 11, color: colors.textSecondary }}>
+                        {new Date(m.createdAt).toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' })}
+                      </td>
+                      <td style={{ padding: '6px 12px' }}>
+                        <span style={{
+                          display: 'inline-flex', padding: '1px 6px', borderRadius: 3, fontSize: 11, fontWeight: 600,
+                          ...(m.movementType === 'top_up'
+                            ? { background: colors.actionBg, color: colors.action }
+                            : { background: '#F0F0F0', color: colors.textSecondary }),
+                        }}>
+                          {m.movementType === 'top_up' ? 'Top-Up' : m.movementType}
+                        </span>
+                      </td>
+                      <td style={{ padding: '6px 12px', fontSize: 12, fontFamily: 'monospace', fontWeight: 600, color: colors.action }}>
+                        +R {new Decimal(m.amount).toFixed(2)}
+                      </td>
+                      <td style={{ padding: '6px 12px', fontSize: 12, fontFamily: 'monospace', color: colors.textPrimary }}>
+                        R {new Decimal(m.balanceAfter).toFixed(2)}
+                      </td>
+                      <td style={{ padding: '6px 12px', fontSize: 11, color: colors.textSecondary }}>
+                        {m.referenceNote ?? '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
     </PageShell>
   )
