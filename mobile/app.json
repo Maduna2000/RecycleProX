@@ -1,0 +1,65 @@
+{
+  "expo": {
+    "name": "ScaleStation",
+    "slug": "scalestation",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "scheme": "scalestation",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1B2A4A"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.lariattechnologies.scalestation"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "backgroundColor": "#1B2A4A"
+      },
+      "package": "com.lariattechnologies.scalestation",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ],
+      "minSdkVersion": 26
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#1B2A4A",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain"
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "ScaleStation needs camera access to photograph scale readings and product loads."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "ScaleStation needs photo library access to attach existing photos to orders."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
