@@ -2,7 +2,7 @@ import Decimal from 'decimal.js'
 import { prisma } from '@/lib/db/prisma'
 import logger from '@/lib/logger'
 import { SubmitCashUpInput, ApproveCashUpInput } from '@/lib/schemas/cashup'
-import { getFloatForDate, getMostRecentFloatBefore, updateClosingAmount, getFloatTopUpsForDate } from './floatService'
+import { getMostRecentFloatBefore, updateClosingAmount, getDrawingsReceivedForDate } from './floatService'
 import { getExpenseTotalsForDate } from './expenseService'
 import { getLoanTotalsForDate } from './loanService'
 
@@ -34,24 +34,22 @@ export async function openCashUp(openedByUserId: string, sessionDateStr?: string
     return existing
   }
 
-  // Opening balance: previous day's closing ALWAYS takes priority over any
-  // manually-set float for today. A manual SetFloat is only the source of
-  // truth when there is genuinely no prior closing history (bootstrap day).
+  // Opening balance = PREVIOUS day's closing balance (the carry-forward).
+  // Today's float (openingAmount) is NOT used here — it is captured separately
+  // as part of drawingsReceived at submit time, so saving the float always
+  // appears in the cashup "Drawings Received" field without double-counting.
   const prevFloat = await getMostRecentFloatBefore(sessionDate)
   let openingBalance: Decimal
   if (prevFloat?.closingAmount) {
     openingBalance = new Decimal(prevFloat.closingAmount.toString())
     logger.info({ prevDate: prevFloat.floatDate, amount: openingBalance.toFixed(2) }, 'CashUp: using previous closing as opening balance')
+  } else if (prevFloat?.openingAmount) {
+    // No closing recorded yet (e.g. prior session not approved) — carry forward opening
+    openingBalance = new Decimal(prevFloat.openingAmount.toString())
+    logger.info({ prevDate: prevFloat.floatDate, amount: openingBalance.toFixed(2) }, 'CashUp: carrying forward previous opening (no closing set)')
   } else {
-    const floatRecord = await getFloatForDate(sessionDate)
-    if (floatRecord) {
-      openingBalance = new Decimal(floatRecord.openingAmount.toString())
-    } else if (prevFloat?.openingAmount) {
-      openingBalance = new Decimal(prevFloat.openingAmount.toString())
-      logger.info({ prevDate: prevFloat.floatDate, amount: openingBalance.toFixed(2) }, 'CashUp: carrying forward previous opening (no closing set)')
-    } else {
-      openingBalance = new Decimal(0)
-    }
+    // Bootstrap day — no prior float history at all
+    openingBalance = new Decimal(0)
   }
 
   const cashUp = await prisma.cashUp.create({
@@ -132,7 +130,8 @@ export async function submitCashUp(
   }
 
   // Both drawingsReceived and loansTotal are fully server-derived — never from user input.
-  const drawingsReceived = await getFloatTopUpsForDate(cashUp.sessionDate)
+  // drawingsReceived = today's opening float + any top-ups during the day.
+  const drawingsReceived = await getDrawingsReceivedForDate(cashUp.sessionDate)
   const loanTotals = await getLoanTotalsForDate(cashUp.sessionDate)
   // netCashOut is positive = cash went out as advances (reduces drawer), so we subtract it
   const loansTotal = new Decimal(loanTotals.netCashOut).negated()
@@ -232,6 +231,7 @@ export async function getLiveStats(sessionDate: Date) {
     unpaidAllTimeAgg,
     approvedVariances,
     floatTopUpsAgg,
+    todayFloatRecord,
   ] = await Promise.all([
     prisma.sale.aggregate({
       _sum: { totalAmount: true },
@@ -271,6 +271,7 @@ export async function getLiveStats(sessionDate: Date) {
       _sum: { amount: true },
       where: { movementType: 'top_up', createdAt: { gte: start, lte: end } },
     }),
+    prisma.cashFloat.findUnique({ where: { floatDate: start } }),
   ])
 
   return {
@@ -281,7 +282,9 @@ export async function getLiveStats(sessionDate: Date) {
     expenses:      expenses.toFixed(2),
     loanAdvance:   loanTotals.advanced,
     loanRepayment: loanTotals.repaid,
-    floatTopUps:   new Decimal(floatTopUpsAgg._sum.amount?.toString()     ?? '0').toFixed(2),
+    floatTopUps:   new Decimal(todayFloatRecord?.openingAmount?.toString() ?? '0')
+                     .plus(new Decimal(floatTopUpsAgg._sum.amount?.toString() ?? '0'))
+                     .toFixed(2),
     unpaidToday: {
       total: new Decimal(unpaidTodayAgg[0]?.total   ?? '0').toFixed(2),
       count: Number(unpaidTodayAgg[0]?.count   ?? 0),

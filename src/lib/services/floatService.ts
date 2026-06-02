@@ -82,7 +82,7 @@ export async function updateClosingAmount(date: Date, amount: Decimal) {
   logger.info({ floatDate: d.toISOString(), closingAmount: amount.toFixed(2) }, 'CashFloat closing amount updated')
 }
 
-// ─── Sum of top-up movements for a given date (used by cashup formula) ───────
+// ─── Sum of top-up movements for a given date ────────────────────────────────
 
 export async function getFloatTopUpsForDate(date: Date): Promise<Decimal> {
   const start = new Date(date); start.setHours(0, 0, 0, 0)
@@ -93,6 +93,34 @@ export async function getFloatTopUpsForDate(date: Date): Promise<Decimal> {
     where: { movementType: 'top_up', createdAt: { gte: start, lte: end } },
   })
   return new Decimal(result._sum.amount?.toString() ?? '0')
+}
+
+/**
+ * Total "drawings received" for a date = opening float set by manager
+ * + any top-up movements during the day.
+ *
+ * This is the value used in the cashup reconciliation formula so that
+ * saving a float correctly reflects in the cashup "Drawings Received" field.
+ */
+export async function getDrawingsReceivedForDate(date: Date): Promise<Decimal> {
+  const d     = new Date(date); d.setHours(0, 0, 0, 0)
+  const start = new Date(date); start.setHours(0, 0, 0, 0)
+  const end   = new Date(date); end.setHours(23, 59, 59, 999)
+
+  const [floatRecord, topUpsResult] = await Promise.all([
+    prisma.cashFloat.findUnique({ where: { floatDate: d } }),
+    prisma.floatMovement.aggregate({
+      _sum: { amount: true },
+      where: { movementType: 'top_up', createdAt: { gte: start, lte: end } },
+    }),
+  ])
+
+  const openingFloat = floatRecord
+    ? new Decimal(floatRecord.openingAmount.toString())
+    : new Decimal(0)
+  const topUps = new Decimal(topUpsResult._sum.amount?.toString() ?? '0')
+
+  return openingFloat.plus(topUps)
 }
 
 // ─── Get current float with balance and movements ─────────────────────────────
