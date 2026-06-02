@@ -7,11 +7,6 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "scheme": "scalestation",
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#1B2A4A"
-    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.lariattechnologies.scalestation"
@@ -26,8 +21,7 @@
         "android.permission.CAMERA",
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE"
-      ],
-      "minSdkVersion": 26
+      ]
     },
     "web": {
       "bundler": "metro"
