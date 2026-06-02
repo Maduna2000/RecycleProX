@@ -1,5 +1,5 @@
 export const API_BASE_URL =
-  process.env.EXPO_PUBLIC_API_URL ?? 'https://your-vercel-project.vercel.app';
+  process.env.EXPO_PUBLIC_API_URL ?? 'https://renovopros.vercel.app';
 
 export const SCALE_ENDPOINTS = {
   orders: '/api/scale/orders',
