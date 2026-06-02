@@ -2,6 +2,7 @@
 
 # dependencies
 /node_modules
+node_modules/
 /.pnp
 .pnp.js
 .yarn/install-state.gz
@@ -44,3 +45,18 @@ next-env.d.ts
 .env
 
 .vercel
+
+# AI tool directories — contain NTFS junction points that break EAS archiving
+.agents/
+.claude/skills/
+.trae/
+.superpowers/
+.windsurf/
+.claude/scheduled_tasks.lock
+
+# Mobile build artifacts
+mobile/gradle_build*.log
+mobile/android/build/
+mobile/android/.gradle/
+mobile/ios/build/
+mobile/ios/Pods/

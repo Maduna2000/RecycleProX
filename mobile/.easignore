@@ -1,0 +1,11 @@
+﻿# Dependencies — EAS installs fresh on Linux; don't upload Windows binaries
+node_modules/
+
+# Android/iOS local build caches
+android/build
+android/.gradle
+ios/build
+ios/Pods
+
+# Logs
+*.log

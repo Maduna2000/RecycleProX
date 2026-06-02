@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "ScaleStation",
-    "slug": "scalestation",
+    "slug": "scale-station",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -18,8 +18,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
+        "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#1B2A4A"
       },
       "package": "com.lariattechnologies.scalestation",
@@ -31,7 +30,6 @@
       "minSdkVersion": 26
     },
     "web": {
-      "favicon": "./assets/favicon.png",
       "bundler": "metro"
     },
     "plugins": [
@@ -60,6 +58,12 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "43bec9ce-4c06-4c2a-9609-53de273405ec"
+      }
+    },
+    "owner": "siphesihlemaduna"
   }
 }
