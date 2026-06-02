@@ -3,7 +3,7 @@
 import { useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Plus, Trash2, Loader2, AlertTriangle, Scale, RefreshCw, Camera } from 'lucide-react'
+import { Plus, Trash2, Loader2, AlertTriangle, Scale, RefreshCw, Camera, ClipboardList } from 'lucide-react'
 import { toast } from 'sonner'
 import useSWR from 'swr'
 import { CasualSelectorPanel, type CasualSelectorPanelRef } from '@/components/customers/CasualSelectorPanel'
@@ -918,6 +918,12 @@ export default function NewPurchasePage() {
                 style={{ fontSize: 10, padding: '1px 6px', background: '#E0E0E0', border: '1px solid #999', borderRadius: 2, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}
               >
                 <RefreshCw style={{ width: 9, height: 9 }} /> Refresh
+              </button>
+              <button
+                onClick={() => router.push('/app/purchases')}
+                style={{ fontSize: 10, padding: '1px 6px', background: '#185ABD', border: '1px solid #0F3F8A', borderRadius: 2, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3, color: '#fff' }}
+              >
+                <ClipboardList style={{ width: 9, height: 9 }} /> Edit Transaction
               </button>
             </div>
 

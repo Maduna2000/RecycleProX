@@ -23,7 +23,7 @@ const ALWAYS: NavGroup = {
   heading: 'Transactions',
   items: [
     { label: 'Dashboard',  href: '/app/dashboard',  icon: LayoutDashboard },
-    { label: 'Purchases',  href: '/app/purchases',  icon: ShoppingCart },
+    { label: 'Purchases',  href: '/app/purchases/new',  icon: ShoppingCart },
     { label: 'Sales',      href: '/app/sales',      icon: TrendingUp },
     { label: 'Customers',  href: '/app/customers',  icon: Users },
   ],
@@ -83,8 +83,12 @@ const ADMIN: NavGroup = {
 
 function isActive(pathname: string, href: string): boolean {
   // Exact match only for paths that are a prefix of deeper routes
-  if (href === '/app/settings' || href === '/app/purchases' || href === '/app/scale') {
+  if (href === '/app/settings' || href === '/app/scale') {
     return pathname === href || pathname === href + '/'
+  }
+  // Purchases nav points to /new but should highlight for any /app/purchases/* route
+  if (href === '/app/purchases/new') {
+    return pathname.startsWith('/app/purchases')
   }
   return pathname.startsWith(href)
 }
