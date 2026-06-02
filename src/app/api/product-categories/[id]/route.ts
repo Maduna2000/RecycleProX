@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { UpdateCategorySchema } from '@/lib/schemas/product'
 import { prisma } from '@/lib/db/prisma'
+import { updateCategory, deleteCategory, countProductsForCategory } from '@/lib/services/productService'
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await auth()
@@ -11,30 +12,31 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
+  // Preview mode: return how many products would be affected by a rename — no mutation
+  if (req.nextUrl.searchParams.get('preview') === '1') {
+    const body = await req.json().catch(() => ({}))
+    const newName = typeof body === 'object' && body !== null ? (body as Record<string, unknown>).name as string | undefined : undefined
+    if (!newName) return NextResponse.json({ affectedProducts: 0 })
+    const existing = await prisma.productCategory.findUnique({ where: { id: params.id } })
+    if (!existing) return NextResponse.json({ error: 'Category not found' }, { status: 404 })
+    if (newName === existing.name) return NextResponse.json({ affectedProducts: 0, oldName: existing.name })
+    const affectedProducts = await countProductsForCategory(existing.name)
+    return NextResponse.json({ affectedProducts, oldName: existing.name })
+  }
+
   const body = await req.json()
   const parsed = UpdateCategorySchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
 
-  const existing = await prisma.productCategory.findUnique({ where: { id: params.id } })
-  if (!existing) return NextResponse.json({ error: 'Category not found' }, { status: 404 })
-
-  if (parsed.data.name && parsed.data.name !== existing.name) {
-    const conflict = await prisma.productCategory.findUnique({ where: { name: parsed.data.name } })
-    if (conflict) return NextResponse.json({ error: `Category "${parsed.data.name}" already exists` }, { status: 409 })
+  try {
+    const updated = await updateCategory(params.id, parsed.data, session.user.id)
+    return NextResponse.json(updated)
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Failed to update category'
+    const status = msg.includes('already exists') ? 409 : msg.includes('not found') ? 404 : msg.includes('levels') || msg.includes('Circular') || msg.includes('Cannot move') ? 422 : 500
+    if (status === 500) logger.error({ err }, 'PUT /api/product-categories/[id] failed')
+    return NextResponse.json({ error: msg }, { status })
   }
-
-  const updated = await prisma.productCategory.update({
-    where: { id: params.id },
-    data: {
-      ...(parsed.data.name      !== undefined && { name:      parsed.data.name }),
-      ...(parsed.data.colorHex  !== undefined && { colorHex:  parsed.data.colorHex  || null }),
-      ...(parsed.data.iconName  !== undefined && { iconName:  parsed.data.iconName   || null }),
-      ...(parsed.data.sortOrder !== undefined && { sortOrder: parsed.data.sortOrder }),
-    },
-  })
-
-  logger.info({ categoryId: params.id }, 'productCategory.updated')
-  return NextResponse.json(updated)
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
@@ -44,15 +46,12 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const existing = await prisma.productCategory.findUnique({ where: { id: params.id } })
-  if (!existing) return NextResponse.json({ error: 'Category not found' }, { status: 404 })
-
-  const inUse = await prisma.product.count({ where: { category: existing.name } })
-  if (inUse > 0) {
-    return NextResponse.json({ error: `Cannot delete — ${inUse} product${inUse !== 1 ? 's' : ''} use this category.` }, { status: 409 })
+  try {
+    await deleteCategory(params.id)
+    return NextResponse.json({ ok: true })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Failed to delete category'
+    const status = msg.includes('not found') ? 404 : 409
+    return NextResponse.json({ error: msg }, { status })
   }
-
-  await prisma.productCategory.delete({ where: { id: params.id } })
-  logger.info({ categoryId: params.id, name: existing.name }, 'productCategory.deleted')
-  return NextResponse.json({ ok: true })
 }

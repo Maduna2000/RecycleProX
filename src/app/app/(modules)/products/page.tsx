@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSearchParams } from 'next/navigation'
 import useSWR, { mutate } from 'swr'
@@ -32,7 +32,8 @@ function calcMargin(buy: string, sell: string): { pct: string; color: string } {
   return { pct: formatted, color: colors.danger }
 }
 
-type CategoryItem = { id: string; name: string; colorHex: string | null; iconName: string | null; sortOrder: number; isActive: boolean }
+type SubCategoryItem = { id: string; name: string; colorHex: string | null; iconName: string | null; sortOrder: number; isActive: boolean; parentId: string | null; _count?: { products: number } }
+type CategoryItem    = SubCategoryItem & { children: SubCategoryItem[] }
 
 const FALLBACK_COLORS = ['#0066CC','#CC6600','#009966','#9933CC','#CC3300','#006699','#996600','#008080']
 
@@ -110,6 +111,8 @@ export default function ProductsPage() {
 
   const { data: catData, mutate: mutateCats } = useSWR<{ categories: CategoryItem[] }>('/api/product-categories', fetcher)
   const categories: CategoryItem[] = catData?.categories ?? []
+  // Flat list of all category names (parents + children) for lookup helpers
+  const allCategoryNames: SubCategoryItem[] = categories.flatMap(c => [c, ...c.children])
 
   const revalidate = () => mutate(swrKey)
 
@@ -194,7 +197,12 @@ export default function ProductsPage() {
             style={{ height: 24, padding: '0 6px', fontSize: 11, border: '1px solid #ABABAB', borderRadius: 2, background: '#fff', color: '#212529', outline: 'none' }}
           >
             <option value="">All Categories</option>
-            {categories.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
+            {categories.map((c) => (
+              <React.Fragment key={c.id}>
+                <option value={c.name}>{c.name}</option>
+                {c.children.map(s => <option key={s.id} value={s.name}>&nbsp;&nbsp;↳ {s.name}</option>)}
+              </React.Fragment>
+            ))}
           </select>
           <select
             value={statusFilter}
@@ -267,7 +275,7 @@ export default function ProductsPage() {
               <tbody>
                 {products.map((p, i) => {
                   const m      = calcMargin(p.defaultBuyPrice, p.defaultSellPrice)
-                  const cat    = categories.find(c => c.name === p.category)
+                  const cat    = allCategoryNames.find(c => c.name === p.category)
                   const catSty = getCategoryStyle(cat?.colorHex, p.category)
                   const rowBg  = i % 2 === 1 ? '#FAFAFA' : '#fff'
                   return (
@@ -449,7 +457,15 @@ function CreateProductModal({ categories, onClose, onSuccess }: { categories: Ca
             <Select onValueChange={(v) => setValue('category', v as string)}>
               <SelectTrigger className="mt-1"><SelectValue placeholder="Select category" /></SelectTrigger>
               <SelectContent>
-                {categories.map((c) => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}
+                {categories.map((c) => (
+                  <React.Fragment key={c.id}>
+                    {c.children.length === 0
+                      ? <SelectItem value={c.name}>{c.name}</SelectItem>
+                      : <SelectItem value={c.name} disabled className="font-semibold opacity-60">{c.name}</SelectItem>
+                    }
+                    {c.children.map(s => <SelectItem key={s.id} value={s.name}>&nbsp;&nbsp;↳ {s.name}</SelectItem>)}
+                  </React.Fragment>
+                ))}
               </SelectContent>
             </Select>
             {errors.category && <p className="text-xs text-red-600 mt-1">{errors.category.message}</p>}
@@ -516,7 +532,15 @@ function EditProductModal({ product, categories, onClose, onSuccess }: { product
               <Select onValueChange={(v) => setValue('category', v as string)} defaultValue={product.category}>
                 <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {categories.map((c) => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}
+                  {categories.map((c) => (
+                    <React.Fragment key={c.id}>
+                      {c.children.length === 0
+                        ? <SelectItem value={c.name}>{c.name}</SelectItem>
+                        : <SelectItem value={c.name} disabled className="font-semibold opacity-60">{c.name}</SelectItem>
+                      }
+                      {c.children.map(s => <SelectItem key={s.id} value={s.name}>&nbsp;&nbsp;↳ {s.name}</SelectItem>)}
+                    </React.Fragment>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -842,16 +866,20 @@ function IconPicker({ value, onChange }: { value: string; onChange: (v: string) 
 function ManageCategoriesModal({ categories, onClose, onSuccess }: {
   categories: CategoryItem[]; onClose: () => void; onSuccess: () => void
 }) {
-  const [newName,    setNewName]    = useState('')
-  const [newColor,   setNewColor]   = useState('#607D8B')
-  const [newIcon,    setNewIcon]    = useState('')
-  const [adding,     setAdding]     = useState(false)
-  const [editId,     setEditId]     = useState<string | null>(null)
-  const [editName,   setEditName]   = useState('')
-  const [editColor,  setEditColor]  = useState('')
-  const [editIcon,   setEditIcon]   = useState('')
-  const [saving,     setSaving]     = useState(false)
-  const [deleting,   setDeleting]   = useState<string | null>(null)
+  const [newName,      setNewName]      = useState('')
+  const [newColor,     setNewColor]     = useState('#607D8B')
+  const [newIcon,      setNewIcon]      = useState('')
+  const [newParentId,  setNewParentId]  = useState<string>('')
+  const [adding,       setAdding]       = useState(false)
+  const [editId,       setEditId]       = useState<string | null>(null)
+  const [editName,     setEditName]     = useState('')
+  const [editColor,    setEditColor]    = useState('')
+  const [editIcon,     setEditIcon]     = useState('')
+  const [saving,       setSaving]       = useState(false)
+  const [deleting,     setDeleting]     = useState<string | null>(null)
+  const [renameConfirm, setRenameConfirm] = useState<{
+    id: string; oldName: string; newName: string; color: string; icon: string; count: number
+  } | null>(null)
 
   async function handleAdd() {
     if (!newName.trim()) return
@@ -859,40 +887,140 @@ function ManageCategoriesModal({ categories, onClose, onSuccess }: {
     const res = await fetch('/api/product-categories', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newName.trim(), colorHex: newColor, iconName: newIcon || null }),
+      body: JSON.stringify({ name: newName.trim(), colorHex: newColor, iconName: newIcon || null, parentId: newParentId || null }),
     })
     setAdding(false)
-    if (res.ok) { toast.success('Category added'); setNewName(''); setNewIcon(''); onSuccess() }
-    else if (res.status === 409) toast.error('Category name already exists')
-    else toast.error('Failed to add category')
+    if (res.ok) { toast.success('Category added'); setNewName(''); setNewIcon(''); setNewParentId(''); onSuccess() }
+    else { const j = await res.json(); toast.error(j.error ?? 'Failed to add category') }
   }
 
-  function startEdit(cat: CategoryItem) {
+  function startEdit(cat: SubCategoryItem) {
     setEditId(cat.id)
     setEditName(cat.name)
     setEditColor(cat.colorHex ?? '#607D8B')
     setEditIcon(cat.iconName ?? '')
+    setRenameConfirm(null)
   }
 
   async function handleSaveEdit(id: string) {
-    setSaving(true)
-    const res = await fetch(`/api/product-categories/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: editName.trim(), colorHex: editColor, iconName: editIcon || null }),
-    })
-    setSaving(false)
-    if (res.ok) { toast.success('Category updated'); setEditId(null); onSuccess() }
-    else if (res.status === 409) toast.error('Category name already exists')
-    else toast.error('Failed to update category')
+    const allCats = categories.flatMap(c => [c, ...c.children])
+    const cat = allCats.find(c => c.id === id)
+    if (!cat) return
+
+    if (editName.trim() !== cat.name) {
+      // Preview: check how many products would be affected
+      setSaving(true)
+      const res = await fetch(`/api/product-categories/${id}?preview=1`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: editName.trim() }),
+      })
+      setSaving(false)
+      const j = await res.json() as { affectedProducts?: number; oldName?: string; error?: string }
+      if (!res.ok) { toast.error(j.error ?? 'Failed'); return }
+      if ((j.affectedProducts ?? 0) > 0) {
+        setRenameConfirm({ id, oldName: cat.name, newName: editName.trim(), color: editColor, icon: editIcon, count: j.affectedProducts! })
+        return
+      }
+    }
+    await doSaveEdit(id, editName.trim(), editColor, editIcon)
   }
 
-  async function handleDelete(cat: CategoryItem) {
+  async function doSaveEdit(id: string, name: string, colorHex: string, iconName: string) {
+    setSaving(true)
+    const res = await fetch(`/api/product-categories/${id}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, colorHex, iconName: iconName || null }),
+    })
+    setSaving(false)
+    if (res.ok) { toast.success('Category updated'); setEditId(null); setRenameConfirm(null); onSuccess() }
+    else { const j = await res.json(); toast.error((j as { error?: string }).error ?? 'Failed to update category') }
+  }
+
+  async function handleDeactivate(cat: SubCategoryItem) {
+    setDeleting(cat.id)
+    const res = await fetch(`/api/product-categories/${cat.id}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ isActive: false }),
+    })
+    setDeleting(null)
+    if (res.ok) { toast.success(`"${cat.name}" deactivated`); onSuccess() }
+    else { const j = await res.json(); toast.error((j as { error?: string }).error ?? 'Failed to deactivate') }
+  }
+
+  async function handleDelete(cat: SubCategoryItem) {
     setDeleting(cat.id)
     const res = await fetch(`/api/product-categories/${cat.id}`, { method: 'DELETE' })
     setDeleting(null)
     if (res.ok) { toast.success('Category deleted'); onSuccess() }
-    else { const j = await res.json(); toast.error(j.error ?? 'Failed to delete category') }
+    else { const j = await res.json(); toast.error((j as { error?: string }).error ?? 'Failed to delete category') }
+  }
+
+  function renderCatRow(cat: SubCategoryItem, isChild = false) {
+    const hasChildren = !isChild && (cat as CategoryItem).children?.length > 0
+    return (
+      <div key={cat.id} style={{ borderBottom: `1px solid ${colors.border}` }}>
+        {editId === cat.id ? (
+          <div style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {renameConfirm?.id === cat.id ? (
+              <div style={{ background: '#FFF8E1', border: `1px solid ${colors.warning}`, borderRadius: 3, padding: '8px 10px', fontSize: 12 }}>
+                <p style={{ fontWeight: 600, color: '#92610A', marginBottom: 4 }}>
+                  Rename &quot;{renameConfirm.oldName}&quot; → &quot;{renameConfirm.newName}&quot;?
+                </p>
+                <p style={{ color: '#6C757D' }}>
+                  This will update <strong>{renameConfirm.count} product{renameConfirm.count !== 1 ? 's' : ''}</strong> to use the new name.
+                </p>
+                <div style={{ display: 'flex', gap: 6, marginTop: 8, justifyContent: 'flex-end' }}>
+                  <ModalBtn onClick={() => setRenameConfirm(null)} disabled={saving}>Cancel</ModalBtn>
+                  <ModalBtn variant="primary" loading={saving}
+                    onClick={() => doSaveEdit(renameConfirm.id, renameConfirm.newName, renameConfirm.color, renameConfirm.icon)}>
+                    Confirm Rename
+                  </ModalBtn>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input type="color" value={editColor} onChange={(e) => setEditColor(e.target.value)}
+                    style={{ width: 26, height: 26, borderRadius: 3, border: `1px solid ${colors.border}`, cursor: 'pointer', padding: 1 }} />
+                  <input value={editName} onChange={(e) => setEditName(e.target.value)}
+                    style={{ flex: 1, height: 26, border: `1px solid ${colors.border}`, borderRadius: 3, padding: '0 6px', fontSize: 12, outline: 'none' }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') void handleSaveEdit(cat.id); if (e.key === 'Escape') setEditId(null) }}
+                    autoFocus />
+                </div>
+                <IconPicker value={editIcon} onChange={setEditIcon} />
+                <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', marginTop: 2 }}>
+                  <ModalBtn variant="primary" onClick={() => void handleSaveEdit(cat.id)} loading={saving} disabled={!editName.trim()}>Save</ModalBtn>
+                  <ModalBtn onClick={() => { setEditId(null); setRenameConfirm(null) }} disabled={saving}>Cancel</ModalBtn>
+                </div>
+              </>
+            )}
+          </div>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: isChild ? '5px 10px 5px 22px' : '6px 10px' }}>
+            {isChild && <span style={{ fontSize: 9, color: colors.textSecondary, marginRight: -4 }}>↳</span>}
+            <span style={{ width: 12, height: 12, borderRadius: 2, background: cat.colorHex ?? '#607D8B', display: 'inline-block', flexShrink: 0 }} />
+            {cat.iconName && <CatIcon name={cat.iconName} size={12} />}
+            <span style={{ flex: 1, fontSize: 12, fontWeight: isChild ? 400 : 600, color: colors.textPrimary }}>{cat.name}</span>
+            {cat._count && <span style={{ fontSize: 10, color: colors.textSecondary }}>{cat._count.products}p</span>}
+            <button onClick={() => startEdit(cat)} style={{ fontSize: 11, color: colors.process, background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px' }}>Edit</button>
+            {hasChildren ? (
+              <span style={{ fontSize: 10, color: colors.textSecondary, padding: '2px 4px' }} title="Delete sub-categories first">Has subs</span>
+            ) : (
+              <>
+                <button onClick={() => void handleDeactivate(cat)} disabled={deleting === cat.id}
+                  style={{ fontSize: 11, color: colors.warning, background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', opacity: deleting === cat.id ? 0.5 : 1 }}>
+                  {deleting === cat.id ? '…' : 'Deactivate'}
+                </button>
+                <button onClick={() => void handleDelete(cat)} disabled={deleting === cat.id}
+                  style={{ fontSize: 11, color: colors.danger, background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', opacity: deleting === cat.id ? 0.5 : 1 }}>
+                  {deleting === cat.id ? '…' : 'Delete'}
+                </button>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    )
   }
 
   return (
@@ -900,70 +1028,39 @@ function ManageCategoriesModal({ categories, onClose, onSuccess }: {
       <DialogContent className="sm:max-w-md" showCloseButton={false}>
         <ModalTitleBar title="Manage Categories" onClose={onClose} />
         <div className="space-y-3 mt-2">
-          <div style={{ maxHeight: 300, overflowY: 'auto', border: `1px solid ${colors.border}`, borderRadius: 3 }}>
+          <div style={{ maxHeight: 320, overflowY: 'auto', border: `1px solid ${colors.border}`, borderRadius: 3 }}>
             {categories.length === 0 ? (
               <p style={{ padding: '16px', textAlign: 'center', fontSize: 12, color: colors.textSecondary }}>No categories yet</p>
             ) : categories.map((cat) => (
-              <div key={cat.id} style={{ borderBottom: `1px solid ${colors.border}` }}>
-                {editId === cat.id ? (
-                  <div style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <input
-                        type="color"
-                        value={editColor}
-                        onChange={(e) => setEditColor(e.target.value)}
-                        style={{ width: 26, height: 26, borderRadius: 3, border: `1px solid ${colors.border}`, cursor: 'pointer', padding: 1 }}
-                      />
-                      <input
-                        value={editName}
-                        onChange={(e) => setEditName(e.target.value)}
-                        style={{ flex: 1, height: 26, border: `1px solid ${colors.border}`, borderRadius: 3, padding: '0 6px', fontSize: 12, outline: 'none' }}
-                        onKeyDown={(e) => { if (e.key === 'Enter') handleSaveEdit(cat.id); if (e.key === 'Escape') setEditId(null) }}
-                        autoFocus
-                      />
-                    </div>
-                    <IconPicker value={editIcon} onChange={setEditIcon} />
-                    <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', marginTop: 2 }}>
-                      <ModalBtn variant="primary" onClick={() => handleSaveEdit(cat.id)} loading={saving} disabled={!editName.trim()}>Save</ModalBtn>
-                      <ModalBtn onClick={() => setEditId(null)} disabled={saving}>Cancel</ModalBtn>
-                    </div>
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px' }}>
-                    <span style={{ width: 14, height: 14, borderRadius: 3, background: cat.colorHex ?? '#607D8B', display: 'inline-block', flexShrink: 0 }} />
-                    {cat.iconName && <CatIcon name={cat.iconName} size={13} />}
-                    <span style={{ flex: 1, fontSize: 12, fontWeight: 500, color: colors.textPrimary }}>{cat.name}</span>
-                    <button onClick={() => startEdit(cat)} style={{ fontSize: 11, color: colors.process, background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px' }}>Edit</button>
-                    <button
-                      onClick={() => handleDelete(cat)}
-                      disabled={deleting === cat.id}
-                      style={{ fontSize: 11, color: colors.danger, background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px', opacity: deleting === cat.id ? 0.5 : 1 }}
-                    >
-                      {deleting === cat.id ? '…' : 'Delete'}
-                    </button>
-                  </div>
-                )}
-              </div>
+              <React.Fragment key={cat.id}>
+                {renderCatRow(cat, false)}
+                {cat.children.map(sub => renderCatRow(sub, true))}
+              </React.Fragment>
             ))}
           </div>
 
           <div style={{ background: colors.neutralBg, border: `1px solid ${colors.border}`, borderRadius: 3, padding: '10px 12px' }}>
             <p style={{ fontSize: 11, fontWeight: 600, color: colors.textSecondary, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Add Category</p>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 6, alignItems: 'center' }}>
+              <label style={{ fontSize: 11, color: colors.textSecondary, whiteSpace: 'nowrap' }}>Parent:</label>
+              <select
+                value={newParentId}
+                onChange={(e) => setNewParentId(e.target.value)}
+                style={{ flex: 1, height: 26, padding: '0 6px', fontSize: 11, border: `1px solid ${colors.border}`, borderRadius: 3, background: '#fff', color: colors.textPrimary, outline: 'none' }}
+              >
+                <option value="">None (top-level)</option>
+                {categories.filter(c => !c.parentId).map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <input
-                type="color"
-                value={newColor}
-                onChange={(e) => setNewColor(e.target.value)}
-                style={{ width: 32, height: 28, borderRadius: 3, border: `1px solid ${colors.border}`, cursor: 'pointer', padding: 2 }}
-              />
-              <input
-                placeholder="Category name…"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') handleAdd() }}
-                style={{ flex: 1, height: 28, border: `1px solid ${colors.border}`, borderRadius: 3, padding: '0 8px', fontSize: 12, outline: 'none', background: '#fff' }}
-              />
-              <ModalBtn variant="primary" onClick={handleAdd} loading={adding} disabled={!newName.trim()}>Add</ModalBtn>
+              <input type="color" value={newColor} onChange={(e) => setNewColor(e.target.value)}
+                style={{ width: 32, height: 28, borderRadius: 3, border: `1px solid ${colors.border}`, cursor: 'pointer', padding: 2 }} />
+              <input placeholder="Category name…" value={newName} onChange={(e) => setNewName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') void handleAdd() }}
+                style={{ flex: 1, height: 28, border: `1px solid ${colors.border}`, borderRadius: 3, padding: '0 8px', fontSize: 12, outline: 'none', background: '#fff' }} />
+              <ModalBtn variant="primary" onClick={() => void handleAdd()} loading={adding} disabled={!newName.trim()}>Add</ModalBtn>
             </div>
             <IconPicker value={newIcon} onChange={setNewIcon} />
           </div>

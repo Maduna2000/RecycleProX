@@ -33,7 +33,7 @@ async function main() {
     console.log('Admin already exists — skipping')
   }
 
-  // Seed default product categories — update iconName if missing, keep user overrides
+  // Seed default product categories (top-level, parentId = null)
   for (const cat of DEFAULT_CATEGORIES) {
     await prisma.productCategory.upsert({
       where:  { name: cat.name },
@@ -41,6 +41,39 @@ async function main() {
       create: cat,
     })
   }
+
+  // Seed demo sub-categories (only on first run — skip if already exists)
+  const ferrousParent  = await prisma.productCategory.findUnique({ where: { name: 'Ferrous' } })
+  const copperParent   = await prisma.productCategory.findUnique({ where: { name: 'Copper' } })
+
+  if (ferrousParent) {
+    for (const sub of [
+      { name: 'HMS (Heavy Melting Scrap)', colorHex: '#455A64', iconName: 'Layers',  sortOrder: 0, parentId: ferrousParent.id },
+      { name: 'Light Iron',               colorHex: '#607D8B', iconName: 'Layers',  sortOrder: 1, parentId: ferrousParent.id },
+      { name: 'Sheet Iron',               colorHex: '#78909C', iconName: 'Layers',  sortOrder: 2, parentId: ferrousParent.id },
+    ]) {
+      await prisma.productCategory.upsert({
+        where:  { name: sub.name },
+        update: { parentId: ferrousParent.id },
+        create: sub,
+      })
+    }
+  }
+
+  if (copperParent) {
+    for (const sub of [
+      { name: 'Bright Copper',  colorHex: '#FF8C00', iconName: 'Cpu', sortOrder: 0, parentId: copperParent.id },
+      { name: 'Burnt Copper',   colorHex: '#CC5500', iconName: 'Cpu', sortOrder: 1, parentId: copperParent.id },
+      { name: 'Copper Tanks',   colorHex: '#FF6D00', iconName: 'Box', sortOrder: 2, parentId: copperParent.id },
+    ]) {
+      await prisma.productCategory.upsert({
+        where:  { name: sub.name },
+        update: { parentId: copperParent.id },
+        create: sub,
+      })
+    }
+  }
+
   console.log('Product categories seeded')
 }
 

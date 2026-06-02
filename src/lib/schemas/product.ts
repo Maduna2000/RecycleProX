@@ -49,10 +49,20 @@ export const CreateCategorySchema = z.object({
   colorHex:  z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Invalid hex color').optional().or(z.literal('')),
   iconName:  z.string().max(50).optional().or(z.literal('')),
   sortOrder: z.number().int().default(0),
+  parentId:  z.string().uuid().optional().nullable(),
 })
-export const UpdateCategorySchema = CreateCategorySchema.partial()
+export const UpdateCategorySchema = CreateCategorySchema.partial().extend({
+  isActive: z.boolean().optional(),
+})
 export type CreateCategoryInput = z.infer<typeof CreateCategorySchema>
 export type UpdateCategoryInput = z.infer<typeof UpdateCategorySchema>
+
+export type SubCategoryItem = {
+  id: string; name: string; colorHex: string | null; iconName: string | null
+  sortOrder: number; isActive: boolean; parentId: string | null
+  _count?: { products: number }
+}
+export type CategoryWithChildren = SubCategoryItem & { children: SubCategoryItem[] }
 
 export type CreateProductInput = z.infer<typeof CreateProductSchema>
 export type CreateProductFormInput = z.input<typeof CreateProductSchema>

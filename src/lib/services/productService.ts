@@ -8,6 +8,8 @@ import type {
   CreatePriceGroupInput,
   UpdatePriceGroupInput,
   SetGroupOverridesInput,
+  CreateCategoryInput,
+  UpdateCategoryInput,
 } from '@/lib/schemas/product'
 
 // ─── Typed Errors ─────────────────────────────────────────────────────────────
@@ -53,6 +55,9 @@ export async function createProduct(data: CreateProductInput, createdById?: stri
   const existing = await prisma.product.findUnique({ where: { code: data.code } })
   if (existing) throw new DuplicateProductCodeError(data.code)
 
+  const cat = await prisma.productCategory.findUnique({ where: { name: data.category } })
+  if (!cat) throw new Error(`Category "${data.category}" does not exist`)
+
   const product = await prisma.product.create({
     data: {
       code: data.code,
@@ -73,6 +78,11 @@ export async function createProduct(data: CreateProductInput, createdById?: stri
 export async function updateProduct(id: string, data: UpdateProductInput, updatedById?: string) {
   const existing = await prisma.product.findUnique({ where: { id } })
   if (!existing) throw new ProductNotFoundError(id)
+
+  if (data.category !== undefined) {
+    const cat = await prisma.productCategory.findUnique({ where: { name: data.category } })
+    if (!cat) throw new Error(`Category "${data.category}" does not exist`)
+  }
 
   const updated = await prisma.product.update({
     where: { id },
@@ -364,4 +374,98 @@ export async function copyDefaultsToPriceGroup(
 
   logger.info({ priceGroupId, upserted }, 'price-group.defaults-copied')
   return upserted
+}
+
+// ─── Category CRUD ────────────────────────────────────────────────────────────
+
+export async function createCategory(data: CreateCategoryInput) {
+  const existing = await prisma.productCategory.findUnique({ where: { name: data.name } })
+  if (existing) throw new Error(`Category "${data.name}" already exists`)
+
+  if (data.parentId) {
+    const parent = await prisma.productCategory.findUnique({ where: { id: data.parentId } })
+    if (!parent) throw new Error('Parent category not found')
+    if (parent.parentId !== null) throw new Error('Only two category levels are supported')
+  }
+
+  const category = await prisma.productCategory.create({
+    data: {
+      name:      data.name,
+      colorHex:  data.colorHex  || null,
+      iconName:  data.iconName  || null,
+      sortOrder: data.sortOrder ?? 0,
+      parentId:  data.parentId  ?? null,
+    },
+  })
+  logger.info({ categoryId: category.id, name: category.name, parentId: category.parentId }, 'productCategory.created')
+  return category
+}
+
+export async function updateCategory(id: string, data: UpdateCategoryInput, updatedById?: string) {
+  const existing = await prisma.productCategory.findUnique({
+    where: { id },
+    include: { children: { select: { id: true } } },
+  })
+  if (!existing) throw new Error('Category not found')
+
+  if (data.name && data.name !== existing.name) {
+    const conflict = await prisma.productCategory.findUnique({ where: { name: data.name } })
+    if (conflict) throw new Error(`Category "${data.name}" already exists`)
+  }
+
+  if (data.parentId !== undefined && data.parentId !== null) {
+    if (data.parentId === id) throw new Error('A category cannot be its own parent')
+    const newParent = await prisma.productCategory.findUnique({ where: { id: data.parentId } })
+    if (!newParent) throw new Error('Parent category not found')
+    if (newParent.parentId !== null) throw new Error('Only two category levels are supported')
+    if (existing.children.length > 0) throw new Error('Cannot move a parent category under another category — remove its sub-categories first')
+  }
+
+  const isRenaming = data.name !== undefined && data.name !== existing.name
+
+  const updated = await prisma.$transaction(async (tx) => {
+    const cat = await tx.productCategory.update({
+      where: { id },
+      data: {
+        ...(data.name      !== undefined && { name:      data.name }),
+        ...(data.colorHex  !== undefined && { colorHex:  data.colorHex  || null }),
+        ...(data.iconName  !== undefined && { iconName:  data.iconName  || null }),
+        ...(data.sortOrder !== undefined && { sortOrder: data.sortOrder }),
+        ...(data.isActive  !== undefined && { isActive:  data.isActive }),
+        ...(data.parentId  !== undefined && { parentId:  data.parentId ?? null }),
+      },
+    })
+
+    if (isRenaming) {
+      const { count } = await tx.product.updateMany({
+        where: { category: existing.name },
+        data:  { category: data.name! },
+      })
+      logger.info({ categoryId: id, oldName: existing.name, newName: data.name, count, updatedById }, 'productCategory.renamed.cascade')
+    }
+
+    return cat
+  })
+
+  logger.info({ categoryId: id, updatedById }, 'productCategory.updated')
+  return updated
+}
+
+export async function deleteCategory(id: string) {
+  const cat = await prisma.productCategory.findUnique({
+    where: { id },
+    include: { children: { select: { id: true } } },
+  })
+  if (!cat) throw new Error('Category not found')
+  if (cat.children.length > 0) {
+    throw new Error(`Delete sub-categories first (${cat.children.length} sub-categor${cat.children.length !== 1 ? 'ies' : 'y'} exist)`)
+  }
+  const inUse = await prisma.product.count({ where: { category: cat.name } })
+  if (inUse > 0) throw new Error(`${inUse} product${inUse !== 1 ? 's' : ''} use this category — reassign them first`)
+  await prisma.productCategory.delete({ where: { id } })
+  logger.info({ categoryId: id, name: cat.name }, 'productCategory.deleted')
+}
+
+export async function countProductsForCategory(name: string): Promise<number> {
+  return prisma.product.count({ where: { category: name, isActive: true } })
 }

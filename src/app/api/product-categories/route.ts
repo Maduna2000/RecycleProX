@@ -3,15 +3,36 @@ import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { CreateCategorySchema } from '@/lib/schemas/product'
 import { prisma } from '@/lib/db/prisma'
+import { createCategory } from '@/lib/services/productService'
 
 export async function GET() {
   const session = await auth()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const categories = await prisma.productCategory.findMany({
-    where: { isActive: true },
+  const parents = await prisma.productCategory.findMany({
+    where:   { isActive: true, parentId: null },
     orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+    include: {
+      children: {
+        where:   { isActive: true },
+        orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+      },
+    },
   })
+
+  const categories = await Promise.all(
+    parents.map(async (parent) => {
+      const childrenWithCounts = await Promise.all(
+        parent.children.map(async (child) => ({
+          ...child,
+          _count: { products: await prisma.product.count({ where: { category: child.name, isActive: true } }) },
+        }))
+      )
+      const directCount = await prisma.product.count({ where: { category: parent.name, isActive: true } })
+      return { ...parent, children: childrenWithCounts, _count: { products: directCount } }
+    })
+  )
+
   return NextResponse.json({ categories })
 }
 
@@ -26,18 +47,13 @@ export async function POST(req: NextRequest) {
   const parsed = CreateCategorySchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
 
-  const existing = await prisma.productCategory.findUnique({ where: { name: parsed.data.name } })
-  if (existing) return NextResponse.json({ error: `Category "${parsed.data.name}" already exists` }, { status: 409 })
-
-  const category = await prisma.productCategory.create({
-    data: {
-      name:      parsed.data.name,
-      colorHex:  parsed.data.colorHex || null,
-      iconName:  parsed.data.iconName  || null,
-      sortOrder: parsed.data.sortOrder ?? 0,
-    },
-  })
-
-  logger.info({ categoryId: category.id, name: category.name }, 'productCategory.created')
-  return NextResponse.json(category, { status: 201 })
+  try {
+    const category = await createCategory(parsed.data)
+    return NextResponse.json(category, { status: 201 })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Failed to create category'
+    const status = msg.includes('already exists') ? 409 : msg.includes('not found') ? 404 : msg.includes('levels') ? 422 : 500
+    if (status === 500) logger.error({ err }, 'POST /api/product-categories failed')
+    return NextResponse.json({ error: msg }, { status })
+  }
 }

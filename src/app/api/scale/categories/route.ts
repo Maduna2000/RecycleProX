@@ -6,15 +6,31 @@ export async function GET() {
   const session = await auth()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const categories = await prisma.productCategory.findMany({
-    where: { isActive: true },
+  const parents = await prisma.productCategory.findMany({
+    where:   { isActive: true, parentId: null },
     orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+    include: {
+      children: {
+        where:   { isActive: true },
+        orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+      },
+    },
   })
 
-  const result = await Promise.all(categories.map(async cat => ({
-    ...cat,
-    _count: { products: await prisma.product.count({ where: { category: cat.name, isActive: true } }) },
-  })))
+  const result = await Promise.all(
+    parents.map(async (parent) => {
+      const childrenWithCounts = await Promise.all(
+        parent.children.map(async (child) => ({
+          ...child,
+          _count: { products: await prisma.product.count({ where: { category: child.name, isActive: true } }) },
+        }))
+      )
+      const directCount   = await prisma.product.count({ where: { category: parent.name, isActive: true } })
+      const childrenTotal = childrenWithCounts.reduce((s, c) => s + c._count.products, 0)
+      return { ...parent, children: childrenWithCounts, _count: { products: directCount + childrenTotal } }
+    })
+  )
 
-  return NextResponse.json(result)
+  // Hide top-level categories that have zero products across all levels
+  return NextResponse.json(result.filter(c => c._count.products > 0))
 }
