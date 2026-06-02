@@ -47,9 +47,18 @@ export async function signIn(
 }
 
 export async function signOut(): Promise<void> {
-  await SecureStore.deleteItemAsync(TOKEN_KEY);
+  try {
+    await SecureStore.deleteItemAsync(TOKEN_KEY);
+  } catch {
+    // KeyStore unavailable on some Android 9 Samsung devices — ignore
+  }
 }
 
 export async function getStoredToken(): Promise<string | null> {
-  return SecureStore.getItemAsync(TOKEN_KEY);
+  try {
+    return await SecureStore.getItemAsync(TOKEN_KEY);
+  } catch {
+    // KeyStore unavailable on some Android 9 Samsung devices — treat as no token
+    return null;
+  }
 }

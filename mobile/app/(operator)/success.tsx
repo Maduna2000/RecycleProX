@@ -25,7 +25,8 @@ export default function SuccessScreen() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     scale.value = withDelay(100, withSpring(1, { damping: 12, stiffness: 150 }));
     opacity.value = withDelay(200, withTiming(1, { duration: 400 }));
-  }, [opacity, scale]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const checkmarkStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
