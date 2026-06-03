@@ -43,13 +43,38 @@ export async function openCashUp(openedByUserId: string, sessionDateStr?: string
   if (prevFloat?.closingAmount) {
     openingBalance = new Decimal(prevFloat.closingAmount.toString())
     logger.info({ prevDate: prevFloat.floatDate, amount: openingBalance.toFixed(2) }, 'CashUp: using previous closing as opening balance')
-  } else if (prevFloat?.openingAmount) {
-    // No closing recorded yet (e.g. prior session not approved) — carry forward opening
-    openingBalance = new Decimal(prevFloat.openingAmount.toString())
-    logger.info({ prevDate: prevFloat.floatDate, amount: openingBalance.toFixed(2) }, 'CashUp: carrying forward previous opening (no closing set)')
   } else {
-    // Bootstrap day — no prior float history at all
-    openingBalance = new Decimal(0)
+    // No closing recorded — previous session was never approved.
+    // Recalculate the expected balance from that day's transactions so
+    // the carry-forward is not silently reset to the raw float opening.
+    const prevCashUp = await prisma.cashUp.findFirst({
+      where:   { sessionDate: { lt: sessionDate } },
+      orderBy: { sessionDate: 'desc' },
+    })
+    if (prevCashUp) {
+      const prevStats   = await getLiveStats(prevCashUp.sessionDate)
+      const prevOpen    = new Decimal(prevCashUp.openingBalance.toString())
+      const prevDraw    = new Decimal(prevStats.floatTopUps)
+      const calcClosing = prevOpen
+        .plus(prevDraw)
+        .plus(new Decimal(prevStats.cashSales))
+        .minus(new Decimal(prevStats.cashPurchases))
+        .minus(new Decimal(prevStats.cashPayments))
+        .minus(new Decimal(prevStats.expenses))
+        .minus(new Decimal(prevStats.loanAdvance))
+        .plus(new Decimal(prevStats.loanRepayment))
+      openingBalance = calcClosing.isNegative() ? new Decimal(0) : calcClosing
+      logger.warn(
+        { prevDate: prevCashUp.sessionDate, calcClosing: calcClosing.toFixed(2) },
+        'CashUp: previous session not approved — carrying forward calculated expected balance'
+      )
+    } else if (prevFloat?.openingAmount) {
+      // Bootstrap: no prior CashUp at all, fall back to float opening
+      openingBalance = new Decimal(prevFloat.openingAmount.toString())
+      logger.info({ prevDate: prevFloat.floatDate, amount: openingBalance.toFixed(2) }, 'CashUp: bootstrap — carrying forward float opening (no cashup history)')
+    } else {
+      openingBalance = new Decimal(0)
+    }
   }
 
   const cashUp = await prisma.cashUp.create({

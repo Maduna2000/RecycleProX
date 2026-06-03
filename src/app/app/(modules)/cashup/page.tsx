@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import React, { useState } from 'react'
 import useSWR, { mutate as swrMutate } from 'swr'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
@@ -10,7 +10,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { CheckCircle2, Clock, Loader2, Lock, RefreshCw, ExternalLink } from 'lucide-react'
+import { CheckCircle2, Calculator, Clock, Loader2, Lock, RefreshCw, ExternalLink, X } from 'lucide-react'
+import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { DENOMINATIONS, DENOMINATION_LABELS, type Denomination } from '@/lib/schemas/cashup'
 import { PageShell } from '@/components/layout/PageShell'
 import { colors } from '@/lib/design-tokens'
@@ -125,6 +126,68 @@ function VarianceRow({ variance }: { variance: string }) {
   )
 }
 
+// ─── Count Cash modal ─────────────────────────────────────────────────────────
+function CountCashModal({ counts, setCounts, notes, setNotes, submitting, handleSubmit, onClose }: {
+  counts: Record<number, number>
+  setCounts: React.Dispatch<React.SetStateAction<Record<number, number>>>
+  notes: string
+  setNotes: (v: string) => void
+  submitting: boolean
+  handleSubmit: () => Promise<void>
+  onClose: () => void
+}) {
+  const total = DENOMINATIONS.reduce(
+    (s, d) => s.plus(new Decimal(counts[d] ?? 0).times(d).div(100)),
+    new Decimal(0)
+  )
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
+      <DialogContent className="sm:max-w-sm">
+        {/* header */}
+        <div className="flex items-center justify-between mb-3">
+          <span className="font-semibold text-sm" style={{ color: colors.textPrimary }}>Count Cash</span>
+          <button onClick={onClose} className="rounded p-1 hover:bg-slate-100 transition-colors">
+            <X className="w-4 h-4" style={{ color: colors.textSecondary }} />
+          </button>
+        </div>
+        <div className="space-y-3">
+          <div className="grid grid-cols-3 gap-x-2 gap-y-1.5">
+            {DENOMINATIONS.map((d) => (
+              <DenomRow
+                key={d} denom={d}
+                count={counts[d] ?? 0}
+                onChange={(v) => setCounts((prev) => ({ ...prev, [d]: v }))}
+                disabled={submitting}
+              />
+            ))}
+          </div>
+          {/* Running total */}
+          <div className="flex justify-between text-sm font-semibold border-t pt-2" style={{ borderColor: colors.border }}>
+            <span style={{ color: colors.textSecondary }}>Counted Total</span>
+            <span className="font-mono" style={{ color: colors.textPrimary }}>R {total.toFixed(2)}</span>
+          </div>
+          {/* Notes */}
+          <div>
+            <Label className="text-xs">Notes (optional)</Label>
+            <Textarea
+              value={notes}
+              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setNotes(e.target.value)}
+              placeholder="Any comments about the count..."
+              className="mt-1 text-sm" rows={2} disabled={submitting}
+            />
+          </div>
+          <Button className="w-full" size="sm" onClick={() => { void handleSubmit(); onClose() }} disabled={submitting}>
+            {submitting
+              ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Submitting...</>
+              : 'Submit Cash-Up'
+            }
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 // ─── Compact unpaid card ──────────────────────────────────────────────────────
 function UnpaidCard({ label, total, count, href }: {
   label: string; total: string; count: number; href: string
@@ -185,6 +248,8 @@ export default function CashUpPage() {
   const [counts, setCounts] = useState<Record<number, number>>(() =>
     Object.fromEntries(DENOMINATIONS.map((d) => [d, 0]))
   )
+
+  const [countCashOpen, setCountCashOpen] = useState(false)
 
   const declaredCash = DENOMINATIONS.reduce(
     (acc, d) => acc.plus(new Decimal(counts[d] ?? 0).times(d).div(100)),
@@ -347,7 +412,19 @@ export default function CashUpPage() {
 
                     {/* Cash counted + variance */}
                     <div className="pt-1.5 border-t space-y-1.5" style={{ borderColor: colors.border }}>
-                      <ReconRow label="Cash On Hand (Counted)" value={declared.toFixed(2)} highlight />
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1">
+                          <ReconRow label="Cash On Hand (Counted)" value={declared.toFixed(2)} highlight />
+                        </div>
+                        {isOpen && (
+                          <button
+                            onClick={() => setCountCashOpen(true)}
+                            style={{ fontSize: 10, padding: '1px 6px', background: '#E0E0E0', border: '1px solid #999', borderRadius: 2, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3, whiteSpace: 'nowrap', flexShrink: 0 }}
+                          >
+                            <Calculator style={{ width: 9, height: 9 }} /> Count Cash
+                          </button>
+                        )}
+                      </div>
                       {isOpen ? (
                         hasCounted ? (
                           <VarianceRow variance={balance.toFixed(2)} />
@@ -415,38 +492,6 @@ export default function CashUpPage() {
                   {/* ── RIGHT: denomination count (open) + panels ────────────── */}
                   <div className="lg:col-span-2 flex flex-col gap-3">
 
-                    {/* Denomination count — only when open */}
-                    {isOpen && (
-                      <div className="rounded-lg border p-4 bg-white" style={{ borderColor: colors.border }}>
-                        <p className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: colors.textSecondary }}>Count Your Cash</p>
-                        <div className="grid grid-cols-3 gap-x-2 gap-y-1.5">
-                          {DENOMINATIONS.map((d) => (
-                            <DenomRow
-                              key={d} denom={d}
-                              count={counts[d] ?? 0}
-                              onChange={(v) => setCounts((prev) => ({ ...prev, [d]: v }))}
-                              disabled={submitting}
-                            />
-                          ))}
-                        </div>
-                        {/* Notes + submit inside this card */}
-                        <div className="mt-3 pt-3 border-t space-y-2" style={{ borderColor: colors.border }}>
-                          <div>
-                            <Label className="text-xs">Notes (optional)</Label>
-                            <Textarea
-                              value={notes}
-                              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setNotes(e.target.value)}
-                              placeholder="Any comments about the count..."
-                              className="mt-1 text-sm" rows={2} disabled={submitting}
-                            />
-                          </div>
-                          <Button className="w-full" size="sm" onClick={handleSubmit} disabled={submitting}>
-                            {submitting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Submitting...</> : 'Submit Cash-Up'}
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-
                     {/* Unpaid cards */}
                     <UnpaidCard
                       label="Today Unpaid Cash"
@@ -508,6 +553,15 @@ export default function CashUpPage() {
           </>
         )}
       </div>
+
+      {countCashOpen && (
+        <CountCashModal
+          counts={counts} setCounts={setCounts}
+          notes={notes} setNotes={setNotes}
+          submitting={submitting} handleSubmit={handleSubmit}
+          onClose={() => setCountCashOpen(false)}
+        />
+      )}
     </PageShell>
   )
 }
