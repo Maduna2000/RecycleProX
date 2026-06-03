@@ -2,12 +2,11 @@
 
 import { useState } from 'react'
 import useSWR, { mutate } from 'swr'
-import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, ModalTitleBar, ModalBtn } from '@/components/ui/dialog'
-import { AlertTriangle, ShieldBan, ShieldCheck, Pencil, Loader2, Camera } from 'lucide-react'
+import { AlertTriangle, ShieldBan, ShieldCheck, Loader2, Camera } from 'lucide-react'
 import { PhotoUploader, PhotoViewer } from '@/components/PhotoUploader'
 import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
@@ -69,6 +68,33 @@ const COMMODITY_OPTIONS = [
 const EDIT_TABS = ['Personal', 'Business', 'Banking', 'Compliance'] as const
 const PROFILE_TABS = ['Overview', 'Transactions', 'Documents', 'Blacklist'] as const
 
+// ─── Design tokens (mirrors Settings page) ────────────────────────────────────
+
+const sHdrStyle: React.CSSProperties = {
+  background: 'linear-gradient(180deg,#FFFFFF 0%,#E8E8E8 100%)',
+  borderBottom: '1px solid #C0C0C0',
+  padding: '4px 10px',
+}
+const lblStyle: React.CSSProperties = {
+  display: 'block', fontSize: 10, fontWeight: 700,
+  textTransform: 'uppercase', letterSpacing: '0.04em',
+  color: '#6C757D', marginBottom: 2,
+}
+const titleBtn: React.CSSProperties = {
+  fontSize: 11, padding: '2px 10px', cursor: 'pointer', borderRadius: 2,
+  background: 'linear-gradient(180deg,#F5F5F5 0%,#E0E0E0 100%)',
+  border: '1px solid #ABABAB', color: '#333',
+  display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' as const,
+}
+
+function Pill({ text, bg, color }: { text: string; bg: string; color: string }) {
+  return (
+    <span style={{ display: 'inline-block', fontSize: 10, fontWeight: 700, borderRadius: 2, padding: '1px 6px', background: bg, color }}>
+      {text}
+    </span>
+  )
+}
+
 // ─── Main Modal ───────────────────────────────────────────────────────────────
 
 export function CustomerProfileModal({
@@ -100,8 +126,9 @@ export function CustomerProfileModal({
 
   return (
     <Dialog open={!!customerId} onOpenChange={(o) => { if (!o) handleClose() }}>
-      <DialogContent className="sm:max-w-5xl h-[92vh] flex flex-col overflow-hidden" showCloseButton={false}>
+      <DialogContent className="sm:max-w-5xl h-[92vh] flex flex-col overflow-hidden p-0" showCloseButton={false}>
         <ModalTitleBar title="Customer Profile" onClose={handleClose} />
+
         {isLoading && (
           <div className="flex items-center justify-center h-40">
             <Loader2 className="w-6 h-6 animate-spin" style={{ color: colors.textSecondary }} />
@@ -112,46 +139,79 @@ export function CustomerProfileModal({
             Customer not found
           </div>
         )}
-        {customer && <ProfileHeader customer={customer} onEdit={() => setEditOpen(true)} />}
 
         {customer && (
           <>
-            {/* Blacklist banner */}
-            {customer.blacklisted && (
-              <div className="mt-3 flex items-start gap-3 p-3 bg-red-50 border border-red-200 rounded-lg shrink-0">
-                <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm font-semibold text-red-800">Customer is Blacklisted</p>
-                  <p className="text-xs text-red-600 mt-0.5">{customer.blacklistReason}</p>
-                  {customer.blacklistedAt && (
-                    <p className="text-xs text-red-400 mt-0.5">Since {new Date(customer.blacklistedAt).toLocaleDateString('en-ZA')}</p>
+            {/* ── Customer info bar ─────────────────────────────────────────── */}
+            <div style={{ background: 'linear-gradient(180deg,#FAFAFA 0%,#F0F0F0 100%)', borderBottom: '1px solid #D0D0D0', padding: '7px 12px', flexShrink: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#212529' }}>
+                    {customer.firstName} {customer.lastName}
+                  </span>
+                  {customer.accountCode && (
+                    <span style={{ fontSize: 11, fontFamily: 'monospace', fontWeight: 700, color: '#1B3A6B', background: '#E8EFF8', border: '1px solid #B0C4DE', borderRadius: 2, padding: '1px 6px' }}>
+                      {customer.accountCode}
+                    </span>
                   )}
+                  <Pill text={customer.customerType} bg="#E8EFF8" color="#1B3A6B" />
+                  {customer.primaryFunction && (
+                    <Pill text={customer.primaryFunction} bg="#E8F0E8" color="#1B5E20" />
+                  )}
+                  {customer.blacklisted
+                    ? <Pill text="Blacklisted" bg="#FEE2E2" color="#B91C1C" />
+                    : <Pill text="Active" bg="#DCFCE7" color="#166534" />}
                 </div>
+                <button onClick={() => setEditOpen(true)} style={titleBtn}>✏  Edit</button>
+              </div>
+              <div style={{ display: 'flex', gap: 12, marginTop: 3 }}>
+                {customer.idNumber && (
+                  <span style={{ fontSize: 11, fontFamily: 'monospace', color: '#6C757D' }}>{customer.idNumber}</span>
+                )}
+                <span style={{ fontSize: 11, color: '#6C757D' }}>{customer.phone}</span>
+              </div>
+            </div>
+
+            {/* ── Blacklist banner ───────────────────────────────────────────── */}
+            {customer.blacklisted && (
+              <div style={{ background: '#FFF0F0', borderBottom: '1px solid #F0C0C0', padding: '5px 12px', display: 'flex', alignItems: 'flex-start', gap: 8, flexShrink: 0 }}>
+                <AlertTriangle style={{ width: 13, height: 13, color: '#C53030', flexShrink: 0, marginTop: 1 }} />
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#C53030' }}>Blacklisted</span>
+                <span style={{ fontSize: 11, color: '#9B2C2C' }}>{customer.blacklistReason}</span>
+                {customer.blacklistedAt && (
+                  <span style={{ fontSize: 10, color: '#FC8181' }}>
+                    · Since {new Date(customer.blacklistedAt).toLocaleDateString('en-ZA')}
+                  </span>
+                )}
               </div>
             )}
 
-            {/* Tabs */}
-            <div className="flex gap-0.5 border-b -mx-4 px-4 mt-3 shrink-0" style={{ borderColor: colors.border }}>
+            {/* ── Tab strip ─────────────────────────────────────────────────── */}
+            <div style={{ display: 'flex', borderBottom: '1px solid #C0C0C0', background: '#EFEFEF', flexShrink: 0 }}>
               {PROFILE_TABS.map((t) => (
                 <button
                   key={t}
                   onClick={() => setTab(t)}
-                  className="px-4 py-2 text-sm font-medium border-b-2 transition-colors"
-                  style={tab === t
-                    ? { borderColor: colors.process, color: colors.process }
-                    : { borderColor: 'transparent', color: colors.textSecondary }}
+                  style={{
+                    padding: '6px 14px', fontSize: 12, fontWeight: tab === t ? 700 : 400,
+                    borderBottom: tab === t ? '2px solid #217346' : '2px solid transparent',
+                    color: tab === t ? '#217346' : '#6C757D',
+                    background: 'none', border: 'none',
+                    borderBottom: tab === t ? '2px solid #217346' : '2px solid transparent',
+                    cursor: 'pointer',
+                  }}
                 >
                   {t}
                 </button>
               ))}
             </div>
 
-            {/* Scrollable tab content */}
-            <div className="flex-1 overflow-y-auto py-4">
-              {tab === 'Overview'      && <OverviewTab customer={customer} />}
-              {tab === 'Transactions'  && <TransactionsTab customerId={customer.id} />}
-              {tab === 'Documents'     && <DocumentsTab customer={customer} onPhotoSaved={refreshCustomer} />}
-              {tab === 'Blacklist'     && (
+            {/* ── Scrollable tab content ─────────────────────────────────────── */}
+            <div style={{ flex: 1, overflowY: 'auto' }}>
+              {tab === 'Overview'     && <OverviewTab customer={customer} />}
+              {tab === 'Transactions' && <TransactionsTab customerId={customer.id} />}
+              {tab === 'Documents'    && <DocumentsTab customer={customer} onPhotoSaved={refreshCustomer} />}
+              {tab === 'Blacklist'    && (
                 <BlacklistTab
                   customer={customer}
                   onAction={() => setBlacklistOpen(true)}
@@ -186,47 +246,29 @@ export function CustomerProfileModal({
   )
 }
 
-// ─── Profile Header ───────────────────────────────────────────────────────────
+// ─── Section & Field (Settings-style) ────────────────────────────────────────
 
-function ProfileHeader({ customer, onEdit }: { customer: Customer; onEdit: () => void }) {
+function Section({ title, children, cols = 2 }: { title: string; children: React.ReactNode; cols?: number }) {
   return (
-    <div className="px-1 pt-2 pb-3 border-b shrink-0" style={{ borderColor: colors.border }}>
-      <div className="flex items-start justify-between">
-        <div className="flex items-center gap-3">
-          <div
-            className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg shrink-0"
-            style={{ background: colors.process }}
-          >
-            {customer.firstName.charAt(0)}{customer.lastName.charAt(0)}
-          </div>
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-lg font-bold" style={{ color: colors.textPrimary }}>
-                {customer.firstName} {customer.lastName}
-              </span>
-              {customer.accountCode && (
-                <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded" style={{ background: colors.processBg, color: colors.process }}>
-                  {customer.accountCode}
-                </span>
-              )}
-            </div>
-            <p className="text-xs font-mono mt-0.5" style={{ color: colors.textSecondary }}>{customer.idNumber}</p>
-            <p className="text-xs mt-0.5" style={{ color: colors.textSecondary }}>{customer.phone}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap justify-end">
-          <Badge className={customer.customerType === 'account' ? 'bg-blue-100 text-blue-700 border-0' : 'bg-gray-100 text-gray-600 border-0'}>
-            {customer.customerType}
-          </Badge>
-          {customer.primaryFunction && (
-            <Badge className="bg-purple-100 text-purple-700 border-0">{customer.primaryFunction}</Badge>
-          )}
-          {customer.blacklisted
-            ? <Badge className="bg-red-100 text-red-700 border-0">Blacklisted</Badge>
-            : <Badge className="bg-green-100 text-green-700 border-0">Active</Badge>}
-          <ModalBtn variant="outline" onClick={onEdit} icon={<Pencil style={{ width: 12, height: 12 }} />}>Edit</ModalBtn>
-        </div>
+    <div style={{ borderBottom: '1px solid #E0E0E0' }}>
+      <div style={sHdrStyle}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: '#1B3A6B' }}>{title}</span>
       </div>
+      <dl style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: '8px 16px', padding: '10px 12px' }}>
+        {children}
+      </dl>
+    </div>
+  )
+}
+
+function Field({ label, value, mono, span2 }: { label: string; value?: string | null; mono?: boolean; span2?: boolean }) {
+  const display = value ?? '—'
+  return (
+    <div style={span2 ? { gridColumn: 'span 2' } : undefined}>
+      <span style={lblStyle}>{label}</span>
+      <span style={{ display: 'block', fontSize: 12, color: display === '—' ? '#9CA3AF' : '#212529', fontFamily: mono ? 'monospace' : undefined, minHeight: 16, lineHeight: '16px' }}>
+        {display}
+      </span>
     </div>
   )
 }
@@ -234,78 +276,47 @@ function ProfileHeader({ customer, onEdit }: { customer: Customer; onEdit: () =>
 // ─── Overview Tab ─────────────────────────────────────────────────────────────
 
 function OverviewTab({ customer }: { customer: Customer }) {
-  const fmt     = (v?: string | null) => v ?? '—'
-  const fmtDate = (v?: string | null) => v ? new Date(v).toLocaleDateString('en-ZA') : '—'
-  const fmtMoney = (v?: string | null) => v ? `R ${parseFloat(v).toFixed(2)}` : '—'
+  const fmt      = (v?: string | null) => v || null
+  const fmtDate  = (v?: string | null) => v ? new Date(v).toLocaleDateString('en-ZA') : null
+  const fmtMoney = (v?: string | null) => v ? `R ${parseFloat(v).toFixed(2)}` : null
 
   return (
-    <div className="space-y-4">
+    <div style={{ border: '1px solid #D0D0D0', margin: 8, borderRadius: 2, overflow: 'hidden' }}>
       <Section title="Personal Details">
-        <Field label="First Name"      value={customer.firstName} />
-        <Field label="Last Name"       value={customer.lastName} />
-        <Field label="ID Number"       value={customer.idNumber} mono />
-        <Field label="Date of Birth"   value={fmtDate(customer.dateOfBirth)} />
-        <Field label="Gender"          value={fmt(customer.gender)} />
-        <Field label="Nationality"     value={fmt(customer.nationality)} />
-        <Field label="Phone (Mobile)"  value={customer.phone} />
-        {customer.landline && <Field label="Landline" value={customer.landline} />}
-        <Field label="Email"           value={fmt(customer.email)} />
-        <Field label="Physical Address" value={fmt(customer.physicalAddress)} />
-        <Field label="Postal Address"  value={fmt(customer.postalAddress)} />
+        <Field label="First Name"       value={customer.firstName} />
+        <Field label="Last Name"        value={customer.lastName} />
+        <Field label="ID Number"        value={customer.idNumber} mono />
+        <Field label="Date of Birth"    value={fmtDate(customer.dateOfBirth)} />
+        <Field label="Gender"           value={fmt(customer.gender)} />
+        <Field label="Nationality"      value={fmt(customer.nationality)} />
+        <Field label="Phone (Mobile)"   value={customer.phone} />
+        <Field label="Landline"         value={fmt(customer.landline)} />
+        <Field label="Email"            value={fmt(customer.email)} />
+        <Field label="Physical Address" value={fmt(customer.physicalAddress)} span2 />
+        <Field label="Postal Address"   value={fmt(customer.postalAddress)} span2 />
       </Section>
 
       <Section title="Business Details">
-        <Field label="Customer Type"   value={customer.customerType} />
+        <Field label="Customer Type"    value={customer.customerType} />
         <Field label="Primary Function" value={fmt(customer.primaryFunction)} />
-        <div>
-          <dt className="text-xs font-semibold uppercase tracking-wide" style={{ color: colors.textSecondary }}>Market Sector</dt>
-          <dd className="mt-1">
-            {customer.marketSector === 'formal'
-              ? <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">Formal</span>
-              : customer.marketSector === 'informal'
-              ? <span className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">Informal</span>
-              : <span className="text-sm" style={{ color: colors.textSecondary }}>—</span>}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-xs font-semibold uppercase tracking-wide" style={{ color: colors.textSecondary }}>Dealer Category</dt>
-          <dd className="mt-1 flex items-center gap-2">
-            {customer.dealerCategory
-              ? <><span className="text-sm" style={{ color: colors.textPrimary }}>{DEALER_LABELS[customer.dealerCategory]}</span>
-                  {customer.priceGroup && <span className="text-xs" style={{ color: colors.textSecondary }}>· {customer.priceGroup.name}</span>}</>
-              : <span className="text-sm" style={{ color: colors.textSecondary }}>—</span>}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-xs font-semibold uppercase tracking-wide" style={{ color: colors.textSecondary }}>VAT</dt>
-          <dd className="mt-1">
-            {customer.zeroRated
-              ? <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full font-medium">Zero Rated</span>
-              : <span className="text-sm" style={{ color: colors.textSecondary }}>VAT Applied</span>}
-          </dd>
-        </div>
-        <Field label="Price Group"     value={customer.priceGroup?.name ?? '—'} />
-        <Field label="Company Name"    value={fmt(customer.companyName)} />
-        <Field label="Company Reg No"  value={fmt(customer.companyRegNumber)} />
-        <Field label="Contact Person"  value={fmt(customer.contactPerson)} />
-        <Field label="VAT Number"      value={fmt(customer.vatNumber)} />
-        <Field label="Credit Limit"    value={fmtMoney(customer.creditLimit)} />
+        <Field label="Market Sector"    value={customer.marketSector === 'formal' ? 'Formal (Scrap Yard)' : customer.marketSector === 'informal' ? 'Informal (Street Seller)' : null} />
+        <Field label="Dealer Category"  value={customer.dealerCategory ? DEALER_LABELS[customer.dealerCategory] : null} />
+        <Field label="VAT"              value={customer.zeroRated ? 'Zero Rated' : 'Standard'} />
+        <Field label="Price Group"      value={customer.priceGroup?.name ?? null} />
+        <Field label="Company Name"     value={fmt(customer.companyName)} />
+        <Field label="Company Reg No"   value={fmt(customer.companyRegNumber)} />
+        <Field label="Contact Person"   value={fmt(customer.contactPerson)} />
+        <Field label="VAT Number"       value={fmt(customer.vatNumber)} />
+        <Field label="Credit Limit"     value={fmtMoney(customer.creditLimit)} />
         {customer.tradeCommodities && customer.tradeCommodities.length > 0 && (
-          <div className="col-span-2">
-            <dt className="text-xs font-semibold uppercase tracking-wide" style={{ color: colors.textSecondary }}>Trade Commodities</dt>
-            <dd className="mt-1 flex flex-wrap gap-1">
-              {customer.tradeCommodities.map((c) => (
-                <span key={c} className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">{c}</span>
-              ))}
-            </dd>
-          </div>
+          <Field label="Trade Commodities" value={customer.tradeCommodities.join(', ')} span2 />
         )}
       </Section>
 
       <Section title="Banking Details">
-        <Field label="Bank Name"      value={fmt(customer.bankName)} />
-        <Field label="Account Number" value={fmt(customer.bankAccountNo)} />
-        <Field label="Branch Code"    value={fmt(customer.bankBranchCode)} />
+        <Field label="Bank Name"       value={fmt(customer.bankName)} />
+        <Field label="Account Number"  value={fmt(customer.bankAccountNo)} mono />
+        <Field label="Branch Code"     value={fmt(customer.bankBranchCode)} mono />
       </Section>
 
       <Section title="Compliance">
@@ -316,29 +327,15 @@ function OverviewTab({ customer }: { customer: Customer }) {
       </Section>
 
       {customer.customerNotes && (
-        <div className="rounded-xl border p-5" style={{ background: '#fff' }}>
-          <h3 className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: colors.textSecondary }}>Notes</h3>
-          <p className="text-sm whitespace-pre-wrap" style={{ color: colors.textPrimary }}>{customer.customerNotes}</p>
+        <div style={{ borderBottom: '1px solid #E0E0E0' }}>
+          <div style={sHdrStyle}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: '#1B3A6B' }}>Notes</span>
+          </div>
+          <p style={{ fontSize: 12, color: '#212529', padding: '10px 12px', whiteSpace: 'pre-wrap', margin: 0 }}>
+            {customer.customerNotes}
+          </p>
         </div>
       )}
-    </div>
-  )
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="rounded-xl border p-5" style={{ background: '#fff' }}>
-      <h3 className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: colors.textSecondary }}>{title}</h3>
-      <dl className="grid grid-cols-2 gap-x-8 gap-y-3">{children}</dl>
-    </div>
-  )
-}
-
-function Field({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
-  return (
-    <div>
-      <dt className="text-xs font-semibold uppercase tracking-wide" style={{ color: colors.textSecondary }}>{label}</dt>
-      <dd className={`mt-1 text-sm ${mono ? 'font-mono' : ''}`} style={{ color: colors.textPrimary }}>{value}</dd>
     </div>
   )
 }
@@ -349,29 +346,29 @@ function TransactionsTab({ customerId }: { customerId: string }) {
   const { data } = useSWR(`/api/customers/${customerId}/transactions`, fetcher)
   if (!data?.transactions?.length) {
     return (
-      <div className="rounded-xl border p-10 text-center" style={{ color: colors.textSecondary }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40, fontSize: 13, color: '#9CA3AF' }}>
         No transactions yet
       </div>
     )
   }
   return (
-    <div className="rounded-xl border overflow-hidden">
-      <table className="w-full text-sm">
-        <thead className="border-b" style={{ background: colors.toolbar }}>
-          <tr>
+    <div style={{ margin: 8, border: '1px solid #D0D0D0', borderRadius: 2, overflow: 'hidden' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+        <thead>
+          <tr style={{ background: 'linear-gradient(180deg,#FFFFFF 0%,#E8E8E8 100%)', borderBottom: '1px solid #C0C0C0' }}>
             {['Date', 'Reference', 'Type', 'Amount', 'Status'].map((h) => (
-              <th key={h} className="text-left px-4 py-3 text-xs font-semibold uppercase" style={{ color: colors.textSecondary }}>{h}</th>
+              <th key={h} style={{ textAlign: 'left', padding: '5px 10px', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#6C757D' }}>{h}</th>
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y" style={{ borderColor: colors.border }}>
-          {data.transactions.map((tx: { id: string; type: string; reference: string; date: string; amount: string; status: string }) => (
-            <tr key={tx.id} className="hover:bg-gray-50">
-              <td className="px-4 py-3 text-xs" style={{ color: colors.textSecondary }}>{new Date(tx.date).toLocaleDateString('en-ZA')}</td>
-              <td className="px-4 py-3 font-mono text-xs" style={{ color: colors.textPrimary }}>{tx.reference}</td>
-              <td className="px-4 py-3 capitalize text-xs" style={{ color: colors.textPrimary }}>{tx.type}</td>
-              <td className="px-4 py-3 text-xs" style={{ color: colors.textPrimary }}>R {tx.amount}</td>
-              <td className="px-4 py-3 capitalize text-xs" style={{ color: colors.textSecondary }}>{tx.status}</td>
+        <tbody>
+          {data.transactions.map((tx: { id: string; type: string; reference: string; date: string; amount: string; status: string }, i: number) => (
+            <tr key={tx.id} style={{ borderTop: i > 0 ? '1px solid #F0F0F0' : undefined, background: i % 2 === 0 ? '#FAFAFA' : '#FFFFFF' }}>
+              <td style={{ padding: '5px 10px', color: '#6C757D' }}>{new Date(tx.date).toLocaleDateString('en-ZA')}</td>
+              <td style={{ padding: '5px 10px', fontFamily: 'monospace', color: '#212529' }}>{tx.reference}</td>
+              <td style={{ padding: '5px 10px', textTransform: 'capitalize', color: '#212529' }}>{tx.type}</td>
+              <td style={{ padding: '5px 10px', color: '#212529' }}>R {tx.amount}</td>
+              <td style={{ padding: '5px 10px', textTransform: 'capitalize', color: '#6C757D' }}>{tx.status}</td>
             </tr>
           ))}
         </tbody>
@@ -451,77 +448,78 @@ function DocumentsTab({ customer, onPhotoSaved }: { customer: Customer; onPhotoS
   }
 
   return (
-    <div className="space-y-4">
-      <div className="rounded-xl border p-6" style={{ background: '#fff' }}>
-        <div className="flex items-center gap-2 mb-4">
-          <span className="text-gray-600">📎</span>
-          <h3 className="font-semibold" style={{ color: colors.textPrimary }}>Compliance Documents</h3>
+    <div style={{ margin: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {/* Compliance Documents */}
+      <div style={{ border: '1px solid #D0D0D0', borderRadius: 2, overflow: 'hidden' }}>
+        <div style={sHdrStyle}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: '#1B3A6B' }}>Compliance Documents</span>
         </div>
-        <div className="flex items-center gap-3 mb-4">
-          <select
-            value={docType}
-            onChange={(e) => setDocType(e.target.value)}
-            className="border rounded-md px-3 py-2 text-sm bg-white focus:outline-none"
-            style={{ borderColor: colors.border }}
-          >
-            {Object.entries(DOCUMENT_TYPE_LABELS).map(([v, l]) => (
-              <option key={v} value={v}>{l}</option>
-            ))}
-          </select>
-          <label className={`cursor-pointer flex items-center gap-2 px-4 py-2 rounded-md border text-sm font-medium transition-colors ${uploading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'}`} style={{ borderColor: colors.border }}>
-            {uploading ? 'Uploading…' : '+ Upload'}
-            <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png" onChange={handleDocUpload} disabled={uploading} />
-          </label>
-        </div>
-        {!docs?.length ? (
-          <p className="text-sm" style={{ color: colors.textSecondary }}>No compliance documents uploaded yet.</p>
-        ) : (
-          <div className="divide-y border rounded-lg overflow-hidden" style={{ borderColor: colors.border }}>
-            {docs.map((doc) => (
-              <div key={doc.id} className="flex items-center justify-between px-4 py-3 bg-white hover:bg-gray-50">
-                <div className="flex items-center gap-3">
-                  <span className="text-gray-400 text-lg">📄</span>
+        <div style={{ padding: '10px 12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+            <select
+              value={docType}
+              onChange={(e) => setDocType(e.target.value)}
+              style={{ border: '1px solid #C0C0C0', borderRadius: 2, padding: '3px 8px', fontSize: 12, background: '#fff' }}
+            >
+              {Object.entries(DOCUMENT_TYPE_LABELS).map(([v, l]) => (
+                <option key={v} value={v}>{l}</option>
+              ))}
+            </select>
+            <label style={{ cursor: uploading ? 'not-allowed' : 'pointer', opacity: uploading ? 0.5 : 1, ...titleBtn }}>
+              {uploading ? 'Uploading…' : '+ Upload'}
+              <input type="file" style={{ display: 'none' }} accept=".pdf,.jpg,.jpeg,.png" onChange={handleDocUpload} disabled={uploading} />
+            </label>
+          </div>
+          {!docs?.length ? (
+            <p style={{ fontSize: 12, color: '#9CA3AF', margin: 0 }}>No compliance documents uploaded yet.</p>
+          ) : (
+            <div style={{ border: '1px solid #E0E0E0', borderRadius: 2, overflow: 'hidden' }}>
+              {docs.map((doc, i) => (
+                <div key={doc.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', borderTop: i > 0 ? '1px solid #F0F0F0' : undefined, background: i % 2 === 0 ? '#FAFAFA' : '#FFF' }}>
                   <div>
-                    <p className="text-sm font-medium" style={{ color: colors.textPrimary }}>{DOCUMENT_TYPE_LABELS[doc.documentType] ?? doc.documentType}</p>
-                    <p className="text-xs" style={{ color: colors.textSecondary }}>{doc.fileName} · {new Date(doc.uploadedAt).toLocaleDateString('en-ZA')}</p>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: '#212529', display: 'block' }}>{DOCUMENT_TYPE_LABELS[doc.documentType] ?? doc.documentType}</span>
+                    <span style={{ fontSize: 11, color: '#9CA3AF' }}>{doc.fileName} · {new Date(doc.uploadedAt).toLocaleDateString('en-ZA')}</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={() => handleDocView(doc.r2Key)} style={{ fontSize: 11, color: '#1B3A6B', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>View</button>
+                    {isManager && (
+                      <button onClick={() => handleDocDelete(doc.id)} style={{ fontSize: 11, color: '#C53030', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>Delete</button>
+                    )}
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => handleDocView(doc.r2Key)} className="text-xs text-blue-600 hover:underline">View</button>
-                  {isManager && (
-                    <button onClick={() => handleDocDelete(doc.id)} className="text-xs text-red-600 hover:underline">Delete</button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
-      <div className="rounded-xl border p-6" style={{ background: '#fff' }}>
-        <div className="flex items-center gap-2 mb-4">
-          <Camera className="w-4 h-4" style={{ color: colors.process }} />
-          <h3 className="font-semibold" style={{ color: colors.textPrimary }}>ID Document Photo</h3>
+      {/* ID Photo */}
+      <div style={{ border: '1px solid #D0D0D0', borderRadius: 2, overflow: 'hidden' }}>
+        <div style={{ ...sHdrStyle, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <Camera style={{ width: 11, height: 11, color: '#1B3A6B' }} />
+          <span style={{ fontSize: 11, fontWeight: 700, color: '#1B3A6B' }}>ID Document Photo</span>
         </div>
-        {customer.idPhotoR2Key ? (
-          <PhotoViewer
-            r2Key={customer.idPhotoR2Key}
-            alt={`${customer.firstName} ${customer.lastName} ID`}
-            canDelete={isManager}
-            onDelete={handlePhotoDeleted}
-            autoLoad={justUploaded}
-          />
-        ) : (
-          <div className="space-y-3">
-            <p className="text-sm" style={{ color: colors.textSecondary }}>No ID photo uploaded yet</p>
-            <PhotoUploader
-              context="customer_id"
-              referenceId={customer.id}
-              label="Upload ID Photo"
-              onUploaded={savePhotoKey}
+        <div style={{ padding: '10px 12px' }}>
+          {customer.idPhotoR2Key ? (
+            <PhotoViewer
+              r2Key={customer.idPhotoR2Key}
+              alt={`${customer.firstName} ${customer.lastName} ID`}
+              canDelete={isManager}
+              onDelete={handlePhotoDeleted}
+              autoLoad={justUploaded}
             />
-          </div>
-        )}
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <p style={{ fontSize: 12, color: '#9CA3AF', margin: 0 }}>No ID photo uploaded yet</p>
+              <PhotoUploader
+                context="customer_id"
+                referenceId={customer.id}
+                label="Upload ID Photo"
+                onUploaded={savePhotoKey}
+              />
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
@@ -533,24 +531,29 @@ function BlacklistTab({ customer, onAction, onUnblacklist }: {
   customer: Customer; onAction: () => void; onUnblacklist: () => void
 }) {
   return (
-    <div className="rounded-xl border p-6" style={{ background: '#fff' }}>
-      {customer.blacklisted ? (
-        <div className="space-y-4">
-          <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-            <p className="font-semibold text-red-800">Currently Blacklisted</p>
-            <p className="text-sm text-red-600 mt-1">{customer.blacklistReason}</p>
-            {customer.blacklistedAt && (
-              <p className="text-xs text-red-400 mt-1">Since {new Date(customer.blacklistedAt).toLocaleDateString('en-ZA')}</p>
-            )}
+    <div style={{ margin: 8, border: '1px solid #D0D0D0', borderRadius: 2, overflow: 'hidden' }}>
+      <div style={sHdrStyle}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: '#1B3A6B' }}>Blacklist Status</span>
+      </div>
+      <div style={{ padding: '12px' }}>
+        {customer.blacklisted ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ background: '#FFF0F0', border: '1px solid #F0C0C0', borderRadius: 2, padding: '8px 12px' }}>
+              <p style={{ fontSize: 12, fontWeight: 700, color: '#C53030', margin: '0 0 4px' }}>Currently Blacklisted</p>
+              <p style={{ fontSize: 12, color: '#9B2C2C', margin: '0 0 2px' }}>{customer.blacklistReason}</p>
+              {customer.blacklistedAt && (
+                <p style={{ fontSize: 11, color: '#FC8181', margin: 0 }}>Since {new Date(customer.blacklistedAt).toLocaleDateString('en-ZA')}</p>
+              )}
+            </div>
+            <ModalBtn variant="outline" onClick={onUnblacklist} icon={<ShieldCheck style={{ width: 14, height: 14 }} />}>Remove from Blacklist</ModalBtn>
           </div>
-          <ModalBtn variant="outline" onClick={onUnblacklist} icon={<ShieldCheck style={{ width: 14, height: 14 }} />}>Remove from Blacklist</ModalBtn>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          <p className="text-sm" style={{ color: colors.textSecondary }}>This customer is not blacklisted.</p>
-          <ModalBtn variant="danger" onClick={onAction} icon={<ShieldBan style={{ width: 14, height: 14 }} />}>Blacklist Customer</ModalBtn>
-        </div>
-      )}
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <p style={{ fontSize: 12, color: '#6C757D', margin: 0 }}>This customer is not blacklisted.</p>
+            <ModalBtn variant="danger" onClick={onAction} icon={<ShieldBan style={{ width: 14, height: 14 }} />}>Blacklist Customer</ModalBtn>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
