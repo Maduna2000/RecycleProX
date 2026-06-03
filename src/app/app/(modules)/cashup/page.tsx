@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { CheckCircle2, Calculator, Clock, Loader2, Lock, RefreshCw, ExternalLink, X } from 'lucide-react'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
-import { DENOMINATIONS, DENOMINATION_LABELS, type Denomination } from '@/lib/schemas/cashup'
+import { DENOMINATIONS, DENOMINATION_LABELS } from '@/lib/schemas/cashup'
 import { PageShell } from '@/components/layout/PageShell'
 import { colors } from '@/lib/design-tokens'
 import { useOfflineMutation } from '@/hooks/useOfflineFetch'
@@ -64,29 +64,6 @@ type ExpenseItem = {
   expenseType: { name: string }
 }
 
-// ─── Denomination input (compact, fits in 3-column grid) ──────────────────────
-function DenomRow({ denom, count, onChange, disabled }: {
-  denom: Denomination; count: number; onChange: (v: number) => void; disabled: boolean
-}) {
-  const value = new Decimal(count).times(denom).div(100)
-  return (
-    <div className="flex items-center gap-1.5">
-      <span className="w-9 text-right font-mono text-xs font-semibold shrink-0" style={{ color: colors.textPrimary }}>
-        {DENOMINATION_LABELS[denom]}
-      </span>
-      <Input
-        type="number" min={0}
-        value={count === 0 ? '' : count}
-        onChange={(e) => onChange(Math.max(0, parseInt(e.target.value || '0', 10)))}
-        className="w-12 text-right font-mono h-6 text-xs border-[#E0E0E0] px-1"
-        disabled={disabled} placeholder="0"
-      />
-      <span className="text-xs font-mono text-right shrink-0" style={{ color: colors.textSecondary, minWidth: '3.5rem' }}>
-        R {value.toFixed(2)}
-      </span>
-    </div>
-  )
-}
 
 // ─── Reconciliation row ───────────────────────────────────────────────────────
 // positive = green. negative = neutral text with "−" prefix (NOT red — deductions are expected).
