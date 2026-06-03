@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { AlertTriangle, ShieldBan, ShieldCheck, Loader2, Camera } from 'lucide-react'
+import { AlertTriangle, ShieldBan, ShieldCheck, Loader2 } from 'lucide-react'
 import { PhotoUploader, PhotoViewer } from '@/components/PhotoUploader'
 import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
@@ -141,7 +141,6 @@ function Pill({ text, bg, color }: { text: string; bg: string; color: string }) 
 export default function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
-  const { data: session } = useSession()
   const [tab, setTab] = useState<typeof TABS[number]>('Overview')
   const [editOpen, setEditOpen] = useState(false)
   const [blacklistOpen, setBlacklistOpen] = useState(false)
