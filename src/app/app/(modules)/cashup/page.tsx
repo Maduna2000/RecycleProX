@@ -10,8 +10,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { CheckCircle2, Calculator, Clock, Loader2, Lock, RefreshCw, ExternalLink, X } from 'lucide-react'
-import { Dialog, DialogContent } from '@/components/ui/dialog'
+import { CheckCircle2, Calculator, Clock, Loader2, Lock, RefreshCw, ExternalLink } from 'lucide-react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { DENOMINATIONS, DENOMINATION_LABELS, type Denomination } from '@/lib/schemas/cashup'
 import { PageShell } from '@/components/layout/PageShell'
 import { colors } from '@/lib/design-tokens'
@@ -142,43 +142,80 @@ function CountCashModal({ counts, setCounts, notes, setNotes, submitting, handle
   )
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-sm">
-        {/* header */}
-        <div className="flex items-center justify-between mb-3">
-          <span className="font-semibold text-sm" style={{ color: colors.textPrimary }}>Count Cash</span>
-          <button onClick={onClose} className="rounded p-1 hover:bg-slate-100 transition-colors">
-            <X className="w-4 h-4" style={{ color: colors.textSecondary }} />
-          </button>
-        </div>
-        <div className="space-y-3">
-          <div className="grid grid-cols-3 gap-x-2 gap-y-1.5">
-            {DENOMINATIONS.map((d) => (
-              <DenomRow
-                key={d} denom={d}
-                count={counts[d] ?? 0}
-                onChange={(v) => setCounts((prev) => ({ ...prev, [d]: v }))}
-                disabled={submitting}
-              />
-            ))}
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="text-sm font-semibold" style={{ color: colors.textPrimary }}>Count Cash</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3 mt-1">
+
+          {/* Denomination table — bordered, scrollable, one row per denomination */}
+          <div style={{ border: `1px solid ${colors.border}`, borderRadius: 3, overflow: 'hidden' }}>
+            {/* Column headers */}
+            <div
+              className="grid px-3 py-1.5 text-xs font-semibold uppercase tracking-wide"
+              style={{ gridTemplateColumns: '1fr 6rem 6rem', background: colors.toolbar, color: colors.textSecondary }}
+            >
+              <span>Denomination</span>
+              <span className="text-center">Qty</span>
+              <span className="text-right">Value</span>
+            </div>
+
+            {/* One full-width row per denomination */}
+            <div style={{ maxHeight: 320, overflowY: 'auto' }}>
+              {DENOMINATIONS.map((d) => {
+                const val = new Decimal(counts[d] ?? 0).times(d).div(100)
+                return (
+                  <div
+                    key={d}
+                    className="grid items-center px-3 py-2"
+                    style={{ gridTemplateColumns: '1fr 6rem 6rem', borderTop: `1px solid ${colors.border}` }}
+                  >
+                    <span className="font-mono font-semibold text-sm" style={{ color: colors.textPrimary }}>
+                      {DENOMINATION_LABELS[d]}
+                    </span>
+                    <div className="flex justify-center">
+                      <Input
+                        type="number" min={0}
+                        value={(counts[d] ?? 0) === 0 ? '' : counts[d]}
+                        onChange={(e) => setCounts((prev) => ({ ...prev, [d]: Math.max(0, parseInt(e.target.value || '0', 10)) }))}
+                        className="w-16 text-center font-mono h-7 text-sm border-[#E0E0E0] px-1"
+                        disabled={submitting} placeholder="0"
+                      />
+                    </div>
+                    <span className="font-mono text-sm text-right" style={{ color: val.isZero() ? colors.textSecondary : colors.textPrimary }}>
+                      R {val.toFixed(2)}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
           </div>
-          {/* Running total */}
-          <div className="flex justify-between text-sm font-semibold border-t pt-2" style={{ borderColor: colors.border }}>
+
+          {/* Counted total */}
+          <div
+            className="flex justify-between items-center px-3 py-2 rounded text-sm font-semibold"
+            style={{ background: colors.toolbar, border: `1px solid ${colors.border}` }}
+          >
             <span style={{ color: colors.textSecondary }}>Counted Total</span>
-            <span className="font-mono" style={{ color: colors.textPrimary }}>R {total.toFixed(2)}</span>
+            <span className="font-mono text-base" style={{ color: total.isZero() ? colors.textSecondary : colors.textPrimary }}>
+              R {total.toFixed(2)}
+            </span>
           </div>
+
           {/* Notes */}
           <div>
-            <Label className="text-xs">Notes (optional)</Label>
+            <Label className="text-xs" style={{ color: colors.textSecondary }}>Notes (optional)</Label>
             <Textarea
               value={notes}
               onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setNotes(e.target.value)}
-              placeholder="Any comments about the count..."
+              placeholder="Any comments about the count…"
               className="mt-1 text-sm" rows={2} disabled={submitting}
             />
           </div>
+
           <Button className="w-full" size="sm" onClick={() => { void handleSubmit(); onClose() }} disabled={submitting}>
             {submitting
-              ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Submitting...</>
+              ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Submitting…</>
               : 'Submit Cash-Up'
             }
           </Button>
