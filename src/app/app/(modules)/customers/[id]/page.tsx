@@ -3,13 +3,12 @@
 import { useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import useSWR, { mutate } from 'swr'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { AlertTriangle, ArrowLeft, ShieldBan, ShieldCheck, Pencil, Loader2, Camera } from 'lucide-react'
+import { AlertTriangle, ShieldBan, ShieldCheck, Loader2, Camera } from 'lucide-react'
 import { PhotoUploader, PhotoViewer } from '@/components/PhotoUploader'
 import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
@@ -69,132 +68,352 @@ const COMMODITY_OPTIONS = [
   'Plastic', 'Paper / Cardboard', 'Catalytic Converters', 'Batteries', 'Other',
 ]
 
+// ─── Shared styles — mirrors the Settings page design tokens ──────────────────
+const sectionHdr: React.CSSProperties = {
+  background: 'linear-gradient(180deg,#FFFFFF 0%,#E8E8E8 100%)',
+  borderBottom: '1px solid #C0C0C0',
+  padding: '4px 10px',
+  flexShrink: 0,
+}
+const lbl: React.CSSProperties = {
+  display: 'block', fontSize: 10, fontWeight: 700,
+  textTransform: 'uppercase', letterSpacing: '0.04em',
+  color: '#6C757D', marginBottom: 2,
+}
+
+function SHdr({ title }: { title: string }) {
+  return (
+    <div style={sectionHdr}>
+      <span style={{ fontSize: 11, fontWeight: 700, color: '#1B3A6B' }}>{title}</span>
+    </div>
+  )
+}
+
+// ─── Read-only profile field ───────────────────────────────────────────────────
+function PField({ label, value, mono, span2 }: {
+  label: string; value?: string | null; mono?: boolean; span2?: boolean
+}) {
+  const display = value ?? '—'
+  return (
+    <div style={span2 ? { gridColumn: 'span 2' } : undefined}>
+      <span style={lbl}>{label}</span>
+      <span style={{
+        display: 'block', fontSize: 12,
+        color: display === '—' ? '#9CA3AF' : '#212529',
+        fontFamily: mono ? 'monospace' : undefined,
+        minHeight: 16, lineHeight: '16px',
+      }}>
+        {display}
+      </span>
+    </div>
+  )
+}
+
+// ─── Section wrapper ───────────────────────────────────────────────────────────
+function ProfileSection({ title, children, cols = 2 }: {
+  title: string; children: React.ReactNode; cols?: number
+}) {
+  return (
+    <div style={{ borderBottom: '1px solid #E0E0E0' }}>
+      <SHdr title={title} />
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: `repeat(${cols}, 1fr)`,
+        gap: '8px 16px',
+        padding: '10px 12px',
+      }}>
+        {children}
+      </div>
+    </div>
+  )
+}
+
+// ─── Pill badge ────────────────────────────────────────────────────────────────
+function Pill({ text, bg, color }: { text: string; bg: string; color: string }) {
+  return (
+    <span style={{ display: 'inline-block', fontSize: 10, fontWeight: 700, borderRadius: 2, padding: '1px 6px', background: bg, color }}>
+      {text}
+    </span>
+  )
+}
+
+// ─── Main page ─────────────────────────────────────────────────────────────────
 export default function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
+  const { data: session } = useSession()
   const [tab, setTab] = useState<typeof TABS[number]>('Overview')
   const [editOpen, setEditOpen] = useState(false)
   const [blacklistOpen, setBlacklistOpen] = useState(false)
 
   const { data: customer, isLoading } = useSWR<Customer>(`/api/customers/${id}`, fetcher)
 
-  if (isLoading) return <div className="flex items-center justify-center h-64 text-gray-400">Loading...</div>
-  if (!customer) return <div className="flex items-center justify-center h-64 text-gray-400">Customer not found</div>
+  if (isLoading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: '#9CA3AF', fontSize: 13 }}>
+      Loading…
+    </div>
+  )
+  if (!customer) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: '#9CA3AF', fontSize: 13 }}>
+      Customer not found
+    </div>
+  )
 
-  const fullName = `${customer.firstName} ${customer.lastName}`
+  const fullName    = `${customer.firstName} ${customer.lastName}`
+  const fmt         = (v?: string | null) => v ?? undefined
+  const fmtDate     = (v?: string | null) => v ? new Date(v).toLocaleDateString('en-ZA') : undefined
+  const fmtMoney    = (v?: string | null) => v ? `R ${parseFloat(v).toFixed(2)}` : undefined
+
+  const titleBtn: React.CSSProperties = {
+    fontSize: 11, padding: '2px 10px', cursor: 'pointer', borderRadius: 2,
+    background: 'linear-gradient(180deg,#F5F5F5 0%,#E0E0E0 100%)',
+    border: '1px solid #ABABAB', color: '#333', display: 'flex', alignItems: 'center', gap: 4,
+  }
 
   return (
-    <div>
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={() => router.back()}>
-            <ArrowLeft className="w-4 h-4 mr-1" /> Customers
-          </Button>
-          <div>
-            <h1 className="text-xl font-bold" style={{ color: '#212529' }}>{fullName}</h1>
-            <p className="text-sm" style={{ color: '#6C757D' }}>
-              {customer.customerType === 'account' ? 'Account Customer' : 'Casual Customer'}
-              {customer.accountCode ? ` · ${customer.accountCode}` : ''}
-              {' · '}{customer.idNumber}
-            </p>
-          </div>
+    <div style={{ border: '1px solid #B0B0B0', borderRadius: 2, background: '#F5F5F5', display: 'flex', flexDirection: 'column' }}>
+
+      {/* ── Title bar ─────────────────────────────────────────────────────────── */}
+      <div style={{ background: 'linear-gradient(180deg,#EAEAEA 0%,#D4D4D4 100%)', borderBottom: '2px solid #B0B0B0', padding: '5px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button onClick={() => router.back()} style={titleBtn}>← Customers</button>
+          <span style={{ fontSize: 1, color: '#B0B0B0', userSelect: 'none' }}>│</span>
+          <span style={{ fontSize: 13, fontWeight: 700, color: '#212529' }}>{fullName}</span>
+          <span style={{ fontSize: 11, color: '#6C757D' }}>·  {customer.customerType === 'account' ? 'Account Customer' : 'Casual Customer'}</span>
+          {customer.accountCode && (
+            <span style={{ fontSize: 11, fontFamily: 'monospace', fontWeight: 700, color: '#1B3A6B', background: '#E8EFF8', border: '1px solid #B0C4DE', borderRadius: 2, padding: '1px 6px' }}>
+              {customer.accountCode}
+            </span>
+          )}
+          {customer.idNumber && (
+            <span style={{ fontSize: 11, fontFamily: 'monospace', color: '#6C757D' }}>·  {customer.idNumber}</span>
+          )}
         </div>
-        <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" onClick={() => setEditOpen(true)}>
-            <Pencil className="w-3.5 h-3.5 mr-1.5" /> Edit
-          </Button>
-          <Button
-            size="sm"
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button onClick={() => setEditOpen(true)} style={titleBtn}>✏  Edit</button>
+          <button
             onClick={() => router.push('/app/purchases/new')}
-            style={{ background: '#217346', color: '#fff' }}
+            style={{ fontSize: 11, padding: '2px 10px', background: 'linear-gradient(180deg,#2E8B57 0%,#1E6B3D 100%)', border: '1px solid #176338', borderRadius: 2, cursor: 'pointer', color: '#fff', fontWeight: 700 }}
           >
-            New Purchase
-          </Button>
+            + New Purchase
+          </button>
         </div>
       </div>
 
-      {/* Blacklist banner */}
+      {/* ── Blacklist banner ──────────────────────────────────────────────────── */}
       {customer.blacklisted && (
-        <div className="mb-4 flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-xl">
-          <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
-          <div>
-            <p className="font-semibold text-red-800">Customer is Blacklisted</p>
-            <p className="text-sm text-red-600 mt-0.5">{customer.blacklistReason}</p>
-            {customer.blacklistedAt && (
-              <p className="text-xs text-red-400 mt-1">Since {new Date(customer.blacklistedAt).toLocaleDateString('en-ZA')}</p>
-            )}
-          </div>
+        <div style={{ background: '#FFF0F0', borderBottom: '1px solid #F0C0C0', padding: '5px 12px', display: 'flex', alignItems: 'flex-start', gap: 8, flexShrink: 0 }}>
+          <AlertTriangle style={{ width: 13, height: 13, color: '#C53030', flexShrink: 0, marginTop: 1 }} />
+          <span style={{ fontSize: 11, fontWeight: 700, color: '#C53030' }}>Blacklisted</span>
+          <span style={{ fontSize: 11, color: '#9B2C2C' }}>{customer.blacklistReason}</span>
+          {customer.blacklistedAt && (
+            <span style={{ fontSize: 10, color: '#FC8181' }}>
+              · Since {new Date(customer.blacklistedAt).toLocaleDateString('en-ZA')}
+            </span>
+          )}
         </div>
       )}
 
-      {/* Customer header card */}
-      <div className="bg-white rounded-xl border p-6 mb-4">
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center text-green-700 font-bold text-lg">
-              {customer.firstName.charAt(0)}{customer.lastName.charAt(0)}
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl font-bold text-gray-900">{fullName}</h1>
-                {customer.accountCode && (
-                  <span className="font-mono text-sm font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">{customer.accountCode}</span>
-                )}
-              </div>
-              <p className="text-sm text-gray-500 font-mono">{customer.idNumber}</p>
-              <p className="text-sm text-gray-500">{customer.phone}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Badge className={customer.customerType === 'account' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}>
-              {customer.customerType}
-            </Badge>
-            {customer.primaryFunction && (
-              <Badge className="bg-purple-100 text-purple-700">{customer.primaryFunction}</Badge>
-            )}
-            {customer.blacklisted
-              ? <Badge variant="destructive">Blacklisted</Badge>
-              : <Badge className="bg-green-100 text-green-700">Active</Badge>}
-            <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
-              <Pencil className="w-3.5 h-3.5 mr-1.5" /> Edit
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex gap-1 border-b mb-4">
+      {/* ── Tab strip ─────────────────────────────────────────────────────────── */}
+      <div style={{ display: 'flex', borderBottom: '1px solid #C0C0C0', background: '#EFEFEF', flexShrink: 0 }}>
         {TABS.map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-              tab === t ? 'border-green-600 text-green-700' : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
+            style={{
+              padding: '5px 14px', fontSize: 11, cursor: 'pointer',
+              fontWeight: tab === t ? 700 : 400,
+              background: tab === t ? '#fff' : 'transparent',
+              borderRight: '1px solid #D0D0D0',
+              borderBottom: tab === t ? '2px solid #217346' : '2px solid transparent',
+              color: tab === t ? '#217346' : '#555',
+            }}
           >
             {t}
           </button>
         ))}
       </div>
 
-      {/* Tab content */}
-      {tab === 'Overview' && <OverviewTab customer={customer} />}
-      {tab === 'Transactions' && <TransactionsTab customerId={id} />}
-      {tab === 'Documents' && <DocumentsTab customer={customer} onPhotoSaved={() => mutate(`/api/customers/${id}`)} />}
-      {tab === 'Blacklist' && (
-        <BlacklistTab
-          customer={customer}
-          onAction={() => setBlacklistOpen(true)}
-          onUnblacklist={async () => {
-            const res = await fetch(`/api/customers/${id}/unblacklist`, { method: 'POST' })
-            if (res.ok) { toast.success('Customer unblacklisted'); mutate(`/api/customers/${id}`) }
-            else toast.error('Failed to unblacklist customer')
-          }}
-        />
-      )}
+      {/* ── Two-column layout: main content + sidebar ─────────────────────────── */}
+      <div style={{ display: 'flex', alignItems: 'flex-start' }}>
 
-      {/* Edit modal */}
+        {/* Main content */}
+        <div style={{ flex: 1, borderRight: '1px solid #D0D0D0', background: '#fff' }}>
+
+          {tab === 'Overview' && (
+            <>
+              <ProfileSection title="Personal Details">
+                <PField label="First Name"       value={customer.firstName} />
+                <PField label="Last Name"        value={customer.lastName} />
+                <PField label="ID Number"        value={customer.idNumber} mono />
+                <PField label="Date of Birth"    value={fmtDate(customer.dateOfBirth)} />
+                <PField label="Gender"           value={fmt(customer.gender)} />
+                <PField label="Nationality"      value={fmt(customer.nationality)} />
+                <PField label="Phone (Mobile)"   value={customer.phone} mono />
+                <PField label="Landline"         value={fmt(customer.landline)} mono />
+                <PField label="Email"            value={fmt(customer.email)} />
+                <PField label="Physical Address" value={fmt(customer.physicalAddress)} span2 />
+                <PField label="Postal Address"   value={fmt(customer.postalAddress)}  span2 />
+              </ProfileSection>
+
+              <ProfileSection title="Business Details">
+                <PField label="Customer Type"    value={customer.customerType} />
+                <PField label="Primary Function" value={fmt(customer.primaryFunction)} />
+
+                <div>
+                  <span style={lbl}>Market Sector</span>
+                  {customer.marketSector === 'formal'
+                    ? <Pill text="Formal"   bg="#DBEAFE" color="#1E40AF" />
+                    : customer.marketSector === 'informal'
+                    ? <Pill text="Informal" bg="#FEF3C7" color="#92400E" />
+                    : <span style={{ fontSize: 12, color: '#9CA3AF' }}>—</span>}
+                </div>
+
+                <div>
+                  <span style={lbl}>Dealer Category</span>
+                  <span style={{ fontSize: 12, color: customer.dealerCategory ? '#212529' : '#9CA3AF' }}>
+                    {customer.dealerCategory ? DEALER_LABELS[customer.dealerCategory] : '—'}
+                    {customer.priceGroup && (
+                      <span style={{ color: '#6C757D', marginLeft: 4 }}>· {customer.priceGroup.name}</span>
+                    )}
+                  </span>
+                </div>
+
+                <div>
+                  <span style={lbl}>VAT</span>
+                  {customer.zeroRated
+                    ? <Pill text="Zero Rated" bg="#FEF9C3" color="#713F12" />
+                    : <span style={{ fontSize: 12, color: '#6C757D' }}>VAT Applied</span>}
+                </div>
+
+                <PField label="Price Group"    value={customer.priceGroup?.name} />
+                <PField label="Company Name"   value={fmt(customer.companyName)} />
+                <PField label="Company Reg No" value={fmt(customer.companyRegNumber)} mono />
+                <PField label="Contact Person" value={fmt(customer.contactPerson)} />
+                <PField label="VAT Number"     value={fmt(customer.vatNumber)} mono />
+                <PField label="Credit Limit"   value={fmtMoney(customer.creditLimit)} />
+
+                {customer.tradeCommodities && customer.tradeCommodities.length > 0 && (
+                  <div style={{ gridColumn: 'span 2' }}>
+                    <span style={lbl}>Trade Commodities</span>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 3 }}>
+                      {customer.tradeCommodities.map((c) => (
+                        <Pill key={c} text={c} bg="#DCFCE7" color="#166534" />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </ProfileSection>
+
+              <ProfileSection title="Banking Details">
+                <PField label="Bank Name"      value={fmt(customer.bankName)} />
+                <PField label="Account Number" value={fmt(customer.bankAccountNo)} mono />
+                <PField label="Branch Code"    value={fmt(customer.bankBranchCode)} mono />
+              </ProfileSection>
+
+              <ProfileSection title="Compliance">
+                <PField label="Police Register No." value={fmt(customer.policeRegisterNo)} mono />
+                <PField label="License Number"      value={fmt(customer.licenseNumber)} mono />
+                <PField label="License Expiry"      value={fmtDate(customer.licenseExpiry)} />
+                <PField label="Registered"          value={new Date(customer.createdAt).toLocaleDateString('en-ZA')} />
+              </ProfileSection>
+
+              {customer.customerNotes && (
+                <div style={{ borderBottom: '1px solid #E0E0E0' }}>
+                  <SHdr title="Notes" />
+                  <p style={{ padding: '8px 12px', fontSize: 12, color: '#374151', whiteSpace: 'pre-wrap', margin: 0 }}>
+                    {customer.customerNotes}
+                  </p>
+                </div>
+              )}
+            </>
+          )}
+
+          {tab === 'Transactions' && <TransactionsTab customerId={id} />}
+          {tab === 'Documents'    && <DocumentsTab customer={customer} onPhotoSaved={() => mutate(`/api/customers/${id}`)} />}
+          {tab === 'Blacklist'    && (
+            <BlacklistTab
+              customer={customer}
+              onAction={() => setBlacklistOpen(true)}
+              onUnblacklist={async () => {
+                const res = await fetch(`/api/customers/${id}/unblacklist`, { method: 'POST' })
+                if (res.ok) { toast.success('Customer unblacklisted'); mutate(`/api/customers/${id}`) }
+                else toast.error('Failed to unblacklist customer')
+              }}
+            />
+          )}
+        </div>
+
+        {/* ── Sidebar ───────────────────────────────────────────────────────── */}
+        <div style={{ width: 200, flexShrink: 0, background: '#FAFAFA' }}>
+          <SHdr title="Profile" />
+          <div style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 7 }}>
+            <div>
+              <span style={lbl}>Type</span>
+              <Pill
+                text={customer.customerType === 'account' ? 'Account' : 'Casual'}
+                bg={customer.customerType === 'account' ? '#DBEAFE' : '#F3F4F6'}
+                color={customer.customerType === 'account' ? '#1E40AF' : '#374151'}
+              />
+            </div>
+            {customer.primaryFunction && (
+              <div>
+                <span style={lbl}>Function</span>
+                <Pill text={customer.primaryFunction} bg="#F3E8FF" color="#6B21A8" />
+              </div>
+            )}
+            <div>
+              <span style={lbl}>Status</span>
+              <Pill
+                text={customer.blacklisted ? 'Blacklisted' : 'Active'}
+                bg={customer.blacklisted ? '#FEE2E2' : '#DCFCE7'}
+                color={customer.blacklisted ? '#991B1B' : '#166534'}
+              />
+            </div>
+            <div>
+              <span style={lbl}>Registered</span>
+              <span style={{ fontSize: 11, color: '#6C757D' }}>
+                {new Date(customer.createdAt).toLocaleDateString('en-ZA')}
+              </span>
+            </div>
+            {customer.priceGroup && (
+              <div>
+                <span style={lbl}>Price Group</span>
+                <span style={{ fontSize: 11, color: '#212529', fontWeight: 600 }}>{customer.priceGroup.name}</span>
+              </div>
+            )}
+          </div>
+
+          <SHdr title="Actions" />
+          <div style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 5 }}>
+            <button
+              onClick={() => setEditOpen(true)}
+              style={{ fontSize: 11, padding: '4px 8px', background: 'linear-gradient(180deg,#F5F5F5 0%,#E0E0E0 100%)', border: '1px solid #ABABAB', borderRadius: 2, cursor: 'pointer', textAlign: 'left', color: '#333', width: '100%' }}
+            >
+              ✏  Edit Profile
+            </button>
+            <button
+              onClick={() => router.push('/app/purchases/new')}
+              style={{ fontSize: 11, padding: '4px 8px', background: 'linear-gradient(180deg,#2E8B57 0%,#1E6B3D 100%)', border: '1px solid #176338', borderRadius: 2, cursor: 'pointer', color: '#fff', fontWeight: 700, width: '100%', textAlign: 'left' }}
+            >
+              + New Purchase
+            </button>
+            <button
+              onClick={() => setTab('Blacklist')}
+              style={{
+                fontSize: 11, padding: '4px 8px', borderRadius: 2, cursor: 'pointer', width: '100%', textAlign: 'left',
+                background: customer.blacklisted ? 'linear-gradient(180deg,#DCFCE7 0%,#BBF7D0 100%)' : 'linear-gradient(180deg,#FEE2E2 0%,#FECACA 100%)',
+                border: `1px solid ${customer.blacklisted ? '#86EFAC' : '#FCA5A5'}`,
+                color: customer.blacklisted ? '#166534' : '#991B1B',
+              }}
+            >
+              {customer.blacklisted ? '✓  Remove Blacklist' : '⚠  Blacklist'}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Modals ────────────────────────────────────────────────────────────── */}
       {editOpen && (
         <EditCustomerModal
           customer={customer}
@@ -202,8 +421,6 @@ export default function CustomerDetailPage() {
           onSuccess={() => { mutate(`/api/customers/${id}`); setEditOpen(false) }}
         />
       )}
-
-      {/* Blacklist modal */}
       {blacklistOpen && (
         <BlacklistModal
           customerId={id}
@@ -215,146 +432,34 @@ export default function CustomerDetailPage() {
   )
 }
 
-// ─── Overview Tab ─────────────────────────────────────────────────────────────
-function OverviewTab({ customer }: { customer: Customer }) {
-  const fmt = (v?: string | null) => v ?? '—'
-  const fmtDate = (v?: string | null) => v ? new Date(v).toLocaleDateString('en-ZA') : '—'
-  const fmtMoney = (v?: string | null) => v ? `R ${parseFloat(v).toFixed(2)}` : '—'
-
-  return (
-    <div className="space-y-4">
-      {/* Personal */}
-      <Section title="Personal Details">
-        <Field label="First Name" value={customer.firstName} />
-        <Field label="Last Name" value={customer.lastName} />
-        <Field label="ID Number" value={customer.idNumber} mono />
-        <Field label="Date of Birth" value={fmtDate(customer.dateOfBirth)} />
-        <Field label="Gender" value={fmt(customer.gender)} />
-        <Field label="Nationality" value={fmt(customer.nationality)} />
-        <Field label="Phone (Mobile)" value={customer.phone} />
-        {customer.landline && <Field label="Landline" value={customer.landline} />}
-        <Field label="Email" value={fmt(customer.email)} />
-        <Field label="Physical Address" value={fmt(customer.physicalAddress)} />
-        <Field label="Postal Address" value={fmt(customer.postalAddress)} />
-      </Section>
-
-      {/* Business */}
-      <Section title="Business Details">
-        <Field label="Customer Type" value={customer.customerType} />
-        <Field label="Primary Function" value={fmt(customer.primaryFunction)} />
-        <div>
-          <dt className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Market Sector</dt>
-          <dd className="mt-1">
-            {customer.marketSector === 'formal'
-              ? <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">Formal</span>
-              : customer.marketSector === 'informal'
-              ? <span className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">Informal</span>
-              : <span className="text-sm text-gray-400">—</span>}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Dealer Category</dt>
-          <dd className="mt-1 flex items-center gap-2">
-            {customer.dealerCategory
-              ? <><span className="text-sm text-gray-900">{DEALER_LABELS[customer.dealerCategory]}</span>
-                  {customer.priceGroup && <span className="text-xs text-gray-500">· {customer.priceGroup.name}</span>}</>
-              : <span className="text-sm text-gray-400">—</span>}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-xs font-semibold text-gray-400 uppercase tracking-wide">VAT</dt>
-          <dd className="mt-1">
-            {customer.zeroRated
-              ? <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full font-medium">Zero Rated</span>
-              : <span className="text-sm text-gray-500">VAT Applied</span>}
-          </dd>
-        </div>
-        <Field label="Price Group" value={customer.priceGroup?.name ?? '—'} />
-        <Field label="Company Name" value={fmt(customer.companyName)} />
-        <Field label="Company Reg No" value={fmt(customer.companyRegNumber)} />
-        <Field label="Contact Person" value={fmt(customer.contactPerson)} />
-        <Field label="VAT Number" value={fmt(customer.vatNumber)} />
-        <Field label="Credit Limit" value={fmtMoney(customer.creditLimit)} />
-        {customer.tradeCommodities && customer.tradeCommodities.length > 0 && (
-          <div className="col-span-2">
-            <dt className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Trade Commodities</dt>
-            <dd className="mt-1 flex flex-wrap gap-1">
-              {customer.tradeCommodities.map((c) => (
-                <span key={c} className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">{c}</span>
-              ))}
-            </dd>
-          </div>
-        )}
-      </Section>
-
-      {/* Banking */}
-      <Section title="Banking Details">
-        <Field label="Bank Name" value={fmt(customer.bankName)} />
-        <Field label="Account Number" value={fmt(customer.bankAccountNo)} />
-        <Field label="Branch Code" value={fmt(customer.bankBranchCode)} />
-      </Section>
-
-      {/* Compliance */}
-      <Section title="Compliance">
-        <Field label="Police Register No." value={fmt(customer.policeRegisterNo)} />
-        <Field label="License Number" value={fmt(customer.licenseNumber)} />
-        <Field label="License Expiry" value={fmtDate(customer.licenseExpiry)} />
-        <Field label="Registered" value={new Date(customer.createdAt).toLocaleDateString('en-ZA')} />
-      </Section>
-
-      {/* Notes */}
-      {customer.customerNotes && (
-        <div className="bg-white rounded-xl border p-5">
-          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Notes</h3>
-          <p className="text-sm text-gray-700 whitespace-pre-wrap">{customer.customerNotes}</p>
-        </div>
-      )}
-    </div>
-  )
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="bg-white rounded-xl border p-5">
-      <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">{title}</h3>
-      <dl className="grid grid-cols-2 gap-x-8 gap-y-3">{children}</dl>
-    </div>
-  )
-}
-
-function Field({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
-  return (
-    <div>
-      <dt className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{label}</dt>
-      <dd className={`mt-1 text-sm text-gray-900 ${mono ? 'font-mono' : ''}`}>{value}</dd>
-    </div>
-  )
-}
-
 // ─── Transactions Tab ─────────────────────────────────────────────────────────
 function TransactionsTab({ customerId }: { customerId: string }) {
   const { data } = useSWR(`/api/customers/${customerId}/transactions`, fetcher)
   if (!data?.transactions?.length) {
-    return <div className="bg-white rounded-xl border p-10 text-center text-gray-400">No transactions yet</div>
+    return (
+      <div style={{ padding: '40px 0', textAlign: 'center', color: '#9CA3AF', fontSize: 12 }}>
+        No transactions yet
+      </div>
+    )
   }
   return (
-    <div className="bg-white rounded-xl border overflow-hidden">
-      <table className="w-full text-sm">
-        <thead className="bg-gray-50 border-b">
-          <tr>
+    <div style={{ overflowX: 'auto' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+        <thead>
+          <tr style={{ background: 'linear-gradient(180deg,#F5F5F5 0%,#EBEBEB 100%)', borderBottom: '1px solid #C0C0C0' }}>
             {['Date', 'Reference', 'Type', 'Amount', 'Status'].map((h) => (
-              <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">{h}</th>
+              <th key={h} style={{ textAlign: 'left', padding: '5px 10px', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: '#6C757D', letterSpacing: '0.04em' }}>{h}</th>
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y">
-          {data.transactions.map((tx: { id: string; type: string; reference: string; date: string; amount: string; status: string }) => (
-            <tr key={tx.id} className="hover:bg-gray-50">
-              <td className="px-4 py-3">{new Date(tx.date).toLocaleDateString('en-ZA')}</td>
-              <td className="px-4 py-3 font-mono text-xs">{tx.reference}</td>
-              <td className="px-4 py-3 capitalize">{tx.type}</td>
-              <td className="px-4 py-3">R {tx.amount}</td>
-              <td className="px-4 py-3 capitalize">{tx.status}</td>
+        <tbody>
+          {data.transactions.map((tx: { id: string; type: string; reference: string; date: string; amount: string; status: string }, i: number) => (
+            <tr key={tx.id} style={{ borderBottom: '1px solid #F0F0F0', background: i % 2 === 0 ? '#fff' : '#FAFAFA' }}>
+              <td style={{ padding: '5px 10px' }}>{new Date(tx.date).toLocaleDateString('en-ZA')}</td>
+              <td style={{ padding: '5px 10px', fontFamily: 'monospace', fontSize: 11 }}>{tx.reference}</td>
+              <td style={{ padding: '5px 10px', textTransform: 'capitalize' }}>{tx.type}</td>
+              <td style={{ padding: '5px 10px', fontFamily: 'monospace' }}>R {tx.amount}</td>
+              <td style={{ padding: '5px 10px', textTransform: 'capitalize' }}>{tx.status}</td>
             </tr>
           ))}
         </tbody>
@@ -368,16 +473,13 @@ function DocumentsTab({ customer, onPhotoSaved }: { customer: Customer; onPhotoS
   const { data: session } = useSession()
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
   const [justUploaded, setJustUploaded] = useState(false)
-  const [docType, setDocType] = useState<string>('trading_licence')
-  const [uploading, setUploading] = useState(false)
-  const { data: docs, mutate: mutateDocs } = useSWR<CustomerDoc[]>(
-    `/api/customers/${customer.id}/documents`, fetcher,
-  )
+  const [docType, setDocType]           = useState<string>('trading_licence')
+  const [uploading, setUploading]       = useState(false)
+  const { data: docs, mutate: mutateDocs } = useSWR<CustomerDoc[]>(`/api/customers/${customer.id}/documents`, fetcher)
 
   async function savePhotoKey(key: string) {
     const res = await fetch(`/api/customers/${customer.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ idPhotoR2Key: key }),
     })
     if (res.ok) { setJustUploaded(true); onPhotoSaved() }
@@ -386,11 +488,10 @@ function DocumentsTab({ customer, onPhotoSaved }: { customer: Customer; onPhotoS
 
   async function handlePhotoDeleted() {
     const res = await fetch(`/api/customers/${customer.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ idPhotoR2Key: null }),
     })
-    if (res.ok) { onPhotoSaved() }
+    if (res.ok) onPhotoSaved()
   }
 
   async function handleDocUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -398,29 +499,21 @@ function DocumentsTab({ customer, onPhotoSaved }: { customer: Customer; onPhotoS
     if (!file) return
     setUploading(true)
     try {
-      // 1. Get presign URL
       const presignRes = await fetch('/api/r2/upload-url', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ contentType: file.type, context: 'customer_document', referenceId: customer.id, fileSize: file.size }),
       })
       if (!presignRes.ok) { toast.error('Failed to get upload URL'); return }
       const { uploadUrl: url, key } = await presignRes.json()
-      // 2. Upload to R2
       const uploadRes = await fetch(url, { method: 'PUT', body: file, headers: { 'Content-Type': file.type } })
       if (!uploadRes.ok) { toast.error('Upload failed'); return }
-      // 3. Save document record
       const saveRes = await fetch(`/api/customers/${customer.id}/documents`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ documentType: docType, r2Key: key, fileName: file.name }),
       })
       if (saveRes.ok) { toast.success('Document uploaded'); mutateDocs() }
-      else { toast.error('Failed to save document') }
-    } finally {
-      setUploading(false)
-      e.target.value = ''
-    }
+      else toast.error('Failed to save document')
+    } finally { setUploading(false); e.target.value = '' }
   }
 
   async function handleDocDelete(docId: string) {
@@ -436,49 +529,40 @@ function DocumentsTab({ customer, onPhotoSaved }: { customer: Customer; onPhotoS
   }
 
   return (
-    <div className="space-y-4">
-      {/* Compliance Documents */}
-      <div className="bg-white rounded-xl border p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <span className="text-gray-600">📎</span>
-          <h3 className="font-semibold text-gray-900">Compliance Documents</h3>
-        </div>
-
-        {/* Upload row */}
-        <div className="flex items-center gap-3 mb-4">
+    <div>
+      {/* Compliance docs */}
+      <SHdr title="Compliance Documents" />
+      <div style={{ padding: '10px 12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
           <select
             value={docType}
             onChange={(e) => setDocType(e.target.value)}
-            className="border rounded-md px-3 py-2 text-sm bg-white border-gray-300 focus:outline-none focus:ring-1 focus:ring-green-500"
+            style={{ height: 26, borderRadius: 2, border: '1px solid #ABABAB', padding: '0 7px', fontSize: 12, color: '#212529', background: '#fff', outline: 'none' }}
           >
             {Object.entries(DOCUMENT_TYPE_LABELS).map(([v, l]) => (
               <option key={v} value={v}>{l}</option>
             ))}
           </select>
-          <label className={`cursor-pointer flex items-center gap-2 px-4 py-2 rounded-md border text-sm font-medium transition-colors ${uploading ? 'opacity-50 cursor-not-allowed bg-gray-50' : 'bg-white hover:bg-gray-50 border-gray-300'}`}>
-            {uploading ? 'Uploading…' : '+ Upload'}
-            <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png" onChange={handleDocUpload} disabled={uploading} />
+          <label style={{ cursor: uploading ? 'not-allowed' : 'pointer', opacity: uploading ? 0.5 : 1, fontSize: 11, padding: '2px 10px', background: 'linear-gradient(180deg,#F5F5F5 0%,#E0E0E0 100%)', border: '1px solid #ABABAB', borderRadius: 2, color: '#333' }}>
+            {uploading ? 'Uploading…' : '+ Upload Document'}
+            <input type="file" style={{ display: 'none' }} accept=".pdf,.jpg,.jpeg,.png" onChange={handleDocUpload} disabled={uploading} />
           </label>
         </div>
 
-        {/* Document list */}
         {!docs?.length ? (
-          <p className="text-sm text-gray-400">No compliance documents uploaded yet.</p>
+          <p style={{ fontSize: 12, color: '#9CA3AF' }}>No compliance documents uploaded yet.</p>
         ) : (
-          <div className="divide-y border rounded-lg overflow-hidden">
-            {docs.map((doc) => (
-              <div key={doc.id} className="flex items-center justify-between px-4 py-3 bg-white hover:bg-gray-50">
-                <div className="flex items-center gap-3">
-                  <span className="text-gray-400 text-lg">📄</span>
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">{DOCUMENT_TYPE_LABELS[doc.documentType] ?? doc.documentType}</p>
-                    <p className="text-xs text-gray-400">{doc.fileName} · {new Date(doc.uploadedAt).toLocaleDateString('en-ZA')}</p>
-                  </div>
+          <div style={{ border: '1px solid #E0E0E0', borderRadius: 2, overflow: 'hidden' }}>
+            {docs.map((doc, i) => (
+              <div key={doc.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '5px 10px', background: i % 2 === 0 ? '#fff' : '#FAFAFA', borderBottom: i < docs.length - 1 ? '1px solid #F0F0F0' : undefined }}>
+                <div>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: '#212529' }}>{DOCUMENT_TYPE_LABELS[doc.documentType] ?? doc.documentType}</span>
+                  <span style={{ fontSize: 10, color: '#9CA3AF', marginLeft: 6 }}>{doc.fileName} · {new Date(doc.uploadedAt).toLocaleDateString('en-ZA')}</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => handleDocView(doc.r2Key)} className="text-xs text-blue-600 hover:underline">View</button>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={() => handleDocView(doc.r2Key)} style={{ fontSize: 11, color: '#1B3A6B', cursor: 'pointer', textDecoration: 'underline', background: 'none', border: 'none', padding: 0 }}>View</button>
                   {isManager && (
-                    <button onClick={() => handleDocDelete(doc.id)} className="text-xs text-red-600 hover:underline">Delete</button>
+                    <button onClick={() => handleDocDelete(doc.id)} style={{ fontSize: 11, color: '#C53030', cursor: 'pointer', textDecoration: 'underline', background: 'none', border: 'none', padding: 0 }}>Delete</button>
                   )}
                 </div>
               </div>
@@ -488,12 +572,8 @@ function DocumentsTab({ customer, onPhotoSaved }: { customer: Customer; onPhotoS
       </div>
 
       {/* ID Photo */}
-      <div className="bg-white rounded-xl border p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <Camera className="w-4 h-4 text-green-600" />
-          <h3 className="font-semibold text-gray-900">ID Document Photo</h3>
-        </div>
-
+      <SHdr title="ID Document Photo" />
+      <div style={{ padding: '10px 12px' }}>
         {customer.idPhotoR2Key ? (
           <PhotoViewer
             r2Key={customer.idPhotoR2Key}
@@ -503,14 +583,9 @@ function DocumentsTab({ customer, onPhotoSaved }: { customer: Customer; onPhotoS
             autoLoad={justUploaded}
           />
         ) : (
-          <div className="space-y-3">
-            <p className="text-sm text-gray-500">No ID photo uploaded yet</p>
-            <PhotoUploader
-              context="customer_id"
-              referenceId={customer.id}
-              label="Upload ID Photo"
-              onUploaded={savePhotoKey}
-            />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <p style={{ fontSize: 12, color: '#9CA3AF', margin: 0 }}>No ID photo uploaded yet.</p>
+            <PhotoUploader context="customer_id" referenceId={customer.id} label="Upload ID Photo" onUploaded={savePhotoKey} />
           </div>
         )}
       </div>
@@ -519,30 +594,43 @@ function DocumentsTab({ customer, onPhotoSaved }: { customer: Customer; onPhotoS
 }
 
 // ─── Blacklist Tab ────────────────────────────────────────────────────────────
-function BlacklistTab({ customer, onAction, onUnblacklist }: { customer: Customer; onAction: () => void; onUnblacklist: () => void }) {
+function BlacklistTab({ customer, onAction, onUnblacklist }: {
+  customer: Customer; onAction: () => void; onUnblacklist: () => void
+}) {
   return (
-    <div className="bg-white rounded-xl border p-6">
-      {customer.blacklisted ? (
-        <div className="space-y-4">
-          <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-            <p className="font-semibold text-red-800">Currently Blacklisted</p>
-            <p className="text-sm text-red-600 mt-1">{customer.blacklistReason}</p>
-            {customer.blacklistedAt && (
-              <p className="text-xs text-red-400 mt-1">Since {new Date(customer.blacklistedAt).toLocaleDateString('en-ZA')}</p>
-            )}
-          </div>
-          <Button variant="outline" className="border-green-300 text-green-700 hover:bg-green-50" onClick={onUnblacklist}>
-            <ShieldCheck className="w-4 h-4 mr-2" /> Remove from Blacklist
-          </Button>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          <p className="text-sm text-gray-500">This customer is not blacklisted.</p>
-          <Button variant="destructive" onClick={onAction}>
-            <ShieldBan className="w-4 h-4 mr-2" /> Blacklist Customer
-          </Button>
-        </div>
-      )}
+    <div>
+      <SHdr title="Blacklist Management" />
+      <div style={{ padding: '12px' }}>
+        {customer.blacklisted ? (
+          <>
+            <div style={{ background: '#FFF0F0', border: '1px solid #F0C0C0', borderRadius: 2, padding: '8px 12px', marginBottom: 10 }}>
+              <p style={{ fontSize: 12, fontWeight: 700, color: '#C53030', margin: '0 0 4px' }}>Currently Blacklisted</p>
+              <p style={{ fontSize: 12, color: '#9B2C2C', margin: '0 0 4px' }}>{customer.blacklistReason}</p>
+              {customer.blacklistedAt && (
+                <p style={{ fontSize: 10, color: '#FC8181', margin: 0 }}>
+                  Since {new Date(customer.blacklistedAt).toLocaleDateString('en-ZA')}
+                </p>
+              )}
+            </div>
+            <button
+              onClick={onUnblacklist}
+              style={{ fontSize: 11, padding: '4px 12px', background: 'linear-gradient(180deg,#DCFCE7 0%,#BBF7D0 100%)', border: '1px solid #86EFAC', borderRadius: 2, cursor: 'pointer', color: '#166534', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}
+            >
+              <ShieldCheck style={{ width: 12, height: 12 }} /> Remove from Blacklist
+            </button>
+          </>
+        ) : (
+          <>
+            <p style={{ fontSize: 12, color: '#6C757D', marginBottom: 10 }}>This customer is not blacklisted.</p>
+            <button
+              onClick={onAction}
+              style={{ fontSize: 11, padding: '4px 12px', background: 'linear-gradient(180deg,#FEE2E2 0%,#FECACA 100%)', border: '1px solid #FCA5A5', borderRadius: 2, cursor: 'pointer', color: '#991B1B', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}
+            >
+              <ShieldBan style={{ width: 12, height: 12 }} /> Blacklist Customer
+            </button>
+          </>
+        )}
+      </div>
     </div>
   )
 }
@@ -551,8 +639,8 @@ function BlacklistTab({ customer, onAction, onUnblacklist }: { customer: Custome
 const EDIT_TABS = ['Personal', 'Business', 'Banking', 'Compliance'] as const
 
 function EditCustomerModal({ customer, onClose, onSuccess }: { customer: Customer; onClose: () => void; onSuccess: () => void }) {
-  const [loading, setLoading] = useState(false)
-  const [editTab, setEditTab] = useState<typeof EDIT_TABS[number]>('Personal')
+  const [loading, setLoading]   = useState(false)
+  const [editTab, setEditTab]   = useState<typeof EDIT_TABS[number]>('Personal')
   const { data: pgData } = useSWR<{ groups: { id: string; name: string; isActive: boolean }[] }>('/api/price-groups', fetcher)
   const priceGroups = (pgData?.groups ?? []).filter((g) => g.isActive)
 
@@ -566,54 +654,38 @@ function EditCustomerModal({ customer, onClose, onSuccess }: { customer: Custome
   const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<UpdateCustomerFormInput, unknown, UpdateCustomerInput>({
     resolver: zodResolver(UpdateCustomerSchema),
     defaultValues: {
-      firstName:        customer.firstName,
-      lastName:         customer.lastName,
-      phone:            customer.phone,
-      email:            customer.email ?? '',
-      physicalAddress:  customer.physicalAddress ?? '',
-      postalAddress:    customer.postalAddress ?? '',
-      vatNumber:        customer.vatNumber ?? '',
-      companyName:      customer.companyName ?? '',
-      companyRegNumber: customer.companyRegNumber ?? '',
-      contactPerson:    customer.contactPerson ?? '',
-      landline:         customer.landline ?? '',
-      customerType:     customer.customerType as 'casual' | 'account',
-      primaryFunction:  (customer.primaryFunction as 'customer' | 'supplier' | 'both') ?? 'supplier',
-      gender:           (customer.gender as 'male' | 'female' | 'other') ?? undefined,
-      nationality:      customer.nationality ?? '',
-      bankName:         customer.bankName ?? '',
-      bankAccountNo:    customer.bankAccountNo ?? '',
-      bankBranchCode:   customer.bankBranchCode ?? '',
-      creditLimit:      customer.creditLimit ? String(parseFloat(customer.creditLimit)) : '',
-      policeRegisterNo: customer.policeRegisterNo ?? '',
-      licenseNumber:    customer.licenseNumber ?? '',
-      dateOfBirth:      fmtDateInput(customer.dateOfBirth),
-      licenseExpiry:    fmtDateInput(customer.licenseExpiry),
-      tradeCommodities: customer.tradeCommodities ?? [],
-      customerNotes:    customer.customerNotes ?? '',
-      priceGroupId:     customer.priceGroupId ?? undefined,
-      marketSector:     customer.marketSector ?? undefined,
-      dealerCategory:   customer.dealerCategory ?? undefined,
-      zeroRated:        customer.zeroRated ?? false,
+      firstName: customer.firstName, lastName: customer.lastName,
+      phone: customer.phone, email: customer.email ?? '',
+      physicalAddress: customer.physicalAddress ?? '', postalAddress: customer.postalAddress ?? '',
+      vatNumber: customer.vatNumber ?? '', companyName: customer.companyName ?? '',
+      companyRegNumber: customer.companyRegNumber ?? '', contactPerson: customer.contactPerson ?? '',
+      landline: customer.landline ?? '',
+      customerType: customer.customerType as 'casual' | 'account',
+      primaryFunction: (customer.primaryFunction as 'customer' | 'supplier' | 'both') ?? 'supplier',
+      gender: (customer.gender as 'male' | 'female' | 'other') ?? undefined,
+      nationality: customer.nationality ?? '',
+      bankName: customer.bankName ?? '', bankAccountNo: customer.bankAccountNo ?? '', bankBranchCode: customer.bankBranchCode ?? '',
+      creditLimit: customer.creditLimit ? String(parseFloat(customer.creditLimit)) : '',
+      policeRegisterNo: customer.policeRegisterNo ?? '', licenseNumber: customer.licenseNumber ?? '',
+      dateOfBirth: fmtDateInput(customer.dateOfBirth), licenseExpiry: fmtDateInput(customer.licenseExpiry),
+      tradeCommodities: customer.tradeCommodities ?? [], customerNotes: customer.customerNotes ?? '',
+      priceGroupId: customer.priceGroupId ?? undefined,
+      marketSector: customer.marketSector ?? undefined, dealerCategory: customer.dealerCategory ?? undefined,
+      zeroRated: customer.zeroRated ?? false,
     },
   })
 
   const tradeCommodities = (watch('tradeCommodities') as string[] | undefined) ?? []
 
   function toggleCommodity(val: string) {
-    if (tradeCommodities.includes(val)) {
-      setValue('tradeCommodities', tradeCommodities.filter((c) => c !== val))
-    } else {
-      setValue('tradeCommodities', [...tradeCommodities, val])
-    }
+    if (tradeCommodities.includes(val)) setValue('tradeCommodities', tradeCommodities.filter((c) => c !== val))
+    else setValue('tradeCommodities', [...tradeCommodities, val])
   }
 
   async function onSubmit(data: UpdateCustomerInput) {
     setLoading(true)
     const res = await fetch(`/api/customers/${customer.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
     })
     setLoading(false)
     if (res.ok) { toast.success('Customer updated'); onSuccess() }
@@ -625,43 +697,24 @@ function EditCustomerModal({ customer, onClose, onSuccess }: { customer: Custome
       <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader><DialogTitle>Edit Customer</DialogTitle></DialogHeader>
 
-        {/* Edit tabs */}
         <div className="flex gap-1 border-b -mx-1 mb-4">
           {EDIT_TABS.map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setEditTab(t)}
-              className={`px-3 py-2 text-xs font-medium border-b-2 transition-colors ${
-                editTab === t ? 'border-green-600 text-green-700' : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-            >
+            <button key={t} type="button" onClick={() => setEditTab(t)}
+              className={`px-3 py-2 text-xs font-medium border-b-2 transition-colors ${editTab === t ? 'border-green-600 text-green-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
               {t}
             </button>
           ))}
         </div>
 
         <form onSubmit={handleSubmit(onSubmit)}>
-          {/* Personal */}
           {editTab === 'Personal' && (
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label>First Name</Label>
-                  <Input {...register('firstName')} className="mt-1" disabled={loading} />
-                  {errors.firstName && <p className="text-xs text-red-600 mt-1">{errors.firstName.message}</p>}
-                </div>
-                <div>
-                  <Label>Last Name</Label>
-                  <Input {...register('lastName')} className="mt-1" disabled={loading} />
-                  {errors.lastName && <p className="text-xs text-red-600 mt-1">{errors.lastName.message}</p>}
-                </div>
+                <div><Label>First Name</Label><Input {...register('firstName')} className="mt-1" disabled={loading} />{errors.firstName && <p className="text-xs text-red-600 mt-1">{errors.firstName.message}</p>}</div>
+                <div><Label>Last Name</Label><Input {...register('lastName')} className="mt-1" disabled={loading} />{errors.lastName && <p className="text-xs text-red-600 mt-1">{errors.lastName.message}</p>}</div>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label>Date of Birth</Label>
-                  <Input {...register('dateOfBirth')} type="date" className="mt-1" disabled={loading} />
-                </div>
+                <div><Label>Date of Birth</Label><Input {...register('dateOfBirth')} type="date" className="mt-1" disabled={loading} /></div>
                 <div>
                   <Label>Gender</Label>
                   <Select onValueChange={(v) => setValue('gender', v as 'male' | 'female' | 'other')} defaultValue={customer.gender ?? ''}>
@@ -674,35 +727,15 @@ function EditCustomerModal({ customer, onClose, onSuccess }: { customer: Custome
                   </Select>
                 </div>
               </div>
-              <div>
-                <Label>Nationality</Label>
-                <Input {...register('nationality')} className="mt-1" disabled={loading} />
-              </div>
-              <div>
-                <Label>Phone (Mobile)</Label>
-                <Input {...register('phone')} className="mt-1" disabled={loading} />
-                {errors.phone && <p className="text-xs text-red-600 mt-1">{errors.phone.message}</p>}
-              </div>
-              <div>
-                <Label>Landline <span className="text-gray-400 font-normal">(optional)</span></Label>
-                <Input {...register('landline')} className="mt-1" disabled={loading} placeholder="e.g. +268 2404 xxxx" />
-              </div>
-              <div>
-                <Label>Email</Label>
-                <Input {...register('email')} type="email" className="mt-1" disabled={loading} />
-              </div>
-              <div>
-                <Label>Physical Address</Label>
-                <Input {...register('physicalAddress')} className="mt-1" disabled={loading} />
-              </div>
-              <div>
-                <Label>Postal Address</Label>
-                <Input {...register('postalAddress')} className="mt-1" disabled={loading} />
-              </div>
+              <div><Label>Nationality</Label><Input {...register('nationality')} className="mt-1" disabled={loading} /></div>
+              <div><Label>Phone (Mobile)</Label><Input {...register('phone')} className="mt-1" disabled={loading} />{errors.phone && <p className="text-xs text-red-600 mt-1">{errors.phone.message}</p>}</div>
+              <div><Label>Landline <span className="text-gray-400 font-normal">(optional)</span></Label><Input {...register('landline')} className="mt-1" disabled={loading} /></div>
+              <div><Label>Email</Label><Input {...register('email')} type="email" className="mt-1" disabled={loading} /></div>
+              <div><Label>Physical Address</Label><Input {...register('physicalAddress')} className="mt-1" disabled={loading} /></div>
+              <div><Label>Postal Address</Label><Input {...register('postalAddress')} className="mt-1" disabled={loading} /></div>
             </div>
           )}
 
-          {/* Business */}
           {editTab === 'Business' && (
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
@@ -736,22 +769,14 @@ function EditCustomerModal({ customer, onClose, onSuccess }: { customer: Custome
                   <Label className="text-yellow-800">Zero-Rated VAT</Label>
                   <p className="text-xs text-yellow-700 mt-0.5">No VAT will be charged on this account&apos;s transactions</p>
                 </div>
-                <input
-                  type="checkbox"
-                  checked={watch('zeroRated') ?? false}
-                  onChange={(e) => setValue('zeroRated', e.target.checked)}
-                  className="w-4 h-4 rounded border-gray-300 text-green-600 cursor-pointer"
-                />
+                <input type="checkbox" checked={watch('zeroRated') ?? false} onChange={(e) => setValue('zeroRated', e.target.checked)} className="w-4 h-4 rounded border-gray-300 text-green-600 cursor-pointer" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label>Customer Type</Label>
                   <Select onValueChange={(v) => setValue('customerType', v as 'casual' | 'account')} defaultValue={customer.customerType}>
                     <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="casual">Casual</SelectItem>
-                      <SelectItem value="account">Account</SelectItem>
-                    </SelectContent>
+                    <SelectContent><SelectItem value="casual">Casual</SelectItem><SelectItem value="account">Account</SelectItem></SelectContent>
                   </Select>
                 </div>
                 <div>
@@ -768,101 +793,49 @@ function EditCustomerModal({ customer, onClose, onSuccess }: { customer: Custome
               </div>
               <div>
                 <Label>Price Group <span className="text-gray-400 font-normal">(optional)</span></Label>
-                <Select
-                  onValueChange={(v) => setValue('priceGroupId', !v || v === 'none' ? undefined : v)}
-                  value={watch('priceGroupId') ?? 'none'}
-                >
+                <Select onValueChange={(v) => setValue('priceGroupId', !v || v === 'none' ? undefined : v)} value={watch('priceGroupId') ?? 'none'}>
                   <SelectTrigger className="mt-1"><SelectValue placeholder="No price group" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">No price group</SelectItem>
-                    {priceGroups.map((g) => (
-                      <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
-                    ))}
+                    {priceGroups.map((g) => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
-              <div>
-                <Label>Company Name</Label>
-                <Input {...register('companyName')} className="mt-1" disabled={loading} />
-              </div>
-              <div>
-                <Label>Company Reg No <span className="text-gray-400 font-normal">(optional)</span></Label>
-                <Input {...register('companyRegNumber')} className="mt-1" disabled={loading} placeholder="e.g. 2021/123456/07" />
-              </div>
-              <div>
-                <Label>Contact Person</Label>
-                <Input {...register('contactPerson')} className="mt-1" disabled={loading} />
-              </div>
-              <div>
-                <Label>VAT Number</Label>
-                <Input {...register('vatNumber')} className="mt-1" disabled={loading} />
-                {errors.vatNumber && <p className="text-xs text-red-600 mt-1">{errors.vatNumber.message}</p>}
-              </div>
-              <div>
-                <Label>Credit Limit (R)</Label>
-                <Input {...register('creditLimit')} type="number" step="0.01" min="0" className="mt-1" disabled={loading} />
-              </div>
+              <div><Label>Company Name</Label><Input {...register('companyName')} className="mt-1" disabled={loading} /></div>
+              <div><Label>Company Reg No</Label><Input {...register('companyRegNumber')} className="mt-1" disabled={loading} /></div>
+              <div><Label>Contact Person</Label><Input {...register('contactPerson')} className="mt-1" disabled={loading} /></div>
+              <div><Label>VAT Number</Label><Input {...register('vatNumber')} className="mt-1" disabled={loading} />{errors.vatNumber && <p className="text-xs text-red-600 mt-1">{errors.vatNumber.message}</p>}</div>
+              <div><Label>Credit Limit (R)</Label><Input {...register('creditLimit')} type="number" step="0.01" min="0" className="mt-1" disabled={loading} /></div>
               <div>
                 <Label className="mb-2">Trade Commodities</Label>
                 <div className="grid grid-cols-2 gap-2 mt-1">
                   {COMMODITY_OPTIONS.map((opt) => (
                     <label key={opt} className="flex items-center gap-2 text-sm cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={tradeCommodities.includes(opt)}
-                        onChange={() => toggleCommodity(opt)}
-                        className="w-4 h-4 rounded border-gray-300 text-green-600"
-                      />
-                      {opt}
+                      <input type="checkbox" checked={tradeCommodities.includes(opt)} onChange={() => toggleCommodity(opt)} className="w-4 h-4 rounded border-gray-300 text-green-600" />{opt}
                     </label>
                   ))}
                 </div>
               </div>
               <div>
                 <Label>Notes</Label>
-                <textarea
-                  {...register('customerNotes')}
-                  rows={3}
-                  className="mt-1 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
-                  disabled={loading}
-                />
+                <textarea {...register('customerNotes')} rows={3} className="mt-1 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50" disabled={loading} />
               </div>
             </div>
           )}
 
-          {/* Banking */}
           {editTab === 'Banking' && (
             <div className="space-y-3">
-              <div>
-                <Label>Bank Name</Label>
-                <Input {...register('bankName')} className="mt-1" disabled={loading} placeholder="e.g. ABSA, FNB, Standard Bank" />
-              </div>
-              <div>
-                <Label>Account Number</Label>
-                <Input {...register('bankAccountNo')} className="mt-1" disabled={loading} />
-              </div>
-              <div>
-                <Label>Branch Code</Label>
-                <Input {...register('bankBranchCode')} className="mt-1" disabled={loading} placeholder="6-digit branch code" />
-              </div>
+              <div><Label>Bank Name</Label><Input {...register('bankName')} className="mt-1" disabled={loading} placeholder="e.g. ABSA, FNB, Standard Bank" /></div>
+              <div><Label>Account Number</Label><Input {...register('bankAccountNo')} className="mt-1" disabled={loading} /></div>
+              <div><Label>Branch Code</Label><Input {...register('bankBranchCode')} className="mt-1" disabled={loading} placeholder="6-digit branch code" /></div>
             </div>
           )}
 
-          {/* Compliance */}
           {editTab === 'Compliance' && (
             <div className="space-y-3">
-              <div>
-                <Label>Police Register No.</Label>
-                <Input {...register('policeRegisterNo')} className="mt-1" disabled={loading} />
-              </div>
-              <div>
-                <Label>License Number <span className="text-gray-400 font-normal">(Second-Hand Goods Act)</span></Label>
-                <Input {...register('licenseNumber')} className="mt-1" disabled={loading} />
-              </div>
-              <div>
-                <Label>License Expiry</Label>
-                <Input {...register('licenseExpiry')} type="date" className="mt-1" disabled={loading} />
-              </div>
+              <div><Label>Police Register No.</Label><Input {...register('policeRegisterNo')} className="mt-1" disabled={loading} /></div>
+              <div><Label>License Number <span className="text-gray-400 font-normal">(Second-Hand Goods Act)</span></Label><Input {...register('licenseNumber')} className="mt-1" disabled={loading} /></div>
+              <div><Label>License Expiry</Label><Input {...register('licenseExpiry')} type="date" className="mt-1" disabled={loading} /></div>
             </div>
           )}
 
@@ -881,13 +854,13 @@ function EditCustomerModal({ customer, onClose, onSuccess }: { customer: Custome
 // ─── Blacklist Modal ──────────────────────────────────────────────────────────
 function BlacklistModal({ customerId, onClose, onSuccess }: { customerId: string; onClose: () => void; onSuccess: () => void }) {
   const [loading, setLoading] = useState(false)
-  const { register, handleSubmit, formState: { errors } } = useForm<BlacklistInput>({
-    resolver: zodResolver(BlacklistSchema),
-  })
+  const { register, handleSubmit, formState: { errors } } = useForm<BlacklistInput>({ resolver: zodResolver(BlacklistSchema) })
 
   async function onSubmit(data: BlacklistInput) {
     setLoading(true)
-    const res = await fetch(`/api/customers/${customerId}/blacklist`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
+    const res = await fetch(`/api/customers/${customerId}/blacklist`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
+    })
     setLoading(false)
     if (res.ok) { toast.success('Customer blacklisted'); onSuccess() }
     else { const j = await res.json(); toast.error(j.error ?? 'Failed to blacklist') }
