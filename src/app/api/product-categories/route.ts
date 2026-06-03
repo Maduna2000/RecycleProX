@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json()
   const parsed = CreateCategorySchema.safeParse(body)
-  if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
+  if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Validation failed' }, { status: 422 })
 
   try {
     const category = await createCategory(parsed.data)

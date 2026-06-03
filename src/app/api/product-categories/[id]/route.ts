@@ -26,7 +26,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 
   const body = await req.json()
   const parsed = UpdateCategorySchema.safeParse(body)
-  if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
+  if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Validation failed' }, { status: 422 })
 
   try {
     const updated = await updateCategory(params.id, parsed.data, session.user.id)
