@@ -12,13 +12,14 @@ export interface ScaleSlipLine {
 }
 
 export interface ScaleSlipData {
-  orderNumber:   string
-  createdAt:     Date
-  customerName:  string
-  customerPhone: string
-  lines:         ScaleSlipLine[]
-  operatorName:  string
-  yardName:      string
+  orderNumber:     string
+  createdAt:       Date
+  customerName:    string
+  customerPhone:   string
+  customerIdNumber?: string
+  lines:           ScaleSlipLine[]
+  operatorName:    string
+  yardName:        string
 }
 
 // ─── Layout constants (80 mm paper) ──────────────────────────────────────────
@@ -60,8 +61,9 @@ export async function generateScaleOrderSlip(data: ScaleSlipData): Promise<Uint8
 
   h += LINE_H - 2                        // CUSTOMER label
   h += LINE_H                            // customer name
-  h += LINE_H + 4                        // phone
-  h += 8                                 // divider gap
+  h += LINE_H                            // phone
+  if (data.customerIdNumber) h += LINE_H // ID number (conditional)
+  h += 4 + 8                             // bottom padding + divider gap
 
   // Product(s) section — one block per line
   if (multiLine) {
@@ -135,7 +137,12 @@ export async function generateScaleOrderSlip(data: ScaleSlipData): Promise<Uint8
   drawText(data.customerName, { size: NORMAL, font: bold })
   y -= LINE_H
   drawText(data.customerPhone, { size: SMALL, color: GRAY })
-  y -= LINE_H + 4
+  y -= LINE_H
+  if (data.customerIdNumber) {
+    drawText(`ID: ${data.customerIdNumber}`, { size: SMALL, color: GRAY })
+    y -= LINE_H
+  }
+  y -= 4
   drawDivider(y); y -= 8
 
   // ── Product(s) & Weight(s) ─────────────────────────────────────────────────

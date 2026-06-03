@@ -58,10 +58,11 @@ async function generateOrderNumber(tx: TxClient, date: Date): Promise<string> {
 // ─── Customer display helpers ─────────────────────────────────────────────────
 
 type OrderWithCustomer = {
-  customer:        { firstName: string; lastName: string; phone: string } | null
+  customer:        { firstName: string; lastName: string; phone: string; idNumber?: string | null } | null
   casualFirstName: string | null
   casualLastName:  string | null
   casualPhone:     string | null
+  casualIdNumber:  string | null
 }
 
 export function resolveCustomerName(o: OrderWithCustomer): string {
@@ -71,6 +72,10 @@ export function resolveCustomerName(o: OrderWithCustomer): string {
 
 export function resolveCustomerPhone(o: OrderWithCustomer): string {
   return o.customer?.phone ?? o.casualPhone ?? ''
+}
+
+export function resolveCustomerIdNumber(o: OrderWithCustomer): string {
+  return o.customer?.idNumber ?? o.casualIdNumber ?? ''
 }
 
 // ─── Create ───────────────────────────────────────────────────────────────────
@@ -99,6 +104,7 @@ export async function createScaleOrder(data: CreateScaleOrderInput, operatorId: 
         casualFirstName: data.customerId ? null : (data.casualFirstName ?? null),
         casualLastName:  data.customerId ? null : (data.casualLastName  ?? null),
         casualPhone:     data.customerId ? null : (data.casualPhone     ?? null),
+        casualIdNumber:  data.customerId ? null : (data.casualIdNumber  ?? null),
         productId:       firstLine.productId,
         weight:          firstWeight.toDecimalPlaces(3),
         photoR2Keys:     firstLine.photoR2Keys,

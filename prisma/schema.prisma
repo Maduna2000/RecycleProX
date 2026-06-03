@@ -804,6 +804,7 @@ model ScaleOrder {
   casualFirstName String?
   casualLastName  String?
   casualPhone     String?
+  casualIdNumber  String?
   productId       String
   weight          Decimal          @db.Decimal(18, 3)
   photoR2Keys     String[]

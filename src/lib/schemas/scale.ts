@@ -11,6 +11,7 @@ export const CreateScaleOrderSchema = z.object({
   casualFirstName: z.string().min(1).optional(),
   casualLastName:  z.string().min(1).optional(),
   casualPhone:     z.string().min(7).optional(),
+  casualIdNumber:  z.string().optional(),
   lines:           z.array(LineInputSchema).min(1).max(20),
   notes:           z.string().max(500).optional(),
 }).refine(

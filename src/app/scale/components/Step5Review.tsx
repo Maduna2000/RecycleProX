@@ -31,7 +31,7 @@ export default function Step5Review({ customer, cart, onRemoveLine, onNewOrder }
 
       const payload = customer.id
         ? { customerId: customer.id, lines }
-        : { casualFirstName: customer.firstName, casualLastName: customer.lastName, casualPhone: customer.phone, lines }
+        : { casualFirstName: customer.firstName, casualLastName: customer.lastName, casualPhone: customer.phone, casualIdNumber: customer.idNumber, lines }
 
       const res = await fetch('/api/scale/orders', {
         method:  'POST',

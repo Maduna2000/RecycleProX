@@ -21,6 +21,7 @@ export interface SelectedCustomer {
   firstName: string
   lastName:  string
   phone:     string
+  idNumber?: string
   isNew?:    boolean
 }
 
@@ -71,7 +72,7 @@ export default function Step1Customer({ onSelect }: Props) {
   }, [mode, searchQuery])
 
   function handleCasualSubmit(data: CasualForm) {
-    onSelect({ id: null, firstName: data.firstName, lastName: data.lastName, phone: data.phone, isNew: true })
+    onSelect({ id: null, firstName: data.firstName, lastName: data.lastName, phone: data.phone, idNumber: data.idNumber || undefined, isNew: true })
   }
 
   // ── Mode: choose ──────────────────────────────────────────────────────────

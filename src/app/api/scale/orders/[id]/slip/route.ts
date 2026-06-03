@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
-import { getScaleOrderById, saveSlipKey, resolveCustomerName, resolveCustomerPhone, ScaleOrderNotFoundError } from '@/lib/services/scaleService'
+import { getScaleOrderById, saveSlipKey, resolveCustomerName, resolveCustomerPhone, resolveCustomerIdNumber, ScaleOrderNotFoundError } from '@/lib/services/scaleService'
 import { getAllSettings } from '@/lib/services/settingsService'
 import { generateScaleOrderSlip } from '@/lib/pdf/scaleSlip'
 import { uploadBytes, scaleOrderSlipKey } from '@/lib/r2'
@@ -28,13 +28,15 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
           weight:       `${new Decimal(order.weight.toString()).toFixed(3)} ${order.product.unit}`,
         }]
 
+    const idNumber = resolveCustomerIdNumber(order)
     const pdfBytes = await generateScaleOrderSlip({
-      orderNumber:   order.orderNumber,
-      createdAt:     order.createdAt,
-      customerName:  resolveCustomerName(order),
-      customerPhone: resolveCustomerPhone(order),
-      lines:         slipLines,
-      operatorName:  order.operator.fullName,
+      orderNumber:      order.orderNumber,
+      createdAt:        order.createdAt,
+      customerName:     resolveCustomerName(order),
+      customerPhone:    resolveCustomerPhone(order),
+      customerIdNumber: idNumber || undefined,
+      lines:            slipLines,
+      operatorName:     order.operator.fullName,
       yardName,
     })
 
