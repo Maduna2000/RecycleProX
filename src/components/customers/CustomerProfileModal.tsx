@@ -126,7 +126,7 @@ export function CustomerProfileModal({
 
   return (
     <Dialog open={!!customerId} onOpenChange={(o) => { if (!o) handleClose() }}>
-      <DialogContent className="sm:max-w-5xl h-[92vh] flex flex-col overflow-hidden p-0" showCloseButton={false}>
+      <DialogContent className="sm:max-w-3xl h-[92vh] flex flex-col overflow-hidden p-0" showCloseButton={false}>
         <ModalTitleBar title="Customer Profile" onClose={handleClose} />
 
         {isLoading && (
@@ -253,7 +253,7 @@ function Section({ title, children, cols = 2 }: { title: string; children: React
       <div style={sHdrStyle}>
         <span style={{ fontSize: 11, fontWeight: 700, color: '#1B3A6B' }}>{title}</span>
       </div>
-      <dl style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: '8px 16px', padding: '10px 12px' }}>
+      <dl style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: '8px 12px', padding: '10px 12px' }}>
         {children}
       </dl>
     </div>
@@ -265,9 +265,17 @@ function Field({ label, value, mono, span2 }: { label: string; value?: string | 
   return (
     <div style={span2 ? { gridColumn: 'span 2' } : undefined}>
       <span style={lblStyle}>{label}</span>
-      <span style={{ display: 'block', fontSize: 12, color: display === '—' ? '#9CA3AF' : '#212529', fontFamily: mono ? 'monospace' : undefined, minHeight: 16, lineHeight: '16px' }}>
+      <div style={{
+        height: 26, border: '1px solid #D0D0D0', borderRadius: 2,
+        background: '#F8F8F8', padding: '0 7px', fontSize: 12,
+        color: display === '—' ? '#9CA3AF' : '#212529',
+        fontFamily: mono ? 'monospace' : undefined,
+        display: 'flex', alignItems: 'center',
+        boxSizing: 'border-box' as const,
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const,
+      }}>
         {display}
-      </span>
+      </div>
     </div>
   )
 }
@@ -280,7 +288,7 @@ function OverviewTab({ customer }: { customer: Customer }) {
   const fmtMoney = (v?: string | null) => v ? `R ${parseFloat(v).toFixed(2)}` : null
 
   return (
-    <div style={{ border: '1px solid #D0D0D0', margin: 8, borderRadius: 2, overflow: 'hidden' }}>
+    <div>
       <Section title="Personal Details">
         <Field label="First Name"       value={customer.firstName} />
         <Field label="Last Name"        value={customer.lastName} />
@@ -351,23 +359,26 @@ function TransactionsTab({ customerId }: { customerId: string }) {
     )
   }
   return (
-    <div style={{ margin: 8, border: '1px solid #D0D0D0', borderRadius: 2, overflow: 'hidden' }}>
+    <div style={{ borderBottom: '1px solid #E0E0E0' }}>
+      <div style={sHdrStyle}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: '#1B3A6B' }}>Transactions</span>
+      </div>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
         <thead>
-          <tr style={{ background: 'linear-gradient(180deg,#FFFFFF 0%,#E8E8E8 100%)', borderBottom: '1px solid #C0C0C0' }}>
+          <tr style={{ background: '#F8F8F8', borderBottom: '1px solid #E0E0E0' }}>
             {['Date', 'Reference', 'Type', 'Amount', 'Status'].map((h) => (
-              <th key={h} style={{ textAlign: 'left', padding: '5px 10px', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#6C757D' }}>{h}</th>
+              <th key={h} style={{ textAlign: 'left', padding: '5px 12px', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#6C757D' }}>{h}</th>
             ))}
           </tr>
         </thead>
         <tbody>
           {data.transactions.map((tx: { id: string; type: string; reference: string; date: string; amount: string; status: string }, i: number) => (
-            <tr key={tx.id} style={{ borderTop: i > 0 ? '1px solid #F0F0F0' : undefined, background: i % 2 === 0 ? '#FAFAFA' : '#FFFFFF' }}>
-              <td style={{ padding: '5px 10px', color: '#6C757D' }}>{new Date(tx.date).toLocaleDateString('en-ZA')}</td>
-              <td style={{ padding: '5px 10px', fontFamily: 'monospace', color: '#212529' }}>{tx.reference}</td>
-              <td style={{ padding: '5px 10px', textTransform: 'capitalize', color: '#212529' }}>{tx.type}</td>
-              <td style={{ padding: '5px 10px', color: '#212529' }}>R {tx.amount}</td>
-              <td style={{ padding: '5px 10px', textTransform: 'capitalize', color: '#6C757D' }}>{tx.status}</td>
+            <tr key={tx.id} style={{ borderTop: '1px solid #F0F0F0', background: i % 2 === 0 ? '#FAFAFA' : '#FFFFFF' }}>
+              <td style={{ padding: '5px 12px', color: '#6C757D' }}>{new Date(tx.date).toLocaleDateString('en-ZA')}</td>
+              <td style={{ padding: '5px 12px', fontFamily: 'monospace', color: '#212529' }}>{tx.reference}</td>
+              <td style={{ padding: '5px 12px', textTransform: 'capitalize', color: '#212529' }}>{tx.type}</td>
+              <td style={{ padding: '5px 12px', color: '#212529' }}>R {tx.amount}</td>
+              <td style={{ padding: '5px 12px', textTransform: 'capitalize', color: '#6C757D' }}>{tx.status}</td>
             </tr>
           ))}
         </tbody>
@@ -447,9 +458,9 @@ function DocumentsTab({ customer, onPhotoSaved }: { customer: Customer; onPhotoS
   }
 
   return (
-    <div style={{ margin: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div>
       {/* Compliance Documents */}
-      <div style={{ border: '1px solid #D0D0D0', borderRadius: 2, overflow: 'hidden' }}>
+      <div style={{ borderBottom: '1px solid #E0E0E0' }}>
         <div style={sHdrStyle}>
           <span style={{ fontSize: 11, fontWeight: 700, color: '#1B3A6B' }}>Compliance Documents</span>
         </div>
@@ -493,7 +504,7 @@ function DocumentsTab({ customer, onPhotoSaved }: { customer: Customer; onPhotoS
       </div>
 
       {/* ID Photo */}
-      <div style={{ border: '1px solid #D0D0D0', borderRadius: 2, overflow: 'hidden' }}>
+      <div style={{ borderBottom: '1px solid #E0E0E0' }}>
         <div style={{ ...sHdrStyle, display: 'flex', alignItems: 'center', gap: 6 }}>
           <Camera style={{ width: 11, height: 11, color: '#1B3A6B' }} />
           <span style={{ fontSize: 11, fontWeight: 700, color: '#1B3A6B' }}>ID Document Photo</span>
@@ -530,7 +541,7 @@ function BlacklistTab({ customer, onAction, onUnblacklist }: {
   customer: Customer; onAction: () => void; onUnblacklist: () => void
 }) {
   return (
-    <div style={{ margin: 8, border: '1px solid #D0D0D0', borderRadius: 2, overflow: 'hidden' }}>
+    <div style={{ borderBottom: '1px solid #E0E0E0' }}>
       <div style={sHdrStyle}>
         <span style={{ fontSize: 11, fontWeight: 700, color: '#1B3A6B' }}>Blacklist Status</span>
       </div>
