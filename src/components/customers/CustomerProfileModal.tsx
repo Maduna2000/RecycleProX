@@ -194,7 +194,6 @@ export function CustomerProfileModal({
                   onClick={() => setTab(t)}
                   style={{
                     padding: '6px 14px', fontSize: 12, fontWeight: tab === t ? 700 : 400,
-                    borderBottom: tab === t ? '2px solid #217346' : '2px solid transparent',
                     color: tab === t ? '#217346' : '#6C757D',
                     background: 'none', border: 'none',
                     borderBottom: tab === t ? '2px solid #217346' : '2px solid transparent',
