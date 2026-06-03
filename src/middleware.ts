@@ -53,6 +53,11 @@ export default auth((req: NextRequest & { auth: { user?: { role?: string; forceP
       return NextResponse.redirect(new URL('/login', req.url))
     }
 
+    // Scale operators belong on the scale station, not the main app
+    if (session.user?.role === 'scale_operator') {
+      return NextResponse.redirect(new URL('/scale', req.url))
+    }
+
     // Force password change redirect
     if (session.user?.forcePasswordChange && pathname !== '/app/change-password') {
       return NextResponse.redirect(new URL('/app/change-password', req.url))
