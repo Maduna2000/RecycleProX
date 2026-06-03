@@ -10,8 +10,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { CheckCircle2, Calculator, Clock, Loader2, Lock, RefreshCw, ExternalLink } from 'lucide-react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { CheckCircle2, Calculator, Clock, Loader2, Lock, RefreshCw, ExternalLink, X } from 'lucide-react'
+import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { DENOMINATIONS, DENOMINATION_LABELS, type Denomination } from '@/lib/schemas/cashup'
 import { PageShell } from '@/components/layout/PageShell'
 import { colors } from '@/lib/design-tokens'
@@ -142,10 +142,14 @@ function CountCashModal({ counts, setCounts, notes, setNotes, submitting, handle
   )
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="text-sm font-semibold" style={{ color: colors.textPrimary }}>Count Cash</DialogTitle>
-        </DialogHeader>
+      <DialogContent className="sm:max-w-md" showCloseButton={false}>
+        {/* Title bar with close button — matches ManageCategoriesModal pattern */}
+        <div className="flex items-center justify-between pb-3 border-b" style={{ borderColor: colors.border }}>
+          <span className="font-semibold text-sm" style={{ color: colors.textPrimary }}>Count Cash</span>
+          <button onClick={onClose} className="rounded p-1 hover:bg-slate-100 transition-colors" aria-label="Close">
+            <X className="w-4 h-4" style={{ color: colors.textSecondary }} />
+          </button>
+        </div>
         <div className="space-y-3 mt-1">
 
           {/* Denomination table — bordered, scrollable, one row per denomination */}
