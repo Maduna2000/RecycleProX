@@ -15,7 +15,8 @@ export default auth((req: NextRequest & { auth: { user?: { role?: string; forceP
 
   // Public routes — always allow
   if (pathname.startsWith('/login') || pathname.startsWith('/police') ||
-      pathname === '/api/r2/test' || pathname === '/scale/login') {
+      pathname === '/api/r2/test' || pathname === '/scale/login' ||
+      pathname.startsWith('/api/mobile/')) {
     return NextResponse.next()
   }
 

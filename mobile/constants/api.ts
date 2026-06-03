@@ -1,6 +1,13 @@
 export const API_BASE_URL =
   process.env.EXPO_PUBLIC_API_URL ?? 'https://renovopros.vercel.app';
 
+// Session cookie name must match NextAuth's encoding salt:
+// HTTPS/production → __Secure-authjs.session-token
+// HTTP/dev         → authjs.session-token
+export const SESSION_COOKIE_NAME = __DEV__
+  ? 'authjs.session-token'
+  : '__Secure-authjs.session-token';
+
 export const SCALE_ENDPOINTS = {
   orders: '/api/scale/orders',
   order: (id: string) => `/api/scale/orders/${id}`,

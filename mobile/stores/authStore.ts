@@ -49,28 +49,20 @@ export const useAuthStore = create<AuthState & AuthActions>((set) => ({
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 10_000);
-      const res = await fetch(`${API_BASE_URL}/api/auth/session`, {
-        headers: { Cookie: `next-auth.session-token=${token}` },
+      const res = await fetch(`${API_BASE_URL}/api/mobile/session`, {
+        headers: { Authorization: `Bearer ${token}` },
         signal: controller.signal,
       });
       clearTimeout(timeout);
       if (!res.ok) return false;
-      let session: Record<string, unknown>;
+      let data: { user: SessionUser };
       try {
-        session = await res.json();
+        data = await res.json();
       } catch {
         return false;
       }
-      if (!session?.user || typeof session.user !== 'object') return false;
-      const u = session.user as Record<string, unknown>;
-      if (!u?.id) return false;
-      const user: SessionUser = {
-        id: String(u.id),
-        fullName: String(u.fullName ?? u.name ?? ''),
-        username: String(u.username ?? u.email ?? ''),
-        role: String(u.role ?? ''),
-      };
-      set({ user, token, isAuthenticated: true });
+      if (!data?.user?.id) return false;
+      set({ user: data.user, token, isAuthenticated: true });
       return true;
     } catch {
       return false;
