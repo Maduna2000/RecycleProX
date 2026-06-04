@@ -1,15 +1,19 @@
 'use client'
 
+import { useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { signOut, useSession } from 'next-auth/react'
 import { redirect } from 'next/navigation'
-import { LogOut, Scale } from 'lucide-react'
+import { LogOut, Scale, Printer } from 'lucide-react'
+import PrinterSetup from './components/PrinterSetup'
+import { PrinterContext } from './PrinterContext'
 
 export default function ScaleClientLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const isPublic = pathname === '/scale/login' || pathname.startsWith('/scale/admin')
 
   const { data: session, status } = useSession()
+  const [printerSetupOpen, setPrinterSetupOpen] = useState(false)
 
   if (isPublic) return <>{children}</>
 
@@ -44,15 +48,26 @@ export default function ScaleClientLayout({ children }: { children: React.ReactN
             {session.user.fullName}
           </span>
           <button
+            onClick={() => setPrinterSetupOpen(true)}
+            className="min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-300 hover:text-white rounded-lg transition-colors"
+            aria-label="Printer settings"
+          >
+            <Printer className="w-4 h-4" />
+          </button>
+          <button
             onClick={() => signOut({ callbackUrl: '/scale/login' })}
-            className="flex items-center gap-1.5 text-slate-300 hover:text-white text-sm transition-colors px-2 py-1 rounded"
+            className="flex items-center gap-1.5 text-slate-300 hover:text-white text-sm transition-colors px-3 min-h-[44px] rounded-lg"
+            aria-label="Sign out"
           >
             <LogOut className="w-4 h-4" />
             <span className="hidden sm:block">Sign out</span>
           </button>
         </div>
       </header>
-      <main className="flex-1 flex flex-col">{children}</main>
+      <PrinterContext.Provider value={{ openPrinterSetup: () => setPrinterSetupOpen(true) }}>
+        <main className="flex-1 flex flex-col">{children}</main>
+      </PrinterContext.Provider>
+      <PrinterSetup open={printerSetupOpen} onClose={() => setPrinterSetupOpen(false)} />
     </div>
   )
 }

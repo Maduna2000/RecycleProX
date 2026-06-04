@@ -124,7 +124,7 @@ export default function Step1Customer({ onSelect }: Props) {
         <p className="text-slate-500 mb-6">Enter the walk-in customer&apos;s information</p>
 
         <form onSubmit={form.handleSubmit(handleCasualSubmit)} className="flex flex-col gap-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="text-sm font-medium text-slate-700 block mb-1">First Name *</label>
               <input

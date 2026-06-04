@@ -131,7 +131,8 @@ export default function Step4Photos({ orderId, onConfirm }: Props) {
                 {!slot.uploading && (
                   <button
                     onClick={() => { updateSlot(i, { key: null, preview: null }); clearUploadError(i); inputRefs[i]?.current?.click() }}
-                    className="absolute top-2 right-2 bg-white/90 rounded-full p-1.5 shadow"
+                    className="absolute top-2 right-2 bg-white/90 rounded-full shadow min-h-[44px] min-w-[44px] flex items-center justify-center"
+                    aria-label="Retake photo"
                   >
                     <RefreshCw className="w-4 h-4 text-slate-600" />
                   </button>

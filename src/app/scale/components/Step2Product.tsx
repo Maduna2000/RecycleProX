@@ -174,7 +174,7 @@ export default function Step2Product({ onSelect }: Props) {
 
   // ── Category grid ──────────────────────────────────────────────────────────
   return (
-    <div className="flex-1 flex flex-col p-5">
+    <div className="flex-1 flex flex-col p-5 max-w-lg mx-auto w-full">
       <h2 className="text-2xl font-bold text-slate-800 mb-1">Select Category</h2>
       <p className="text-slate-500 mb-5">Choose the type of material</p>
 

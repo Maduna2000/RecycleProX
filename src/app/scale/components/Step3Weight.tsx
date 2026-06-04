@@ -39,7 +39,7 @@ export default function Step3Weight({ unit, onConfirm }: Props) {
       : 'border-slate-300 focus:border-emerald-500'
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center p-6 max-w-md mx-auto w-full">
+    <div className="flex-1 flex flex-col items-center justify-start pt-8 p-6 max-w-md mx-auto w-full">
       <h2 className="text-2xl font-bold text-slate-800 mb-1 text-center">Enter Weight</h2>
       <p className="text-slate-500 mb-8 text-center">Enter the scale reading in {unit}</p>
 
