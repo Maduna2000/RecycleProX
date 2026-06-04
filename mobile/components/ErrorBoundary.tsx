@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity } from 'react-native';
 import { COLORS } from '@/constants/theme';
 
 type Props = { children: React.ReactNode };
@@ -13,15 +13,14 @@ export class ErrorBoundary extends React.Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
-    // Log to external crash reporter here when available
     console.error('[ErrorBoundary]', error.message, info.componentStack);
   }
 
   render() {
     if (this.state.hasError) {
       return (
-        <ScrollView
-          contentContainerStyle={{
+        <View
+          style={{
             flex: 1,
             alignItems: 'center',
             justifyContent: 'center',
@@ -50,7 +49,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
           >
             <Text style={{ color: COLORS.white, fontSize: 17, fontWeight: '700' }}>Try Again</Text>
           </TouchableOpacity>
-        </ScrollView>
+        </View>
       );
     }
     return this.props.children;
