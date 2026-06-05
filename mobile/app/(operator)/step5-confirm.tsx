@@ -97,7 +97,7 @@ export default function Step5Confirm() {
       {/* Bottom CTAs */}
       <View style={{ paddingHorizontal: 20, paddingBottom: 24, gap: 12 }}>
         <TouchableOpacity
-          onPress={() => { handleConfirmLine(); handleAddAnother(); }}
+          onPress={() => { confirmLine(); handleAddAnother(); }}
           style={{
             backgroundColor: COLORS.white,
             borderRadius: 14,
@@ -113,7 +113,7 @@ export default function Step5Confirm() {
         </TouchableOpacity>
 
         <TouchableOpacity
-          onPress={() => { handleConfirmLine(); handleReview(); }}
+          onPress={() => { confirmLine(); handleReview(); }}
           style={{
             backgroundColor: COLORS.green,
             borderRadius: 14,

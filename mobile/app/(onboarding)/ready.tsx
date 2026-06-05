@@ -6,8 +6,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS } from '@/constants/theme';
 
 async function completeOnboarding() {
-  await AsyncStorage.setItem('onboarding_complete', 'true');
-  router.replace('/(auth)/login');
+  try {
+    await AsyncStorage.setItem('onboarding_complete', 'true');
+    router.replace('/(auth)/login');
+  } catch {
+    router.replace('/(auth)/login');
+  }
 }
 
 export default function OnboardingReady() {

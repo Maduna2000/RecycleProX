@@ -160,7 +160,7 @@ export default function Step1Customer() {
                         }}
                       >
                         <Text style={{ color: COLORS.navy, fontWeight: '700' }}>
-                          {c.firstName[0]}{c.lastName[0]}
+                          {c.firstName[0] ?? '?'}{c.lastName[0] ?? '?'}
                         </Text>
                       </View>
                       <View style={{ flex: 1 }}>

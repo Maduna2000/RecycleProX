@@ -84,7 +84,7 @@ export default function Step6Review() {
         {/* Lines */}
         <FlatList
           data={lines}
-          keyExtractor={(_, i) => String(i)}
+          keyExtractor={(line, i) => `${line.product.id}_${i}`}
           contentContainerStyle={{ paddingHorizontal: 20, gap: 10 }}
           ListHeaderComponent={
             <Text style={{ color: COLORS.gray600, fontWeight: '700', fontSize: 13, textTransform: 'uppercase', marginBottom: 4 }}>

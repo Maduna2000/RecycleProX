@@ -14,11 +14,19 @@ export async function signIn(
   username: string,
   password: string
 ): Promise<{ token: string; user: SessionUser }> {
-  const res = await fetch(`${API_BASE_URL}/api/mobile/signin`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, password }),
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15_000);
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE_URL}/api/mobile/signin`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
 
   const data = await res.json().catch(() => ({})) as { token?: string; user?: SessionUser; error?: string };
 
