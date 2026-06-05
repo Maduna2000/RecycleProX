@@ -1,215 +1,148 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, FlatList,
-  KeyboardAvoidingView, Platform, ActivityIndicator,
+  ActivityIndicator, StyleSheet,
 } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useQuery } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { useOrderStore } from '@/stores/orderStore';
-import { searchCustomers } from '@/services/scaleService';
+import { searchCustomers, CustomerSearchResult } from '@/services/scaleService';
 import { StepProgressBar } from '@/components/StepProgressBar';
 import { OfflineBanner } from '@/components/OfflineBanner';
-import { SkeletonList } from '@/components/ui/SkeletonList';
-import { COLORS, MIN_TOUCH_TARGET } from '@/constants/theme';
+import { COLORS } from '@/constants/theme';
+
+type Mode = 'casual' | 'account';
 
 export default function Step1Customer() {
-  const [mode, setMode] = useState<'casual' | 'account'>('casual');
-  const [search, setSearch] = useState('');
-  const [casualForm, setCasualForm] = useState({ firstName: '', lastName: '', phone: '' });
+  const [mode, setMode] = useState<Mode>('casual');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<CustomerSearchResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { setCustomer } = useOrderStore();
 
-  const { data: results, isLoading, isFetching } = useQuery({
-    queryKey: ['customers', search],
-    queryFn: () => searchCustomers(search),
-    enabled: mode === 'account' && search.length >= 2,
-    staleTime: 30_000,
-  });
+  useEffect(() => {
+    if (mode !== 'account') return;
+    if (debounce.current) clearTimeout(debounce.current);
+    if (query.trim().length < 2) { setResults([]); return; }
+    debounce.current = setTimeout(async () => {
+      setSearching(true);
+      try { setResults(await searchCustomers(query.trim())); }
+      catch { setResults([]); }
+      finally { setSearching(false); }
+    }, 400);
+    return () => { if (debounce.current) clearTimeout(debounce.current); };
+  }, [query, mode]);
 
-  const canProceedCasual = casualForm.firstName.trim() && casualForm.lastName.trim();
-
-  const handleCasualNext = () => {
+  function selectCasual() {
+    if (!firstName.trim() || !lastName.trim()) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setCustomer({ type: 'casual', ...casualForm });
+    setCustomer({ type: 'casual', firstName: firstName.trim(), lastName: lastName.trim(), phone: phone.trim() });
     router.push('/(operator)/step2-product');
-  };
+  }
 
-  const handleSelectAccount = (c: NonNullable<typeof results>[0]) => {
+  function selectAccount(c: CustomerSearchResult) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setCustomer({
-      type: 'account',
-      customerId: c.id,
-      firstName: c.firstName,
-      lastName: c.lastName,
-      phone: c.phone,
-      companyName: c.companyName,
-    });
+    setCustomer({ type: 'account', customerId: c.id, firstName: c.firstName, lastName: c.lastName, phone: c.phone });
     router.push('/(operator)/step2-product');
-  };
+  }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.offWhite }}>
+    <SafeAreaView style={styles.safe}>
       <StepProgressBar currentStep={1} />
       <OfflineBanner />
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <View style={{ flex: 1, paddingHorizontal: 20 }}>
-          <Text style={{ color: COLORS.navy, fontSize: 22, fontWeight: '800', marginTop: 20, marginBottom: 20 }}>
-            Who is the customer?
-          </Text>
+      <View style={styles.header}>
+        <Text style={styles.title}>Customer</Text>
+        <Text style={styles.sub}>Walk-in or account customer?</Text>
+      </View>
 
-          {/* Mode tabs */}
-          <View style={{ flexDirection: 'row', backgroundColor: COLORS.gray100, borderRadius: 12, padding: 4, marginBottom: 24 }}>
-            {(['casual', 'account'] as const).map((m) => (
-              <TouchableOpacity
-                key={m}
-                onPress={() => setMode(m)}
-                style={{
-                  flex: 1,
-                  paddingVertical: 10,
-                  borderRadius: 10,
-                  alignItems: 'center',
-                  backgroundColor: mode === m ? COLORS.white : 'transparent',
-                }}
-              >
-                <Text style={{ color: mode === m ? COLORS.navy : COLORS.gray500, fontWeight: mode === m ? '700' : '400', fontSize: 15 }}>
-                  {m === 'casual' ? '🚶 Walk-in' : '🏢 Account'}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+      <View style={styles.tabs}>
+        {(['casual', 'account'] as Mode[]).map(m => (
+          <TouchableOpacity
+            key={m}
+            style={[styles.tab, mode === m && styles.tabActive]}
+            onPress={() => setMode(m)}
+          >
+            <Text style={[styles.tabText, mode === m && styles.tabTextActive]}>
+              {m === 'casual' ? 'Walk-in' : 'Account'}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
 
-          {mode === 'casual' ? (
-            <View style={{ gap: 14 }}>
-              {[
-                { label: 'First Name *', field: 'firstName' as const, placeholder: 'e.g. John' },
-                { label: 'Last Name *', field: 'lastName' as const, placeholder: 'e.g. Smith' },
-                { label: 'Phone (optional)', field: 'phone' as const, placeholder: 'e.g. 072 000 0000' },
-              ].map(({ label, field, placeholder }) => (
-                <View key={field}>
-                  <Text style={{ color: COLORS.gray600, fontSize: 13, fontWeight: '600', marginBottom: 6 }}>
-                    {label.toUpperCase()}
-                  </Text>
-                  <TextInput
-                    style={{
-                      backgroundColor: COLORS.white,
-                      borderRadius: 12,
-                      paddingHorizontal: 16,
-                      minHeight: MIN_TOUCH_TARGET + 4,
-                      fontSize: 16,
-                      color: COLORS.gray800,
-                      borderWidth: 1,
-                      borderColor: COLORS.gray200,
-                    }}
-                    placeholder={placeholder}
-                    value={casualForm[field]}
-                    onChangeText={(v) => setCasualForm((f) => ({ ...f, [field]: v }))}
-                    keyboardType={field === 'phone' ? 'phone-pad' : 'default'}
-                    returnKeyType="next"
-                  />
-                </View>
-              ))}
-            </View>
-          ) : (
-            <View style={{ flex: 1, gap: 12 }}>
-              <TextInput
-                style={{
-                  backgroundColor: COLORS.white,
-                  borderRadius: 12,
-                  paddingHorizontal: 16,
-                  minHeight: MIN_TOUCH_TARGET + 4,
-                  fontSize: 16,
-                  color: COLORS.gray800,
-                  borderWidth: 1,
-                  borderColor: COLORS.gray200,
-                }}
-                placeholder="Search by name or ID..."
-                value={search}
-                onChangeText={setSearch}
-                returnKeyType="search"
-              />
-              {(isLoading || isFetching) && search.length >= 2 ? (
-                <SkeletonList rows={4} showAvatar />
-              ) : results && results.length > 0 ? (
-                <FlatList
-                  data={results}
-                  keyExtractor={(c) => c.id}
-                  renderItem={({ item: c }) => (
-                    <TouchableOpacity
-                      onPress={() => handleSelectAccount(c)}
-                      style={{
-                        backgroundColor: COLORS.white,
-                        borderRadius: 12,
-                        padding: 16,
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: 12,
-                        borderWidth: 1,
-                        borderColor: COLORS.gray200,
-                      }}
-                    >
-                      <View
-                        style={{
-                          width: 40,
-                          height: 40,
-                          borderRadius: 20,
-                          backgroundColor: COLORS.navy + '15',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
-                      >
-                        <Text style={{ color: COLORS.navy, fontWeight: '700' }}>
-                          {c.firstName[0] ?? '?'}{c.lastName[0] ?? '?'}
-                        </Text>
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={{ color: COLORS.gray800, fontWeight: '600', fontSize: 15 }}>
-                          {c.firstName} {c.lastName}
-                        </Text>
-                        {c.companyName && (
-                          <Text style={{ color: COLORS.gray500, fontSize: 13 }}>{c.companyName}</Text>
-                        )}
-                      </View>
-                      <Text style={{ color: COLORS.green, fontSize: 20 }}>›</Text>
-                    </TouchableOpacity>
-                  )}
-                  ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
-                  showsVerticalScrollIndicator={false}
-                />
-              ) : search.length >= 2 ? (
-                <Text style={{ color: COLORS.gray500, textAlign: 'center', marginTop: 20 }}>
-                  No customers found for "{search}"
-                </Text>
-              ) : (
-                <Text style={{ color: COLORS.gray400, textAlign: 'center', marginTop: 20 }}>
-                  Type at least 2 characters to search
-                </Text>
-              )}
-            </View>
-          )}
+      {mode === 'casual' ? (
+        <View style={styles.form}>
+          <Text style={styles.label}>First Name *</Text>
+          <TextInput style={styles.input} value={firstName} onChangeText={setFirstName}
+            placeholder="e.g. John" placeholderTextColor={COLORS.gray400} autoCapitalize="words" />
+          <Text style={styles.label}>Last Name *</Text>
+          <TextInput style={styles.input} value={lastName} onChangeText={setLastName}
+            placeholder="e.g. Smith" placeholderTextColor={COLORS.gray400} autoCapitalize="words" />
+          <Text style={styles.label}>Phone (optional)</Text>
+          <TextInput style={styles.input} value={phone} onChangeText={setPhone}
+            placeholder="e.g. 076 123 4567" placeholderTextColor={COLORS.gray400} keyboardType="phone-pad" />
         </View>
+      ) : (
+        <View style={styles.form}>
+          <Text style={styles.label}>Search by name or ID</Text>
+          <TextInput style={styles.input} value={query} onChangeText={setQuery}
+            placeholder="Type at least 2 characters..." placeholderTextColor={COLORS.gray400} autoCapitalize="none" />
+          {searching && <ActivityIndicator color={COLORS.green} style={{ marginTop: 8 }} />}
+          <FlatList
+            data={results}
+            keyExtractor={c => c.id}
+            style={{ maxHeight: 240 }}
+            renderItem={({ item: c }) => (
+              <TouchableOpacity style={styles.resultRow} onPress={() => selectAccount(c)}>
+                <Text style={styles.resultName}>{c.firstName} {c.lastName}</Text>
+                {c.phone ? <Text style={styles.resultSub}>{c.phone}</Text> : null}
+              </TouchableOpacity>
+            )}
+          />
+        </View>
+      )}
 
-        {/* CTA */}
+      <View style={styles.footer}>
         {mode === 'casual' && (
-          <View style={{ paddingHorizontal: 20, paddingBottom: 24, paddingTop: 12 }}>
-            <TouchableOpacity
-              onPress={handleCasualNext}
-              disabled={!canProceedCasual}
-              style={{
-                backgroundColor: canProceedCasual ? COLORS.green : COLORS.gray300,
-                borderRadius: 14,
-                paddingVertical: 16,
-                alignItems: 'center',
-                minHeight: 54,
-              }}
-              activeOpacity={0.85}
-            >
-              <Text style={{ color: COLORS.white, fontSize: 17, fontWeight: '700' }}>Next →</Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity
+            style={[styles.nextBtn, (!firstName.trim() || !lastName.trim()) && styles.btnDisabled]}
+            onPress={selectCasual}
+            disabled={!firstName.trim() || !lastName.trim()}
+          >
+            <Text style={styles.nextBtnText}>Next →</Text>
+          </TouchableOpacity>
         )}
-      </KeyboardAvoidingView>
+      </View>
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: COLORS.offWhite },
+  header: { padding: 20, backgroundColor: COLORS.white, borderBottomWidth: 1, borderBottomColor: COLORS.gray100 },
+  title: { color: COLORS.navy, fontSize: 22, fontWeight: '800', marginBottom: 2 },
+  sub: { color: COLORS.gray500, fontSize: 14 },
+  tabs: { flexDirection: 'row', margin: 20, backgroundColor: COLORS.gray100, borderRadius: 10, padding: 4 },
+  tab: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 8 },
+  tabActive: { backgroundColor: COLORS.white, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 2 },
+  tabText: { color: COLORS.gray500, fontWeight: '600', fontSize: 14 },
+  tabTextActive: { color: COLORS.navy },
+  form: { flex: 1, paddingHorizontal: 20 },
+  label: { color: COLORS.gray600, fontSize: 13, fontWeight: '600', marginBottom: 4, marginTop: 12 },
+  input: {
+    backgroundColor: COLORS.white, borderRadius: 10, padding: 14,
+    color: COLORS.gray800, fontSize: 16, borderWidth: 1, borderColor: COLORS.gray200,
+  },
+  resultRow: { backgroundColor: COLORS.white, padding: 14, borderRadius: 10, marginTop: 6, borderWidth: 1, borderColor: COLORS.gray200 },
+  resultName: { color: COLORS.gray800, fontWeight: '600', fontSize: 15 },
+  resultSub: { color: COLORS.gray500, fontSize: 13, marginTop: 2 },
+  footer: { padding: 20 },
+  nextBtn: { backgroundColor: COLORS.green, borderRadius: 14, paddingVertical: 16, alignItems: 'center', minHeight: 54 },
+  btnDisabled: { opacity: 0.4 },
+  nextBtnText: { color: COLORS.white, fontSize: 17, fontWeight: '700' },
+});

@@ -32,7 +32,6 @@
     },
     "plugins": [
       "expo-router",
-      "./modules/expo-thermal-printer",
       [
         "expo-splash-screen",
         {

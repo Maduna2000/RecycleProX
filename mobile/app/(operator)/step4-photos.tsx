@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Image, ActivityIndicator, Alert } from 'react-native';
+import {
+  View, Text, TouchableOpacity, Image, ActivityIndicator, Alert, StyleSheet, ScrollView,
+} from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
@@ -9,176 +11,128 @@ import { useOrderStore } from '@/stores/orderStore';
 import { getPresignedUploadUrl, uploadToR2 } from '@/services/scaleService';
 import { StepProgressBar } from '@/components/StepProgressBar';
 import { OfflineBanner } from '@/components/OfflineBanner';
-import { COLORS, MIN_TOUCH_TARGET } from '@/constants/theme';
+import { COLORS } from '@/constants/theme';
 
-const SLOTS = [
-  { label: 'Scale Reading', hint: 'Photo of the scale display showing the weight', emoji: '⚖️' },
-  { label: 'Product / Load', hint: 'Photo of the material being weighed', emoji: '📦' },
-];
+type Slot = { uri: string; r2Key: string } | null;
 
 export default function Step4Photos() {
-  const [photos, setPhotos] = useState<Array<{ uri: string; r2Key: string } | null>>([null, null]);
+  const [slots, setSlots] = useState<[Slot, Slot]>([null, null]);
   const [uploading, setUploading] = useState<[boolean, boolean]>([false, false]);
   const { currentProduct, addPhoto, goToStep } = useOrderStore();
 
-  const canProceed = photos.every((p) => p !== null);
-
-  const handleCapture = async (slotIndex: number) => {
-    const permission = await ImagePicker.requestCameraPermissionsAsync();
-    if (!permission.granted) {
-      Alert.alert(
-        'Camera Access Required',
-        'ScaleStation needs camera access to photograph scale readings. Please enable it in Settings.',
-        [{ text: 'OK' }]
-      );
+  async function captureSlot(idx: 0 | 1) {
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert('Permission needed', 'Camera access is required to take photos.');
       return;
     }
-
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.9,
-      allowsEditing: false,
-    });
-
+    const result = await ImagePicker.launchCameraAsync({ quality: 0.9, base64: false });
     if (result.canceled || !result.assets[0]) return;
 
-    setUploading((prev) => { const next = [...prev] as [boolean, boolean]; next[slotIndex] = true; return next; });
-
+    const raw = result.assets[0];
+    setUploading(prev => { const n = [...prev] as [boolean,boolean]; n[idx] = true; return n; });
     try {
-      // Compress: max 1280px, 82% JPEG quality
       const compressed = await ImageManipulator.manipulateAsync(
-        result.assets[0].uri,
+        raw.uri,
         [{ resize: { width: 1280 } }],
         { compress: 0.82, format: ImageManipulator.SaveFormat.JPEG }
       );
-
-      const filename = `scale-${Date.now()}-${slotIndex}.jpg`;
+      const filename = `scale_${Date.now()}_${idx}.jpg`;
       const { uploadUrl, r2Key } = await getPresignedUploadUrl(filename, 'image/jpeg');
       await uploadToR2(uploadUrl, compressed.uri, 'image/jpeg');
-
-      setPhotos((prev) => {
-        const next = [...prev];
-        next[slotIndex] = { uri: compressed.uri, r2Key };
-        return next;
-      });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch {
+      setSlots(prev => { const n = [...prev] as [Slot,Slot]; n[idx] = { uri: compressed.uri, r2Key }; return n; });
+    } catch (e) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert('Upload Failed', 'Could not upload photo. Please try again.');
+      Alert.alert('Upload failed', 'Could not upload photo. Check your connection and try again.');
     } finally {
-      setUploading((prev) => { const next = [...prev] as [boolean, boolean]; next[slotIndex] = false; return next; });
+      setUploading(prev => { const n = [...prev] as [boolean,boolean]; n[idx] = false; return n; });
     }
-  };
+  }
 
-  const handleRetake = (index: number) => {
-    setPhotos((prev) => { const next = [...prev]; next[index] = null; return next; });
-  };
-
-  const handleNext = () => {
-    photos.forEach((p) => { if (p) addPhoto(p.uri, p.r2Key); });
+  function handleNext() {
+    if (!slots[0] || !slots[1]) return;
+    addPhoto(slots[0].uri, slots[0].r2Key);
+    addPhoto(slots[1].uri, slots[1].r2Key);
+    goToStep(5);
     router.push('/(operator)/step5-confirm');
-  };
+  }
+
+  const LABELS = ['Scale Reading', 'Product / Load'];
+  const bothDone = slots[0] !== null && slots[1] !== null;
+  const anyUploading = uploading[0] || uploading[1];
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.offWhite }}>
+    <SafeAreaView style={styles.safe}>
       <StepProgressBar currentStep={4} />
       <OfflineBanner />
+      <ScrollView>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Text style={styles.back}>‹ Back</Text>
+          </TouchableOpacity>
+          <Text style={styles.title}>Photos</Text>
+          <Text style={styles.sub}>Both photos are required · {currentProduct?.name}</Text>
+        </View>
 
-      <View style={{ flex: 1, padding: 20 }}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Text style={{ color: COLORS.blue, fontSize: 15, marginBottom: 12 }}>‹ Back</Text>
-        </TouchableOpacity>
-        <Text style={{ color: COLORS.navy, fontSize: 22, fontWeight: '800', marginBottom: 6 }}>
-          Take Photos
-        </Text>
-        <Text style={{ color: COLORS.gray500, fontSize: 14, marginBottom: 24 }}>
-          Both photos are required before proceeding.
-        </Text>
-
-        <View style={{ gap: 16 }}>
-          {SLOTS.map((slot, i) => (
-            <View key={slot.label}>
-              <Text style={{ color: COLORS.gray600, fontWeight: '700', fontSize: 14, marginBottom: 8 }}>
-                {i + 1}. {slot.label}
-              </Text>
-              {photos[i] ? (
-                <View style={{ borderRadius: 14, overflow: 'hidden', position: 'relative' }}>
-                  <Image
-                    source={{ uri: photos[i]!.uri }}
-                    style={{ width: '100%', height: 180, borderRadius: 14 }}
-                    resizeMode="cover"
-                  />
-                  <TouchableOpacity
-                    onPress={() => handleRetake(i)}
-                    style={{
-                      position: 'absolute',
-                      top: 10,
-                      right: 10,
-                      backgroundColor: 'rgba(0,0,0,0.6)',
-                      borderRadius: 20,
-                      paddingHorizontal: 12,
-                      paddingVertical: 6,
-                    }}
-                  >
-                    <Text style={{ color: COLORS.white, fontSize: 13, fontWeight: '600' }}>Retake</Text>
+        <View style={styles.slots}>
+          {([0, 1] as const).map(idx => (
+            <View key={idx} style={styles.slot}>
+              <Text style={styles.slotLabel}>{LABELS[idx]}</Text>
+              {slots[idx] ? (
+                <View style={styles.photoPreview}>
+                  <Image source={{ uri: slots[idx]!.uri }} style={styles.photo} />
+                  <TouchableOpacity style={styles.retakeBtn} onPress={() => captureSlot(idx)}>
+                    <Text style={styles.retakeText}>Retake</Text>
                   </TouchableOpacity>
                 </View>
               ) : (
                 <TouchableOpacity
-                  onPress={() => handleCapture(i)}
-                  disabled={uploading[i]}
-                  style={{
-                    height: 160,
-                    backgroundColor: COLORS.white,
-                    borderRadius: 14,
-                    borderWidth: 2,
-                    borderColor: COLORS.gray200,
-                    borderStyle: 'dashed',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 10,
-                  }}
-                  activeOpacity={0.85}
+                  style={[styles.captureBtn, uploading[idx] && styles.btnDisabled]}
+                  onPress={() => captureSlot(idx)}
+                  disabled={uploading[idx]}
                 >
-                  {uploading[i] ? (
-                    <>
-                      <ActivityIndicator color={COLORS.navy} />
-                      <Text style={{ color: COLORS.gray500, fontSize: 13 }}>Uploading...</Text>
-                    </>
-                  ) : (
-                    <>
-                      <Text style={{ fontSize: 36 }}>{slot.emoji}</Text>
-                      <Text style={{ color: COLORS.navy, fontWeight: '700', fontSize: 15 }}>
-                        Tap to capture
-                      </Text>
-                      <Text style={{ color: COLORS.gray400, fontSize: 12, textAlign: 'center', paddingHorizontal: 20 }}>
-                        {slot.hint}
-                      </Text>
-                    </>
-                  )}
+                  {uploading[idx]
+                    ? <ActivityIndicator color={COLORS.white} />
+                    : <Text style={styles.captureBtnText}>📷 Take Photo</Text>
+                  }
                 </TouchableOpacity>
               )}
             </View>
           ))}
         </View>
-      </View>
 
-      <View style={{ paddingHorizontal: 20, paddingBottom: 24 }}>
-        <TouchableOpacity
-          onPress={handleNext}
-          disabled={!canProceed}
-          style={{
-            backgroundColor: canProceed ? COLORS.green : COLORS.gray300,
-            borderRadius: 14,
-            paddingVertical: 16,
-            alignItems: 'center',
-            minHeight: 54,
-          }}
-          activeOpacity={0.85}
-        >
-          <Text style={{ color: COLORS.white, fontSize: 17, fontWeight: '700' }}>Next →</Text>
-        </TouchableOpacity>
-      </View>
+        <View style={styles.footer}>
+          <TouchableOpacity
+            style={[styles.nextBtn, (!bothDone || anyUploading) && styles.btnDisabled]}
+            onPress={handleNext}
+            disabled={!bothDone || anyUploading}
+          >
+            <Text style={styles.nextBtnText}>Next → Confirm</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: COLORS.offWhite },
+  header: { padding: 20, backgroundColor: COLORS.white, borderBottomWidth: 1, borderBottomColor: COLORS.gray100 },
+  back: { color: COLORS.blue, fontSize: 15, marginBottom: 10 },
+  title: { color: COLORS.navy, fontSize: 22, fontWeight: '800', marginBottom: 2 },
+  sub: { color: COLORS.gray500, fontSize: 14 },
+  slots: { padding: 20, gap: 20 },
+  slot: { backgroundColor: COLORS.white, borderRadius: 14, padding: 16, borderWidth: 1, borderColor: COLORS.gray200 },
+  slotLabel: { color: COLORS.navy, fontWeight: '700', fontSize: 15, marginBottom: 12 },
+  captureBtn: { backgroundColor: COLORS.navy, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
+  btnDisabled: { opacity: 0.4 },
+  captureBtnText: { color: COLORS.white, fontWeight: '700', fontSize: 15 },
+  photoPreview: { gap: 8 },
+  photo: { width: '100%', height: 160, borderRadius: 10, resizeMode: 'cover' },
+  retakeBtn: { backgroundColor: COLORS.gray100, borderRadius: 10, paddingVertical: 10, alignItems: 'center' },
+  retakeText: { color: COLORS.gray600, fontWeight: '600', fontSize: 14 },
+  footer: { padding: 20 },
+  nextBtn: { backgroundColor: COLORS.green, borderRadius: 14, paddingVertical: 16, alignItems: 'center', minHeight: 54 },
+  nextBtnText: { color: COLORS.white, fontSize: 17, fontWeight: '700' },
+});

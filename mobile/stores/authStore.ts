@@ -11,7 +11,7 @@ type AuthState = {
 };
 
 type AuthActions = {
-  login: (username: string, password: string) => Promise<void>;
+  login: (username: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
   restoreSession: () => Promise<boolean>;
   clearError: () => void;
@@ -29,12 +29,13 @@ export const useAuthStore = create<AuthState & AuthActions>((set) => ({
     try {
       const { token, user } = await signIn(username, password);
       set({ user, token, isAuthenticated: true, isLoading: false });
+      return true;
     } catch (err) {
       set({
         isLoading: false,
         error: err instanceof Error ? err.message : 'Login failed',
       });
-      throw err;
+      return false;
     }
   },
 

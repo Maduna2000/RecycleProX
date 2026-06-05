@@ -1,205 +1,124 @@
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  ActivityIndicator,
-  Image,
+  View, Text, TextInput, TouchableOpacity, ActivityIndicator,
+  StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Image,
 } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useForm, Controller } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
+import * as Haptics from 'expo-haptics';
 import { useAuthStore } from '@/stores/authStore';
-import { COLORS, MIN_TOUCH_TARGET } from '@/constants/theme';
-
-const loginSchema = z.object({
-  username: z.string().min(1, 'Username is required'),
-  password: z.string().min(1, 'Password is required'),
-});
-type LoginForm = z.infer<typeof loginSchema>;
+import { COLORS } from '@/constants/theme';
 
 export default function LoginScreen() {
-  const [showPassword, setShowPassword] = useState(false);
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const { login, isLoading, error, clearError } = useAuthStore();
 
-  const { control, handleSubmit, formState: { errors } } = useForm<LoginForm>({
-    resolver: zodResolver(loginSchema),
-  });
-
-  const onSubmit = async (data: LoginForm) => {
+  async function handleLogin() {
+    if (!username.trim() || !password.trim()) return;
     clearError();
-    try {
-      await login(data.username, data.password);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const ok = await login(username.trim(), password);
+    if (ok) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.replace('/(operator)');
-    } catch {
-      // error shown via store.error
+    } else {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     }
-  };
+  }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.navy }}>
+    <SafeAreaView style={styles.safe}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
-          contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', paddingHorizontal: 32, paddingVertical: 40 }}
+          contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Logo */}
-          <View style={{ alignItems: 'center', marginBottom: 48 }}>
-            <Image
-              source={require('../../assets/splash-icon.png')}
-              style={{ width: 100, height: 100, resizeMode: 'contain', marginBottom: 16 }}
-            />
-            <Text style={{ color: COLORS.white, fontSize: 26, fontWeight: '800' }}>ScaleStation</Text>
-            <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 14, marginTop: 4 }}>
-              Sign in to continue
-            </Text>
-          </View>
+          <Image
+            source={require('@/assets/splash-icon.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
+          <Text style={styles.title}>Scale Station</Text>
+          <Text style={styles.subtitle}>Sign in to your operator account</Text>
 
-          {/* Error banner */}
-          {error && (
-            <View
-              style={{
-                backgroundColor: '#FEE2E2',
-                borderRadius: 10,
-                padding: 12,
-                marginBottom: 20,
-                flexDirection: 'row',
-                gap: 8,
-              }}
+          {error ? (
+            <View style={styles.errorBox}>
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          ) : null}
+
+          <View style={styles.form}>
+            <Text style={styles.label}>Username</Text>
+            <TextInput
+              style={styles.input}
+              value={username}
+              onChangeText={setUsername}
+              autoCapitalize="none"
+              autoCorrect={false}
+              placeholder="Enter username"
+              placeholderTextColor={COLORS.gray500}
+              returnKeyType="next"
+              editable={!isLoading}
+            />
+
+            <Text style={styles.label}>Password</Text>
+            <TextInput
+              style={styles.input}
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              placeholder="Enter password"
+              placeholderTextColor={COLORS.gray500}
+              returnKeyType="done"
+              onSubmitEditing={handleLogin}
+              editable={!isLoading}
+            />
+
+            <TouchableOpacity
+              style={[styles.btn, isLoading && styles.btnDisabled]}
+              onPress={handleLogin}
+              disabled={isLoading || !username.trim() || !password.trim()}
+              activeOpacity={0.85}
             >
-              <Text style={{ flex: 1, color: '#B91C1C', fontSize: 14 }}>{error}</Text>
-              <TouchableOpacity onPress={clearError} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Text style={{ color: '#B91C1C', fontSize: 18, lineHeight: 18 }}>✕</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {/* Username */}
-          <View style={{ marginBottom: 16 }}>
-            <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, fontWeight: '600', marginBottom: 8 }}>
-              USERNAME
-            </Text>
-            <Controller
-              control={control}
-              name="username"
-              render={({ field: { onChange, value, onBlur } }) => (
-                <TextInput
-                  style={{
-                    backgroundColor: 'rgba(255,255,255,0.1)',
-                    borderRadius: 12,
-                    paddingHorizontal: 16,
-                    minHeight: MIN_TOUCH_TARGET + 4,
-                    color: COLORS.white,
-                    fontSize: 16,
-                    borderWidth: errors.username ? 1 : 0,
-                    borderColor: COLORS.red,
-                  }}
-                  placeholder="Enter your username"
-                  placeholderTextColor="rgba(255,255,255,0.35)"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  value={value}
-                  onChangeText={onChange}
-                  onBlur={onBlur}
-                  returnKeyType="next"
-                />
+              {isLoading ? (
+                <ActivityIndicator color={COLORS.white} size="small" />
+              ) : (
+                <Text style={styles.btnText}>Sign In</Text>
               )}
-            />
-            {errors.username && (
-              <Text style={{ color: COLORS.red, fontSize: 12, marginTop: 4 }}>
-                {errors.username.message}
-              </Text>
-            )}
+            </TouchableOpacity>
           </View>
-
-          {/* Password */}
-          <View style={{ marginBottom: 32 }}>
-            <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, fontWeight: '600', marginBottom: 8 }}>
-              PASSWORD
-            </Text>
-            <View style={{ position: 'relative' }}>
-              <Controller
-                control={control}
-                name="password"
-                render={({ field: { onChange, value, onBlur } }) => (
-                  <TextInput
-                    style={{
-                      backgroundColor: 'rgba(255,255,255,0.1)',
-                      borderRadius: 12,
-                      paddingHorizontal: 16,
-                      paddingRight: 52,
-                      minHeight: MIN_TOUCH_TARGET + 4,
-                      color: COLORS.white,
-                      fontSize: 16,
-                      borderWidth: errors.password ? 1 : 0,
-                      borderColor: COLORS.red,
-                    }}
-                    placeholder="Enter your password"
-                    placeholderTextColor="rgba(255,255,255,0.35)"
-                    secureTextEntry={!showPassword}
-                    value={value}
-                    onChangeText={onChange}
-                    onBlur={onBlur}
-                    returnKeyType="done"
-                    onSubmitEditing={handleSubmit(onSubmit)}
-                  />
-                )}
-              />
-              <TouchableOpacity
-                onPress={() => setShowPassword((v) => !v)}
-                style={{
-                  position: 'absolute',
-                  right: 16,
-                  top: 0,
-                  bottom: 0,
-                  justifyContent: 'center',
-                }}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 20 }}>
-                  {showPassword ? '🙈' : '👁'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-            {errors.password && (
-              <Text style={{ color: COLORS.red, fontSize: 12, marginTop: 4 }}>
-                {errors.password.message}
-              </Text>
-            )}
-          </View>
-
-          {/* Submit */}
-          <TouchableOpacity
-            onPress={handleSubmit(onSubmit)}
-            disabled={isLoading}
-            style={{
-              backgroundColor: isLoading ? COLORS.green + '80' : COLORS.green,
-              borderRadius: 14,
-              paddingVertical: 16,
-              alignItems: 'center',
-              minHeight: 54,
-              flexDirection: 'row',
-              justifyContent: 'center',
-              gap: 10,
-            }}
-            activeOpacity={0.85}
-          >
-            {isLoading && <ActivityIndicator color={COLORS.white} size="small" />}
-            <Text style={{ color: COLORS.white, fontSize: 17, fontWeight: '700' }}>
-              {isLoading ? 'Signing in...' : 'Sign In'}
-            </Text>
-          </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: COLORS.navy },
+  scroll: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
+  logo: { width: 100, height: 100, marginBottom: 16 },
+  title: { color: COLORS.white, fontSize: 28, fontWeight: '800', marginBottom: 4 },
+  subtitle: { color: 'rgba(255,255,255,0.6)', fontSize: 15, marginBottom: 32, textAlign: 'center' },
+  errorBox: {
+    width: '100%', backgroundColor: 'rgba(239,68,68,0.15)', borderRadius: 10,
+    padding: 12, marginBottom: 16, borderWidth: 1, borderColor: 'rgba(239,68,68,0.4)',
+  },
+  errorText: { color: '#FCA5A5', fontSize: 14, textAlign: 'center' },
+  form: { width: '100%', gap: 8 },
+  label: { color: 'rgba(255,255,255,0.7)', fontSize: 13, fontWeight: '600', marginBottom: 4 },
+  input: {
+    backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 12, padding: 14,
+    color: COLORS.white, fontSize: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
+    marginBottom: 12,
+  },
+  btn: {
+    backgroundColor: COLORS.green, borderRadius: 14, paddingVertical: 16,
+    alignItems: 'center', marginTop: 8, minHeight: 54,
+  },
+  btnDisabled: { opacity: 0.5 },
+  btnText: { color: COLORS.white, fontSize: 17, fontWeight: '700' },
+});

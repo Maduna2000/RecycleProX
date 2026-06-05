@@ -1,88 +1,75 @@
 import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as Haptics from 'expo-haptics';
 import { useAuthStore } from '@/stores/authStore';
 import { useOrderStore } from '@/stores/orderStore';
-import { OfflineBanner } from '@/components/OfflineBanner';
-import { StepProgressBar } from '@/components/StepProgressBar';
 import { COLORS } from '@/constants/theme';
 
 export default function OperatorHome() {
   const { user, logout } = useAuthStore();
-  const { step, reset } = useOrderStore();
+  const { reset } = useOrderStore();
 
-  const handleLogout = async () => {
+  function handleNewOrder() {
     reset();
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    router.push('/(operator)/step1-customer');
+  }
+
+  async function handleLogout() {
     await logout();
     router.replace('/(auth)/login');
-  };
-
-  const handleNewOrder = () => {
-    reset();
-    router.push('/(operator)/step1-customer');
-  };
+  }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.offWhite }}>
-      <OfflineBanner />
-
-      {/* Header */}
-      <View style={{ backgroundColor: COLORS.navy, paddingHorizontal: 20, paddingVertical: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+    <SafeAreaView style={styles.safe}>
+      <View style={styles.header}>
         <View>
-          <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>Logged in as</Text>
-          <Text style={{ color: COLORS.white, fontSize: 16, fontWeight: '700' }}>
-            {user?.fullName ?? user?.username ?? 'Operator'}
-          </Text>
+          <Text style={styles.greeting}>Hello,</Text>
+          <Text style={styles.name}>{user?.fullName ?? user?.username ?? 'Operator'}</Text>
         </View>
-        <TouchableOpacity
-          onPress={handleLogout}
-          style={{ backgroundColor: 'rgba(255,255,255,0.12)', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8 }}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 13, fontWeight: '600' }}>Sign Out</Text>
+        <TouchableOpacity onPress={handleLogout} style={styles.logoutBtn} activeOpacity={0.7}>
+          <Text style={styles.logoutText}>Sign Out</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Body */}
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 24 }}>
-        <View
-          style={{
-            width: 80,
-            height: 80,
-            borderRadius: 20,
-            backgroundColor: COLORS.navy,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Text style={{ fontSize: 36 }}>⚖️</Text>
-        </View>
-        <Text style={{ color: COLORS.navy, fontSize: 24, fontWeight: '800', textAlign: 'center' }}>
-          Scale Station
-        </Text>
-        <Text style={{ color: COLORS.gray500, fontSize: 15, textAlign: 'center', lineHeight: 22 }}>
-          Ready to record a weighing order. Tap the button below to begin.
-        </Text>
-
-        <TouchableOpacity
-          onPress={handleNewOrder}
-          style={{
-            backgroundColor: COLORS.green,
-            borderRadius: 16,
-            paddingVertical: 18,
-            paddingHorizontal: 48,
-            alignItems: 'center',
-            minHeight: 56,
-            width: '100%',
-          }}
-          activeOpacity={0.85}
-        >
-          <Text style={{ color: COLORS.white, fontSize: 18, fontWeight: '800' }}>
-            + New Weighing Order
+      <View style={styles.body}>
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Ready to weigh?</Text>
+          <Text style={styles.cardSub}>
+            Capture customer info, products, photos and generate a receipt slip.
           </Text>
-        </TouchableOpacity>
+          <TouchableOpacity style={styles.primaryBtn} onPress={handleNewOrder} activeOpacity={0.85}>
+            <Text style={styles.primaryBtnText}>+ New Weighing Order</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: COLORS.offWhite ?? '#F8F9FA' },
+  header: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    backgroundColor: COLORS.navy, paddingHorizontal: 20, paddingVertical: 16,
+  },
+  greeting: { color: 'rgba(255,255,255,0.6)', fontSize: 13 },
+  name: { color: COLORS.white, fontSize: 18, fontWeight: '800' },
+  logoutBtn: { paddingHorizontal: 12, paddingVertical: 8 },
+  logoutText: { color: 'rgba(255,255,255,0.7)', fontSize: 14 },
+  body: { flex: 1, padding: 20, justifyContent: 'center' },
+  card: {
+    backgroundColor: COLORS.white, borderRadius: 16, padding: 24,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08, shadowRadius: 8, elevation: 3,
+  },
+  cardTitle: { color: COLORS.navy, fontSize: 22, fontWeight: '800', marginBottom: 8 },
+  cardSub: { color: COLORS.gray500 ?? '#6B7280', fontSize: 14, lineHeight: 20, marginBottom: 24 },
+  primaryBtn: {
+    backgroundColor: COLORS.green, borderRadius: 14, paddingVertical: 16,
+    alignItems: 'center', minHeight: 54,
+  },
+  primaryBtnText: { color: COLORS.white, fontSize: 17, fontWeight: '700' },
+});

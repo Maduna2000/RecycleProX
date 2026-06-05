@@ -2,12 +2,14 @@
   "name": "mobile",
   "version": "1.0.0",
   "main": "expo-router/entry",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo run:android",
+    "ios": "expo run:ios"
+  },
   "dependencies": {
-    "@gorhom/bottom-sheet": "^5.2.14",
-    "@hookform/resolvers": "^5.4.0",
     "@react-native-async-storage/async-storage": "^3.1.1",
     "@react-native-community/netinfo": "^12.0.1",
-    "@tanstack/react-query": "^5.100.14",
     "axios": "^1.16.1",
     "expo": "~56.0.8",
     "expo-camera": "^56.0.7",
@@ -21,29 +23,17 @@
     "expo-sharing": "^56.0.15",
     "expo-splash-screen": "^56.0.10",
     "expo-status-bar": "~56.0.4",
-    "expo-thermal-printer": "file:./modules/expo-thermal-printer",
-    "nativewind": "^4.2.4",
     "react": "19.2.7",
-    "react-hook-form": "^7.77.0",
     "react-native": "0.85.3",
     "react-native-gesture-handler": "^3.0.0",
-    "react-native-reanimated": "4.3.1",
-    "react-native-worklets": "0.8.0",
     "react-native-safe-area-context": "^5.8.0",
-    "tailwindcss": "^3.4.19",
-    "zod": "^4.4.3",
+    "zod": "^4.0.0",
     "zustand": "^5.0.14"
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
     "babel-preset-expo": "^56.0.14",
     "typescript": "~6.0.3"
-  },
-  "scripts": {
-    "start": "expo start",
-    "android": "expo run:android",
-    "ios": "expo run:ios",
-    "web": "expo start --web"
   },
   "private": true
 }
