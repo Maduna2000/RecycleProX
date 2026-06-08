@@ -54,7 +54,7 @@ class ThermalPrinterPlugin : Plugin() {
 
     // Allows the web layer to request BT permissions before the first print
     @PluginMethod
-    fun requestPermissions(call: PluginCall) {
+    fun requestBluetoothPermissions(call: PluginCall) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             ActivityCompat.requestPermissions(
                 activity,

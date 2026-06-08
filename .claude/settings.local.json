@@ -57,7 +57,9 @@
       "Bash(npx claude-code-templates@latest --skill development/senior-architect)",
       "Bash(awk '{print $1, $11}')",
       "Bash(python .claude/skills/ui-ux-pro-max/scripts/search.py \"enterprise recycling management SaaS admin portal professional\" --design-system -p \"Renovo Pro\" -f markdown)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Bash(EXPO_TOKEN=S3HL7HoHjoWFvpEyF_Y_titjiTO2umNexbrfGDRA npx eas whoami)",
+      "Bash(powershell.exe -Command \"Rename-Item -Path 'c:\\\\Users\\\\MD TECH SOLUTION\\\\RecycleProX\\\\mobile\\\\node_modules\\\\.react-native-reanimated-QP6wXYpf' -NewName '.skip-eas' -ErrorAction Stop; Write-Host renamed\")"
     ]
   }
 }
