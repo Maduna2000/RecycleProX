@@ -26,7 +26,9 @@ export default function Index() {
         router.replace('/(auth)/login');
       }
     }
-    bootstrap();
+    bootstrap().catch(() => {
+      router.replace('/(auth)/login');
+    });
   }, []);
 
   return (
