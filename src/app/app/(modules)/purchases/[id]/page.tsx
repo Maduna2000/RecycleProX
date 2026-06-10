@@ -143,13 +143,13 @@ export default function PurchaseDetailPage() {
                   </td>
                   <td className="px-4 py-3">
                     <p className="font-mono text-gray-700">
-                      {Number(line.quantity).toFixed(3)} {line.product.unit}
+                      {Number(line.quantity).toFixed(2)} {line.product.unit}
                     </p>
                     {hasWeightData && (
                       <p className="text-[11px] text-gray-400 font-mono mt-0.5">
-                        {`Gross ${Number(line.grossQty).toFixed(3)}`}
-                        {Number(line.tareQty ?? 0) > 0 && ` · Tare ${Number(line.tareQty).toFixed(3)}`}
-                        {hasDeduction && ` · Ded. ${Number(line.deductionQty).toFixed(3)}`}
+                        {`Gross ${Number(line.grossQty).toFixed(2)}`}
+                        {Number(line.tareQty ?? 0) > 0 && ` · Tare ${Number(line.tareQty).toFixed(2)}`}
+                        {hasDeduction && ` · Ded. ${Number(line.deductionQty).toFixed(2)}`}
                         {hasDeduction && line.deductionReason && (
                           <span className="text-amber-600"> ({line.deductionReason})</span>
                         )}

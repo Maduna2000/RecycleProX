@@ -29,7 +29,7 @@ export default function Step5LineAdded({ justAdded, cart, onAddAnother, onReview
         </div>
         <div className="text-center">
           <h2 className="text-2xl font-bold text-slate-800">Product Added</h2>
-          <p className="text-slate-500 mt-1">{justAdded.productName} — {parseFloat(justAdded.weight).toFixed(3)} {justAdded.unit}</p>
+          <p className="text-slate-500 mt-1">{justAdded.productName} — {parseFloat(justAdded.weight).toFixed(2)} {justAdded.unit}</p>
         </div>
       </div>
 
@@ -48,7 +48,7 @@ export default function Step5LineAdded({ justAdded, cart, onAddAnother, onReview
                 <p className="text-xs text-slate-400">{item.categoryName}</p>
               </div>
               <span className="font-semibold text-slate-700 text-sm font-mono">
-                {parseFloat(item.weight).toFixed(3)} {item.unit}
+                {parseFloat(item.weight).toFixed(2)} {item.unit}
               </span>
             </div>
           ))}

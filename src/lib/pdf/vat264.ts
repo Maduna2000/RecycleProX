@@ -161,7 +161,7 @@ export async function generateVat264(data: Vat264Data): Promise<Uint8Array> {
 
     const desc = line.description.length > 45 ? line.description.substring(0, 43) + '…' : line.description
     page.drawText(desc, { x: colX.desc, y, size: 8, font: reg, color: DARK })
-    page.drawText(new Decimal(line.quantity).toFixed(3), { x: colX.qty,   y, size: 8, font: reg, color: DARK })
+    page.drawText(new Decimal(line.quantity).toFixed(2), { x: colX.qty,   y, size: 8, font: reg, color: DARK })
     page.drawText(line.unit,                             { x: colX.unit,  y, size: 8, font: reg, color: DARK })
     page.drawText(`R ${new Decimal(line.unitPrice).toFixed(2)}`, { x: colX.price, y, size: 8, font: reg, color: DARK })
     page.drawText(`R ${new Decimal(line.lineTotal).toFixed(2)}`, { x: colX.total, y, size: 8, font: reg, color: DARK })

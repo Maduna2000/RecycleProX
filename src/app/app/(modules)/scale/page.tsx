@@ -584,7 +584,7 @@ function OrdersTab() {
       key: 'weight', header: 'Weight', width: '90px',
       render: (o) => (
         <span className="block text-right" style={{ fontSize: fontSize.xs, fontWeight: fontWeight.semibold, fontFamily: 'monospace' }}>
-          {Number(o.weight).toFixed(3)} kg
+          {Number(o.weight).toFixed(2)} kg
         </span>
       ),
     },

@@ -3,11 +3,12 @@
 import { useEffect, useState } from 'react'
 import { X, Printer, CheckCircle2, Loader2, BluetoothSearching, Smartphone } from 'lucide-react'
 import {
-  isPrintingAvailable,
+  waitForCapacitor,
   getPairedPrinters,
   getSavedPrinterAddress,
   savePrinterAddress,
   clearSavedPrinterAddress,
+  getCapacitorDiagnostics,
   type Printer as BTDevice,
 } from '@/lib/scale/capacitorPrint'
 
@@ -26,18 +27,36 @@ export default function PrinterSetup({ open, onClose }: Props) {
   useEffect(() => {
     if (!open) return
 
-    if (!isPrintingAvailable()) {
-      setUiState('not-in-app')
-      return
-    }
-
-    setSelected(getSavedPrinterAddress())
+    let cancelled = false
     setUiState('scanning')
 
-    getPairedPrinters().then(list => {
+    // Wait for Capacitor with retries - important for tablets where
+    // the bridge can take longer to initialize due to larger screen rendering
+    async function initPrinterSetup() {
+      const isAvailable = await waitForCapacitor(5, 100)
+
+      if (cancelled) return
+
+      if (!isAvailable) {
+        // Log diagnostics for debugging tablet issues
+        const diag = getCapacitorDiagnostics()
+        console.warn('[PrinterSetup] Capacitor not available:', diag)
+        setUiState('not-in-app')
+        return
+      }
+
+      setSelected(getSavedPrinterAddress())
+
+      const list = await getPairedPrinters()
+      if (cancelled) return
+
       setPrinters(list)
       setUiState(list.length > 0 ? 'list' : 'none')
-    })
+    }
+
+    initPrinterSetup()
+
+    return () => { cancelled = true }
   }, [open])
 
   function handleSelect(address: string) {

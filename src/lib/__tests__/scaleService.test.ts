@@ -92,7 +92,7 @@ describe('readScale — TCP', () => {
 
     const result = await readScale(1)
     expect(result).toBeInstanceOf(Decimal)
-    expect(result.toFixed(3)).toBe('23.450')
+    expect(result.toFixed(2)).toBe('23.45')
   })
 })
 
@@ -134,20 +134,20 @@ describe('gross - tare net quantity', () => {
     const gross = new Decimal('31.000')
     const tare  = new Decimal('0.000')
     const net   = Decimal.max(gross.minus(tare), new Decimal('0'))
-    expect(net.toFixed(3)).toBe('31.000')
+    expect(net.toFixed(2)).toBe('31.00')
   })
 
   it('grossQty=25.000 tareQty=3.000 → net=22.000', () => {
     const gross = new Decimal('25.000')
     const tare  = new Decimal('3.000')
     const net   = Decimal.max(gross.minus(tare), new Decimal('0'))
-    expect(net.toFixed(3)).toBe('22.000')
+    expect(net.toFixed(2)).toBe('22.00')
   })
 
   it('net is never negative when tare > gross', () => {
     const gross = new Decimal('1.000')
     const tare  = new Decimal('5.000')
     const net   = Decimal.max(gross.minus(tare), new Decimal('0'))
-    expect(net.toFixed(3)).toBe('0.000')
+    expect(net.toFixed(2)).toBe('0.00')
   })
 })

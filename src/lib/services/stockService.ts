@@ -78,9 +78,9 @@ export async function getStockOnHand(productId?: string) {
     const onHand = totalIn.minus(totalOut)
     return {
       product: p,
-      totalIn: totalIn.toFixed(3),
-      totalOut: totalOut.toFixed(3),
-      onHand: onHand.toFixed(3),
+      totalIn: totalIn.toFixed(2),
+      totalOut: totalOut.toFixed(2),
+      onHand: onHand.toFixed(2),
       hasMovements: allIds.has(p.id),
     }
   })
@@ -200,8 +200,8 @@ export async function stockTransfer(opts: {
     return [out, inMov]
   })
 
-  logger.info({ sourceProductId: opts.sourceProductId, destProductId: opts.destProductId, quantity: qty.toFixed(3), createdByUserId: opts.createdByUserId }, 'stock.transfer')
-  return { outMovement, inMovement, quantity: qty.toFixed(3), sourceProduct: source, destProduct: dest }
+  logger.info({ sourceProductId: opts.sourceProductId, destProductId: opts.destProductId, quantity: qty.toFixed(2), createdByUserId: opts.createdByUserId }, 'stock.transfer')
+  return { outMovement, inMovement, quantity: qty.toFixed(2), sourceProduct: source, destProduct: dest }
 }
 
 // ─── Void reversal — called when purchase or sale is voided ──────────────────

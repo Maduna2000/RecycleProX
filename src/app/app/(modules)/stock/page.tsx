@@ -143,7 +143,7 @@ export default function StockPage() {
               <p className="font-mono" style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>{r.product.code}</p>
             </div>
             {belowReorder && (
-              <span title={`Below reorder level (min: ${minLevel?.toFixed(3)} ${r.product.unit})`}>
+              <span title={`Below reorder level (min: ${minLevel?.toFixed(2)} ${r.product.unit})`}>
                 <AlertTriangle className="w-3.5 h-3.5 shrink-0" style={{ color: colors.warning }} />
               </span>
             )}
@@ -170,7 +170,7 @@ export default function StockPage() {
       width: '110px',
       render: (r) => (
         <span className="font-mono text-xs" style={{ color: colors.action }}>
-          {Number(r.totalIn).toFixed(3)} {r.product.unit}
+          {Number(r.totalIn).toFixed(2)} {r.product.unit}
         </span>
       ),
     },
@@ -180,7 +180,7 @@ export default function StockPage() {
       width: '110px',
       render: (r) => (
         <span className="font-mono text-xs" style={{ color: colors.danger }}>
-          {Number(r.totalOut).toFixed(3)} {r.product.unit}
+          {Number(r.totalOut).toFixed(2)} {r.product.unit}
         </span>
       ),
     },
@@ -201,7 +201,7 @@ export default function StockPage() {
               className="font-mono font-semibold text-xs"
               style={{ color: qty > 0 ? colors.textPrimary : qty < 0 ? colors.danger : colors.textSecondary }}
             >
-              {Number(r.onHand).toFixed(3)} {r.product.unit}
+              {Number(r.onHand).toFixed(2)} {r.product.unit}
             </span>
           </div>
         )
@@ -246,7 +246,7 @@ export default function StockPage() {
       width: '110px',
       render: (r) => (
         <span className="font-mono text-xs" style={{ color: colors.textPrimary }}>
-          {Number(r.quantity).toFixed(3)} {r.product.unit}
+          {Number(r.quantity).toFixed(2)} {r.product.unit}
         </span>
       ),
     },

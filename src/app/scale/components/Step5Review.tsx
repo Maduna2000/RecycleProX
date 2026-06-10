@@ -1,12 +1,12 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Loader2, Printer, RotateCcw, CheckCircle2, Trash2, AlertCircle } from 'lucide-react'
 import type { SelectedCustomer } from './Step1Customer'
 import type { CartLine } from './Step5LineAdded'
 import { buildReceipt }         from '@/lib/scale/thermalReceipt'
 import {
-  isPrintingAvailable,
+  waitForCapacitor,
   getSavedPrinterAddress,
   printBytes,
 } from '@/lib/scale/capacitorPrint'
@@ -31,7 +31,9 @@ export default function Step5Review({ customer, cart, onRemoveLine, onNewOrder }
   // Cached receipt bytes so "Reprint" doesn't rebuild from potentially stale state
   const receiptRef = useRef<Uint8Array | null>(null)
 
-  const inCapacitor = isPrintingAvailable()
+  // Wait for Capacitor bridge - important for tablets where bridge may not be ready immediately
+  const [inCapacitor, setInCapacitor] = useState(false)
+  useEffect(() => { waitForCapacitor().then(setInCapacitor) }, [])
 
   async function doPrint(bytes: Uint8Array) {
     setStatus('printing')
@@ -152,7 +154,7 @@ export default function Step5Review({ customer, cart, onRemoveLine, onNewOrder }
                 <p className="text-xs text-slate-400">{item.categoryName}</p>
               </div>
               <span className="font-semibold text-slate-700 text-sm font-mono shrink-0">
-                {parseFloat(item.weight).toFixed(3)} {item.unit}
+                {parseFloat(item.weight).toFixed(2)} {item.unit}
               </span>
               {status === 'idle' && cart.length > 1 && (
                 <button
@@ -200,12 +202,24 @@ export default function Step5Review({ customer, cart, onRemoveLine, onNewOrder }
           <div>
             <p className="font-semibold text-amber-800">No printer configured</p>
             <p className="text-amber-700 text-sm mb-2">Order {orderNumber} was saved. Set up your printer then reprint.</p>
-            <button
-              onClick={openPrinterSetup}
-              className="text-sm font-semibold text-emerald-700 hover:text-emerald-900 underline underline-offset-2"
-            >
-              Set up printer →
-            </button>
+            <div className="flex flex-wrap gap-3">
+              <button
+                onClick={openPrinterSetup}
+                className="text-sm font-semibold text-emerald-700 hover:text-emerald-900 underline underline-offset-2"
+              >
+                Set up printer →
+              </button>
+              {orderId && (
+                <a
+                  href={`/api/scale/orders/${orderId}/slip`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm font-semibold text-blue-600 hover:text-blue-800 underline underline-offset-2"
+                >
+                  Download Slip (PDF)
+                </a>
+              )}
+            </div>
           </div>
         </div>
       )}

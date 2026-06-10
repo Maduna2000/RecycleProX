@@ -216,7 +216,7 @@ export default function NewPurchasePage() {
     const deduction = new Decimal(deductionStr || '0')
     const net       = Decimal.max(gross.minus(tare), new Decimal('0'))
     const paid      = Decimal.max(net.minus(deduction), new Decimal('0'))
-    patchLine(key, { quantity: paid.toFixed(3), grossQty: grossStr, tareQty: tareStr })
+    patchLine(key, { quantity: paid.toFixed(2), grossQty: grossStr, tareQty: tareStr })
   }
 
   // ── Product selection ────────────────────────────────────────────────────
@@ -823,7 +823,7 @@ export default function NewPurchasePage() {
                             {Decimal.max(
                               new Decimal(line.grossQty || '0').minus(new Decimal(line.tareQty || '0')),
                               new Decimal('0'),
-                            ).toFixed(3)}
+                            ).toFixed(2)}
                           </div>
                         </div>
 
@@ -839,7 +839,7 @@ export default function NewPurchasePage() {
                                 new Decimal('0'),
                               )
                               const paid = Decimal.max(net.minus(new Decimal(e.target.value || '0')), new Decimal('0'))
-                              patchLine(line.key, { deductionQty: e.target.value, quantity: paid.toFixed(3) })
+                              patchLine(line.key, { deductionQty: e.target.value, quantity: paid.toFixed(2) })
                             }}
                             style={{ height: 24, width: 76, borderRadius: 2, border: '1px solid #ABABAB', padding: '0 6px', fontSize: 11, fontFamily: 'monospace', outline: 'none' }}
                           />

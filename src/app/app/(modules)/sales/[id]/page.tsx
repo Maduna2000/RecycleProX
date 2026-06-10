@@ -153,10 +153,10 @@ export default function SaleDetailPage() {
                   <p className="text-xs text-gray-400 font-mono">{line.product.code}</p>
                 </td>
                 <td className="px-4 py-3 font-mono text-gray-700">
-                  <div>{Number(line.quantity).toFixed(3)} {line.product.unit}</div>
+                  <div>{Number(line.quantity).toFixed(2)} {line.product.unit}</div>
                   {line.grossQty && line.tareQty && Number(line.tareQty) > 0 && (
                     <div className="text-xs text-gray-400 mt-0.5">
-                      Gross: {Number(line.grossQty).toFixed(3)}  Tare: {Number(line.tareQty).toFixed(3)}
+                      Gross: {Number(line.grossQty).toFixed(2)}  Tare: {Number(line.tareQty).toFixed(2)}
                     </div>
                   )}
                 </td>

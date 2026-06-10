@@ -287,8 +287,8 @@ export async function getScaleStats() {
     todayProcessed,
     todayVoided,
     todayWeightKg: totalWeightResult._sum.weight
-      ? new Decimal(totalWeightResult._sum.weight.toString()).toFixed(3)
-      : '0.000',
+      ? new Decimal(totalWeightResult._sum.weight.toString()).toFixed(2)
+      : '0.00',
   }
 }
 

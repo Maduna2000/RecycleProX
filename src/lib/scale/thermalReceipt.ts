@@ -132,7 +132,7 @@ export function buildReceipt(data: ReceiptData): Uint8Array {
     add(textLine(label))
     add(CMD_BOLD_OFF)
     add(textLine(`   ${item.categoryName}`))
-    add(twoCol('   Weight:', `${parseFloat(item.weight).toFixed(3)} ${item.unit}`))
+    add(twoCol('   Weight:', `${parseFloat(item.weight).toFixed(2)} ${item.unit}`))
   })
 
   // ── Footer ────────────────────────────────────────────────────────────────

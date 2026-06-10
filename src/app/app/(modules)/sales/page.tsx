@@ -345,7 +345,7 @@ export default function SalesPage() {
                         <p className="font-mono" style={{ fontSize: 10, color: colors.textSecondary }}>{line.product.code}</p>
                       </td>
                       <td className="font-mono" style={{ padding: '4px 12px 4px 0', color: colors.textSecondary }}>
-                        {new Decimal(line.quantity).toFixed(3)} {line.product.unit}
+                        {new Decimal(line.quantity).toFixed(2)} {line.product.unit}
                       </td>
                       <td className="font-mono" style={{ padding: '4px 12px 4px 0', color: colors.textSecondary }}>
                         R {new Decimal(line.unitPrice).toFixed(2)}

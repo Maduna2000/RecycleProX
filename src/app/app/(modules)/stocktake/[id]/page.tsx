@@ -114,7 +114,7 @@ export default function StocktakeDetailPage() {
     const g = new Decimal(gross || '0')
     const t = new Decimal(tare  || '0')
     const net = Decimal.max(g.minus(t), new Decimal('0'))
-    setCountedQty(net.toFixed(3))
+    setCountedQty(net.toFixed(2))
     setAddWeigh((prev) => ({ ...prev, grossQty: gross, tareQty: tare }))
   }
 
@@ -155,9 +155,9 @@ export default function StocktakeDetailPage() {
       const newTare  = type === 'tare'  ? w : (ew.tareQty  || entry.tareQty  || '0')
       const net = Decimal.max(new Decimal(newGross).minus(new Decimal(newTare)), new Decimal('0'))
       patchEntryWeigh(entry.id, { grossQty: newGross, tareQty: newTare })
-      toast.success(`${type === 'gross' ? 'Gross' : 'Tare'}: ${w} kg — Net: ${net.toFixed(3)} kg`)
+      toast.success(`${type === 'gross' ? 'Gross' : 'Tare'}: ${w} kg — Net: ${net.toFixed(2)} kg`)
       // Auto-save the re-weighed entry
-      await saveEntry(entry.productId, net.toFixed(3), { grossQty: newGross, tareQty: newTare })
+      await saveEntry(entry.productId, net.toFixed(2), { grossQty: newGross, tareQty: newTare })
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Scale not responding')
     } finally {
@@ -464,11 +464,11 @@ export default function StocktakeDetailPage() {
                     <td className="px-4 py-3">
                       <Badge variant="secondary" className="text-xs">{CATEGORY_LABELS[e.product.category] ?? e.product.category}</Badge>
                     </td>
-                    <td className="px-4 py-3 font-mono text-gray-700">{Number(e.systemQty).toFixed(3)} {e.product.unit}</td>
+                    <td className="px-4 py-3 font-mono text-gray-700">{Number(e.systemQty).toFixed(2)} {e.product.unit}</td>
                     <td className="px-4 py-3">
                       {(e.grossQty || e.tareQty) ? (
                         <span className="font-mono text-xs text-gray-500">
-                          G:{Number(e.grossQty ?? 0).toFixed(3)} T:{Number(e.tareQty ?? 0).toFixed(3)}
+                          G:{Number(e.grossQty ?? 0).toFixed(2)} T:{Number(e.tareQty ?? 0).toFixed(2)}
                         </span>
                       ) : <span className="text-gray-300">—</span>}
                       {/* Re-weigh buttons for open stocktakes */}
@@ -494,10 +494,10 @@ export default function StocktakeDetailPage() {
                         </div>
                       )}
                     </td>
-                    <td className="px-4 py-3 font-mono text-gray-700">{Number(e.countedQty).toFixed(3)} {e.product.unit}</td>
+                    <td className="px-4 py-3 font-mono text-gray-700">{Number(e.countedQty).toFixed(2)} {e.product.unit}</td>
                     <td className="px-4 py-3">
                       <span className={`font-mono font-semibold ${variance.gt(0) ? 'text-green-700' : variance.lt(0) ? 'text-red-700' : 'text-gray-400'}`}>
-                        {variance.gt(0) ? '+' : ''}{Number(e.variance).toFixed(3)} {e.product.unit}
+                        {variance.gt(0) ? '+' : ''}{Number(e.variance).toFixed(2)} {e.product.unit}
                       </span>
                     </td>
                     <td className="px-4 py-3">

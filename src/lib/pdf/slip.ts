@@ -223,7 +223,7 @@ export async function generateTransactionSlip(data: TransactionSlipData): Promis
     // Row 1: name + qty in column + total
     const lineTotal = `E${new Decimal(line.lineTotal).toFixed(2)}`
     const lw      = bold.widthOfTextAtSize(lineTotal, NORMAL)
-    const qtyStr  = new Decimal(line.qty).toFixed(3)
+    const qtyStr  = new Decimal(line.qty).toFixed(2)
     const qw      = reg.widthOfTextAtSize(qtyStr, NORMAL)
     page.drawText(name,      { x: MARGIN,               y: cursor, size: NORMAL, font: reg,  color: BLACK })
     page.drawText(qtyStr,    { x: QTY_RIGHT - qw,        y: cursor, size: NORMAL, font: reg,  color: DGRAY })
@@ -237,7 +237,7 @@ export async function generateTransactionSlip(data: TransactionSlipData): Promis
 
     // Row 3: tare info (if any)
     if (line.grossQty && line.tareQty && line.tareQty > 0) {
-      const tare = `  Gross: ${new Decimal(line.grossQty).toFixed(3)}  Tare: ${new Decimal(line.tareQty).toFixed(3)}${line.tareReason ? ` (${line.tareReason})` : ''}`
+      const tare = `  Gross: ${new Decimal(line.grossQty).toFixed(2)}  Tare: ${new Decimal(line.tareQty).toFixed(2)}${line.tareReason ? ` (${line.tareReason})` : ''}`
       page.drawText(tare, { x: MARGIN, y: cursor, size: SMALL, font: reg, color: GRAY })
       nextLine(SMALL)
     }
@@ -248,7 +248,7 @@ export async function generateTransactionSlip(data: TransactionSlipData): Promis
   // Total Qty row (multi-item only)
   if (data.lines.length > 1) {
     const totalQty    = data.lines.reduce((sum, l) => new Decimal(sum).plus(new Decimal(l.qty)).toNumber(), 0)
-    const totalQtyStr = new Decimal(totalQty).toFixed(3)
+    const totalQtyStr = new Decimal(totalQty).toFixed(2)
     const tqw         = bold.widthOfTextAtSize(totalQtyStr, SMALL)
     page.drawText('Total Qty:',  { x: MARGIN,          y: cursor, size: SMALL, font: reg,  color: DGRAY })
     page.drawText(totalQtyStr,   { x: QTY_RIGHT - tqw, y: cursor, size: SMALL, font: bold, color: DGRAY })

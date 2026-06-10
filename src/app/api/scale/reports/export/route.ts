@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
     'Phone':         resolveCustomerPhone(o),
     'Category':      o.product.category,
     'Product':       o.product.name,
-    'Weight':        new Decimal(o.weight.toString()).toFixed(3),
+    'Weight':        new Decimal(o.weight.toString()).toFixed(2),
     'Unit':          o.product.unit,
     'Status':        o.status,
     'Operator':      o.operator.fullName,
