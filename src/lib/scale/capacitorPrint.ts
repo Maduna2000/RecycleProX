@@ -68,21 +68,22 @@ export function isPrintingAvailable(): boolean {
  * On tablets, the Capacitor bridge may take longer to initialize due to
  * larger screen rendering. This function retries detection with exponential backoff.
  *
- * @param maxAttempts Maximum number of retry attempts (default: 5)
- * @param initialDelayMs Initial delay between retries in ms (default: 100)
+ * @param maxAttempts Maximum number of retry attempts (default: 8)
+ * @param initialDelayMs Initial delay between retries in ms (default: 200)
  * @returns Promise<boolean> - true if Capacitor + ThermalPrinter plugin is available
  */
 export async function waitForCapacitor(
-  maxAttempts: number = 5,
-  initialDelayMs: number = 100
+  maxAttempts: number = 8,
+  initialDelayMs: number = 200
 ): Promise<boolean> {
   // Immediate check - if already available, return instantly
   if (isPrintingAvailable()) return true
 
   // Not available immediately - might be a browser, or Capacitor not ready yet
-  // On tablets, the bridge can take longer to initialize
+  // On tablets, the bridge can take longer to initialize (up to 10+ seconds on some devices)
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    const delay = initialDelayMs * Math.pow(2, attempt - 1) // 100, 200, 400, 800, 1600ms
+    // Exponential backoff: 200, 400, 800, 1600, 3200, 6400, 12800, 25600ms (total ~50s)
+    const delay = initialDelayMs * Math.pow(2, attempt - 1)
     await new Promise(resolve => setTimeout(resolve, delay))
 
     if (isPrintingAvailable()) return true

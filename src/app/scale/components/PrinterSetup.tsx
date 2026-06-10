@@ -31,9 +31,9 @@ export default function PrinterSetup({ open, onClose }: Props) {
     setUiState('scanning')
 
     // Wait for Capacitor with retries - important for tablets where
-    // the bridge can take longer to initialize due to larger screen rendering
+    // the bridge can take longer to initialize (can take 10+ seconds on some devices)
     async function initPrinterSetup() {
-      const isAvailable = await waitForCapacitor(5, 100)
+      const isAvailable = await waitForCapacitor() // Uses default 8 attempts, 200ms initial delay
 
       if (cancelled) return
 

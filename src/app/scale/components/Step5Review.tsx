@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Loader2, Printer, RotateCcw, CheckCircle2, Trash2, AlertCircle } from 'lucide-react'
+import { Loader2, Printer, RotateCcw, CheckCircle2, Trash2, AlertCircle, Download } from 'lucide-react'
 import type { SelectedCustomer } from './Step1Customer'
 import type { CartLine } from './Step5LineAdded'
 import { buildReceipt }         from '@/lib/scale/thermalReceipt'
@@ -103,9 +103,18 @@ export default function Step5Review({ customer, cart, onRemoveLine, onNewOrder }
         await doPrint(bytes)
         setStatus('done')
       } else {
-        // Browser fallback — open PDF slip in new tab
-        window.open(`/api/scale/orders/${order.id}/slip`, '_blank')
+        // Browser fallback — download PDF slip
+        setOrderId(order.id)
         setStatus('done')
+        // Trigger download after state update
+        setTimeout(() => {
+          const a = document.createElement('a')
+          a.href = `/api/scale/orders/${order.id}/slip`
+          a.download = `scale-order-${order.orderNumber}.pdf`
+          document.body.appendChild(a)
+          a.click()
+          document.body.removeChild(a)
+        }, 100)
       }
     } catch (err: unknown) {
       setErrorMsg(err instanceof Error ? err.message : 'Something went wrong')
@@ -122,6 +131,28 @@ export default function Step5Review({ customer, cart, onRemoveLine, onNewOrder }
     } catch (err: unknown) {
       setErrorMsg(err instanceof Error ? err.message : 'Print failed')
       setStatus('error')
+    }
+  }
+
+  // Download PDF slip - works in Capacitor WebView where target="_blank" doesn't
+  async function handleDownloadSlip() {
+    if (!orderId) return
+    try {
+      const res = await fetch(`/api/scale/orders/${orderId}/slip`)
+      if (!res.ok) throw new Error('Failed to fetch slip')
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+
+      // Create a temporary link and click it to trigger download
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `scale-order-${orderNumber || orderId}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : 'Failed to download slip')
     }
   }
 
@@ -210,14 +241,13 @@ export default function Step5Review({ customer, cart, onRemoveLine, onNewOrder }
                 Set up printer →
               </button>
               {orderId && (
-                <a
-                  href={`/api/scale/orders/${orderId}/slip`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm font-semibold text-blue-600 hover:text-blue-800 underline underline-offset-2"
+                <button
+                  onClick={handleDownloadSlip}
+                  className="text-sm font-semibold text-blue-600 hover:text-blue-800 underline underline-offset-2 flex items-center gap-1"
                 >
+                  <Download className="w-4 h-4" />
                   Download Slip (PDF)
-                </a>
+                </button>
               )}
             </div>
           </div>
@@ -265,10 +295,10 @@ export default function Step5Review({ customer, cart, onRemoveLine, onNewOrder }
       {/* Reprint (after success) */}
       {status === 'done' && orderId && (
         <button
-          onClick={inCapacitor && receiptRef.current ? handleReprint : () => window.open(`/api/scale/orders/${orderId}/slip`, '_blank')}
+          onClick={inCapacitor && receiptRef.current ? handleReprint : handleDownloadSlip}
           className="w-full mt-3 bg-slate-700 hover:bg-slate-800 text-white text-base font-semibold h-12 rounded-xl flex items-center justify-center gap-2 transition-colors"
         >
-          <Printer className="w-5 h-5" /> Reprint Slip
+          <Printer className="w-5 h-5" /> {inCapacitor && receiptRef.current ? 'Reprint Slip' : 'Download Slip'}
         </button>
       )}
 
