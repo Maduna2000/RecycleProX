@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { X, Printer, CheckCircle2, Loader2, BluetoothSearching, Smartphone } from 'lucide-react'
+import { X, Printer, CheckCircle2, Loader2, BluetoothSearching, Smartphone, Bug } from 'lucide-react'
 import {
   waitForCapacitor,
   getPairedPrinters,
@@ -10,6 +10,7 @@ import {
   clearSavedPrinterAddress,
   getCapacitorDiagnostics,
   type Printer as BTDevice,
+  type CapacitorDiagnostics,
 } from '@/lib/scale/capacitorPrint'
 
 interface Props {
@@ -23,12 +24,15 @@ export default function PrinterSetup({ open, onClose }: Props) {
   const [uiState,   setUiState]   = useState<State>('scanning')
   const [printers,  setPrinters]  = useState<BTDevice[]>([])
   const [selected,  setSelected]  = useState<string | null>(null)
+  const [diagnostics, setDiagnostics] = useState<CapacitorDiagnostics | null>(null)
+  const [showDiag, setShowDiag] = useState(false)
 
   useEffect(() => {
     if (!open) return
 
     let cancelled = false
     setUiState('scanning')
+    setDiagnostics(null)
 
     // Wait for Capacitor with retries - important for tablets where
     // the bridge can take longer to initialize (can take 10+ seconds on some devices)
@@ -37,9 +41,12 @@ export default function PrinterSetup({ open, onClose }: Props) {
 
       if (cancelled) return
 
+      // Always capture diagnostics for debugging
+      const diag = getCapacitorDiagnostics()
+      setDiagnostics(diag)
+
       if (!isAvailable) {
         // Log diagnostics for debugging tablet issues
-        const diag = getCapacitorDiagnostics()
         console.warn('[PrinterSetup] Capacitor not available:', diag)
         setUiState('not-in-app')
         return
@@ -106,6 +113,33 @@ export default function PrinterSetup({ open, onClose }: Props) {
               <p className="text-sm text-slate-400">
                 Printer setup is only available in the Scale Station Android app.
               </p>
+              {/* Debug button to show diagnostics */}
+              <button
+                onClick={() => setShowDiag(!showDiag)}
+                className="mt-2 text-xs text-slate-400 hover:text-slate-600 flex items-center gap-1"
+              >
+                <Bug className="w-3 h-3" />
+                {showDiag ? 'Hide' : 'Show'} Debug Info
+              </button>
+              {showDiag && diagnostics && (
+                <div className="mt-2 text-left bg-slate-100 rounded-lg p-3 text-xs font-mono w-full max-w-sm">
+                  <p className={diagnostics.hasCapacitor ? 'text-green-600' : 'text-red-600'}>
+                    Capacitor: {diagnostics.hasCapacitor ? '✓' : '✗'}
+                  </p>
+                  <p className={diagnostics.isNativePlatform ? 'text-green-600' : 'text-red-600'}>
+                    isNativePlatform: {diagnostics.isNativePlatform ? '✓' : '✗'}
+                  </p>
+                  <p className={diagnostics.hasThermalPrinter ? 'text-green-600' : 'text-red-600'}>
+                    ThermalPrinter: {diagnostics.hasThermalPrinter ? '✓' : '✗'}
+                  </p>
+                  <p className="text-slate-500 mt-1 break-all">
+                    Screen: {diagnostics.screenWidth}×{diagnostics.screenHeight}
+                  </p>
+                  <p className="text-slate-500 break-all" style={{ fontSize: '10px' }}>
+                    UA: {diagnostics.userAgent}
+                  </p>
+                </div>
+              )}
             </div>
           )}
 

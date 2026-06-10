@@ -1,12 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import { signOut, useSession } from 'next-auth/react'
 import { redirect } from 'next/navigation'
 import { LogOut, Scale, Printer } from 'lucide-react'
 import PrinterSetup from './components/PrinterSetup'
 import { PrinterContext } from './PrinterContext'
+import { waitForCapacitor } from '@/lib/scale/capacitorPrint'
 
 export default function ScaleClientLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -14,6 +15,14 @@ export default function ScaleClientLayout({ children }: { children: React.ReactN
 
   const { data: session, status } = useSession()
   const [printerSetupOpen, setPrinterSetupOpen] = useState(false)
+  const [capacitorStatus, setCapacitorStatus] = useState<'checking' | 'yes' | 'no'>('checking')
+
+  // Check Capacitor status on mount
+  useEffect(() => {
+    waitForCapacitor().then(isAvailable => {
+      setCapacitorStatus(isAvailable ? 'yes' : 'no')
+    })
+  }, [])
 
   if (isPublic) return <>{children}</>
 
@@ -49,10 +58,18 @@ export default function ScaleClientLayout({ children }: { children: React.ReactN
           </span>
           <button
             onClick={() => setPrinterSetupOpen(true)}
-            className="min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-300 hover:text-white rounded-lg transition-colors"
+            className="min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-300 hover:text-white rounded-lg transition-colors relative"
             aria-label="Printer settings"
           >
             <Printer className="w-4 h-4" />
+            {/* Capacitor status indicator - green=detected, red=not detected, yellow=checking */}
+            <span
+              className={`absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border border-slate-900 ${
+                capacitorStatus === 'checking' ? 'bg-yellow-400' :
+                capacitorStatus === 'yes' ? 'bg-emerald-400' : 'bg-red-400'
+              }`}
+              title={`Capacitor: ${capacitorStatus}`}
+            />
           </button>
           <button
             onClick={() => signOut({ callbackUrl: '/scale/login' })}
