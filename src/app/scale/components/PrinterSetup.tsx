@@ -8,8 +8,6 @@ import {
   Loader2,
   Smartphone,
   Bug,
-  Wifi,
-  Bluetooth,
   ChevronDown,
   RotateCcw,
   Settings,
@@ -62,7 +60,7 @@ export default function PrinterSetup({ open, onClose }: Props) {
   const [testResult, setTestResult] = useState<{ success: boolean; error?: string } | null>(null)
 
   // Store
-  const { printers, defaultPrinterId, addPrinter, updatePrinter, removePrinter, setDefault } = usePrinterStore()
+  const { printers, defaultPrinterId, addPrinter, updatePrinter, setDefault } = usePrinterStore()
 
   // Load settings on open
   useEffect(() => {
@@ -112,7 +110,7 @@ export default function PrinterSetup({ open, onClose }: Props) {
   async function handleScan() {
     setIsScanning(true)
     await requestBluetoothPermissions()
-    const result = await startBluetoothScan()
+    await startBluetoothScan()
     // Merge with paired devices (discovered devices that are paired)
     const devices = await getPairedPrinters()
     setPairedDevices(devices)
@@ -183,12 +181,6 @@ export default function PrinterSetup({ open, onClose }: Props) {
     }
 
     onClose()
-  }
-
-  // Get device type for selected address
-  function getDeviceType(): 'classic' | 'ble' {
-    const device = pairedDevices.find(d => d.address === selectedAddress)
-    return device?.type || 'classic'
   }
 
   if (!open) return null

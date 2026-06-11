@@ -92,7 +92,7 @@ export interface ReceiptData {
  * @param cols - Column width (32 for 58mm, 48 for 80mm). Defaults to 32.
  */
 export function buildReceipt(data: ReceiptData, cols: number = DEFAULT_COLS): Uint8Array {
-  const { textLine, emptyLine, separator, centred, twoCol } = createHelpers(cols)
+  const { textLine, emptyLine, separator, twoCol } = createHelpers(cols)
   const buf: number[] = []
   const add = (...chunks: number[][]) => chunks.forEach(c => buf.push(...c))
 
