@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="colorPrimary">#10B981</color>
+    <color name="colorPrimaryDark">#059669</color>
+    <color name="colorAccent">#10B981</color>
+
+    <!-- Splash screen colors - matches Expo app.json splash config -->
+    <color name="splashBackground">#1B2A4A</color>
+    <color name="splashIconBackground">#1B2A4A</color>
+</resources>

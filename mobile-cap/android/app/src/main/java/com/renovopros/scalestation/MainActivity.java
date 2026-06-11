@@ -4,7 +4,6 @@ import com.getcapacitor.BridgeActivity;
 import android.os.Bundle;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
-import android.webkit.WebViewClient;
 
 public class MainActivity extends BridgeActivity {
 
@@ -41,14 +40,9 @@ public class MainActivity extends BridgeActivity {
         String currentUA = settings.getUserAgentString();
         settings.setUserAgentString(currentUA + " ScaleStation/1.0");
 
-        // Prevent blank screen on resume after OS kills background process
-        webView.setWebViewClient(new WebViewClient() {
-            @Override
-            public void onPageFinished(WebView view, String url) {
-                super.onPageFinished(view, url);
-                view.setVisibility(WebView.VISIBLE);
-            }
-        });
+        // NOTE: Do NOT set a custom WebViewClient here!
+        // Capacitor's BridgeWebViewClient handles JavaScript bridge injection.
+        // Replacing it breaks the bridge on older WebViews (like Huawei tablets).
     }
 
     // Fix: Android back button causes WebView history navigation → goes back to step 1.

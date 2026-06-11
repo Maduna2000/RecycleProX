@@ -1,97 +1,209 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { X, Printer, CheckCircle2, Loader2, BluetoothSearching, Smartphone, Bug } from 'lucide-react'
+import {
+  X,
+  Printer,
+  CheckCircle2,
+  Loader2,
+  Smartphone,
+  Bug,
+  Wifi,
+  Bluetooth,
+  ChevronDown,
+  RotateCcw,
+  Settings,
+  AlertCircle,
+} from 'lucide-react'
 import {
   waitForCapacitor,
   getPairedPrinters,
-  getSavedPrinterAddress,
-  savePrinterAddress,
-  clearSavedPrinterAddress,
   getCapacitorDiagnostics,
+  sendTestPrint,
+  testNetworkConnection,
+  requestBluetoothPermissions,
+  startBluetoothScan,
   type Printer as BTDevice,
   type CapacitorDiagnostics,
 } from '@/lib/scale/capacitorPrint'
+import { usePrinterStore } from '@/stores/printerStore'
+import type { ConnectionType, PaperWidth } from '@/lib/schemas/printer'
 
 interface Props {
-  open:    boolean
+  open: boolean
   onClose: () => void
 }
 
-type State = 'not-in-app' | 'scanning' | 'list' | 'none'
+type CapacitorState = 'checking' | 'available' | 'unavailable'
 
 export default function PrinterSetup({ open, onClose }: Props) {
-  const [uiState,   setUiState]   = useState<State>('scanning')
-  const [printers,  setPrinters]  = useState<BTDevice[]>([])
-  const [selected,  setSelected]  = useState<string | null>(null)
+  // Capacitor state
+  const [capacitorState, setCapacitorState] = useState<CapacitorState>('checking')
   const [diagnostics, setDiagnostics] = useState<CapacitorDiagnostics | null>(null)
   const [showDiag, setShowDiag] = useState(false)
 
+  // Device lists
+  const [pairedDevices, setPairedDevices] = useState<BTDevice[]>([])
+  const [isScanning, setIsScanning] = useState(false)
+  const [loadingDevices, setLoadingDevices] = useState(true)
+
+  // Form state
+  const [connectionType, setConnectionType] = useState<ConnectionType>('bluetooth')
+  const [selectedAddress, setSelectedAddress] = useState('')
+  const [networkIp, setNetworkIp] = useState('')
+  const [networkPort, setNetworkPort] = useState('9100')
+  const [paperWidth, setPaperWidth] = useState<PaperWidth>('58mm')
+  const [density, setDensity] = useState(4)
+  const [autoCut, setAutoCut] = useState(true)
+  const [printerLabel, setPrinterLabel] = useState('')
+
+  // Test print state
+  const [testing, setTesting] = useState(false)
+  const [testResult, setTestResult] = useState<{ success: boolean; error?: string } | null>(null)
+
+  // Store
+  const { printers, defaultPrinterId, addPrinter, updatePrinter, removePrinter, setDefault } = usePrinterStore()
+
+  // Load settings on open
   useEffect(() => {
     if (!open) return
 
-    let cancelled = false
-    setUiState('scanning')
+    setCapacitorState('checking')
     setDiagnostics(null)
+    setTestResult(null)
 
-    // Wait for Capacitor with retries - important for tablets where
-    // the bridge can take longer to initialize (can take 10+ seconds on some devices)
-    async function initPrinterSetup() {
-      const isAvailable = await waitForCapacitor() // Uses default 8 attempts, 200ms initial delay
-
-      if (cancelled) return
-
-      // Always capture diagnostics for debugging
+    async function init() {
+      const isAvailable = await waitForCapacitor()
       const diag = getCapacitorDiagnostics()
       setDiagnostics(diag)
+      setCapacitorState(isAvailable ? 'available' : 'unavailable')
 
-      if (!isAvailable) {
-        // Log diagnostics for debugging tablet issues
-        console.warn('[PrinterSetup] Capacitor not available:', diag)
-        setUiState('not-in-app')
-        return
+      if (isAvailable) {
+        // Load paired devices
+        setLoadingDevices(true)
+        const devices = await getPairedPrinters()
+        setPairedDevices(devices)
+        setLoadingDevices(false)
+
+        // Load saved settings from default printer
+        const defaultPrinter = printers.find(p => p.id === defaultPrinterId)
+        if (defaultPrinter) {
+          setConnectionType(defaultPrinter.connectionType)
+          setSelectedAddress(defaultPrinter.address)
+          setPaperWidth(defaultPrinter.paperWidth)
+          setDensity(defaultPrinter.density)
+          setAutoCut(defaultPrinter.autoCut)
+          setPrinterLabel(defaultPrinter.label)
+
+          // Parse network address if needed
+          if (defaultPrinter.connectionType === 'network') {
+            const parts = defaultPrinter.address.split(':')
+            setNetworkIp(parts[0] || '')
+            setNetworkPort(parts[1] || '9100')
+          }
+        }
       }
-
-      setSelected(getSavedPrinterAddress())
-
-      const list = await getPairedPrinters()
-      if (cancelled) return
-
-      setPrinters(list)
-      setUiState(list.length > 0 ? 'list' : 'none')
     }
 
-    initPrinterSetup()
+    init()
+  }, [open, printers, defaultPrinterId])
 
-    return () => { cancelled = true }
-  }, [open])
-
-  function handleSelect(address: string) {
-    savePrinterAddress(address)
-    setSelected(address)
+  // Scan for devices
+  async function handleScan() {
+    setIsScanning(true)
+    await requestBluetoothPermissions()
+    const result = await startBluetoothScan()
+    // Merge with paired devices (discovered devices that are paired)
+    const devices = await getPairedPrinters()
+    setPairedDevices(devices)
+    setIsScanning(false)
   }
 
-  function handleClear() {
-    clearSavedPrinterAddress()
-    setSelected(null)
+  // Test print
+  async function handleTestPrint() {
+    setTesting(true)
+    setTestResult(null)
+
+    const address = connectionType === 'network'
+      ? `${networkIp}:${networkPort}`
+      : selectedAddress
+
+    if (!address) {
+      setTestResult({ success: false, error: 'No printer selected' })
+      setTesting(false)
+      return
+    }
+
+    // Test network connection first if network printer
+    if (connectionType === 'network') {
+      const netTest = await testNetworkConnection(networkIp, parseInt(networkPort, 10))
+      if (!netTest.success) {
+        setTestResult({ success: false, error: netTest.error || 'Connection failed' })
+        setTesting(false)
+        return
+      }
+    }
+
+    const result = await sendTestPrint(connectionType, address, paperWidth)
+    setTestResult(result)
+    setTesting(false)
+  }
+
+  // Save settings
+  function handleSave() {
+    const address = connectionType === 'network'
+      ? `${networkIp}:${networkPort}`
+      : selectedAddress
+
+    if (!address) return
+
+    // Find existing printer with same address or create new
+    const existing = printers.find(p => p.address === address)
+
+    if (existing) {
+      updatePrinter(existing.id, {
+        label: printerLabel || `Printer ${address.slice(-5)}`,
+        connectionType,
+        paperWidth,
+        density,
+        autoCut,
+      })
+      setDefault(existing.id)
+    } else {
+      const newPrinter = addPrinter({
+        label: printerLabel || `Printer ${address.slice(-5)}`,
+        connectionType,
+        address,
+        paperWidth,
+        density,
+        autoCut,
+        isDefault: true,
+      })
+      setDefault(newPrinter.id)
+    }
+
+    onClose()
+  }
+
+  // Get device type for selected address
+  function getDeviceType(): 'classic' | 'ble' {
+    const device = pairedDevices.find(d => d.address === selectedAddress)
+    return device?.type || 'classic'
   }
 
   if (!open) return null
 
   return (
-    // Backdrop
     <div
       className="fixed inset-0 z-50 flex items-end justify-center bg-black/50"
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
-      {/* Sheet */}
       <div className="w-full max-w-lg bg-white rounded-t-3xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-300">
-
-        {/* Handle + header */}
+        {/* Header */}
         <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-slate-100">
           <div className="flex items-center gap-2">
-            <Printer className="w-5 h-5 text-emerald-600" />
-            <h2 className="text-lg font-bold text-slate-800">Printer Setup</h2>
+            <Settings className="w-5 h-5 text-emerald-600" />
+            <h2 className="text-lg font-bold text-slate-800">Printer Settings</h2>
           </div>
           <button
             onClick={onClose}
@@ -103,17 +215,23 @@ export default function PrinterSetup({ open, onClose }: Props) {
         </div>
 
         {/* Body */}
-        <div className="p-5 max-h-[60vh] overflow-y-auto">
+        <div className="p-5 max-h-[70vh] overflow-y-auto">
+          {/* Checking Capacitor */}
+          {capacitorState === 'checking' && (
+            <div className="flex flex-col items-center gap-3 py-8">
+              <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
+              <p className="text-slate-500 text-sm">Checking printer support...</p>
+            </div>
+          )}
 
           {/* Not in Capacitor */}
-          {uiState === 'not-in-app' && (
+          {capacitorState === 'unavailable' && (
             <div className="flex flex-col items-center gap-3 py-8 text-center">
               <Smartphone className="w-12 h-12 text-slate-300" />
               <p className="font-semibold text-slate-700">Mobile app only</p>
               <p className="text-sm text-slate-400">
                 Printer setup is only available in the Scale Station Android app.
               </p>
-              {/* Debug button to show diagnostics */}
               <button
                 onClick={() => setShowDiag(!showDiag)}
                 className="mt-2 text-xs text-slate-400 hover:text-slate-600 flex items-center gap-1"
@@ -122,96 +240,247 @@ export default function PrinterSetup({ open, onClose }: Props) {
                 {showDiag ? 'Hide' : 'Show'} Debug Info
               </button>
               {showDiag && diagnostics && (
-                <div className="mt-2 text-left bg-slate-100 rounded-lg p-3 text-xs font-mono w-full max-w-sm">
+                <div className="mt-2 text-left bg-slate-100 rounded-lg p-3 text-xs font-mono w-full">
                   <p className={diagnostics.hasCapacitor ? 'text-green-600' : 'text-red-600'}>
-                    Capacitor: {diagnostics.hasCapacitor ? '✓' : '✗'}
+                    Capacitor: {diagnostics.hasCapacitor ? 'Yes' : 'No'}
                   </p>
                   <p className={diagnostics.isNativePlatform ? 'text-green-600' : 'text-red-600'}>
-                    isNativePlatform: {diagnostics.isNativePlatform ? '✓' : '✗'}
+                    Native: {diagnostics.isNativePlatform ? 'Yes' : 'No'}
                   </p>
                   <p className={diagnostics.hasThermalPrinter ? 'text-green-600' : 'text-red-600'}>
-                    ThermalPrinter: {diagnostics.hasThermalPrinter ? '✓' : '✗'}
-                  </p>
-                  <p className="text-slate-500 mt-1 break-all">
-                    Screen: {diagnostics.screenWidth}×{diagnostics.screenHeight}
-                  </p>
-                  <p className="text-slate-500 break-all" style={{ fontSize: '10px' }}>
-                    UA: {diagnostics.userAgent}
+                    Plugin: {diagnostics.hasThermalPrinter ? 'Yes' : 'No'}
                   </p>
                 </div>
               )}
             </div>
           )}
 
-          {/* Scanning */}
-          {uiState === 'scanning' && (
-            <div className="flex flex-col items-center gap-3 py-8">
-              <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
-              <p className="text-slate-500 text-sm">Scanning for paired printers…</p>
-            </div>
-          )}
-
-          {/* No printers found */}
-          {uiState === 'none' && (
-            <div className="flex flex-col items-center gap-3 py-8 text-center">
-              <BluetoothSearching className="w-12 h-12 text-slate-300" />
-              <p className="font-semibold text-slate-700">No paired printers found</p>
-              <p className="text-sm text-slate-400">
-                Pair your Bluetooth thermal printer in Android Settings → Bluetooth first, then come back here.
-              </p>
-            </div>
-          )}
-
-          {/* Printer list */}
-          {uiState === 'list' && (
-            <div className="flex flex-col gap-3">
-              <p className="text-xs text-slate-500 uppercase tracking-wide font-semibold mb-1">
-                Paired devices
-              </p>
-              {printers.map(printer => {
-                const isActive = selected === printer.address
-                return (
-                  <button
-                    key={printer.address}
-                    onClick={() => handleSelect(printer.address)}
-                    className={`flex items-center gap-4 p-4 rounded-2xl border-2 text-left transition-all active:scale-95 ${
-                      isActive
-                        ? 'border-emerald-500 bg-emerald-50'
-                        : 'border-slate-200 bg-white hover:border-slate-300'
-                    }`}
+          {/* Settings Form */}
+          {capacitorState === 'available' && (
+            <div className="space-y-5">
+              {/* Connection Type */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Connection Type
+                </label>
+                <div className="relative">
+                  <select
+                    value={connectionType}
+                    onChange={e => {
+                      setConnectionType(e.target.value as ConnectionType)
+                      setSelectedAddress('')
+                      setTestResult(null)
+                    }}
+                    className="w-full appearance-none px-4 py-3 pr-10 rounded-xl border-2 border-slate-200 bg-white focus:border-emerald-400 focus:outline-none text-slate-800"
                   >
-                    <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
-                      <Printer className="w-5 h-5 text-slate-600" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-slate-800 truncate">{printer.name || 'Unknown device'}</p>
-                      <p className="text-xs text-slate-400 font-mono">{printer.address}</p>
-                      <span className={`inline-block mt-1 text-xs px-2 py-0.5 rounded-full font-medium ${
-                        printer.type === 'ble'
-                          ? 'bg-blue-100 text-blue-700'
-                          : 'bg-slate-100 text-slate-600'
-                      }`}>
-                        {printer.type === 'ble' ? 'Bluetooth LE' : 'Classic BT'}
-                      </span>
-                    </div>
-                    {isActive && <CheckCircle2 className="w-6 h-6 text-emerald-500 shrink-0" />}
-                  </button>
-                )
-              })}
+                    <option value="bluetooth">Bluetooth Classic</option>
+                    <option value="ble">Bluetooth LE (BLE)</option>
+                    <option value="network">Network / WiFi</option>
+                  </select>
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+                </div>
+              </div>
 
-              {selected && (
-                <button
-                  onClick={handleClear}
-                  className="mt-1 text-sm text-red-500 hover:text-red-700 min-h-[44px] flex items-center justify-center rounded-xl hover:bg-red-50 transition-colors"
-                >
-                  Clear printer selection
-                </button>
+              {/* Device Selection - Bluetooth */}
+              {(connectionType === 'bluetooth' || connectionType === 'ble') && (
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-sm font-medium text-slate-700">
+                      Select Printer
+                    </label>
+                    <button
+                      onClick={handleScan}
+                      disabled={isScanning}
+                      className="text-xs text-emerald-600 hover:text-emerald-700 flex items-center gap-1"
+                    >
+                      {isScanning ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : (
+                        <RotateCcw className="w-3 h-3" />
+                      )}
+                      Refresh
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <select
+                      value={selectedAddress}
+                      onChange={e => {
+                        setSelectedAddress(e.target.value)
+                        setTestResult(null)
+                      }}
+                      disabled={loadingDevices}
+                      className="w-full appearance-none px-4 py-3 pr-10 rounded-xl border-2 border-slate-200 bg-white focus:border-emerald-400 focus:outline-none text-slate-800 disabled:bg-slate-100"
+                    >
+                      <option value="">-- Select a printer --</option>
+                      {pairedDevices
+                        .filter(d => connectionType === 'ble' ? d.type === 'ble' : d.type === 'classic')
+                        .map(device => (
+                          <option key={device.address} value={device.address}>
+                            {device.name || 'Unknown'} ({device.address})
+                          </option>
+                        ))}
+                    </select>
+                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+                  </div>
+                  {pairedDevices.length === 0 && !loadingDevices && (
+                    <p className="text-xs text-slate-400 mt-2">
+                      No paired printers found. Pair your printer in Android Bluetooth settings first.
+                    </p>
+                  )}
+                </div>
               )}
+
+              {/* Network Settings */}
+              {connectionType === 'network' && (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      IP Address
+                    </label>
+                    <input
+                      type="text"
+                      value={networkIp}
+                      onChange={e => {
+                        setNetworkIp(e.target.value)
+                        setTestResult(null)
+                      }}
+                      placeholder="192.168.1.100"
+                      className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-400 focus:outline-none font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Port
+                    </label>
+                    <input
+                      type="text"
+                      value={networkPort}
+                      onChange={e => {
+                        setNetworkPort(e.target.value)
+                        setTestResult(null)
+                      }}
+                      placeholder="9100"
+                      className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-400 focus:outline-none font-mono"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Printer Label */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Printer Name (optional)
+                </label>
+                <input
+                  type="text"
+                  value={printerLabel}
+                  onChange={e => setPrinterLabel(e.target.value)}
+                  placeholder="e.g., Front Counter"
+                  maxLength={32}
+                  className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-400 focus:outline-none"
+                />
+              </div>
+
+              {/* Paper Width */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Paper Width
+                </label>
+                <div className="relative">
+                  <select
+                    value={paperWidth}
+                    onChange={e => setPaperWidth(e.target.value as PaperWidth)}
+                    className="w-full appearance-none px-4 py-3 pr-10 rounded-xl border-2 border-slate-200 bg-white focus:border-emerald-400 focus:outline-none text-slate-800"
+                  >
+                    <option value="58mm">58mm (32 chars/line)</option>
+                    <option value="80mm">80mm (48 chars/line)</option>
+                  </select>
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+                </div>
+              </div>
+
+              {/* Print Density */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Print Density: {density}
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="7"
+                  value={density}
+                  onChange={e => setDensity(parseInt(e.target.value, 10))}
+                  className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                />
+                <div className="flex justify-between text-xs text-slate-400 mt-1">
+                  <span>Lighter</span>
+                  <span>Darker</span>
+                </div>
+              </div>
+
+              {/* Auto-Cut */}
+              <div className="flex items-center justify-between p-4 rounded-xl border-2 border-slate-200">
+                <div>
+                  <p className="font-medium text-slate-700">Auto-Cut Paper</p>
+                  <p className="text-xs text-slate-400">Cut paper after each print</p>
+                </div>
+                <button
+                  onClick={() => setAutoCut(!autoCut)}
+                  className={`relative w-12 h-7 rounded-full transition-colors ${
+                    autoCut ? 'bg-emerald-500' : 'bg-slate-300'
+                  }`}
+                >
+                  <span
+                    className={`absolute top-1 left-1 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                      autoCut ? 'translate-x-5' : ''
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* Test Print Result */}
+              {testResult && (
+                <div className={`p-4 rounded-xl flex items-center gap-3 ${
+                  testResult.success ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
+                }`}>
+                  {testResult.success ? (
+                    <CheckCircle2 className="w-5 h-5 shrink-0" />
+                  ) : (
+                    <AlertCircle className="w-5 h-5 shrink-0" />
+                  )}
+                  <span className="text-sm">
+                    {testResult.success ? 'Test print successful!' : testResult.error}
+                  </span>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={handleTestPrint}
+                  disabled={testing || (!selectedAddress && connectionType !== 'network') || (connectionType === 'network' && !networkIp)}
+                  className="flex-1 py-3 px-4 rounded-xl border-2 border-slate-200 text-slate-700 font-medium hover:bg-slate-50 disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {testing ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <Printer className="w-5 h-5" />
+                  )}
+                  Test Print
+                </button>
+                <button
+                  onClick={handleSave}
+                  disabled={(!selectedAddress && connectionType !== 'network') || (connectionType === 'network' && !networkIp)}
+                  className="flex-1 py-3 px-4 rounded-xl bg-emerald-600 text-white font-medium hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  Save Settings
+                </button>
+              </div>
             </div>
           )}
         </div>
 
-        {/* Safe area bottom padding */}
+        {/* Safe area padding */}
         <div style={{ paddingBottom: 'env(safe-area-inset-bottom, 16px)' }} />
       </div>
     </div>

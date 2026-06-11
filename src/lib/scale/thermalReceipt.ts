@@ -1,6 +1,8 @@
-// ESC/POS byte generator for 58mm thermal printers.
-// Produces output that also works correctly on 80mm (wider margin only).
+// ESC/POS byte generator for thermal printers.
+// Supports both 58mm (32 cols) and 80mm (48 cols) paper widths.
 // Pure TypeScript — zero dependencies.
+
+import { PaperWidth, PAPER_WIDTH_COLUMNS } from '@/lib/schemas/printer'
 
 const ESC = 0x1b
 const GS  = 0x1d
@@ -17,9 +19,10 @@ const CMD_SIZE_BIG    = [GS,  0x21, 0x11]     // double width + height
 const CMD_FEED        = [ESC, 0x64, 0x04]     // feed 4 lines before cut
 const CMD_CUT         = [GS,  0x56, 0x42, 0x32] // partial cut
 
-const COLS = 32  // 58mm @normal font; safe on 80mm too
+// Default column count for 58mm paper
+const DEFAULT_COLS = 32
 
-// ── Helpers ─────────────────────────────────────────────────────────────────
+// ── Helpers (parameterized for column width) ─────────────────────────────────
 
 function enc(s: string): number[] {
   const out: number[] = []
@@ -30,31 +33,37 @@ function enc(s: string): number[] {
   return out
 }
 
-function textLine(s: string): number[] {
-  return [...enc(s.slice(0, COLS)), LF]
-}
+function createHelpers(cols: number) {
+  function textLine(s: string): number[] {
+    return [...enc(s.slice(0, cols)), LF]
+  }
 
-function emptyLine(): number[] { return [LF] }
+  function emptyLine(): number[] {
+    return [LF]
+  }
 
-function separator(char = '-'): number[] {
-  return textLine(char.repeat(COLS))
-}
+  function separator(char = '-'): number[] {
+    return textLine(char.repeat(cols))
+  }
 
-function pad(s: string, width: number): string {
-  return s.length >= width ? s.slice(0, width) : s + ' '.repeat(width - s.length)
-}
+  function pad(s: string, width: number): string {
+    return s.length >= width ? s.slice(0, width) : s + ' '.repeat(width - s.length)
+  }
 
-function centred(s: string): string {
-  if (s.length >= COLS) return s.slice(0, COLS)
-  const p = Math.floor((COLS - s.length) / 2)
-  return ' '.repeat(p) + s
-}
+  function centred(s: string): string {
+    if (s.length >= cols) return s.slice(0, cols)
+    const p = Math.floor((cols - s.length) / 2)
+    return ' '.repeat(p) + s
+  }
 
-function twoCol(left: string, right: string): number[] {
-  const maxL = COLS - right.length - 1
-  const l    = left.length > maxL ? left.slice(0, maxL - 1) + '…' : left
-  const gap  = COLS - l.length - right.length
-  return textLine(l + ' '.repeat(Math.max(1, gap)) + right)
+  function twoCol(left: string, right: string): number[] {
+    const maxL = cols - right.length - 1
+    const l    = left.length > maxL ? left.slice(0, maxL - 1) + '…' : left
+    const gap  = cols - l.length - right.length
+    return textLine(l + ' '.repeat(Math.max(1, gap)) + right)
+  }
+
+  return { textLine, emptyLine, separator, pad, centred, twoCol }
 }
 
 // ── Public interface ─────────────────────────────────────────────────────────
@@ -77,7 +86,13 @@ export interface ReceiptData {
   }[]
 }
 
-export function buildReceipt(data: ReceiptData): Uint8Array {
+/**
+ * Build ESC/POS receipt bytes for a scale order.
+ * @param data - Receipt data
+ * @param cols - Column width (32 for 58mm, 48 for 80mm). Defaults to 32.
+ */
+export function buildReceipt(data: ReceiptData, cols: number = DEFAULT_COLS): Uint8Array {
+  const { textLine, emptyLine, separator, centred, twoCol } = createHelpers(cols)
   const buf: number[] = []
   const add = (...chunks: number[][]) => chunks.forEach(c => buf.push(...c))
 
@@ -91,9 +106,9 @@ export function buildReceipt(data: ReceiptData): Uint8Array {
   // ── Header ────────────────────────────────────────────────────────────────
   add(CMD_ALIGN_C)
   add(CMD_BOLD_ON, CMD_SIZE_BIG)
-  add(textLine(centred('SCALE STATION')))
+  add(textLine('SCALE STATION'))
   add(CMD_SIZE_NORMAL)
-  add(textLine(centred('Renovo Pro')))
+  add(textLine('Renovo Pro'))
   add(CMD_BOLD_OFF)
   add(emptyLine())
   add(separator('='))
@@ -140,19 +155,26 @@ export function buildReceipt(data: ReceiptData): Uint8Array {
   add(separator('='))
   add(CMD_ALIGN_C)
   add(CMD_BOLD_ON)
-  add(textLine(centred('NO PRICE ON THIS SLIP')))
+  add(textLine('NO PRICE ON THIS SLIP'))
   add(CMD_BOLD_OFF)
   add(separator('='))
   add(emptyLine())
-  add(textLine(centred('Thank you!')))
+  add(textLine('Thank you!'))
   add(emptyLine())
 
   // ── Feed + cut ────────────────────────────────────────────────────────────
   add(CMD_FEED)
   add(CMD_CUT)
 
-  // suppress unused import warning for pad helper
-  void pad
-
   return new Uint8Array(buf)
+}
+
+/**
+ * Build ESC/POS receipt bytes using paper width enum.
+ * @param data - Receipt data
+ * @param paperWidth - Paper width enum ('58mm' or '80mm'). Defaults to '58mm'.
+ */
+export function buildReceiptForPaperWidth(data: ReceiptData, paperWidth: PaperWidth = '58mm'): Uint8Array {
+  const cols = PAPER_WIDTH_COLUMNS[paperWidth] as 32 | 48
+  return buildReceipt(data, cols)
 }

@@ -59,12 +59,12 @@ export default function LoginPage() {
           <div className="flex flex-col items-center mb-8">
             <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4" style={{ background: '#1B3A6B' }}>
               <RefreshCw className="w-9 h-9 text-white" />
-            </div>
+            </div>the
             <h1 className="text-2xl font-bold" style={{ color: '#212529' }}>Renovo Pro</h1>
             <p className="text-sm mt-1" style={{ color: '#6C757D' }}>Golden Keys Investments</p>
           </div>
 
-          {/* Error */}
+          {/* Error */}retr
           {error && (
             <div className="mb-4 p-3 rounded-lg text-sm" style={{ background: '#FFF0F0', border: '1px solid #F5C6C6', color: '#C0392B' }}>
               {error}
