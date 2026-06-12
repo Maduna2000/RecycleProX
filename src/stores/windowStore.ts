@@ -11,6 +11,7 @@ export interface WindowEntry {
 interface WindowStore {
   windows: WindowEntry[]
   openWindow(href: string, label: string, icon: LucideIcon): void
+  updateWindowLabel(href: string, label: string): void
   closeWindow(id: string, navigate: (href: string) => void): void
   clearAll(): void
 }
@@ -25,6 +26,17 @@ export const useWindowStore = create<WindowStore>()((set, get) => ({
     const next = windows.length >= 4
       ? [...windows.slice(1), entry]
       : [...windows, entry]
+    set({ windows: next })
+  },
+
+  updateWindowLabel(href, label) {
+    const { windows } = get()
+    const idx = windows.findIndex(w => w.href === href)
+    if (idx === -1) return
+    const existing = windows[idx]
+    if (!existing) return
+    const next = [...windows]
+    next[idx] = { ...existing, label }
     set({ windows: next })
   },
 

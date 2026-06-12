@@ -5,7 +5,12 @@ import { Minus, X } from 'lucide-react'
 import { getModuleName } from '@/lib/module-names'
 import { useWindowStore } from '@/stores/windowStore'
 
-export function PageTitleBar() {
+interface PageTitleBarProps {
+  /** Override the default module name with a custom title (e.g., record name for detail pages) */
+  title?: string | null
+}
+
+export function PageTitleBar({ title }: PageTitleBarProps = {}) {
   const pathname = usePathname()
   const router   = useRouter()
   const { windows, closeWindow } = useWindowStore()
@@ -28,6 +33,9 @@ export function PageTitleBar() {
     closeWindow(entry.id, (href) => router.push(href))
   }
 
+  // Use provided title if available, otherwise fall back to module name
+  const displayTitle = title ?? getModuleName(pathname)
+
   return (
     <div
       className="flex items-center justify-between shrink-0 px-3 border-b select-none"
@@ -38,7 +46,7 @@ export function PageTitleBar() {
       }}
     >
       <span className="text-[12px] font-semibold text-[#374151]">
-        {getModuleName(pathname)}
+        {displayTitle}
       </span>
       <div className="flex items-center gap-0.5">
         <button

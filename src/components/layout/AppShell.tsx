@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils'
 import { useOfflineStore } from '@/stores/offlineStore'
 import { getModuleName } from '@/lib/module-names'
 import { WindowTaskbar } from '@/components/ui/WindowTaskbar'
+import { useRecordTitle } from '@/hooks/useRecordTitle'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -421,12 +422,8 @@ export function AppShell({
   const toolbarBtns = useToolbarButtons(pathname, role)
   const moduleName  = getModuleName(pathname)
 
-  const isPriceGroupDetail = pathname.startsWith('/app/price-groups/') && pathname !== '/app/price-groups/'
-  const priceGroupDetailId = isPriceGroupDetail ? pathname.split('/')[3] : null
-  const { data: priceGroupData } = useSWR<{ id: string; name: string }>(
-    priceGroupDetailId ? `/api/price-groups/${priceGroupDetailId}` : null,
-    (url: string) => fetch(url).then(r => r.json()),
-  )
+  // Dynamic route title (for detail pages like /app/purchases/[id])
+  const { title: recordTitle, isDetailPage, parentPath, parentLabel } = useRecordTitle(pathname)
 
   const goHome = useCallback(() => router.push('/app/dashboard'), [router])
 
@@ -472,17 +469,17 @@ export function AppShell({
             Portal
           </Link>
           <ChevronRight className="w-3 h-3 text-white/20 shrink-0" />
-          {isPriceGroupDetail ? (
+          {isDetailPage && parentPath && parentLabel ? (
             <>
               <Link
-                href="/app/price-groups"
+                href={parentPath}
                 className="text-[#8BA4D4] text-[11px] font-medium hover:text-white transition-colors whitespace-nowrap shrink-0"
               >
-                Price Groups
+                {parentLabel}
               </Link>
               <ChevronRight className="w-3 h-3 text-white/20 shrink-0" />
               <span className="text-white text-[14px] font-bold tracking-wide truncate">
-                {priceGroupData?.name ?? '…'}
+                {recordTitle}
               </span>
             </>
           ) : (

@@ -49,7 +49,7 @@ type Product = {
 
 const TH: React.CSSProperties = {
   textAlign: 'left', padding: '0 8px', height: 28,
-  fontSize: 10, fontWeight: 700, color: '#6C757D',
+  fontSize: 10, fontWeight: 700, color: colors.textSecondary,
   textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap',
 }
 const TD: React.CSSProperties = { padding: '0 8px', fontSize: 12 }
@@ -57,12 +57,12 @@ const TD: React.CSSProperties = { padding: '0 8px', fontSize: 12 }
 const secBtn: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 4, height: 24,
   padding: '0 8px', fontSize: 11, fontWeight: 600, borderRadius: 2,
-  background: '#fff', border: '1px solid #ABABAB', color: '#212529', cursor: 'pointer',
+  background: colors.surface, border: `1px solid ${colors.border}`, color: colors.textPrimary, cursor: 'pointer',
 }
 const priBtn: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 4, height: 24,
   padding: '0 8px', fontSize: 11, fontWeight: 600, borderRadius: 2,
-  background: '#217346', border: '1px solid #176338', color: '#fff', cursor: 'pointer',
+  background: colors.action, border: `1px solid ${colors.actionHover}`, color: colors.textOnDark, cursor: 'pointer',
 }
 
 export default function ProductsPage() {

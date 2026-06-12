@@ -8,7 +8,8 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { LoginSchema, type LoginInput } from '@/lib/schemas/auth'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { RefreshCw, Loader2 } from 'lucide-react'
+import { RefreshCw, Loader2, Eye, EyeOff } from 'lucide-react'
+import { colors } from '@/lib/design-tokens'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -51,22 +52,24 @@ export default function LoginPage() {
     router.refresh()
   }
 
+  const [showPassword, setShowPassword] = useState(false)
+
   return (
-    <div className="min-h-screen flex items-center justify-center" style={{ background: '#F8F9FA' }}>
+    <div className="min-h-screen flex items-center justify-center" style={{ background: colors.toolbar }}>
       <div className="w-full max-w-md">
-        <div className="bg-white rounded-2xl shadow-lg p-8" style={{ border: '1px solid #E0E0E0' }}>
+        <div className="bg-white rounded-lg shadow-lg p-8" style={{ border: `1px solid ${colors.border}` }}>
           {/* Logo & Title */}
           <div className="flex flex-col items-center mb-8">
-            <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4" style={{ background: '#1B3A6B' }}>
+            <div className="w-16 h-16 rounded-lg flex items-center justify-center mb-4" style={{ background: colors.primary }}>
               <RefreshCw className="w-9 h-9 text-white" />
-            </div>the
-            <h1 className="text-2xl font-bold" style={{ color: '#212529' }}>Renovo Pro</h1>
-            <p className="text-sm mt-1" style={{ color: '#6C757D' }}>Golden Keys Investments</p>
+            </div>
+            <h1 className="text-2xl font-bold" style={{ color: colors.textPrimary }}>Renovo Pro</h1>
+            <p className="text-sm mt-1" style={{ color: colors.textSecondary }}>Golden Keys Investments</p>
           </div>
 
-          {/* Error */}retr
+          {/* Error */}
           {error && (
-            <div className="mb-4 p-3 rounded-lg text-sm" style={{ background: '#FFF0F0', border: '1px solid #F5C6C6', color: '#C0392B' }}>
+            <div className="mb-4 p-3 rounded-lg text-sm" style={{ background: colors.dangerBg, border: `1px solid ${colors.danger}`, color: colors.danger }}>
               {error}
             </div>
           )}
@@ -74,31 +77,43 @@ export default function LoginPage() {
           {/* Form */}
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div>
-              <Label htmlFor="username" style={{ color: '#212529' }}>Username</Label>
+              <Label htmlFor="username" style={{ color: colors.textPrimary }}>Username</Label>
               <Input
                 id="username"
                 autoComplete="username"
                 {...register('username')}
-                className="mt-1 border-[#E0E0E0]"
+                className="mt-1"
+                style={{ borderColor: colors.border }}
                 disabled={loading}
               />
               {errors.username && (
-                <p className="text-xs mt-1" style={{ color: '#C0392B' }}>{errors.username.message}</p>
+                <p className="text-xs mt-1" style={{ color: colors.danger }}>{errors.username.message}</p>
               )}
             </div>
 
             <div>
-              <Label htmlFor="password" style={{ color: '#212529' }}>Password</Label>
-              <Input
-                id="password"
-                type="password"
-                autoComplete="current-password"
-                {...register('password')}
-                className="mt-1 border-[#E0E0E0]"
-                disabled={loading}
-              />
+              <Label htmlFor="password" style={{ color: colors.textPrimary }}>Password</Label>
+              <div className="relative mt-1">
+                <Input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  {...register('password')}
+                  style={{ borderColor: colors.border }}
+                  disabled={loading}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-gray-100"
+                  style={{ color: colors.textSecondary }}
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
               {errors.password && (
-                <p className="text-xs mt-1" style={{ color: '#C0392B' }}>{errors.password.message}</p>
+                <p className="text-xs mt-1" style={{ color: colors.danger }}>{errors.password.message}</p>
               )}
             </div>
 
@@ -106,13 +121,13 @@ export default function LoginPage() {
               type="submit"
               disabled={loading}
               className="w-full flex items-center justify-center gap-2 h-10 rounded-lg text-sm font-semibold text-white transition-colors disabled:opacity-50"
-              style={{ background: '#1B3A6B' }}
+              style={{ background: colors.primary }}
             >
               {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Signing in…</> : 'Sign In'}
             </button>
           </form>
 
-          <p className="text-center text-xs mt-6" style={{ color: '#6C757D' }}>
+          <p className="text-center text-xs mt-6" style={{ color: colors.textSecondary }}>
             Accounts are created by an administrator
           </p>
         </div>

@@ -126,7 +126,7 @@ export function CustomerProfileModal({
 
   return (
     <Dialog open={!!customerId} onOpenChange={(o) => { if (!o) handleClose() }}>
-      <DialogContent className="sm:max-w-3xl h-[92vh] flex flex-col overflow-hidden p-0" showCloseButton={false}>
+      <DialogContent className="sm:max-w-3xl max-h-[90vh] flex flex-col overflow-hidden p-0" showCloseButton={false}>
         <ModalTitleBar title="Customer Profile" onClose={handleClose} />
 
         {isLoading && (
@@ -194,9 +194,9 @@ export function CustomerProfileModal({
                   onClick={() => setTab(t)}
                   style={{
                     padding: '6px 14px', fontSize: 12, fontWeight: tab === t ? 700 : 400,
-                    color: tab === t ? '#217346' : '#6C757D',
+                    color: tab === t ? colors.action : colors.textSecondary,
                     background: 'none', border: 'none',
-                    borderBottom: tab === t ? '2px solid #217346' : '2px solid transparent',
+                    borderBottom: tab === t ? `2px solid ${colors.action}` : '2px solid transparent',
                     cursor: 'pointer',
                   }}
                 >

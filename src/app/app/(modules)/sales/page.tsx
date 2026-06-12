@@ -119,7 +119,7 @@ export default function SalesPage() {
         <div className="flex items-center gap-2">
           <div
             className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0"
-            style={{ background: '#217346' }}
+            style={{ background: colors.action }}
           >
             {(row.buyerName?.[0] ?? '?').toUpperCase()}
           </div>

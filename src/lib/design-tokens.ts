@@ -19,8 +19,8 @@ export const colors = {
   // Brand
   /** Navy — top nav bar, active tab background */
   primary:       '#1B3A6B',
-  /** Green — primary action buttons (Confirm, Save, Complete) */
-  action:        '#217346',
+  /** Emerald-500 — primary action buttons (Confirm, Save, Complete) */
+  action:        '#10b981',
   /** Blue — secondary buttons, links, info states */
   process:       '#185ABD',
   /** Amber — pending states, warnings, loan banners */
@@ -59,8 +59,8 @@ export const colors = {
   warningBg:     '#FEF9EC',
   /** Red background tint — danger / voided badge fill */
   dangerBg:      '#FDECEA',
-  /** Green background tint — active / completed badge fill */
-  actionBg:      '#EBF5F0',
+  /** Emerald-50 background tint — active / completed badge fill */
+  actionBg:      '#ECFDF5',
   /** Blue background tint — info badge fill */
   processBg:     '#EBF3FC',
   /** Grey background tint — inactive badge fill */
@@ -85,8 +85,8 @@ export const colors = {
   tileNavyHover: '#2558a8',
   tileBluFrom:   '#1d6bc7',
   tileBluHover:  '#2278d4',
-  tileGreenFrom: '#278a54',
-  tileGreenHover:'#2e9e60',
+  tileGreenFrom: '#10b981',
+  tileGreenHover:'#059669',
   tileAmberFrom: '#c49b1c',
   tileAmberHover:'#d4a820',
 
@@ -115,8 +115,8 @@ export const colors = {
   violetBg:      '#F3EFFF',
 
   // Button hover darkens
-  /** Darker green — hover state for action/primary buttons */
-  actionHover:   '#185A38',
+  /** Emerald-600 — hover state for action/primary buttons */
+  actionHover:   '#059669',
   /** Darker blue — hover state for process/secondary buttons */
   processHover:  '#1249A0',
 
