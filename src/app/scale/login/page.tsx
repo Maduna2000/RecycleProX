@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { LoginSchema, type LoginInput } from '@/lib/schemas/auth'
-import { Scale, Loader2 } from 'lucide-react'
+import { Scale, Loader2, Eye, EyeOff } from 'lucide-react'
 
 const SCALE_ROLES = ['scale_operator', 'admin', 'manager']
 
@@ -15,6 +15,7 @@ export default function ScaleLoginPage() {
   const { data: session, status } = useSession()
   const [error,   setError]   = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
 
   // Already authenticated — skip straight to the wizard
   useEffect(() => {
@@ -111,13 +112,28 @@ export default function ScaleLoginPage() {
               <label className="block text-sm font-medium text-slate-700 mb-1.5">
                 Password
               </label>
-              <input
-                type="password"
-                autoComplete="current-password"
-                {...register('password')}
-                disabled={loading}
-                className="w-full h-12 border border-slate-300 rounded-xl px-4 text-base focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-50"
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
+                  {...register('password')}
+                  disabled={loading}
+                  className="w-full h-12 border border-slate-300 rounded-xl px-4 pr-12 text-base focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-50"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  disabled={loading}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 disabled:opacity-50 transition-colors"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? (
+                    <EyeOff className="w-5 h-5" />
+                  ) : (
+                    <Eye className="w-5 h-5" />
+                  )}
+                </button>
+              </div>
               {errors.password && (
                 <p className="text-xs text-red-600 mt-1">{errors.password.message}</p>
               )}
