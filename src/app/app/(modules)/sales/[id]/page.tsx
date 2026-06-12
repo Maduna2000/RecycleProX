@@ -3,19 +3,43 @@
 import { useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import useSWR, { mutate } from 'swr'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, ModalTitleBar, ModalBtn } from '@/components/ui/dialog'
-import { ArrowLeft, Ban, Loader2, Plus, Printer } from 'lucide-react'
+import { ArrowLeft, Ban, Loader2, Plus, Printer, Camera } from 'lucide-react'
 import { toast } from 'sonner'
 import { useSession } from 'next-auth/react'
 import { format } from '@/lib/utils/format'
 import Decimal from 'decimal.js'
 import { PhotoViewer } from '@/components/PhotoUploader'
+import { colors } from '@/lib/design-tokens'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
+
+// Windows aesthetic styles
+const TH: React.CSSProperties = {
+  textAlign: 'left', padding: '0 8px', height: 28,
+  fontSize: 10, fontWeight: 700, color: colors.textSecondary,
+  textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap',
+  background: 'linear-gradient(180deg,#F5F5F5 0%,#ECECEC 100%)',
+}
+const TD: React.CSSProperties = { padding: '8px', fontSize: 12, color: colors.textPrimary }
+
+const secBtn: React.CSSProperties = {
+  display: 'inline-flex', alignItems: 'center', gap: 4, height: 24,
+  padding: '0 8px', fontSize: 11, fontWeight: 600, borderRadius: 2,
+  background: colors.surface, border: `1px solid ${colors.border}`, color: colors.textPrimary, cursor: 'pointer',
+}
+const priBtn: React.CSSProperties = {
+  display: 'inline-flex', alignItems: 'center', gap: 4, height: 24,
+  padding: '0 8px', fontSize: 11, fontWeight: 600, borderRadius: 2,
+  background: colors.action, border: `1px solid ${colors.actionHover}`, color: colors.textOnDark, cursor: 'pointer',
+}
+const dangerBtn: React.CSSProperties = {
+  display: 'inline-flex', alignItems: 'center', gap: 4, height: 24,
+  padding: '0 8px', fontSize: 11, fontWeight: 600, borderRadius: 2,
+  background: colors.surface, border: `1px solid ${colors.danger}`, color: colors.danger, cursor: 'pointer',
+}
 
 type SaleLine = {
   id: string
@@ -45,6 +69,20 @@ type Sale = {
   lines: SaleLine[]
 }
 
+function StatusBadge({ status }: { status: Sale['status'] }) {
+  const styles: Record<Sale['status'], React.CSSProperties> = {
+    completed: { background: colors.actionBg, color: colors.action, border: `1px solid ${colors.action}` },
+    pending: { background: colors.warningBg, color: colors.warning, border: `1px solid ${colors.warning}` },
+    voided: { background: colors.dangerBg, color: colors.danger, border: `1px solid ${colors.danger}` },
+  }
+  const labels: Record<Sale['status'], string> = { completed: 'Completed', pending: 'Pending', voided: 'Voided' }
+  return (
+    <span style={{ ...styles[status], padding: '2px 6px', borderRadius: 2, fontSize: 10, fontWeight: 600, textTransform: 'uppercase' }}>
+      {labels[status]}
+    </span>
+  )
+}
+
 export default function SaleDetailPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
@@ -54,173 +92,196 @@ export default function SaleDetailPage() {
   const { data: sale, isLoading } = useSWR<Sale>(`/api/sales/${id}`, fetcher)
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
 
-  if (isLoading) return <div className="flex items-center justify-center h-64 text-gray-400">Loading...</div>
-  if (!sale) return <div className="flex items-center justify-center h-64 text-gray-400">Sale not found</div>
+  if (isLoading) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 256, color: colors.textSecondary }}>
+        <Loader2 style={{ width: 20, height: 20, animation: 'spin 1s linear infinite' }} />
+      </div>
+    )
+  }
+  if (!sale) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 256, color: colors.textSecondary, fontSize: 13 }}>
+        Sale not found
+      </div>
+    )
+  }
 
   const outstanding = sale.status === 'pending'
     ? new Decimal(sale.totalAmount).minus(new Decimal(sale.amountPaid ?? '0'))
     : new Decimal(0)
 
   return (
-    <div className="max-w-3xl mx-auto w-full">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={() => router.push('/app/sales')}>
-            <ArrowLeft className="w-4 h-4 mr-1" /> Sales
-          </Button>
-          <div>
-            <h1 className="text-xl font-bold text-gray-900 font-mono">{sale.refNumber}</h1>
-            <p className="text-xs text-gray-400">{format.datetime(sale.createdAt)}</p>
-          </div>
-        </div>
-        <Button className="bg-green-600 hover:bg-green-700" onClick={() => router.push('/app/sales/new')}>
-          <Plus className="w-4 h-4 mr-1.5" /> New Sale
-        </Button>
-      </div>
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, padding: 8 }}>
+      {/* Main container with Windows border */}
+      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, background: '#fff', border: '1px solid #B0B0B0', borderRadius: 2, overflow: 'hidden' }}>
 
-      {/* Voided banner */}
-      {sale.status === 'voided' && (
-        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl">
-          <p className="font-semibold text-red-700">This sale has been voided</p>
-          {sale.voidReason && <p className="text-sm text-red-600 mt-0.5">Reason: {sale.voidReason}</p>}
-          {sale.voidedAt && <p className="text-xs text-red-400 mt-1">{format.datetime(sale.voidedAt)}</p>}
-        </div>
-      )}
-
-      {/* Pending banner */}
-      {sale.status === 'pending' && (
-        <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-xl">
-          <p className="font-semibold text-amber-700">Payment outstanding</p>
-          <p className="text-sm text-amber-600 mt-0.5">
-            Balance due: <span className="font-mono font-bold">R {outstanding.toFixed(2)}</span>
-            {sale.amountPaid && new Decimal(sale.amountPaid).gt(0) && (
-              <span className="ml-3 text-amber-500">({`R ${new Decimal(sale.amountPaid).toFixed(2)} paid`})</span>
-            )}
-          </p>
-        </div>
-      )}
-
-      {/* Sale card */}
-      <div className="bg-white rounded-xl border p-6 mb-4">
-        <div className="flex items-start justify-between">
-          <div>
-            <p className="text-xs text-gray-400 uppercase tracking-wide font-semibold">Sale</p>
-            <h1 className="text-2xl font-bold text-gray-900 font-mono mt-0.5">{sale.refNumber}</h1>
-            <p className="text-sm text-gray-500 mt-1">{format.datetime(sale.createdAt)}</p>
-          </div>
-          <div className="flex items-center gap-2">
-            {sale.status === 'completed' && <Badge className="bg-green-100 text-green-700">Completed</Badge>}
-            {sale.status === 'pending'   && <Badge className="bg-amber-100 text-amber-700">Pending</Badge>}
-            {sale.status === 'voided'    && <Badge variant="destructive">Voided</Badge>}
-            <Badge variant="outline" className="capitalize">{sale.paymentMethod}</Badge>
-          </div>
+        {/* Title bar with gradient */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 10px', borderBottom: '2px solid #B0B0B0', background: 'linear-gradient(180deg,#EAEAEA 0%,#D4D4D4 100%)', flexShrink: 0 }}>
+          <button onClick={() => router.push('/app/sales')} style={{ ...secBtn, padding: '0 6px' }}>
+            <ArrowLeft style={{ width: 12, height: 12 }} />
+          </button>
+          <span style={{ fontSize: 13, fontWeight: 700, color: colors.primary, fontFamily: 'monospace' }}>{sale.refNumber}</span>
+          <StatusBadge status={sale.status} />
+          <span style={{ fontSize: 10, color: colors.textSecondary, padding: '2px 6px', background: colors.neutralBg, border: `1px solid ${colors.border}`, borderRadius: 2, textTransform: 'capitalize' }}>
+            {sale.paymentMethod}
+          </span>
+          <div style={{ flex: 1 }} />
+          <button onClick={() => router.push('/app/sales/new')} style={priBtn}>
+            <Plus style={{ width: 11, height: 11 }} /> New Sale
+          </button>
         </div>
 
-        <div className="mt-5 pt-5 border-t grid grid-cols-2 gap-4 text-sm">
-          <div>
-            <p className="text-xs text-gray-400 uppercase font-semibold mb-1">Buyer</p>
-            <p className="font-semibold text-gray-900">{sale.buyerName}</p>
-            {sale.buyerIdNumber && <p className="text-gray-500 font-mono">{sale.buyerIdNumber}</p>}
-            {sale.buyerPhone && <p className="text-gray-500">{sale.buyerPhone}</p>}
+        {/* Voided banner */}
+        {sale.status === 'voided' && (
+          <div style={{ padding: '8px 12px', background: colors.dangerBg, borderBottom: `1px solid ${colors.danger}`, flexShrink: 0 }}>
+            <p style={{ fontSize: 12, fontWeight: 600, color: colors.danger }}>This sale has been voided</p>
+            {sale.voidReason && <p style={{ fontSize: 11, color: colors.danger, marginTop: 2 }}>Reason: {sale.voidReason}</p>}
+            {sale.voidedAt && <p style={{ fontSize: 10, color: colors.danger, opacity: 0.7, marginTop: 2 }}>{format.datetime(sale.voidedAt)}</p>}
           </div>
+        )}
+
+        {/* Pending banner */}
+        {sale.status === 'pending' && (
+          <div style={{ padding: '8px 12px', background: colors.warningBg, borderBottom: `1px solid ${colors.warning}`, flexShrink: 0 }}>
+            <p style={{ fontSize: 12, fontWeight: 600, color: colors.warning }}>Payment outstanding</p>
+            <p style={{ fontSize: 11, color: colors.warning, marginTop: 2 }}>
+              Balance due: <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>R {outstanding.toFixed(2)}</span>
+              {sale.amountPaid && new Decimal(sale.amountPaid).gt(0) && (
+                <span style={{ marginLeft: 12, opacity: 0.8 }}>({`R ${new Decimal(sale.amountPaid).toFixed(2)} paid`})</span>
+              )}
+            </p>
+          </div>
+        )}
+
+        {/* Content area */}
+        <div style={{ flex: 1, overflow: 'auto', padding: 12 }}>
+          {/* Sale info grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+            {/* Left: Sale details */}
+            <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 2, padding: 12 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', marginBottom: 8 }}>Sale Details</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 12px', fontSize: 12 }}>
+                <span style={{ color: colors.textSecondary }}>Reference:</span>
+                <span style={{ fontFamily: 'monospace', fontWeight: 600, color: colors.textPrimary }}>{sale.refNumber}</span>
+                <span style={{ color: colors.textSecondary }}>Date:</span>
+                <span style={{ color: colors.textPrimary }}>{format.datetime(sale.createdAt)}</span>
+                <span style={{ color: colors.textSecondary }}>Payment:</span>
+                <span style={{ color: colors.textPrimary, textTransform: 'capitalize' }}>{sale.paymentMethod}</span>
+              </div>
+            </div>
+
+            {/* Right: Buyer info */}
+            <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 2, padding: 12 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', marginBottom: 8 }}>Buyer</div>
+              <div style={{ fontSize: 12 }}>
+                <p style={{ fontWeight: 600, color: colors.textPrimary }}>{sale.buyerName}</p>
+                {sale.buyerIdNumber && <p style={{ fontFamily: 'monospace', color: colors.textSecondary, marginTop: 2 }}>{sale.buyerIdNumber}</p>}
+                {sale.buyerPhone && <p style={{ color: colors.textSecondary, marginTop: 2 }}>{sale.buyerPhone}</p>}
+              </div>
+            </div>
+          </div>
+
+          {/* Notes */}
           {sale.notes && (
-            <div>
-              <p className="text-xs text-gray-400 uppercase font-semibold mb-1">Notes</p>
-              <p className="text-gray-700">{sale.notes}</p>
+            <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 2, padding: 12, marginBottom: 16 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', marginBottom: 4 }}>Notes</div>
+              <p style={{ fontSize: 12, color: colors.textPrimary }}>{sale.notes}</p>
+            </div>
+          )}
+
+          {/* Products table */}
+          <div style={{ background: '#fff', border: `1px solid ${colors.border}`, borderRadius: 2, overflow: 'hidden', marginBottom: 16 }}>
+            <div style={{ padding: '6px 10px', borderBottom: `1px solid ${colors.border}`, background: 'linear-gradient(180deg,#EAEAEA 0%,#D4D4D4 100%)' }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: colors.primary }}>Products Sold</span>
+              <span style={{ fontSize: 10, color: colors.textSecondary, marginLeft: 8 }}>{sale.lines.length} items</span>
+            </div>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ borderBottom: `1px solid ${colors.border}` }}>
+                  <th style={TH}>Product</th>
+                  <th style={TH}>Qty</th>
+                  <th style={TH}>Sell Price</th>
+                  <th style={{ ...TH, textAlign: 'right' }}>Line Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sale.lines.map((line, i) => (
+                  <tr key={line.id} style={{ borderBottom: i < sale.lines.length - 1 ? `1px solid ${colors.rowDivider}` : undefined }}>
+                    <td style={TD}>
+                      <p style={{ fontWeight: 500, color: colors.textPrimary }}>{line.product.name}</p>
+                      <p style={{ fontSize: 10, fontFamily: 'monospace', color: colors.textSecondary }}>{line.product.code}</p>
+                    </td>
+                    <td style={{ ...TD, fontFamily: 'monospace' }}>
+                      <div>{Number(line.quantity).toFixed(2)} {line.product.unit}</div>
+                      {line.grossQty && line.tareQty && Number(line.tareQty) > 0 && (
+                        <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 2 }}>
+                          Gross: {Number(line.grossQty).toFixed(2)} · Tare: {Number(line.tareQty).toFixed(2)}
+                        </div>
+                      )}
+                    </td>
+                    <td style={{ ...TD, fontFamily: 'monospace' }}>R {Number(line.unitPrice).toFixed(2)}</td>
+                    <td style={{ ...TD, fontFamily: 'monospace', fontWeight: 600, textAlign: 'right' }}>R {Number(line.lineTotal).toFixed(2)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr style={{ borderTop: `2px solid ${colors.border}`, background: 'linear-gradient(180deg,#F5F5F5 0%,#ECECEC 100%)' }}>
+                  <td colSpan={3} style={{ ...TD, textAlign: 'right', fontWeight: 600, color: colors.textSecondary }}>Total</td>
+                  <td style={{ ...TD, fontFamily: 'monospace', fontWeight: 700, fontSize: 14, textAlign: 'right', color: colors.action }}>
+                    R {Number(sale.totalAmount).toFixed(2)}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          {/* Photos */}
+          {sale.photoR2Keys && sale.photoR2Keys.length > 0 && (
+            <div style={{ background: '#fff', border: `1px solid ${colors.border}`, borderRadius: 2, overflow: 'hidden', marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', borderBottom: `1px solid ${colors.border}`, background: 'linear-gradient(180deg,#EAEAEA 0%,#D4D4D4 100%)' }}>
+                <Camera style={{ width: 12, height: 12, color: colors.action }} />
+                <span style={{ fontSize: 11, fontWeight: 700, color: colors.primary }}>Photos</span>
+              </div>
+              <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {sale.photoR2Keys.map((key) => (
+                  <PhotoViewer
+                    key={key}
+                    r2Key={key}
+                    alt="Sale photo"
+                    canDelete={isManager}
+                    onDelete={async () => {
+                      const res = await fetch(`/api/sales/${sale.id}/photos`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ remove: key }),
+                      })
+                      if (res.ok) mutate(`/api/sales/${id}`)
+                      else toast.error('Failed to remove photo')
+                    }}
+                  />
+                ))}
+              </div>
             </div>
           )}
         </div>
-      </div>
 
-      {/* Lines */}
-      <div className="bg-white rounded-xl border overflow-hidden mb-4">
-        <div className="px-6 py-4 border-b">
-          <h2 className="font-semibold text-gray-900">Products Sold</h2>
-        </div>
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b">
-            <tr>
-              {['Product', 'Qty', 'Sell Price', 'Line Total'].map((h) => (
-                <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {sale.lines.map((line) => (
-              <tr key={line.id}>
-                <td className="px-4 py-3">
-                  <p className="font-medium text-gray-900">{line.product.name}</p>
-                  <p className="text-xs text-gray-400 font-mono">{line.product.code}</p>
-                </td>
-                <td className="px-4 py-3 font-mono text-gray-700">
-                  <div>{Number(line.quantity).toFixed(2)} {line.product.unit}</div>
-                  {line.grossQty && line.tareQty && Number(line.tareQty) > 0 && (
-                    <div className="text-xs text-gray-400 mt-0.5">
-                      Gross: {Number(line.grossQty).toFixed(2)}  Tare: {Number(line.tareQty).toFixed(2)}
-                    </div>
-                  )}
-                </td>
-                <td className="px-4 py-3 font-mono text-gray-700">R {Number(line.unitPrice).toFixed(2)}</td>
-                <td className="px-4 py-3 font-mono font-semibold text-gray-900">R {Number(line.lineTotal).toFixed(2)}</td>
-              </tr>
-            ))}
-          </tbody>
-          <tfoot className="border-t bg-gray-50">
-            <tr>
-              <td colSpan={3} className="px-4 py-3 text-right font-semibold text-gray-700">Total</td>
-              <td className="px-4 py-3 font-mono font-bold text-lg text-gray-900">
-                R {Number(sale.totalAmount).toFixed(2)}
-              </td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-
-      {/* Photos */}
-      {sale.photoR2Keys && sale.photoR2Keys.length > 0 && (
-        <div className="bg-white rounded-xl border p-6 mb-4">
-          <h2 className="font-semibold text-gray-900 mb-3">Photos</h2>
-          <div className="space-y-3">
-            {sale.photoR2Keys.map((key) => (
-              <PhotoViewer
-                key={key}
-                r2Key={key}
-                alt="Sale photo"
-                canDelete={isManager}
-                onDelete={async () => {
-                  const res = await fetch(`/api/sales/${sale.id}/photos`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ remove: key }),
-                  })
-                  if (res.ok) mutate(`/api/sales/${id}`)
-                  else toast.error('Failed to remove photo')
-                }}
-              />
-            ))}
+        {/* Actions footer */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderTop: '1px solid #B0B0B0', background: 'linear-gradient(180deg,#F5F5F5 0%,#ECECEC 100%)', flexShrink: 0 }}>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button
+              onClick={() => window.open(`/api/sales/${sale.id}/receipt?format=pdf`, '_blank')}
+              style={secBtn}
+            >
+              <Printer style={{ width: 11, height: 11 }} /> Print Receipt
+            </button>
           </div>
+          {isManager && sale.status !== 'voided' && (
+            <button onClick={() => setVoidOpen(true)} style={dangerBtn}>
+              <Ban style={{ width: 11, height: 11 }} /> Void Sale
+            </button>
+          )}
         </div>
-      )}
-
-      {/* Actions */}
-      <div className="flex justify-between pb-6">
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={() => window.open(`/api/sales/${sale.id}/receipt?format=pdf`, '_blank')}
-          >
-            <Printer className="w-4 h-4 mr-2" /> Print Receipt
-          </Button>
-        </div>
-        {isManager && sale.status !== 'voided' && (
-          <Button
-            variant="outline"
-            className="text-red-600 border-red-200 hover:bg-red-50"
-            onClick={() => setVoidOpen(true)}
-          >
-            <Ban className="w-4 h-4 mr-2" /> Void Sale
-          </Button>
-        )}
       </div>
 
       {voidOpen && (
@@ -253,27 +314,27 @@ function VoidModal({ sale, onClose, onSuccess }: { sale: Sale; onClose: () => vo
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-md p-4" showCloseButton={false}>
+      <DialogContent className="sm:max-w-md" showCloseButton={false}>
         <ModalTitleBar title="Void Sale" onClose={onClose} />
-        <div className="space-y-4 mt-3">
-          <p className="text-sm text-gray-600">
-            You are about to void <span className="font-semibold">{sale.refNumber}</span> (R {Number(sale.totalAmount).toFixed(2)}).
+        <div style={{ padding: 12 }}>
+          <p style={{ fontSize: 12, color: colors.textSecondary, marginBottom: 12 }}>
+            You are about to void <span style={{ fontWeight: 600, color: colors.textPrimary }}>{sale.refNumber}</span> (R {Number(sale.totalAmount).toFixed(2)}).
             This action cannot be undone.
           </p>
-          <div>
-            <Label>Reason for void</Label>
+          <div style={{ marginBottom: 12 }}>
+            <Label style={{ fontSize: 11, fontWeight: 600, color: colors.textPrimary }}>Reason for void</Label>
             <Input
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder="Enter reason (min 5 characters)"
-              className="mt-1"
+              style={{ marginTop: 4, height: 28, fontSize: 12, borderColor: colors.border }}
               disabled={loading}
             />
           </div>
-          <div className="flex justify-end gap-2">
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
             <ModalBtn variant="outline" onClick={onClose} disabled={loading}>Cancel</ModalBtn>
-            <ModalBtn variant="danger" onClick={onConfirm} disabled={loading || reason.trim().length < 5}>
-              {loading ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />Voiding...</> : 'Confirm Void'}
+            <ModalBtn variant="danger" onClick={onConfirm} disabled={loading || reason.trim().length < 5} loading={loading}>
+              Confirm Void
             </ModalBtn>
           </div>
         </div>
