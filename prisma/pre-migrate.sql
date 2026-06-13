@@ -11,9 +11,9 @@ BEGIN
   END IF;
 END $$;
 
--- Unify scale portal with main product catalog (wipe test data, idempotent)
--- Must truncate child tables before dropping parent tables
-TRUNCATE TABLE "ScaleOrderLine" CASCADE;
-TRUNCATE TABLE "ScaleOrder"     CASCADE;
+-- Migration complete: ScaleProduct and ScaleCategory tables have been dropped.
+-- Scale orders now use the main Product catalog.
+-- IMPORTANT: TRUNCATE statements removed to preserve production data.
+-- The old tables are dropped idempotently below (safe no-op if already gone).
 DROP TABLE IF EXISTS "ScaleProduct" CASCADE;
 DROP TABLE IF EXISTS "ScaleCategory" CASCADE;
