@@ -24,7 +24,13 @@ export default function ScaleClientLayout({ children }: { children: React.ReactN
   const [capacitorStatus, setCapacitorStatus] = useState<'checking' | 'yes' | 'no'>('checking')
   const [pendingScaleOrders, setPendingScaleOrders] = useState(0)
   const [isSyncing, setIsSyncing] = useState(false)
+  const [mounted, setMounted] = useState(false)
   const { isOnline, setPendingCount, setSyncing } = useOfflineStore()
+
+  // Track when component is mounted to avoid hydration mismatch
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   // Initialize online status monitoring
   useOnlineStatus()
@@ -107,8 +113,8 @@ export default function ScaleClientLayout({ children }: { children: React.ReactN
           <Scale className="w-5 h-5 text-emerald-400" />
           <span className="font-bold text-lg tracking-tight">Scale Station</span>
 
-          {/* Offline indicator */}
-          {!isOnline && (
+          {/* Offline indicator - only render after mount to avoid hydration mismatch */}
+          {mounted && !isOnline && (
             <div className="flex items-center gap-1.5 ml-2 px-2 py-0.5 bg-amber-500/20 rounded-full">
               <WifiOff className="w-3.5 h-3.5 text-amber-400" />
               <span className="text-amber-300 text-xs font-medium">Offline</span>
@@ -118,8 +124,8 @@ export default function ScaleClientLayout({ children }: { children: React.ReactN
             </div>
           )}
 
-          {/* Pending sync indicator (when online but have pending orders) */}
-          {isOnline && pendingScaleOrders > 0 && (
+          {/* Pending sync indicator (when online but have pending orders) - only after mount */}
+          {mounted && isOnline && pendingScaleOrders > 0 && (
             <button
               onClick={handleManualSync}
               disabled={isSyncing}
