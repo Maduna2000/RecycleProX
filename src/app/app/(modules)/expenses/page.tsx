@@ -251,30 +251,54 @@ export default function ExpensesPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search ref, category or description..."
-            className="pl-7 pr-3 h-7 text-xs rounded border bg-white focus:outline-none w-60 border-[#E0E0E0] focus:border-[#185ABD]"
+            className="pl-7 pr-3 bg-white focus:outline-none w-60"
+            style={{
+              height: 28,
+              border: `1px solid ${colors.border}`,
+              borderRadius: 2,
+              fontSize: fontSize.base,
+            }}
           />
         </div>
         <input
           type="date"
           value={from}
           onChange={(e) => setFrom(e.target.value)}
-          className="h-7 border rounded px-2 text-xs bg-white focus:outline-none border-[#E0E0E0] focus:border-[#185ABD]"
-          style={{ color: from ? colors.textPrimary : colors.textSecondary }}
+          className="px-2 bg-white focus:outline-none"
+          style={{
+            height: 28,
+            border: `1px solid ${colors.border}`,
+            borderRadius: 2,
+            fontSize: fontSize.base,
+            color: from ? colors.textPrimary : colors.textSecondary,
+          }}
           title="From date"
         />
         <input
           type="date"
           value={to}
           onChange={(e) => setTo(e.target.value)}
-          className="h-7 border rounded px-2 text-xs bg-white focus:outline-none border-[#E0E0E0] focus:border-[#185ABD]"
-          style={{ color: to ? colors.textPrimary : colors.textSecondary }}
+          className="px-2 bg-white focus:outline-none"
+          style={{
+            height: 28,
+            border: `1px solid ${colors.border}`,
+            borderRadius: 2,
+            fontSize: fontSize.base,
+            color: to ? colors.textPrimary : colors.textSecondary,
+          }}
           title="To date"
         />
         {hasFilters && (
           <button
             onClick={clearFilters}
-            className="h-7 px-2.5 text-xs flex items-center gap-1 border rounded hover:bg-[#F1F3F4] transition-colors"
-            style={{ borderColor: colors.border, color: colors.textSecondary }}
+            className="px-2.5 flex items-center gap-1 hover:bg-[#F1F3F4] transition-colors"
+            style={{
+              height: 28,
+              border: `1px solid ${colors.border}`,
+              borderRadius: 2,
+              fontSize: fontSize.base,
+              color: colors.textSecondary,
+            }}
           >
             <X className="w-3 h-3" /> Clear
           </button>
@@ -308,6 +332,11 @@ export default function ExpensesPage() {
           rowActions={rowActions}
           loading={isLoading}
           emptyMessage="No expenses found"
+          emptyIcon={Receipt}
+          emptyAction={{
+            label: "Add your first expense",
+            onClick: () => setAddOpen(true),
+          }}
           total={data?.total}
           pageSize={50}
         />

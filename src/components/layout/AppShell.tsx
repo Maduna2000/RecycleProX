@@ -70,11 +70,7 @@ function useToolbarButtons(pathname: string, role: string): ToolbarButton[] {
       { label: 'Record Payment', icon: Plus, href: '/app/payments', variant: 'primary' },
     ]
 
-  if (pathname === '/app/expenses' || pathname.startsWith('/app/expenses/'))
-    return [
-      { label: 'Add Expense',      icon: Plus, href: '/app/expenses?add=1',     variant: 'primary' },
-      { label: 'Add Expense Type', icon: Tag,  href: '/app/expenses?addtype=1', variant: 'secondary' },
-    ]
+  // Expenses toolbar buttons removed - PageShell header already has them
 
   if (pathname === '/app/cashup' || pathname.startsWith('/app/cashup/'))
     return [

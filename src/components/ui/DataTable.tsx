@@ -35,6 +35,7 @@ export interface DataTableProps<T> {
   loading?:           boolean
   error?:             string | boolean
   emptyMessage?:      string
+  emptyIcon?:         React.ElementType
   emptyAction?:       { label: string; onClick: () => void }
   total?:             number
   page?:              number
@@ -179,6 +180,7 @@ export function DataTable<T>({
   loading,
   error,
   emptyMessage = 'No records found',
+  emptyIcon: EmptyIcon,
   emptyAction,
   total,
   page = 1,
@@ -300,13 +302,22 @@ export function DataTable<T>({
               </tr>
             ) : rows.length === 0 ? (
               <tr>
-                <td colSpan={totalCols} className="py-12 text-center">
-                  <p className="text-sm text-[#6C757D]">{emptyMessage}</p>
-                  {emptyAction && (
-                    <button className="mt-3 text-xs text-[#185ABD] hover:underline" onClick={emptyAction.onClick}>
-                      {emptyAction.label}
-                    </button>
-                  )}
+                <td colSpan={totalCols} className="py-16 text-center">
+                  <div className="flex flex-col items-center gap-3">
+                    {EmptyIcon && (
+                      <EmptyIcon className="w-12 h-12" style={{ color: '#B0B0B0' }} />
+                    )}
+                    <p className="text-sm" style={{ color: colors.textSecondary }}>{emptyMessage}</p>
+                    {emptyAction && (
+                      <button
+                        className="mt-2 px-4 py-1.5 text-xs text-white hover:opacity-90 transition-opacity"
+                        style={{ background: colors.action, borderRadius: 2 }}
+                        onClick={emptyAction.onClick}
+                      >
+                        {emptyAction.label}
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ) : (
