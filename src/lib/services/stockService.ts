@@ -16,7 +16,7 @@ export async function recordMovement(
     productId: string
     direction: 'in' | 'out'
     quantity: Decimal
-    source: 'purchase' | 'sale' | 'manual_adjustment' | 'void_reversal'
+    source: 'purchase' | 'sale' | 'manual_adjustment' | 'void_reversal' | 'stocktake_adjustment'
     sourceId?: string
     notes?: string
     createdByUserId?: string

@@ -7,6 +7,7 @@ import { useSession } from 'next-auth/react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Loader2, CheckCircle, AlertTriangle, Scale, RefreshCw, Camera, ExternalLink } from 'lucide-react'
 import { toast } from 'sonner'
 import Decimal from 'decimal.js'
@@ -55,11 +56,14 @@ type StocktakeEntry = {
 type Stocktake = {
   id: string
   refNumber: string
-  status: 'open' | 'completed'
+  status: 'open' | 'completed' | 'voided'
   notes: string | null
   completedAt: string | null
   createdAt: string
   createdBy: { fullName: string }
+  voidedAt?: string | null
+  voidedBy?: { fullName: string } | null
+  voidReason?: string | null
   entries: StocktakeEntry[]
 }
 
@@ -68,13 +72,16 @@ const CATEGORY_LABELS: Record<string, string> = {
   aluminium: 'Aluminium', plastic: 'Plastic', paper: 'Paper', e_waste: 'E-Waste', other: 'Other',
 }
 
-function StatusBadge({ status }: { status: 'open' | 'completed' }) {
-  const style = status === 'open'
-    ? { background: colors.actionBg, color: colors.action, border: `1px solid ${colors.action}` }
-    : { background: colors.neutralBg, color: colors.textSecondary, border: `1px solid ${colors.border}` }
+function StatusBadge({ status }: { status: 'open' | 'completed' | 'voided' }) {
+  const styleMap: Record<string, React.CSSProperties> = {
+    open: { background: colors.actionBg, color: colors.action, border: `1px solid ${colors.action}` },
+    completed: { background: colors.neutralBg, color: colors.textSecondary, border: `1px solid ${colors.border}` },
+    voided: { background: colors.dangerBg, color: colors.danger, border: `1px solid ${colors.danger}` },
+  }
+  const labelMap: Record<string, string> = { open: 'Open', completed: 'Completed', voided: 'Voided' }
   return (
-    <span style={{ ...style, padding: '2px 6px', borderRadius: 2, fontSize: 10, fontWeight: 600, textTransform: 'uppercase' }}>
-      {status === 'open' ? 'Open' : 'Completed'}
+    <span style={{ ...styleMap[status], padding: '2px 6px', borderRadius: 2, fontSize: 10, fontWeight: 600, textTransform: 'uppercase' }}>
+      {labelMap[status]}
     </span>
   )
 }
@@ -112,6 +119,9 @@ export default function StocktakeDetailPage() {
   const [completing, setCompleting] = useState(false)
   const [entryWeigh, setEntryWeigh] = useState<Record<string, EntryWeighState>>({})
   const [uploadingPhoto, setUploadingPhoto] = useState<Record<string, boolean>>({})
+  const [showCompleteDialog, setShowCompleteDialog] = useState(false)
+  const [showRecountDialog, setShowRecountDialog] = useState(false)
+  const [pendingRecount, setPendingRecount] = useState<{ productId: string; existingQty: string } | null>(null)
   const photoInputRef = useRef<HTMLInputElement>(null)
   const pendingPhotoEntryRef = useRef<string | null>(null)
 
@@ -251,9 +261,22 @@ export default function StocktakeDetailPage() {
     window.open(url, '_blank', 'noopener,noreferrer')
   }
 
-  async function handleAddEntry() {
+  function handleAddEntryClick() {
     if (!productId) { toast.error('Select a product'); return }
     if (!countedQty || parseFloat(countedQty) < 0) { toast.error('Enter a valid quantity (0 or more)'); return }
+
+    // Check if product already counted - show confirmation
+    const existingEntry = entries.find((e) => e.productId === productId)
+    if (existingEntry) {
+      setPendingRecount({ productId, existingQty: existingEntry.countedQty })
+      setShowRecountDialog(true)
+      return
+    }
+
+    performSaveEntry()
+  }
+
+  async function performSaveEntry() {
     setSaving(true)
     try {
       await saveEntry(productId, countedQty, {
@@ -264,6 +287,7 @@ export default function StocktakeDetailPage() {
       setProductId('')
       setCountedQty('')
       setAddWeigh(defaultWeigh())
+      setPendingRecount(null)
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Failed to save entry')
     } finally {
@@ -271,8 +295,8 @@ export default function StocktakeDetailPage() {
     }
   }
 
-  async function handleComplete() {
-    if (!confirm('Mark this stocktake as completed? This cannot be undone.')) return
+  async function performComplete() {
+    setShowCompleteDialog(false)
     setCompleting(true)
     const res = await fetch(`/api/stocktake/${id}`, { method: 'POST' })
     setCompleting(false)
@@ -311,10 +335,10 @@ export default function StocktakeDetailPage() {
           <StatusBadge status={stocktake.status} />
           <div style={{ flex: 1 }} />
           {isOpen && (
-            <button onClick={handleComplete} disabled={completing || entries.length === 0} style={{ ...priBtn, opacity: (completing || entries.length === 0) ? 0.5 : 1 }}>
+            <button onClick={() => setShowCompleteDialog(true)} disabled={completing || entries.length === 0} style={{ ...priBtn, opacity: (completing || entries.length === 0) ? 0.5 : 1 }} aria-label="Complete stocktake">
               {completing
-                ? <><Loader2 style={{ width: 11, height: 11, animation: 'spin 1s linear infinite' }} /> Completing...</>
-                : <><CheckCircle style={{ width: 11, height: 11 }} /> Complete Stocktake</>}
+                ? <><Loader2 style={{ width: 11, height: 11, animation: 'spin 1s linear infinite' }} aria-hidden="true" /> Completing...</>
+                : <><CheckCircle style={{ width: 11, height: 11 }} aria-hidden="true" /> Complete Stocktake</>}
             </button>
           )}
         </div>
@@ -355,9 +379,9 @@ export default function StocktakeDetailPage() {
               <div style={{ padding: 12 }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 140px auto', gap: 12, alignItems: 'end' }}>
                   <div>
-                    <Label style={{ fontSize: 11, fontWeight: 600, color: colors.textPrimary }}>Product</Label>
+                    <Label htmlFor="add-product-select" style={{ fontSize: 11, fontWeight: 600, color: colors.textPrimary }}>Product</Label>
                     <Select value={productId} onValueChange={(v) => setProductId(v ?? '')}>
-                      <SelectTrigger style={{ marginTop: 4, height: 28, fontSize: 12 }}>
+                      <SelectTrigger id="add-product-select" style={{ marginTop: 4, height: 28, fontSize: 12 }}>
                         <SelectValue placeholder="Select product..." />
                       </SelectTrigger>
                       <SelectContent>
@@ -372,23 +396,27 @@ export default function StocktakeDetailPage() {
                     </Select>
                   </div>
                   <div>
-                    <Label style={{ fontSize: 11, fontWeight: 600, color: colors.textPrimary }}>
+                    <Label htmlFor="add-counted-qty" style={{ fontSize: 11, fontWeight: 600, color: colors.textPrimary }}>
                       Net Qty {productId && <span style={{ color: colors.textSecondary, fontWeight: 400 }}>({products.find((p) => p.id === productId)?.unit})</span>}
                     </Label>
                     <Input
+                      id="add-counted-qty"
                       value={countedQty}
                       onChange={(e) => setCountedQty(e.target.value)}
                       placeholder="0.000"
                       style={{ marginTop: 4, height: 28, fontSize: 12, fontFamily: 'monospace' }}
                       disabled={saving}
+                      aria-describedby={productId ? 'qty-unit' : undefined}
                     />
                   </div>
                   <button
                     onClick={() => setAddWeigh((p) => ({ ...p, weighMode: !p.weighMode }))}
-                    style={{ ...scaleBtn, background: addWeigh.weighMode ? colors.process : colors.surface, color: addWeigh.weighMode ? colors.textOnDark : colors.textPrimary, border: `1px solid ${addWeigh.weighMode ? colors.processHover : colors.border}`, width: 28, padding: 0, justifyContent: 'center' }}
-                    title="Toggle scale mode"
+                    style={{ ...scaleBtn, background: addWeigh.weighMode ? colors.process : colors.surface, color: addWeigh.weighMode ? colors.textOnDark : colors.textPrimary, border: `1px solid ${addWeigh.weighMode ? colors.processHover : colors.border}`, width: 32, height: 32, padding: 0, justifyContent: 'center', opacity: 0.5, cursor: 'not-allowed' }}
+                    title="Scale integration coming soon"
+                    aria-label="Toggle scale mode (coming soon)"
+                    disabled
                   >
-                    <Scale style={{ width: 12, height: 12 }} />
+                    <Scale style={{ width: 14, height: 14 }} aria-hidden="true" />
                   </button>
                 </div>
 
@@ -396,9 +424,9 @@ export default function StocktakeDetailPage() {
                 {addWeigh.weighMode && (
                   <div style={{ marginTop: 12, padding: 10, background: colors.processBg, border: `1px solid ${colors.process}`, borderRadius: 2, display: 'flex', alignItems: 'end', gap: 12, flexWrap: 'wrap' }}>
                     <div>
-                      <Label style={{ fontSize: 10, color: colors.textSecondary }}>Scale</Label>
-                      <Select value={addWeigh.selectedScale} onValueChange={(v) => setAddWeigh((p) => ({ ...p, selectedScale: v as '1' | '2' | '3' }))}>
-                        <SelectTrigger style={{ height: 24, width: 80, fontSize: 11, marginTop: 2 }}><SelectValue /></SelectTrigger>
+                      <Label htmlFor="add-scale-select" style={{ fontSize: 10, color: colors.textSecondary }}>Scale</Label>
+                      <Select value={addWeigh.selectedScale} onValueChange={(v) => setAddWeigh((p) => ({ ...p, selectedScale: v as '1' | '2' | '3' }))} disabled>
+                        <SelectTrigger id="add-scale-select" style={{ height: 24, width: 80, fontSize: 11, marginTop: 2, opacity: 0.5 }}><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="1">Scale 1</SelectItem>
                           <SelectItem value="2">Scale 2</SelectItem>
@@ -407,26 +435,26 @@ export default function StocktakeDetailPage() {
                       </Select>
                     </div>
                     <div>
-                      <Label style={{ fontSize: 10, color: colors.textSecondary }}>Gross (kg)</Label>
+                      <Label htmlFor="add-gross-qty" style={{ fontSize: 10, color: colors.textSecondary }}>Gross (kg)</Label>
                       <div style={{ display: 'flex', gap: 4, marginTop: 2 }}>
-                        <Input value={addWeigh.grossQty} onChange={(e) => recomputeAddNet(e.target.value, addWeigh.tareQty)} placeholder="0.000" style={{ height: 24, width: 80, fontSize: 11, fontFamily: 'monospace' }} />
-                        <button onClick={handleAddWeighGross} disabled={addWeigh.weighingGross} style={{ ...scaleBtn, width: 24, padding: 0, justifyContent: 'center', opacity: addWeigh.weighingGross ? 0.5 : 1 }}>
-                          {addWeigh.weighingGross ? <Loader2 style={{ width: 10, height: 10, animation: 'spin 1s linear infinite' }} /> : <RefreshCw style={{ width: 10, height: 10 }} />}
+                        <Input id="add-gross-qty" value={addWeigh.grossQty} onChange={(e) => recomputeAddNet(e.target.value, addWeigh.tareQty)} placeholder="0.000" style={{ height: 24, width: 80, fontSize: 11, fontFamily: 'monospace' }} />
+                        <button onClick={handleAddWeighGross} disabled style={{ ...scaleBtn, width: 32, height: 32, padding: 0, justifyContent: 'center', opacity: 0.5, cursor: 'not-allowed' }} aria-label="Read gross weight from scale (coming soon)" title="Scale integration coming soon">
+                          <RefreshCw style={{ width: 12, height: 12 }} aria-hidden="true" />
                         </button>
                       </div>
                     </div>
                     <div>
-                      <Label style={{ fontSize: 10, color: colors.textSecondary }}>Tare (kg)</Label>
+                      <Label htmlFor="add-tare-qty" style={{ fontSize: 10, color: colors.textSecondary }}>Tare (kg)</Label>
                       <div style={{ display: 'flex', gap: 4, marginTop: 2 }}>
-                        <Input value={addWeigh.tareQty} onChange={(e) => recomputeAddNet(addWeigh.grossQty, e.target.value)} placeholder="0.000" style={{ height: 24, width: 80, fontSize: 11, fontFamily: 'monospace' }} />
-                        <button onClick={handleAddWeighTare} disabled={addWeigh.weighingTare} style={{ ...secBtn, width: 24, padding: 0, justifyContent: 'center', opacity: addWeigh.weighingTare ? 0.5 : 1 }}>
-                          {addWeigh.weighingTare ? <Loader2 style={{ width: 10, height: 10, animation: 'spin 1s linear infinite' }} /> : <RefreshCw style={{ width: 10, height: 10 }} />}
+                        <Input id="add-tare-qty" value={addWeigh.tareQty} onChange={(e) => recomputeAddNet(addWeigh.grossQty, e.target.value)} placeholder="0.000" style={{ height: 24, width: 80, fontSize: 11, fontFamily: 'monospace' }} />
+                        <button onClick={handleAddWeighTare} disabled style={{ ...secBtn, width: 32, height: 32, padding: 0, justifyContent: 'center', opacity: 0.5, cursor: 'not-allowed' }} aria-label="Read tare weight from scale (coming soon)" title="Scale integration coming soon">
+                          <RefreshCw style={{ width: 12, height: 12 }} aria-hidden="true" />
                         </button>
                       </div>
                     </div>
                     <div>
-                      <Label style={{ fontSize: 10, color: colors.textSecondary }}>Net (kg)</Label>
-                      <div style={{ height: 24, display: 'flex', alignItems: 'center', padding: '0 8px', background: '#fff', border: `1px solid ${colors.border}`, borderRadius: 2, fontFamily: 'monospace', fontSize: 11, fontWeight: 600, color: colors.action, marginTop: 2, minWidth: 60 }}>
+                      <Label id="net-result-label" style={{ fontSize: 10, color: colors.textSecondary }}>Net (kg)</Label>
+                      <div aria-labelledby="net-result-label" style={{ height: 24, display: 'flex', alignItems: 'center', padding: '0 8px', background: '#fff', border: `1px solid ${colors.border}`, borderRadius: 2, fontFamily: 'monospace', fontSize: 11, fontWeight: 600, color: colors.action, marginTop: 2, minWidth: 60 }}>
                         {countedQty || '0.000'}
                       </div>
                     </div>
@@ -434,8 +462,8 @@ export default function StocktakeDetailPage() {
                 )}
 
                 <div style={{ marginTop: 12, display: 'flex', justifyContent: 'flex-end' }}>
-                  <button onClick={handleAddEntry} disabled={saving} style={{ ...priBtn, opacity: saving ? 0.5 : 1 }}>
-                    {saving ? <><Loader2 style={{ width: 11, height: 11, animation: 'spin 1s linear infinite' }} /> Saving...</> : 'Save Entry'}
+                  <button onClick={handleAddEntryClick} disabled={saving} style={{ ...priBtn, opacity: saving ? 0.5 : 1 }} aria-label="Save entry">
+                    {saving ? <><Loader2 style={{ width: 11, height: 11, animation: 'spin 1s linear infinite' }} aria-hidden="true" /> Saving...</> : 'Save Entry'}
                   </button>
                 </div>
               </div>
@@ -491,19 +519,19 @@ export default function StocktakeDetailPage() {
                           ) : <span style={{ color: colors.disabled }}>—</span>}
                           {isOpen && (
                             <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 }}>
-                              <Select value={ew.selectedScale} onValueChange={(v) => patchEntryWeigh(e.id, { selectedScale: v as '1' | '2' | '3' })}>
-                                <SelectTrigger style={{ height: 20, width: 60, fontSize: 10, padding: '0 4px' }}><SelectValue /></SelectTrigger>
+                              <Select value={ew.selectedScale} onValueChange={(v) => patchEntryWeigh(e.id, { selectedScale: v as '1' | '2' | '3' })} disabled>
+                                <SelectTrigger style={{ height: 24, width: 60, fontSize: 10, padding: '0 4px', opacity: 0.5 }} aria-label="Select scale (coming soon)"><SelectValue /></SelectTrigger>
                                 <SelectContent>
                                   <SelectItem value="1">Scale 1</SelectItem>
                                   <SelectItem value="2">Scale 2</SelectItem>
                                   <SelectItem value="3">Scale 3</SelectItem>
                                 </SelectContent>
                               </Select>
-                              <button onClick={() => handleReweighEntry(e, 'gross')} disabled={ew.weighingGross} style={{ ...scaleBtn, height: 20, padding: '0 4px', fontSize: 10, opacity: ew.weighingGross ? 0.5 : 1 }} title="Re-weigh gross">
-                                {ew.weighingGross ? <Loader2 style={{ width: 10, height: 10, animation: 'spin 1s linear infinite' }} /> : 'G'}
+                              <button disabled style={{ ...scaleBtn, height: 32, minWidth: 32, padding: '0 6px', fontSize: 10, opacity: 0.5, cursor: 'not-allowed' }} title="Scale integration coming soon" aria-label="Re-weigh gross (coming soon)">
+                                G
                               </button>
-                              <button onClick={() => handleReweighEntry(e, 'tare')} disabled={ew.weighingTare} style={{ ...secBtn, height: 20, padding: '0 4px', fontSize: 10, opacity: ew.weighingTare ? 0.5 : 1 }} title="Re-weigh tare">
-                                {ew.weighingTare ? <Loader2 style={{ width: 10, height: 10, animation: 'spin 1s linear infinite' }} /> : 'T'}
+                              <button disabled style={{ ...secBtn, height: 32, minWidth: 32, padding: '0 6px', fontSize: 10, opacity: 0.5, cursor: 'not-allowed' }} title="Scale integration coming soon" aria-label="Re-weigh tare (coming soon)">
+                                T
                               </button>
                             </div>
                           )}
@@ -517,22 +545,23 @@ export default function StocktakeDetailPage() {
                         <td style={TD}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                             {e.photoR2Key ? (
-                              <button onClick={() => viewPhoto(e.photoR2Key!)} style={{ ...secBtn, height: 20, fontSize: 10 }}>
-                                <ExternalLink style={{ width: 10, height: 10 }} /> View
+                              <button onClick={() => viewPhoto(e.photoR2Key!)} style={{ ...secBtn, height: 28, fontSize: 10 }} aria-label={`View photo for ${e.product.name}`}>
+                                <ExternalLink style={{ width: 12, height: 12 }} aria-hidden="true" /> View
                               </button>
                             ) : (
-                              <span style={{ fontSize: 10, color: colors.disabled }}>—</span>
+                              <span style={{ fontSize: 10, color: colors.disabled }} aria-label="No photo">—</span>
                             )}
                             {isOpen && (
                               <button
                                 onClick={() => triggerPhotoUpload(e.productId)}
                                 disabled={uploadingPhoto[e.productId]}
-                                style={{ ...secBtn, width: 20, height: 20, padding: 0, justifyContent: 'center', opacity: uploadingPhoto[e.productId] ? 0.5 : 1 }}
+                                style={{ ...secBtn, width: 32, height: 32, padding: 0, justifyContent: 'center', opacity: uploadingPhoto[e.productId] ? 0.5 : 1 }}
                                 title="Upload photo"
+                                aria-label={`Upload photo for ${e.product.name}`}
                               >
                                 {uploadingPhoto[e.productId]
-                                  ? <Loader2 style={{ width: 10, height: 10, animation: 'spin 1s linear infinite' }} />
-                                  : <Camera style={{ width: 10, height: 10 }} />}
+                                  ? <Loader2 style={{ width: 12, height: 12, animation: 'spin 1s linear infinite' }} aria-hidden="true" />
+                                  : <Camera style={{ width: 12, height: 12 }} aria-hidden="true" />}
                               </button>
                             )}
                           </div>
@@ -549,7 +578,45 @@ export default function StocktakeDetailPage() {
           </div>
         </div>
       </div>
-      <input ref={photoInputRef} type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }} onChange={handlePhotoSelected} />
+      <input ref={photoInputRef} type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }} onChange={handlePhotoSelected} aria-label="Upload photo file" />
+
+      {/* Complete stocktake confirmation dialog */}
+      <AlertDialog open={showCompleteDialog} onOpenChange={setShowCompleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Complete Stocktake?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will apply all variance adjustments to your stock levels. This action cannot be undone.
+              {variances.length > 0 && (
+                <span style={{ display: 'block', marginTop: 8, fontWeight: 500, color: colors.warning }}>
+                  {variances.length} variance{variances.length > 1 ? 's' : ''} will be applied.
+                </span>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={performComplete}>Complete Stocktake</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Re-count confirmation dialog */}
+      <AlertDialog open={showRecountDialog} onOpenChange={(open: boolean) => { setShowRecountDialog(open); if (!open) setPendingRecount(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Overwrite Previous Count?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This product was already counted with quantity: <strong>{pendingRecount?.existingQty}</strong>.
+              Do you want to overwrite it with the new quantity: <strong>{countedQty}</strong>?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { setShowRecountDialog(false); performSaveEntry() }}>Overwrite</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

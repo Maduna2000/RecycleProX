@@ -129,6 +129,7 @@ model User {
   createdByUserId      String?
 
   stocktakes              Stocktake[]  @relation("StocktakeCreatedBy")
+  voidedStocktakes        Stocktake[]  @relation("StocktakeVoidedBy")
   operatedScaleOrders     ScaleOrder[] @relation("ScaleOrderOperator")
   voidedScaleOrders       ScaleOrder[] @relation("ScaleOrderVoidedBy")
 }
@@ -576,6 +577,7 @@ enum CashUpStatus {
 enum StocktakeStatus {
   open
   completed
+  voided
 }
 
 model Stocktake {
@@ -588,6 +590,15 @@ model Stocktake {
   completedAt     DateTime?
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
+
+  // System quantity snapshot captured at creation (prevents race conditions)
+  stockSnapshot   Json?           // { productId: "systemQty", ... }
+
+  // Void support
+  voidedAt        DateTime?
+  voidedByUserId  String?
+  voidedBy        User?           @relation("StocktakeVoidedBy", fields: [voidedByUserId], references: [id])
+  voidReason      String?
 
   entries         StocktakeEntry[]
 

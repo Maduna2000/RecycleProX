@@ -2,24 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { getStocktake, upsertEntry, completeStocktake, updateEntryPhoto } from '@/lib/services/stocktakeService'
-import { z } from 'zod'
-
-const nonNegNum = z.string().refine((v) => !isNaN(parseFloat(v)) && parseFloat(v) >= 0, {
-  message: 'Must be a non-negative number',
-})
-
-const entrySchema = z.object({
-  productId:  z.string().uuid(),
-  countedQty: nonNegNum,
-  grossQty:   nonNegNum.optional(),
-  tareQty:    nonNegNum.optional(),
-  photoR2Key: z.string().max(500).optional(),
-})
-
-const photoSchema = z.object({
-  productId:  z.string().uuid(),
-  photoR2Key: z.string().min(1).max(500),
-})
+import { UpsertEntrySchema, UpdateEntryPhotoSchema } from '@/lib/schemas/stocktake'
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   const session = await auth()
@@ -47,7 +30,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 
   try {
     const body = await req.json()
-    const parsed = entrySchema.safeParse(body)
+    const parsed = UpsertEntrySchema.safeParse(body)
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid input' }, { status: 400 })
     }
@@ -75,7 +58,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   try {
     const body = await req.json()
-    const parsed = photoSchema.safeParse(body)
+    const parsed = UpdateEntryPhotoSchema.safeParse(body)
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid input' }, { status: 400 })
     }

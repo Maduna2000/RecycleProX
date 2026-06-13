@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { createStocktake, listStocktakes } from '@/lib/services/stocktakeService'
+import { CreateStocktakeSchema } from '@/lib/schemas/stocktake'
 
 export async function GET() {
   const session = await auth()
@@ -28,10 +29,15 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json().catch(() => ({}))
-    const stocktake = await createStocktake(session.user.id, body.notes)
+    const parsed = CreateStocktakeSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid input' }, { status: 400 })
+    }
+    const stocktake = await createStocktake(session.user.id, parsed.data.notes)
     return NextResponse.json(stocktake, { status: 201 })
-  } catch (err) {
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Failed to create stocktake'
     logger.error({ err }, 'POST /api/stocktake failed')
-    return NextResponse.json({ error: 'Failed to create stocktake' }, { status: 500 })
+    return NextResponse.json({ error: msg }, { status: 500 })
   }
 }

@@ -2,12 +2,25 @@ import { prisma } from '@/lib/db/prisma'
 import Decimal from 'decimal.js'
 import logger from '@/lib/logger'
 import { getStockOnHand, recordMovement } from './stockService'
+import type { Prisma } from '@prisma/client'
 
 // ─── Ref number ───────────────────────────────────────────────────────────────
 
 async function nextRef(): Promise<string> {
   const count = await prisma.stocktake.count()
   return `STK-${String(count + 1).padStart(5, '0')}`
+}
+
+// ─── Build stock snapshot ─────────────────────────────────────────────────────
+// Captures system quantities for all active products at stocktake creation time
+
+async function buildStockSnapshot(): Promise<Record<string, string>> {
+  const stockRows = await getStockOnHand()
+  const snapshot: Record<string, string> = {}
+  for (const row of stockRows) {
+    snapshot[row.product.id] = row.onHand
+  }
+  return snapshot
 }
 
 // ─── Create a new stocktake ───────────────────────────────────────────────────
@@ -19,12 +32,20 @@ export async function createStocktake(userId: string, notes?: string) {
     throw new Error(`A stocktake (${existing.refNumber}) is already open. Complete it before starting a new one.`)
   }
 
+  // Capture system quantities for all products at this moment
+  const stockSnapshot = await buildStockSnapshot()
+
   const refNumber = await nextRef()
   const stocktake = await prisma.stocktake.create({
-    data: { refNumber, notes, createdByUserId: userId },
+    data: {
+      refNumber,
+      notes,
+      createdByUserId: userId,
+      stockSnapshot: stockSnapshot as Prisma.InputJsonValue,
+    },
     include: { entries: { include: { product: true } } },
   })
-  logger.info({ stocktakeId: stocktake.id, userId }, 'Stocktake created')
+  logger.info({ stocktakeId: stocktake.id, userId, snapshotProductCount: Object.keys(stockSnapshot).length }, 'Stocktake created with snapshot')
   return stocktake
 }
 
@@ -40,6 +61,7 @@ export async function listStocktakes(opts: { skip?: number; take?: number } = {}
       include: {
         _count: { select: { entries: true } },
         createdBy: { select: { fullName: true } },
+        voidedBy: { select: { fullName: true } },
       },
     }),
     prisma.stocktake.count(),
@@ -58,6 +80,7 @@ export async function getStocktake(id: string) {
         orderBy: { createdAt: 'asc' },
       },
       createdBy: { select: { fullName: true } },
+      voidedBy: { select: { fullName: true } },
     },
   })
 }
@@ -73,11 +96,21 @@ export async function upsertEntry(
   const stocktake = await prisma.stocktake.findUniqueOrThrow({ where: { id: stocktakeId } })
   if (stocktake.status !== 'open') throw new Error('Stocktake is not open')
 
-  const stockRows = await getStockOnHand(productId)
-  const systemRow = stockRows.find((r) => r.product.id === productId)
-  const systemQty = new Decimal(systemRow?.onHand ?? '0')
-  const counted   = new Decimal(countedQty)
-  const variance  = counted.minus(systemQty)
+  // Use snapshot if available, otherwise fall back to live query (for backward compat)
+  let systemQty: Decimal
+  const snapshot = stocktake.stockSnapshot as Record<string, string> | null
+  if (snapshot && snapshot[productId] !== undefined) {
+    systemQty = new Decimal(snapshot[productId])
+  } else {
+    // Fallback: product added after stocktake started or no snapshot (legacy)
+    const stockRows = await getStockOnHand(productId)
+    const systemRow = stockRows.find((r) => r.product.id === productId)
+    systemQty = new Decimal(systemRow?.onHand ?? '0')
+    logger.warn({ stocktakeId, productId }, 'Product not in snapshot, using live stock query')
+  }
+
+  const counted  = new Decimal(countedQty)
+  const variance = counted.minus(systemQty)
 
   const scaleData = {
     grossQty: opts?.grossQty ? new Decimal(opts.grossQty) : undefined,
@@ -132,13 +165,14 @@ export async function updateEntryPhoto(
 // records (source: 'stocktake_adjustment') so live stock is corrected.
 
 export async function completeStocktake(id: string, userId: string) {
-  const stocktake = await prisma.stocktake.findUniqueOrThrow({
-    where: { id },
-    include: { entries: true },
-  })
-  if (stocktake.status !== 'open') throw new Error('Stocktake is already completed')
-
   const updated = await prisma.$transaction(async (tx) => {
+    // Load stocktake with entries INSIDE the transaction for isolation
+    const stocktake = await tx.stocktake.findUniqueOrThrow({
+      where: { id },
+      include: { entries: true },
+    })
+    if (stocktake.status !== 'open') throw new Error('Stocktake is already completed')
+
     const result = await tx.stocktake.update({
       where: { id },
       data: { status: 'completed', completedAt: new Date() },
@@ -159,7 +193,7 @@ export async function completeStocktake(id: string, userId: string) {
         productId:       entry.productId,
         direction:       variance.isPositive() ? 'in' : 'out',
         quantity:        variance.abs(),
-        source:          'manual_adjustment',
+        source:          'stocktake_adjustment',
         sourceId:        id,
         notes:           `Stocktake adjustment (${result.refNumber}): variance ${variance.toFixed(4)}`,
         createdByUserId: userId,
@@ -174,6 +208,69 @@ export async function completeStocktake(id: string, userId: string) {
     return result
   })
 
-  logger.info({ stocktakeId: id, userId, entryCount: stocktake.entries.length }, 'Stocktake completed')
+  logger.info({ stocktakeId: id, userId, entryCount: updated.entries.length }, 'Stocktake completed')
   return updated
+}
+
+// ─── Void a completed stocktake ───────────────────────────────────────────────
+// Reverses all stock movements created by the stocktake completion.
+
+export async function voidStocktake(id: string, userId: string, reason: string) {
+  const voided = await prisma.$transaction(async (tx) => {
+    // Load stocktake with entries inside transaction
+    const stocktake = await tx.stocktake.findUniqueOrThrow({
+      where: { id },
+      include: { entries: true },
+    })
+
+    if (stocktake.status === 'open') {
+      throw new Error('Cannot void an open stocktake. Complete or delete it instead.')
+    }
+    if (stocktake.status === 'voided') {
+      throw new Error('Stocktake is already voided')
+    }
+
+    // Reverse all stock movements created by this stocktake
+    for (const entry of stocktake.entries) {
+      const variance = new Decimal(entry.variance.toString())
+      if (variance.isZero()) continue
+
+      // Reverse: if original was IN, void is OUT; if original was OUT, void is IN
+      await recordMovement(tx, {
+        productId:       entry.productId,
+        direction:       variance.isPositive() ? 'out' : 'in',
+        quantity:        variance.abs(),
+        source:          'void_reversal',
+        sourceId:        id,
+        notes:           `Void stocktake (${stocktake.refNumber}): reversing variance ${variance.toFixed(4)}. Reason: ${reason}`,
+        createdByUserId: userId,
+      })
+
+      logger.info(
+        { stocktakeId: id, productId: entry.productId, variance: variance.toFixed(4), userId },
+        'stocktake.variance.reversed'
+      )
+    }
+
+    // Update stocktake status
+    const result = await tx.stocktake.update({
+      where: { id },
+      data: {
+        status: 'voided',
+        voidedAt: new Date(),
+        voidedByUserId: userId,
+        voidReason: reason,
+      },
+      include: {
+        entries: { include: { product: true } },
+        createdBy: { select: { fullName: true } },
+        voidedBy: { select: { fullName: true } },
+      },
+    })
+
+    return result
+  })
+
+  logger.info({ stocktakeId: id, userId, reason, entryCount: voided.entries.length }, 'Stocktake voided')
+  return voided
 }

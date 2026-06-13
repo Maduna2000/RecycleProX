@@ -1,7 +1,7 @@
 import {
   Users, UserRound, ShoppingCart, AlertCircle,
   Tag, CreditCard, ImageIcon, Scale,
-  Package, ClipboardList, TrendingUp, BarChart2,
+  Package, ClipboardList, ClipboardCheck, TrendingUp, BarChart2,
   Archive, Wallet, Landmark, Settings, LayoutGrid, Banknote,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -50,6 +50,7 @@ export const HREF_TO_ICON: Record<string, LucideIcon> = {
   '/app/payments':         CreditCard,
   '/app/photos':           ImageIcon,
   '/app/stock':            Package,
+  '/app/stocktake':        ClipboardCheck,
   '/app/products':         ClipboardList,
   '/app/price-groups':     TrendingUp,
   '/app/reports':          BarChart2,
