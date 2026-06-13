@@ -140,67 +140,8 @@ export default function StocktakeDetailPage() {
     )
   }
 
-  async function readScale(scaleNumber: '1' | '2' | '3'): Promise<string> {
-    const res = await fetch(`/api/scales/${scaleNumber}/read`)
-    if (!res.ok) {
-      const j = await res.json() as { error?: string }
-      throw new Error(j.error ?? 'Scale error')
-    }
-    const j = await res.json() as { weight: string }
-    return j.weight
-  }
-
-  function recomputeAddNet(gross: string, tare: string) {
-    const g = new Decimal(gross || '0')
-    const t = new Decimal(tare || '0')
-    const net = Decimal.max(g.minus(t), new Decimal('0'))
-    setCountedQty(net.toFixed(2))
-    setAddWeigh((prev) => ({ ...prev, grossQty: gross, tareQty: tare }))
-  }
-
-  async function handleAddWeighGross() {
-    setAddWeigh((p) => ({ ...p, weighingGross: true }))
-    try {
-      const w = await readScale(addWeigh.selectedScale)
-      recomputeAddNet(w, addWeigh.tareQty)
-      toast.success(`Gross: ${w} kg`)
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Scale not responding')
-    } finally {
-      setAddWeigh((p) => ({ ...p, weighingGross: false }))
-    }
-  }
-
-  async function handleAddWeighTare() {
-    setAddWeigh((p) => ({ ...p, weighingTare: true }))
-    try {
-      const w = await readScale(addWeigh.selectedScale)
-      recomputeAddNet(addWeigh.grossQty, w)
-      toast.success(`Tare: ${w} kg`)
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Scale not responding')
-    } finally {
-      setAddWeigh((p) => ({ ...p, weighingTare: false }))
-    }
-  }
-
-  async function handleReweighEntry(entry: StocktakeEntry, type: 'gross' | 'tare') {
-    const ew = getEntryWeigh(entry.id)
-    patchEntryWeigh(entry.id, type === 'gross' ? { weighingGross: true } : { weighingTare: true })
-    try {
-      const w = await readScale(ew.selectedScale)
-      const newGross = type === 'gross' ? w : (ew.grossQty || entry.grossQty || '0')
-      const newTare = type === 'tare' ? w : (ew.tareQty || entry.tareQty || '0')
-      const net = Decimal.max(new Decimal(newGross).minus(new Decimal(newTare)), new Decimal('0'))
-      patchEntryWeigh(entry.id, { grossQty: newGross, tareQty: newTare })
-      toast.success(`${type === 'gross' ? 'Gross' : 'Tare'}: ${w} kg — Net: ${net.toFixed(2)} kg`)
-      await saveEntry(entry.productId, net.toFixed(2), { grossQty: newGross, tareQty: newTare })
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Scale not responding')
-    } finally {
-      patchEntryWeigh(entry.id, type === 'gross' ? { weighingGross: false } : { weighingTare: false })
-    }
-  }
+  // Scale functions removed - scales are a future feature
+  // See Phase 5 in the plan: scales disabled but UI kept as placeholder
 
   async function saveEntry(pid: string, qty: string, opts?: { grossQty?: string; tareQty?: string }) {
     const res = await fetch(`/api/stocktake/${id}`, {
