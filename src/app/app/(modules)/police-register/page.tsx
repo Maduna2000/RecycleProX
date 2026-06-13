@@ -410,7 +410,7 @@ function SignatureDialog({
         </DialogHeader>
         <p className="text-sm" style={{ color: colors.textSecondary }}>Ask the officer to sign below using a mouse or touchscreen.</p>
 
-        <div className="rounded-lg overflow-hidden bg-white" style={{ border: `1px solid ${colors.border}` }}>
+        <div className="rounded overflow-hidden bg-white" style={{ border: `1px solid ${colors.border}` }}>
           <canvas
             ref={canvasRef}
             width={480}

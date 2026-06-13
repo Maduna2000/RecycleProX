@@ -144,6 +144,60 @@ export interface SyncQueueItem {
   errorMessage?: string
 }
 
+// ─── Categories (for scale station) ─────────────────────────────────────────
+
+export interface OfflineCategory {
+  id: string
+  name: string
+  colorHex: string | null
+  iconName: string | null
+  parentId: string | null
+  productCount: number
+}
+
+// ─── Scale Order (pending sync) ─────────────────────────────────────────────
+
+export interface OfflineScaleOrderLine {
+  productId: string
+  productName: string
+  categoryName: string
+  weight: string
+  unit: string
+  localPhotoIds: string[]  // References to photoCache table
+}
+
+export interface OfflineScaleOrder {
+  seq?: number                        // Auto-increment for queue order
+  id: string                          // "local_" + uuid
+  tempOrderNumber: string             // "PENDING-abc123"
+  customerId: string | null
+  casualFirstName: string | null
+  casualLastName: string | null
+  casualPhone: string | null
+  casualIdNumber: string | null
+  lines: OfflineScaleOrderLine[]
+  notes: string | null
+  operatorId: string
+  createdAt: string                   // ISO timestamp
+  syncStatus: 'pending' | 'syncing' | 'synced' | 'failed'
+  cloudId?: string                    // Set after sync
+  cloudOrderNumber?: string           // Set after sync
+  errorMessage?: string               // Set on failure
+}
+
+// ─── Photo Cache (for offline scale orders) ─────────────────────────────────
+
+export interface OfflinePhoto {
+  id: string                          // uuid
+  orderId: string                     // local order ID
+  photoIndex: number                  // 0 or 1 within the line
+  lineIndex: number                   // which line this photo belongs to
+  blob: Blob
+  syncStatus: 'pending' | 'synced' | 'failed'
+  r2Key?: string                      // Set after upload
+  createdAt: string
+}
+
 // ─── Metadata (seed timestamps, etc.) ────────────────────────────────────────
 
 export interface OfflineMeta {
@@ -158,6 +212,7 @@ class RecycleProXDB extends Dexie {
   customers!: Table<OfflineCustomer>
   priceGroups!: Table<OfflinePriceGroup>
   priceOverrides!: Table<OfflinePriceOverride>
+  categories!: Table<OfflineCategory>
 
   purchases!: Table<OfflinePurchase>
   purchaseLines!: Table<OfflinePurchaseLine>
@@ -165,6 +220,9 @@ class RecycleProXDB extends Dexie {
   saleLines!: Table<OfflineSaleLine>
   cashFloats!: Table<OfflineCashFloat>
   expenses!: Table<OfflineExpense>
+
+  scaleOrders!: Table<OfflineScaleOrder>
+  photoCache!: Table<OfflinePhoto>
 
   syncQueue!: Table<SyncQueueItem>
   meta!: Table<OfflineMeta>
@@ -186,6 +244,28 @@ class RecycleProXDB extends Dexie {
 
       syncQueue:     '++seq, id, status, createdAt',
       meta:          'key',
+    })
+
+    // Version 2: Add categories and scale station offline support
+    this.version(2).stores({
+      products:       'id, category, isActive',
+      customers:      'id, idNumber, lastName, customerType, isActive',
+      priceGroups:    'id, isDefault',
+      priceOverrides: 'id, priceGroupId, productId, [priceGroupId+productId]',
+      categories:     'id, parentId, name',
+
+      purchases:      'id, customerId, status, createdAt',
+      purchaseLines:  'id, purchaseId, productId',
+      sales:          'id, customerId, status, createdAt',
+      saleLines:      'id, saleId, productId',
+      cashFloats:     'id, floatDate',
+      expenses:       'id, status, createdAt',
+
+      scaleOrders:    '++seq, id, syncStatus, createdAt',
+      photoCache:     'id, orderId, syncStatus',
+
+      syncQueue:      '++seq, id, status, createdAt',
+      meta:           'key',
     })
   }
 }

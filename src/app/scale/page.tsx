@@ -48,7 +48,7 @@ export default function ScalePage() {
   }
 
   // When photos are confirmed: push to cart, show LineAdded confirmation
-  function handlePhotosConfirm(photoR2Keys: string[]) {
+  function handlePhotosConfirm(photoR2Keys: string[], photoBlobs?: Blob[]) {
     if (!product || !weight) return
     const line: CartLine = {
       productId:    product.id,
@@ -57,6 +57,7 @@ export default function ScalePage() {
       unit:         product.unit,
       weight,
       photoR2Keys,
+      photoBlobs,
     }
     const newCart = [...cart, line]
     setCart(newCart)

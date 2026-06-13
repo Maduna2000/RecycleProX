@@ -129,7 +129,7 @@ export default function UsersPage() {
       </div>
 
       {/* Table */}
-      <div className="flex-1 min-h-0 overflow-y-auto rounded-lg" style={{ border: `1px solid ${colors.border}` }}>
+      <div className="flex-1 min-h-0 overflow-y-auto rounded" style={{ border: `1px solid ${colors.border}` }}>
         <table className="w-full" style={{ background: colors.surface }}>
           <thead style={{ background: colors.toolbar, borderBottom: `1px solid ${colors.border}` }}>
             <tr>

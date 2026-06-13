@@ -8,7 +8,8 @@ export interface CartLine {
   categoryName: string
   unit:         string
   weight:       string
-  photoR2Keys:  string[]
+  photoR2Keys:  string[]      // Used when online
+  photoBlobs?:  Blob[]        // Used when offline
 }
 
 interface Props {

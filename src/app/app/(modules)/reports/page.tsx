@@ -108,7 +108,7 @@ export default function ReportsPage() {
       <div className="max-w-4xl mx-auto w-full space-y-5 pb-6">
 
         {/* Date range controls */}
-        <div className="rounded-lg border p-5 space-y-3 bg-white" style={{ borderColor: colors.border }}>
+        <div className="rounded border p-5 space-y-3 bg-white" style={{ borderColor: colors.border }}>
           <div className="flex flex-wrap items-end gap-3">
             <div>
               <Label className="text-xs mb-1 block" style={{ color: colors.textSecondary }}>From</Label>
@@ -153,7 +153,7 @@ export default function ReportsPage() {
         </div>
 
         {error && (
-          <div className="text-xs px-4 py-3 rounded-lg" style={{ background: colors.dangerBg, color: colors.danger }}>
+          <div className="text-xs px-4 py-3 rounded" style={{ background: colors.dangerBg, color: colors.danger }}>
             Failed to load report data.
           </div>
         )}
@@ -167,7 +167,7 @@ export default function ReportsPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
               {/* Sales */}
-              <div className="rounded-lg border p-4 bg-white" style={{ borderColor: colors.border }}>
+              <div className="rounded border p-4 bg-white" style={{ borderColor: colors.border }}>
                 <div className="flex items-center gap-2 mb-3">
                   <TrendingUp className="w-4 h-4" style={{ color: colors.action }} />
                   <h2 className="font-semibold text-sm" style={{ color: colors.textPrimary }}>Sales</h2>
@@ -178,7 +178,7 @@ export default function ReportsPage() {
               </div>
 
               {/* Purchases */}
-              <div className="rounded-lg border p-4 bg-white" style={{ borderColor: colors.border }}>
+              <div className="rounded border p-4 bg-white" style={{ borderColor: colors.border }}>
                 <div className="flex items-center gap-2 mb-3">
                   <ShoppingCart className="w-4 h-4" style={{ color: colors.danger }} />
                   <h2 className="font-semibold text-sm" style={{ color: colors.textPrimary }}>Purchases</h2>
@@ -189,7 +189,7 @@ export default function ReportsPage() {
               </div>
 
               {/* Cash Flow */}
-              <div className="rounded-lg border p-4 bg-white" style={{ borderColor: colors.border }}>
+              <div className="rounded border p-4 bg-white" style={{ borderColor: colors.border }}>
                 <div className="flex items-center gap-2 mb-3">
                   <ArrowRightLeft className="w-4 h-4" style={{ color: colors.process }} />
                   <h2 className="font-semibold text-sm" style={{ color: colors.textPrimary }}>Cash Flow</h2>
@@ -207,7 +207,7 @@ export default function ReportsPage() {
               </div>
 
               {/* Customers */}
-              <div className="rounded-lg border p-4 bg-white" style={{ borderColor: colors.border }}>
+              <div className="rounded border p-4 bg-white" style={{ borderColor: colors.border }}>
                 <div className="flex items-center gap-2 mb-3">
                   <Users className="w-4 h-4" style={{ color: colors.textSecondary }} />
                   <h2 className="font-semibold text-sm" style={{ color: colors.textPrimary }}>Customers</h2>
@@ -224,7 +224,7 @@ export default function ReportsPage() {
 
             {/* Expenses by category */}
             {data.expenses?.byCategory?.length > 0 && (
-              <div className="rounded-lg border p-4 bg-white" style={{ borderColor: colors.border }}>
+              <div className="rounded border p-4 bg-white" style={{ borderColor: colors.border }}>
                 <div className="flex items-center gap-2 mb-3">
                   <Receipt className="w-4 h-4" style={{ color: colors.warning }} />
                   <h2 className="font-semibold text-sm" style={{ color: colors.textPrimary }}>Expenses by Category</h2>
@@ -253,7 +253,7 @@ export default function ReportsPage() {
 
             {/* Top products — purchase */}
             {data.topProducts.length > 0 && (
-              <div className="rounded-lg border p-4 bg-white" style={{ borderColor: colors.border }}>
+              <div className="rounded border p-4 bg-white" style={{ borderColor: colors.border }}>
                 <h2 className="font-semibold text-sm mb-3" style={{ color: colors.textPrimary }}>Top Products by Purchase Value</h2>
                 <table className="w-full text-sm">
                   <thead>
@@ -278,7 +278,7 @@ export default function ReportsPage() {
 
             {/* Top products — sale */}
             {data.topSaleProducts?.length > 0 && (
-              <div className="rounded-lg border p-4 bg-white" style={{ borderColor: colors.border }}>
+              <div className="rounded border p-4 bg-white" style={{ borderColor: colors.border }}>
                 <h2 className="font-semibold text-sm mb-3" style={{ color: colors.textPrimary }}>Top Products by Sale Revenue</h2>
                 <table className="w-full text-sm">
                   <thead>

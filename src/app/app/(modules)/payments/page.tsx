@@ -399,7 +399,7 @@ function NewPaymentModal({ onClose, onSuccess }: { onClose: () => void; onSucces
               <CustomerLookupWidget onSelect={(c) => setCustomer(c)} />
             ) : (
               <div
-                className="p-3 rounded-lg flex items-center justify-between"
+                className="p-3 rounded flex items-center justify-between"
                 style={{ background: colors.actionBg, border: `1px solid ${colors.action}30` }}
               >
                 <div>
@@ -426,7 +426,7 @@ function NewPaymentModal({ onClose, onSuccess }: { onClose: () => void; onSucces
 
           {customer && hasOutstandingLoan && (
             <div
-              className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs"
+              className="flex items-center gap-2 px-3 py-2 rounded text-xs"
               style={{ background: colors.warningBg, border: `1px solid ${colors.warning}30`, color: '#856404' }}
             >
               <HandCoins className="w-4 h-4 shrink-0" />

@@ -14,20 +14,26 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const p = req.nextUrl.searchParams
-  const result = await listScaleOrders({
-    dateFrom:     p.get('dateFrom')     ?? undefined,
-    dateTo:       p.get('dateTo')       ?? undefined,
-    status:       (p.get('status')      ?? undefined) as 'pending' | 'processed' | 'voided' | undefined,
-    operatorId:   p.get('operatorId')   ?? undefined,
-    productId:    p.get('productId')    ?? undefined,
-    categoryName: p.get('categoryName')  ?? undefined,
-    customerType: (p.get('customerType') ?? undefined) as 'casual' | 'account' | undefined,
-    search:       p.get('search')       ?? undefined,
-    page:         p.get('page')         ? Number(p.get('page'))     : undefined,
-    pageSize:     p.get('pageSize')     ? Number(p.get('pageSize')) : undefined,
-  })
-  return NextResponse.json(result)
+  try {
+    const p = req.nextUrl.searchParams
+    const result = await listScaleOrders({
+      dateFrom:     p.get('dateFrom')     ?? undefined,
+      dateTo:       p.get('dateTo')       ?? undefined,
+      status:       (p.get('status')      ?? undefined) as 'pending' | 'processed' | 'voided' | undefined,
+      operatorId:   p.get('operatorId')   ?? undefined,
+      productId:    p.get('productId')    ?? undefined,
+      categoryName: p.get('categoryName')  ?? undefined,
+      customerType: (p.get('customerType') ?? undefined) as 'casual' | 'account' | undefined,
+      search:       p.get('search')       ?? undefined,
+      page:         p.get('page')         ? Number(p.get('page'))     : undefined,
+      pageSize:     p.get('pageSize')     ? Number(p.get('pageSize')) : undefined,
+    })
+    logger.info({ total: result.total, page: result.page }, 'GET /api/scale/orders success')
+    return NextResponse.json(result)
+  } catch (err) {
+    logger.error({ err }, 'GET /api/scale/orders failed')
+    return NextResponse.json({ error: 'Failed to fetch scale orders' }, { status: 500 })
+  }
 }
 
 export async function POST(req: NextRequest) {

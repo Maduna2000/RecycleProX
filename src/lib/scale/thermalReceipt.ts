@@ -84,6 +84,7 @@ export interface ReceiptData {
     weight:       string
     unit:         string
   }[]
+  isOffline?: boolean  // Show UNSYNCED warning on slip
 }
 
 /**
@@ -102,6 +103,16 @@ export function buildReceipt(data: ReceiptData, cols: number = DEFAULT_COLS): Ui
 
   // ── Init ──────────────────────────────────────────────────────────────────
   add(CMD_INIT)
+
+  // ── Offline warning (if applicable) ──────────────────────────────────────
+  if (data.isOffline) {
+    add(CMD_ALIGN_C)
+    add(CMD_BOLD_ON)
+    add(textLine('*** UNSYNCED ***'))
+    add(textLine('Will update when online'))
+    add(CMD_BOLD_OFF)
+    add(emptyLine())
+  }
 
   // ── Header ────────────────────────────────────────────────────────────────
   add(CMD_ALIGN_C)

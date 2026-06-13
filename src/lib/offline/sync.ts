@@ -1,4 +1,5 @@
 import { offlineDB } from './db'
+import { syncScaleOrders, registerScaleSyncCallbacks } from './scaleSyncService'
 
 // Imported lazily to avoid circular deps at module load time
 let _setPendingCount: ((n: number) => void) | null = null
@@ -13,6 +14,25 @@ export function registerSyncCallbacks(opts: {
   _setPendingCount = opts.setPendingCount
   _setSyncing = opts.setSyncing
   _showToast = opts.showToast
+
+  // Also register callbacks for scale sync
+  registerScaleSyncCallbacks({
+    showToast: opts.showToast,
+    onSyncComplete: () => {
+      // Refresh pending count after scale sync
+      refreshPendingCount()
+    },
+  })
+}
+
+async function refreshPendingCount() {
+  const queueCount = await offlineDB.syncQueue
+    .where('status').equals('pending')
+    .count()
+  const scaleCount = await offlineDB.scaleOrders
+    .where('syncStatus').anyOf(['pending', 'syncing'])
+    .count()
+  _setPendingCount?.(queueCount + scaleCount)
 }
 
 let _syncInProgress = false
@@ -23,11 +43,16 @@ export async function triggerSync(): Promise<void> {
   _setSyncing?.(true)
 
   try {
+    // Sync scale orders first (they have photos that need uploading)
+    await syncScaleOrders()
+
+    // Then sync the general queue
     const pending = await offlineDB.syncQueue
       .where('status').equals('pending')
       .sortBy('seq')
 
     if (pending.length === 0) {
+      await refreshPendingCount()
       return
     }
 
@@ -95,11 +120,8 @@ export async function triggerSync(): Promise<void> {
       }
     }
 
-    // Update pending count
-    const remaining = await offlineDB.syncQueue
-      .where('status').equals('pending')
-      .count()
-    _setPendingCount?.(remaining)
+    // Update pending count (includes scale orders)
+    await refreshPendingCount()
 
     // Notify user
     if (synced > 0 && failed === 0) {

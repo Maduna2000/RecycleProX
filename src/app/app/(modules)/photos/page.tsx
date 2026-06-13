@@ -78,8 +78,8 @@ function PhotoCard({ photo, onClick }: { photo: PhotoRecord; onClick: () => void
 
   return (
     <div
-      className="group bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow cursor-pointer"
-      style={{ border: `1px solid ${colors.border}` }}
+      className="group bg-white overflow-hidden cursor-pointer transition-colors hover:bg-[#F5F5F5]"
+      style={{ border: `1px solid ${colors.border}`, borderRadius: 2 }}
       onClick={onClick}
     >
       {/* Thumbnail — 3:2 landscape ratio */}

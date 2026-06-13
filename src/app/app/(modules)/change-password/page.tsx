@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Recycle, Loader2, CheckCircle2, XCircle } from 'lucide-react'
+import { colors } from '@/lib/design-tokens'
 
 function getStrength(pw: string): { label: string; color: string; score: number } {
   let score = 0
@@ -60,21 +61,21 @@ export default function ChangePasswordPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="min-h-screen flex items-center justify-center" style={{ background: colors.toolbar }}>
       <div className="w-full max-w-md">
-        <div className="bg-white rounded-2xl shadow-lg p-8">
+        <div className="bg-white p-8" style={{ border: `1px solid ${colors.border}`, borderRadius: 2 }}>
           <div className="flex flex-col items-center mb-6">
-            <div className="w-12 h-12 bg-amber-500 rounded-xl flex items-center justify-center mb-3">
+            <div className="w-12 h-12 flex items-center justify-center mb-3" style={{ background: colors.warning, borderRadius: 2 }}>
               <Recycle className="w-6 h-6 text-white" />
             </div>
-            <h1 className="text-xl font-bold text-gray-900">Change Your Password</h1>
-            <p className="text-sm text-gray-500 text-center mt-1">
+            <h1 className="text-xl font-bold" style={{ color: colors.textPrimary }}>Change Your Password</h1>
+            <p className="text-sm text-center mt-1" style={{ color: colors.textSecondary }}>
               You must change your password before continuing
             </p>
           </div>
 
           {error && (
-            <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
+            <div className="mb-4 p-3 text-sm" style={{ background: colors.dangerBg, border: `1px solid ${colors.danger}`, borderRadius: 2, color: colors.danger }}>
               {error}
             </div>
           )}
@@ -121,7 +122,7 @@ export default function ChangePasswordPage() {
               {errors.confirmPassword && <p className="text-xs text-red-600 mt-1">{errors.confirmPassword.message}</p>}
             </div>
 
-            <Button type="submit" className="w-full bg-green-600 hover:bg-green-700" disabled={loading}>
+            <Button type="submit" className="w-full hover:opacity-90" style={{ background: colors.action }} disabled={loading}>
               {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Updating...</> : 'Update Password'}
             </Button>
           </form>

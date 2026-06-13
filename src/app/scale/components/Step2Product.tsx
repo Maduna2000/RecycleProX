@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { ArrowLeft, Loader2, Package } from 'lucide-react'
+import { ArrowLeft, Loader2, Package, WifiOff } from 'lucide-react'
 import * as LucideIcons from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
+import { useScaleCache } from '@/hooks/useScaleCache'
 
 interface SubCategory {
   id: string; name: string; colorHex: string | null; iconName: string | null
@@ -43,18 +44,20 @@ export default function Step2Product({ onSelect }: Props) {
   const [selectedSub,  setSelectedSub]  = useState<SubCategory | null>(null)
   const [navStep,      setNavStep]      = useState<NavStep>('categories')
   const [loading,      setLoading]      = useState(true)
+  const { isOnline, getCategories, getProducts } = useScaleCache()
 
   useEffect(() => {
-    fetch('/api/scale/categories')
-      .then(r => r.json())
-      .then((data: Category[]) => setCategories(data))
+    // Use cache-aware fetch (works online and offline)
+    getCategories()
+      .then((data) => setCategories(data))
       .finally(() => setLoading(false))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   async function fetchProducts(categoryName: string) {
     setLoading(true)
-    const res = await fetch(`/api/scale/products?category=${encodeURIComponent(categoryName)}`)
-    const data = await res.json() as Product[]
+    // Use cache-aware fetch
+    const data = await getProducts(categoryName)
     setProducts(data)
     setLoading(false)
   }
@@ -176,7 +179,14 @@ export default function Step2Product({ onSelect }: Props) {
   return (
     <div className="flex-1 flex flex-col p-5 max-w-lg mx-auto w-full">
       <h2 className="text-2xl font-bold text-slate-800 mb-1">Select Category</h2>
-      <p className="text-slate-500 mb-5">Choose the type of material</p>
+      <p className="text-slate-500 mb-4">Choose the type of material</p>
+
+      {!isOnline && (
+        <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mb-4">
+          <WifiOff className="w-4 h-4 text-amber-600 shrink-0" />
+          <span className="text-amber-700 text-sm">Offline — using cached data</span>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
         {categories.map(cat => (

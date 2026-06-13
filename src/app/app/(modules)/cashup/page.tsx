@@ -212,7 +212,7 @@ function UnpaidCard({ label, total, count, href }: {
 }) {
   const router = useRouter()
   return (
-    <div className="rounded-lg border p-3 bg-white flex items-center justify-between" style={{ borderColor: colors.border }}>
+    <div className="rounded border p-3 bg-white flex items-center justify-between" style={{ borderColor: colors.border }}>
       <div>
         <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: colors.textSecondary }}>{label}</p>
         <p className="font-mono font-bold text-base mt-0.5" style={{ color: colors.danger }}>R {new Decimal(total).toFixed(2)}</p>
@@ -339,7 +339,7 @@ export default function CashUpPage() {
 
         {/* No session */}
         {!cashUp && (
-          <div className="rounded-lg border p-8 text-center bg-white" style={{ borderColor: colors.border }}>
+          <div className="rounded border p-8 text-center bg-white" style={{ borderColor: colors.border }}>
             <Clock className="w-10 h-10 mx-auto mb-3" style={{ color: colors.border }} />
             <p className="font-medium mb-1" style={{ color: colors.textPrimary }}>No session open for today</p>
             <p className="text-sm mb-5" style={{ color: colors.textSecondary }}>Open a session to begin tracking today&apos;s cash.</p>
@@ -402,7 +402,7 @@ export default function CashUpPage() {
                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
 
                   {/* ── LEFT: reconciliation numbers (always compact) ─────────── */}
-                  <div className="lg:col-span-3 rounded-lg border p-4 bg-white space-y-1.5" style={{ borderColor: colors.border }}>
+                  <div className="lg:col-span-3 rounded border p-4 bg-white space-y-1.5" style={{ borderColor: colors.border }}>
                     <h2 className="font-semibold text-sm mb-2" style={{ color: colors.textPrimary }}>
                       {isOpen ? 'Reconciliation (Live)' : 'Reconciliation'}
                     </h2>
@@ -526,7 +526,7 @@ export default function CashUpPage() {
 
                     {/* Card / EFT sales (submitted/approved) */}
                     {!isOpen && new Decimal(cashUp.cardPaymentsTotal ?? '0').gt(0) && (
-                      <div className="rounded-lg border p-3 bg-white" style={{ borderColor: colors.border }}>
+                      <div className="rounded border p-3 bg-white" style={{ borderColor: colors.border }}>
                         <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: colors.textSecondary }}>Card / EFT Sales</p>
                         <p className="font-mono font-bold" style={{ color: colors.process }}>R {new Decimal(cashUp.cardPaymentsTotal).toFixed(2)}</p>
                         <p className="text-xs mt-0.5" style={{ color: colors.textSecondary }}>Excluded from cash reconciliation</p>
@@ -535,7 +535,7 @@ export default function CashUpPage() {
 
                     {/* Today's Expenses */}
                     {expenses.length > 0 && (
-                      <div className="rounded-lg border p-3 bg-white space-y-2" style={{ borderColor: colors.border }}>
+                      <div className="rounded border p-3 bg-white space-y-2" style={{ borderColor: colors.border }}>
                         <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: colors.textSecondary }}>Today&apos;s Expenses</p>
                         {expenses.map((e) => (
                           <div key={e.id} className="flex items-start justify-between gap-2 text-xs">

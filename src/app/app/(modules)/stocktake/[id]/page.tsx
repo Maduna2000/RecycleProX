@@ -4,17 +4,41 @@ import { useState, useRef } from 'react'
 import useSWR, { mutate } from 'swr'
 import { useParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Loader2, CheckCircle, AlertTriangle, Scale, RefreshCw, Camera, ExternalLink } from 'lucide-react'
 import { toast } from 'sonner'
 import Decimal from 'decimal.js'
 import { format } from '@/lib/utils/format'
+import { colors } from '@/lib/design-tokens'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
+
+// Windows aesthetic styles
+const TH: React.CSSProperties = {
+  textAlign: 'left', padding: '0 8px', height: 28,
+  fontSize: 10, fontWeight: 700, color: colors.textSecondary,
+  textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap',
+  background: 'linear-gradient(180deg,#F5F5F5 0%,#ECECEC 100%)',
+}
+const TD: React.CSSProperties = { padding: '8px', fontSize: 12, color: colors.textPrimary }
+
+const secBtn: React.CSSProperties = {
+  display: 'inline-flex', alignItems: 'center', gap: 4, height: 24,
+  padding: '0 8px', fontSize: 11, fontWeight: 600, borderRadius: 2,
+  background: colors.surface, border: `1px solid ${colors.border}`, color: colors.textPrimary, cursor: 'pointer',
+}
+const priBtn: React.CSSProperties = {
+  display: 'inline-flex', alignItems: 'center', gap: 4, height: 24,
+  padding: '0 8px', fontSize: 11, fontWeight: 600, borderRadius: 2,
+  background: colors.action, border: `1px solid ${colors.actionHover}`, color: colors.textOnDark, cursor: 'pointer',
+}
+const scaleBtn: React.CSSProperties = {
+  display: 'inline-flex', alignItems: 'center', gap: 4, height: 24,
+  padding: '0 8px', fontSize: 11, fontWeight: 600, borderRadius: 2,
+  background: colors.process, border: `1px solid ${colors.processHover}`, color: colors.textOnDark, cursor: 'pointer',
+}
 
 type Product = { id: string; code: string; name: string; unit: string; category: string }
 type StocktakeEntry = {
@@ -44,7 +68,17 @@ const CATEGORY_LABELS: Record<string, string> = {
   aluminium: 'Aluminium', plastic: 'Plastic', paper: 'Paper', e_waste: 'E-Waste', other: 'Other',
 }
 
-// ─── Per-entry weigh state (local UI only) ────────────────────────────────────
+function StatusBadge({ status }: { status: 'open' | 'completed' }) {
+  const style = status === 'open'
+    ? { background: colors.actionBg, color: colors.action, border: `1px solid ${colors.action}` }
+    : { background: colors.neutralBg, color: colors.textSecondary, border: `1px solid ${colors.border}` }
+  return (
+    <span style={{ ...style, padding: '2px 6px', borderRadius: 2, fontSize: 10, fontWeight: 600, textTransform: 'uppercase' }}>
+      {status === 'open' ? 'Open' : 'Completed'}
+    </span>
+  )
+}
+
 type EntryWeighState = {
   weighMode: boolean
   selectedScale: '1' | '2' | '3'
@@ -72,20 +106,14 @@ export default function StocktakeDetailPage() {
   )
 
   const [productId, setProductId] = useState('')
-  // Manual entry count qty
   const [countedQty, setCountedQty] = useState('')
-  // Add-entry scale state
   const [addWeigh, setAddWeigh] = useState<EntryWeighState>(defaultWeigh())
   const [saving, setSaving] = useState(false)
   const [completing, setCompleting] = useState(false)
-
-  // Per-existing-entry weigh state (keyed by entry.id)
   const [entryWeigh, setEntryWeigh] = useState<Record<string, EntryWeighState>>({})
-
-  // Per-entry photo uploading state (keyed by entry.productId)
   const [uploadingPhoto, setUploadingPhoto] = useState<Record<string, boolean>>({})
   const photoInputRef = useRef<HTMLInputElement>(null)
-  const pendingPhotoEntryRef = useRef<string | null>(null) // productId of entry being photographed
+  const pendingPhotoEntryRef = useRef<string | null>(null)
 
   function getEntryWeigh(entryId: string): EntryWeighState {
     return entryWeigh[entryId] ?? defaultWeigh()
@@ -95,10 +123,12 @@ export default function StocktakeDetailPage() {
   }
 
   if (!isManager) {
-    return <div className="flex items-center justify-center h-64 text-sm text-gray-400">Access restricted to managers and administrators.</div>
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 256, color: colors.textSecondary, fontSize: 13 }}>
+        Access restricted to managers and administrators.
+      </div>
+    )
   }
-
-  // ── Scale read helper ─────────────────────────────────────────────────────
 
   async function readScale(scaleNumber: '1' | '2' | '3'): Promise<string> {
     const res = await fetch(`/api/scales/${scaleNumber}/read`)
@@ -112,7 +142,7 @@ export default function StocktakeDetailPage() {
 
   function recomputeAddNet(gross: string, tare: string) {
     const g = new Decimal(gross || '0')
-    const t = new Decimal(tare  || '0')
+    const t = new Decimal(tare || '0')
     const net = Decimal.max(g.minus(t), new Decimal('0'))
     setCountedQty(net.toFixed(2))
     setAddWeigh((prev) => ({ ...prev, grossQty: gross, tareQty: tare }))
@@ -144,19 +174,16 @@ export default function StocktakeDetailPage() {
     }
   }
 
-  // ── Re-weigh an existing entry ───────────────────────────────────────────
-
   async function handleReweighEntry(entry: StocktakeEntry, type: 'gross' | 'tare') {
     const ew = getEntryWeigh(entry.id)
     patchEntryWeigh(entry.id, type === 'gross' ? { weighingGross: true } : { weighingTare: true })
     try {
       const w = await readScale(ew.selectedScale)
       const newGross = type === 'gross' ? w : (ew.grossQty || entry.grossQty || '0')
-      const newTare  = type === 'tare'  ? w : (ew.tareQty  || entry.tareQty  || '0')
+      const newTare = type === 'tare' ? w : (ew.tareQty || entry.tareQty || '0')
       const net = Decimal.max(new Decimal(newGross).minus(new Decimal(newTare)), new Decimal('0'))
       patchEntryWeigh(entry.id, { grossQty: newGross, tareQty: newTare })
       toast.success(`${type === 'gross' ? 'Gross' : 'Tare'}: ${w} kg — Net: ${net.toFixed(2)} kg`)
-      // Auto-save the re-weighed entry
       await saveEntry(entry.productId, net.toFixed(2), { grossQty: newGross, tareQty: newTare })
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Scale not responding')
@@ -165,13 +192,7 @@ export default function StocktakeDetailPage() {
     }
   }
 
-  // ── Save entry ────────────────────────────────────────────────────────────
-
-  async function saveEntry(
-    pid: string,
-    qty: string,
-    opts?: { grossQty?: string; tareQty?: string }
-  ) {
+  async function saveEntry(pid: string, qty: string, opts?: { grossQty?: string; tareQty?: string }) {
     const res = await fetch(`/api/stocktake/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -184,8 +205,6 @@ export default function StocktakeDetailPage() {
     mutate(`/api/stocktake/${id}`)
   }
 
-  // ── Photo upload per entry ────────────────────────────────────────────────
-
   function triggerPhotoUpload(productId: string) {
     pendingPhotoEntryRef.current = productId
     photoInputRef.current?.click()
@@ -193,13 +212,12 @@ export default function StocktakeDetailPage() {
 
   async function handlePhotoSelected(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
-    const pid  = pendingPhotoEntryRef.current
+    const pid = pendingPhotoEntryRef.current
     if (!file || !pid) return
-    e.target.value = '' // reset for re-use
+    e.target.value = ''
 
     setUploadingPhoto((prev) => ({ ...prev, [pid]: true }))
     try {
-      // Upload to R2 via server proxy (no CORS required)
       const fd = new FormData()
       fd.append('context', 'stocktake_entry')
       fd.append('referenceId', id)
@@ -209,7 +227,6 @@ export default function StocktakeDetailPage() {
       if (!uploadRes.ok) throw new Error('Upload failed')
       const { key } = await uploadRes.json() as { key: string }
 
-      // Save the key on the entry
       const patchRes = await fetch(`/api/stocktake/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -241,7 +258,7 @@ export default function StocktakeDetailPage() {
     try {
       await saveEntry(productId, countedQty, {
         grossQty: addWeigh.grossQty || undefined,
-        tareQty:  addWeigh.tareQty  || undefined,
+        tareQty: addWeigh.tareQty || undefined,
       })
       toast.success('Entry saved')
       setProductId('')
@@ -264,286 +281,275 @@ export default function StocktakeDetailPage() {
   }
 
   const products = productsData?.products ?? []
-  const entries  = stocktake?.entries ?? []
-  const isOpen   = stocktake?.status === 'open'
+  const entries = stocktake?.entries ?? []
+  const isOpen = stocktake?.status === 'open'
   const countedIds = new Set(entries.map((e) => e.productId))
-  const variances  = entries.filter((e) => new Decimal(e.variance).abs().gt(0))
+  const variances = entries.filter((e) => new Decimal(e.variance).abs().gt(0))
 
-  if (isLoading) return <div className="flex items-center justify-center h-64"><Loader2 className="w-6 h-6 animate-spin text-gray-400" /></div>
-  if (!stocktake) return <div className="p-10 text-center text-gray-400">Stocktake not found</div>
+  if (isLoading) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 256, color: colors.textSecondary }}>
+        <Loader2 style={{ width: 20, height: 20, animation: 'spin 1s linear infinite' }} />
+      </div>
+    )
+  }
+  if (!stocktake) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 256, color: colors.textSecondary, fontSize: 13 }}>
+        Stocktake not found
+      </div>
+    )
+  }
 
   return (
-    <div className="max-w-4xl mx-auto w-full space-y-6">
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-gray-900">{stocktake.refNumber}</h1>
-            {isOpen
-              ? <Badge className="bg-green-100 text-green-700 hover:bg-green-100">Open</Badge>
-              : <Badge variant="secondary">Completed</Badge>}
-          </div>
-          <p className="text-sm text-gray-500 mt-1">
-            Created by {stocktake.createdBy.fullName} · {format.datetime(stocktake.createdAt)}
-            {stocktake.completedAt && ` · Completed ${format.datetime(stocktake.completedAt)}`}
-          </p>
-          {stocktake.notes && <p className="text-sm text-gray-600 mt-1">{stocktake.notes}</p>}
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, padding: 8 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, background: '#fff', border: '1px solid #B0B0B0', borderRadius: 2, overflow: 'hidden' }}>
+
+        {/* Title bar */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 10px', borderBottom: '2px solid #B0B0B0', background: 'linear-gradient(180deg,#EAEAEA 0%,#D4D4D4 100%)', flexShrink: 0 }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: colors.primary, fontFamily: 'monospace' }}>{stocktake.refNumber}</span>
+          <StatusBadge status={stocktake.status} />
+          <div style={{ flex: 1 }} />
+          {isOpen && (
+            <button onClick={handleComplete} disabled={completing || entries.length === 0} style={{ ...priBtn, opacity: (completing || entries.length === 0) ? 0.5 : 1 }}>
+              {completing
+                ? <><Loader2 style={{ width: 11, height: 11, animation: 'spin 1s linear infinite' }} /> Completing...</>
+                : <><CheckCircle style={{ width: 11, height: 11 }} /> Complete Stocktake</>}
+            </button>
+          )}
         </div>
-        {isOpen && (
-          <Button onClick={handleComplete} disabled={completing || entries.length === 0} className="bg-green-600 hover:bg-green-700">
-            {completing
-              ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Completing...</>
-              : <><CheckCircle className="w-4 h-4 mr-2" />Complete Stocktake</>}
-          </Button>
-        )}
-      </div>
 
-      {/* Summary */}
-      {entries.length > 0 && (
-        <div className="grid grid-cols-3 gap-4">
-          <div className="bg-white rounded-xl border p-4 text-center">
-            <p className="text-2xl font-bold text-gray-900">{entries.length}</p>
-            <p className="text-xs text-gray-500 mt-1">Products Counted</p>
-          </div>
-          <div className={`rounded-xl border p-4 text-center ${variances.length > 0 ? 'bg-orange-50' : 'bg-white'}`}>
-            <p className={`text-2xl font-bold ${variances.length > 0 ? 'text-orange-700' : 'text-gray-900'}`}>{variances.length}</p>
-            <p className="text-xs text-gray-500 mt-1">Variances Found</p>
-          </div>
-          <div className="bg-white rounded-xl border p-4 text-center">
-            <p className="text-2xl font-bold text-gray-900">{products.length - countedIds.size}</p>
-            <p className="text-xs text-gray-500 mt-1">Products Remaining</p>
-          </div>
+        {/* Info bar */}
+        <div style={{ padding: '6px 12px', background: colors.surface, borderBottom: `1px solid ${colors.border}`, fontSize: 11, color: colors.textSecondary, flexShrink: 0 }}>
+          Created by {stocktake.createdBy.fullName} · {format.datetime(stocktake.createdAt)}
+          {stocktake.completedAt && ` · Completed ${format.datetime(stocktake.completedAt)}`}
+          {stocktake.notes && <span style={{ marginLeft: 12, color: colors.textPrimary }}>{stocktake.notes}</span>}
         </div>
-      )}
 
-      {/* Add entry form */}
-      {isOpen && (
-        <div className="bg-white rounded-xl border p-5">
-          <h2 className="font-semibold text-gray-900 mb-4">Add Count Entry</h2>
-
-          <div className="grid grid-cols-1 sm:grid-cols-[1fr_160px_40px] gap-3 items-end">
-            <div>
-              <Label>Product</Label>
-              <Select value={productId} onValueChange={(v) => setProductId(v ?? '')}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="Select product..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {products.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      <span className={countedIds.has(p.id) ? 'text-gray-400' : ''}>
-                        {p.name} ({p.code}){countedIds.has(p.id) ? ' ✓' : ''}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label>
-                Net Qty{' '}
-                {productId && <span className="text-gray-400 font-normal">({products.find((p) => p.id === productId)?.unit})</span>}
-              </Label>
-              <Input
-                value={countedQty}
-                onChange={(e) => setCountedQty(e.target.value)}
-                placeholder="0.000"
-                className="mt-1 font-mono"
-                disabled={saving}
-              />
-            </div>
-
-            {/* Scale toggle for add form */}
-            <div className="pb-0.5">
-              <Label className="opacity-0 select-none">.</Label>
-              <Button
-                variant={addWeigh.weighMode ? 'default' : 'outline'}
-                size="sm"
-                className={`mt-1 h-9 w-9 p-0 ${addWeigh.weighMode ? 'bg-blue-600 hover:bg-blue-700' : ''}`}
-                title="Toggle scale mode"
-                onClick={() => setAddWeigh((p) => ({ ...p, weighMode: !p.weighMode }))}
-              >
-                <Scale className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
-
-          {/* Scale panel for add form */}
-          {addWeigh.weighMode && (
-            <div className="mt-3 p-3 rounded-lg bg-blue-50 border border-blue-100 flex items-end gap-3 flex-wrap">
-              <div className="flex flex-col gap-1">
-                <Label className="text-xs text-gray-500">Scale</Label>
-                <Select
-                  value={addWeigh.selectedScale}
-                  onValueChange={(v) => setAddWeigh((p) => ({ ...p, selectedScale: v as '1' | '2' | '3' }))}
-                >
-                  <SelectTrigger className="h-8 w-28 text-sm"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1">Scale 1</SelectItem>
-                    <SelectItem value="2">Scale 2</SelectItem>
-                    <SelectItem value="3">Scale 3</SelectItem>
-                  </SelectContent>
-                </Select>
+        {/* Content */}
+        <div style={{ flex: 1, overflow: 'auto', padding: 12 }}>
+          {/* Summary stats */}
+          {entries.length > 0 && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
+              <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 2, padding: 12, textAlign: 'center' }}>
+                <p style={{ fontSize: 20, fontWeight: 700, color: colors.textPrimary }}>{entries.length}</p>
+                <p style={{ fontSize: 10, color: colors.textSecondary, marginTop: 4 }}>Products Counted</p>
               </div>
+              <div style={{ background: variances.length > 0 ? colors.warningBg : colors.surface, border: `1px solid ${variances.length > 0 ? colors.warning : colors.border}`, borderRadius: 2, padding: 12, textAlign: 'center' }}>
+                <p style={{ fontSize: 20, fontWeight: 700, color: variances.length > 0 ? colors.warning : colors.textPrimary }}>{variances.length}</p>
+                <p style={{ fontSize: 10, color: colors.textSecondary, marginTop: 4 }}>Variances Found</p>
+              </div>
+              <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 2, padding: 12, textAlign: 'center' }}>
+                <p style={{ fontSize: 20, fontWeight: 700, color: colors.textPrimary }}>{products.length - countedIds.size}</p>
+                <p style={{ fontSize: 10, color: colors.textSecondary, marginTop: 4 }}>Products Remaining</p>
+              </div>
+            </div>
+          )}
 
-              <div className="flex flex-col gap-1">
-                <Label className="text-xs text-gray-500">Gross (kg)</Label>
-                <div className="flex gap-1.5">
-                  <Input
-                    value={addWeigh.grossQty}
-                    onChange={(e) => recomputeAddNet(e.target.value, addWeigh.tareQty)}
-                    placeholder="0.000"
-                    className="h-8 w-24 font-mono text-sm"
-                  />
-                  <Button size="sm" className="h-8 px-2 bg-blue-600 hover:bg-blue-700 text-white" disabled={addWeigh.weighingGross} onClick={handleAddWeighGross}>
-                    {addWeigh.weighingGross ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-                  </Button>
+          {/* Add entry form */}
+          {isOpen && (
+            <div style={{ background: '#fff', border: `1px solid ${colors.border}`, borderRadius: 2, marginBottom: 16, overflow: 'hidden' }}>
+              <div style={{ padding: '6px 10px', borderBottom: `1px solid ${colors.border}`, background: 'linear-gradient(180deg,#EAEAEA 0%,#D4D4D4 100%)' }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: colors.primary }}>Add Count Entry</span>
+              </div>
+              <div style={{ padding: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 140px auto', gap: 12, alignItems: 'end' }}>
+                  <div>
+                    <Label style={{ fontSize: 11, fontWeight: 600, color: colors.textPrimary }}>Product</Label>
+                    <Select value={productId} onValueChange={(v) => setProductId(v ?? '')}>
+                      <SelectTrigger style={{ marginTop: 4, height: 28, fontSize: 12 }}>
+                        <SelectValue placeholder="Select product..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {products.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>
+                            <span style={{ color: countedIds.has(p.id) ? colors.textSecondary : colors.textPrimary }}>
+                              {p.name} ({p.code}){countedIds.has(p.id) ? ' ✓' : ''}
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label style={{ fontSize: 11, fontWeight: 600, color: colors.textPrimary }}>
+                      Net Qty {productId && <span style={{ color: colors.textSecondary, fontWeight: 400 }}>({products.find((p) => p.id === productId)?.unit})</span>}
+                    </Label>
+                    <Input
+                      value={countedQty}
+                      onChange={(e) => setCountedQty(e.target.value)}
+                      placeholder="0.000"
+                      style={{ marginTop: 4, height: 28, fontSize: 12, fontFamily: 'monospace' }}
+                      disabled={saving}
+                    />
+                  </div>
+                  <button
+                    onClick={() => setAddWeigh((p) => ({ ...p, weighMode: !p.weighMode }))}
+                    style={{ ...scaleBtn, background: addWeigh.weighMode ? colors.process : colors.surface, color: addWeigh.weighMode ? colors.textOnDark : colors.textPrimary, border: `1px solid ${addWeigh.weighMode ? colors.processHover : colors.border}`, width: 28, padding: 0, justifyContent: 'center' }}
+                    title="Toggle scale mode"
+                  >
+                    <Scale style={{ width: 12, height: 12 }} />
+                  </button>
                 </div>
-              </div>
 
-              <div className="flex flex-col gap-1">
-                <Label className="text-xs text-gray-500">Tare (kg)</Label>
-                <div className="flex gap-1.5">
-                  <Input
-                    value={addWeigh.tareQty}
-                    onChange={(e) => recomputeAddNet(addWeigh.grossQty, e.target.value)}
-                    placeholder="0.000"
-                    className="h-8 w-24 font-mono text-sm"
-                  />
-                  <Button size="sm" variant="outline" className="h-8 px-2" disabled={addWeigh.weighingTare} onClick={handleAddWeighTare}>
-                    {addWeigh.weighingTare ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-                  </Button>
-                </div>
-              </div>
+                {/* Scale panel */}
+                {addWeigh.weighMode && (
+                  <div style={{ marginTop: 12, padding: 10, background: colors.processBg, border: `1px solid ${colors.process}`, borderRadius: 2, display: 'flex', alignItems: 'end', gap: 12, flexWrap: 'wrap' }}>
+                    <div>
+                      <Label style={{ fontSize: 10, color: colors.textSecondary }}>Scale</Label>
+                      <Select value={addWeigh.selectedScale} onValueChange={(v) => setAddWeigh((p) => ({ ...p, selectedScale: v as '1' | '2' | '3' }))}>
+                        <SelectTrigger style={{ height: 24, width: 80, fontSize: 11, marginTop: 2 }}><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1">Scale 1</SelectItem>
+                          <SelectItem value="2">Scale 2</SelectItem>
+                          <SelectItem value="3">Scale 3</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label style={{ fontSize: 10, color: colors.textSecondary }}>Gross (kg)</Label>
+                      <div style={{ display: 'flex', gap: 4, marginTop: 2 }}>
+                        <Input value={addWeigh.grossQty} onChange={(e) => recomputeAddNet(e.target.value, addWeigh.tareQty)} placeholder="0.000" style={{ height: 24, width: 80, fontSize: 11, fontFamily: 'monospace' }} />
+                        <button onClick={handleAddWeighGross} disabled={addWeigh.weighingGross} style={{ ...scaleBtn, width: 24, padding: 0, justifyContent: 'center', opacity: addWeigh.weighingGross ? 0.5 : 1 }}>
+                          {addWeigh.weighingGross ? <Loader2 style={{ width: 10, height: 10, animation: 'spin 1s linear infinite' }} /> : <RefreshCw style={{ width: 10, height: 10 }} />}
+                        </button>
+                      </div>
+                    </div>
+                    <div>
+                      <Label style={{ fontSize: 10, color: colors.textSecondary }}>Tare (kg)</Label>
+                      <div style={{ display: 'flex', gap: 4, marginTop: 2 }}>
+                        <Input value={addWeigh.tareQty} onChange={(e) => recomputeAddNet(addWeigh.grossQty, e.target.value)} placeholder="0.000" style={{ height: 24, width: 80, fontSize: 11, fontFamily: 'monospace' }} />
+                        <button onClick={handleAddWeighTare} disabled={addWeigh.weighingTare} style={{ ...secBtn, width: 24, padding: 0, justifyContent: 'center', opacity: addWeigh.weighingTare ? 0.5 : 1 }}>
+                          {addWeigh.weighingTare ? <Loader2 style={{ width: 10, height: 10, animation: 'spin 1s linear infinite' }} /> : <RefreshCw style={{ width: 10, height: 10 }} />}
+                        </button>
+                      </div>
+                    </div>
+                    <div>
+                      <Label style={{ fontSize: 10, color: colors.textSecondary }}>Net (kg)</Label>
+                      <div style={{ height: 24, display: 'flex', alignItems: 'center', padding: '0 8px', background: '#fff', border: `1px solid ${colors.border}`, borderRadius: 2, fontFamily: 'monospace', fontSize: 11, fontWeight: 600, color: colors.action, marginTop: 2, minWidth: 60 }}>
+                        {countedQty || '0.000'}
+                      </div>
+                    </div>
+                  </div>
+                )}
 
-              <div className="flex flex-col gap-1">
-                <Label className="text-xs text-gray-500">Net (kg)</Label>
-                <div className="h-8 flex items-center px-3 rounded-md border bg-white font-mono text-sm font-semibold text-green-700 min-w-[72px]">
-                  {countedQty || '0.000'}
+                <div style={{ marginTop: 12, display: 'flex', justifyContent: 'flex-end' }}>
+                  <button onClick={handleAddEntry} disabled={saving} style={{ ...priBtn, opacity: saving ? 0.5 : 1 }}>
+                    {saving ? <><Loader2 style={{ width: 11, height: 11, animation: 'spin 1s linear infinite' }} /> Saving...</> : 'Save Entry'}
+                  </button>
                 </div>
               </div>
             </div>
           )}
 
-          <div className="mt-4 flex justify-end">
-            <Button onClick={handleAddEntry} disabled={saving} className="bg-green-600 hover:bg-green-700">
-              {saving ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving...</> : 'Save Entry'}
-            </Button>
+          {/* Entries table */}
+          <div style={{ background: '#fff', border: `1px solid ${colors.border}`, borderRadius: 2, overflow: 'hidden' }}>
+            <div style={{ padding: '6px 10px', borderBottom: `1px solid ${colors.border}`, background: 'linear-gradient(180deg,#EAEAEA 0%,#D4D4D4 100%)' }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: colors.primary }}>Count Entries</span>
+              <span style={{ fontSize: 10, color: colors.textSecondary, marginLeft: 8 }}>({entries.length})</span>
+            </div>
+            {entries.length === 0 ? (
+              <div style={{ padding: '40px 0', textAlign: 'center', color: colors.textSecondary, fontSize: 12 }}>
+                No entries yet — start counting products above
+              </div>
+            ) : (
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ borderBottom: `1px solid ${colors.border}` }}>
+                    <th style={TH}>Product</th>
+                    <th style={TH}>Category</th>
+                    <th style={TH}>System Qty</th>
+                    <th style={TH}>Gross / Tare</th>
+                    <th style={TH}>Net Counted</th>
+                    <th style={TH}>Variance</th>
+                    <th style={TH}>Photo</th>
+                    <th style={{ ...TH, width: 24 }}></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {entries.map((e, i) => {
+                    const variance = new Decimal(e.variance)
+                    const hasVariance = variance.abs().gt(0)
+                    const ew = getEntryWeigh(e.id)
+                    return (
+                      <tr key={e.id} style={{ borderBottom: i < entries.length - 1 ? `1px solid ${colors.rowDivider}` : undefined, background: hasVariance ? colors.warningBg : undefined }}>
+                        <td style={TD}>
+                          <p style={{ fontWeight: 500, color: colors.textPrimary }}>{e.product.name}</p>
+                          <p style={{ fontSize: 10, fontFamily: 'monospace', color: colors.textSecondary }}>{e.product.code}</p>
+                        </td>
+                        <td style={TD}>
+                          <span style={{ padding: '2px 6px', borderRadius: 2, fontSize: 10, background: colors.neutralBg, color: colors.textSecondary }}>
+                            {CATEGORY_LABELS[e.product.category] ?? e.product.category}
+                          </span>
+                        </td>
+                        <td style={{ ...TD, fontFamily: 'monospace' }}>{Number(e.systemQty).toFixed(2)} {e.product.unit}</td>
+                        <td style={TD}>
+                          {(e.grossQty || e.tareQty) ? (
+                            <span style={{ fontFamily: 'monospace', fontSize: 10, color: colors.textSecondary }}>
+                              G:{Number(e.grossQty ?? 0).toFixed(2)} T:{Number(e.tareQty ?? 0).toFixed(2)}
+                            </span>
+                          ) : <span style={{ color: colors.disabled }}>—</span>}
+                          {isOpen && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                              <Select value={ew.selectedScale} onValueChange={(v) => patchEntryWeigh(e.id, { selectedScale: v as '1' | '2' | '3' })}>
+                                <SelectTrigger style={{ height: 20, width: 60, fontSize: 10, padding: '0 4px' }}><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="1">Scale 1</SelectItem>
+                                  <SelectItem value="2">Scale 2</SelectItem>
+                                  <SelectItem value="3">Scale 3</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <button onClick={() => handleReweighEntry(e, 'gross')} disabled={ew.weighingGross} style={{ ...scaleBtn, height: 20, padding: '0 4px', fontSize: 10, opacity: ew.weighingGross ? 0.5 : 1 }} title="Re-weigh gross">
+                                {ew.weighingGross ? <Loader2 style={{ width: 10, height: 10, animation: 'spin 1s linear infinite' }} /> : 'G'}
+                              </button>
+                              <button onClick={() => handleReweighEntry(e, 'tare')} disabled={ew.weighingTare} style={{ ...secBtn, height: 20, padding: '0 4px', fontSize: 10, opacity: ew.weighingTare ? 0.5 : 1 }} title="Re-weigh tare">
+                                {ew.weighingTare ? <Loader2 style={{ width: 10, height: 10, animation: 'spin 1s linear infinite' }} /> : 'T'}
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                        <td style={{ ...TD, fontFamily: 'monospace' }}>{Number(e.countedQty).toFixed(2)} {e.product.unit}</td>
+                        <td style={TD}>
+                          <span style={{ fontFamily: 'monospace', fontWeight: 600, color: variance.gt(0) ? colors.action : variance.lt(0) ? colors.danger : colors.textSecondary }}>
+                            {variance.gt(0) ? '+' : ''}{Number(e.variance).toFixed(2)} {e.product.unit}
+                          </span>
+                        </td>
+                        <td style={TD}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            {e.photoR2Key ? (
+                              <button onClick={() => viewPhoto(e.photoR2Key!)} style={{ ...secBtn, height: 20, fontSize: 10 }}>
+                                <ExternalLink style={{ width: 10, height: 10 }} /> View
+                              </button>
+                            ) : (
+                              <span style={{ fontSize: 10, color: colors.disabled }}>—</span>
+                            )}
+                            {isOpen && (
+                              <button
+                                onClick={() => triggerPhotoUpload(e.productId)}
+                                disabled={uploadingPhoto[e.productId]}
+                                style={{ ...secBtn, width: 20, height: 20, padding: 0, justifyContent: 'center', opacity: uploadingPhoto[e.productId] ? 0.5 : 1 }}
+                                title="Upload photo"
+                              >
+                                {uploadingPhoto[e.productId]
+                                  ? <Loader2 style={{ width: 10, height: 10, animation: 'spin 1s linear infinite' }} />
+                                  : <Camera style={{ width: 10, height: 10 }} />}
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                        <td style={TD}>
+                          {hasVariance && <AlertTriangle style={{ width: 14, height: 14, color: colors.warning }} />}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
-      )}
-
-      {/* Entries table */}
-      <div className="bg-white rounded-xl border overflow-hidden">
-        <div className="px-5 py-3 border-b bg-gray-50">
-          <h2 className="font-semibold text-gray-900">Count Entries ({entries.length})</h2>
-        </div>
-        {entries.length === 0 ? (
-          <div className="p-10 text-center text-gray-400">No entries yet — start counting products above</div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b">
-              <tr>
-                {['Product', 'Category', 'System Qty', 'Gross / Tare', 'Net Counted', 'Variance', 'Photo', ''].map((h) => (
-                  <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {entries.map((e) => {
-                const variance    = new Decimal(e.variance)
-                const hasVariance = variance.abs().gt(0)
-                const ew          = getEntryWeigh(e.id)
-                return (
-                  <tr key={e.id} className={hasVariance ? 'bg-orange-50' : ''}>
-                    <td className="px-4 py-3">
-                      <p className="font-medium text-gray-900">{e.product.name}</p>
-                      <p className="text-xs text-gray-400 font-mono">{e.product.code}</p>
-                    </td>
-                    <td className="px-4 py-3">
-                      <Badge variant="secondary" className="text-xs">{CATEGORY_LABELS[e.product.category] ?? e.product.category}</Badge>
-                    </td>
-                    <td className="px-4 py-3 font-mono text-gray-700">{Number(e.systemQty).toFixed(2)} {e.product.unit}</td>
-                    <td className="px-4 py-3">
-                      {(e.grossQty || e.tareQty) ? (
-                        <span className="font-mono text-xs text-gray-500">
-                          G:{Number(e.grossQty ?? 0).toFixed(2)} T:{Number(e.tareQty ?? 0).toFixed(2)}
-                        </span>
-                      ) : <span className="text-gray-300">—</span>}
-                      {/* Re-weigh buttons for open stocktakes */}
-                      {isOpen && (
-                        <div className="flex items-center gap-1 mt-1">
-                          <Select
-                            value={ew.selectedScale}
-                            onValueChange={(v) => patchEntryWeigh(e.id, { selectedScale: v as '1' | '2' | '3' })}
-                          >
-                            <SelectTrigger className="h-6 w-20 text-xs px-1"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="1">Scale 1</SelectItem>
-                              <SelectItem value="2">Scale 2</SelectItem>
-                              <SelectItem value="3">Scale 3</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <Button size="sm" className="h-6 px-1.5 text-xs bg-blue-600 hover:bg-blue-700" disabled={ew.weighingGross} onClick={() => handleReweighEntry(e, 'gross')} title="Re-weigh gross">
-                            {ew.weighingGross ? <Loader2 className="w-3 h-3 animate-spin" /> : 'G'}
-                          </Button>
-                          <Button size="sm" variant="outline" className="h-6 px-1.5 text-xs" disabled={ew.weighingTare} onClick={() => handleReweighEntry(e, 'tare')} title="Re-weigh tare">
-                            {ew.weighingTare ? <Loader2 className="w-3 h-3 animate-spin" /> : 'T'}
-                          </Button>
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 font-mono text-gray-700">{Number(e.countedQty).toFixed(2)} {e.product.unit}</td>
-                    <td className="px-4 py-3">
-                      <span className={`font-mono font-semibold ${variance.gt(0) ? 'text-green-700' : variance.lt(0) ? 'text-red-700' : 'text-gray-400'}`}>
-                        {variance.gt(0) ? '+' : ''}{Number(e.variance).toFixed(2)} {e.product.unit}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-1">
-                        {e.photoR2Key ? (
-                          <button
-                            onClick={() => viewPhoto(e.photoR2Key!)}
-                            className="flex items-center gap-1 text-xs text-blue-600 hover:underline"
-                          >
-                            <ExternalLink className="w-3.5 h-3.5" /> View
-                          </button>
-                        ) : (
-                          <span className="text-xs text-gray-300">—</span>
-                        )}
-                        {isOpen && (
-                          <button
-                            onClick={() => triggerPhotoUpload(e.productId)}
-                            disabled={uploadingPhoto[e.productId]}
-                            className="ml-1 text-gray-400 hover:text-blue-600 transition-colors disabled:opacity-50"
-                            title="Upload photo"
-                          >
-                            {uploadingPhoto[e.productId]
-                              ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                              : <Camera className="w-3.5 h-3.5" />}
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      {hasVariance && <AlertTriangle className="w-4 h-4 text-orange-500" />}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        )}
       </div>
-      {/* Hidden file input for photo uploads */}
-      <input
-        ref={photoInputRef}
-        type="file"
-        accept="image/jpeg,image/png,image/webp"
-        className="hidden"
-        onChange={handlePhotoSelected}
-      />
+      <input ref={photoInputRef} type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }} onChange={handlePhotoSelected} />
     </div>
   )
 }

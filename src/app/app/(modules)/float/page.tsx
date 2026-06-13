@@ -149,7 +149,7 @@ export default function FloatPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
 
           {/* Today's float status + action forms */}
-          <div className="rounded-lg border p-5 space-y-4 bg-white" style={{ borderColor: colors.border }}>
+          <div className="rounded border p-5 space-y-4 bg-white" style={{ borderColor: colors.border }}>
             <h2 className="text-sm font-semibold" style={{ color: colors.textPrimary }}>Today&apos;s Float</h2>
 
             {loadingToday ? (
@@ -159,7 +159,7 @@ export default function FloatPage() {
             ) : floatAlreadySet ? (
               <div className="space-y-3">
                 {/* Current balance card */}
-                <div className="px-4 py-3 rounded-lg" style={{ background: colors.warningBg, border: `1px solid ${colors.warning}40` }}>
+                <div className="px-4 py-3 rounded" style={{ background: colors.warningBg, border: `1px solid ${colors.warning}40` }}>
                   <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: colors.warning }}>Opening Float</p>
                   <p className="font-mono font-bold mt-1" style={{ fontSize: 24, color: '#92700F' }}>
                     R {new Decimal(todayFloat.openingAmount).toFixed(2)}
@@ -180,7 +180,7 @@ export default function FloatPage() {
 
                 {/* Top-up form */}
                 {isManager && (
-                  <div className="rounded-lg p-4 space-y-3" style={{ background: colors.actionBg, border: `1px solid ${colors.action}30` }}>
+                  <div className="rounded p-4 space-y-3" style={{ background: colors.actionBg, border: `1px solid ${colors.action}30` }}>
                     <div className="flex items-center gap-1.5">
                       <PlusCircle className="w-3.5 h-3.5" style={{ color: colors.action }} />
                       <p className="text-sm font-semibold" style={{ color: colors.action }}>Add Top-Up</p>
@@ -235,7 +235,7 @@ export default function FloatPage() {
                       {showCorrectForm ? 'Hide correction' : 'Correct opening amount'}
                     </button>
                     {showCorrectForm && (
-                      <form onSubmit={openingForm.handleSubmit(onSetOpening)} className="mt-2 space-y-2 p-3 rounded-lg" style={{ background: '#FFF8E1', border: `1px solid ${colors.warning}40` }}>
+                      <form onSubmit={openingForm.handleSubmit(onSetOpening)} className="mt-2 space-y-2 p-3 rounded" style={{ background: '#FFF8E1', border: `1px solid ${colors.warning}40` }}>
                         <p className="text-xs" style={{ color: colors.warning }}>This replaces today&apos;s opening amount. Use only to fix an entry error.</p>
                         <div>
                           <Label className="text-xs" style={{ color: colors.textSecondary }}>Corrected Opening Amount (R)</Label>
@@ -265,11 +265,11 @@ export default function FloatPage() {
               </div>
             ) : (
               <div className="space-y-3">
-                <div className="py-6 rounded-lg text-center text-sm" style={{ background: colors.toolbar, border: `1px dashed ${colors.border}`, color: colors.textSecondary }}>
+                <div className="py-6 rounded text-center text-sm" style={{ background: colors.toolbar, border: `1px dashed ${colors.border}`, color: colors.textSecondary }}>
                   No float set for today yet
                 </div>
                 {suggestedAmount && (
-                  <div className="rounded-lg px-4 py-3" style={{ background: colors.processBg, border: `1px solid ${colors.process}30` }}>
+                  <div className="rounded px-4 py-3" style={{ background: colors.processBg, border: `1px solid ${colors.process}30` }}>
                     <p className="text-xs font-semibold" style={{ color: colors.process }}>Carry-Forward Available</p>
                     <p className="text-xs mt-0.5" style={{ color: colors.textSecondary }}>
                       Previous closing: <span className="font-mono font-semibold" style={{ color: colors.textPrimary }}>R {new Decimal(suggestedAmount).toFixed(2)}</span>
@@ -331,7 +331,7 @@ export default function FloatPage() {
           </div>
 
           {/* History */}
-          <div className="rounded-lg border p-5 bg-white" style={{ borderColor: colors.border }}>
+          <div className="rounded border p-5 bg-white" style={{ borderColor: colors.border }}>
             <div className="flex items-center gap-2 mb-4">
               <Calendar className="w-4 h-4" style={{ color: colors.textSecondary }} />
               <h2 className="text-sm font-semibold" style={{ color: colors.textPrimary }}>Float History</h2>
@@ -369,7 +369,7 @@ export default function FloatPage() {
 
         {/* Today's Movements */}
         {movements.length > 0 && (
-          <div className="rounded-lg border bg-white" style={{ borderColor: colors.border }}>
+          <div className="rounded border bg-white" style={{ borderColor: colors.border }}>
             <div className="flex items-center justify-between px-5 py-3" style={{ borderBottom: `1px solid ${colors.border}` }}>
               <h2 className="text-sm font-semibold" style={{ color: colors.textPrimary }}>Today&apos;s Float Movements</h2>
               <span className="text-xs" style={{ color: colors.textSecondary }}>{movements.length} movement{movements.length !== 1 ? 's' : ''}</span>

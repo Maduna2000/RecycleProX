@@ -4,7 +4,8 @@ import { useState, useEffect, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Search, UserPlus, Users, ArrowRight, Loader2, AlertCircle } from 'lucide-react'
+import { Search, UserPlus, Users, ArrowRight, Loader2, AlertCircle, WifiOff } from 'lucide-react'
+import { useScaleCache } from '@/hooks/useScaleCache'
 
 const CasualSchema = z.object({
   firstName: z.string().min(1, 'Required'),
@@ -36,6 +37,7 @@ export default function Step1Customer({ onSelect }: Props) {
   const [searching, setSearching]     = useState(false)
   const [searchError, setSearchError] = useState<string | null>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const { isOnline, searchCustomers } = useScaleCache()
 
   const form = useForm<CasualForm>({ resolver: zodResolver(CasualSchema) })
 
@@ -43,14 +45,13 @@ export default function Step1Customer({ onSelect }: Props) {
     setSearching(true)
     setSearchError(null)
     try {
-      const res = await fetch(`/api/customers?search=${encodeURIComponent(query)}&type=account&limit=20`)
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err.error ?? `Server error (${res.status})`)
-      }
-      const data = await res.json()
-      const list: SelectedCustomer[] = (data.customers ?? []).map((c: Record<string, string>) => ({
-        id: c.id, firstName: c.firstName, lastName: c.lastName, phone: c.phone,
+      // Use cache-aware search (works online and offline)
+      const customers = await searchCustomers(query)
+      const list: SelectedCustomer[] = customers.map(c => ({
+        id: c.id,
+        firstName: c.firstName,
+        lastName: c.lastName,
+        phone: c.phone,
       }))
       setSearchResults(list)
     } catch (err) {
@@ -201,7 +202,14 @@ export default function Step1Customer({ onSelect }: Props) {
     <div className="flex-1 flex flex-col p-5 max-w-lg mx-auto w-full">
       <button onClick={() => setMode('choose')} className="flex items-center gap-1 text-slate-500 text-sm mb-4 self-start min-h-[44px] px-2 -ml-2 rounded-lg hover:text-slate-800 hover:bg-slate-100 transition-colors">← Back</button>
       <h2 className="text-2xl font-bold text-slate-800 mb-1">Account Customer</h2>
-      <p className="text-slate-500 mb-6">Search by name, ID number or account code</p>
+      <p className="text-slate-500 mb-4">Search by name, ID number or account code</p>
+
+      {!isOnline && (
+        <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mb-4">
+          <WifiOff className="w-4 h-4 text-amber-600 shrink-0" />
+          <span className="text-amber-700 text-sm">Offline — searching cached customers</span>
+        </div>
+      )}
 
       <div className="relative mb-4">
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />

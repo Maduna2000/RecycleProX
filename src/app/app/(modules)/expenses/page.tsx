@@ -284,8 +284,8 @@ export default function ExpensesPage() {
       {/* Approved total banner */}
       {tab === 'Approved' && data && (
         <div
-          className="flex items-center gap-3 px-4 py-2.5 rounded-lg shrink-0 mb-3"
-          style={{ background: colors.actionBg, border: `1px solid ${colors.action}30` }}
+          className="flex items-center gap-3 px-4 py-2.5 shrink-0 mb-3"
+          style={{ background: colors.actionBg, border: `1px solid ${colors.action}30`, borderRadius: 2 }}
         >
           <Receipt className="w-4 h-4 shrink-0" style={{ color: colors.action }} />
           <div>

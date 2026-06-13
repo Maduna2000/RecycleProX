@@ -103,6 +103,57 @@ async function seedPriceGroups() {
   }
 }
 
+interface CategoryFromAPI {
+  id: string
+  name: string
+  colorHex: string | null
+  iconName: string | null
+  parentId?: string | null
+  children?: CategoryFromAPI[]
+  _count?: { products: number }
+}
+
+async function seedCategories() {
+  const res = await fetch('/api/scale/categories')
+  if (!res.ok) return
+  const data = await res.json() as CategoryFromAPI[]
+
+  // Flatten hierarchical categories into flat list
+  const flat: Array<{
+    id: string
+    name: string
+    colorHex: string | null
+    iconName: string | null
+    parentId: string | null
+    productCount: number
+  }> = []
+
+  for (const cat of data) {
+    flat.push({
+      id: cat.id,
+      name: cat.name,
+      colorHex: cat.colorHex,
+      iconName: cat.iconName,
+      parentId: null,
+      productCount: cat._count?.products ?? 0,
+    })
+    if (cat.children && cat.children.length > 0) {
+      for (const child of cat.children) {
+        flat.push({
+          id: child.id,
+          name: child.name,
+          colorHex: child.colorHex ?? cat.colorHex,
+          iconName: child.iconName ?? cat.iconName,
+          parentId: cat.id,
+          productCount: child._count?.products ?? 0,
+        })
+      }
+    }
+  }
+
+  await offlineDB.categories.bulkPut(flat)
+}
+
 /** Run full seed if stale or forced */
 export async function runSeeder(force = false): Promise<void> {
   const lastSeeded = await getLastSeededAt()
@@ -114,6 +165,7 @@ export async function runSeeder(force = false): Promise<void> {
     seedProducts(),
     seedCustomers(),
     seedPriceGroups(),
+    seedCategories(),
   ])
 
   await setLastSeededAt()

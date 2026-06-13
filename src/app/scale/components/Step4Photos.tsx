@@ -1,18 +1,20 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { Camera, CheckCircle2, Loader2, RefreshCw } from 'lucide-react'
+import { Camera, CheckCircle2, Loader2, RefreshCw, WifiOff } from 'lucide-react'
+import { useOfflineStore } from '@/stores/offlineStore'
 
 interface PhotoSlot {
   label:     string
   key:       string | null
+  blob:      Blob | null
   preview:   string | null
   uploading: boolean
 }
 
 interface Props {
   orderId:   string
-  onConfirm: (photoR2Keys: string[]) => void
+  onConfirm: (photoR2Keys: string[], photoBlobs?: Blob[]) => void
 }
 
 // Compress image to JPEG via Canvas, max 1280px on longest side, 82% quality.
@@ -46,9 +48,10 @@ async function compressImage(file: File): Promise<Blob> {
 }
 
 export default function Step4Photos({ orderId, onConfirm }: Props) {
+  const { isOnline } = useOfflineStore()
   const [slots, setSlots] = useState<PhotoSlot[]>([
-    { label: 'Scale Reading', key: null, preview: null, uploading: false },
-    { label: 'Product / Load', key: null, preview: null, uploading: false },
+    { label: 'Scale Reading', key: null, blob: null, preview: null, uploading: false },
+    { label: 'Product / Load', key: null, blob: null, preview: null, uploading: false },
   ])
   const [uploadErrors, setUploadErrors] = useState<(string | null)[]>([null, null])
   const inputRefs = [useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null)]
@@ -69,19 +72,25 @@ export default function Step4Photos({ orderId, onConfirm }: Props) {
     try {
       const compressed = await compressImage(file)
 
-      const form = new FormData()
-      form.append('context',     'scale_order')
-      form.append('referenceId', orderId)
-      form.append('photoIndex',  String(index))
-      form.append('file',        compressed, `photo-${index}.jpg`)
+      if (isOnline) {
+        // Online: Upload to R2
+        const form = new FormData()
+        form.append('context',     'scale_order')
+        form.append('referenceId', orderId)
+        form.append('photoIndex',  String(index))
+        form.append('file',        compressed, `photo-${index}.jpg`)
 
-      const res = await fetch('/api/r2/upload', { method: 'POST', body: form })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err.error ?? `Upload failed (${res.status})`)
+        const res = await fetch('/api/r2/upload', { method: 'POST', body: form })
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}))
+          throw new Error(err.error ?? `Upload failed (${res.status})`)
+        }
+        const { key } = await res.json()
+        updateSlot(index, { key, blob: compressed, uploading: false })
+      } else {
+        // Offline: Store blob locally
+        updateSlot(index, { key: `local_${index}`, blob: compressed, uploading: false })
       }
-      const { key } = await res.json()
-      updateSlot(index, { key, uploading: false })
     } catch (err) {
       updateSlot(index, { uploading: false, preview: null })
       setUploadErrors(prev => prev.map((e, i) =>
@@ -97,17 +106,33 @@ export default function Step4Photos({ orderId, onConfirm }: Props) {
     if (file) handleFile(index, file)
   }
 
-  const allDone = slots.every(s => s.key !== null)
+  // Offline mode: just need blobs. Online mode: need R2 keys
+  const allDone = isOnline
+    ? slots.every(s => s.key !== null && !s.key.startsWith('local_'))
+    : slots.every(s => s.blob !== null)
 
   function handleConfirm() {
-    const keys = slots.map(s => s.key!).filter(Boolean)
-    if (keys.length === 2) onConfirm(keys)
+    const keys = slots.map(s => s.key).filter((k): k is string => k !== null && !k.startsWith('local_'))
+    const blobs = slots.map(s => s.blob).filter((b): b is Blob => b !== null)
+
+    if (isOnline && keys.length === 2) {
+      onConfirm(keys, blobs)
+    } else if (!isOnline && blobs.length === 2) {
+      onConfirm([], blobs)
+    }
   }
 
   return (
     <div className="flex-1 flex flex-col p-5 max-w-md mx-auto w-full">
       <h2 className="text-2xl font-bold text-slate-800 mb-1">Capture Photos</h2>
-      <p className="text-slate-500 mb-6">Take a photo of the scale reading and the product/load</p>
+      <p className="text-slate-500 mb-4">Take a photo of the scale reading and the product/load</p>
+
+      {!isOnline && (
+        <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mb-4">
+          <WifiOff className="w-4 h-4 text-amber-600 shrink-0" />
+          <span className="text-amber-700 text-sm">Offline — photos will be stored locally and uploaded when back online</span>
+        </div>
+      )}
 
       {/* Side-by-side on tablet (sm+), stacked on mobile */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">

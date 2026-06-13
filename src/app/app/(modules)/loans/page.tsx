@@ -498,7 +498,7 @@ function RepayDialog({ loan, onClose, onSuccess }: { loan: Loan; onClose: () => 
       <DialogContent className="max-w-md" showCloseButton={false}>
         <ModalTitleBar title="Record Repayment" onClose={onClose} />
         <div className="space-y-4 pt-2">
-          <div className="rounded-lg p-3 text-sm space-y-1" style={{ background: colors.toolbar, border: `1px solid ${colors.border}` }}>
+          <div className="rounded p-3 text-sm space-y-1" style={{ background: colors.toolbar, border: `1px solid ${colors.border}` }}>
             <p className="font-medium" style={{ color: colors.textPrimary }}>{loan.customer.firstName} {loan.customer.lastName}</p>
             <p style={{ color: colors.textSecondary }}>Ref: {loan.refNumber}</p>
             <p style={{ color: colors.textSecondary }}>
@@ -558,7 +558,7 @@ function VoidLoanDialog({ loan, onClose, onSuccess }: { loan: Loan; onClose: () 
       <DialogContent className="max-w-md" showCloseButton={false}>
         <ModalTitleBar title="Void Loan" onClose={onClose} />
         <div className="space-y-4 pt-2">
-          <div className="rounded-lg p-3 text-sm" style={{ background: colors.dangerBg, border: `1px solid ${colors.danger}30` }}>
+          <div className="rounded p-3 text-sm" style={{ background: colors.dangerBg, border: `1px solid ${colors.danger}30` }}>
             <p className="font-medium" style={{ color: colors.danger }}>
               {loan.customer.firstName} {loan.customer.lastName} — {loan.refNumber}
             </p>

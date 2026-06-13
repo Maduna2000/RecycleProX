@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Search, Download, Eye, CheckCircle2, XCircle, Loader2, X } from 'lucide-react'
+import { Search, Download, Eye, CheckCircle2, XCircle, Loader2, X, RefreshCw, AlertCircle } from 'lucide-react'
 import { StatusBadge } from '../components/StatusBadge'
 
 interface OrderLine {
@@ -55,9 +55,20 @@ export default function ScaleOrdersPage() {
   const [voidReason, setVoidReason] = useState('')
 
   const query = buildQuery(filters, page)
-  const { data, isFetching } = useQuery({
+  const { data, isFetching, error, refetch } = useQuery({
     queryKey: ['scale-orders', query],
-    queryFn: () => fetch(`/api/scale/orders?${query}`).then(r => r.json()),
+    queryFn: async () => {
+      const res = await fetch(`/api/scale/orders?${query}`)
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}))
+        throw new Error(errData.error || `Failed to fetch orders: ${res.status}`)
+      }
+      return res.json()
+    },
+    staleTime: 0, // Always fetch fresh data
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
+    retry: 2,
   })
 
   const voidMut = useMutation({
@@ -94,12 +105,37 @@ export default function ScaleOrdersPage() {
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <h1 className="text-2xl font-bold text-slate-900">Scale Orders</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold text-slate-900">Scale Orders</h1>
+          <button
+            onClick={() => refetch()}
+            disabled={isFetching}
+            className="flex items-center gap-1.5 px-2 py-1.5 text-sm text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
+            title="Refresh orders"
+          >
+            <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
+          </button>
+          {data?.total !== undefined && (
+            <span className="text-sm text-slate-500">({data.total} total)</span>
+          )}
+        </div>
         <div className="flex gap-2">
           <button onClick={() => exportOrders('csv')}  className="flex items-center gap-1.5 px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"><Download className="w-4 h-4" />CSV</button>
           <button onClick={() => exportOrders('xlsx')} className="flex items-center gap-1.5 px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"><Download className="w-4 h-4" />Excel</button>
         </div>
       </div>
+
+      {/* Error display */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-red-800 font-medium">Failed to load orders</p>
+            <p className="text-red-600 text-sm">{error instanceof Error ? error.message : 'Unknown error'}</p>
+            <button onClick={() => refetch()} className="text-red-700 text-sm font-medium underline mt-1">Try again</button>
+          </div>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="bg-white rounded-xl border border-slate-200 p-4 flex flex-wrap gap-3">

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Loader2, Printer, RotateCcw, CheckCircle2, Trash2, AlertCircle, Download } from 'lucide-react'
+import { Loader2, Printer, RotateCcw, CheckCircle2, Trash2, AlertCircle, Download, WifiOff, Cloud } from 'lucide-react'
 import type { SelectedCustomer } from './Step1Customer'
 import type { CartLine } from './Step5LineAdded'
 import { buildReceipt }         from '@/lib/scale/thermalReceipt'
@@ -11,6 +11,9 @@ import {
   printBytes,
 } from '@/lib/scale/capacitorPrint'
 import { usePrinterSetup } from '../PrinterContext'
+import { useOfflineStore } from '@/stores/offlineStore'
+import { createOfflineScaleOrder } from '@/lib/offline/scaleOrderService'
+import { useSession } from 'next-auth/react'
 
 interface Props {
   customer:     SelectedCustomer
@@ -23,9 +26,12 @@ type Status = 'idle' | 'creating' | 'printing' | 'done' | 'error' | 'no-printer'
 
 export default function Step5Review({ customer, cart, onRemoveLine, onNewOrder }: Props) {
   const { openPrinterSetup } = usePrinterSetup()
+  const { isOnline } = useOfflineStore()
+  const { data: session } = useSession()
   const [status,      setStatus]      = useState<Status>('idle')
   const [orderId,     setOrderId]     = useState<string | null>(null)
   const [orderNumber, setOrderNumber] = useState<string | null>(null)
+  const [isOfflineOrder, setIsOfflineOrder] = useState(false)
   const [errorMsg,    setErrorMsg]    = useState('')
 
   // Cached receipt bytes so "Reprint" doesn't rebuild from potentially stale state
@@ -43,39 +49,70 @@ export default function Step5Review({ customer, cart, onRemoveLine, onNewOrder }
   async function handleGenerateAndPrint() {
     setStatus('creating')
     setErrorMsg('')
+    setIsOfflineOrder(false)
 
     try {
-      // ── 1. Create the order ──────────────────────────────────────────────
-      const lines = cart.map(item => ({
-        productId:   item.productId,
-        weight:      item.weight,
-        photoR2Keys: item.photoR2Keys,
-      }))
+      let finalOrderId: string
+      let finalOrderNumber: string
 
-      const payload = customer.id
-        ? { customerId: customer.id, lines }
-        : {
-            casualFirstName: customer.firstName,
-            casualLastName:  customer.lastName,
-            casualPhone:     customer.phone,
-            casualIdNumber:  customer.idNumber,
-            lines,
-          }
+      if (isOnline) {
+        // ── Online: Create via API ──────────────────────────────────────────
+        const lines = cart.map(item => ({
+          productId:   item.productId,
+          weight:      item.weight,
+          photoR2Keys: item.photoR2Keys,
+        }))
 
-      const res = await fetch('/api/scale/orders', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify(payload),
-      })
-      if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.error ?? 'Failed to create order')
+        const payload = customer.id
+          ? { customerId: customer.id, lines }
+          : {
+              casualFirstName: customer.firstName,
+              casualLastName:  customer.lastName,
+              casualPhone:     customer.phone,
+              casualIdNumber:  customer.idNumber,
+              lines,
+            }
+
+        const res = await fetch('/api/scale/orders', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify(payload),
+        })
+        if (!res.ok) {
+          const err = await res.json()
+          throw new Error(err.error ?? 'Failed to create order')
+        }
+        const order = await res.json()
+        finalOrderId = order.id
+        finalOrderNumber = order.orderNumber
+      } else {
+        // ── Offline: Create locally ─────────────────────────────────────────
+        const result = await createOfflineScaleOrder({
+          customerId: customer.id,
+          casualFirstName: customer.id ? null : customer.firstName,
+          casualLastName: customer.id ? null : customer.lastName,
+          casualPhone: customer.id ? null : customer.phone,
+          casualIdNumber: customer.id ? null : (customer.idNumber ?? null),
+          lines: cart.map(item => ({
+            productId:    item.productId,
+            productName:  item.productName,
+            categoryName: item.categoryName,
+            weight:       item.weight,
+            unit:         item.unit,
+            photoBlobs:   item.photoBlobs ?? [],
+          })),
+          notes: null,
+          operatorId: session?.user?.id ?? 'unknown',
+        })
+        finalOrderId = result.id
+        finalOrderNumber = result.tempOrderNumber
+        setIsOfflineOrder(true)
       }
-      const order = await res.json()
-      setOrderId(order.id)
-      setOrderNumber(order.orderNumber)
 
-      // ── 2. Print path ────────────────────────────────────────────────────
+      setOrderId(finalOrderId)
+      setOrderNumber(finalOrderNumber)
+
+      // ── Print path ────────────────────────────────────────────────────────
       if (inCapacitor) {
         if (!getSavedPrinterAddress()) {
           setStatus('no-printer')
@@ -83,7 +120,7 @@ export default function Step5Review({ customer, cart, onRemoveLine, onNewOrder }
         }
 
         const bytes = buildReceipt({
-          orderNumber: order.orderNumber,
+          orderNumber: finalOrderNumber,
           createdAt:   new Date().toISOString(),
           customer: {
             firstName: customer.firstName,
@@ -98,23 +135,25 @@ export default function Step5Review({ customer, cart, onRemoveLine, onNewOrder }
             weight:       l.weight,
             unit:         l.unit,
           })),
+          isOffline: !isOnline,
         })
         receiptRef.current = bytes
         await doPrint(bytes)
         setStatus('done')
       } else {
-        // Browser fallback — download PDF slip
-        setOrderId(order.id)
+        // Browser fallback
         setStatus('done')
-        // Trigger download after state update
-        setTimeout(() => {
-          const a = document.createElement('a')
-          a.href = `/api/scale/orders/${order.id}/slip`
-          a.download = `scale-order-${order.orderNumber}.pdf`
-          document.body.appendChild(a)
-          a.click()
-          document.body.removeChild(a)
-        }, 100)
+        if (isOnline) {
+          // Download PDF slip only when online
+          setTimeout(() => {
+            const a = document.createElement('a')
+            a.href = `/api/scale/orders/${finalOrderId}/slip`
+            a.download = `scale-order-${finalOrderNumber}.pdf`
+            document.body.appendChild(a)
+            a.click()
+            document.body.removeChild(a)
+          }, 100)
+        }
       }
     } catch (err: unknown) {
       setErrorMsg(err instanceof Error ? err.message : 'Something went wrong')
@@ -213,14 +252,28 @@ export default function Step5Review({ customer, cart, onRemoveLine, onNewOrder }
 
       {/* Success */}
       {status === 'done' && (
-        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center gap-3 mb-4">
-          <CheckCircle2 className="w-6 h-6 text-emerald-600 shrink-0" />
+        <div className={`rounded-2xl p-4 flex items-center gap-3 mb-4 ${isOfflineOrder ? 'bg-amber-50 border border-amber-200' : 'bg-emerald-50 border border-emerald-200'}`}>
+          {isOfflineOrder ? (
+            <Cloud className="w-6 h-6 text-amber-600 shrink-0" />
+          ) : (
+            <CheckCircle2 className="w-6 h-6 text-emerald-600 shrink-0" />
+          )}
           <div>
-            <p className="font-semibold text-emerald-800">
-              {inCapacitor ? 'Receipt printed' : 'Order created'}: {orderNumber}
+            <p className={`font-semibold ${isOfflineOrder ? 'text-amber-800' : 'text-emerald-800'}`}>
+              {isOfflineOrder
+                ? `Order saved locally: ${orderNumber}`
+                : inCapacitor
+                  ? `Receipt printed: ${orderNumber}`
+                  : `Order created: ${orderNumber}`
+              }
             </p>
-            <p className="text-emerald-600 text-sm">
-              {inCapacitor ? 'Slip sent to printer' : 'Slip opened — use your print dialog to print'}
+            <p className={`text-sm ${isOfflineOrder ? 'text-amber-600' : 'text-emerald-600'}`}>
+              {isOfflineOrder
+                ? 'Will sync automatically when back online'
+                : inCapacitor
+                  ? 'Slip sent to printer'
+                  : 'Slip opened — use your print dialog to print'
+              }
             </p>
           </div>
         </div>
@@ -265,6 +318,14 @@ export default function Step5Review({ customer, cart, onRemoveLine, onNewOrder }
 
       {/* ── Action buttons ──────────────────────────────────────────────────── */}
 
+      {/* Offline indicator */}
+      {!isOnline && status === 'idle' && (
+        <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mb-4">
+          <WifiOff className="w-4 h-4 text-amber-600 shrink-0" />
+          <span className="text-amber-700 text-sm">Offline — order will be saved locally and synced when back online</span>
+        </div>
+      )}
+
       {/* Main CTA — hidden once order is done or no-printer (order already saved) */}
       {status !== 'done' && status !== 'no-printer' && (
         <button
@@ -273,11 +334,13 @@ export default function Step5Review({ customer, cart, onRemoveLine, onNewOrder }
           className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xl font-semibold h-16 rounded-xl flex items-center justify-center gap-3 transition-colors"
         >
           {status === 'creating' ? (
-            <><Loader2 className="w-6 h-6 animate-spin" /> Creating order…</>
+            <><Loader2 className="w-6 h-6 animate-spin" /> {isOnline ? 'Creating order…' : 'Saving locally…'}</>
           ) : status === 'printing' ? (
             <><Loader2 className="w-6 h-6 animate-spin" /> Sending to printer…</>
-          ) : (
+          ) : isOnline ? (
             <><Printer className="w-6 h-6" /> Generate &amp; Print Slip</>
+          ) : (
+            <><Printer className="w-6 h-6" /> Save &amp; Print (Offline)</>
           )}
         </button>
       )}
