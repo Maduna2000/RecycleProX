@@ -10,7 +10,7 @@ import {
   RefreshCw, Plus, Printer,
   BarChart2, ClipboardCheck, FileSpreadsheet,
   Download, LogOut, Settings,
-  Tag, Users, UserPlus, ChevronRight,
+  Users, UserPlus, ChevronRight,
   Archive, Landmark,
   Wifi, WifiOff,
   Scale, ClipboardList,
