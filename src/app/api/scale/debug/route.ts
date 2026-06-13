@@ -38,7 +38,7 @@ export async function GET() {
     // Group by date
     const ordersByDate: Record<string, number> = {}
     for (const order of recentOrders) {
-      const date = order.createdAt.toISOString().split('T')[0]
+      const date = order.createdAt.toISOString().split('T')[0] as string
       ordersByDate[date] = (ordersByDate[date] || 0) + 1
     }
 
