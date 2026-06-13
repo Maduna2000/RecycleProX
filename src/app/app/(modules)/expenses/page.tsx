@@ -398,14 +398,54 @@ function AddExpenseModal({ onClose, onSuccess }: { onClose: () => void; onSucces
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-lg" showCloseButton={false}>
-        <ModalTitleBar title="Add Expense" onClose={onClose} />
+      <DialogContent
+        className="sm:max-w-lg p-0"
+        showCloseButton={false}
+        style={{
+          borderRadius: 2,
+          border: `1px solid ${colors.border}`,
+          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+          background: colors.surface,
+        }}
+      >
+        {/* Windows-style title bar with gradient */}
+        <div
+          style={{
+            background: 'linear-gradient(180deg, #EAEAEA 0%, #D4D4D4 100%)',
+            borderBottom: `1px solid ${colors.border}`,
+            padding: '6px 8px 6px 12px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <span style={{ fontSize: fontSize.sm, fontWeight: 600, color: colors.textPrimary }}>Add Expense</span>
+          <button
+            onClick={onClose}
+            style={{
+              width: 20,
+              height: 20,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              borderRadius: 2,
+              color: colors.textSecondary,
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = '#C0392B'; e.currentTarget.style.color = '#fff' }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = colors.textSecondary }}
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
         <form onSubmit={handleSubmit(onSubmit)}>
           <div style={{ padding: '12px 16px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
 
             <div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                <Label>Expense Category</Label>
+                <Label style={{ fontSize: fontSize.sm, fontWeight: 600, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Expense Category</Label>
                 <button
                   type="button"
                   onClick={() => setAddTypeOpen(true)}
@@ -418,7 +458,18 @@ function AddExpenseModal({ onClose, onSuccess }: { onClose: () => void; onSucces
                 value={expenseTypeId ?? ''}
                 onValueChange={(v) => setValue('expenseTypeId', v as string)}
               >
-                <SelectTrigger>
+                <SelectTrigger
+                  style={{
+                    width: '100%',
+                    height: 28,
+                    border: `1px solid ${colors.border}`,
+                    borderRadius: 2,
+                    background: colors.surface,
+                    padding: '2px 8px',
+                    fontSize: fontSize.base,
+                    color: expenseTypeId ? colors.textPrimary : colors.textMuted,
+                  }}
+                >
                   <SelectValue placeholder="Select category…">
                     {selectedTypeName ?? ''}
                   </SelectValue>
@@ -435,8 +486,19 @@ function AddExpenseModal({ onClose, onSuccess }: { onClose: () => void; onSucces
             </div>
 
             <div>
-              <Label style={{ display: 'block', marginBottom: 4 }}>Description</Label>
-              <Input {...register('description')} disabled={loading} placeholder="Brief description…" />
+              <Label style={{ display: 'block', marginBottom: 4, fontSize: fontSize.sm, fontWeight: 600, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Description</Label>
+              <Input
+                {...register('description')}
+                disabled={loading}
+                placeholder="Brief description…"
+                style={{
+                  height: 28,
+                  border: `1px solid ${colors.border}`,
+                  borderRadius: 2,
+                  padding: '2px 8px',
+                  fontSize: fontSize.base,
+                }}
+              />
               {errors.description && (
                 <p style={{ fontSize: 11, marginTop: 3, color: colors.danger }}>{errors.description.message}</p>
               )}
@@ -444,16 +506,42 @@ function AddExpenseModal({ onClose, onSuccess }: { onClose: () => void; onSucces
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               <div>
-                <Label style={{ display: 'block', marginBottom: 4 }}>Amount (R)</Label>
-                <Input {...register('amount')} type="number" step="0.01" min="0.01" disabled={loading} />
+                <Label style={{ display: 'block', marginBottom: 4, fontSize: fontSize.sm, fontWeight: 600, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Amount (R)</Label>
+                <Input
+                  {...register('amount')}
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  disabled={loading}
+                  style={{
+                    height: 28,
+                    border: `1px solid ${colors.border}`,
+                    borderRadius: 2,
+                    padding: '2px 8px',
+                    fontSize: fontSize.base,
+                  }}
+                />
                 {errors.amount && (
                   <p style={{ fontSize: 11, marginTop: 3, color: colors.danger }}>{errors.amount.message}</p>
                 )}
               </div>
               <div>
-                <Label style={{ display: 'block', marginBottom: 4 }}>Payment Method</Label>
+                <Label style={{ display: 'block', marginBottom: 4, fontSize: fontSize.sm, fontWeight: 600, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Payment Method</Label>
                 <Select onValueChange={(v) => setValue('paymentMethod', v as 'cash' | 'eft' | 'cheque' | 'amplopay')} defaultValue="cash">
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger
+                    style={{
+                      width: '100%',
+                      height: 28,
+                      border: `1px solid ${colors.border}`,
+                      borderRadius: 2,
+                      background: colors.surface,
+                      padding: '2px 8px',
+                      fontSize: fontSize.base,
+                      color: colors.textPrimary,
+                    }}
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="cash">Cash</SelectItem>
                     <SelectItem value="eft">EFT</SelectItem>
@@ -466,23 +554,33 @@ function AddExpenseModal({ onClose, onSuccess }: { onClose: () => void; onSucces
 
             {paymentMethod === 'cheque' && (
               <div>
-                <Label style={{ display: 'block', marginBottom: 4 }}>Cheque Number</Label>
-                <Input {...register('chequeNo')} disabled={loading} />
+                <Label style={{ display: 'block', marginBottom: 4, fontSize: fontSize.sm, fontWeight: 600, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Cheque Number</Label>
+                <Input
+                  {...register('chequeNo')}
+                  disabled={loading}
+                  style={{
+                    height: 28,
+                    border: `1px solid ${colors.border}`,
+                    borderRadius: 2,
+                    padding: '2px 8px',
+                    fontSize: fontSize.base,
+                  }}
+                />
               </div>
             )}
 
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: 'pointer', color: colors.textPrimary }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: fontSize.base, cursor: 'pointer', color: colors.textPrimary }}>
               <input
                 type="checkbox"
                 checked={!!includesVat}
                 onChange={(e) => setValue('includesVat', e.target.checked)}
-                style={{ width: 13, height: 13 }}
+                style={{ width: 14, height: 14, accentColor: colors.action }}
               />
               Amount includes 15% VAT
             </label>
 
             <div>
-              <Label style={{ display: 'block', marginBottom: 4 }}>Slip / Receipt <span style={{ fontWeight: 400, color: colors.textSecondary }}>(optional)</span></Label>
+              <Label style={{ display: 'block', marginBottom: 4, fontSize: fontSize.sm, fontWeight: 600, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Slip / Receipt <span style={{ fontWeight: 400, color: colors.textMuted, textTransform: 'none' }}>(optional)</span></Label>
               <input
                 ref={fileRef}
                 type="file"
@@ -492,7 +590,7 @@ function AddExpenseModal({ onClose, onSuccess }: { onClose: () => void; onSucces
                 disabled={loading}
               />
               {slipFile ? (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', border: `1px solid ${colors.border}`, borderRadius: 3, fontSize: 12, color: colors.textPrimary }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', border: `1px solid ${colors.border}`, borderRadius: 2, fontSize: fontSize.base, color: colors.textPrimary, background: colors.surface }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
                     <Paperclip style={{ width: 13, height: 13, flexShrink: 0, color: colors.textSecondary }} />
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{slipFile.name}</span>
@@ -510,7 +608,7 @@ function AddExpenseModal({ onClose, onSuccess }: { onClose: () => void; onSucces
                   type="button"
                   onClick={() => fileRef.current?.click()}
                   disabled={loading}
-                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 10px', border: `1px dashed ${colors.border}`, borderRadius: 3, fontSize: 12, width: '100%', background: '#FAFAFA', color: colors.textSecondary, cursor: 'pointer' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 10px', border: `1px dashed ${colors.border}`, borderRadius: 2, fontSize: fontSize.base, width: '100%', background: colors.bg, color: colors.textSecondary, cursor: 'pointer' }}
                 >
                   <Upload style={{ width: 13, height: 13 }} />
                   Upload slip or photo (PDF, JPG, PNG — max 20 MB)
@@ -518,7 +616,17 @@ function AddExpenseModal({ onClose, onSuccess }: { onClose: () => void; onSucces
               )}
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
+            {/* Footer with gradient */}
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: 8,
+                marginTop: 8,
+                paddingTop: 12,
+                borderTop: `1px solid ${colors.border}`,
+              }}
+            >
               <ModalBtn onClick={onClose} disabled={loading}>Cancel</ModalBtn>
               <ModalBtn type="submit" variant="primary" loading={loading}>Record Expense</ModalBtn>
             </div>
@@ -557,21 +665,77 @@ function AddTypeModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-sm" showCloseButton={false}>
-        <ModalTitleBar title="New Expense Category" onClose={onClose} />
+      <DialogContent
+        className="sm:max-w-sm p-0"
+        showCloseButton={false}
+        style={{
+          borderRadius: 2,
+          border: `1px solid ${colors.border}`,
+          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+          background: colors.surface,
+        }}
+      >
+        {/* Windows-style title bar with gradient */}
+        <div
+          style={{
+            background: 'linear-gradient(180deg, #EAEAEA 0%, #D4D4D4 100%)',
+            borderBottom: `1px solid ${colors.border}`,
+            padding: '6px 8px 6px 12px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <span style={{ fontSize: fontSize.sm, fontWeight: 600, color: colors.textPrimary }}>New Expense Category</span>
+          <button
+            onClick={onClose}
+            style={{
+              width: 20,
+              height: 20,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              borderRadius: 2,
+              color: colors.textSecondary,
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = '#C0392B'; e.currentTarget.style.color = '#fff' }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = colors.textSecondary }}
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
         <form onSubmit={handleSubmit}>
           <div style={{ padding: '12px 16px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div>
-              <Label style={{ display: 'block', marginBottom: 4 }}>Category Name</Label>
+              <Label style={{ display: 'block', marginBottom: 4, fontSize: fontSize.sm, fontWeight: 600, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Category Name</Label>
               <Input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Fuel, Wages, Repairs"
                 disabled={loading}
                 autoFocus
+                style={{
+                  height: 28,
+                  border: `1px solid ${colors.border}`,
+                  borderRadius: 2,
+                  padding: '2px 8px',
+                  fontSize: fontSize.base,
+                }}
               />
             </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: 8,
+                marginTop: 4,
+                paddingTop: 12,
+                borderTop: `1px solid ${colors.border}`,
+              }}
+            >
               <ModalBtn onClick={onClose} disabled={loading}>Cancel</ModalBtn>
               <ModalBtn type="submit" variant="primary" loading={loading} disabled={loading || !name.trim()}>Create</ModalBtn>
             </div>
