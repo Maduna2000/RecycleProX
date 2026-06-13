@@ -13,7 +13,6 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { CreateExpenseSchema, type CreateExpenseFormInput, type CreateExpenseInput } from '@/lib/schemas/expense'
 import { DataTable, StatusBadge, type Column, type RowAction } from '@/components/ui/DataTable'
 import { Dialog, DialogContent, ModalBtn } from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -230,15 +229,6 @@ export default function ExpensesPage() {
     <PageShell
       title="Expenses"
       subtitle={`${data?.total ?? expenses.length} expenses`}
-      action={
-        <Button
-          onClick={() => setAddOpen(true)}
-          style={{ background: colors.action }}
-          className="text-white hover:opacity-90 text-xs h-8 px-3"
-        >
-          <Plus className="w-3.5 h-3.5 mr-1.5" /> Add Expense
-        </Button>
-      }
       tabs={pageTabs}
       activeTab={tab}
       onTabChange={(v) => setTab(v as PageTab)}
