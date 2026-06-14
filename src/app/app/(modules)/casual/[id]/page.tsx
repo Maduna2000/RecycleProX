@@ -1,11 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import useSWR, { mutate } from 'swr'
-import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { Loader2 } from 'lucide-react'
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { toast } from 'sonner'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -21,6 +19,18 @@ type Customer = {
 }
 
 const TABS = ['Overview', 'Transactions'] as const
+const SECTION_TABS = ['Personal', 'Notes'] as const
+
+// ─── Schema for casual customer edit ──────────────────────────────────────────
+const EditCasualSchema = z.object({
+  firstName: z.string().min(1, 'Required'),
+  lastName: z.string().min(1, 'Required'),
+  phone: z.string().min(1, 'Required'),
+  physicalAddress: z.string().optional(),
+  customerNotes: z.string().optional(),
+})
+
+type EditCasualInput = z.infer<typeof EditCasualSchema>
 
 // ─── Shared styles ─────────────────────────────────────────────────────────────
 const sectionHdr: React.CSSProperties = {
@@ -35,30 +45,21 @@ const lbl: React.CSSProperties = {
   color: '#6C757D', marginBottom: 2,
 }
 
+// Input styles (like Settings page)
+const inp: React.CSSProperties = {
+  height: 26, width: '100%', borderRadius: 2,
+  border: '1px solid #ABABAB', padding: '0 7px',
+  fontSize: 12, color: '#212529', background: '#fff',
+  outline: 'none', boxSizing: 'border-box',
+}
+const inpDisabled: React.CSSProperties = {
+  ...inp, background: '#F5F5F5', color: '#6C757D', cursor: 'default',
+}
+
 function SHdr({ title }: { title: string }) {
   return (
     <div style={sectionHdr}>
       <span style={{ fontSize: 11, fontWeight: 700, color: '#1B3A6B' }}>{title}</span>
-    </div>
-  )
-}
-
-// ─── Read-only profile field ───────────────────────────────────────────────────
-function PField({ label, value, mono, span2 }: {
-  label: string; value?: string | null; mono?: boolean; span2?: boolean
-}) {
-  const display = value ?? '—'
-  return (
-    <div style={span2 ? { gridColumn: 'span 2' } : undefined}>
-      <span style={lbl}>{label}</span>
-      <span style={{
-        display: 'block', fontSize: 12,
-        color: display === '—' ? '#9CA3AF' : '#212529',
-        fontFamily: mono ? 'monospace' : undefined,
-        minHeight: 16, lineHeight: '16px',
-      }}>
-        {display}
-      </span>
     </div>
   )
 }
@@ -77,9 +78,44 @@ export default function CasualCustomerDetailPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
   const [tab, setTab] = useState<typeof TABS[number]>('Overview')
-  const [editOpen, setEditOpen] = useState(false)
+  const [sectionTab, setSectionTab] = useState<typeof SECTION_TABS[number]>('Personal')
+  const [isEditing, setIsEditing] = useState(false)
+  const [saving, setSaving] = useState(false)
 
   const { data: customer, isLoading } = useSWR<Customer>(`/api/customers/${id}`, fetcher)
+
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<EditCasualInput>({
+    resolver: zodResolver(EditCasualSchema),
+    values: customer ? {
+      firstName: customer.firstName,
+      lastName: customer.lastName,
+      phone: customer.phone,
+      physicalAddress: customer.physicalAddress ?? '',
+      customerNotes: customer.customerNotes ?? '',
+    } : undefined,
+  })
+
+  async function onSubmit(data: EditCasualInput) {
+    setSaving(true)
+    const res = await fetch(`/api/customers/${id}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
+    })
+    setSaving(false)
+    if (res.ok) { toast.success('Customer updated'); mutate(`/api/customers/${id}`); setIsEditing(false) }
+    else { const j = await res.json(); toast.error(j.error ?? 'Failed to update') }
+  }
+
+  function handleCancel() {
+    reset()
+    setIsEditing(false)
+  }
+
+  // Guard: if Notes tab selected but no notes (and not editing), reset to Personal
+  useEffect(() => {
+    if (sectionTab === 'Notes' && !customer?.customerNotes && !isEditing) {
+      setSectionTab('Personal')
+    }
+  }, [customer?.customerNotes, sectionTab, isEditing])
 
   if (isLoading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: '#9CA3AF', fontSize: 13 }}>
@@ -93,12 +129,17 @@ export default function CasualCustomerDetailPage() {
   )
 
   const fullName = `${customer.firstName} ${customer.lastName}`
-  const fmt = (v?: string | null) => v ?? undefined
 
   const titleBtn: React.CSSProperties = {
     fontSize: 11, padding: '2px 10px', cursor: 'pointer', borderRadius: 2,
     background: 'linear-gradient(180deg,#F5F5F5 0%,#E0E0E0 100%)',
     border: '1px solid #ABABAB', color: '#333', display: 'flex', alignItems: 'center', gap: 4,
+  }
+  const saveBtn: React.CSSProperties = {
+    fontSize: 11, padding: '2px 10px', cursor: saving ? 'not-allowed' : 'pointer', borderRadius: 2,
+    background: 'linear-gradient(180deg,#10B981 0%,#059669 100%)',
+    border: '1px solid #059669', color: '#fff', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4,
+    opacity: saving ? 0.7 : 1,
   }
 
   return (
@@ -116,7 +157,17 @@ export default function CasualCustomerDetailPage() {
           )}
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
-          <button onClick={() => setEditOpen(true)} style={titleBtn}>✏  Edit</button>
+          {!isEditing ? (
+            <button onClick={() => setIsEditing(true)} style={titleBtn}>✏  Edit</button>
+          ) : (
+            <>
+              <button onClick={handleCancel} style={titleBtn} disabled={saving}>Cancel</button>
+              <button onClick={handleSubmit(onSubmit)} style={saveBtn} disabled={saving}>
+                {saving && <Loader2 style={{ width: 12, height: 12, animation: 'spin 1s linear infinite' }} />}
+                {saving ? 'Saving...' : '💾 Save'}
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -147,35 +198,88 @@ export default function CasualCustomerDetailPage() {
         <div style={{ flex: 1, borderRight: '1px solid #D0D0D0', background: '#fff' }}>
 
           {tab === 'Overview' && (
-            <Accordion type="single" defaultValue="personal">
-              <AccordionItem value="personal">
-                <AccordionTrigger style={{ background: 'linear-gradient(180deg,#FFFFFF 0%,#E8E8E8 100%)', borderBottom: '1px solid #C0C0C0', padding: '6px 10px', fontSize: 11, fontWeight: 700, color: '#1B3A6B' }}>
-                  Personal Details
-                </AccordionTrigger>
-                <AccordionContent>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px 16px', padding: '10px 12px' }}>
-                    <PField label="First Name" value={customer.firstName} />
-                    <PField label="Last Name" value={customer.lastName} />
-                    <PField label="ID Number" value={customer.idNumber} mono />
-                    <PField label="Phone (Mobile)" value={customer.phone} mono />
-                    <PField label="Physical Address" value={fmt(customer.physicalAddress)} span2 />
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
+            <div>
+              {/* Secondary Tab Strip for sections */}
+              <div style={{ display: 'flex', borderBottom: '1px solid #C0C0C0', background: '#EFEFEF', flexShrink: 0 }}>
+                {(customer.customerNotes || isEditing
+                  ? SECTION_TABS
+                  : SECTION_TABS.filter(t => t !== 'Notes')
+                ).map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setSectionTab(t)}
+                    style={{
+                      padding: '5px 14px',
+                      fontSize: 11,
+                      cursor: 'pointer',
+                      fontWeight: sectionTab === t ? 700 : 400,
+                      background: sectionTab === t ? '#fff' : 'transparent',
+                      border: 'none',
+                      borderRight: '1px solid #D0D0D0',
+                      borderBottom: sectionTab === t ? '2px solid #217346' : '2px solid transparent',
+                      color: sectionTab === t ? '#217346' : '#555',
+                    }}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
 
-              {customer.customerNotes && (
-                <AccordionItem value="notes">
-                  <AccordionTrigger style={{ background: 'linear-gradient(180deg,#FFFFFF 0%,#E8E8E8 100%)', borderBottom: '1px solid #C0C0C0', padding: '6px 10px', fontSize: 11, fontWeight: 700, color: '#1B3A6B' }}>
-                    Notes
-                  </AccordionTrigger>
-                  <AccordionContent>
-                    <p style={{ padding: '8px 12px', fontSize: 12, color: '#374151', whiteSpace: 'pre-wrap', margin: 0 }}>
-                      {customer.customerNotes}
-                    </p>
-                  </AccordionContent>
-                </AccordionItem>
+              {/* Section Content - Personal */}
+              {sectionTab === 'Personal' && (
+                <div>
+                  <SHdr title="Personal Details" />
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px 16px', padding: '10px 12px' }}>
+                    <div>
+                      <span style={lbl}>First Name</span>
+                      <input {...register('firstName')} disabled={!isEditing || saving} style={isEditing ? inp : inpDisabled} />
+                      {errors.firstName && <span style={{ fontSize: 10, color: '#DC2626' }}>{errors.firstName.message}</span>}
+                    </div>
+                    <div>
+                      <span style={lbl}>Last Name</span>
+                      <input {...register('lastName')} disabled={!isEditing || saving} style={isEditing ? inp : inpDisabled} />
+                      {errors.lastName && <span style={{ fontSize: 10, color: '#DC2626' }}>{errors.lastName.message}</span>}
+                    </div>
+                    <div>
+                      <span style={lbl}>ID Number</span>
+                      <input value={customer.idNumber} disabled style={inpDisabled} />
+                    </div>
+                    <div>
+                      <span style={lbl}>Phone (Mobile)</span>
+                      <input {...register('phone')} disabled={!isEditing || saving} style={{ ...(isEditing ? inp : inpDisabled), fontFamily: 'monospace' }} />
+                      {errors.phone && <span style={{ fontSize: 10, color: '#DC2626' }}>{errors.phone.message}</span>}
+                    </div>
+                    <div style={{ gridColumn: 'span 2' }}>
+                      <span style={lbl}>Physical Address</span>
+                      <input {...register('physicalAddress')} disabled={!isEditing || saving} style={isEditing ? inp : inpDisabled} />
+                    </div>
+                  </div>
+                </div>
               )}
-            </Accordion>
+
+              {/* Section Content - Notes */}
+              {sectionTab === 'Notes' && (
+                <div>
+                  <SHdr title="Notes" />
+                  <div style={{ padding: '10px 12px' }}>
+                    <textarea
+                      {...register('customerNotes')}
+                      disabled={!isEditing || saving}
+                      rows={5}
+                      style={{
+                        width: '100%', borderRadius: 2, border: '1px solid #ABABAB',
+                        padding: '7px', fontSize: 12, resize: 'vertical', minHeight: 80,
+                        background: isEditing ? '#fff' : '#F5F5F5',
+                        color: isEditing ? '#212529' : '#6C757D',
+                        cursor: isEditing ? 'text' : 'default',
+                        outline: 'none',
+                      }}
+                      placeholder={isEditing ? 'Add notes about this customer...' : ''}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
           )}
 
           {tab === 'Transactions' && <TransactionsTab customerId={id} />}
@@ -207,24 +311,34 @@ export default function CasualCustomerDetailPage() {
 
           <SHdr title="Actions" />
           <div style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 5 }}>
-            <button
-              onClick={() => setEditOpen(true)}
-              style={{ fontSize: 11, padding: '4px 8px', background: 'linear-gradient(180deg,#F5F5F5 0%,#E0E0E0 100%)', border: '1px solid #ABABAB', borderRadius: 2, cursor: 'pointer', textAlign: 'left', color: '#333', width: '100%' }}
-            >
-              ✏  Edit Profile
-            </button>
+            {!isEditing ? (
+              <button
+                onClick={() => setIsEditing(true)}
+                style={{ fontSize: 11, padding: '4px 8px', background: 'linear-gradient(180deg,#F5F5F5 0%,#E0E0E0 100%)', border: '1px solid #ABABAB', borderRadius: 2, cursor: 'pointer', textAlign: 'left', color: '#333', width: '100%' }}
+              >
+                ✏  Edit Profile
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={handleCancel}
+                  disabled={saving}
+                  style={{ fontSize: 11, padding: '4px 8px', background: 'linear-gradient(180deg,#F5F5F5 0%,#E0E0E0 100%)', border: '1px solid #ABABAB', borderRadius: 2, cursor: 'pointer', textAlign: 'left', color: '#333', width: '100%' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSubmit(onSubmit)}
+                  disabled={saving}
+                  style={{ fontSize: 11, padding: '4px 8px', background: 'linear-gradient(180deg,#10B981 0%,#059669 100%)', border: '1px solid #059669', borderRadius: 2, cursor: saving ? 'not-allowed' : 'pointer', textAlign: 'left', color: '#fff', fontWeight: 600, width: '100%', opacity: saving ? 0.7 : 1 }}
+                >
+                  {saving ? 'Saving...' : '💾 Save'}
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
-
-      {/* ── Edit Modal ────────────────────────────────────────────────────────────── */}
-      {editOpen && (
-        <EditCustomerModal
-          customer={customer}
-          onClose={() => setEditOpen(false)}
-          onSuccess={() => { mutate(`/api/customers/${id}`); setEditOpen(false) }}
-        />
-      )}
     </div>
   )
 }
@@ -262,138 +376,5 @@ function TransactionsTab({ customerId }: { customerId: string }) {
         </tbody>
       </table>
     </div>
-  )
-}
-
-// ─── Edit Modal ───────────────────────────────────────────────────────────────
-const EditCasualSchema = z.object({
-  firstName: z.string().min(1, 'Required'),
-  lastName: z.string().min(1, 'Required'),
-  phone: z.string().min(1, 'Required'),
-  physicalAddress: z.string().optional(),
-})
-
-type EditCasualInput = z.infer<typeof EditCasualSchema>
-
-function EditCustomerModal({ customer, onClose, onSuccess }: { customer: Customer; onClose: () => void; onSuccess: () => void }) {
-  const [loading, setLoading] = useState(false)
-
-  const { register, handleSubmit, formState: { errors } } = useForm<EditCasualInput>({
-    resolver: zodResolver(EditCasualSchema),
-    defaultValues: {
-      firstName: customer.firstName,
-      lastName: customer.lastName,
-      phone: customer.phone,
-      physicalAddress: customer.physicalAddress ?? '',
-    },
-  })
-
-  async function onSubmit(data: EditCasualInput) {
-    setLoading(true)
-    const res = await fetch(`/api/customers/${customer.id}`, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
-    })
-    setLoading(false)
-    if (res.ok) { toast.success('Customer updated'); onSuccess() }
-    else { const j = await res.json(); toast.error(j.error ?? 'Failed to update') }
-  }
-
-  const inputStyle: React.CSSProperties = {
-    width: '100%',
-    padding: '6px 10px',
-    fontSize: 12,
-    border: '1px solid #D0D0D0',
-    borderRadius: 2,
-    background: '#fff',
-    color: '#212529',
-  }
-
-  const errorStyle: React.CSSProperties = {
-    fontSize: 10,
-    color: '#DC2626',
-    marginTop: 2,
-  }
-
-  return (
-    <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-md p-0" style={{ maxHeight: '90vh', overflow: 'hidden', borderRadius: 2, border: '1px solid #B0B0B0' }}>
-        {/* Title bar */}
-        <div style={{ background: 'linear-gradient(180deg,#EAEAEA 0%,#D4D4D4 100%)', borderBottom: '2px solid #B0B0B0', padding: '8px 12px' }}>
-          <span style={{ fontSize: 13, fontWeight: 700, color: '#212529' }}>Edit Customer</span>
-        </div>
-
-        <form onSubmit={handleSubmit(onSubmit)} style={{ display: 'flex', flexDirection: 'column', maxHeight: 'calc(90vh - 45px)' }}>
-          {/* Form content */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '12px' }}>
-            {/* Personal Details section */}
-            <SHdr title="Personal Details" />
-            <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 10, background: '#fff' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
-                <div>
-                  <span style={lbl}>First Name</span>
-                  <input {...register('firstName')} disabled={loading} style={inputStyle} />
-                  {errors.firstName && <p style={errorStyle}>{errors.firstName.message}</p>}
-                </div>
-                <div>
-                  <span style={lbl}>Last Name</span>
-                  <input {...register('lastName')} disabled={loading} style={inputStyle} />
-                  {errors.lastName && <p style={errorStyle}>{errors.lastName.message}</p>}
-                </div>
-              </div>
-              <div>
-                <span style={lbl}>Phone (Mobile)</span>
-                <input {...register('phone')} disabled={loading} style={inputStyle} />
-                {errors.phone && <p style={errorStyle}>{errors.phone.message}</p>}
-              </div>
-              <div>
-                <span style={lbl}>Physical Address</span>
-                <input {...register('physicalAddress')} disabled={loading} style={inputStyle} />
-              </div>
-            </div>
-          </div>
-
-          {/* Action buttons */}
-          <div style={{ borderTop: '1px solid #D0D0D0', padding: '10px 12px', background: '#F5F5F5', display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={loading}
-              style={{
-                fontSize: 11,
-                padding: '5px 12px',
-                background: 'linear-gradient(180deg,#F5F5F5 0%,#E0E0E0 100%)',
-                border: '1px solid #ABABAB',
-                borderRadius: 2,
-                cursor: loading ? 'not-allowed' : 'pointer',
-                color: '#333',
-                opacity: loading ? 0.5 : 1,
-              }}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              style={{
-                fontSize: 11,
-                padding: '5px 12px',
-                background: loading ? 'linear-gradient(180deg,#D1FAE5 0%,#A7F3D0 100%)' : 'linear-gradient(180deg,#10B981 0%,#059669 100%)',
-                border: '1px solid #059669',
-                borderRadius: 2,
-                cursor: loading ? 'not-allowed' : 'pointer',
-                color: '#fff',
-                fontWeight: 600,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 4,
-              }}
-            >
-              {loading && <Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} />}
-              {loading ? 'Saving...' : 'Save Changes'}
-            </button>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
   )
 }

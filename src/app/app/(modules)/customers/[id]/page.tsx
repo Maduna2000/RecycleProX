@@ -6,7 +6,6 @@ import useSWR, { mutate } from 'swr'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { AlertTriangle, ShieldBan, ShieldCheck, Loader2 } from 'lucide-react'
 import { PhotoUploader, PhotoViewer } from '@/components/PhotoUploader'
@@ -82,30 +81,30 @@ const lbl: React.CSSProperties = {
   color: '#6C757D', marginBottom: 2,
 }
 
+// Input styles (like Settings page)
+const inp: React.CSSProperties = {
+  height: 26, width: '100%', borderRadius: 2,
+  border: '1px solid #ABABAB', padding: '0 7px',
+  fontSize: 12, color: '#212529', background: '#fff',
+  outline: 'none', boxSizing: 'border-box',
+}
+const inpDisabled: React.CSSProperties = {
+  ...inp, background: '#F5F5F5', color: '#6C757D', cursor: 'default',
+}
+const selectStyle: React.CSSProperties = {
+  height: 26, width: '100%', borderRadius: 2,
+  border: '1px solid #ABABAB', padding: '0 7px',
+  fontSize: 12, color: '#212529', background: '#fff',
+  outline: 'none', boxSizing: 'border-box',
+}
+const selectDisabled: React.CSSProperties = {
+  ...selectStyle, background: '#F5F5F5', color: '#6C757D', cursor: 'default',
+}
+
 function SHdr({ title }: { title: string }) {
   return (
     <div style={sectionHdr}>
       <span style={{ fontSize: 11, fontWeight: 700, color: '#1B3A6B' }}>{title}</span>
-    </div>
-  )
-}
-
-// ─── Read-only profile field ───────────────────────────────────────────────────
-function PField({ label, value, mono, span2 }: {
-  label: string; value?: string | null; mono?: boolean; span2?: boolean
-}) {
-  const display = value ?? '—'
-  return (
-    <div style={span2 ? { gridColumn: 'span 2' } : undefined}>
-      <span style={lbl}>{label}</span>
-      <span style={{
-        display: 'block', fontSize: 12,
-        color: display === '—' ? '#9CA3AF' : '#212529',
-        fontFamily: mono ? 'monospace' : undefined,
-        minHeight: 16, lineHeight: '16px',
-      }}>
-        {display}
-      </span>
     </div>
   )
 }
@@ -125,17 +124,73 @@ export default function CustomerDetailPage() {
   const router = useRouter()
   const [tab, setTab] = useState<typeof TABS[number]>('Overview')
   const [sectionTab, setSectionTab] = useState<typeof SECTION_TABS[number]>('Personal')
-  const [editOpen, setEditOpen] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
+  const [saving, setSaving] = useState(false)
   const [blacklistOpen, setBlacklistOpen] = useState(false)
 
   const { data: customer, isLoading } = useSWR<Customer>(`/api/customers/${id}`, fetcher)
+  const { data: pgData } = useSWR<{ groups: { id: string; name: string; isActive: boolean }[] }>('/api/price-groups', fetcher)
+  const priceGroups = (pgData?.groups ?? []).filter((g) => g.isActive)
 
-  // Guard: if Notes tab selected but no notes, reset to Personal
+  const fmtDateInput = (v?: string | null) => {
+    if (!v) return ''
+    const d = new Date(v)
+    if (isNaN(d.getTime())) return ''
+    return d.toISOString().split('T')[0]
+  }
+
+  const { register, handleSubmit, setValue, watch, reset, formState: { errors } } = useForm<UpdateCustomerFormInput, unknown, UpdateCustomerInput>({
+    resolver: zodResolver(UpdateCustomerSchema),
+    values: customer ? {
+      firstName: customer.firstName, lastName: customer.lastName,
+      phone: customer.phone, email: customer.email ?? '',
+      physicalAddress: customer.physicalAddress ?? '', postalAddress: customer.postalAddress ?? '',
+      vatNumber: customer.vatNumber ?? '', companyName: customer.companyName ?? '',
+      companyRegNumber: customer.companyRegNumber ?? '', contactPerson: customer.contactPerson ?? '',
+      landline: customer.landline ?? '',
+      customerType: customer.customerType as 'casual' | 'account',
+      primaryFunction: (customer.primaryFunction as 'customer' | 'supplier' | 'both') ?? 'supplier',
+      gender: (customer.gender as 'male' | 'female' | 'other') ?? undefined,
+      nationality: customer.nationality ?? '',
+      bankName: customer.bankName ?? '', bankAccountNo: customer.bankAccountNo ?? '', bankBranchCode: customer.bankBranchCode ?? '',
+      creditLimit: customer.creditLimit ? String(parseFloat(customer.creditLimit)) : '',
+      policeRegisterNo: customer.policeRegisterNo ?? '', licenseNumber: customer.licenseNumber ?? '',
+      dateOfBirth: fmtDateInput(customer.dateOfBirth), licenseExpiry: fmtDateInput(customer.licenseExpiry),
+      tradeCommodities: customer.tradeCommodities ?? [], customerNotes: customer.customerNotes ?? '',
+      priceGroupId: customer.priceGroupId ?? undefined,
+      marketSector: customer.marketSector ?? undefined, dealerCategory: customer.dealerCategory ?? undefined,
+      zeroRated: customer.zeroRated ?? false,
+    } : undefined,
+  })
+
+  const tradeCommodities = (watch('tradeCommodities') as string[] | undefined) ?? []
+
+  function toggleCommodity(val: string) {
+    if (tradeCommodities.includes(val)) setValue('tradeCommodities', tradeCommodities.filter((c) => c !== val))
+    else setValue('tradeCommodities', [...tradeCommodities, val])
+  }
+
+  async function onSubmit(data: UpdateCustomerInput) {
+    setSaving(true)
+    const res = await fetch(`/api/customers/${id}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
+    })
+    setSaving(false)
+    if (res.ok) { toast.success('Customer updated'); mutate(`/api/customers/${id}`); setIsEditing(false) }
+    else { const j = await res.json(); toast.error(j.error ?? 'Failed to update') }
+  }
+
+  function handleCancel() {
+    reset()
+    setIsEditing(false)
+  }
+
+  // Guard: if Notes tab selected but no notes (and not editing), reset to Personal
   useEffect(() => {
-    if (sectionTab === 'Notes' && !customer?.customerNotes) {
+    if (sectionTab === 'Notes' && !customer?.customerNotes && !isEditing) {
       setSectionTab('Personal')
     }
-  }, [customer?.customerNotes, sectionTab])
+  }, [customer?.customerNotes, sectionTab, isEditing])
 
   if (isLoading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: '#9CA3AF', fontSize: 13 }}>
@@ -149,14 +204,18 @@ export default function CustomerDetailPage() {
   )
 
   const fullName    = `${customer.firstName} ${customer.lastName}`
-  const fmt         = (v?: string | null) => v ?? undefined
-  const fmtDate     = (v?: string | null) => v ? new Date(v).toLocaleDateString('en-ZA') : undefined
-  const fmtMoney    = (v?: string | null) => v ? `R ${parseFloat(v).toFixed(2)}` : undefined
+  const fmtDate     = (v?: string | null) => v ? new Date(v).toLocaleDateString('en-ZA') : '—'
 
   const titleBtn: React.CSSProperties = {
     fontSize: 11, padding: '2px 10px', cursor: 'pointer', borderRadius: 2,
     background: 'linear-gradient(180deg,#F5F5F5 0%,#E0E0E0 100%)',
     border: '1px solid #ABABAB', color: '#333', display: 'flex', alignItems: 'center', gap: 4,
+  }
+  const saveBtn: React.CSSProperties = {
+    fontSize: 11, padding: '2px 10px', cursor: saving ? 'not-allowed' : 'pointer', borderRadius: 2,
+    background: 'linear-gradient(180deg,#10B981 0%,#059669 100%)',
+    border: '1px solid #059669', color: '#fff', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4,
+    opacity: saving ? 0.7 : 1,
   }
 
   return (
@@ -179,7 +238,17 @@ export default function CustomerDetailPage() {
           )}
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
-          <button onClick={() => setEditOpen(true)} style={titleBtn}>✏  Edit</button>
+          {!isEditing ? (
+            <button onClick={() => setIsEditing(true)} style={titleBtn}>✏  Edit</button>
+          ) : (
+            <>
+              <button onClick={handleCancel} style={titleBtn} disabled={saving}>Cancel</button>
+              <button onClick={handleSubmit(onSubmit)} style={saveBtn} disabled={saving}>
+                {saving && <Loader2 style={{ width: 12, height: 12, animation: 'spin 1s linear infinite' }} />}
+                {saving ? 'Saving...' : '💾 Save'}
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -227,7 +296,7 @@ export default function CustomerDetailPage() {
             <div>
               {/* Secondary Tab Strip for sections */}
               <div style={{ display: 'flex', borderBottom: '1px solid #C0C0C0', background: '#EFEFEF', flexShrink: 0 }}>
-                {(customer.customerNotes
+                {(customer.customerNotes || isEditing
                   ? SECTION_TABS
                   : SECTION_TABS.filter(t => t !== 'Notes')
                 ).map((t) => (
@@ -256,17 +325,58 @@ export default function CustomerDetailPage() {
                 <div>
                   <SHdr title="Personal Details" />
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px 16px', padding: '10px 12px' }}>
-                    <PField label="First Name"       value={customer.firstName} />
-                    <PField label="Last Name"        value={customer.lastName} />
-                    <PField label="ID Number"        value={customer.idNumber} mono />
-                    <PField label="Date of Birth"    value={fmtDate(customer.dateOfBirth)} />
-                    <PField label="Gender"           value={fmt(customer.gender)} />
-                    <PField label="Nationality"      value={fmt(customer.nationality)} />
-                    <PField label="Phone (Mobile)"   value={customer.phone} mono />
-                    <PField label="Landline"         value={fmt(customer.landline)} mono />
-                    <PField label="Email"            value={fmt(customer.email)} />
-                    <PField label="Physical Address" value={fmt(customer.physicalAddress)} span2 />
-                    <PField label="Postal Address"   value={fmt(customer.postalAddress)}  span2 />
+                    <div>
+                      <span style={lbl}>First Name</span>
+                      <input {...register('firstName')} disabled={!isEditing || saving} style={isEditing ? inp : inpDisabled} />
+                      {errors.firstName && <span style={{ fontSize: 10, color: '#DC2626' }}>{errors.firstName.message}</span>}
+                    </div>
+                    <div>
+                      <span style={lbl}>Last Name</span>
+                      <input {...register('lastName')} disabled={!isEditing || saving} style={isEditing ? inp : inpDisabled} />
+                      {errors.lastName && <span style={{ fontSize: 10, color: '#DC2626' }}>{errors.lastName.message}</span>}
+                    </div>
+                    <div>
+                      <span style={lbl}>ID Number</span>
+                      <input value={customer.idNumber} disabled style={inpDisabled} />
+                    </div>
+                    <div>
+                      <span style={lbl}>Date of Birth</span>
+                      <input {...register('dateOfBirth')} type="date" disabled={!isEditing || saving} style={isEditing ? inp : inpDisabled} />
+                    </div>
+                    <div>
+                      <span style={lbl}>Gender</span>
+                      <select {...register('gender')} disabled={!isEditing || saving} style={isEditing ? selectStyle : selectDisabled}>
+                        <option value="">—</option>
+                        <option value="male">Male</option>
+                        <option value="female">Female</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </div>
+                    <div>
+                      <span style={lbl}>Nationality</span>
+                      <input {...register('nationality')} disabled={!isEditing || saving} style={isEditing ? inp : inpDisabled} />
+                    </div>
+                    <div>
+                      <span style={lbl}>Phone (Mobile)</span>
+                      <input {...register('phone')} disabled={!isEditing || saving} style={{ ...(isEditing ? inp : inpDisabled), fontFamily: 'monospace' }} />
+                      {errors.phone && <span style={{ fontSize: 10, color: '#DC2626' }}>{errors.phone.message}</span>}
+                    </div>
+                    <div>
+                      <span style={lbl}>Landline</span>
+                      <input {...register('landline')} disabled={!isEditing || saving} style={{ ...(isEditing ? inp : inpDisabled), fontFamily: 'monospace' }} />
+                    </div>
+                    <div>
+                      <span style={lbl}>Email</span>
+                      <input {...register('email')} type="email" disabled={!isEditing || saving} style={isEditing ? inp : inpDisabled} />
+                    </div>
+                    <div style={{ gridColumn: 'span 2' }}>
+                      <span style={lbl}>Physical Address</span>
+                      <input {...register('physicalAddress')} disabled={!isEditing || saving} style={isEditing ? inp : inpDisabled} />
+                    </div>
+                    <div style={{ gridColumn: 'span 2' }}>
+                      <span style={lbl}>Postal Address</span>
+                      <input {...register('postalAddress')} disabled={!isEditing || saving} style={isEditing ? inp : inpDisabled} />
+                    </div>
                   </div>
                 </div>
               )}
@@ -276,52 +386,85 @@ export default function CustomerDetailPage() {
                 <div>
                   <SHdr title="Business Details" />
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px 16px', padding: '10px 12px' }}>
-                    <PField label="Customer Type"    value={customer.customerType} />
-                    <PField label="Primary Function" value={fmt(customer.primaryFunction)} />
-
+                    <div>
+                      <span style={lbl}>Customer Type</span>
+                      <select {...register('customerType')} disabled={!isEditing || saving} style={isEditing ? selectStyle : selectDisabled}>
+                        <option value="casual">Casual</option>
+                        <option value="account">Account</option>
+                      </select>
+                    </div>
+                    <div>
+                      <span style={lbl}>Primary Function</span>
+                      <select {...register('primaryFunction')} disabled={!isEditing || saving} style={isEditing ? selectStyle : selectDisabled}>
+                        <option value="supplier">Supplier (sells to us)</option>
+                        <option value="customer">Customer (buys from us)</option>
+                        <option value="both">Both</option>
+                      </select>
+                    </div>
                     <div>
                       <span style={lbl}>Market Sector</span>
-                      {customer.marketSector === 'formal'
-                        ? <Pill text="Formal"   bg="#DBEAFE" color="#1E40AF" />
-                        : customer.marketSector === 'informal'
-                        ? <Pill text="Informal" bg="#FEF3C7" color="#92400E" />
-                        : <span style={{ fontSize: 12, color: '#9CA3AF' }}>—</span>}
+                      <select value={watch('marketSector') ?? ''} onChange={(e) => setValue('marketSector', e.target.value === '' ? undefined : e.target.value as 'formal' | 'informal')} disabled={!isEditing || saving} style={isEditing ? selectStyle : selectDisabled}>
+                        <option value="">—</option>
+                        <option value="formal">Formal (scrap yard)</option>
+                        <option value="informal">Informal (street seller)</option>
+                      </select>
                     </div>
-
                     <div>
                       <span style={lbl}>Dealer Category</span>
-                      <span style={{ fontSize: 12, color: customer.dealerCategory ? '#212529' : '#9CA3AF' }}>
-                        {customer.dealerCategory ? DEALER_LABELS[customer.dealerCategory] : '—'}
-                        {customer.priceGroup && (
-                          <span style={{ color: '#6C757D', marginLeft: 4 }}>· {customer.priceGroup.name}</span>
-                        )}
-                      </span>
+                      <select value={watch('dealerCategory') ?? ''} onChange={(e) => setValue('dealerCategory', e.target.value === '' ? undefined : e.target.value as 'casual' | 'dealer_1' | 'dealer_2' | 'dealer_3')} disabled={!isEditing || saving} style={isEditing ? selectStyle : selectDisabled}>
+                        <option value="">—</option>
+                        <option value="casual">Casual</option>
+                        <option value="dealer_1">Dealer 1</option>
+                        <option value="dealer_2">Dealer 2</option>
+                        <option value="dealer_3">Dealer 3</option>
+                      </select>
                     </div>
-
                     <div>
-                      <span style={lbl}>VAT</span>
-                      {customer.zeroRated
-                        ? <Pill text="Zero Rated" bg="#FEF9C3" color="#713F12" />
-                        : <span style={{ fontSize: 12, color: '#6C757D' }}>VAT Applied</span>}
-                    </div>
-
-                    <PField label="Price Group"    value={customer.priceGroup?.name} />
-                    <PField label="Company Name"   value={fmt(customer.companyName)} />
-                    <PField label="Company Reg No" value={fmt(customer.companyRegNumber)} mono />
-                    <PField label="Contact Person" value={fmt(customer.contactPerson)} />
-                    <PField label="VAT Number"     value={fmt(customer.vatNumber)} mono />
-                    <PField label="Credit Limit"   value={fmtMoney(customer.creditLimit)} />
-
-                    {customer.tradeCommodities && customer.tradeCommodities.length > 0 && (
-                      <div style={{ gridColumn: 'span 2' }}>
-                        <span style={lbl}>Trade Commodities</span>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 3 }}>
-                          {customer.tradeCommodities.map((c) => (
-                            <Pill key={c} text={c} bg="#DCFCE7" color="#166534" />
-                          ))}
-                        </div>
+                      <span style={lbl}>VAT Status</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, height: 26 }}>
+                        <input type="checkbox" checked={watch('zeroRated') ?? false} onChange={(e) => setValue('zeroRated', e.target.checked)} disabled={!isEditing || saving} style={{ width: 14, height: 14, cursor: isEditing ? 'pointer' : 'default' }} />
+                        <span style={{ fontSize: 12, color: '#212529' }}>Zero Rated</span>
                       </div>
-                    )}
+                    </div>
+                    <div>
+                      <span style={lbl}>Price Group</span>
+                      <select value={watch('priceGroupId') ?? ''} onChange={(e) => setValue('priceGroupId', e.target.value === '' ? undefined : e.target.value)} disabled={!isEditing || saving} style={isEditing ? selectStyle : selectDisabled}>
+                        <option value="">—</option>
+                        {priceGroups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <span style={lbl}>Company Name</span>
+                      <input {...register('companyName')} disabled={!isEditing || saving} style={isEditing ? inp : inpDisabled} />
+                    </div>
+                    <div>
+                      <span style={lbl}>Company Reg No</span>
+                      <input {...register('companyRegNumber')} disabled={!isEditing || saving} style={{ ...(isEditing ? inp : inpDisabled), fontFamily: 'monospace' }} />
+                    </div>
+                    <div>
+                      <span style={lbl}>Contact Person</span>
+                      <input {...register('contactPerson')} disabled={!isEditing || saving} style={isEditing ? inp : inpDisabled} />
+                    </div>
+                    <div>
+                      <span style={lbl}>VAT Number</span>
+                      <input {...register('vatNumber')} disabled={!isEditing || saving} style={{ ...(isEditing ? inp : inpDisabled), fontFamily: 'monospace' }} />
+                      {errors.vatNumber && <span style={{ fontSize: 10, color: '#DC2626' }}>{errors.vatNumber.message}</span>}
+                    </div>
+                    <div>
+                      <span style={lbl}>Credit Limit (R)</span>
+                      <input {...register('creditLimit')} type="number" step="0.01" min="0" disabled={!isEditing || saving} style={isEditing ? inp : inpDisabled} />
+                    </div>
+                    <div style={{ gridColumn: 'span 2' }}>
+                      <span style={lbl}>Trade Commodities</span>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+                        {COMMODITY_OPTIONS.map((opt) => (
+                          <label key={opt} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, cursor: isEditing ? 'pointer' : 'default', color: '#333' }}>
+                            <input type="checkbox" checked={tradeCommodities.includes(opt)} onChange={() => isEditing && toggleCommodity(opt)} disabled={!isEditing || saving} style={{ width: 12, height: 12 }} />
+                            {opt}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
@@ -331,9 +474,18 @@ export default function CustomerDetailPage() {
                 <div>
                   <SHdr title="Banking Details" />
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px 16px', padding: '10px 12px' }}>
-                    <PField label="Bank Name"      value={fmt(customer.bankName)} />
-                    <PField label="Account Number" value={fmt(customer.bankAccountNo)} mono />
-                    <PField label="Branch Code"    value={fmt(customer.bankBranchCode)} mono />
+                    <div>
+                      <span style={lbl}>Bank Name</span>
+                      <input {...register('bankName')} disabled={!isEditing || saving} style={isEditing ? inp : inpDisabled} placeholder={isEditing ? 'e.g. ABSA, FNB, Standard Bank' : ''} />
+                    </div>
+                    <div>
+                      <span style={lbl}>Account Number</span>
+                      <input {...register('bankAccountNo')} disabled={!isEditing || saving} style={{ ...(isEditing ? inp : inpDisabled), fontFamily: 'monospace' }} />
+                    </div>
+                    <div>
+                      <span style={lbl}>Branch Code</span>
+                      <input {...register('bankBranchCode')} disabled={!isEditing || saving} style={{ ...(isEditing ? inp : inpDisabled), fontFamily: 'monospace' }} placeholder={isEditing ? '6-digit code' : ''} />
+                    </div>
                   </div>
                 </div>
               )}
@@ -343,21 +495,46 @@ export default function CustomerDetailPage() {
                 <div>
                   <SHdr title="Compliance" />
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px 16px', padding: '10px 12px' }}>
-                    <PField label="Police Register No." value={fmt(customer.policeRegisterNo)} mono />
-                    <PField label="License Number"      value={fmt(customer.licenseNumber)} mono />
-                    <PField label="License Expiry"      value={fmtDate(customer.licenseExpiry)} />
-                    <PField label="Registered"          value={new Date(customer.createdAt).toLocaleDateString('en-ZA')} />
+                    <div>
+                      <span style={lbl}>Police Register No.</span>
+                      <input {...register('policeRegisterNo')} disabled={!isEditing || saving} style={{ ...(isEditing ? inp : inpDisabled), fontFamily: 'monospace' }} />
+                    </div>
+                    <div>
+                      <span style={lbl}>License Number</span>
+                      <input {...register('licenseNumber')} disabled={!isEditing || saving} style={{ ...(isEditing ? inp : inpDisabled), fontFamily: 'monospace' }} />
+                    </div>
+                    <div>
+                      <span style={lbl}>License Expiry</span>
+                      <input {...register('licenseExpiry')} type="date" disabled={!isEditing || saving} style={isEditing ? inp : inpDisabled} />
+                    </div>
+                    <div>
+                      <span style={lbl}>Registered</span>
+                      <input value={fmtDate(customer.createdAt)} disabled style={inpDisabled} />
+                    </div>
                   </div>
                 </div>
               )}
 
-              {/* Section Content - Notes (conditional) */}
-              {sectionTab === 'Notes' && customer.customerNotes && (
+              {/* Section Content - Notes */}
+              {sectionTab === 'Notes' && (
                 <div>
                   <SHdr title="Notes" />
-                  <p style={{ padding: '8px 12px', fontSize: 12, color: '#374151', whiteSpace: 'pre-wrap', margin: 0 }}>
-                    {customer.customerNotes}
-                  </p>
+                  <div style={{ padding: '10px 12px' }}>
+                    <textarea
+                      {...register('customerNotes')}
+                      disabled={!isEditing || saving}
+                      rows={5}
+                      style={{
+                        width: '100%', borderRadius: 2, border: '1px solid #ABABAB',
+                        padding: '7px', fontSize: 12, resize: 'vertical', minHeight: 80,
+                        background: isEditing ? '#fff' : '#F5F5F5',
+                        color: isEditing ? '#212529' : '#6C757D',
+                        cursor: isEditing ? 'text' : 'default',
+                        outline: 'none',
+                      }}
+                      placeholder={isEditing ? 'Add notes about this customer...' : ''}
+                    />
+                  </div>
                 </div>
               )}
             </div>
@@ -420,12 +597,31 @@ export default function CustomerDetailPage() {
 
           <SHdr title="Actions" />
           <div style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 5 }}>
-            <button
-              onClick={() => setEditOpen(true)}
-              style={{ fontSize: 11, padding: '4px 8px', background: 'linear-gradient(180deg,#F5F5F5 0%,#E0E0E0 100%)', border: '1px solid #ABABAB', borderRadius: 2, cursor: 'pointer', textAlign: 'left', color: '#333', width: '100%' }}
-            >
-              ✏  Edit Profile
-            </button>
+            {!isEditing ? (
+              <button
+                onClick={() => setIsEditing(true)}
+                style={{ fontSize: 11, padding: '4px 8px', background: 'linear-gradient(180deg,#F5F5F5 0%,#E0E0E0 100%)', border: '1px solid #ABABAB', borderRadius: 2, cursor: 'pointer', textAlign: 'left', color: '#333', width: '100%' }}
+              >
+                ✏  Edit Profile
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={handleCancel}
+                  disabled={saving}
+                  style={{ fontSize: 11, padding: '4px 8px', background: 'linear-gradient(180deg,#F5F5F5 0%,#E0E0E0 100%)', border: '1px solid #ABABAB', borderRadius: 2, cursor: 'pointer', textAlign: 'left', color: '#333', width: '100%' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSubmit(onSubmit)}
+                  disabled={saving}
+                  style={{ fontSize: 11, padding: '4px 8px', background: 'linear-gradient(180deg,#10B981 0%,#059669 100%)', border: '1px solid #059669', borderRadius: 2, cursor: saving ? 'not-allowed' : 'pointer', textAlign: 'left', color: '#fff', fontWeight: 600, width: '100%', opacity: saving ? 0.7 : 1 }}
+                >
+                  {saving ? 'Saving...' : '💾 Save'}
+                </button>
+              </>
+            )}
             <button
               onClick={() => setTab('Blacklist')}
               style={{
@@ -442,13 +638,6 @@ export default function CustomerDetailPage() {
       </div>
 
       {/* ── Modals ────────────────────────────────────────────────────────────── */}
-      {editOpen && (
-        <EditCustomerModal
-          customer={customer}
-          onClose={() => setEditOpen(false)}
-          onSuccess={() => { mutate(`/api/customers/${id}`); setEditOpen(false) }}
-        />
-      )}
       {blacklistOpen && (
         <BlacklistModal
           customerId={id}
@@ -660,222 +849,6 @@ function BlacklistTab({ customer, onAction, onUnblacklist }: {
         )}
       </div>
     </div>
-  )
-}
-
-// ─── Edit Modal ───────────────────────────────────────────────────────────────
-const EDIT_TABS = ['Personal', 'Business', 'Banking', 'Compliance'] as const
-
-function EditCustomerModal({ customer, onClose, onSuccess }: { customer: Customer; onClose: () => void; onSuccess: () => void }) {
-  const [loading, setLoading]   = useState(false)
-  const [editTab, setEditTab]   = useState<typeof EDIT_TABS[number]>('Personal')
-  const { data: pgData } = useSWR<{ groups: { id: string; name: string; isActive: boolean }[] }>('/api/price-groups', fetcher)
-  const priceGroups = (pgData?.groups ?? []).filter((g) => g.isActive)
-
-  const fmtDateInput = (v?: string | null) => {
-    if (!v) return ''
-    const d = new Date(v)
-    if (isNaN(d.getTime())) return ''
-    return d.toISOString().split('T')[0]
-  }
-
-  const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<UpdateCustomerFormInput, unknown, UpdateCustomerInput>({
-    resolver: zodResolver(UpdateCustomerSchema),
-    defaultValues: {
-      firstName: customer.firstName, lastName: customer.lastName,
-      phone: customer.phone, email: customer.email ?? '',
-      physicalAddress: customer.physicalAddress ?? '', postalAddress: customer.postalAddress ?? '',
-      vatNumber: customer.vatNumber ?? '', companyName: customer.companyName ?? '',
-      companyRegNumber: customer.companyRegNumber ?? '', contactPerson: customer.contactPerson ?? '',
-      landline: customer.landline ?? '',
-      customerType: customer.customerType as 'casual' | 'account',
-      primaryFunction: (customer.primaryFunction as 'customer' | 'supplier' | 'both') ?? 'supplier',
-      gender: (customer.gender as 'male' | 'female' | 'other') ?? undefined,
-      nationality: customer.nationality ?? '',
-      bankName: customer.bankName ?? '', bankAccountNo: customer.bankAccountNo ?? '', bankBranchCode: customer.bankBranchCode ?? '',
-      creditLimit: customer.creditLimit ? String(parseFloat(customer.creditLimit)) : '',
-      policeRegisterNo: customer.policeRegisterNo ?? '', licenseNumber: customer.licenseNumber ?? '',
-      dateOfBirth: fmtDateInput(customer.dateOfBirth), licenseExpiry: fmtDateInput(customer.licenseExpiry),
-      tradeCommodities: customer.tradeCommodities ?? [], customerNotes: customer.customerNotes ?? '',
-      priceGroupId: customer.priceGroupId ?? undefined,
-      marketSector: customer.marketSector ?? undefined, dealerCategory: customer.dealerCategory ?? undefined,
-      zeroRated: customer.zeroRated ?? false,
-    },
-  })
-
-  const tradeCommodities = (watch('tradeCommodities') as string[] | undefined) ?? []
-
-  function toggleCommodity(val: string) {
-    if (tradeCommodities.includes(val)) setValue('tradeCommodities', tradeCommodities.filter((c) => c !== val))
-    else setValue('tradeCommodities', [...tradeCommodities, val])
-  }
-
-  async function onSubmit(data: UpdateCustomerInput) {
-    setLoading(true)
-    const res = await fetch(`/api/customers/${customer.id}`, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
-    })
-    setLoading(false)
-    if (res.ok) { toast.success('Customer updated'); onSuccess() }
-    else { const j = await res.json(); toast.error(j.error ?? 'Failed to update') }
-  }
-
-  return (
-    <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>Edit Customer</DialogTitle></DialogHeader>
-
-        <div className="flex gap-1 border-b -mx-1 mb-4">
-          {EDIT_TABS.map((t) => (
-            <button key={t} type="button" onClick={() => setEditTab(t)}
-              className={`px-3 py-2 text-xs font-medium border-b-2 transition-colors ${editTab === t ? 'border-green-600 text-green-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
-              {t}
-            </button>
-          ))}
-        </div>
-
-        <form onSubmit={handleSubmit(onSubmit)}>
-          {editTab === 'Personal' && (
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div><Label>First Name</Label><Input {...register('firstName')} className="mt-1" disabled={loading} />{errors.firstName && <p className="text-xs text-red-600 mt-1">{errors.firstName.message}</p>}</div>
-                <div><Label>Last Name</Label><Input {...register('lastName')} className="mt-1" disabled={loading} />{errors.lastName && <p className="text-xs text-red-600 mt-1">{errors.lastName.message}</p>}</div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div><Label>Date of Birth</Label><Input {...register('dateOfBirth')} type="date" className="mt-1" disabled={loading} /></div>
-                <div>
-                  <Label>Gender</Label>
-                  <Select onValueChange={(v) => setValue('gender', v as 'male' | 'female' | 'other')} defaultValue={customer.gender ?? ''}>
-                    <SelectTrigger className="mt-1"><SelectValue placeholder="Select..." /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="male">Male</SelectItem>
-                      <SelectItem value="female">Female</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div><Label>Nationality</Label><Input {...register('nationality')} className="mt-1" disabled={loading} /></div>
-              <div><Label>Phone (Mobile)</Label><Input {...register('phone')} className="mt-1" disabled={loading} />{errors.phone && <p className="text-xs text-red-600 mt-1">{errors.phone.message}</p>}</div>
-              <div><Label>Landline <span className="text-gray-400 font-normal">(optional)</span></Label><Input {...register('landline')} className="mt-1" disabled={loading} /></div>
-              <div><Label>Email</Label><Input {...register('email')} type="email" className="mt-1" disabled={loading} /></div>
-              <div><Label>Physical Address</Label><Input {...register('physicalAddress')} className="mt-1" disabled={loading} /></div>
-              <div><Label>Postal Address</Label><Input {...register('postalAddress')} className="mt-1" disabled={loading} /></div>
-            </div>
-          )}
-
-          {editTab === 'Business' && (
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label>Market Sector</Label>
-                  <Select onValueChange={(v) => setValue('marketSector', v === 'none' ? undefined : v as 'formal' | 'informal')} defaultValue={customer.marketSector ?? 'none'}>
-                    <SelectTrigger className="mt-1"><SelectValue placeholder="Select..." /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Not set</SelectItem>
-                      <SelectItem value="formal">Formal (scrap yard)</SelectItem>
-                      <SelectItem value="informal">Informal (street seller)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Dealer Category</Label>
-                  <Select onValueChange={(v) => setValue('dealerCategory', v === 'none' ? undefined : v as 'casual' | 'dealer_1' | 'dealer_2' | 'dealer_3')} defaultValue={customer.dealerCategory ?? 'none'}>
-                    <SelectTrigger className="mt-1"><SelectValue placeholder="Select..." /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Not set</SelectItem>
-                      <SelectItem value="casual">Casual</SelectItem>
-                      <SelectItem value="dealer_1">Dealer 1 → Price Group A</SelectItem>
-                      <SelectItem value="dealer_2">Dealer 2 → Price Group B</SelectItem>
-                      <SelectItem value="dealer_3">Dealer 3 → Price Group C</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="flex items-center justify-between p-3 rounded-lg bg-yellow-50 border border-yellow-200">
-                <div>
-                  <Label className="text-yellow-800">Zero-Rated VAT</Label>
-                  <p className="text-xs text-yellow-700 mt-0.5">No VAT will be charged on this account&apos;s transactions</p>
-                </div>
-                <input type="checkbox" checked={watch('zeroRated') ?? false} onChange={(e) => setValue('zeroRated', e.target.checked)} className="w-4 h-4 rounded border-gray-300 text-green-600 cursor-pointer" />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label>Customer Type</Label>
-                  <Select onValueChange={(v) => setValue('customerType', v as 'casual' | 'account')} defaultValue={customer.customerType}>
-                    <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                    <SelectContent><SelectItem value="casual">Casual</SelectItem><SelectItem value="account">Account</SelectItem></SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Primary Function</Label>
-                  <Select onValueChange={(v) => setValue('primaryFunction', v as 'customer' | 'supplier' | 'both')} defaultValue={customer.primaryFunction ?? 'supplier'}>
-                    <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="supplier">Supplier (sells to us)</SelectItem>
-                      <SelectItem value="customer">Customer (buys from us)</SelectItem>
-                      <SelectItem value="both">Both</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div>
-                <Label>Price Group <span className="text-gray-400 font-normal">(optional)</span></Label>
-                <Select onValueChange={(v) => setValue('priceGroupId', !v || v === 'none' ? undefined : v)} value={watch('priceGroupId') ?? 'none'}>
-                  <SelectTrigger className="mt-1"><SelectValue placeholder="No price group" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No price group</SelectItem>
-                    {priceGroups.map((g) => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div><Label>Company Name</Label><Input {...register('companyName')} className="mt-1" disabled={loading} /></div>
-              <div><Label>Company Reg No</Label><Input {...register('companyRegNumber')} className="mt-1" disabled={loading} /></div>
-              <div><Label>Contact Person</Label><Input {...register('contactPerson')} className="mt-1" disabled={loading} /></div>
-              <div><Label>VAT Number</Label><Input {...register('vatNumber')} className="mt-1" disabled={loading} />{errors.vatNumber && <p className="text-xs text-red-600 mt-1">{errors.vatNumber.message}</p>}</div>
-              <div><Label>Credit Limit (R)</Label><Input {...register('creditLimit')} type="number" step="0.01" min="0" className="mt-1" disabled={loading} /></div>
-              <div>
-                <Label className="mb-2">Trade Commodities</Label>
-                <div className="grid grid-cols-2 gap-2 mt-1">
-                  {COMMODITY_OPTIONS.map((opt) => (
-                    <label key={opt} className="flex items-center gap-2 text-sm cursor-pointer">
-                      <input type="checkbox" checked={tradeCommodities.includes(opt)} onChange={() => toggleCommodity(opt)} className="w-4 h-4 rounded border-gray-300 text-green-600" />{opt}
-                    </label>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <Label>Notes</Label>
-                <textarea {...register('customerNotes')} rows={3} className="mt-1 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50" disabled={loading} />
-              </div>
-            </div>
-          )}
-
-          {editTab === 'Banking' && (
-            <div className="space-y-3">
-              <div><Label>Bank Name</Label><Input {...register('bankName')} className="mt-1" disabled={loading} placeholder="e.g. ABSA, FNB, Standard Bank" /></div>
-              <div><Label>Account Number</Label><Input {...register('bankAccountNo')} className="mt-1" disabled={loading} /></div>
-              <div><Label>Branch Code</Label><Input {...register('bankBranchCode')} className="mt-1" disabled={loading} placeholder="6-digit branch code" /></div>
-            </div>
-          )}
-
-          {editTab === 'Compliance' && (
-            <div className="space-y-3">
-              <div><Label>Police Register No.</Label><Input {...register('policeRegisterNo')} className="mt-1" disabled={loading} /></div>
-              <div><Label>License Number <span className="text-gray-400 font-normal">(Second-Hand Goods Act)</span></Label><Input {...register('licenseNumber')} className="mt-1" disabled={loading} /></div>
-              <div><Label>License Expiry</Label><Input {...register('licenseExpiry')} type="date" className="mt-1" disabled={loading} /></div>
-            </div>
-          )}
-
-          <div className="flex justify-end gap-2 pt-4 mt-4 border-t">
-            <Button type="button" variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
-            <Button type="submit" className="bg-green-600 hover:bg-green-700" disabled={loading}>
-              {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving...</> : 'Save Changes'}
-            </Button>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
   )
 }
 
