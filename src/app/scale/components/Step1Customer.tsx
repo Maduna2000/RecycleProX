@@ -105,6 +105,7 @@ export default function Step1Customer({ onSelect }: Props) {
         }
 
         // Auto-populate but keep editable
+        form.setValue('idNumber', idNumber, { shouldValidate: true })
         form.setValue('firstName', customer.firstName)
         form.setValue('lastName', customer.lastName)
         form.setValue('phone', customer.phone)
@@ -191,16 +192,17 @@ export default function Step1Customer({ onSelect }: Props) {
             <label className="text-sm font-medium text-slate-700 block mb-1">National ID / Passport *</label>
             <div className="relative">
               <input
-                {...form.register('idNumber')}
+                {...form.register('idNumber', {
+                  onChange: (e) => {
+                    if (e.target.value.length === 13) {
+                      handleIdNumberLookup(e.target.value)
+                    }
+                  }
+                })}
                 autoComplete="off"
                 className="w-full border border-slate-300 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 placeholder="1234567890123"
                 onBlur={(e) => handleIdNumberLookup(e.target.value)}
-                onChange={(e) => {
-                  if (e.target.value.length === 13) {
-                    handleIdNumberLookup(e.target.value)
-                  }
-                }}
               />
               {lookingUp && (
                 <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 animate-spin" />
