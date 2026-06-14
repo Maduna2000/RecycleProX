@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import useSWR, { mutate } from 'swr'
 import { AlertTriangle, Loader2, Eye, ShieldBan, ShieldCheck, UserX, Trash2, UserMinus } from 'lucide-react'
 import { DataTable, Avatar, StatusBadge, type Column, type RowAction } from '@/components/ui/DataTable'
+import { CustomerProfileModal } from '@/components/customers/CustomerProfileModal'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -109,7 +110,6 @@ function DealerCategoryBadge({ cat }: { cat?: string | null }) {
 
 // ─── Accounts list ─────────────────────────────────────────────────────────────
 function AccountsList({ onAddCustomer }: { onAddCustomer: () => void }) {
-  const router = useRouter()
   const { data: session } = useSession()
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
 
@@ -117,6 +117,7 @@ function AccountsList({ onAddCustomer }: { onAddCustomer: () => void }) {
   const [showBlacklisted, setShowBlacklisted] = useState('')
   const [dealerCategory,  setDealerCategory]  = useState('')
   const [primaryFunction, setPrimaryFunction] = useState('')
+  const [profileId,       setProfileId]       = useState<string | null>(null)
   const [blacklistId,     setBlacklistId]     = useState<string | null>(null)
   const [deleteId,        setDeleteId]        = useState<string | null>(null)
   const [deleteLoading,   setDeleteLoading]   = useState(false)
@@ -308,7 +309,7 @@ function AccountsList({ onAddCustomer }: { onAddCustomer: () => void }) {
     {
       label: 'View Profile',
       icon: Eye,
-      onClick: (r) => router.push(`/app/customers/${r.id}`),
+      onClick: (r) => setProfileId(r.id),
     },
     {
       label: 'Blacklist',
@@ -419,6 +420,12 @@ function AccountsList({ onAddCustomer }: { onAddCustomer: () => void }) {
           emptyAction={{ label: '+ Add Account Customer', onClick: onAddCustomer }}
         />
       </div>
+
+      {/* Profile modal */}
+      <CustomerProfileModal
+        customerId={profileId}
+        onClose={() => { setProfileId(null); refreshList() }}
+      />
 
       {/* Blacklist modal */}
       {blacklistId && blacklistTarget && (

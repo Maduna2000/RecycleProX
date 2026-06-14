@@ -68,6 +68,14 @@ const COMMODITY_OPTIONS = [
 const EDIT_TABS = ['Personal', 'Business', 'Banking', 'Compliance'] as const
 const PROFILE_TABS = ['Overview', 'Transactions', 'Documents', 'Blacklist'] as const
 
+// Get profile tabs based on customer type
+function getProfileTabs(customerType: string) {
+  if (customerType === 'casual') {
+    return ['Overview', 'Transactions'] as const
+  }
+  return PROFILE_TABS
+}
+
 // ─── Design tokens (mirrors Settings page) ────────────────────────────────────
 
 const sHdrStyle: React.CSSProperties = {
@@ -113,6 +121,9 @@ export function CustomerProfileModal({
     fetcher,
   )
 
+  // Get tabs based on customer type
+  const profileTabs = customer ? getProfileTabs(customer.customerType) : ['Overview'] as const
+
   function handleClose() {
     setTab('Overview')
     setEditOpen(false)
@@ -126,7 +137,7 @@ export function CustomerProfileModal({
 
   return (
     <Dialog open={!!customerId} onOpenChange={(o) => { if (!o) handleClose() }}>
-      <DialogContent className="max-w-6xl max-h-[85vh] flex flex-col overflow-hidden p-0" showCloseButton={false}>
+      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col overflow-hidden p-0" showCloseButton={false}>
         <ModalTitleBar title="Customer Profile" onClose={handleClose} />
 
         {isLoading && (
@@ -149,15 +160,25 @@ export function CustomerProfileModal({
                   <span style={{ fontSize: 12, fontWeight: 700, color: '#212529' }}>
                     {customer.firstName} {customer.lastName}
                   </span>
+
+                  {/* Customer type badge - prominent */}
+                  <Pill
+                    text={customer.customerType === 'casual' ? 'Casual Seller' : 'Account Customer'}
+                    bg={customer.customerType === 'casual' ? '#FEF3C7' : '#E8EFF8'}
+                    color={customer.customerType === 'casual' ? '#92400E' : '#1B3A6B'}
+                  />
+
                   {customer.accountCode && (
                     <span style={{ fontSize: 10, fontFamily: 'monospace', fontWeight: 700, color: '#1B3A6B', background: '#E8EFF8', border: '1px solid #B0C4DE', borderRadius: 2, padding: '1px 5px' }}>
                       {customer.accountCode}
                     </span>
                   )}
-                  <Pill text={customer.customerType} bg="#E8EFF8" color="#1B3A6B" />
-                  {customer.primaryFunction && (
+
+                  {/* Only show primary function for account customers */}
+                  {customer.customerType === 'account' && customer.primaryFunction && (
                     <Pill text={customer.primaryFunction} bg="#E8F0E8" color="#1B5E20" />
                   )}
+
                   {customer.blacklisted
                     ? <Pill text="Blacklisted" bg="#FEE2E2" color="#B91C1C" />
                     : <Pill text="Active" bg="#DCFCE7" color="#166534" />}
@@ -186,23 +207,26 @@ export function CustomerProfileModal({
               </div>
             )}
 
-            {/* ── Tab strip ─────────────────────────────────────────────────── */}
-            <div style={{ display: 'flex', borderBottom: '1px solid #C0C0C0', background: '#EFEFEF', flexShrink: 0 }}>
-              {PROFILE_TABS.map((t) => (
-                <button
-                  key={t}
-                  onClick={() => setTab(t)}
-                  style={{
-                    padding: '4px 12px', fontSize: 11, fontWeight: tab === t ? 700 : 400,
-                    color: tab === t ? colors.action : colors.textSecondary,
-                    background: 'none', border: 'none',
-                    borderBottom: tab === t ? `2px solid ${colors.action}` : '2px solid transparent',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {t}
-                </button>
-              ))}
+            {/* ── Section dropdown ──────────────────────────────────────────── */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderBottom: '1px solid #C0C0C0', background: '#EFEFEF', flexShrink: 0 }}>
+              <label style={{ fontSize: 11, fontWeight: 600, color: colors.textSecondary }}>View:</label>
+              <select
+                value={tab}
+                onChange={(e) => setTab(e.target.value as typeof tab)}
+                style={{
+                  fontSize: 11,
+                  padding: '4px 8px',
+                  border: '1px solid #C0C0C0',
+                  borderRadius: 4,
+                  background: '#FFF',
+                  color: colors.textPrimary,
+                  cursor: 'pointer',
+                }}
+              >
+                {profileTabs.map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
             </div>
 
             {/* ── Scrollable tab content ─────────────────────────────────────── */}
@@ -286,24 +310,26 @@ function OverviewTab({ customer }: { customer: Customer }) {
   const fmt      = (v?: string | null) => v || null
   const fmtDate  = (v?: string | null) => v ? new Date(v).toLocaleDateString('en-ZA') : null
   const fmtMoney = (v?: string | null) => v ? `R ${parseFloat(v).toFixed(2)}` : null
+  const isCasual = customer.customerType === 'casual'
 
   return (
     <div>
-      <Section title="Personal & Contact" cols={4}>
+      <Section title="Personal & Contact" cols={isCasual ? 2 : 4}>
         <Field label="First Name"       value={customer.firstName} />
         <Field label="Last Name"        value={customer.lastName} />
         <Field label="ID Number"        value={customer.idNumber} mono />
-        <Field label="Date of Birth"    value={fmtDate(customer.dateOfBirth)} />
-        <Field label="Gender"           value={fmt(customer.gender)} />
-        <Field label="Nationality"      value={fmt(customer.nationality)} />
         <Field label="Phone (Mobile)"   value={customer.phone} />
-        <Field label="Landline"         value={fmt(customer.landline)} />
-        <Field label="Email"            value={fmt(customer.email)} span2 />
-        <Field label="Physical Address" value={fmt(customer.physicalAddress)} span2 />
-        <Field label="Postal Address"   value={fmt(customer.postalAddress)} span2 />
+        {!isCasual && <Field label="Date of Birth"    value={fmtDate(customer.dateOfBirth)} />}
+        {!isCasual && <Field label="Gender"           value={fmt(customer.gender)} />}
+        {!isCasual && <Field label="Nationality"      value={fmt(customer.nationality)} />}
+        {!isCasual && <Field label="Landline"         value={fmt(customer.landline)} />}
+        {!isCasual && <Field label="Email"            value={fmt(customer.email)} span2 />}
+        <Field label="Physical Address" value={fmt(customer.physicalAddress)} span2={!isCasual} />
+        {!isCasual && <Field label="Postal Address"   value={fmt(customer.postalAddress)} span2 />}
       </Section>
 
-      <Section title="Business & Pricing" cols={4}>
+      {!isCasual && (
+        <Section title="Business & Pricing" cols={4}>
         <Field label="Customer Type"    value={customer.customerType} />
         <Field label="Primary Function" value={fmt(customer.primaryFunction)} />
         <Field label="Market Sector"    value={customer.marketSector === 'formal' ? 'Formal' : customer.marketSector === 'informal' ? 'Informal' : null} />
@@ -319,8 +345,10 @@ function OverviewTab({ customer }: { customer: Customer }) {
           <Field label="Trade Commodities" value={customer.tradeCommodities.join(', ')} span3 />
         )}
       </Section>
+      )}
 
-      <Section title="Banking & Compliance" cols={4}>
+      {!isCasual && (
+        <Section title="Banking & Compliance" cols={4}>
         <Field label="Bank Name"       value={fmt(customer.bankName)} />
         <Field label="Account Number"  value={fmt(customer.bankAccountNo)} mono />
         <Field label="Branch Code"     value={fmt(customer.bankBranchCode)} mono />
@@ -329,6 +357,7 @@ function OverviewTab({ customer }: { customer: Customer }) {
         <Field label="License Number"      value={fmt(customer.licenseNumber)} />
         <Field label="License Expiry"      value={fmtDate(customer.licenseExpiry)} />
       </Section>
+      )}
 
       {customer.customerNotes && (
         <div style={{ borderBottom: '1px solid #E0E0E0' }}>
@@ -574,6 +603,10 @@ function EditCustomerModal({ customer, onClose, onSuccess }: {
   const [editTab, setEditTab] = useState<typeof EDIT_TABS[number]>('Personal')
   const { data: pgData } = useSWR<{ groups: { id: string; name: string; isActive: boolean }[] }>('/api/price-groups', fetcher)
   const priceGroups = (pgData?.groups ?? []).filter((g) => g.isActive)
+  const isCasual = customer.customerType === 'casual'
+
+  // Get edit tabs based on customer type
+  const editTabs = isCasual ? ['Personal'] as const : EDIT_TABS
 
   const fmtDateInput = (v?: string | null) => {
     if (!v) return ''
@@ -644,7 +677,8 @@ function EditCustomerModal({ customer, onClose, onSuccess }: {
       <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto" showCloseButton={false}>
         <ModalTitleBar title="Edit Customer" onClose={onClose} />
         <div className="flex gap-1 border-b -mx-1 mb-4">
-          {EDIT_TABS.map((t) => (
+          {/* Only show tabs if not casual (casuals only have Personal) */}
+          {!isCasual && editTabs.map((t) => (
             <button
               key={t}
               type="button"
@@ -674,52 +708,68 @@ function EditCustomerModal({ customer, onClose, onSuccess }: {
                   {errors.lastName && <p className="text-xs text-red-600 mt-1">{errors.lastName.message}</p>}
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label>Date of Birth</Label>
-                  <Input {...register('dateOfBirth')} type="date" className="mt-1" disabled={loading} />
-                </div>
-                <div>
-                  <Label>Gender</Label>
-                  <Select onValueChange={(v) => setValue('gender', v as 'male' | 'female' | 'other')} defaultValue={customer.gender ?? ''}>
-                    <SelectTrigger className="mt-1"><SelectValue placeholder="Select..." /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="male">Male</SelectItem>
-                      <SelectItem value="female">Female</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div>
-                <Label>Nationality</Label>
-                <Input {...register('nationality')} className="mt-1" disabled={loading} />
-              </div>
+
+              {/* Only show these fields for account customers */}
+              {!isCasual && (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label>Date of Birth</Label>
+                      <Input {...register('dateOfBirth')} type="date" className="mt-1" disabled={loading} />
+                    </div>
+                    <div>
+                      <Label>Gender</Label>
+                      <Select onValueChange={(v) => setValue('gender', v as 'male' | 'female' | 'other')} defaultValue={customer.gender ?? ''}>
+                        <SelectTrigger className="mt-1"><SelectValue placeholder="Select..." /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="male">Male</SelectItem>
+                          <SelectItem value="female">Female</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div>
+                    <Label>Nationality</Label>
+                    <Input {...register('nationality')} className="mt-1" disabled={loading} />
+                  </div>
+                </>
+              )}
+
               <div>
                 <Label>Phone (Mobile)</Label>
                 <Input {...register('phone')} className="mt-1" disabled={loading} />
                 {errors.phone && <p className="text-xs text-red-600 mt-1">{errors.phone.message}</p>}
               </div>
-              <div>
-                <Label>Landline <span className="text-gray-400 font-normal">(optional)</span></Label>
-                <Input {...register('landline')} className="mt-1" disabled={loading} />
-              </div>
-              <div>
-                <Label>Email</Label>
-                <Input {...register('email')} type="email" className="mt-1" disabled={loading} />
-              </div>
+
+              {!isCasual && (
+                <>
+                  <div>
+                    <Label>Landline <span className="text-gray-400 font-normal">(optional)</span></Label>
+                    <Input {...register('landline')} className="mt-1" disabled={loading} />
+                  </div>
+                  <div>
+                    <Label>Email</Label>
+                    <Input {...register('email')} type="email" className="mt-1" disabled={loading} />
+                  </div>
+                </>
+              )}
+
               <div>
                 <Label>Physical Address</Label>
                 <Input {...register('physicalAddress')} className="mt-1" disabled={loading} />
               </div>
-              <div>
-                <Label>Postal Address</Label>
-                <Input {...register('postalAddress')} className="mt-1" disabled={loading} />
-              </div>
+
+              {!isCasual && (
+                <div>
+                  <Label>Postal Address</Label>
+                  <Input {...register('postalAddress')} className="mt-1" disabled={loading} />
+                </div>
+              )}
             </div>
           )}
 
-          {editTab === 'Business' && (
+          {!isCasual && editTab === 'Business' && (
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -846,7 +896,7 @@ function EditCustomerModal({ customer, onClose, onSuccess }: {
             </div>
           )}
 
-          {editTab === 'Banking' && (
+          {!isCasual && editTab === 'Banking' && (
             <div className="space-y-3">
               <div>
                 <Label>Bank Name</Label>
@@ -863,7 +913,7 @@ function EditCustomerModal({ customer, onClose, onSuccess }: {
             </div>
           )}
 
-          {editTab === 'Compliance' && (
+          {!isCasual && editTab === 'Compliance' && (
             <div className="space-y-3">
               <div>
                 <Label>Police Register No.</Label>

@@ -1,8 +1,8 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import useSWR, { mutate } from 'swr'
+import { CustomerProfileModal } from '@/components/customers/CustomerProfileModal'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -30,7 +30,6 @@ function customerStatus(c: Customer): string {
 }
 
 export default function CasualsPage() {
-  const router = useRouter()
   const { data: session } = useSession()
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
 
@@ -40,6 +39,7 @@ export default function CasualsPage() {
   const [dealerCategory, setDealerCategory]   = useState('')
   const [primaryFunction, setPrimaryFunction] = useState('')
   const [importOpen, setImportOpen]       = useState(false)
+  const [profileId, setProfileId]         = useState<string | null>(null)
   const [blacklistId, setBlacklistId]     = useState<string | null>(null)
   const [deleteId, setDeleteId]           = useState<string | null>(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
@@ -151,7 +151,7 @@ export default function CasualsPage() {
     {
       label:   'View Profile',
       icon:    Eye,
-      onClick: (c) => router.push(`/app/customers/${c.id}`),
+      onClick: (c) => setProfileId(c.id),
     },
     {
       label:   'Promote to Account',
@@ -309,6 +309,11 @@ export default function CasualsPage() {
               : 'No casual customers found'}
           />
         </div>
+
+        <CustomerProfileModal
+          customerId={profileId}
+          onClose={() => { setProfileId(null); refreshList() }}
+        />
 
         {importOpen && (
           <ImportCsvModal
