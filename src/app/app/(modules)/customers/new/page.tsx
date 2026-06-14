@@ -76,7 +76,6 @@ export default function NewAccountPage() {
     },
   })
 
-  const customerType    = watch('customerType')
   const isActiveFalse   = watch('isActive') === false
   const tradeCommodities = (watch('tradeCommodities') as string[] | undefined) ?? []
   const dealerCategory  = watch('dealerCategory')
