@@ -546,7 +546,7 @@ function AddExpenseModal({ onClose, onSuccess }: { onClose: () => void; onSucces
               </div>
               <div>
                 <Label style={{ display: 'block', marginBottom: 4, fontSize: fontSize.sm, fontWeight: 600, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Payment Method</Label>
-                <Select onValueChange={(v) => setValue('paymentMethod', v as 'cash' | 'eft' | 'cheque' | 'amplopay')} defaultValue="cash">
+                <Select onValueChange={(v) => setValue('paymentMethod', v as 'cash' | 'eft' | 'cheque')} defaultValue="cash">
                   <SelectTrigger
                     style={{
                       width: '100%',
@@ -565,7 +565,6 @@ function AddExpenseModal({ onClose, onSuccess }: { onClose: () => void; onSucces
                     <SelectItem value="cash">Cash</SelectItem>
                     <SelectItem value="eft">EFT</SelectItem>
                     <SelectItem value="cheque">Cheque</SelectItem>
-                    <SelectItem value="amplopay">AmploPay</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

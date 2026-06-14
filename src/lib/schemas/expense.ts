@@ -14,7 +14,7 @@ export const CreateExpenseSchema = z.object({
     z.number().positive('Amount must be positive'),
   ),
   includesVat:   z.boolean().default(false),
-  paymentMethod: z.enum(['cash', 'eft', 'cheque', 'amplopay']).default('cash'),
+  paymentMethod: z.enum(['cash', 'eft', 'cheque']).default('cash'),
   chequeNo:      z.string().optional(),
 })
 

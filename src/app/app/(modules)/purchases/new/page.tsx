@@ -334,7 +334,7 @@ export default function NewPurchasePage() {
     if (notes)      noteParts.push(notes)
     const combinedNotes = noteParts.join(' | ') || undefined
 
-    const paymentMethod = isPending ? 'cash' : paymentType as 'cash' | 'eft' | 'cheque' | 'amplopay'
+    const paymentMethod = isPending ? 'cash' : paymentType as 'cash' | 'eft' | 'cheque'
     const status        = isPending ? 'pending' : 'completed'
 
     const body = {

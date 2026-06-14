@@ -43,7 +43,6 @@ const PAYMENT_METHODS = [
   { value: 'cash',     label: 'Cash' },
   { value: 'eft',      label: 'EFT' },
   { value: 'cheque',   label: 'Cheque' },
-  { value: 'amplopay', label: 'AmploPay' },
 ]
 
 type PageTab = 'active' | 'history'

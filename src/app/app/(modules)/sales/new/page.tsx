@@ -105,7 +105,7 @@ export default function NewSalePage() {
 
   // ── Transaction state ─────────────────────────────────────────────────────
   const [lines,        setLines]        = useState<LineItem[]>([emptyLine(1)])
-  const [paymentType,  setPaymentType]  = useState<'unpaid' | 'cash' | 'eft' | 'cheque' | 'amplopay'>('cash')
+  const [paymentType,  setPaymentType]  = useState<'unpaid' | 'cash' | 'eft' | 'cheque'>('cash')
   const [notes,        setNotes]        = useState('')
   const [invoiceNo,    setInvoiceNo]    = useState('')
   const [submitting,   setSubmitting]   = useState(false)
@@ -305,7 +305,7 @@ export default function NewSalePage() {
       buyerName:     effectiveName,
       buyerIdNumber: effectiveId   || undefined,
       buyerPhone:    effectivePhone || undefined,
-      paymentMethod: isPending ? 'cash' : (paymentType as 'cash' | 'eft' | 'cheque' | 'amplopay'),
+      paymentMethod: isPending ? 'cash' : (paymentType as 'cash' | 'eft' | 'cheque'),
       status:        isPending ? 'pending' : 'completed',
       notes:         notes || (invoiceNo ? `INV:${invoiceNo}` : undefined),
       lines: validLines.map((l) => ({
@@ -527,7 +527,7 @@ export default function NewSalePage() {
           {/* Payment Type */}
           <div style={{ flexShrink: 0, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px 10px', padding: '6px 10px' }}>
             <label style={{ fontSize: 11, fontWeight: 600, color: '#374151', whiteSpace: 'nowrap', width: '100%' }}>Payment Type:</label>
-            {(['unpaid', 'cash', 'cheque', 'eft', 'amplopay'] as const).map((type) => (
+            {(['unpaid', 'cash', 'cheque', 'eft'] as const).map((type) => (
               <label key={type} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#374151', cursor: 'pointer' }}>
                 <input
                   type="radio"
@@ -536,7 +536,7 @@ export default function NewSalePage() {
                   onChange={() => setPaymentType(type)}
                   style={{ width: 13, height: 13 }}
                 />
-                {type === 'unpaid' ? 'Unpaid' : type === 'eft' ? 'EFT' : type === 'amplopay' ? 'AmploPay' : type.charAt(0).toUpperCase() + type.slice(1)}
+                {type === 'unpaid' ? 'Unpaid' : type === 'eft' ? 'EFT' : type.charAt(0).toUpperCase() + type.slice(1)}
               </label>
             ))}
           </div>

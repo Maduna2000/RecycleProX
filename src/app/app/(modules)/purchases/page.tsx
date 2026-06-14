@@ -225,7 +225,6 @@ export default function PurchasesPage() {
           <option value="cash">Cash</option>
           <option value="eft">EFT</option>
           <option value="cheque">Cheque</option>
-          <option value="amplopay">AmploPay</option>
         </select>
         <input
           type="date"
