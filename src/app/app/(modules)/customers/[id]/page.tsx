@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import useSWR, { mutate } from 'swr'
 import { Button } from '@/components/ui/button'
@@ -8,7 +8,6 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { AlertTriangle, ShieldBan, ShieldCheck, Loader2 } from 'lucide-react'
 import { PhotoUploader, PhotoViewer } from '@/components/PhotoUploader'
 import { useSession } from 'next-auth/react'
@@ -62,6 +61,7 @@ const DOCUMENT_TYPE_LABELS: Record<string, string> = {
 }
 
 const TABS = ['Overview', 'Transactions', 'Documents', 'Blacklist'] as const
+const SECTION_TABS = ['Personal', 'Business', 'Banking', 'Compliance', 'Notes'] as const
 
 const COMMODITY_OPTIONS = [
   'Copper', 'Aluminium', 'Steel (Ferrous)', 'Non-Ferrous Metals',
@@ -124,10 +124,18 @@ export default function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
   const [tab, setTab] = useState<typeof TABS[number]>('Overview')
+  const [sectionTab, setSectionTab] = useState<typeof SECTION_TABS[number]>('Personal')
   const [editOpen, setEditOpen] = useState(false)
   const [blacklistOpen, setBlacklistOpen] = useState(false)
 
   const { data: customer, isLoading } = useSWR<Customer>(`/api/customers/${id}`, fetcher)
+
+  // Guard: if Notes tab selected but no notes, reset to Personal
+  useEffect(() => {
+    if (sectionTab === 'Notes' && !customer?.customerNotes) {
+      setSectionTab('Personal')
+    }
+  }, [customer?.customerNotes, sectionTab])
 
   if (isLoading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: '#9CA3AF', fontSize: 13 }}>
@@ -172,12 +180,6 @@ export default function CustomerDetailPage() {
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
           <button onClick={() => setEditOpen(true)} style={titleBtn}>✏  Edit</button>
-          <button
-            onClick={() => router.push('/app/purchases/new')}
-            style={{ fontSize: 11, padding: '2px 10px', background: 'linear-gradient(180deg,#2E8B57 0%,#1E6B3D 100%)', border: '1px solid #176338', borderRadius: 2, cursor: 'pointer', color: '#fff', fontWeight: 700 }}
-          >
-            + New Purchase
-          </button>
         </div>
       </div>
 
@@ -222,12 +224,37 @@ export default function CustomerDetailPage() {
         <div style={{ flex: 1, borderRight: '1px solid #D0D0D0', background: '#fff' }}>
 
           {tab === 'Overview' && (
-            <Accordion type="multiple" defaultValue={['personal', 'business']}>
-              <AccordionItem value="personal">
-                <AccordionTrigger style={{ background: 'linear-gradient(180deg,#FFFFFF 0%,#E8E8E8 100%)', borderBottom: '1px solid #C0C0C0', padding: '6px 10px', fontSize: 11, fontWeight: 700, color: '#1B3A6B' }}>
-                  Personal Details
-                </AccordionTrigger>
-                <AccordionContent>
+            <div>
+              {/* Secondary Tab Strip for sections */}
+              <div style={{ display: 'flex', borderBottom: '1px solid #C0C0C0', background: '#EFEFEF', flexShrink: 0 }}>
+                {(customer.customerNotes
+                  ? SECTION_TABS
+                  : SECTION_TABS.filter(t => t !== 'Notes')
+                ).map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setSectionTab(t)}
+                    style={{
+                      padding: '5px 14px',
+                      fontSize: 11,
+                      cursor: 'pointer',
+                      fontWeight: sectionTab === t ? 700 : 400,
+                      background: sectionTab === t ? '#fff' : 'transparent',
+                      border: 'none',
+                      borderRight: '1px solid #D0D0D0',
+                      borderBottom: sectionTab === t ? '2px solid #217346' : '2px solid transparent',
+                      color: sectionTab === t ? '#217346' : '#555',
+                    }}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
+
+              {/* Section Content - Personal */}
+              {sectionTab === 'Personal' && (
+                <div>
+                  <SHdr title="Personal Details" />
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px 16px', padding: '10px 12px' }}>
                     <PField label="First Name"       value={customer.firstName} />
                     <PField label="Last Name"        value={customer.lastName} />
@@ -241,14 +268,13 @@ export default function CustomerDetailPage() {
                     <PField label="Physical Address" value={fmt(customer.physicalAddress)} span2 />
                     <PField label="Postal Address"   value={fmt(customer.postalAddress)}  span2 />
                   </div>
-                </AccordionContent>
-              </AccordionItem>
+                </div>
+              )}
 
-              <AccordionItem value="business">
-                <AccordionTrigger style={{ background: 'linear-gradient(180deg,#FFFFFF 0%,#E8E8E8 100%)', borderBottom: '1px solid #C0C0C0', padding: '6px 10px', fontSize: 11, fontWeight: 700, color: '#1B3A6B' }}>
-                  Business Details
-                </AccordionTrigger>
-                <AccordionContent>
+              {/* Section Content - Business */}
+              {sectionTab === 'Business' && (
+                <div>
+                  <SHdr title="Business Details" />
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px 16px', padding: '10px 12px' }}>
                     <PField label="Customer Type"    value={customer.customerType} />
                     <PField label="Primary Function" value={fmt(customer.primaryFunction)} />
@@ -297,49 +323,44 @@ export default function CustomerDetailPage() {
                       </div>
                     )}
                   </div>
-                </AccordionContent>
-              </AccordionItem>
+                </div>
+              )}
 
-              <AccordionItem value="banking">
-                <AccordionTrigger style={{ background: 'linear-gradient(180deg,#FFFFFF 0%,#E8E8E8 100%)', borderBottom: '1px solid #C0C0C0', padding: '6px 10px', fontSize: 11, fontWeight: 700, color: '#1B3A6B' }}>
-                  Banking Details
-                </AccordionTrigger>
-                <AccordionContent>
+              {/* Section Content - Banking */}
+              {sectionTab === 'Banking' && (
+                <div>
+                  <SHdr title="Banking Details" />
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px 16px', padding: '10px 12px' }}>
                     <PField label="Bank Name"      value={fmt(customer.bankName)} />
                     <PField label="Account Number" value={fmt(customer.bankAccountNo)} mono />
                     <PField label="Branch Code"    value={fmt(customer.bankBranchCode)} mono />
                   </div>
-                </AccordionContent>
-              </AccordionItem>
+                </div>
+              )}
 
-              <AccordionItem value="compliance">
-                <AccordionTrigger style={{ background: 'linear-gradient(180deg,#FFFFFF 0%,#E8E8E8 100%)', borderBottom: '1px solid #C0C0C0', padding: '6px 10px', fontSize: 11, fontWeight: 700, color: '#1B3A6B' }}>
-                  Compliance
-                </AccordionTrigger>
-                <AccordionContent>
+              {/* Section Content - Compliance */}
+              {sectionTab === 'Compliance' && (
+                <div>
+                  <SHdr title="Compliance" />
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px 16px', padding: '10px 12px' }}>
                     <PField label="Police Register No." value={fmt(customer.policeRegisterNo)} mono />
                     <PField label="License Number"      value={fmt(customer.licenseNumber)} mono />
                     <PField label="License Expiry"      value={fmtDate(customer.licenseExpiry)} />
                     <PField label="Registered"          value={new Date(customer.createdAt).toLocaleDateString('en-ZA')} />
                   </div>
-                </AccordionContent>
-              </AccordionItem>
-
-              {customer.customerNotes && (
-                <AccordionItem value="notes">
-                  <AccordionTrigger style={{ background: 'linear-gradient(180deg,#FFFFFF 0%,#E8E8E8 100%)', borderBottom: '1px solid #C0C0C0', padding: '6px 10px', fontSize: 11, fontWeight: 700, color: '#1B3A6B' }}>
-                    Notes
-                  </AccordionTrigger>
-                  <AccordionContent>
-                    <p style={{ padding: '8px 12px', fontSize: 12, color: '#374151', whiteSpace: 'pre-wrap', margin: 0 }}>
-                      {customer.customerNotes}
-                    </p>
-                  </AccordionContent>
-                </AccordionItem>
+                </div>
               )}
-            </Accordion>
+
+              {/* Section Content - Notes (conditional) */}
+              {sectionTab === 'Notes' && customer.customerNotes && (
+                <div>
+                  <SHdr title="Notes" />
+                  <p style={{ padding: '8px 12px', fontSize: 12, color: '#374151', whiteSpace: 'pre-wrap', margin: 0 }}>
+                    {customer.customerNotes}
+                  </p>
+                </div>
+              )}
+            </div>
           )}
 
           {tab === 'Transactions' && <TransactionsTab customerId={id} />}
@@ -404,12 +425,6 @@ export default function CustomerDetailPage() {
               style={{ fontSize: 11, padding: '4px 8px', background: 'linear-gradient(180deg,#F5F5F5 0%,#E0E0E0 100%)', border: '1px solid #ABABAB', borderRadius: 2, cursor: 'pointer', textAlign: 'left', color: '#333', width: '100%' }}
             >
               ✏  Edit Profile
-            </button>
-            <button
-              onClick={() => router.push('/app/purchases/new')}
-              style={{ fontSize: 11, padding: '4px 8px', background: 'linear-gradient(180deg,#2E8B57 0%,#1E6B3D 100%)', border: '1px solid #176338', borderRadius: 2, cursor: 'pointer', color: '#fff', fontWeight: 700, width: '100%', textAlign: 'left' }}
-            >
-              + New Purchase
             </button>
             <button
               onClick={() => setTab('Blacklist')}
