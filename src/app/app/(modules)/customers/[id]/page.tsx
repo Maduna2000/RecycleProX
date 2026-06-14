@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { AlertTriangle, ShieldBan, ShieldCheck, Loader2 } from 'lucide-react'
 import { PhotoUploader, PhotoViewer } from '@/components/PhotoUploader'
 import { useSession } from 'next-auth/react'
@@ -105,25 +106,6 @@ function PField({ label, value, mono, span2 }: {
       }}>
         {display}
       </span>
-    </div>
-  )
-}
-
-// ─── Section wrapper ───────────────────────────────────────────────────────────
-function ProfileSection({ title, children, cols = 2 }: {
-  title: string; children: React.ReactNode; cols?: number
-}) {
-  return (
-    <div style={{ borderBottom: '1px solid #E0E0E0' }}>
-      <SHdr title={title} />
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: `repeat(${cols}, 1fr)`,
-        gap: '8px 16px',
-        padding: '10px 12px',
-      }}>
-        {children}
-      </div>
     </div>
   )
 }
@@ -240,92 +222,124 @@ export default function CustomerDetailPage() {
         <div style={{ flex: 1, borderRight: '1px solid #D0D0D0', background: '#fff' }}>
 
           {tab === 'Overview' && (
-            <>
-              <ProfileSection title="Personal Details">
-                <PField label="First Name"       value={customer.firstName} />
-                <PField label="Last Name"        value={customer.lastName} />
-                <PField label="ID Number"        value={customer.idNumber} mono />
-                <PField label="Date of Birth"    value={fmtDate(customer.dateOfBirth)} />
-                <PField label="Gender"           value={fmt(customer.gender)} />
-                <PField label="Nationality"      value={fmt(customer.nationality)} />
-                <PField label="Phone (Mobile)"   value={customer.phone} mono />
-                <PField label="Landline"         value={fmt(customer.landline)} mono />
-                <PField label="Email"            value={fmt(customer.email)} />
-                <PField label="Physical Address" value={fmt(customer.physicalAddress)} span2 />
-                <PField label="Postal Address"   value={fmt(customer.postalAddress)}  span2 />
-              </ProfileSection>
-
-              <ProfileSection title="Business Details">
-                <PField label="Customer Type"    value={customer.customerType} />
-                <PField label="Primary Function" value={fmt(customer.primaryFunction)} />
-
-                <div>
-                  <span style={lbl}>Market Sector</span>
-                  {customer.marketSector === 'formal'
-                    ? <Pill text="Formal"   bg="#DBEAFE" color="#1E40AF" />
-                    : customer.marketSector === 'informal'
-                    ? <Pill text="Informal" bg="#FEF3C7" color="#92400E" />
-                    : <span style={{ fontSize: 12, color: '#9CA3AF' }}>—</span>}
-                </div>
-
-                <div>
-                  <span style={lbl}>Dealer Category</span>
-                  <span style={{ fontSize: 12, color: customer.dealerCategory ? '#212529' : '#9CA3AF' }}>
-                    {customer.dealerCategory ? DEALER_LABELS[customer.dealerCategory] : '—'}
-                    {customer.priceGroup && (
-                      <span style={{ color: '#6C757D', marginLeft: 4 }}>· {customer.priceGroup.name}</span>
-                    )}
-                  </span>
-                </div>
-
-                <div>
-                  <span style={lbl}>VAT</span>
-                  {customer.zeroRated
-                    ? <Pill text="Zero Rated" bg="#FEF9C3" color="#713F12" />
-                    : <span style={{ fontSize: 12, color: '#6C757D' }}>VAT Applied</span>}
-                </div>
-
-                <PField label="Price Group"    value={customer.priceGroup?.name} />
-                <PField label="Company Name"   value={fmt(customer.companyName)} />
-                <PField label="Company Reg No" value={fmt(customer.companyRegNumber)} mono />
-                <PField label="Contact Person" value={fmt(customer.contactPerson)} />
-                <PField label="VAT Number"     value={fmt(customer.vatNumber)} mono />
-                <PField label="Credit Limit"   value={fmtMoney(customer.creditLimit)} />
-
-                {customer.tradeCommodities && customer.tradeCommodities.length > 0 && (
-                  <div style={{ gridColumn: 'span 2' }}>
-                    <span style={lbl}>Trade Commodities</span>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 3 }}>
-                      {customer.tradeCommodities.map((c) => (
-                        <Pill key={c} text={c} bg="#DCFCE7" color="#166534" />
-                      ))}
-                    </div>
+            <Accordion type="multiple" defaultValue={['personal', 'business']}>
+              <AccordionItem value="personal">
+                <AccordionTrigger style={{ background: 'linear-gradient(180deg,#FFFFFF 0%,#E8E8E8 100%)', borderBottom: '1px solid #C0C0C0', padding: '6px 10px', fontSize: 11, fontWeight: 700, color: '#1B3A6B' }}>
+                  Personal Details
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px 16px', padding: '10px 12px' }}>
+                    <PField label="First Name"       value={customer.firstName} />
+                    <PField label="Last Name"        value={customer.lastName} />
+                    <PField label="ID Number"        value={customer.idNumber} mono />
+                    <PField label="Date of Birth"    value={fmtDate(customer.dateOfBirth)} />
+                    <PField label="Gender"           value={fmt(customer.gender)} />
+                    <PField label="Nationality"      value={fmt(customer.nationality)} />
+                    <PField label="Phone (Mobile)"   value={customer.phone} mono />
+                    <PField label="Landline"         value={fmt(customer.landline)} mono />
+                    <PField label="Email"            value={fmt(customer.email)} />
+                    <PField label="Physical Address" value={fmt(customer.physicalAddress)} span2 />
+                    <PField label="Postal Address"   value={fmt(customer.postalAddress)}  span2 />
                   </div>
-                )}
-              </ProfileSection>
+                </AccordionContent>
+              </AccordionItem>
 
-              <ProfileSection title="Banking Details">
-                <PField label="Bank Name"      value={fmt(customer.bankName)} />
-                <PField label="Account Number" value={fmt(customer.bankAccountNo)} mono />
-                <PField label="Branch Code"    value={fmt(customer.bankBranchCode)} mono />
-              </ProfileSection>
+              <AccordionItem value="business">
+                <AccordionTrigger style={{ background: 'linear-gradient(180deg,#FFFFFF 0%,#E8E8E8 100%)', borderBottom: '1px solid #C0C0C0', padding: '6px 10px', fontSize: 11, fontWeight: 700, color: '#1B3A6B' }}>
+                  Business Details
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px 16px', padding: '10px 12px' }}>
+                    <PField label="Customer Type"    value={customer.customerType} />
+                    <PField label="Primary Function" value={fmt(customer.primaryFunction)} />
 
-              <ProfileSection title="Compliance">
-                <PField label="Police Register No." value={fmt(customer.policeRegisterNo)} mono />
-                <PField label="License Number"      value={fmt(customer.licenseNumber)} mono />
-                <PField label="License Expiry"      value={fmtDate(customer.licenseExpiry)} />
-                <PField label="Registered"          value={new Date(customer.createdAt).toLocaleDateString('en-ZA')} />
-              </ProfileSection>
+                    <div>
+                      <span style={lbl}>Market Sector</span>
+                      {customer.marketSector === 'formal'
+                        ? <Pill text="Formal"   bg="#DBEAFE" color="#1E40AF" />
+                        : customer.marketSector === 'informal'
+                        ? <Pill text="Informal" bg="#FEF3C7" color="#92400E" />
+                        : <span style={{ fontSize: 12, color: '#9CA3AF' }}>—</span>}
+                    </div>
+
+                    <div>
+                      <span style={lbl}>Dealer Category</span>
+                      <span style={{ fontSize: 12, color: customer.dealerCategory ? '#212529' : '#9CA3AF' }}>
+                        {customer.dealerCategory ? DEALER_LABELS[customer.dealerCategory] : '—'}
+                        {customer.priceGroup && (
+                          <span style={{ color: '#6C757D', marginLeft: 4 }}>· {customer.priceGroup.name}</span>
+                        )}
+                      </span>
+                    </div>
+
+                    <div>
+                      <span style={lbl}>VAT</span>
+                      {customer.zeroRated
+                        ? <Pill text="Zero Rated" bg="#FEF9C3" color="#713F12" />
+                        : <span style={{ fontSize: 12, color: '#6C757D' }}>VAT Applied</span>}
+                    </div>
+
+                    <PField label="Price Group"    value={customer.priceGroup?.name} />
+                    <PField label="Company Name"   value={fmt(customer.companyName)} />
+                    <PField label="Company Reg No" value={fmt(customer.companyRegNumber)} mono />
+                    <PField label="Contact Person" value={fmt(customer.contactPerson)} />
+                    <PField label="VAT Number"     value={fmt(customer.vatNumber)} mono />
+                    <PField label="Credit Limit"   value={fmtMoney(customer.creditLimit)} />
+
+                    {customer.tradeCommodities && customer.tradeCommodities.length > 0 && (
+                      <div style={{ gridColumn: 'span 2' }}>
+                        <span style={lbl}>Trade Commodities</span>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 3 }}>
+                          {customer.tradeCommodities.map((c) => (
+                            <Pill key={c} text={c} bg="#DCFCE7" color="#166534" />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+
+              <AccordionItem value="banking">
+                <AccordionTrigger style={{ background: 'linear-gradient(180deg,#FFFFFF 0%,#E8E8E8 100%)', borderBottom: '1px solid #C0C0C0', padding: '6px 10px', fontSize: 11, fontWeight: 700, color: '#1B3A6B' }}>
+                  Banking Details
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px 16px', padding: '10px 12px' }}>
+                    <PField label="Bank Name"      value={fmt(customer.bankName)} />
+                    <PField label="Account Number" value={fmt(customer.bankAccountNo)} mono />
+                    <PField label="Branch Code"    value={fmt(customer.bankBranchCode)} mono />
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+
+              <AccordionItem value="compliance">
+                <AccordionTrigger style={{ background: 'linear-gradient(180deg,#FFFFFF 0%,#E8E8E8 100%)', borderBottom: '1px solid #C0C0C0', padding: '6px 10px', fontSize: 11, fontWeight: 700, color: '#1B3A6B' }}>
+                  Compliance
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px 16px', padding: '10px 12px' }}>
+                    <PField label="Police Register No." value={fmt(customer.policeRegisterNo)} mono />
+                    <PField label="License Number"      value={fmt(customer.licenseNumber)} mono />
+                    <PField label="License Expiry"      value={fmtDate(customer.licenseExpiry)} />
+                    <PField label="Registered"          value={new Date(customer.createdAt).toLocaleDateString('en-ZA')} />
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
 
               {customer.customerNotes && (
-                <div style={{ borderBottom: '1px solid #E0E0E0' }}>
-                  <SHdr title="Notes" />
-                  <p style={{ padding: '8px 12px', fontSize: 12, color: '#374151', whiteSpace: 'pre-wrap', margin: 0 }}>
-                    {customer.customerNotes}
-                  </p>
-                </div>
+                <AccordionItem value="notes">
+                  <AccordionTrigger style={{ background: 'linear-gradient(180deg,#FFFFFF 0%,#E8E8E8 100%)', borderBottom: '1px solid #C0C0C0', padding: '6px 10px', fontSize: 11, fontWeight: 700, color: '#1B3A6B' }}>
+                    Notes
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <p style={{ padding: '8px 12px', fontSize: 12, color: '#374151', whiteSpace: 'pre-wrap', margin: 0 }}>
+                      {customer.customerNotes}
+                    </p>
+                  </AccordionContent>
+                </AccordionItem>
               )}
-            </>
+            </Accordion>
           )}
 
           {tab === 'Transactions' && <TransactionsTab customerId={id} />}
