@@ -179,18 +179,8 @@ export default function NewAccountPage() {
                 </Field>
               </div>
 
-              {/* Casual Indicator · Inactive Indicator */}
+              {/* Inactive Indicator */}
               <div className="flex gap-6 py-1">
-                <label className="flex items-center gap-1.5 cursor-pointer text-[12px]" style={{ color: '#374151' }}>
-                  <input
-                    type="checkbox"
-                    className="w-3.5 h-3.5"
-                    checked={customerType === 'casual'}
-                    onChange={(e) => setValue('customerType', e.target.checked ? 'casual' : 'account')}
-                    disabled={loading}
-                  />
-                  <span className="font-bold text-[11px]" style={{ color: '#1B3A6B' }}>Casual Indicator</span>
-                </label>
                 <label className="flex items-center gap-1.5 cursor-pointer text-[12px]" style={{ color: '#374151' }}>
                   <input
                     type="checkbox"

@@ -126,7 +126,7 @@ export function CustomerProfileModal({
 
   return (
     <Dialog open={!!customerId} onOpenChange={(o) => { if (!o) handleClose() }}>
-      <DialogContent className="sm:max-w-3xl max-h-[85vh] flex flex-col overflow-hidden p-0" showCloseButton={false}>
+      <DialogContent className="sm:max-w-3xl max-h-[80vh] flex flex-col overflow-hidden p-0 !top-[5vh] !translate-y-0" showCloseButton={false}>
         <ModalTitleBar title="Customer Profile" onClose={handleClose} />
 
         {isLoading && (
