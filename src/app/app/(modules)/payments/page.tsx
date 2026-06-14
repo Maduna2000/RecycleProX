@@ -27,7 +27,7 @@ type Payment = {
   notes?: string
   voidedAt?: string
   createdAt: string
-  customer: { id: string; firstName: string; lastName: string; idNumber: string | null }
+  customer: { id: string; firstName: string; lastName: string; idNumber: string | null } | null
 }
 
 type AccountBalance = {
@@ -103,12 +103,12 @@ export default function PaymentsPage() {
       header: 'Customer',
       render: (r) => (
         <div className="flex items-center gap-2">
-          <Avatar name={`${r.customer.firstName} ${r.customer.lastName}`} size={26} />
+          <Avatar name={r.customer ? `${r.customer.firstName} ${r.customer.lastName}` : '?'} size={26} />
           <div>
             <p style={{ fontSize: fontSize.sm, fontWeight: fontWeight.medium, color: colors.textPrimary }}>
-              {r.customer.firstName} {r.customer.lastName}
+              {r.customer ? `${r.customer.firstName} ${r.customer.lastName}` : 'Unknown'}
             </p>
-            <p className="font-mono" style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>{r.customer.idNumber}</p>
+            <p className="font-mono" style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>{r.customer?.idNumber ?? '-'}</p>
           </div>
         </div>
       ),
@@ -263,7 +263,6 @@ export default function PaymentsPage() {
               <option value="cash">Cash</option>
               <option value="eft">EFT</option>
               <option value="cheque">Cheque</option>
-              <option value="amplopay">AmploPay</option>
             </select>
             <input
               type="date"
@@ -353,7 +352,7 @@ export default function PaymentsPage() {
 function NewPaymentModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
   const [customer,      setCustomer]      = useState<SelectedCustomer | null>(null)
   const [amount,        setAmount]        = useState('')
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'eft' | 'cheque' | 'amplopay'>('cash')
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'eft' | 'cheque'>('cash')
   const [notes,         setNotes]         = useState('')
   const [loading,       setLoading]       = useState(false)
 
@@ -464,7 +463,6 @@ function NewPaymentModal({ onClose, onSuccess }: { onClose: () => void; onSucces
                 <SelectItem value="cash">Cash</SelectItem>
                 <SelectItem value="eft">EFT</SelectItem>
                 <SelectItem value="cheque">Cheque</SelectItem>
-                <SelectItem value="amplopay">AmploPay</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -524,7 +522,7 @@ function VoidPaymentModal({ payment, onClose, onSuccess }: { payment: Payment; o
             <span className="font-semibold" style={{ color: colors.textPrimary }}>{payment.refNumber}</span>
             {' '}(R {new Decimal(payment.amount).toFixed(2)}) to{' '}
             <span className="font-semibold" style={{ color: colors.textPrimary }}>
-              {payment.customer.firstName} {payment.customer.lastName}
+              {payment.customer ? `${payment.customer.firstName} ${payment.customer.lastName}` : 'Unknown'}
             </span>? This cannot be undone.
           </p>
           <div>
