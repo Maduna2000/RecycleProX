@@ -118,7 +118,7 @@ export default function NewPurchasePage() {
   const [customer,        setCustomer]        = useState<SelectedCustomer | null>(null)
   const [customerType,    setCustomerType]    = useState<'casual' | 'account'>('casual')
   const [lines,           setLines]           = useState<LineItem[]>([emptyLine(1)])
-  const [paymentType,     setPaymentType]     = useState<'unpaid' | 'cash' | 'eft' | 'cheque' | 'amplopay'>('cash')
+  const [paymentType,     setPaymentType]     = useState<'unpaid' | 'cash' | 'eft' | 'cheque'>('unpaid')
   const [notes,           setNotes]           = useState('')
   const [grvNumber,       setGrvNumber]       = useState('')
   const [invoiceNo,       setInvoiceNo]       = useState('')
@@ -401,7 +401,7 @@ export default function NewPurchasePage() {
           setCustomerType('casual')
           setLines([emptyLine(keyCounter)])
           setKeyCounter((k) => k + 1)
-          setPaymentType('cash')
+          setPaymentType('unpaid')
           setNotes('')
           setGrvNumber('')
           setInvoiceNo('')
@@ -612,7 +612,7 @@ export default function NewPurchasePage() {
           {/* Payment Type */}
           <div style={{ flexShrink: 0, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px 10px', padding: '6px 10px' }}>
             <label style={{ fontSize: 11, fontWeight: 600, color: '#374151', whiteSpace: 'nowrap', width: '100%' }}>Payment Type:</label>
-            {(['unpaid', 'cash', 'cheque', 'eft', 'amplopay'] as const).map((type) => (
+            {(['unpaid', 'cash', 'cheque', 'eft'] as const).map((type) => (
               <label key={type} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#374151', cursor: 'pointer' }}>
                 <input
                   type="radio"
@@ -624,7 +624,7 @@ export default function NewPurchasePage() {
                   }}
                   style={{ width: 13, height: 13 }}
                 />
-                {type === 'unpaid' ? 'Unpaid' : type === 'eft' ? 'EFT' : type === 'amplopay' ? 'AmploPay' : type.charAt(0).toUpperCase() + type.slice(1)}
+                {type === 'unpaid' ? 'Unpaid' : type === 'eft' ? 'EFT' : type.charAt(0).toUpperCase() + type.slice(1)}
               </label>
             ))}
           </div>
@@ -1164,25 +1164,17 @@ export default function NewPurchasePage() {
 
       {/* ── Action bar ────────────────────────────────────────────────────── */}
       <div
-        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 16px', borderTop: '2px solid #B0B0B0', background: 'linear-gradient(180deg,#F5F5F5 0%,#E8E8E8 100%)', flexShrink: 0 }}
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', padding: '6px 16px', borderTop: '2px solid #B0B0B0', background: 'linear-gradient(180deg,#F5F5F5 0%,#E8E8E8 100%)', flexShrink: 0 }}
       >
         <button
           type="button"
-          onClick={() => submitPurchase(true)}
+          onClick={() => submitPurchase(paymentType === 'unpaid')}
           disabled={submitting || (!!customer && !!customer.blacklisted)}
-          style={{ height: 28, padding: '0 20px', borderRadius: 2, fontSize: 12, fontWeight: 500, background: '#FFF', border: '1px solid #C9A020', color: '#92400E', cursor: 'pointer', opacity: submitting || (!!customer && !!customer.blacklisted) ? 0.4 : 1 }}
-        >
-          {submitting ? <Loader2 style={{ width: 13, height: 13, display: 'inline', animation: 'spin 1s linear infinite' }} /> : 'Save as Unpaid'}
-        </button>
-        <button
-          type="button"
-          onClick={() => submitPurchase(false)}
-          disabled={submitting || (!!customer && !!customer.blacklisted) || paymentType === 'unpaid'}
-          style={{ height: 28, padding: '0 24px', borderRadius: 2, fontSize: 12, fontWeight: 700, background: '#217346', border: '1px solid #176338', color: '#FFF', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, opacity: submitting || (!!customer && !!customer.blacklisted) || paymentType === 'unpaid' ? 0.4 : 1 }}
+          style={{ height: 28, padding: '0 24px', borderRadius: 2, fontSize: 12, fontWeight: 700, background: '#217346', border: '1px solid #176338', color: '#FFF', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, opacity: submitting || (!!customer && !!customer.blacklisted) ? 0.4 : 1 }}
         >
           {submitting
-            ? <><Loader2 style={{ width: 13, height: 13, animation: 'spin 1s linear infinite' }} /> Saving…</>
-            : `Save · R ${cashToPay.toFixed(2)}`}
+            ? <><Loader2 style={{ width: 13, height: 13, animation: 'spin 1s linear infinite' }} /> Submitting…</>
+            : paymentType === 'unpaid' ? 'Submit' : `Submit · R ${cashToPay.toFixed(2)}`}
         </button>
       </div>
 

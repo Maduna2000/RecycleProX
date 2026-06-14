@@ -24,7 +24,7 @@ export function ProcessPaymentModal({
   onClose: () => void
   onSuccess: () => void
 }) {
-  const [method,      setMethod]      = useState<'cash' | 'eft' | 'cheque' | 'amplopay'>('cash')
+  const [method,      setMethod]      = useState<'cash' | 'eft' | 'cheque'>('cash')
   const [amount,      setAmount]      = useState('')
   const [amountError, setAmountError] = useState<string | null>(null)
   const [loading,     setLoading]     = useState(false)
@@ -123,7 +123,6 @@ export function ProcessPaymentModal({
                 <SelectItem value="cash">Cash</SelectItem>
                 <SelectItem value="eft">EFT</SelectItem>
                 <SelectItem value="cheque">Cheque</SelectItem>
-                <SelectItem value="amplopay">AmploPay</SelectItem>
               </SelectContent>
             </Select>
           </div>
