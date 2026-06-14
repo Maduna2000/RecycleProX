@@ -126,7 +126,7 @@ export function CustomerProfileModal({
 
   return (
     <Dialog open={!!customerId} onOpenChange={(o) => { if (!o) handleClose() }}>
-      <DialogContent className="sm:max-w-3xl max-h-[80vh] flex flex-col overflow-hidden p-0 !top-[5vh] !translate-y-0" showCloseButton={false}>
+      <DialogContent className="max-w-6xl max-h-[85vh] flex flex-col overflow-hidden p-0" showCloseButton={false}>
         <ModalTitleBar title="Customer Profile" onClose={handleClose} />
 
         {isLoading && (
@@ -143,14 +143,14 @@ export function CustomerProfileModal({
         {customer && (
           <>
             {/* ── Customer info bar ─────────────────────────────────────────── */}
-            <div style={{ background: 'linear-gradient(180deg,#FAFAFA 0%,#F0F0F0 100%)', borderBottom: '1px solid #D0D0D0', padding: '7px 12px', flexShrink: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: '#212529' }}>
+            <div style={{ background: 'linear-gradient(180deg,#FAFAFA 0%,#F0F0F0 100%)', borderBottom: '1px solid #D0D0D0', padding: '4px 10px', flexShrink: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: '#212529' }}>
                     {customer.firstName} {customer.lastName}
                   </span>
                   {customer.accountCode && (
-                    <span style={{ fontSize: 11, fontFamily: 'monospace', fontWeight: 700, color: '#1B3A6B', background: '#E8EFF8', border: '1px solid #B0C4DE', borderRadius: 2, padding: '1px 6px' }}>
+                    <span style={{ fontSize: 10, fontFamily: 'monospace', fontWeight: 700, color: '#1B3A6B', background: '#E8EFF8', border: '1px solid #B0C4DE', borderRadius: 2, padding: '1px 5px' }}>
                       {customer.accountCode}
                     </span>
                   )}
@@ -162,24 +162,24 @@ export function CustomerProfileModal({
                     ? <Pill text="Blacklisted" bg="#FEE2E2" color="#B91C1C" />
                     : <Pill text="Active" bg="#DCFCE7" color="#166534" />}
                 </div>
-                <button onClick={() => setEditOpen(true)} style={titleBtn}>✏  Edit</button>
+                <button onClick={() => setEditOpen(true)} style={{ ...titleBtn, fontSize: 10, padding: '2px 8px' }}>✏ Edit</button>
               </div>
-              <div style={{ display: 'flex', gap: 12, marginTop: 3 }}>
+              <div style={{ display: 'flex', gap: 10, marginTop: 2 }}>
                 {customer.idNumber && (
-                  <span style={{ fontSize: 11, fontFamily: 'monospace', color: '#6C757D' }}>{customer.idNumber}</span>
+                  <span style={{ fontSize: 10, fontFamily: 'monospace', color: '#6C757D' }}>{customer.idNumber}</span>
                 )}
-                <span style={{ fontSize: 11, color: '#6C757D' }}>{customer.phone}</span>
+                <span style={{ fontSize: 10, color: '#6C757D' }}>{customer.phone}</span>
               </div>
             </div>
 
             {/* ── Blacklist banner ───────────────────────────────────────────── */}
             {customer.blacklisted && (
-              <div style={{ background: '#FFF0F0', borderBottom: '1px solid #F0C0C0', padding: '5px 12px', display: 'flex', alignItems: 'flex-start', gap: 8, flexShrink: 0 }}>
-                <AlertTriangle style={{ width: 13, height: 13, color: '#C53030', flexShrink: 0, marginTop: 1 }} />
-                <span style={{ fontSize: 11, fontWeight: 700, color: '#C53030' }}>Blacklisted</span>
-                <span style={{ fontSize: 11, color: '#9B2C2C' }}>{customer.blacklistReason}</span>
+              <div style={{ background: '#FFF0F0', borderBottom: '1px solid #F0C0C0', padding: '4px 10px', display: 'flex', alignItems: 'flex-start', gap: 6, flexShrink: 0 }}>
+                <AlertTriangle style={{ width: 12, height: 12, color: '#C53030', flexShrink: 0, marginTop: 1 }} />
+                <span style={{ fontSize: 10, fontWeight: 700, color: '#C53030' }}>Blacklisted</span>
+                <span style={{ fontSize: 10, color: '#9B2C2C' }}>{customer.blacklistReason}</span>
                 {customer.blacklistedAt && (
-                  <span style={{ fontSize: 10, color: '#FC8181' }}>
+                  <span style={{ fontSize: 9, color: '#FC8181' }}>
                     · Since {new Date(customer.blacklistedAt).toLocaleDateString('en-ZA')}
                   </span>
                 )}
@@ -193,7 +193,7 @@ export function CustomerProfileModal({
                   key={t}
                   onClick={() => setTab(t)}
                   style={{
-                    padding: '6px 14px', fontSize: 12, fontWeight: tab === t ? 700 : 400,
+                    padding: '4px 12px', fontSize: 11, fontWeight: tab === t ? 700 : 400,
                     color: tab === t ? colors.action : colors.textSecondary,
                     background: 'none', border: 'none',
                     borderBottom: tab === t ? `2px solid ${colors.action}` : '2px solid transparent',
@@ -247,27 +247,27 @@ export function CustomerProfileModal({
 
 // ─── Section & Field (Settings-style) ────────────────────────────────────────
 
-function Section({ title, children, cols = 2 }: { title: string; children: React.ReactNode; cols?: number }) {
+function Section({ title, children, cols = 3 }: { title: string; children: React.ReactNode; cols?: number }) {
   return (
     <div style={{ borderBottom: '1px solid #E0E0E0' }}>
-      <div style={sHdrStyle}>
-        <span style={{ fontSize: 11, fontWeight: 700, color: '#1B3A6B' }}>{title}</span>
+      <div style={{ ...sHdrStyle, padding: '3px 8px' }}>
+        <span style={{ fontSize: 10, fontWeight: 700, color: '#1B3A6B', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{title}</span>
       </div>
-      <dl style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: '8px 12px', padding: '10px 12px' }}>
+      <dl style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: '6px 10px', padding: '6px 8px' }}>
         {children}
       </dl>
     </div>
   )
 }
 
-function Field({ label, value, mono, span2 }: { label: string; value?: string | null; mono?: boolean; span2?: boolean }) {
+function Field({ label, value, mono, span2, span3 }: { label: string; value?: string | null; mono?: boolean; span2?: boolean; span3?: boolean }) {
   const display = value ?? '—'
   return (
-    <div style={span2 ? { gridColumn: 'span 2' } : undefined}>
-      <span style={lblStyle}>{label}</span>
+    <div style={span3 ? { gridColumn: 'span 3' } : span2 ? { gridColumn: 'span 2' } : undefined}>
+      <span style={{ ...lblStyle, fontSize: 9, marginBottom: 1 }}>{label}</span>
       <div style={{
-        height: 26, border: '1px solid #D0D0D0', borderRadius: 2,
-        background: '#F8F8F8', padding: '0 7px', fontSize: 12,
+        height: 22, border: '1px solid #D0D0D0', borderRadius: 2,
+        background: '#F8F8F8', padding: '0 6px', fontSize: 11,
         color: display === '—' ? '#9CA3AF' : '#212529',
         fontFamily: mono ? 'monospace' : undefined,
         display: 'flex', alignItems: 'center',
@@ -289,7 +289,7 @@ function OverviewTab({ customer }: { customer: Customer }) {
 
   return (
     <div>
-      <Section title="Personal Details">
+      <Section title="Personal & Contact" cols={4}>
         <Field label="First Name"       value={customer.firstName} />
         <Field label="Last Name"        value={customer.lastName} />
         <Field label="ID Number"        value={customer.idNumber} mono />
@@ -298,47 +298,44 @@ function OverviewTab({ customer }: { customer: Customer }) {
         <Field label="Nationality"      value={fmt(customer.nationality)} />
         <Field label="Phone (Mobile)"   value={customer.phone} />
         <Field label="Landline"         value={fmt(customer.landline)} />
-        <Field label="Email"            value={fmt(customer.email)} />
+        <Field label="Email"            value={fmt(customer.email)} span2 />
         <Field label="Physical Address" value={fmt(customer.physicalAddress)} span2 />
         <Field label="Postal Address"   value={fmt(customer.postalAddress)} span2 />
       </Section>
 
-      <Section title="Business Details">
+      <Section title="Business & Pricing" cols={4}>
         <Field label="Customer Type"    value={customer.customerType} />
         <Field label="Primary Function" value={fmt(customer.primaryFunction)} />
-        <Field label="Market Sector"    value={customer.marketSector === 'formal' ? 'Formal (Scrap Yard)' : customer.marketSector === 'informal' ? 'Informal (Street Seller)' : null} />
+        <Field label="Market Sector"    value={customer.marketSector === 'formal' ? 'Formal' : customer.marketSector === 'informal' ? 'Informal' : null} />
         <Field label="Dealer Category"  value={customer.dealerCategory ? DEALER_LABELS[customer.dealerCategory] : null} />
         <Field label="VAT"              value={customer.zeroRated ? 'Zero Rated' : 'Standard'} />
         <Field label="Price Group"      value={customer.priceGroup?.name ?? null} />
+        <Field label="Credit Limit"     value={fmtMoney(customer.creditLimit)} />
         <Field label="Company Name"     value={fmt(customer.companyName)} />
         <Field label="Company Reg No"   value={fmt(customer.companyRegNumber)} />
         <Field label="Contact Person"   value={fmt(customer.contactPerson)} />
-        <Field label="VAT Number"       value={fmt(customer.vatNumber)} />
-        <Field label="Credit Limit"     value={fmtMoney(customer.creditLimit)} />
+        <Field label="VAT Number"       value={fmt(customer.vatNumber)} span2 />
         {customer.tradeCommodities && customer.tradeCommodities.length > 0 && (
-          <Field label="Trade Commodities" value={customer.tradeCommodities.join(', ')} span2 />
+          <Field label="Trade Commodities" value={customer.tradeCommodities.join(', ')} span3 />
         )}
       </Section>
 
-      <Section title="Banking Details">
+      <Section title="Banking & Compliance" cols={4}>
         <Field label="Bank Name"       value={fmt(customer.bankName)} />
         <Field label="Account Number"  value={fmt(customer.bankAccountNo)} mono />
         <Field label="Branch Code"     value={fmt(customer.bankBranchCode)} mono />
-      </Section>
-
-      <Section title="Compliance">
+        <Field label="Registered"      value={new Date(customer.createdAt).toLocaleDateString('en-ZA')} />
         <Field label="Police Register No." value={fmt(customer.policeRegisterNo)} />
         <Field label="License Number"      value={fmt(customer.licenseNumber)} />
         <Field label="License Expiry"      value={fmtDate(customer.licenseExpiry)} />
-        <Field label="Registered"          value={new Date(customer.createdAt).toLocaleDateString('en-ZA')} />
       </Section>
 
       {customer.customerNotes && (
         <div style={{ borderBottom: '1px solid #E0E0E0' }}>
-          <div style={sHdrStyle}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: '#1B3A6B' }}>Notes</span>
+          <div style={{ ...sHdrStyle, padding: '3px 8px' }}>
+            <span style={{ fontSize: 10, fontWeight: 700, color: '#1B3A6B', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Notes</span>
           </div>
-          <p style={{ fontSize: 12, color: '#212529', padding: '10px 12px', whiteSpace: 'pre-wrap', margin: 0 }}>
+          <p style={{ fontSize: 11, color: '#212529', padding: '6px 8px', whiteSpace: 'pre-wrap', margin: 0 }}>
             {customer.customerNotes}
           </p>
         </div>
@@ -458,42 +455,42 @@ function DocumentsTab({ customer, onPhotoSaved }: { customer: Customer; onPhotoS
   }
 
   return (
-    <div>
-      {/* Compliance Documents */}
-      <div style={{ borderBottom: '1px solid #E0E0E0' }}>
-        <div style={sHdrStyle}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: '#1B3A6B' }}>Compliance Documents</span>
+    <div className="grid grid-cols-2 gap-0" style={{ height: '100%' }}>
+      {/* Left: Compliance Documents */}
+      <div style={{ borderRight: '1px solid #E0E0E0' }}>
+        <div style={{ ...sHdrStyle, padding: '3px 8px' }}>
+          <span style={{ fontSize: 10, fontWeight: 700, color: '#1B3A6B', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Compliance Documents</span>
         </div>
-        <div style={{ padding: '10px 12px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+        <div style={{ padding: '6px 8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
             <select
               value={docType}
               onChange={(e) => setDocType(e.target.value)}
-              style={{ border: '1px solid #C0C0C0', borderRadius: 2, padding: '3px 8px', fontSize: 12, background: '#fff' }}
+              style={{ border: '1px solid #C0C0C0', borderRadius: 2, padding: '2px 6px', fontSize: 10, background: '#fff' }}
             >
               {Object.entries(DOCUMENT_TYPE_LABELS).map(([v, l]) => (
                 <option key={v} value={v}>{l}</option>
               ))}
             </select>
-            <label style={{ cursor: uploading ? 'not-allowed' : 'pointer', opacity: uploading ? 0.5 : 1, ...titleBtn }}>
+            <label style={{ cursor: uploading ? 'not-allowed' : 'pointer', opacity: uploading ? 0.5 : 1, ...titleBtn, fontSize: 10, padding: '2px 8px' }}>
               {uploading ? 'Uploading…' : '+ Upload'}
               <input type="file" style={{ display: 'none' }} accept=".pdf,.jpg,.jpeg,.png" onChange={handleDocUpload} disabled={uploading} />
             </label>
           </div>
           {!docs?.length ? (
-            <p style={{ fontSize: 12, color: '#9CA3AF', margin: 0 }}>No compliance documents uploaded yet.</p>
+            <p style={{ fontSize: 10, color: '#9CA3AF', margin: 0 }}>No documents uploaded.</p>
           ) : (
             <div style={{ border: '1px solid #E0E0E0', borderRadius: 2, overflow: 'hidden' }}>
               {docs.map((doc, i) => (
-                <div key={doc.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', borderTop: i > 0 ? '1px solid #F0F0F0' : undefined, background: i % 2 === 0 ? '#FAFAFA' : '#FFF' }}>
-                  <div>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: '#212529', display: 'block' }}>{DOCUMENT_TYPE_LABELS[doc.documentType] ?? doc.documentType}</span>
-                    <span style={{ fontSize: 11, color: '#9CA3AF' }}>{doc.fileName} · {new Date(doc.uploadedAt).toLocaleDateString('en-ZA')}</span>
+                <div key={doc.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 6px', borderTop: i > 0 ? '1px solid #F0F0F0' : undefined, background: i % 2 === 0 ? '#FAFAFA' : '#FFF' }}>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <span style={{ fontSize: 10, fontWeight: 600, color: '#212529', display: 'block' }}>{DOCUMENT_TYPE_LABELS[doc.documentType] ?? doc.documentType}</span>
+                    <span style={{ fontSize: 9, color: '#9CA3AF' }}>{doc.fileName}</span>
                   </div>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button onClick={() => handleDocView(doc.r2Key)} style={{ fontSize: 11, color: '#1B3A6B', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>View</button>
+                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                    <button onClick={() => handleDocView(doc.r2Key)} style={{ fontSize: 9, color: '#1B3A6B', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>View</button>
                     {isManager && (
-                      <button onClick={() => handleDocDelete(doc.id)} style={{ fontSize: 11, color: '#C53030', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>Delete</button>
+                      <button onClick={() => handleDocDelete(doc.id)} style={{ fontSize: 9, color: '#C53030', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>Delete</button>
                     )}
                   </div>
                 </div>
@@ -503,13 +500,13 @@ function DocumentsTab({ customer, onPhotoSaved }: { customer: Customer; onPhotoS
         </div>
       </div>
 
-      {/* ID Photo */}
-      <div style={{ borderBottom: '1px solid #E0E0E0' }}>
-        <div style={{ ...sHdrStyle, display: 'flex', alignItems: 'center', gap: 6 }}>
-          <Camera style={{ width: 11, height: 11, color: '#1B3A6B' }} />
-          <span style={{ fontSize: 11, fontWeight: 700, color: '#1B3A6B' }}>ID Document Photo</span>
+      {/* Right: ID Photo */}
+      <div>
+        <div style={{ ...sHdrStyle, padding: '3px 8px', display: 'flex', alignItems: 'center', gap: 4 }}>
+          <Camera style={{ width: 10, height: 10, color: '#1B3A6B' }} />
+          <span style={{ fontSize: 10, fontWeight: 700, color: '#1B3A6B', textTransform: 'uppercase', letterSpacing: '0.5px' }}>ID Photo</span>
         </div>
-        <div style={{ padding: '10px 12px' }}>
+        <div style={{ padding: '6px 8px' }}>
           {customer.idPhotoR2Key ? (
             <PhotoViewer
               r2Key={customer.idPhotoR2Key}
@@ -519,8 +516,8 @@ function DocumentsTab({ customer, onPhotoSaved }: { customer: Customer; onPhotoS
               autoLoad={justUploaded}
             />
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <p style={{ fontSize: 12, color: '#9CA3AF', margin: 0 }}>No ID photo uploaded yet</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <p style={{ fontSize: 10, color: '#9CA3AF', margin: 0 }}>No ID photo uploaded yet</p>
               <PhotoUploader
                 context="customer_id"
                 referenceId={customer.id}
