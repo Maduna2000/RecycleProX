@@ -309,34 +309,6 @@ export default function CasualCustomerDetailPage() {
             </div>
           </div>
 
-          <SHdr title="Actions" />
-          <div style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 5 }}>
-            {!isEditing ? (
-              <button
-                onClick={() => setIsEditing(true)}
-                style={{ fontSize: 11, padding: '4px 8px', background: 'linear-gradient(180deg,#F5F5F5 0%,#E0E0E0 100%)', border: '1px solid #ABABAB', borderRadius: 2, cursor: 'pointer', textAlign: 'left', color: '#333', width: '100%' }}
-              >
-                ✏  Edit Profile
-              </button>
-            ) : (
-              <>
-                <button
-                  onClick={handleCancel}
-                  disabled={saving}
-                  style={{ fontSize: 11, padding: '4px 8px', background: 'linear-gradient(180deg,#F5F5F5 0%,#E0E0E0 100%)', border: '1px solid #ABABAB', borderRadius: 2, cursor: 'pointer', textAlign: 'left', color: '#333', width: '100%' }}
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSubmit(onSubmit)}
-                  disabled={saving}
-                  style={{ fontSize: 11, padding: '4px 8px', background: 'linear-gradient(180deg,#10B981 0%,#059669 100%)', border: '1px solid #059669', borderRadius: 2, cursor: saving ? 'not-allowed' : 'pointer', textAlign: 'left', color: '#fff', fontWeight: 600, width: '100%', opacity: saving ? 0.7 : 1 }}
-                >
-                  {saving ? 'Saving...' : '💾 Save'}
-                </button>
-              </>
-            )}
-          </div>
         </div>
       </div>
     </div>
