@@ -35,6 +35,9 @@ export default function CasualsPage() {
 
   const [search, setSearch]               = useState('')
   const [letter, setLetter]               = useState<string | null>(null)
+  const [showBlacklisted, setShowBlacklisted] = useState('')
+  const [dealerCategory, setDealerCategory]   = useState('')
+  const [primaryFunction, setPrimaryFunction] = useState('')
   const [importOpen, setImportOpen]       = useState(false)
   const [profileId, setProfileId]         = useState<string | null>(null)
   const [blacklistId, setBlacklistId]     = useState<string | null>(null)
@@ -44,6 +47,9 @@ export default function CasualsPage() {
 
   const params = new URLSearchParams({ type: 'casual', limit: '200' })
   if (search) params.set('search', search)
+  if (showBlacklisted) params.set('blacklisted', showBlacklisted)
+  if (dealerCategory) params.set('dealerCategory', dealerCategory)
+  if (primaryFunction) params.set('primaryFunction', primaryFunction)
   const { data, isLoading } = useSWR<{ customers: Customer[]; total: number }>(
     `/api/customers?${params}`,
     fetcher,
@@ -210,6 +216,46 @@ export default function CasualsPage() {
             />
           </div>
 
+          <select
+            className="h-7 rounded px-2 text-xs bg-white focus:outline-none border"
+            style={{ color: colors.textPrimary, borderColor: colors.border }}
+            value={showBlacklisted}
+            onChange={(e) => setShowBlacklisted(e.target.value)}
+          >
+            <option value="">All Status</option>
+            <option value="false">Active Only</option>
+            <option value="true">Blacklisted Only</option>
+          </select>
+
+          <select
+            className="h-7 rounded px-2 text-xs bg-white focus:outline-none border"
+            style={{ color: colors.textPrimary, borderColor: colors.border }}
+            value={dealerCategory}
+            onChange={(e) => setDealerCategory(e.target.value)}
+          >
+            <option value="">All Categories</option>
+            <option value="casual">Casual</option>
+            <option value="dealer_1">Dealer 1</option>
+            <option value="dealer_2">Dealer 2</option>
+            <option value="dealer_3">Dealer 3</option>
+          </select>
+
+          <select
+            className="h-7 rounded px-2 text-xs bg-white focus:outline-none border"
+            style={{ color: colors.textPrimary, borderColor: colors.border }}
+            value={primaryFunction}
+            onChange={(e) => setPrimaryFunction(e.target.value)}
+          >
+            <option value="">All Functions</option>
+            <option value="supplier">Supplier</option>
+            <option value="customer">Customer</option>
+            <option value="both">Both</option>
+          </select>
+
+          <span className="text-xs" style={{ color: colors.textSecondary }}>
+            {customers.length} casual{customers.length !== 1 ? 's' : ''}
+          </span>
+
           {isManager && (
             <div className="ml-auto">
               <button
@@ -256,7 +302,6 @@ export default function CasualsPage() {
             columns={columns}
             rows={customers}
             rowKey={(r) => r.id}
-            onRowClick={(r) => setProfileId(r.id)}
             rowActions={rowActions}
             loading={isLoading}
             emptyMessage={letter
