@@ -81,6 +81,27 @@ export function resolveCustomerIdNumber(o: OrderWithCustomer): string {
 // ─── Create ───────────────────────────────────────────────────────────────────
 
 export async function createScaleOrder(data: CreateScaleOrderInput, operatorId: string) {
+  // Auto-save casual customer to Customer table if idNumber is provided
+  if (!data.customerId && data.casualIdNumber && data.casualFirstName && data.casualLastName && data.casualPhone) {
+    const { quickCreate } = await import('./customerService')
+    const savedCustomer = await quickCreate({
+      idNumber: data.casualIdNumber,
+      firstName: data.casualFirstName,
+      lastName: data.casualLastName,
+      phone: data.casualPhone,
+      physicalAddress: data.casualAddress,
+    }, operatorId)
+
+    // Link saved customer to scale order
+    data.customerId = savedCustomer.id
+    // Clear casual fields since we now have customerId
+    data.casualFirstName = undefined
+    data.casualLastName = undefined
+    data.casualPhone = undefined
+    data.casualIdNumber = undefined
+    data.casualAddress = undefined
+  }
+
   if (data.customerId) {
     const customer = await prisma.customer.findUnique({ where: { id: data.customerId } })
     if (!customer) throw new ScaleCustomerNotFoundError()

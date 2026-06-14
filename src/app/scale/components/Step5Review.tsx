@@ -70,6 +70,7 @@ export default function Step5Review({ customer, cart, onRemoveLine, onNewOrder }
               casualLastName:  customer.lastName,
               casualPhone:     customer.phone,
               casualIdNumber:  customer.idNumber,
+              casualAddress:   customer.address,
               lines,
             }
 

@@ -4,14 +4,14 @@ import { useState, useEffect, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Search, UserPlus, Users, ArrowRight, Loader2, AlertCircle, WifiOff } from 'lucide-react'
+import { Search, UserPlus, Users, ArrowRight, Loader2, AlertCircle, WifiOff, CheckCircle } from 'lucide-react'
 import { useScaleCache } from '@/hooks/useScaleCache'
 
 const CasualSchema = z.object({
   firstName: z.string().min(1, 'Required'),
   lastName:  z.string().min(1, 'Required'),
   phone:     z.string().regex(/^[72]\d{7}$/, 'Must be 8 digits, starting with 7 (mobile) or 2 (landline)'),
-  idNumber:  z.string().optional().refine(v => !v || /^\d{13}$/.test(v), 'Must be exactly 13 digits'),
+  idNumber:  z.string().min(1, 'Required').regex(/^\d{13}$/, 'Must be exactly 13 digits'),
   address:   z.string().optional(),
 })
 
@@ -23,6 +23,7 @@ export interface SelectedCustomer {
   lastName:  string
   phone:     string
   idNumber?: string
+  address?:  string
   isNew?:    boolean
 }
 
@@ -36,6 +37,16 @@ export default function Step1Customer({ onSelect }: Props) {
   const [searchResults, setSearchResults] = useState<SelectedCustomer[]>([])
   const [searching, setSearching]     = useState(false)
   const [searchError, setSearchError] = useState<string | null>(null)
+  const [casualLookupResult, setCasualLookupResult] = useState<{
+    firstName: string
+    lastName: string
+    phone: string
+    physicalAddress?: string | null
+    blacklisted: boolean
+    blacklistReason?: string | null
+  } | null>(null)
+  const [blacklistError, setBlacklistError] = useState<string | null>(null)
+  const [lookingUp, setLookingUp] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const { isOnline, searchCustomers } = useScaleCache()
 
@@ -72,8 +83,58 @@ export default function Step1Customer({ onSelect }: Props) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, searchQuery])
 
+  async function handleIdNumberLookup(idNumber: string) {
+    if (idNumber.length !== 13) return
+
+    setLookingUp(true)
+    setBlacklistError(null)
+    setCasualLookupResult(null)
+
+    try {
+      const res = await fetch(`/api/customers/lookup?idNumber=${idNumber}`)
+      if (!res.ok) throw new Error('Lookup failed')
+
+      const customer = await res.json()
+
+      if (customer) {
+        // Check blacklist status
+        if (customer.blacklisted) {
+          setBlacklistError(`This customer is blacklisted: ${customer.blacklistReason || 'No reason provided'}`)
+          setCasualLookupResult(null)
+          return
+        }
+
+        // Auto-populate but keep editable
+        form.setValue('firstName', customer.firstName)
+        form.setValue('lastName', customer.lastName)
+        form.setValue('phone', customer.phone)
+        form.setValue('address', customer.physicalAddress || '')
+
+        setCasualLookupResult(customer)
+        setBlacklistError(null)
+      } else {
+        setCasualLookupResult(null)
+        setBlacklistError(null)
+      }
+    } catch {
+      // Silently fail - allow manual entry
+      setCasualLookupResult(null)
+      setBlacklistError(null)
+    } finally {
+      setLookingUp(false)
+    }
+  }
+
   function handleCasualSubmit(data: CasualForm) {
-    onSelect({ id: null, firstName: data.firstName, lastName: data.lastName, phone: data.phone, idNumber: data.idNumber || undefined, isNew: true })
+    onSelect({
+      id: null,
+      firstName: data.firstName,
+      lastName: data.lastName,
+      phone: data.phone,
+      idNumber: data.idNumber || undefined,
+      address: data.address || undefined,
+      isNew: true
+    })
   }
 
   // ── Mode: choose ──────────────────────────────────────────────────────────
@@ -125,6 +186,44 @@ export default function Step1Customer({ onSelect }: Props) {
         <p className="text-slate-500 mb-6">Enter the walk-in customer&apos;s information</p>
 
         <form onSubmit={form.handleSubmit(handleCasualSubmit)} className="flex flex-col gap-4">
+          {/* 1. National ID - FIRST FIELD */}
+          <div>
+            <label className="text-sm font-medium text-slate-700 block mb-1">National ID / Passport *</label>
+            <div className="relative">
+              <input
+                {...form.register('idNumber')}
+                autoComplete="off"
+                className="w-full border border-slate-300 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                placeholder="1234567890123"
+                onBlur={(e) => handleIdNumberLookup(e.target.value)}
+                onChange={(e) => {
+                  if (e.target.value.length === 13) {
+                    handleIdNumberLookup(e.target.value)
+                  }
+                }}
+              />
+              {lookingUp && (
+                <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 animate-spin" />
+              )}
+            </div>
+            {form.formState.errors.idNumber && (
+              <p className="text-red-500 text-xs mt-1">{form.formState.errors.idNumber.message}</p>
+            )}
+            {casualLookupResult && (
+              <p className="text-emerald-600 text-xs mt-1 flex items-center gap-1">
+                <CheckCircle className="w-3 h-3" /> Customer found: {casualLookupResult.firstName} {casualLookupResult.lastName}
+              </p>
+            )}
+            {blacklistError && (
+              <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 mt-1">
+                <p className="text-red-700 text-xs flex items-center gap-1">
+                  <AlertCircle className="w-4 h-4" /> {blacklistError}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* 2 & 3. First Name + Last Name */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="text-sm font-medium text-slate-700 block mb-1">First Name *</label>
@@ -152,6 +251,7 @@ export default function Step1Customer({ onSelect }: Props) {
             </div>
           </div>
 
+          {/* 4. Phone Number */}
           <div>
             <label className="text-sm font-medium text-slate-700 block mb-1">Phone Number *</label>
             <input
@@ -167,28 +267,20 @@ export default function Step1Customer({ onSelect }: Props) {
             )}
           </div>
 
-          <div>
-            <label className="text-sm font-medium text-slate-700 block mb-1">National ID / Passport</label>
-            <input
-              {...form.register('idNumber')}
-              autoComplete="off"
-              className="w-full border border-slate-300 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              placeholder="13-digit national ID (optional)"
-            />
-          </div>
-
+          {/* 5. Address */}
           <div>
             <label className="text-sm font-medium text-slate-700 block mb-1">Address</label>
             <input
               {...form.register('address')}
               className="w-full border border-slate-300 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              placeholder="Optional"
+              placeholder="Physical address"
             />
           </div>
 
           <button
             type="submit"
-            className="mt-2 bg-emerald-600 hover:bg-emerald-700 text-white text-lg font-semibold h-14 rounded-xl flex items-center justify-center gap-2 transition-colors"
+            disabled={!!blacklistError}
+            className="mt-2 bg-emerald-600 hover:bg-emerald-700 text-white text-lg font-semibold h-14 rounded-xl flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Continue →
           </button>
