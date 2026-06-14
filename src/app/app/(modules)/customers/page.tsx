@@ -109,6 +109,7 @@ function DealerCategoryBadge({ cat }: { cat?: string | null }) {
 
 // ─── Accounts list ─────────────────────────────────────────────────────────────
 function AccountsList({ onAddCustomer }: { onAddCustomer: () => void }) {
+  const router = useRouter()
   const { data: session } = useSession()
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
 
