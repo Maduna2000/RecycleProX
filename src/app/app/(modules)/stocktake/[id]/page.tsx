@@ -143,6 +143,21 @@ export default function StocktakeDetailPage() {
   // Scale functions removed - scales are a future feature
   // See Phase 5 in the plan: scales disabled but UI kept as placeholder
 
+  // Placeholder scale functions for add weigh mode (disabled until scale integration)
+  function recomputeAddNet(gross: string, tare: string) {
+    const g = parseFloat(gross || '0')
+    const t = parseFloat(tare || '0')
+    const net = Math.max(0, g - t)
+    setAddWeigh((p) => ({ ...p, grossQty: gross, tareQty: tare }))
+    setCountedQty(net > 0 ? net.toFixed(3) : '')
+  }
+  function handleAddWeighGross() {
+    // Placeholder for future scale integration
+  }
+  function handleAddWeighTare() {
+    // Placeholder for future scale integration
+  }
+
   async function saveEntry(pid: string, qty: string, opts?: { grossQty?: string; tareQty?: string }) {
     const res = await fetch(`/api/stocktake/${id}`, {
       method: 'PUT',
