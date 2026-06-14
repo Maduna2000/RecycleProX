@@ -150,7 +150,7 @@ export default function CasualCustomerDetailPage() {
         <div style={{ flex: 1, borderRight: '1px solid #D0D0D0', background: '#fff' }}>
 
           {tab === 'Overview' && (
-            <Accordion type="single" collapsible defaultValue="personal">
+            <Accordion type="single" defaultValue="personal">
               <AccordionItem value="personal">
                 <AccordionTrigger style={{ background: 'linear-gradient(180deg,#FFFFFF 0%,#E8E8E8 100%)', borderBottom: '1px solid #C0C0C0', padding: '6px 10px', fontSize: 11, fontWeight: 700, color: '#1B3A6B' }}>
                   Personal Details
