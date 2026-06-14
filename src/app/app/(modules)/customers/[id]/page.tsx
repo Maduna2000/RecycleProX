@@ -42,10 +42,6 @@ type Customer = {
   accountCode?: string | null
 }
 
-const DEALER_LABELS: Record<string, string> = {
-  casual: 'Casual', dealer_1: 'Dealer 1', dealer_2: 'Dealer 2', dealer_3: 'Dealer 3',
-}
-
 type CustomerDoc = {
   id: string; documentType: string; fileName: string; r2Key: string
   notes?: string; uploadedAt: string
