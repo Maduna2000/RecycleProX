@@ -53,6 +53,7 @@ export default function ScaleOrdersPage() {
   const [detail, setDetail]   = useState<Order | null>(null)
   const [voidId, setVoidId]   = useState<string | null>(null)
   const [voidReason, setVoidReason] = useState('')
+  const [photoViewer, setPhotoViewer] = useState<{ urls: string[]; index: number } | null>(null)
 
   const query = buildQuery(filters, page)
   const { data, isFetching, error, refetch } = useQuery({
@@ -299,13 +300,28 @@ export default function ScaleOrdersPage() {
 
             {detail.photoUrls && detail.photoUrls.length > 0 && (
               <div className="mt-5">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Photos</p>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Photos ({detail.photoUrls.length})</p>
+                  <button
+                    onClick={() => setPhotoViewer({ urls: detail.photoUrls!, index: 0 })}
+                    className="text-xs text-emerald-600 hover:text-emerald-700 font-medium"
+                  >
+                    View All
+                  </button>
+                </div>
                 <div className="grid grid-cols-2 gap-3">
                   {detail.photoUrls.map((url, i) => (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <a key={i} href={url} target="_blank" rel="noreferrer">
-                      <img src={url} alt={`Photo ${i + 1}`} className="w-full h-36 object-cover rounded-xl border border-slate-200 hover:opacity-90 transition-opacity" />
-                    </a>
+                    <button
+                      key={i}
+                      onClick={() => setPhotoViewer({ urls: detail.photoUrls!, index: i })}
+                      className="relative group"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={url} alt={`Photo ${i + 1}`} className="w-full h-36 object-cover rounded-xl border border-slate-200 group-hover:opacity-90 transition-opacity" />
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/20 rounded-xl transition-colors">
+                        <Eye className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </div>
+                    </button>
                   ))}
                 </div>
               </div>
@@ -317,6 +333,78 @@ export default function ScaleOrdersPage() {
               </a>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Photo Viewer Modal */}
+      {photoViewer && (
+        <div className="fixed inset-0 bg-black/90 flex flex-col z-[100]">
+          {/* Header */}
+          <div className="flex items-center justify-between px-6 py-4 bg-black/50">
+            <span className="text-white font-medium">
+              Photo {photoViewer.index + 1} of {photoViewer.urls.length}
+            </span>
+            <button
+              onClick={() => setPhotoViewer(null)}
+              className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+            >
+              <X className="w-6 h-6 text-white" />
+            </button>
+          </div>
+
+          {/* Photo Container */}
+          <div className="flex-1 flex items-center justify-center p-4 relative">
+            {/* Previous Button */}
+            {photoViewer.urls.length > 1 && (
+              <button
+                onClick={() => setPhotoViewer(prev => prev ? { ...prev, index: (prev.index - 1 + prev.urls.length) % prev.urls.length } : null)}
+                className="absolute left-4 p-3 bg-black/50 hover:bg-black/70 rounded-full transition-colors z-10"
+              >
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+            )}
+
+            {/* Image */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={photoViewer.urls[photoViewer.index]}
+              alt={`Photo ${photoViewer.index + 1}`}
+              className="max-w-full max-h-full object-contain rounded-lg"
+              style={{ maxHeight: 'calc(100vh - 160px)' }}
+            />
+
+            {/* Next Button */}
+            {photoViewer.urls.length > 1 && (
+              <button
+                onClick={() => setPhotoViewer(prev => prev ? { ...prev, index: (prev.index + 1) % prev.urls.length } : null)}
+                className="absolute right-4 p-3 bg-black/50 hover:bg-black/70 rounded-full transition-colors z-10"
+              >
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            )}
+          </div>
+
+          {/* Thumbnail Strip */}
+          {photoViewer.urls.length > 1 && (
+            <div className="flex items-center justify-center gap-2 px-6 py-4 bg-black/50 overflow-x-auto">
+              {photoViewer.urls.map((url, i) => (
+                <button
+                  key={i}
+                  onClick={() => setPhotoViewer(prev => prev ? { ...prev, index: i } : null)}
+                  className={`flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-all ${
+                    i === photoViewer.index ? 'border-emerald-500 opacity-100' : 'border-transparent opacity-60 hover:opacity-100'
+                  }`}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={url} alt={`Thumbnail ${i + 1}`} className="w-full h-full object-cover" />
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
