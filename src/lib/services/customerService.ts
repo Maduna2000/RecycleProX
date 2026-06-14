@@ -194,7 +194,53 @@ export async function blacklistCustomer(id: string, reason: string, userId: stri
   return customer
 }
 
+export class CustomerHasRecordsError extends Error {
+  relatedRecords: { type: string; count: number }[]
+  constructor(records: { type: string; count: number }[]) {
+    const summary = records.map(r => `${r.count} ${r.type}`).join(', ')
+    super(`Cannot delete customer with existing records: ${summary}`)
+    this.name = 'CustomerHasRecordsError'
+    this.relatedRecords = records
+  }
+}
+
 export async function deleteCustomer(id: string, userId: string) {
+  // Check for related records that would prevent deletion
+  const [
+    purchaseCount,
+    saleCount,
+    paymentCount,
+    loanCount,
+    loanRepaymentCount,
+    transactionPaymentCount,
+    scaleOrderCount,
+  ] = await Promise.all([
+    prisma.purchase.count({ where: { customerId: id } }),
+    prisma.sale.count({ where: { customerId: id } }),
+    prisma.payment.count({ where: { customerId: id } }),
+    prisma.loan.count({ where: { customerId: id } }),
+    prisma.loanRepayment.count({ where: { customerId: id } }),
+    prisma.transactionPayment.count({ where: { customerId: id } }),
+    prisma.scaleOrder.count({ where: { customerId: id } }),
+  ])
+
+  const relatedRecords: { type: string; count: number }[] = []
+  if (purchaseCount > 0) relatedRecords.push({ type: 'purchases', count: purchaseCount })
+  if (saleCount > 0) relatedRecords.push({ type: 'sales', count: saleCount })
+  if (paymentCount > 0) relatedRecords.push({ type: 'payments', count: paymentCount })
+  if (loanCount > 0) relatedRecords.push({ type: 'loans', count: loanCount })
+  if (loanRepaymentCount > 0) relatedRecords.push({ type: 'loan repayments', count: loanRepaymentCount })
+  if (transactionPaymentCount > 0) relatedRecords.push({ type: 'transaction payments', count: transactionPaymentCount })
+  if (scaleOrderCount > 0) relatedRecords.push({ type: 'scale orders', count: scaleOrderCount })
+
+  if (relatedRecords.length > 0) {
+    throw new CustomerHasRecordsError(relatedRecords)
+  }
+
+  // Delete customer documents first (they have onDelete: Cascade but let's be explicit)
+  await prisma.customerDocument.deleteMany({ where: { customerId: id } })
+
+  // Now safe to delete the customer
   await prisma.customer.delete({ where: { id } })
   logger.info({ customerId: id, userId }, 'Customer deleted')
 }

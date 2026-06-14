@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
-import { getCustomer, updateCustomer, deleteCustomer } from '@/lib/services/customerService'
+import { getCustomer, updateCustomer, deleteCustomer, CustomerHasRecordsError } from '@/lib/services/customerService'
 import { UpdateCustomerSchema } from '@/lib/schemas/customer'
 import logger from '@/lib/logger'
 
@@ -46,6 +46,12 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
     await deleteCustomer(params.id, session.user.id)
     return NextResponse.json({ ok: true })
   } catch (err) {
+    if (err instanceof CustomerHasRecordsError) {
+      return NextResponse.json({
+        error: err.message,
+        relatedRecords: err.relatedRecords,
+      }, { status: 409 })
+    }
     logger.error({ err }, 'DELETE /api/customers/[id] failed')
     return NextResponse.json({ error: 'Failed to delete customer' }, { status: 500 })
   }
