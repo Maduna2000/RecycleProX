@@ -301,39 +301,99 @@ function EditCustomerModal({ customer, onClose, onSuccess }: { customer: Custome
     else { const j = await res.json(); toast.error(j.error ?? 'Failed to update') }
   }
 
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    padding: '6px 10px',
+    fontSize: 12,
+    border: '1px solid #D0D0D0',
+    borderRadius: 2,
+    background: '#fff',
+    color: '#212529',
+  }
+
+  const errorStyle: React.CSSProperties = {
+    fontSize: 10,
+    color: '#DC2626',
+    marginTop: 2,
+  }
+
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>Edit Customer</DialogTitle></DialogHeader>
+      <DialogContent className="sm:max-w-md p-0" style={{ maxHeight: '90vh', overflow: 'hidden', borderRadius: 2, border: '1px solid #B0B0B0' }}>
+        {/* Title bar */}
+        <div style={{ background: 'linear-gradient(180deg,#EAEAEA 0%,#D4D4D4 100%)', borderBottom: '2px solid #B0B0B0', padding: '8px 12px' }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: '#212529' }}>Edit Customer</span>
+        </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-3 mt-2">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label>First Name</Label>
-              <Input {...register('firstName')} className="mt-1" disabled={loading} />
-              {errors.firstName && <p className="text-xs text-red-600 mt-1">{errors.firstName.message}</p>}
+        <form onSubmit={handleSubmit(onSubmit)} style={{ display: 'flex', flexDirection: 'column', maxHeight: 'calc(90vh - 45px)' }}>
+          {/* Form content */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '12px' }}>
+            {/* Personal Details section */}
+            <SHdr title="Personal Details" />
+            <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 10, background: '#fff' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
+                <div>
+                  <span style={lbl}>First Name</span>
+                  <input {...register('firstName')} disabled={loading} style={inputStyle} />
+                  {errors.firstName && <p style={errorStyle}>{errors.firstName.message}</p>}
+                </div>
+                <div>
+                  <span style={lbl}>Last Name</span>
+                  <input {...register('lastName')} disabled={loading} style={inputStyle} />
+                  {errors.lastName && <p style={errorStyle}>{errors.lastName.message}</p>}
+                </div>
+              </div>
+              <div>
+                <span style={lbl}>Phone (Mobile)</span>
+                <input {...register('phone')} disabled={loading} style={inputStyle} />
+                {errors.phone && <p style={errorStyle}>{errors.phone.message}</p>}
+              </div>
+              <div>
+                <span style={lbl}>Physical Address</span>
+                <input {...register('physicalAddress')} disabled={loading} style={inputStyle} />
+              </div>
             </div>
-            <div>
-              <Label>Last Name</Label>
-              <Input {...register('lastName')} className="mt-1" disabled={loading} />
-              {errors.lastName && <p className="text-xs text-red-600 mt-1">{errors.lastName.message}</p>}
-            </div>
-          </div>
-          <div>
-            <Label>Phone (Mobile)</Label>
-            <Input {...register('phone')} className="mt-1" disabled={loading} />
-            {errors.phone && <p className="text-xs text-red-600 mt-1">{errors.phone.message}</p>}
-          </div>
-          <div>
-            <Label>Physical Address</Label>
-            <Input {...register('physicalAddress')} className="mt-1" disabled={loading} />
           </div>
 
-          <div className="flex justify-end gap-2 pt-4 border-t">
-            <Button type="button" variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
-            <Button type="submit" className="bg-green-600 hover:bg-green-700" disabled={loading}>
-              {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving...</> : 'Save Changes'}
-            </Button>
+          {/* Action buttons */}
+          <div style={{ borderTop: '1px solid #D0D0D0', padding: '10px 12px', background: '#F5F5F5', display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={loading}
+              style={{
+                fontSize: 11,
+                padding: '5px 12px',
+                background: 'linear-gradient(180deg,#F5F5F5 0%,#E0E0E0 100%)',
+                border: '1px solid #ABABAB',
+                borderRadius: 2,
+                cursor: loading ? 'not-allowed' : 'pointer',
+                color: '#333',
+                opacity: loading ? 0.5 : 1,
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              style={{
+                fontSize: 11,
+                padding: '5px 12px',
+                background: loading ? 'linear-gradient(180deg,#D1FAE5 0%,#A7F3D0 100%)' : 'linear-gradient(180deg,#10B981 0%,#059669 100%)',
+                border: '1px solid #059669',
+                borderRadius: 2,
+                cursor: loading ? 'not-allowed' : 'pointer',
+                color: '#fff',
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+              }}
+            >
+              {loading && <Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} />}
+              {loading ? 'Saving...' : 'Save Changes'}
+            </button>
           </div>
         </form>
       </DialogContent>

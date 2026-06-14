@@ -62,7 +62,10 @@
       "Bash(powershell.exe -Command \"Rename-Item -Path 'c:\\\\Users\\\\MD TECH SOLUTION\\\\RecycleProX\\\\mobile\\\\node_modules\\\\.react-native-reanimated-QP6wXYpf' -NewName '.skip-eas' -ErrorAction Stop; Write-Host renamed\")",
       "Bash(node -e \"let d='';process.stdin.on\\('data',c=>d+=c\\);process.stdin.on\\('end',\\(\\)=>{const j=JSON.parse\\(d\\);console.log\\('error:',JSON.stringify\\(j.error\\)\\);console.log\\('logs:',j.logFiles?.[0]?.substring\\(0,200\\)\\);}\\)\")",
       "Bash(curl -s \"https://storage.googleapis.com/eas-workflows-production/logs/43bec9ce-4c06-4c2a-9609-53de273405ec/9464f196-f68f-47a9-a23a-804b75b764d1/2026-06-09T14%3A02%3A08Z-9ab68c80-5285-42ba-b755-05b82d2e6f6f.txt?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=www-production%40exponentjs.iam.gserviceaccount.com%2F20260609%2Fauto%2Fstorage%2Fgoog4_request&X-Goog-Date=20260609T140337Z&X-Goog-Expires=900&X-Goog-SignedHeaders=host&X-Goog-Signature=9bc3e33dcd446ed781e46436542482a8f89ffc9f44f5db039c7490e2af53fe51315fee6ad60dfce4dc2e21a0c4f578e1e7322eb06dfabd3eba40666a30f7d4f6828a94a23f6de9b946874baafa55da15f11631aa5f9beec28104276b1b6132cc448491a827611442eeed10f56532367e93908457f53cb5ce599ecbe146a76071fd84dd4d024f64011da49b5ba64f61418d944ea38625bf2ccfa7792a9003ede198922eb47defbd1b5727abe076e2e955d0ad15ad75ce50a02a8071efc9dbd44bda84c91a62f0f3475986592925e9d771c48506feb76c787741bcd28c5926e08d15ad7a7b7bf77822c4d2e44b1bb3da486943689fe0596068fa81940874613940\")",
-      "Bash(./gradlew assembleRelease:*)"
+      "Bash(./gradlew assembleRelease:*)",
+      "Bash(cd:*)",
+      "Bash(dir:*)",
+      "Bash(git commit:*)"
     ]
   }
 }
