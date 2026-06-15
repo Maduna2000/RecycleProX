@@ -42,8 +42,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Validation failed', issues: parsed.error.issues }, { status: 400 })
   }
 
+  // Extract allowedModules from body (not validated by CreateUserSchema)
+  const allowedModules = Array.isArray(body.allowedModules) ? body.allowedModules : undefined
+
   try {
-    const user = await createUser(parsed.data, session.user.id)
+    const user = await createUser({ ...parsed.data, allowedModules }, session.user.id)
     return NextResponse.json(user, { status: 201 })
   } catch (err) {
     logger.error({ err }, 'POST /api/users failed')

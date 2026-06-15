@@ -8,6 +8,27 @@ import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 
+// Module options for permission control
+const MODULE_OPTIONS = [
+  { key: '/app/dashboard', label: 'Dashboard' },
+  { key: '/app/customers', label: 'Accounts' },
+  { key: '/app/purchases', label: 'Purchases' },
+  { key: '/app/sales', label: 'Sales' },
+  { key: '/app/payments', label: 'Payments' },
+  { key: '/app/expenses', label: 'Expenses' },
+  { key: '/app/cashup', label: 'Cash Up' },
+  { key: '/app/float', label: 'Float' },
+  { key: '/app/stock', label: 'Stock' },
+  { key: '/app/stocktake', label: 'Stocktake' },
+  { key: '/app/products', label: 'Products' },
+  { key: '/app/price-groups', label: 'Price Groups' },
+  { key: '/app/reports', label: 'Reports' },
+  { key: '/app/loans', label: 'Loans' },
+  { key: '/app/police-register', label: 'Police Register' },
+  { key: '/app/audit-log', label: 'Audit Log' },
+  { key: '/app/settings', label: 'Settings' },
+]
+
 // ─── Shared styles (matching profile pages) ─────────────────────────────────────
 const modalHdr: React.CSSProperties = {
   background: 'linear-gradient(180deg,#EAEAEA 0%,#D4D4D4 100%)',
@@ -47,21 +68,69 @@ const submitBtn: React.CSSProperties = {
   background: 'linear-gradient(180deg,#10B981 0%,#059669 100%)',
   border: '1px solid #059669', color: '#fff', fontWeight: 600,
 }
+const smallBtn: React.CSSProperties = {
+  fontSize: 10, padding: '2px 8px', borderRadius: 2, cursor: 'pointer',
+  background: '#f5f5f5', border: '1px solid #ccc', color: '#333',
+}
 
 export function CreateUserModal({ open, onClose, onSuccess }: { open: boolean; onClose: () => void; onSuccess: () => void }) {
   const [loading, setLoading] = useState(false)
+  const [selectedRole, setSelectedRole] = useState<string>('')
+  const [selectedModules, setSelectedModules] = useState<string[]>([])
+
   const { register, handleSubmit, setValue, reset, formState: { errors } } = useForm<CreateUserInput>({
     resolver: zodResolver(CreateUserSchema),
     defaultValues: { isActive: true },
   })
 
+  // Show module selection only for manager and cashier roles
+  const showModuleSelection = selectedRole === 'manager' || selectedRole === 'cashier'
+
+  function handleRoleChange(role: string) {
+    setSelectedRole(role)
+    setValue('role', role as 'admin' | 'manager' | 'cashier' | 'scale_operator')
+    // Clear module selection when changing roles
+    if (role === 'admin' || role === 'scale_operator') {
+      setSelectedModules([])
+    }
+  }
+
+  function toggleModule(moduleKey: string) {
+    setSelectedModules((prev) =>
+      prev.includes(moduleKey)
+        ? prev.filter((k) => k !== moduleKey)
+        : [...prev, moduleKey]
+    )
+  }
+
+  function selectAllModules() {
+    setSelectedModules(MODULE_OPTIONS.map((m) => m.key))
+  }
+
+  function clearAllModules() {
+    setSelectedModules([])
+  }
+
   async function onSubmit(data: CreateUserInput) {
     setLoading(true)
-    const res = await fetch('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
+
+    // Include allowedModules for manager/cashier roles
+    const payload = {
+      ...data,
+      ...(showModuleSelection && { allowedModules: selectedModules }),
+    }
+
+    const res = await fetch('/api/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
     setLoading(false)
     if (res.ok) {
       toast.success('User created')
       reset()
+      setSelectedRole('')
+      setSelectedModules([])
       onSuccess()
       onClose()
     } else {
@@ -70,9 +139,16 @@ export function CreateUserModal({ open, onClose, onSuccess }: { open: boolean; o
     }
   }
 
+  function handleClose() {
+    reset()
+    setSelectedRole('')
+    setSelectedModules([])
+    onClose()
+  }
+
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) { reset(); onClose() } }}>
-      <DialogContent className="sm:max-w-md p-6">
+    <Dialog open={open} onOpenChange={(o) => { if (!o) handleClose() }}>
+      <DialogContent className="sm:max-w-lg p-6 max-h-[90vh] overflow-y-auto">
         <div style={modalHdr}>
           <span style={{ fontSize: 13, fontWeight: 700, color: '#212529' }}>Add User</span>
         </div>
@@ -99,21 +175,88 @@ export function CreateUserModal({ open, onClose, onSuccess }: { open: boolean; o
           <div>
             <span style={lbl}>Role</span>
             <select
-              onChange={(e) => setValue('role', e.target.value as 'admin' | 'manager' | 'cashier')}
+              onChange={(e) => handleRoleChange(e.target.value)}
               disabled={loading}
               style={selectStyle}
-              defaultValue=""
+              value={selectedRole}
             >
               <option value="" disabled>Select role...</option>
               <option value="admin">Admin</option>
               <option value="manager">Manager</option>
               <option value="cashier">Cashier</option>
+              <option value="scale_operator">Scale Operator</option>
             </select>
             {errors.role && <span style={{ fontSize: 10, color: '#DC2626', marginTop: 2, display: 'block' }}>{errors.role.message}</span>}
           </div>
 
+          {/* Module Access Section - only for manager/cashier */}
+          {showModuleSelection && (
+            <div style={{ marginTop: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <span style={lbl}>Module Access</span>
+                <div style={{ display: 'flex', gap: 4 }}>
+                  <button type="button" onClick={selectAllModules} style={smallBtn}>Select All</button>
+                  <button type="button" onClick={clearAllModules} style={smallBtn}>Clear All</button>
+                </div>
+              </div>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(2, 1fr)',
+                gap: 6,
+                padding: 8,
+                border: '1px solid #ddd',
+                borderRadius: 4,
+                background: '#fafafa',
+                maxHeight: 200,
+                overflowY: 'auto',
+              }}>
+                {MODULE_OPTIONS.map((mod) => (
+                  <label
+                    key={mod.key}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      fontSize: 11,
+                      cursor: 'pointer',
+                      padding: '2px 4px',
+                      borderRadius: 2,
+                      background: selectedModules.includes(mod.key) ? '#e0f2fe' : 'transparent',
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedModules.includes(mod.key)}
+                      onChange={() => toggleModule(mod.key)}
+                      disabled={loading}
+                      style={{ margin: 0 }}
+                    />
+                    {mod.label}
+                  </label>
+                ))}
+              </div>
+              <p style={{ fontSize: 10, color: '#666', marginTop: 4 }}>
+                {selectedModules.length === 0
+                  ? 'No modules selected — user will have full access'
+                  : `${selectedModules.length} module(s) selected`}
+              </p>
+            </div>
+          )}
+
+          {/* Info messages for admin/scale_operator */}
+          {selectedRole === 'admin' && (
+            <p style={{ fontSize: 10, color: '#666', fontStyle: 'italic' }}>
+              Admins have full access to all modules.
+            </p>
+          )}
+          {selectedRole === 'scale_operator' && (
+            <p style={{ fontSize: 10, color: '#666', fontStyle: 'italic' }}>
+              Scale operators can only access the Scale Station app.
+            </p>
+          )}
+
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
-            <button type="button" onClick={onClose} disabled={loading} style={cancelBtn}>
+            <button type="button" onClick={handleClose} disabled={loading} style={cancelBtn}>
               Cancel
             </button>
             <button type="submit" disabled={loading} style={{ ...submitBtn, opacity: loading ? 0.7 : 1, cursor: loading ? 'not-allowed' : 'pointer' }}>

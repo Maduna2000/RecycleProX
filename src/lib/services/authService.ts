@@ -32,7 +32,10 @@ export class ForbiddenError extends Error {
 // ─── Service ──────────────────────────────────────────────────────────────────
 
 export async function login(username: string, password: string) {
-  const user = await prisma.user.findUnique({ where: { username } })
+  const user = await prisma.user.findUnique({
+    where: { username },
+    include: { moduleAccess: { select: { moduleKey: true } } },
+  })
 
   if (!user) {
     logger.warn({ username }, 'Login failed: user not found')
@@ -67,26 +70,49 @@ export async function login(username: string, password: string) {
     data: { failedAttempts: 0, lastLoginAt: new Date() },
   })
 
+  const allowedModules = user.moduleAccess.map((m) => m.moduleKey)
+
   logger.info({ userId: user.id, username }, 'Login successful')
   return {
     user: sanitize(user),
     forcePasswordChange: user.forcePasswordChange,
+    allowedModules,
   }
 }
 
-export async function createUser(data: CreateUserInput, createdByUserId: string) {
+export async function createUser(
+  data: CreateUserInput & { allowedModules?: string[] },
+  createdByUserId: string,
+) {
   const passwordHash = await bcrypt.hash(data.password, 12)
-  const user = await prisma.user.create({
-    data: {
-      fullName: data.fullName,
-      username: data.username,
-      passwordHash,
-      role: data.role,
-      isActive: data.isActive ?? true,
-      forcePasswordChange: true,
-      createdByUserId,
-    },
+
+  const user = await prisma.$transaction(async (tx) => {
+    const newUser = await tx.user.create({
+      data: {
+        fullName: data.fullName,
+        username: data.username,
+        passwordHash,
+        role: data.role,
+        isActive: data.isActive ?? true,
+        forcePasswordChange: true,
+        createdByUserId,
+      },
+    })
+
+    // Create module access records if provided (for non-admin, non-scale_operator users)
+    if (data.allowedModules?.length && data.role !== 'admin' && data.role !== 'scale_operator') {
+      await tx.userModuleAccess.createMany({
+        data: data.allowedModules.map((moduleKey) => ({
+          userId: newUser.id,
+          moduleKey,
+          grantedById: createdByUserId,
+        })),
+      })
+    }
+
+    return newUser
   })
+
   logger.info({ userId: user.id, createdByUserId }, 'User created')
   return sanitize(user)
 }
@@ -152,6 +178,38 @@ export async function unlockAccount(userId: string, adminId: string) {
   logger.info({ userId, adminId }, 'Account unlocked')
 }
 
+export async function updateUserModuleAccess(
+  userId: string,
+  moduleKeys: string[],
+  grantedById: string,
+) {
+  await prisma.$transaction(async (tx) => {
+    // Delete all existing module access for this user
+    await tx.userModuleAccess.deleteMany({ where: { userId } })
+
+    // Create new module access records
+    if (moduleKeys.length > 0) {
+      await tx.userModuleAccess.createMany({
+        data: moduleKeys.map((moduleKey) => ({
+          userId,
+          moduleKey,
+          grantedById,
+        })),
+      })
+    }
+  })
+
+  logger.info({ userId, grantedById, moduleCount: moduleKeys.length }, 'User module access updated')
+}
+
+export async function getUserModuleAccess(userId: string): Promise<string[]> {
+  const access = await prisma.userModuleAccess.findMany({
+    where: { userId },
+    select: { moduleKey: true },
+  })
+  return access.map((a) => a.moduleKey)
+}
+
 export async function setPin(userId: string, pin: string) {
   const pinHash = await bcrypt.hash(pin, 10)
   await prisma.user.update({ where: { id: userId }, data: { pinHash } })
@@ -189,6 +247,7 @@ const USER_SELECT = {
   id: true, fullName: true, username: true, role: true,
   isActive: true, forcePasswordChange: true, failedAttempts: true,
   lockedAt: true, lastLoginAt: true, createdAt: true,
+  moduleAccess: { select: { moduleKey: true } },
 } as const
 
 export async function listUsers(opts: {
@@ -221,7 +280,13 @@ export async function listUsers(opts: {
     prisma.user.count({ where }),
   ])
 
-  return { users, total, page, totalPages: Math.ceil(total / limit) }
+  // Transform moduleAccess to allowedModules array
+  const transformedUsers = users.map((user) => ({
+    ...user,
+    allowedModules: user.moduleAccess.map((m) => m.moduleKey),
+  }))
+
+  return { users: transformedUsers, total, page, totalPages: Math.ceil(total / limit) }
 }
 
 export async function getUser(id: string) {

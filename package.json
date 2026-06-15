@@ -9,6 +9,7 @@
     "start": "next start",
     "lint": "next lint",
     "seed": "npx ts-node --compiler-options '{\"module\":\"CommonJS\"}' prisma/seed.ts",
+    "migrate:permissions": "npx ts-node --compiler-options '{\"module\":\"CommonJS\"}' scripts/migrate-user-permissions.ts",
     "electron": "electron .",
     "electron:dev": "concurrently \"next dev\" \"wait-on http://localhost:3000 && electron .\"",
     "electron:build": "next build && electron-builder"

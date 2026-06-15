@@ -18,7 +18,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         if (!parsed.success) return null
 
         try {
-          const { user, forcePasswordChange } = await login(
+          const { user, forcePasswordChange, allowedModules } = await login(
             parsed.data.username,
             parsed.data.password,
           )
@@ -30,6 +30,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             forcePasswordChange,
             fullName: user.fullName,
             username: user.username,
+            allowedModules,
           }
         } catch (err) {
           // Log the real error so it shows in Vercel function logs
@@ -53,6 +54,7 @@ declare module 'next-auth' {
       forcePasswordChange: boolean
       fullName: string
       username: string
+      allowedModules: string[]
     }
   }
 }

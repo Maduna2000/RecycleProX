@@ -20,6 +20,7 @@ const fetcher = (url: string) => fetch(url).then((r) => r.json())
 type User = {
   id: string; fullName: string; username: string; role: string
   isActive: boolean; lockedAt: string | null; lastLoginAt: string | null
+  allowedModules?: string[]
 }
 
 function statusBadge(user: User) {
@@ -43,14 +44,16 @@ function statusBadge(user: User) {
 }
 
 const ROLE_STYLES: Record<string, { background: string; color: string }> = {
-  admin:   { background: colors.purpleBg, color: colors.purple },
-  manager: { background: colors.processBg, color: colors.process },
-  cashier: { background: colors.neutralBg, color: colors.textSecondary },
+  admin:          { background: colors.purpleBg, color: colors.purple },
+  manager:        { background: colors.processBg, color: colors.process },
+  cashier:        { background: colors.neutralBg, color: colors.textSecondary },
+  scale_operator: { background: colors.actionBg, color: colors.action },
 }
 
 function roleBadge(role: string) {
   const style = ROLE_STYLES[role] ?? { background: colors.neutralBg, color: colors.textSecondary }
-  return <span className="px-2 py-0.5 rounded text-xs font-medium capitalize" style={style}>{role}</span>
+  const displayName = role === 'scale_operator' ? 'Scale Op' : role
+  return <span className="px-2 py-0.5 rounded text-xs font-medium capitalize" style={style}>{displayName}</span>
 }
 
 export default function UsersPage() {
@@ -125,6 +128,7 @@ export default function UsersPage() {
           <option value="admin">Admin</option>
           <option value="manager">Manager</option>
           <option value="cashier">Cashier</option>
+          <option value="scale_operator">Scale Operator</option>
         </select>
       </div>
 

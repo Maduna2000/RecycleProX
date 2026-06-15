@@ -18,6 +18,7 @@ export const authConfig: NextAuthConfig = {
         token.forcePasswordChange = (user as { forcePasswordChange: boolean }).forcePasswordChange
         token.fullName            = (user as { fullName: string }).fullName
         token.username            = (user as { username: string }).username
+        token.allowedModules      = (user as { allowedModules?: string[] }).allowedModules ?? []
       }
       return token
     },
@@ -27,6 +28,7 @@ export const authConfig: NextAuthConfig = {
       session.user.forcePasswordChange = token.forcePasswordChange as boolean
       session.user.fullName            = token.fullName as string
       session.user.username            = token.username as string
+      session.user.allowedModules      = token.allowedModules as string[]
       return session
     },
     authorized({ auth }) {

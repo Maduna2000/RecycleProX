@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { signIn, getSession } from 'next-auth/react'
+import { signIn, signOut, getSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -44,11 +44,16 @@ export default function LoginPage() {
     }
 
     const sess = await getSession()
+
+    // Block scale operators from main login — they must use /scale/login
     if (sess?.user?.role === 'scale_operator') {
-      router.push('/scale')
-    } else {
-      router.push('/app/dashboard')
+      await signOut({ redirect: false })
+      setLoading(false)
+      setError('Scale operators must use the Scale Station login')
+      return
     }
+
+    router.push('/app/dashboard')
     router.refresh()
   }
 

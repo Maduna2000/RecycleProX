@@ -131,6 +131,22 @@ model User {
   voidedStocktakes        Stocktake[]  @relation("StocktakeVoidedBy")
   operatedScaleOrders     ScaleOrder[] @relation("ScaleOrderOperator")
   voidedScaleOrders       ScaleOrder[] @relation("ScaleOrderVoidedBy")
+  moduleAccess            UserModuleAccess[]
+}
+
+// ─── User Module Access (per-user permission control) ────────────────────────
+
+model UserModuleAccess {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  moduleKey   String   // e.g., "/app/purchases", "/app/sales"
+  grantedById String?
+  grantedAt   DateTime @default(now())
+
+  @@unique([userId, moduleKey])
+  @@index([userId])
+  @@index([moduleKey])
 }
 
 model AuditLog {
