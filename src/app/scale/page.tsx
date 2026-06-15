@@ -20,9 +20,6 @@ interface StepConfig {
 // Default config - all steps required
 const DEFAULT_CONFIG: StepConfig = { requireWeight: true, requirePhotos: true }
 
-// All possible steps shown in the progress bar (LineAdded is a transient step, not shown)
-const ALL_STEPS = ['Customer', 'Product', 'Weight', 'Photos', 'Review']
-
 function useTempId() {
   const [id] = useState(() => crypto.randomUUID())
   return id
