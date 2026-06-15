@@ -891,7 +891,7 @@ function OrdersTab() {
         o.customer?.customerType === 'account' ? 'Account' : 'Walk-in',
         o.product.name,
         o.product.category.name,
-        o.weight,
+        o.weight ?? '—',
         o.status,
         o.operator.fullName,
       ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
@@ -962,7 +962,7 @@ function OrdersTab() {
       key: 'weight', header: 'Weight', width: '90px',
       render: (o) => (
         <span className="block text-right" style={{ fontSize: fontSize.xs, fontWeight: fontWeight.semibold, fontFamily: 'monospace' }}>
-          {Number(o.weight).toFixed(2)} kg
+          {o.weight ? `${Number(o.weight).toFixed(2)} kg` : '—'}
         </span>
       ),
     },

@@ -224,9 +224,11 @@ export default function Step5Review({ customer, cart, onRemoveLine, onNewOrder }
                 <p className="font-medium text-slate-800 text-sm truncate">{item.productName}</p>
                 <p className="text-xs text-slate-400">{item.categoryName}</p>
               </div>
-              <span className="font-semibold text-slate-700 text-sm font-mono shrink-0">
-                {parseFloat(item.weight).toFixed(2)} {item.unit}
-              </span>
+              {item.weight && (
+                <span className="font-semibold text-slate-700 text-sm font-mono shrink-0">
+                  {parseFloat(item.weight).toFixed(2)} {item.unit}
+                </span>
+              )}
               {status === 'idle' && cart.length > 1 && (
                 <button
                   onClick={() => onRemoveLine(i)}

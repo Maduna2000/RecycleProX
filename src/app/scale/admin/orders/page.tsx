@@ -187,7 +187,7 @@ export default function ScaleOrdersPage() {
                       {o.lines.map((l, i) => (
                         <div key={i} className="flex items-baseline gap-1.5 text-xs">
                           <span className="font-medium text-slate-700">{l.product.name}</span>
-                          <span className="text-slate-400 font-mono">{Number(l.weight).toFixed(2)} {l.product.unit}</span>
+                          <span className="text-slate-400 font-mono">{l.weight ? `${Number(l.weight).toFixed(2)} ${l.product.unit}` : '—'}</span>
                         </div>
                       ))}
                     </div>
@@ -198,7 +198,7 @@ export default function ScaleOrdersPage() {
                 <td className="px-4 py-3 text-right font-mono text-slate-700 hidden md:table-cell">
                   {o.lines && o.lines.length > 1
                     ? <span className="text-slate-400 text-xs">see products</span>
-                    : <>{Number(o.weight).toFixed(2)} {o.product.unit}</>
+                    : <>{o.weight ? `${Number(o.weight).toFixed(2)} ${o.product.unit}` : '—'}</>
                   }
                 </td>
                 <td className="px-4 py-3 text-center"><StatusBadge status={o.status} /></td>
@@ -283,7 +283,7 @@ export default function ScaleOrdersPage() {
                           <span className="text-slate-800 font-medium">{l.product.name}</span>
                           {l.product.category && <span className="text-xs text-slate-400 ml-1.5">({l.product.category})</span>}
                         </div>
-                        <span className="font-mono text-slate-700">{Number(l.weight).toFixed(2)} {l.product.unit}</span>
+                        <span className="font-mono text-slate-700">{l.weight ? `${Number(l.weight).toFixed(2)} ${l.product.unit}` : '—'}</span>
                       </div>
                     ))}
                   </div>
@@ -292,7 +292,7 @@ export default function ScaleOrdersPage() {
                 <>
                   <DetailRow label="Category" value={detail.product.category} />
                   <DetailRow label="Product"  value={detail.product.name} />
-                  <DetailRow label="Weight"   value={`${Number(detail.weight).toFixed(2)} ${detail.product.unit}`} />
+                  <DetailRow label="Weight"   value={detail.weight ? `${Number(detail.weight).toFixed(2)} ${detail.product.unit}` : '—'} />
                 </>
               )}
               <DetailRow label="Operator"  value={detail.operator.fullName} />

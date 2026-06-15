@@ -45,7 +45,7 @@ async function RecentOrders() {
                   : `${o.casualFirstName ?? ''} ${o.casualLastName ?? ''}`.trim() || 'Walk-in'}
               </td>
               <td className="px-4 py-3 text-slate-600 hidden md:table-cell">{o.product.name}</td>
-              <td className="px-4 py-3 text-right text-slate-600 hidden sm:table-cell font-mono">{Number(o.weight).toFixed(2)} {o.product.unit}</td>
+              <td className="px-4 py-3 text-right text-slate-600 hidden sm:table-cell font-mono">{o.weight ? `${Number(o.weight).toFixed(2)} ${o.product.unit}` : '—'}</td>
               <td className="px-4 py-3 text-center">
                 <StatusBadge status={o.status} />
               </td>
