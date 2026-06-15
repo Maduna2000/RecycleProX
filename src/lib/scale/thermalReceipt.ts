@@ -153,12 +153,10 @@ export function buildReceipt(data: ReceiptData, cols: number = DEFAULT_COLS): Ui
 
   data.lines.forEach((item, i) => {
     add(separator('-'))
-    const label = `${i + 1}. ${item.productName}`
+    const weight = `${parseFloat(item.weight).toFixed(2)} ${item.unit}`
     add(CMD_BOLD_ON)
-    add(textLine(label))
+    add(twoCol(`${i + 1}. ${item.productName}`, weight))
     add(CMD_BOLD_OFF)
-    add(textLine(`   ${item.categoryName}`))
-    add(twoCol('   Weight:', `${parseFloat(item.weight).toFixed(2)} ${item.unit}`))
   })
 
   // ── Footer ────────────────────────────────────────────────────────────────

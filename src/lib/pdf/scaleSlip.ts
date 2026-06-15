@@ -65,20 +65,16 @@ export async function generateScaleOrderSlip(data: ScaleSlipData): Promise<Uint8
   if (data.customerIdNumber) h += LINE_H // ID number (conditional)
   h += 4 + 8                             // bottom padding + divider gap
 
-  // Product(s) section — one block per line
+  // Product(s) section — one line per item (product + weight)
   if (multiLine) {
     h += LINE_H - 2                      // PRODUCTS label
     for (let i = 0; i < data.lines.length; i++) {
-      h += LINE_H - 1                    // product name
-      h += LINE_H - 1                    // category
-      h += LINE_H + 2                    // WEIGHT row
-      h += 4                             // gap between items
+      h += LINE_H                        // product + weight on same line
+      if (i < data.lines.length - 1) h += 2  // reduced gap between items
     }
   } else {
     h += LINE_H - 2                      // PRODUCT label
-    h += LINE_H - 1                      // product name
-    h += LINE_H + 1                      // category
-    h += LINE_H + 4                      // WEIGHT row
+    h += LINE_H + 2                      // product + weight on same line
   }
   h += 8                                 // divider gap
 
@@ -152,26 +148,17 @@ export async function generateScaleOrderSlip(data: ScaleSlipData): Promise<Uint8
 
     data.lines.forEach((line, i) => {
       drawText(`${i + 1}. ${line.productName}`, { size: NORMAL, font: bold })
-      y -= LINE_H - 1
-      drawText(`   ${line.categoryName}`, { size: SMALL, color: GRAY })
-      y -= LINE_H - 1
-      drawText('WEIGHT', { size: SMALL, font: bold, color: GRAY })
-      drawText(line.weight, { size: LARGE, font: bold, align: 'right' })
-      y -= LINE_H + 2
-      if (i < data.lines.length - 1) y -= 4
+      drawText(line.weight, { size: NORMAL, font: bold, align: 'right' })
+      y -= LINE_H
+      if (i < data.lines.length - 1) y -= 2
     })
   } else {
     const line = data.lines[0]!
     drawText('PRODUCT', { size: SMALL, font: bold, color: GRAY })
     y -= LINE_H - 2
     drawText(line.productName, { size: NORMAL, font: bold })
-    y -= LINE_H - 1
-    drawText(`Category: ${line.categoryName}`, { size: SMALL, color: GRAY })
-    y -= LINE_H + 1
-
-    drawText('WEIGHT', { size: SMALL, font: bold, color: GRAY })
-    drawText(line.weight, { size: LARGE, font: bold, align: 'right' })
-    y -= LINE_H + 4
+    drawText(line.weight, { size: NORMAL, font: bold, align: 'right' })
+    y -= LINE_H + 2
   }
 
   drawDivider(y); y -= 8
