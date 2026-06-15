@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Search, Download, Eye, CheckCircle2, XCircle, Loader2, X, RefreshCw, AlertCircle } from 'lucide-react'
 import { StatusBadge } from '../components/StatusBadge'
@@ -336,76 +336,13 @@ export default function ScaleOrdersPage() {
         </div>
       )}
 
-      {/* Photo Viewer Modal */}
+      {/* Fullscreen Photo Viewer Modal */}
       {photoViewer && (
-        <div className="fixed inset-0 bg-black/90 flex flex-col z-[100]">
-          {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 bg-black/50">
-            <span className="text-white font-medium">
-              Photo {photoViewer.index + 1} of {photoViewer.urls.length}
-            </span>
-            <button
-              onClick={() => setPhotoViewer(null)}
-              className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-            >
-              <X className="w-6 h-6 text-white" />
-            </button>
-          </div>
-
-          {/* Photo Container */}
-          <div className="flex-1 flex items-center justify-center p-4 relative">
-            {/* Previous Button */}
-            {photoViewer.urls.length > 1 && (
-              <button
-                onClick={() => setPhotoViewer(prev => prev ? { ...prev, index: (prev.index - 1 + prev.urls.length) % prev.urls.length } : null)}
-                className="absolute left-4 p-3 bg-black/50 hover:bg-black/70 rounded-full transition-colors z-10"
-              >
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-              </button>
-            )}
-
-            {/* Image */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={photoViewer.urls[photoViewer.index]}
-              alt={`Photo ${photoViewer.index + 1}`}
-              className="max-w-full max-h-full object-contain rounded-lg"
-              style={{ maxHeight: 'calc(100vh - 160px)' }}
-            />
-
-            {/* Next Button */}
-            {photoViewer.urls.length > 1 && (
-              <button
-                onClick={() => setPhotoViewer(prev => prev ? { ...prev, index: (prev.index + 1) % prev.urls.length } : null)}
-                className="absolute right-4 p-3 bg-black/50 hover:bg-black/70 rounded-full transition-colors z-10"
-              >
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </button>
-            )}
-          </div>
-
-          {/* Thumbnail Strip */}
-          {photoViewer.urls.length > 1 && (
-            <div className="flex items-center justify-center gap-2 px-6 py-4 bg-black/50 overflow-x-auto">
-              {photoViewer.urls.map((url, i) => (
-                <button
-                  key={i}
-                  onClick={() => setPhotoViewer(prev => prev ? { ...prev, index: i } : null)}
-                  className={`flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-all ${
-                    i === photoViewer.index ? 'border-emerald-500 opacity-100' : 'border-transparent opacity-60 hover:opacity-100'
-                  }`}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={url} alt={`Thumbnail ${i + 1}`} className="w-full h-full object-cover" />
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        <FullscreenPhotoViewer
+          urls={photoViewer.urls}
+          initialIndex={photoViewer.index}
+          onClose={() => setPhotoViewer(null)}
+        />
       )}
     </div>
   )
@@ -416,6 +353,144 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
     <div className="flex justify-between items-start gap-4">
       <span className="text-slate-500 flex-shrink-0">{label}</span>
       <span className="text-slate-800 text-right font-medium">{value}</span>
+    </div>
+  )
+}
+
+// Fullscreen Photo Viewer with keyboard navigation
+function FullscreenPhotoViewer({
+  urls,
+  initialIndex,
+  onClose
+}: {
+  urls: string[]
+  initialIndex: number
+  onClose: () => void
+}) {
+  const [index, setIndex] = useState(initialIndex)
+
+  const goNext = useCallback(() => {
+    if (urls.length > 1) {
+      setIndex(prev => (prev + 1) % urls.length)
+    }
+  }, [urls.length])
+
+  const goPrev = useCallback(() => {
+    if (urls.length > 1) {
+      setIndex(prev => (prev - 1 + urls.length) % urls.length)
+    }
+  }, [urls.length])
+
+  // Keyboard navigation
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        onClose()
+      } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+        goNext()
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+        goPrev()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    // Prevent body scroll while modal is open
+    document.body.style.overflow = 'hidden'
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+      document.body.style.overflow = ''
+    }
+  }, [onClose, goNext, goPrev])
+
+  return (
+    <div
+      className="fixed inset-0 bg-black z-[100] flex items-center justify-center"
+      onClick={(e) => {
+        // Close when clicking on the backdrop (not the image or controls)
+        if (e.target === e.currentTarget) {
+          onClose()
+        }
+      }}
+    >
+      {/* Close button - top right */}
+      <button
+        onClick={onClose}
+        className="absolute top-4 right-4 z-20 p-3 bg-black/60 hover:bg-black/80 rounded-full transition-colors"
+        aria-label="Close"
+      >
+        <X className="w-6 h-6 text-white" />
+      </button>
+
+      {/* Photo counter - top left */}
+      <div className="absolute top-4 left-4 z-20 px-4 py-2 bg-black/60 rounded-full">
+        <span className="text-white text-sm font-medium">
+          {index + 1} / {urls.length}
+        </span>
+      </div>
+
+      {/* Previous button */}
+      {urls.length > 1 && (
+        <button
+          onClick={goPrev}
+          className="absolute left-4 z-20 p-4 bg-black/60 hover:bg-black/80 rounded-full transition-colors"
+          aria-label="Previous photo"
+        >
+          <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+      )}
+
+      {/* Main image - centered and fills available space */}
+      <div className="w-full h-full flex items-center justify-center p-4 md:p-8">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={urls[index]}
+          alt={`Photo ${index + 1}`}
+          className="max-w-full max-h-full object-contain select-none"
+          onClick={(e) => e.stopPropagation()}
+          draggable={false}
+        />
+      </div>
+
+      {/* Next button */}
+      {urls.length > 1 && (
+        <button
+          onClick={goNext}
+          className="absolute right-4 z-20 p-4 bg-black/60 hover:bg-black/80 rounded-full transition-colors"
+          aria-label="Next photo"
+        >
+          <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      )}
+
+      {/* Thumbnail strip - bottom */}
+      {urls.length > 1 && (
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 px-4 py-3 bg-black/60 rounded-xl overflow-x-auto max-w-[90vw]">
+          {urls.map((url, i) => (
+            <button
+              key={i}
+              onClick={() => setIndex(i)}
+              className={`flex-shrink-0 w-14 h-14 rounded-lg overflow-hidden border-2 transition-all ${
+                i === index
+                  ? 'border-emerald-500 opacity-100 scale-110'
+                  : 'border-transparent opacity-50 hover:opacity-100'
+              }`}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={url} alt={`Thumbnail ${i + 1}`} className="w-full h-full object-cover" />
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Keyboard hint */}
+      <div className="absolute bottom-4 right-4 z-20 text-white/40 text-xs hidden md:block">
+        Press ESC to close{urls.length > 1 ? ' · Arrow keys to navigate' : ''}
+      </div>
     </div>
   )
 }
