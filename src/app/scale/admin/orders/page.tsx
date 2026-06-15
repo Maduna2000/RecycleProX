@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Search, Download, Eye, CheckCircle2, XCircle, Loader2, X, RefreshCw, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react'
 import { StatusBadge } from '../components/StatusBadge'
@@ -369,6 +370,12 @@ interface PhotoViewerOverlayProps {
 
 function PhotoViewerOverlay({ urls, initialIndex, onClose }: PhotoViewerOverlayProps) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex)
+  const [mounted, setMounted] = useState(false)
+
+  // Wait for client-side mount before rendering portal
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const goNext = useCallback(() => {
     if (urls.length > 1) {
@@ -519,7 +526,10 @@ function PhotoViewerOverlay({ urls, initialIndex, onClose }: PhotoViewerOverlayP
     transform: isActive ? 'scale(1.1)' : 'scale(1)',
   })
 
-  return (
+  // Don't render on server - portal needs document.body
+  if (!mounted) return null
+
+  const overlayContent = (
     <div
       style={overlayStyle}
       onClick={(e) => {
@@ -616,4 +626,7 @@ function PhotoViewerOverlay({ urls, initialIndex, onClose }: PhotoViewerOverlayP
       </div>
     </div>
   )
+
+  // Render via portal to document.body - escapes all parent CSS stacking contexts
+  return createPortal(overlayContent, document.body)
 }
