@@ -12,7 +12,7 @@ export interface CreateOfflineOrderInput {
     productId: string
     productName: string
     categoryName: string
-    weight: string
+    weight: string | null
     unit: string
     photoBlobs: Blob[]
   }>
