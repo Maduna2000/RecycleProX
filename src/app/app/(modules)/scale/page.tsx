@@ -1479,7 +1479,7 @@ function ConfigRow({
         <span
           style={{
             fontSize: fontSize.sm,
-            fontWeight: isChild ? fontWeight.normal : fontWeight.semibold,
+            fontWeight: isChild ? fontWeight.regular : fontWeight.semibold,
             color: colors.textPrimary,
           }}
         >
