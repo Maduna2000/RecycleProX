@@ -153,7 +153,8 @@ export async function updateExpense(
     }
 
     // Build update data, excluding updatedAt from the input
-    const { updatedAt: _, ...updateFields } = data
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { updatedAt: _updatedAt, ...updateFields } = data
     const updated = await tx.expense.update({
       where: { id: expenseId },
       data: {
