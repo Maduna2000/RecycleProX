@@ -16,6 +16,20 @@ export const CreateExpenseSchema = z.object({
   includesVat:   z.boolean().default(false),
   paymentMethod: z.enum(['cash', 'eft', 'cheque']).default('cash'),
   chequeNo:      z.string().optional(),
+  isPending:     z.boolean().default(false),
+})
+
+export const UpdateExpenseSchema = z.object({
+  expenseTypeId: z.string().uuid().optional(),
+  description:   z.string().min(1).optional(),
+  amount:        z.preprocess(
+    (v) => (v === '' || v === undefined || v === null ? undefined : parseFloat(String(v))),
+    z.number().positive().optional(),
+  ),
+  includesVat:   z.boolean().optional(),
+  paymentMethod: z.enum(['cash', 'eft', 'cheque']).optional(),
+  chequeNo:      z.string().optional().nullable(),
+  updatedAt:     z.string().datetime(), // For optimistic locking
 })
 
 export const ApproveExpenseSchema = z.object({
@@ -26,6 +40,7 @@ export type CreateExpenseTypeInput = z.infer<typeof CreateExpenseTypeSchema>
 export type CreateExpenseInput     = z.infer<typeof CreateExpenseSchema>
 export type CreateExpenseFormInput = z.input<typeof CreateExpenseSchema>
 export type ApproveExpenseInput    = z.infer<typeof ApproveExpenseSchema>
+export type UpdateExpenseInput     = z.infer<typeof UpdateExpenseSchema>
 
 export const UploadExpenseAttachmentSchema = z.object({
   r2Key:    z.string().min(1),

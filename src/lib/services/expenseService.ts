@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/db/prisma'
 import Decimal from 'decimal.js'
 import logger from '@/lib/logger'
-import type { CreateExpenseInput, CreateExpenseTypeInput } from '@/lib/schemas/expense'
+import type { CreateExpenseInput, CreateExpenseTypeInput, UpdateExpenseInput } from '@/lib/schemas/expense'
 
 // ─── Ref number ───────────────────────────────────────────────────────────────
 
@@ -49,9 +49,8 @@ export async function createExpense(data: CreateExpenseInput, userId: string) {
     where: { sessionDate: today, status: { in: ['open', 'submitted'] } },
   })
 
-  // Auto-approve cash expenses when a cashup session is open — petty cash is self-evidently real
-  const isCash = (data.paymentMethod ?? 'cash') === 'cash'
-  const autoApprove = isCash && openSession != null
+  // If isPending is false (default), auto-approve; otherwise leave as pending
+  const isPending = data.isPending ?? false
 
   const expense = await prisma.expense.create({
     data: {
@@ -65,11 +64,11 @@ export async function createExpense(data: CreateExpenseInput, userId: string) {
       chequeNo:        data.chequeNo,
       cashUpId:        openSession?.id ?? null,
       createdByUserId: userId,
-      ...(autoApprove && { status: 'approved', approvedById: userId, approvedAt: new Date() }),
+      ...(!isPending && { status: 'approved', approvedById: userId, approvedAt: new Date() }),
     },
     include: { expenseType: true },
   })
-  logger.info({ expenseId: expense.id, userId, cashUpId: openSession?.id }, 'Expense created')
+  logger.info({ expenseId: expense.id, userId, cashUpId: openSession?.id, isPending }, 'Expense created')
   return expense
 }
 
@@ -110,6 +109,63 @@ export async function getExpense(id: string) {
   return prisma.expense.findUniqueOrThrow({
     where: { id },
     include: { expenseType: true, attachments: { orderBy: { uploadedAt: 'desc' } } },
+  })
+}
+
+export async function updateExpense(
+  expenseId: string,
+  userId: string,
+  userRole: string,
+  data: UpdateExpenseInput
+) {
+  return prisma.$transaction(async (tx) => {
+    const expense = await tx.expense.findUnique({ where: { id: expenseId } })
+    if (!expense) {
+      throw new Error('Expense not found')
+    }
+
+    if (expense.status !== 'pending') {
+      throw new Error(expense.status === 'approved' ? 'Expense already approved' : 'Expense has been voided')
+    }
+
+    const isCreator = expense.createdByUserId === userId
+    const isManagerOrAdmin = ['admin', 'manager'].includes(userRole)
+    if (!isCreator && !isManagerOrAdmin) {
+      throw new Error('Not authorized to edit this expense')
+    }
+
+    // Check optimistic locking
+    const expectedUpdatedAt = new Date(data.updatedAt)
+    if (expense.updatedAt.getTime() !== expectedUpdatedAt.getTime()) {
+      throw new Error('Expense was modified by another user')
+    }
+
+    // Recalculate VAT if amount or includesVat changed
+    let vatAmount = expense.vatAmount
+    if (data.amount !== undefined || data.includesVat !== undefined) {
+      const amount = new Decimal(data.amount ?? expense.amount.toString())
+      const includesVat = data.includesVat ?? expense.includesVat
+      const vatSetting = await tx.systemSettings.findUnique({ where: { key: 'vatRate' } })
+      const vatRate = vatSetting ? new Decimal(vatSetting.value).div(100) : new Decimal('0.15')
+      vatAmount = includesVat
+        ? amount.times(vatRate.div(vatRate.plus(1))).toDecimalPlaces(2)
+        : new Decimal(0)
+    }
+
+    // Build update data, excluding updatedAt from the input
+    const { updatedAt: _, ...updateFields } = data
+    const updated = await tx.expense.update({
+      where: { id: expenseId },
+      data: {
+        ...updateFields,
+        ...(data.amount !== undefined && { amount: new Decimal(data.amount) }),
+        vatAmount,
+      },
+      include: { expenseType: true },
+    })
+
+    logger.info({ expenseId, userId }, 'Expense updated')
+    return updated
   })
 }
 

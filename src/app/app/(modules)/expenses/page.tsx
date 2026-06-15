@@ -6,7 +6,7 @@ import { useSearchParams } from 'next/navigation'
 import Decimal from 'decimal.js'
 import useSWR, { mutate } from 'swr'
 import { useSession } from 'next-auth/react'
-import { CheckCircle, Trash2, Receipt, Search, X, Paperclip, Upload, Eye } from 'lucide-react'
+import { CheckCircle, Trash2, Receipt, Search, X, Paperclip, Upload, Eye, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -26,7 +26,8 @@ type Expense = {
   id: string; refNumber: string; description: string
   amount: string; vatAmount: string; includesVat: boolean
   paymentMethod: string; chequeNo?: string | null; status: string
-  createdAt: string; expenseType: { name: string }
+  createdAt: string; updatedAt: string; createdByUserId?: string | null
+  expenseType: { id: string; name: string }
   _count?: { attachments: number }
 }
 
@@ -39,12 +40,13 @@ export default function ExpensesPage() {
   const { data: session } = useSession()
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
 
-  const [tab,         setTab]         = useState<PageTab>('Pending')
-  const [addOpen,     setAddOpen]     = useState(false)
-  const [addTypeOpen, setAddTypeOpen] = useState(false)
-  const [search,      setSearch]      = useState('')
-  const [from,        setFrom]        = useState('')
-  const [to,          setTo]          = useState('')
+  const [tab,            setTab]            = useState<PageTab>('Pending')
+  const [addOpen,        setAddOpen]        = useState(false)
+  const [addTypeOpen,    setAddTypeOpen]    = useState(false)
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null)
+  const [search,         setSearch]         = useState('')
+  const [from,           setFrom]           = useState('')
+  const [to,             setTo]             = useState('')
 
   // Open modal from toolbar query params
   useEffect(() => {
@@ -203,6 +205,16 @@ export default function ExpensesPage() {
       onClick: (r) => router.push(`/app/expenses/${r.id}`),
     },
     {
+      label:   'Edit',
+      icon:    Pencil,
+      hidden:  (r) => {
+        if (r.status !== 'pending') return true
+        const isCreator = r.createdByUserId === session?.user?.id
+        return !isCreator && !isManager
+      },
+      onClick: (r) => setEditingExpense(r),
+    },
+    {
       label:   'View Slip',
       icon:    Paperclip,
       hidden:  (r) => (r._count?.attachments ?? 0) === 0,
@@ -334,8 +346,18 @@ export default function ExpensesPage() {
 
       {addOpen && (
         <AddExpenseModal
+          mode="create"
           onClose={() => setAddOpen(false)}
           onSuccess={() => { mutate(key); setAddOpen(false) }}
+        />
+      )}
+
+      {editingExpense && (
+        <AddExpenseModal
+          mode="edit"
+          expense={editingExpense}
+          onClose={() => setEditingExpense(null)}
+          onSuccess={() => { mutate(key); setEditingExpense(null) }}
         />
       )}
 
@@ -349,26 +371,75 @@ export default function ExpensesPage() {
   )
 }
 
-// ─── Add Expense Modal ────────────────────────────────────────────────────────
-function AddExpenseModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
+// ─── Add/Edit Expense Modal ──────────────────────────────────────────────────
+type AddExpenseModalProps = {
+  mode: 'create' | 'edit'
+  expense?: Expense
+  onClose: () => void
+  onSuccess: () => void
+}
+
+function AddExpenseModal({ mode, expense, onClose, onSuccess }: AddExpenseModalProps) {
   const [loading,     setLoading]     = useState(false)
   const [addTypeOpen, setAddTypeOpen] = useState(false)
   const [slipFile,    setSlipFile]    = useState<File | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const { data: types } = useSWR<ExpenseType[]>('/api/expense-types', fetcher)
 
+  const isEdit = mode === 'edit' && expense
+
   const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<CreateExpenseFormInput, unknown, CreateExpenseInput>({
     resolver: zodResolver(CreateExpenseSchema),
-    defaultValues: { paymentMethod: 'cash', includesVat: false },
+    defaultValues: isEdit
+      ? {
+          expenseTypeId: expense.expenseType.id,
+          description:   expense.description,
+          amount:        parseFloat(expense.amount),
+          includesVat:   expense.includesVat,
+          paymentMethod: expense.paymentMethod as 'cash' | 'eft' | 'cheque',
+          chequeNo:      expense.chequeNo ?? undefined,
+          isPending:     true, // Already pending in edit mode
+        }
+      : { paymentMethod: 'cash', includesVat: false, isPending: false },
   })
 
   const paymentMethod  = watch('paymentMethod')
   const includesVat    = watch('includesVat')
+  const isPending      = watch('isPending')
   const expenseTypeId  = watch('expenseTypeId') as string | undefined
   const selectedTypeName = (types ?? []).find((t) => t.id === expenseTypeId)?.name
 
   async function onSubmit(data: CreateExpenseInput) {
     setLoading(true)
+
+    if (isEdit) {
+      // Edit mode - PATCH request
+      const res = await fetch(`/api/expenses/${expense.id}`, {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
+          expenseTypeId: data.expenseTypeId,
+          description:   data.description,
+          amount:        data.amount,
+          includesVat:   data.includesVat,
+          paymentMethod: data.paymentMethod,
+          chequeNo:      data.chequeNo ?? null,
+          updatedAt:     expense.updatedAt,
+        }),
+      })
+      if (!res.ok) {
+        setLoading(false)
+        const j = await res.json()
+        toast.error(j.error ?? 'Failed to update expense')
+        return
+      }
+      setLoading(false)
+      toast.success('Expense updated')
+      onSuccess()
+      return
+    }
+
+    // Create mode - POST request
     const res = await fetch('/api/expenses', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -438,7 +509,7 @@ function AddExpenseModal({ onClose, onSuccess }: { onClose: () => void; onSucces
             justifyContent: 'space-between',
           }}
         >
-          <span style={{ fontSize: fontSize.sm, fontWeight: 600, color: colors.textPrimary }}>Add Expense</span>
+          <span style={{ fontSize: fontSize.sm, fontWeight: 600, color: colors.textPrimary }}>{isEdit ? 'Edit Expense' : 'Add Expense'}</span>
           <button
             onClick={onClose}
             style={{
@@ -597,6 +668,23 @@ function AddExpenseModal({ onClose, onSuccess }: { onClose: () => void; onSucces
               Amount includes 15% VAT
             </label>
 
+            {!isEdit && (
+              <div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: fontSize.base, cursor: 'pointer', color: colors.textPrimary }}>
+                  <input
+                    type="checkbox"
+                    checked={!!isPending}
+                    onChange={(e) => setValue('isPending', e.target.checked)}
+                    style={{ width: 14, height: 14, accentColor: colors.action }}
+                  />
+                  Mark as pending expense
+                </label>
+                <p style={{ fontSize: 11, marginTop: 3, marginLeft: 20, color: colors.textMuted }}>
+                  Pending expenses can be edited before approval
+                </p>
+              </div>
+            )}
+
             <div>
               <Label style={{ display: 'block', marginBottom: 4, fontSize: fontSize.sm, fontWeight: 600, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Slip / Receipt <span style={{ fontWeight: 400, color: colors.textMuted, textTransform: 'none' }}>(optional)</span></Label>
               <input
@@ -646,7 +734,7 @@ function AddExpenseModal({ onClose, onSuccess }: { onClose: () => void; onSucces
               }}
             >
               <ModalBtn onClick={onClose} disabled={loading}>Cancel</ModalBtn>
-              <ModalBtn type="submit" variant="primary" loading={loading}>Record Expense</ModalBtn>
+              <ModalBtn type="submit" variant="primary" loading={loading}>{isEdit ? 'Update Expense' : 'Record Expense'}</ModalBtn>
             </div>
           </div>
         </form>
