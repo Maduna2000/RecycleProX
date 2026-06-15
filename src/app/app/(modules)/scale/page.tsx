@@ -1,17 +1,19 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
+import { createPortal } from 'react-dom'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import {
   Search, X, Download, RefreshCw,
   FileText, Images, CheckCircle2, XCircle,
   UserPlus, Eye, EyeOff, Loader2, Scale,
+  ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import { DataTable, StatusBadge, type Column, type RowAction } from '@/components/ui/DataTable'
 import { InlineDetailPanel } from '@/components/ui/InlineDetailPanel'
 import { PageShell } from '@/components/layout/PageShell'
-import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
+import { colors, fontSize, fontWeight, layout } from '@/lib/design-tokens'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -100,53 +102,286 @@ function StatsStrip() {
   )
 }
 
-// ─── Photo Detail Panel ───────────────────────────────────────────────────────
+// ─── Fullscreen Photo Viewer ──────────────────────────────────────────────────
+// Renders as a portal to document.body for true fullscreen display
 
-function PhotoDetailPanel({ order, onClose }: { order: OrderDetail | null; onClose: () => void }) {
-  const open = !!order
-  const customerName = order?.customer
-    ? `${order.customer.firstName} ${order.customer.lastName}`
-    : 'Walk-in'
-  const dateStr = order ? new Date(order.createdAt).toLocaleString('en-ZA', {
-    day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
-  }) : ''
+function FullscreenPhotoViewer({ order, onClose }: { order: OrderDetail | null; onClose: () => void }) {
+  const [currentIndex, setCurrentIndex] = useState(0)
+  const [mounted, setMounted] = useState(false)
+
+  const urls = order?.photoUrls ?? []
   const labels = ['Scale Reading', 'Product / Load']
 
-  return (
-    <InlineDetailPanel
-      open={open}
-      onClose={onClose}
-      title={order ? `Photos — ${order.orderNumber}` : 'Photos'}
-      height={320}
+  // Wait for client-side mount
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  // Reset index when order changes
+  useEffect(() => {
+    setCurrentIndex(0)
+  }, [order?.id])
+
+  // Keyboard navigation + body scroll lock
+  useEffect(() => {
+    if (!order) return
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      switch (e.key) {
+        case 'Escape':
+          onClose()
+          break
+        case 'ArrowRight':
+        case 'ArrowDown':
+          if (urls.length > 1) setCurrentIndex(prev => (prev + 1) % urls.length)
+          break
+        case 'ArrowLeft':
+        case 'ArrowUp':
+          if (urls.length > 1) setCurrentIndex(prev => (prev - 1 + urls.length) % urls.length)
+          break
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    document.body.style.overflow = 'hidden'
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+      document.body.style.overflow = ''
+    }
+  }, [order, onClose, urls.length])
+
+  if (!order || !mounted) return null
+
+  const customerName = order.customer
+    ? `${order.customer.firstName} ${order.customer.lastName}`
+    : 'Walk-in'
+  const dateStr = new Date(order.createdAt).toLocaleString('en-ZA', {
+    day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+  })
+
+  const overlayContent = (
+    <div
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 9999,
+        background: 'rgba(0, 0, 0, 0.95)',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose()
+      }}
     >
-      {order && (
-        <div className="p-4 flex flex-col gap-3 h-full overflow-y-auto">
-          <div className="flex items-center gap-4 text-xs text-[#6C757D]">
-            <span><strong style={{ color: colors.textPrimary }}>Customer:</strong> {customerName}</span>
-            <span><strong style={{ color: colors.textPrimary }}>Date:</strong> {dateStr}</span>
+      {/* Header */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '16px 24px',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+        }}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <span style={{ fontSize: fontSize.md, fontWeight: fontWeight.semibold, color: colors.textOnDark }}>
+            Photos — {order.orderNumber}
+          </span>
+          <span style={{ fontSize: fontSize.xs, color: 'rgba(255, 255, 255, 0.6)' }}>
+            {customerName} · {dateStr}
+          </span>
+        </div>
+        <button
+          onClick={onClose}
+          style={{
+            width: 44,
+            height: 44,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(255, 255, 255, 0.1)',
+            border: 'none',
+            borderRadius: layout.cardRadius,
+            cursor: 'pointer',
+            transition: 'background 150ms ease',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)' }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)' }}
+          aria-label="Close"
+        >
+          <X style={{ width: 24, height: 24, color: colors.textOnDark }} />
+        </button>
+      </div>
+
+      {/* Main image area */}
+      <div
+        style={{
+          flex: 1,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          position: 'relative',
+          padding: 24,
+        }}
+      >
+        {urls.length === 0 ? (
+          <div style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: fontSize.base }}>
+            No photos available
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            {(order.photoUrls.length > 0 ? order.photoUrls : [null, null]).map((url, i) => (
-              <div key={i} className="border border-[#E0E0E0] rounded-sm overflow-hidden bg-[#F8F9FA]">
-                <div className="px-3 py-1.5 bg-[#F1F3F4] border-b border-[#E0E0E0]">
-                  <p style={{ fontSize: fontSize.xs, fontWeight: fontWeight.semibold, color: colors.textSecondary }}>
-                    {labels[i] ?? `Photo ${i + 1}`}
-                  </p>
-                  <p style={{ fontSize: fontSize.xs, color: colors.textMuted }}>{dateStr} · {customerName}</p>
-                </div>
-                {url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={url} alt={labels[i]} className="w-full object-cover" style={{ maxHeight: 180 }} />
-                ) : (
-                  <div className="flex items-center justify-center h-32 text-xs text-[#9CA3AF]">No photo</div>
-                )}
+        ) : (
+          <>
+            {/* Previous button */}
+            {urls.length > 1 && (
+              <button
+                onClick={() => setCurrentIndex(prev => (prev - 1 + urls.length) % urls.length)}
+                style={{
+                  position: 'absolute',
+                  left: 24,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  width: 56,
+                  height: 56,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  border: 'none',
+                  borderRadius: '50%',
+                  cursor: 'pointer',
+                  transition: 'background 150ms ease',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)' }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)' }}
+                aria-label="Previous"
+              >
+                <ChevronLeft style={{ width: 32, height: 32, color: colors.textOnDark }} />
+              </button>
+            )}
+
+            {/* Image */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, maxWidth: '100%', maxHeight: '100%' }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={urls[currentIndex]}
+                alt={labels[currentIndex] ?? `Photo ${currentIndex + 1}`}
+                style={{
+                  maxWidth: '100%',
+                  maxHeight: 'calc(100vh - 200px)',
+                  objectFit: 'contain',
+                  borderRadius: layout.cardRadius,
+                  userSelect: 'none',
+                }}
+                onClick={(e) => e.stopPropagation()}
+                draggable={false}
+              />
+              <div
+                style={{
+                  padding: '8px 16px',
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  borderRadius: 999,
+                  fontSize: fontSize.sm,
+                  fontWeight: fontWeight.medium,
+                  color: colors.textOnDark,
+                }}
+              >
+                {labels[currentIndex] ?? `Photo ${currentIndex + 1}`} · {currentIndex + 1} / {urls.length}
               </div>
-            ))}
-          </div>
+            </div>
+
+            {/* Next button */}
+            {urls.length > 1 && (
+              <button
+                onClick={() => setCurrentIndex(prev => (prev + 1) % urls.length)}
+                style={{
+                  position: 'absolute',
+                  right: 24,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  width: 56,
+                  height: 56,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  border: 'none',
+                  borderRadius: '50%',
+                  cursor: 'pointer',
+                  transition: 'background 150ms ease',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)' }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)' }}
+                aria-label="Next"
+              >
+                <ChevronRight style={{ width: 32, height: 32, color: colors.textOnDark }} />
+              </button>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Thumbnail strip */}
+      {urls.length > 1 && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 12,
+            padding: '16px 24px',
+            borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+          }}
+        >
+          {urls.map((url, i) => (
+            <button
+              key={i}
+              onClick={() => setCurrentIndex(i)}
+              style={{
+                width: 64,
+                height: 64,
+                borderRadius: layout.btnRadius,
+                overflow: 'hidden',
+                border: i === currentIndex ? `2px solid ${colors.action}` : '2px solid transparent',
+                opacity: i === currentIndex ? 1 : 0.5,
+                cursor: 'pointer',
+                transition: 'all 150ms ease',
+                transform: i === currentIndex ? 'scale(1.1)' : 'scale(1)',
+                background: 'none',
+                padding: 0,
+              }}
+              onMouseEnter={(e) => { if (i !== currentIndex) e.currentTarget.style.opacity = '0.8' }}
+              onMouseLeave={(e) => { if (i !== currentIndex) e.currentTarget.style.opacity = '0.5' }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={url}
+                alt={labels[i] ?? `Thumbnail ${i + 1}`}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+            </button>
+          ))}
         </div>
       )}
-    </InlineDetailPanel>
+
+      {/* Keyboard hint */}
+      <div
+        style={{
+          position: 'absolute',
+          bottom: 24,
+          right: 24,
+          fontSize: fontSize.xs,
+          color: 'rgba(255, 255, 255, 0.4)',
+        }}
+      >
+        ESC to close{urls.length > 1 ? ' · Arrow keys to navigate' : ''}
+      </div>
+    </div>
   )
+
+  return createPortal(overlayContent, document.body)
 }
 
 // ─── Void Modal ───────────────────────────────────────────────────────────────
@@ -754,7 +989,7 @@ function OrdersTab() {
           />
         </div>
 
-        <PhotoDetailPanel order={photoOrder} onClose={() => setPhotoOrder(null)} />
+        <FullscreenPhotoViewer order={photoOrder} onClose={() => setPhotoOrder(null)} />
       </div>
 
       <VoidModal order={voidTarget} onClose={() => setVoidTarget(null)} onVoided={handleVoided} />
