@@ -22,7 +22,7 @@ interface Product {
 }
 
 export interface SelectedProduct {
-  id: string; name: string; unit: string; categoryName: string
+  id: string; name: string; unit: string; categoryName: string; categoryId: string
 }
 
 interface Props {
@@ -157,7 +157,7 @@ export default function Step2Product({ onSelect }: Props) {
             {products.map(p => (
               <button
                 key={p.id}
-                onClick={() => onSelect({ id: p.id, name: p.name, unit: p.unit, categoryName: activeCat.name })}
+                onClick={() => onSelect({ id: p.id, name: p.name, unit: p.unit, categoryName: activeCat.name, categoryId: activeCat.id })}
                 className="flex items-center justify-between bg-white rounded-xl shadow-sm p-4 border-2 border-transparent hover:border-emerald-500 active:scale-95 transition-all text-left min-h-[56px]"
               >
                 <div>

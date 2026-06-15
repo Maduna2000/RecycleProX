@@ -20,12 +20,12 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       ? order.lines.map(l => ({
           productName:  l.product.name,
           categoryName: l.product.category,
-          weight:       `${new Decimal(l.weight.toString()).toFixed(2)} ${l.product.unit}`,
+          weight:       l.weight ? `${new Decimal(l.weight.toString()).toFixed(2)} ${l.product.unit}` : '—',
         }))
       : [{
           productName:  order.product.name,
           categoryName: order.product.category,
-          weight:       `${new Decimal(order.weight.toString()).toFixed(2)} ${order.product.unit}`,
+          weight:       order.weight ? `${new Decimal(order.weight.toString()).toFixed(2)} ${order.product.unit}` : '—',
         }]
 
     const idNumber = resolveCustomerIdNumber(order)

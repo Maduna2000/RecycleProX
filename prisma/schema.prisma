@@ -320,8 +320,26 @@ model ProductCategory {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  parent   ProductCategory?  @relation("SubCategories", fields: [parentId], references: [id])
-  children ProductCategory[] @relation("SubCategories")
+  parent     ProductCategory?     @relation("SubCategories", fields: [parentId], references: [id])
+  children   ProductCategory[]    @relation("SubCategories")
+  stepConfig CategoryStepConfig?
+}
+
+// ─── Category Step Configuration (Scale Station) ──────────────────────────────
+
+model CategoryStepConfig {
+  id              String          @id @default(uuid())
+  categoryId      String          @unique
+  category        ProductCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  requireWeight   Boolean         @default(true)
+  requirePhotos   Boolean         @default(true)
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  createdByUserId String?
+
+  @@index([categoryId])
 }
 
 // ─── Purchases (M5) ───────────────────────────────────────────────────────────
@@ -816,7 +834,7 @@ model ScaleOrder {
   casualPhone     String?
   casualIdNumber  String?
   productId       String
-  weight          Decimal          @db.Decimal(18, 3)
+  weight          Decimal?         @db.Decimal(18, 3)  // Nullable when weight step is skipped
   photoR2Keys     String[]
   lineCount       Int              @default(1)
   slipR2Key       String?
@@ -848,7 +866,7 @@ model ScaleOrderLine {
   order       ScaleOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
   productId   String
   product     Product    @relation("ScaleOrderLineProduct", fields: [productId], references: [id])
-  weight      Decimal    @db.Decimal(18, 3)
+  weight      Decimal?   @db.Decimal(18, 3)  // Nullable when weight step is skipped
   photoR2Keys String[]
   createdAt   DateTime   @default(now())
 

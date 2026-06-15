@@ -7,9 +7,9 @@ export interface CartLine {
   productName:  string
   categoryName: string
   unit:         string
-  weight:       string
-  photoR2Keys:  string[]      // Used when online
-  photoBlobs?:  Blob[]        // Used when offline
+  weight:       string | null  // Null when weight step is skipped
+  photoR2Keys:  string[]       // Used when online
+  photoBlobs?:  Blob[]         // Used when offline
 }
 
 interface Props {
@@ -30,7 +30,10 @@ export default function Step5LineAdded({ justAdded, cart, onAddAnother, onReview
         </div>
         <div className="text-center">
           <h2 className="text-2xl font-bold text-slate-800">Product Added</h2>
-          <p className="text-slate-500 mt-1">{justAdded.productName} — {parseFloat(justAdded.weight).toFixed(2)} {justAdded.unit}</p>
+          <p className="text-slate-500 mt-1">
+            {justAdded.productName}
+            {justAdded.weight && ` — ${parseFloat(justAdded.weight).toFixed(2)} ${justAdded.unit}`}
+          </p>
         </div>
       </div>
 
@@ -48,9 +51,11 @@ export default function Step5LineAdded({ justAdded, cart, onAddAnother, onReview
                 <p className="font-medium text-slate-800 text-sm">{item.productName}</p>
                 <p className="text-xs text-slate-400">{item.categoryName}</p>
               </div>
-              <span className="font-semibold text-slate-700 text-sm font-mono">
-                {parseFloat(item.weight).toFixed(2)} {item.unit}
-              </span>
+              {item.weight && (
+                <span className="font-semibold text-slate-700 text-sm font-mono">
+                  {parseFloat(item.weight).toFixed(2)} {item.unit}
+                </span>
+              )}
             </div>
           ))}
         </div>

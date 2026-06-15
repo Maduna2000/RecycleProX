@@ -114,7 +114,7 @@ export async function createScaleOrder(data: CreateScaleOrderInput, operatorId: 
 
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
   const firstLine   = data.lines[0]!
-  const firstWeight = new Decimal(firstLine.weight)
+  const firstWeight = firstLine.weight ? new Decimal(firstLine.weight).toDecimalPlaces(3) : null
 
   const order = await prisma.$transaction(async (tx) => {
     const orderNumber = await generateOrderNumber(tx, new Date())
@@ -127,8 +127,8 @@ export async function createScaleOrder(data: CreateScaleOrderInput, operatorId: 
         casualPhone:     data.customerId ? null : (data.casualPhone     ?? null),
         casualIdNumber:  data.customerId ? null : (data.casualIdNumber  ?? null),
         productId:       firstLine.productId,
-        weight:          firstWeight.toDecimalPlaces(3),
-        photoR2Keys:     firstLine.photoR2Keys,
+        weight:          firstWeight,
+        photoR2Keys:     firstLine.photoR2Keys ?? [],
         lineCount:       data.lines.length,
         status:          'pending',
         operatorId,
@@ -140,8 +140,8 @@ export async function createScaleOrder(data: CreateScaleOrderInput, operatorId: 
       data: data.lines.map(line => ({
         orderId:     created.id,
         productId:   line.productId,
-        weight:      new Decimal(line.weight).toDecimalPlaces(3),
-        photoR2Keys: line.photoR2Keys,
+        weight:      line.weight ? new Decimal(line.weight).toDecimalPlaces(3) : null,
+        photoR2Keys: line.photoR2Keys ?? [],
       })),
     })
 

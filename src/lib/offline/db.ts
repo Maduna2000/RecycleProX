@@ -161,9 +161,18 @@ export interface OfflineScaleOrderLine {
   productId: string
   productName: string
   categoryName: string
-  weight: string
+  weight: string | null     // Null when weight step is skipped
   unit: string
-  localPhotoIds: string[]  // References to photoCache table
+  localPhotoIds: string[]   // References to photoCache table
+}
+
+// ─── Step Config Cache (for scale station) ────────────────────────────────────
+
+export interface OfflineStepConfig {
+  categoryId: string
+  requireWeight: boolean
+  requirePhotos: boolean
+  updatedAt: string | null  // ISO timestamp
 }
 
 export interface OfflineScaleOrder {
@@ -213,6 +222,7 @@ class RecycleProXDB extends Dexie {
   priceGroups!: Table<OfflinePriceGroup>
   priceOverrides!: Table<OfflinePriceOverride>
   categories!: Table<OfflineCategory>
+  stepConfigs!: Table<OfflineStepConfig>
 
   purchases!: Table<OfflinePurchase>
   purchaseLines!: Table<OfflinePurchaseLine>
@@ -253,6 +263,29 @@ class RecycleProXDB extends Dexie {
       priceGroups:    'id, isDefault',
       priceOverrides: 'id, priceGroupId, productId, [priceGroupId+productId]',
       categories:     'id, parentId, name',
+
+      purchases:      'id, customerId, status, createdAt',
+      purchaseLines:  'id, purchaseId, productId',
+      sales:          'id, customerId, status, createdAt',
+      saleLines:      'id, saleId, productId',
+      cashFloats:     'id, floatDate',
+      expenses:       'id, status, createdAt',
+
+      scaleOrders:    '++seq, id, syncStatus, createdAt',
+      photoCache:     'id, orderId, syncStatus',
+
+      syncQueue:      '++seq, id, status, createdAt',
+      meta:           'key',
+    })
+
+    // Version 3: Add step configs for category-based step configuration
+    this.version(3).stores({
+      products:       'id, category, isActive',
+      customers:      'id, idNumber, lastName, customerType, isActive',
+      priceGroups:    'id, isDefault',
+      priceOverrides: 'id, priceGroupId, productId, [priceGroupId+productId]',
+      categories:     'id, parentId, name',
+      stepConfigs:    'categoryId',
 
       purchases:      'id, customerId, status, createdAt',
       purchaseLines:  'id, purchaseId, productId',

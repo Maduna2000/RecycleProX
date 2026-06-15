@@ -81,7 +81,7 @@ export interface ReceiptData {
   lines: {
     productName:  string
     categoryName: string
-    weight:       string
+    weight:       string | null  // Null when weight step is skipped
     unit:         string
   }[]
   isOffline?: boolean  // Show UNSYNCED warning on slip
@@ -153,7 +153,7 @@ export function buildReceipt(data: ReceiptData, cols: number = DEFAULT_COLS): Ui
 
   data.lines.forEach((item, i) => {
     add(separator('-'))
-    const weight = `${parseFloat(item.weight).toFixed(2)} ${item.unit}`
+    const weight = item.weight ? `${parseFloat(item.weight).toFixed(2)} ${item.unit}` : '—'
     add(CMD_BOLD_ON)
     add(twoCol(`${i + 1}. ${item.productName}`, weight))
     add(CMD_BOLD_OFF)

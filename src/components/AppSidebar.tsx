@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import {
   LayoutDashboard, ShoppingCart, TrendingUp, Users,
-  Package, BarChart2, Settings, LogOut, RefreshCw,
+  Package, BarChart2, Settings, Settings2, LogOut, RefreshCw,
   Warehouse, DollarSign, Tag, Banknote, ShieldCheck, ShieldAlert,
   Receipt, Coins, UserCheck, ClipboardList, HandCoins, Images,
   AlertCircle, Scale,
@@ -64,9 +64,10 @@ const RECORDS: NavGroup = {
 const SCALE_ADMIN: NavGroup = {
   heading: 'Scale Station',
   items: [
-    { label: 'Orders',    href: '/app/scale',               icon: ClipboardList },
-    { label: 'Operators', href: '/app/scale?tab=operators', icon: Users },
-    { label: 'Station',   href: '/scale',                   icon: Scale },
+    { label: 'Orders',      href: '/app/scale',               icon: ClipboardList },
+    { label: 'Operators',   href: '/app/scale?tab=operators', icon: Users },
+    { label: 'Step Config', href: '/app/scale?tab=config',    icon: Settings2 },
+    { label: 'Station',     href: '/scale',                   icon: Scale },
   ],
 }
 
