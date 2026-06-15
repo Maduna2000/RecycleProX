@@ -13,7 +13,7 @@ import {
 import { DataTable, StatusBadge, type Column, type RowAction } from '@/components/ui/DataTable'
 import { InlineDetailPanel } from '@/components/ui/InlineDetailPanel'
 import { PageShell } from '@/components/layout/PageShell'
-import { colors, fontSize, fontWeight, layout } from '@/lib/design-tokens'
+import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
