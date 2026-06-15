@@ -210,7 +210,7 @@ export default function ScalePage() {
     }
     // Map actual step to enabled step index
     const stepNames = ['Customer', 'Product', 'Weight', 'Photos']
-    const currentStepName = stepNames[step - 1]
+    const currentStepName = stepNames[step - 1] ?? ''
     const idx = enabledSteps.indexOf(currentStepName)
     return idx >= 0 ? idx + 1 : step
   }, [step, enabledSteps])
