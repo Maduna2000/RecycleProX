@@ -9,6 +9,7 @@ import {
   ArrowLeft, CheckCircle, Trash2, Paperclip, Eye, Loader2, Upload, X,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { colors } from '@/lib/design-tokens'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
@@ -58,6 +59,7 @@ export default function ExpenseDetailPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
   const { data: session } = useSession()
+  const { confirm } = useConfirm()
   const isMgr = ['admin', 'manager'].includes(session?.user?.role ?? '')
 
   const { data: expense, mutate: mutateExpense, isLoading } =
@@ -80,7 +82,14 @@ export default function ExpenseDetailPage() {
   }
 
   async function handleVoid() {
-    if (!confirm('Void this expense? This cannot be undone.')) return
+    const confirmed = await confirm({
+      title: 'Void Expense',
+      message: 'Are you sure you want to void this expense? This action cannot be undone.',
+      variant: 'danger',
+      confirmLabel: 'Void Expense',
+      cancelLabel: 'Cancel',
+    })
+    if (!confirmed) return
     setVoiding(true)
     const res = await fetch(`/api/expenses/${id}`, { method: 'DELETE' })
     setVoiding(false)
@@ -125,7 +134,14 @@ export default function ExpenseDetailPage() {
   }
 
   async function handleDelete(attachId: string) {
-    if (!confirm('Delete this attachment?')) return
+    const confirmed = await confirm({
+      title: 'Delete Attachment',
+      message: 'Are you sure you want to delete this attachment?',
+      variant: 'warning',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+    })
+    if (!confirmed) return
     const res = await fetch(`/api/expenses/${id}/attachments/${attachId}`, { method: 'DELETE' })
     if (res.ok) { toast.success('Attachment deleted'); mutateAttachments() }
     else toast.error('Failed to delete attachment')

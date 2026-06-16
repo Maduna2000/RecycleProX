@@ -8,6 +8,7 @@ import useSWR, { mutate } from 'swr'
 import { useSession } from 'next-auth/react'
 import { CheckCircle, Trash2, Receipt, Search, X, Paperclip, Upload, Eye, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
+import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { CreateExpenseSchema, type CreateExpenseFormInput, type CreateExpenseInput } from '@/lib/schemas/expense'
@@ -38,6 +39,7 @@ export default function ExpensesPage() {
   const router        = useRouter()
   const searchParams  = useSearchParams()
   const { data: session } = useSession()
+  const { confirm }   = useConfirm()
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
 
   const [tab,            setTab]            = useState<PageTab>('Pending')
@@ -91,7 +93,14 @@ export default function ExpensesPage() {
   }
 
   async function handleVoid(id: string) {
-    if (!confirm('Void this expense?')) return
+    const confirmed = await confirm({
+      title: 'Void Expense',
+      message: 'Are you sure you want to void this expense? This action cannot be undone.',
+      variant: 'danger',
+      confirmLabel: 'Void Expense',
+      cancelLabel: 'Cancel',
+    })
+    if (!confirmed) return
     const res = await fetch(`/api/expenses/${id}`, { method: 'DELETE' })
     if (res.ok) { toast.success('Expense voided'); mutate(key) }
     else { const j = await res.json(); toast.error(j.error ?? 'Failed to void') }

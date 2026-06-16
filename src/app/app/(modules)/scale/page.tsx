@@ -10,6 +10,7 @@ import {
   UserPlus, Eye, EyeOff, Loader2, Scale,
   ChevronLeft, ChevronRight, Info,
 } from 'lucide-react'
+import { toast } from 'sonner'
 import { DataTable, StatusBadge, type Column, type RowAction } from '@/components/ui/DataTable'
 import { InlineDetailPanel } from '@/components/ui/InlineDetailPanel'
 import { PageShell } from '@/components/layout/PageShell'
@@ -848,7 +849,7 @@ function OrdersTab() {
       const detail: OrderDetail = await fetcher(`/api/scale/orders/${order.id}`)
       setPhotoOrder(detail)
     } catch {
-      alert('Failed to load photos')
+      toast.error('Failed to load photos')
     } finally {
       setPhotoLoading(false)
     }
@@ -860,7 +861,7 @@ function OrdersTab() {
       if (!res.ok) { const d = await res.json(); throw new Error(d.error) }
       setOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: 'processed' } : o))
     } catch (e) {
-      alert(e instanceof Error ? e.message : 'Failed to mark as processed')
+      toast.error(e instanceof Error ? e.message : 'Failed to mark as processed')
     }
   }
 
@@ -902,7 +903,7 @@ function OrdersTab() {
       a.click()
       URL.revokeObjectURL(url)
     } catch {
-      alert('Export failed')
+      toast.error('Export failed')
     } finally {
       setExporting(false)
     }
@@ -1186,7 +1187,7 @@ function OperatorsTab() {
       const updated: Operator = await res.json()
       setOperators(prev => prev.map(o => o.id === updated.id ? updated : o))
     } catch (e) {
-      alert(e instanceof Error ? e.message : 'Action failed')
+      toast.error(e instanceof Error ? e.message : 'Action failed')
     } finally {
       setActionLoading(null)
     }
@@ -1345,7 +1346,7 @@ function ConfigTab() {
     } catch {
       // Revert on error
       fetchConfigs()
-      alert('Failed to save configuration')
+      toast.error('Failed to save configuration')
     } finally {
       setSaving(null)
     }

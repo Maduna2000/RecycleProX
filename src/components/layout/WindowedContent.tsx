@@ -6,6 +6,7 @@ import { getModuleName, getModuleIcon } from '@/lib/module-names'
 import { useWindowStore } from '@/stores/windowStore'
 import { PageTitleBar } from '@/components/ui/PageTitleBar'
 import { useRecordTitle } from '@/hooks/useRecordTitle'
+import { ConfirmDialogProvider } from '@/components/ui/ConfirmDialog'
 
 export function WindowedContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -29,9 +30,11 @@ export function WindowedContent({ children }: { children: React.ReactNode }) {
   }, [pathname, recordTitle, isDetailPage, isLoading])
 
   return (
-    <div className="flex flex-col flex-1 min-h-0">
-      <PageTitleBar title={isDetailPage ? recordTitle : undefined} />
-      {children}
-    </div>
+    <ConfirmDialogProvider>
+      <div className="flex flex-col flex-1 min-h-0">
+        <PageTitleBar title={isDetailPage ? recordTitle : undefined} />
+        {children}
+      </div>
+    </ConfirmDialogProvider>
   )
 }
