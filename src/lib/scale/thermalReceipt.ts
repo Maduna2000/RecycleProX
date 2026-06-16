@@ -63,7 +63,38 @@ function createHelpers(cols: number) {
     return textLine(l + ' '.repeat(Math.max(1, gap)) + right)
   }
 
-  return { textLine, emptyLine, separator, pad, centred, twoCol }
+  /**
+   * Two-column layout with text wrapping (max 2 lines).
+   * Line 1: prefix + product name start + right-aligned value
+   * Line 2: indented overflow text (truncated with … if needed)
+   */
+  function twoColWrap(prefix: string, text: string, right: string): number[][] {
+    const indent = ' '.repeat(prefix.length)
+    const maxLine1Text = cols - prefix.length - right.length - 1
+    const maxLine2Text = cols - prefix.length
+
+    // If it fits on one line, no wrapping needed
+    if (text.length <= maxLine1Text) {
+      const gap = cols - prefix.length - text.length - right.length
+      return [textLine(prefix + text + ' '.repeat(Math.max(1, gap)) + right)]
+    }
+
+    // Line 1: prefix + as much text as fits + right value
+    const line1Text = text.slice(0, maxLine1Text)
+    const gap = cols - prefix.length - line1Text.length - right.length
+    const line1 = textLine(prefix + line1Text + ' '.repeat(Math.max(1, gap)) + right)
+
+    // Line 2: indented overflow, truncated if needed
+    const overflow = text.slice(maxLine1Text).trimStart()
+    const line2Text = overflow.length > maxLine2Text
+      ? overflow.slice(0, maxLine2Text - 1) + '…'
+      : overflow
+    const line2 = textLine(indent + line2Text)
+
+    return [line1, line2]
+  }
+
+  return { textLine, emptyLine, separator, pad, centred, twoCol, twoColWrap }
 }
 
 // ── Public interface ─────────────────────────────────────────────────────────
@@ -93,7 +124,7 @@ export interface ReceiptData {
  * @param cols - Column width (32 for 58mm, 48 for 80mm). Defaults to 32.
  */
 export function buildReceipt(data: ReceiptData, cols: number = DEFAULT_COLS): Uint8Array {
-  const { textLine, emptyLine, separator, twoCol } = createHelpers(cols)
+  const { textLine, emptyLine, separator, twoColWrap } = createHelpers(cols)
   const buf: number[] = []
   const add = (...chunks: number[][]) => chunks.forEach(c => buf.push(...c))
 
@@ -154,8 +185,10 @@ export function buildReceipt(data: ReceiptData, cols: number = DEFAULT_COLS): Ui
   data.lines.forEach((item, i) => {
     add(separator('-'))
     const weight = item.weight ? `${parseFloat(item.weight).toFixed(2)} ${item.unit}` : '—'
+    const prefix = `${i + 1}. `
+    const lines = twoColWrap(prefix, item.productName, weight)
     add(CMD_BOLD_ON)
-    add(twoCol(`${i + 1}. ${item.productName}`, weight))
+    lines.forEach(line => add(line))
     add(CMD_BOLD_OFF)
   })
 
