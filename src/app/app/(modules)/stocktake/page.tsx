@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { Plus, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { WinButton } from '@/components/ui/WinButton'
 import { format } from '@/lib/utils/format'
 import { colors } from '@/lib/design-tokens'
 
@@ -81,15 +82,11 @@ export default function StocktakePage() {
           <span style={{ fontSize: 13, fontWeight: 700, color: '#1B3A6B' }}>Stocktake</span>
           <span style={{ fontSize: 11, color: '#6C757D' }}>{count} on record</span>
           <div style={{ flex: 1 }} />
-          <button
-            onClick={handleCreate}
-            disabled={creating}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, height: 24, padding: '0 8px', fontSize: 11, fontWeight: 600, borderRadius: 2, background: '#217346', border: '1px solid #176338', color: '#fff', cursor: creating ? 'not-allowed' : 'pointer', opacity: creating ? 0.7 : 1 }}
-          >
+          <WinButton onClick={handleCreate} disabled={creating}>
             {creating
-              ? <><Loader2 style={{ width: 11, height: 11 }} className="animate-spin" />Creating…</>
-              : <><Plus style={{ width: 11, height: 11 }} />New Stocktake</>}
-          </button>
+              ? <><Loader2 style={{ width: 9, height: 9 }} className="animate-spin" />Creating…</>
+              : <><Plus style={{ width: 9, height: 9 }} />New Stocktake</>}
+          </WinButton>
         </div>
 
         {/* Table */}

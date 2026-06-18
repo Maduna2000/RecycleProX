@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { WinButton } from '@/components/ui/WinButton'
 import { Plus, Star, Loader2, MoreVertical, ExternalLink } from 'lucide-react'
 import { toast } from 'sonner'
 import { useForm } from 'react-hook-form'
@@ -61,12 +62,9 @@ export default function PriceGroupsPage() {
           <span style={{ fontSize: 11, color: '#6C757D' }}>{groups.length} group{groups.length !== 1 ? 's' : ''}</span>
           <div style={{ flex: 1 }} />
           {isManager && (
-            <button
-              onClick={() => setCreateOpen(true)}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 4, height: 24, padding: '0 8px', fontSize: 11, fontWeight: 600, borderRadius: 2, background: '#217346', border: '1px solid #176338', color: '#fff', cursor: 'pointer' }}
-            >
-              <Plus style={{ width: 11, height: 11 }} /> Add Price Group
-            </button>
+            <WinButton onClick={() => setCreateOpen(true)}>
+              <Plus style={{ width: 9, height: 9 }} /> Add Price Group
+            </WinButton>
           )}
         </div>
 

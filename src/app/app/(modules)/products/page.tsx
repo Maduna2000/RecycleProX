@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, ModalTitleBar, ModalBtn } from '@/components/ui/dialog'
+import { WinButton } from '@/components/ui/WinButton'
 import { Search, Pencil, TrendingUp, Plus, Eye, EyeOff, Trash2, X, Settings2, Package, Loader2, MoreVertical } from 'lucide-react'
 import * as LucideIcons from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -53,17 +54,6 @@ const TH: React.CSSProperties = {
   textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap',
 }
 const TD: React.CSSProperties = { padding: '0 8px', fontSize: 12 }
-
-const secBtn: React.CSSProperties = {
-  display: 'inline-flex', alignItems: 'center', gap: 4, height: 24,
-  padding: '0 8px', fontSize: 11, fontWeight: 600, borderRadius: 2,
-  background: colors.surface, border: `1px solid ${colors.border}`, color: colors.textPrimary, cursor: 'pointer',
-}
-const priBtn: React.CSSProperties = {
-  display: 'inline-flex', alignItems: 'center', gap: 4, height: 24,
-  padding: '0 8px', fontSize: 11, fontWeight: 600, borderRadius: 2,
-  background: colors.action, border: `1px solid ${colors.actionHover}`, color: colors.textOnDark, cursor: 'pointer',
-}
 
 export default function ProductsPage() {
   const router       = useRouter()
@@ -167,15 +157,15 @@ export default function ProductsPage() {
           <div style={{ flex: 1 }} />
           {isManager && (
             <>
-              <button onClick={() => setCatManageOpen(true)} style={secBtn}>
-                <Settings2 style={{ width: 11, height: 11 }} /> Categories
-              </button>
-              <button onClick={() => setBulkOpen(true)} style={secBtn}>
-                <TrendingUp style={{ width: 11, height: 11 }} /> Bulk Price
-              </button>
-              <button onClick={() => setCreateOpen(true)} style={priBtn}>
-                <Plus style={{ width: 11, height: 11 }} /> Add Product
-              </button>
+              <WinButton onClick={() => setCatManageOpen(true)}>
+                <Settings2 style={{ width: 9, height: 9 }} /> Categories
+              </WinButton>
+              <WinButton onClick={() => setBulkOpen(true)}>
+                <TrendingUp style={{ width: 9, height: 9 }} /> Bulk Price
+              </WinButton>
+              <WinButton onClick={() => setCreateOpen(true)}>
+                <Plus style={{ width: 9, height: 9 }} /> Add Product
+              </WinButton>
             </>
           )}
         </div>
@@ -242,9 +232,9 @@ export default function ProductsPage() {
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 120, color: '#6C757D', fontSize: 12, gap: 8 }}>
               <span>No products found</span>
               {isManager && (
-                <button onClick={() => setCreateOpen(true)} style={{ ...priBtn, height: 26, fontSize: 11 }}>
-                  <Plus style={{ width: 11, height: 11 }} /> Add Product
-                </button>
+                <WinButton onClick={() => setCreateOpen(true)}>
+                  <Plus style={{ width: 9, height: 9 }} /> Add Product
+                </WinButton>
               )}
             </div>
           ) : (

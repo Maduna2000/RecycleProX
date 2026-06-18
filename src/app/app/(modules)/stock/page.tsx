@@ -9,6 +9,7 @@ import Decimal from 'decimal.js'
 import { DataTable, type Column } from '@/components/ui/DataTable'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { WinButton } from '@/components/ui/WinButton'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -391,13 +392,9 @@ export default function StockPage() {
       {/* Manager action — Manual Adjustment button */}
       {isManager && (
         <div className="flex justify-end shrink-0 mb-1">
-          <button
-            onClick={() => setAdjustOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium border bg-white"
-            style={{ color: colors.textPrimary, borderColor: colors.border }}
-          >
-            <SlidersHorizontal className="w-3.5 h-3.5" /> Manual Adjustment
-          </button>
+          <WinButton onClick={() => setAdjustOpen(true)}>
+            <SlidersHorizontal style={{ width: 9, height: 9 }} /> Manual Adjustment
+          </WinButton>
         </div>
       )}
 
