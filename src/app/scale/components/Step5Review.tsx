@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Loader2, Printer, RotateCcw, CheckCircle2, Trash2, AlertCircle, Download, WifiOff, Cloud } from 'lucide-react'
+import { Loader2, Printer, RotateCcw, CheckCircle2, Trash2, AlertCircle, Download, WifiOff, Cloud, X, Check, Pencil } from 'lucide-react'
 import type { SelectedCustomer } from './Step1Customer'
 import type { CartLine } from './Step5LineAdded'
 import { buildReceipt }         from '@/lib/scale/thermalReceipt'
@@ -19,12 +19,13 @@ interface Props {
   customer:     SelectedCustomer
   cart:         CartLine[]
   onRemoveLine: (index: number) => void
+  onUpdateLine: (index: number, updates: Partial<CartLine>) => void
   onNewOrder:   () => void
 }
 
 type Status = 'idle' | 'creating' | 'printing' | 'done' | 'error' | 'no-printer'
 
-export default function Step5Review({ customer, cart, onRemoveLine, onNewOrder }: Props) {
+export default function Step5Review({ customer, cart, onRemoveLine, onUpdateLine, onNewOrder }: Props) {
   const { openPrinterSetup } = usePrinterSetup()
   const { isOnline } = useOfflineStore()
   const { data: session } = useSession()
@@ -33,6 +34,12 @@ export default function Step5Review({ customer, cart, onRemoveLine, onNewOrder }
   const [orderNumber, setOrderNumber] = useState<string | null>(null)
   const [isOfflineOrder, setIsOfflineOrder] = useState(false)
   const [errorMsg,    setErrorMsg]    = useState('')
+
+  // Inline weight edit state
+  const [editingWeightIndex, setEditingWeightIndex] = useState<number | null>(null)
+  const [editWeight, setEditWeight] = useState('')
+  const [editError, setEditError] = useState('')
+  const editInputRef = useRef<HTMLInputElement>(null)
 
   // Cached receipt bytes so "Reprint" doesn't rebuild from potentially stale state
   const receiptRef = useRef<Uint8Array | null>(null)
@@ -198,6 +205,55 @@ export default function Step5Review({ customer, cart, onRemoveLine, onNewOrder }
 
   const busy = status === 'creating' || status === 'printing'
 
+  // ── Inline weight edit functions ─────────────────────────────────────────
+  function openWeightEdit(index: number, currentWeight: string | null) {
+    setEditingWeightIndex(index)
+    setEditWeight(currentWeight ?? '')
+    setEditError('')
+    // Focus input after render
+    setTimeout(() => editInputRef.current?.focus(), 0)
+  }
+
+  function handleWeightInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const v = e.target.value
+    // Allow digits, one decimal point, max 3 decimals
+    if (/^\d*\.?\d{0,3}$/.test(v)) {
+      setEditWeight(v)
+      setEditError('')
+    }
+  }
+
+  function cancelWeightEdit() {
+    setEditingWeightIndex(null)
+    setEditWeight('')
+    setEditError('')
+  }
+
+  function saveWeightEdit() {
+    if (editingWeightIndex === null) return
+
+    const num = parseFloat(editWeight)
+    if (!editWeight || isNaN(num) || num <= 0) {
+      setEditError('Enter a valid weight greater than 0')
+      return
+    }
+
+    onUpdateLine(editingWeightIndex, { weight: editWeight })
+    setEditingWeightIndex(null)
+    setEditWeight('')
+    setEditError('')
+  }
+
+  function handleWeightKeyDown(e: React.KeyboardEvent) {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      saveWeightEdit()
+    } else if (e.key === 'Escape') {
+      e.preventDefault()
+      cancelWeightEdit()
+    }
+  }
+
   return (
     <div className="flex-1 flex flex-col p-5 max-w-md mx-auto w-full">
       <h2 className="text-2xl font-bold text-slate-800 mb-1">Review &amp; Print</h2>
@@ -219,24 +275,83 @@ export default function Step5Review({ customer, cart, onRemoveLine, onNewOrder }
         </div>
         <div className="divide-y divide-slate-100">
           {cart.map((item, i) => (
-            <div key={i} className="px-4 py-3 flex items-center gap-3">
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-slate-800 text-sm truncate">{item.productName}</p>
-                <p className="text-xs text-slate-400">{item.categoryName}</p>
+            <div key={i} className="px-4 py-3">
+              <div className="flex items-center gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-slate-800 text-sm truncate">{item.productName}</p>
+                  <p className="text-xs text-slate-400">{item.categoryName}</p>
+                </div>
+
+                {/* Weight display or inline edit */}
+                {editingWeightIndex === i ? (
+                  <div className="flex items-center gap-1.5 bg-slate-50 rounded-lg px-2 py-1.5 border border-emerald-300">
+                    <button
+                      type="button"
+                      onClick={() => setEditWeight('')}
+                      className="text-slate-400 hover:text-slate-600 p-1 rounded transition-colors"
+                      aria-label="Clear"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                    <input
+                      ref={editInputRef}
+                      type="number"
+                      inputMode="decimal"
+                      value={editWeight}
+                      onChange={handleWeightInputChange}
+                      onKeyDown={handleWeightKeyDown}
+                      className="w-16 text-sm font-semibold text-right bg-transparent border-none focus:outline-none font-mono"
+                      placeholder="0.00"
+                    />
+                    <span className="text-xs font-medium text-slate-500">{item.unit}</span>
+                    <button
+                      type="button"
+                      onClick={saveWeightEdit}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white p-1.5 rounded-md transition-colors"
+                      aria-label="Save"
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ) : item.weight ? (
+                  status === 'idle' ? (
+                    <button
+                      onClick={() => openWeightEdit(i, item.weight)}
+                      className="flex items-center gap-1.5 font-semibold text-slate-700 text-sm font-mono shrink-0 hover:text-emerald-600 hover:bg-emerald-50 px-2 py-1 rounded-lg transition-colors group"
+                    >
+                      {parseFloat(item.weight).toFixed(2)} {item.unit}
+                      <Pencil className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </button>
+                  ) : (
+                    <span className="font-semibold text-slate-700 text-sm font-mono shrink-0">
+                      {parseFloat(item.weight).toFixed(2)} {item.unit}
+                    </span>
+                  )
+                ) : status === 'idle' ? (
+                  <button
+                    onClick={() => openWeightEdit(i, null)}
+                    className="text-xs text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 px-2 py-1 rounded-lg transition-colors"
+                  >
+                    + Add weight
+                  </button>
+                ) : (
+                  <span className="text-xs text-slate-400">—</span>
+                )}
+
+                {status === 'idle' && cart.length > 1 && editingWeightIndex !== i && (
+                  <button
+                    onClick={() => onRemoveLine(i)}
+                    className="shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                    aria-label={`Remove ${item.productName}`}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
               </div>
-              {item.weight && (
-                <span className="font-semibold text-slate-700 text-sm font-mono shrink-0">
-                  {parseFloat(item.weight).toFixed(2)} {item.unit}
-                </span>
-              )}
-              {status === 'idle' && cart.length > 1 && (
-                <button
-                  onClick={() => onRemoveLine(i)}
-                  className="shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-                  aria-label={`Remove ${item.productName}`}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+
+              {/* Error message when editing this row */}
+              {editingWeightIndex === i && editError && (
+                <p className="text-red-500 text-xs mt-2 ml-1">{editError}</p>
               )}
             </div>
           ))}

@@ -197,6 +197,12 @@ export default function ScalePage() {
     setCart(prev => prev.filter((_, i) => i !== index))
   }
 
+  function handleUpdateLine(index: number, updates: Partial<CartLine>) {
+    setCart(prev => prev.map((line, i) =>
+      i === index ? { ...line, ...updates } : line
+    ))
+  }
+
   // Progress bar: calculate display step based on enabled steps
   // step 5 (LineAdded) is transient, step 6 (Review) is last
   const displayStep = useMemo(() => {
@@ -361,6 +367,7 @@ export default function ScalePage() {
               customer={customer}
               cart={cart}
               onRemoveLine={handleRemoveLine}
+              onUpdateLine={handleUpdateLine}
               onNewOrder={reset}
             />
           )}
