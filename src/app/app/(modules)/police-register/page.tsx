@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import useSWR, { mutate } from 'swr'
-import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { FileDown, Loader2, Pen, CheckCircle, ExternalLink, RotateCcw } from 'lucide-react'
 import { toast } from 'sonner'
@@ -201,13 +200,26 @@ export default function PoliceRegisterPage() {
                   <button
                     onClick={handleDownload}
                     disabled={loading || !date || !officerName.trim()}
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 12px', fontSize: 12, fontWeight: 600, borderRadius: 2, background: colors.process, border: 'none', color: '#fff', cursor: loading || !date || !officerName.trim() ? 'not-allowed' : 'pointer', opacity: loading || !date || !officerName.trim() ? 0.6 : 1, alignSelf: 'flex-start' }}
-                    onMouseEnter={(e) => !loading && (e.currentTarget.style.background = colors.processHover)}
-                    onMouseLeave={(e) => !loading && (e.currentTarget.style.background = colors.process)}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 3,
+                      fontSize: 10,
+                      padding: '1px 6px',
+                      background: '#E0E0E0',
+                      border: '1px solid #999',
+                      borderRadius: 2,
+                      cursor: loading || !date || !officerName.trim() ? 'not-allowed' : 'pointer',
+                      opacity: loading || !date || !officerName.trim() ? 0.6 : 1,
+                      alignSelf: 'flex-start',
+                      color: '#212529',
+                    }}
+                    onMouseEnter={(e) => { if (!loading && date && officerName.trim()) e.currentTarget.style.background = '#D0D0D0' }}
+                    onMouseLeave={(e) => { if (!loading && date && officerName.trim()) e.currentTarget.style.background = '#E0E0E0' }}
                   >
                     {loading
-                      ? <><Loader2 style={{ width: 13, height: 13 }} className="animate-spin" />Generating PDF…</>
-                      : <><FileDown style={{ width: 13, height: 13 }} />Generate &amp; Download PDF</>}
+                      ? <><Loader2 style={{ width: 9, height: 9, animation: 'spin 1s linear infinite' }} />Generating PDF…</>
+                      : <><FileDown style={{ width: 9, height: 9 }} />Generate &amp; Download PDF</>}
                   </button>
                 </div>
               </div>
@@ -427,22 +439,71 @@ function SignatureDialog({
         </div>
 
         <div className="flex items-center justify-between pt-2">
-          <Button variant="ghost" size="sm" onClick={clearCanvas} disabled={saving}>
-            <RotateCcw className="w-3.5 h-3.5 mr-1.5" /> Clear
-          </Button>
+          <button
+            onClick={clearCanvas}
+            disabled={saving}
+            style={{
+              fontSize: 10,
+              padding: '1px 6px',
+              background: '#E0E0E0',
+              border: '1px solid #999',
+              borderRadius: 2,
+              cursor: saving ? 'not-allowed' : 'pointer',
+              opacity: saving ? 0.6 : 1,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 3,
+              color: '#212529',
+            }}
+            onMouseEnter={(e) => { if (!saving) e.currentTarget.style.background = '#D0D0D0' }}
+            onMouseLeave={(e) => { if (!saving) e.currentTarget.style.background = '#E0E0E0' }}
+          >
+            <RotateCcw style={{ width: 9, height: 9 }} /> Clear
+          </button>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={onClose} disabled={saving}>Skip</Button>
+            <button
+              onClick={onClose}
+              disabled={saving}
+              style={{
+                fontSize: 10,
+                padding: '1px 6px',
+                background: '#E0E0E0',
+                border: '1px solid #999',
+                borderRadius: 2,
+                cursor: saving ? 'not-allowed' : 'pointer',
+                opacity: saving ? 0.6 : 1,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 3,
+                color: '#212529',
+              }}
+              onMouseEnter={(e) => { if (!saving) e.currentTarget.style.background = '#D0D0D0' }}
+              onMouseLeave={(e) => { if (!saving) e.currentTarget.style.background = '#E0E0E0' }}
+            >
+              Skip
+            </button>
             <button
               onClick={handleSave}
               disabled={saving || !hasStrokes}
-              className="flex items-center gap-1.5 h-9 px-4 rounded text-sm font-medium text-white transition-colors disabled:opacity-50"
-              style={{ background: colors.action }}
-              onMouseEnter={(e) => !saving && (e.currentTarget.style.background = colors.actionHover)}
-              onMouseLeave={(e) => !saving && (e.currentTarget.style.background = colors.action)}
+              style={{
+                fontSize: 10,
+                padding: '1px 6px',
+                background: '#E0E0E0',
+                border: '1px solid #999',
+                borderRadius: 2,
+                cursor: saving || !hasStrokes ? 'not-allowed' : 'pointer',
+                opacity: saving || !hasStrokes ? 0.6 : 1,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 3,
+                color: '#212529',
+              }}
+              onMouseEnter={(e) => { if (!saving && hasStrokes) e.currentTarget.style.background = '#D0D0D0' }}
+              onMouseLeave={(e) => { if (!saving && hasStrokes) e.currentTarget.style.background = '#E0E0E0' }}
             >
               {saving
-                ? <><Loader2 className="w-4 h-4 animate-spin" />Saving…</>
-                : <><CheckCircle className="w-4 h-4" />Save Signature</>}
+                ? <><Loader2 style={{ width: 9, height: 9, animation: 'spin 1s linear infinite' }} />Saving…</>
+                : <><CheckCircle style={{ width: 9, height: 9 }} />Save Signature</>}
             </button>
           </div>
         </div>

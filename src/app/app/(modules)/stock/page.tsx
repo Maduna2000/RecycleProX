@@ -8,7 +8,6 @@ import { toast } from 'sonner'
 import Decimal from 'decimal.js'
 import { DataTable, type Column } from '@/components/ui/DataTable'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
 import { WinButton } from '@/components/ui/WinButton'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -492,10 +491,21 @@ export default function StockPage() {
             {hasMovFilters && (
               <button
                 onClick={clearMovFilters}
-                className="h-7 px-2.5 text-xs flex items-center gap-1 border rounded hover:bg-[#F1F3F4] transition-colors"
-                style={{ borderColor: colors.border, color: colors.textSecondary }}
+                style={{
+                  fontSize: 10,
+                  padding: '1px 6px',
+                  background: '#E0E0E0',
+                  border: '1px solid #999',
+                  borderRadius: 2,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 3,
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = '#D0D0D0' }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = '#E0E0E0' }}
               >
-                <X className="w-3 h-3" /> Clear
+                <X style={{ width: 9, height: 9 }} /> Clear
               </button>
             )}
           </div>
@@ -555,12 +565,25 @@ export default function StockPage() {
             <button
               onClick={handleExport}
               disabled={exporting}
-              className="ml-auto flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium border bg-white disabled:opacity-50"
-              style={{ color: colors.textPrimary, borderColor: colors.border }}
+              style={{
+                marginLeft: 'auto',
+                fontSize: 10,
+                padding: '1px 6px',
+                background: '#E0E0E0',
+                border: '1px solid #999',
+                borderRadius: 2,
+                cursor: exporting ? 'not-allowed' : 'pointer',
+                opacity: exporting ? 0.6 : 1,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 3,
+              }}
+              onMouseEnter={(e) => { if (!exporting) e.currentTarget.style.background = '#D0D0D0' }}
+              onMouseLeave={(e) => { if (!exporting) e.currentTarget.style.background = '#E0E0E0' }}
             >
               {exporting
-                ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Exporting…</>
-                : <><Download className="w-3.5 h-3.5" /> Export Excel</>}
+                ? <><Loader2 style={{ width: 9, height: 9, animation: 'spin 1s linear infinite' }} /> Exporting…</>
+                : <><Download style={{ width: 9, height: 9 }} /> Export Excel</>}
             </button>
           </div>
 
@@ -692,15 +715,46 @@ function AdjustmentModal({
           </div>
 
           <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
-            <Button
-              style={{ background: colors.action }}
-              className="hover:opacity-90"
+            <button
+              onClick={onClose}
+              disabled={loading}
+              style={{
+                fontSize: 10,
+                padding: '1px 6px',
+                background: '#E0E0E0',
+                border: '1px solid #999',
+                borderRadius: 2,
+                cursor: loading ? 'not-allowed' : 'pointer',
+                opacity: loading ? 0.6 : 1,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 3,
+              }}
+              onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = '#D0D0D0' }}
+              onMouseLeave={(e) => { if (!loading) e.currentTarget.style.background = '#E0E0E0' }}
+            >
+              Cancel
+            </button>
+            <button
               onClick={onSubmit}
               disabled={loading}
+              style={{
+                fontSize: 10,
+                padding: '1px 6px',
+                background: '#E0E0E0',
+                border: '1px solid #999',
+                borderRadius: 2,
+                cursor: loading ? 'not-allowed' : 'pointer',
+                opacity: loading ? 0.6 : 1,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 3,
+              }}
+              onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = '#D0D0D0' }}
+              onMouseLeave={(e) => { if (!loading) e.currentTarget.style.background = '#E0E0E0' }}
             >
-              {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving…</> : 'Record Adjustment'}
-            </Button>
+              {loading ? <><Loader2 style={{ width: 9, height: 9, animation: 'spin 1s linear infinite' }} /> Saving…</> : 'Record Adjustment'}
+            </button>
           </div>
         </div>
       </DialogContent>

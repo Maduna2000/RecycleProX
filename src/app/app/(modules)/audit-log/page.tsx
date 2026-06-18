@@ -134,12 +134,22 @@ export default function AuditLogPage() {
           {hasFilters && (
             <button
               onClick={clearFilters}
-              className="h-7 px-2.5 text-xs flex items-center gap-1 border rounded"
-              style={{ borderColor: colors.border, color: colors.textSecondary, borderRadius: layout.btnRadius }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = colors.bg)}
-              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+              style={{
+                fontSize: 10,
+                padding: '1px 6px',
+                background: '#E0E0E0',
+                border: '1px solid #999',
+                borderRadius: 2,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 3,
+                color: '#212529',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = '#D0D0D0' }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = '#E0E0E0' }}
             >
-              <X className="w-3 h-3" /> Clear
+              <X style={{ width: 9, height: 9 }} /> Clear
             </button>
           )}
         </div>
@@ -233,26 +243,48 @@ export default function AuditLogPage() {
         {totalPages > 1 && (
           <div className="flex items-center justify-between pt-0.5 shrink-0">
             <span style={{ fontSize: 11, color: colors.textSecondary }}>{showing}</span>
-            <div className="flex items-center gap-0.5">
+            <div className="flex items-center gap-1">
               <button
                 disabled={page <= 1}
                 onClick={() => setPage(p => p - 1)}
-                className="px-2 h-6 rounded-sm border disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                style={{ borderColor: colors.border }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = colors.neutralBg)}
-                onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                style={{
+                  fontSize: 10,
+                  padding: '1px 6px',
+                  background: '#E0E0E0',
+                  border: '1px solid #999',
+                  borderRadius: 2,
+                  cursor: page <= 1 ? 'not-allowed' : 'pointer',
+                  opacity: page <= 1 ? 0.4 : 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 3,
+                  color: '#212529',
+                }}
+                onMouseEnter={(e) => { if (page > 1) e.currentTarget.style.background = '#D0D0D0' }}
+                onMouseLeave={(e) => { if (page > 1) e.currentTarget.style.background = '#E0E0E0' }}
               >
-                <ChevronLeft className="w-3 h-3" />
+                <ChevronLeft style={{ width: 9, height: 9 }} />
               </button>
               <button
                 disabled={page >= totalPages}
                 onClick={() => setPage(p => p + 1)}
-                className="px-2 h-6 rounded-sm border disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                style={{ borderColor: colors.border }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = colors.neutralBg)}
-                onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                style={{
+                  fontSize: 10,
+                  padding: '1px 6px',
+                  background: '#E0E0E0',
+                  border: '1px solid #999',
+                  borderRadius: 2,
+                  cursor: page >= totalPages ? 'not-allowed' : 'pointer',
+                  opacity: page >= totalPages ? 0.4 : 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 3,
+                  color: '#212529',
+                }}
+                onMouseEnter={(e) => { if (page < totalPages) e.currentTarget.style.background = '#D0D0D0' }}
+                onMouseLeave={(e) => { if (page < totalPages) e.currentTarget.style.background = '#E0E0E0' }}
               >
-                <ChevronRight className="w-3 h-3" />
+                <ChevronRight style={{ width: 9, height: 9 }} />
               </button>
             </div>
           </div>

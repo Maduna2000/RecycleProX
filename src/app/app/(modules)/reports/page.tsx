@@ -121,18 +121,43 @@ export default function ReportsPage() {
             <button
               onClick={handleRun}
               disabled={isLoading}
-              className="flex items-center gap-1.5 px-4 py-2 rounded text-sm font-medium text-white disabled:opacity-50"
-              style={{ background: colors.action }}
+              style={{
+                fontSize: 10,
+                padding: '1px 6px',
+                background: '#E0E0E0',
+                border: '1px solid #999',
+                borderRadius: 2,
+                cursor: isLoading ? 'not-allowed' : 'pointer',
+                opacity: isLoading ? 0.6 : 1,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 3,
+                color: '#212529',
+              }}
+              onMouseEnter={(e) => { if (!isLoading) e.currentTarget.style.background = '#D0D0D0' }}
+              onMouseLeave={(e) => { if (!isLoading) e.currentTarget.style.background = '#E0E0E0' }}
             >
-              {isLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Loading…</> : 'Run Report'}
+              {isLoading ? <><Loader2 style={{ width: 9, height: 9, animation: 'spin 1s linear infinite' }} /> Loading…</> : 'Run Report'}
             </button>
             {data && (
               <button
                 onClick={exportCSV}
-                className="flex items-center gap-1.5 px-4 py-2 rounded text-sm font-medium border"
-                style={{ borderColor: colors.border, background: colors.surface, color: colors.textPrimary }}
+                style={{
+                  fontSize: 10,
+                  padding: '1px 6px',
+                  background: '#E0E0E0',
+                  border: '1px solid #999',
+                  borderRadius: 2,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 3,
+                  color: '#212529',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = '#D0D0D0' }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = '#E0E0E0' }}
               >
-                <Download className="w-4 h-4" /> Export CSV
+                <Download style={{ width: 9, height: 9 }} /> Export CSV
               </button>
             )}
           </div>
@@ -141,10 +166,20 @@ export default function ReportsPage() {
               <button
                 key={p.label}
                 onClick={() => { setFrom(p.from); setTo(p.to); setQuery(`from=${p.from}&to=${p.to}`) }}
-                className="text-xs px-3 py-1.5 rounded border font-medium transition-colors"
-                style={{ borderColor: colors.border, color: colors.textSecondary, background: colors.surface }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = colors.bg)}
-                onMouseLeave={(e) => (e.currentTarget.style.background = colors.surface)}
+                style={{
+                  fontSize: 10,
+                  padding: '1px 6px',
+                  background: '#E0E0E0',
+                  border: '1px solid #999',
+                  borderRadius: 2,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 3,
+                  color: '#212529',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = '#D0D0D0' }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = '#E0E0E0' }}
               >
                 {p.label}
               </button>

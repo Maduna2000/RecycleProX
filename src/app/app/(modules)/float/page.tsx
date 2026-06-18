@@ -213,10 +213,25 @@ export default function FloatPage() {
                       <button
                         type="submit"
                         disabled={saving}
-                        className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded text-xs font-medium text-white disabled:opacity-50"
-                        style={{ background: colors.action }}
+                        style={{
+                          width: '100%',
+                          fontSize: 10,
+                          padding: '1px 6px',
+                          background: '#E0E0E0',
+                          border: '1px solid #999',
+                          borderRadius: 2,
+                          cursor: saving ? 'not-allowed' : 'pointer',
+                          opacity: saving ? 0.6 : 1,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 3,
+                          color: '#212529',
+                        }}
+                        onMouseEnter={(e) => { if (!saving) e.currentTarget.style.background = '#D0D0D0' }}
+                        onMouseLeave={(e) => { if (!saving) e.currentTarget.style.background = '#E0E0E0' }}
                       >
-                        {saving ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Adding…</> : 'Add to Float'}
+                        {saving ? <><Loader2 style={{ width: 9, height: 9, animation: 'spin 1s linear infinite' }} /> Adding…</> : 'Add to Float'}
                       </button>
                     </form>
                   </div>
@@ -253,10 +268,25 @@ export default function FloatPage() {
                         <button
                           type="submit"
                           disabled={saving}
-                          className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded text-xs font-medium text-white disabled:opacity-50"
-                          style={{ background: colors.warning }}
+                          style={{
+                            width: '100%',
+                            fontSize: 10,
+                            padding: '1px 6px',
+                            background: '#E0E0E0',
+                            border: '1px solid #999',
+                            borderRadius: 2,
+                            cursor: saving ? 'not-allowed' : 'pointer',
+                            opacity: saving ? 0.6 : 1,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 3,
+                            color: '#212529',
+                          }}
+                          onMouseEnter={(e) => { if (!saving) e.currentTarget.style.background = '#D0D0D0' }}
+                          onMouseLeave={(e) => { if (!saving) e.currentTarget.style.background = '#E0E0E0' }}
                         >
-                          {saving ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Saving…</> : 'Correct Opening Amount'}
+                          {saving ? <><Loader2 style={{ width: 9, height: 9, animation: 'spin 1s linear infinite' }} /> Saving…</> : 'Correct Opening Amount'}
                         </button>
                       </form>
                     )}
@@ -319,10 +349,25 @@ export default function FloatPage() {
                     <button
                       type="submit"
                       disabled={saving}
-                      className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded text-xs font-medium text-white disabled:opacity-50"
-                      style={{ background: colors.action }}
+                      style={{
+                        width: '100%',
+                        fontSize: 10,
+                        padding: '1px 6px',
+                        background: '#E0E0E0',
+                        border: '1px solid #999',
+                        borderRadius: 2,
+                        cursor: saving ? 'not-allowed' : 'pointer',
+                        opacity: saving ? 0.6 : 1,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 3,
+                        color: '#212529',
+                      }}
+                      onMouseEnter={(e) => { if (!saving) e.currentTarget.style.background = '#D0D0D0' }}
+                      onMouseLeave={(e) => { if (!saving) e.currentTarget.style.background = '#E0E0E0' }}
                     >
-                      {saving ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Saving…</> : 'Set Opening Float'}
+                      {saving ? <><Loader2 style={{ width: 9, height: 9, animation: 'spin 1s linear infinite' }} /> Saving…</> : 'Set Opening Float'}
                     </button>
                   </form>
                 )}

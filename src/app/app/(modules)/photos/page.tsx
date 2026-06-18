@@ -243,11 +243,24 @@ function ViewerDialog({
               <button
                 onClick={onPrev ?? undefined}
                 disabled={!onPrev}
-                className="p-1.5 rounded border disabled:opacity-30"
-                style={{ borderColor: colors.border }}
+                style={{
+                  fontSize: 10,
+                  padding: '1px 6px',
+                  background: '#E0E0E0',
+                  border: '1px solid #999',
+                  borderRadius: 2,
+                  cursor: !onPrev ? 'not-allowed' : 'pointer',
+                  opacity: !onPrev ? 0.3 : 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 3,
+                  color: '#212529',
+                }}
+                onMouseEnter={(e) => { if (onPrev) e.currentTarget.style.background = '#D0D0D0' }}
+                onMouseLeave={(e) => { if (onPrev) e.currentTarget.style.background = '#E0E0E0' }}
                 title="Previous (←)"
               >
-                <ChevronLeft className="w-3.5 h-3.5" />
+                <ChevronLeft style={{ width: 9, height: 9 }} />
               </button>
               <span className="text-xs tabular-nums" style={{ color: colors.textSecondary }}>
                 {idx + 1} / {photos.length}
@@ -255,39 +268,88 @@ function ViewerDialog({
               <button
                 onClick={onNext ?? undefined}
                 disabled={!onNext}
-                className="p-1.5 rounded border disabled:opacity-30"
-                style={{ borderColor: colors.border }}
+                style={{
+                  fontSize: 10,
+                  padding: '1px 6px',
+                  background: '#E0E0E0',
+                  border: '1px solid #999',
+                  borderRadius: 2,
+                  cursor: !onNext ? 'not-allowed' : 'pointer',
+                  opacity: !onNext ? 0.3 : 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 3,
+                  color: '#212529',
+                }}
+                onMouseEnter={(e) => { if (onNext) e.currentTarget.style.background = '#D0D0D0' }}
+                onMouseLeave={(e) => { if (onNext) e.currentTarget.style.background = '#E0E0E0' }}
                 title="Next (→)"
               >
-                <ChevronRight className="w-3.5 h-3.5" />
+                <ChevronRight style={{ width: 9, height: 9 }} />
               </button>
             </div>
 
             <button
               onClick={download}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium border"
-              style={{ borderColor: colors.border, color: colors.textPrimary }}
+              style={{
+                fontSize: 10,
+                padding: '1px 6px',
+                background: '#E0E0E0',
+                border: '1px solid #999',
+                borderRadius: 2,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 3,
+                color: '#212529',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = '#D0D0D0' }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = '#E0E0E0' }}
             >
-              <Download className="w-3.5 h-3.5" /> Download
+              <Download style={{ width: 9, height: 9 }} /> Download
             </button>
 
             {(viewer.type === 'purchase_signature' || viewer.type === 'purchase_vat264' || viewer.type === 'sale_photo') && (
               <button
                 onClick={openReceiptPdf}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-white"
-                style={{ background: colors.action }}
+                style={{
+                  fontSize: 10,
+                  padding: '1px 6px',
+                  background: '#E0E0E0',
+                  border: '1px solid #999',
+                  borderRadius: 2,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 3,
+                  color: '#212529',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = '#D0D0D0' }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = '#E0E0E0' }}
               >
-                <Receipt className="w-3.5 h-3.5" /> Reprint Receipt
+                <Receipt style={{ width: 9, height: 9 }} /> Reprint Receipt
               </button>
             )}
 
             {(viewer.type === 'purchase_signature' || viewer.type === 'purchase_vat264') && (
               <button
                 onClick={openVat264}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-white"
-                style={{ background: colors.process }}
+                style={{
+                  fontSize: 10,
+                  padding: '1px 6px',
+                  background: '#E0E0E0',
+                  border: '1px solid #999',
+                  borderRadius: 2,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 3,
+                  color: '#212529',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = '#D0D0D0' }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = '#E0E0E0' }}
               >
-                <FileText className="w-3.5 h-3.5" /> VAT264 / SHG Act
+                <FileText style={{ width: 9, height: 9 }} /> VAT264 / SHG Act
               </button>
             )}
           </div>
@@ -398,12 +460,22 @@ function PhotoGrid({
         {hasFilters && (
           <button
             onClick={clearFilters}
-            className="flex items-center gap-1 text-xs transition-colors"
-            style={{ color: colors.textSecondary }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = colors.textPrimary)}
-            onMouseLeave={(e) => (e.currentTarget.style.color = colors.textSecondary)}
+            style={{
+              fontSize: 10,
+              padding: '1px 6px',
+              background: '#E0E0E0',
+              border: '1px solid #999',
+              borderRadius: 2,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 3,
+              color: '#212529',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = '#D0D0D0' }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = '#E0E0E0' }}
           >
-            <X className="w-3 h-3" /> Clear
+            <X style={{ width: 9, height: 9 }} /> Clear
           </button>
         )}
 
@@ -428,7 +500,23 @@ function PhotoGrid({
           <Images className="w-12 h-12 opacity-20" />
           <p className="text-sm">{emptyMsg}</p>
           {hasFilters && (
-            <button onClick={clearFilters} className="text-xs underline" style={{ color: colors.process }}>
+            <button
+              onClick={clearFilters}
+              style={{
+                fontSize: 10,
+                padding: '1px 6px',
+                background: '#E0E0E0',
+                border: '1px solid #999',
+                borderRadius: 2,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 3,
+                color: '#212529',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = '#D0D0D0' }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = '#E0E0E0' }}
+            >
               Clear filters
             </button>
           )}
@@ -454,10 +542,23 @@ function PhotoGrid({
           <button
             disabled={page <= 1}
             onClick={() => setPage((p) => p - 1)}
-            className="p-1.5 rounded border disabled:opacity-40"
-            style={{ borderColor: colors.border }}
+            style={{
+              fontSize: 10,
+              padding: '1px 6px',
+              background: '#E0E0E0',
+              border: '1px solid #999',
+              borderRadius: 2,
+              cursor: page <= 1 ? 'not-allowed' : 'pointer',
+              opacity: page <= 1 ? 0.4 : 1,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 3,
+              color: '#212529',
+            }}
+            onMouseEnter={(e) => { if (page > 1) e.currentTarget.style.background = '#D0D0D0' }}
+            onMouseLeave={(e) => { if (page > 1) e.currentTarget.style.background = '#E0E0E0' }}
           >
-            <ChevronLeft className="w-4 h-4" />
+            <ChevronLeft style={{ width: 9, height: 9 }} />
           </button>
           <span className="text-xs" style={{ color: colors.textSecondary }}>
             Page {page} of {pageCount}
@@ -465,10 +566,23 @@ function PhotoGrid({
           <button
             disabled={page >= pageCount}
             onClick={() => setPage((p) => p + 1)}
-            className="p-1.5 rounded border disabled:opacity-40"
-            style={{ borderColor: colors.border }}
+            style={{
+              fontSize: 10,
+              padding: '1px 6px',
+              background: '#E0E0E0',
+              border: '1px solid #999',
+              borderRadius: 2,
+              cursor: page >= pageCount ? 'not-allowed' : 'pointer',
+              opacity: page >= pageCount ? 0.4 : 1,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 3,
+              color: '#212529',
+            }}
+            onMouseEnter={(e) => { if (page < pageCount) e.currentTarget.style.background = '#D0D0D0' }}
+            onMouseLeave={(e) => { if (page < pageCount) e.currentTarget.style.background = '#E0E0E0' }}
           >
-            <ChevronRight className="w-4 h-4" />
+            <ChevronRight style={{ width: 9, height: 9 }} />
           </button>
         </div>
       )}
@@ -504,10 +618,22 @@ export default function PhotosPage() {
         exportPhotos.length > 0 ? (
           <button
             onClick={() => exportCsv(exportPhotos)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium border hover:bg-gray-50 transition-colors"
-            style={{ borderColor: colors.border, color: colors.textPrimary }}
+            style={{
+              fontSize: 10,
+              padding: '1px 6px',
+              background: '#E0E0E0',
+              border: '1px solid #999',
+              borderRadius: 2,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 3,
+              color: '#212529',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = '#D0D0D0' }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = '#E0E0E0' }}
           >
-            <FileDown className="w-3.5 h-3.5" /> Export CSV
+            <FileDown style={{ width: 9, height: 9 }} /> Export CSV
           </button>
         ) : undefined
       }
