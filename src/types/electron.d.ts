@@ -10,7 +10,7 @@ interface ElectronAPI {
   maximize:       () => void
   close:          () => void
   readScale:      (scaleNum: number) => Promise<{ weight: number; unit: string }>
-  printSlip:      (data: unknown) => Promise<{ ok: boolean }>
+  printSlip:      (data: { type: 'purchase' | 'sale'; id: string }) => Promise<{ success: boolean }>
   openCashDrawer: () => Promise<boolean>
 }
 

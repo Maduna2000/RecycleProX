@@ -412,7 +412,21 @@ export default function NewPurchasePage() {
           mutatePending()
           toast.success(`Purchase ${purchase.refNumber} saved as unpaid`)
         } else {
-          setPrintDialog({ id: purchase.id, refNumber: purchase.refNumber })
+          // Auto-print in Electron desktop app
+          if (window.electronAPI?.isElectron) {
+            try {
+              await window.electronAPI.printSlip({ type: 'purchase', id: purchase.id })
+              await window.electronAPI.openCashDrawer()
+              toast.success(`Receipt printed: ${purchase.refNumber}`)
+              router.push('/app/dashboard')
+            } catch {
+              // Fall back to showing PrintResultModal on print failure
+              toast.error('Print failed — showing manual options')
+              setPrintDialog({ id: purchase.id, refNumber: purchase.refNumber })
+            }
+          } else {
+            setPrintDialog({ id: purchase.id, refNumber: purchase.refNumber })
+          }
         }
       }
     } catch {

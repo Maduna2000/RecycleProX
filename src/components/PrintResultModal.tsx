@@ -1,7 +1,8 @@
 'use client'
 
+import { useState } from 'react'
 import { Dialog, DialogContent, ModalTitleBar, ModalBtn } from '@/components/ui/dialog'
-import { Printer, FileText, CheckCircle2, Plus, ExternalLink, Download } from 'lucide-react'
+import { Printer, FileText, CheckCircle2, Plus, ExternalLink, Download, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface PrintResultModalProps {
@@ -17,6 +18,8 @@ export function PrintResultModal({ type, id, refNumber, onClose, onViewPurchase,
   const receiptUrl = `/api/${type}s/${id}/receipt?format=pdf`
   const vat264Url  = `/api/purchases/${id}/vat264`
   const label      = type === 'purchase' ? 'Purchase' : 'Sale'
+  const [printing, setPrinting] = useState(false)
+  const isElectron = typeof window !== 'undefined' && window.electronAPI?.isElectron
 
   function openPdf(url: string) { window.open(url, '_blank') }
 
@@ -31,6 +34,20 @@ export function PrintResultModal({ type, id, refNumber, onClose, onViewPurchase,
       URL.revokeObjectURL(url)
       toast.success('Thermal receipt downloaded — send to printer')
     } catch { toast.error('Failed to download thermal receipt') }
+  }
+
+  async function printDirect() {
+    if (!window.electronAPI) return
+    setPrinting(true)
+    try {
+      await window.electronAPI.printSlip({ type, id })
+      await window.electronAPI.openCashDrawer()
+      toast.success('Receipt printed')
+    } catch {
+      toast.error('Print failed — check printer connection')
+    } finally {
+      setPrinting(false)
+    }
   }
 
   return (
@@ -56,11 +73,27 @@ export function PrintResultModal({ type, id, refNumber, onClose, onViewPurchase,
 
           {/* Print / download actions */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+            {/* Direct print button - shown only in Electron desktop app */}
+            {isElectron && (
+              <button
+                onClick={printDirect}
+                disabled={printing}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%', padding: '8px 12px', background: '#217346', color: '#fff', border: 'none', borderRadius: 2, fontSize: 13, fontWeight: 700, cursor: printing ? 'not-allowed' : 'pointer', opacity: printing ? 0.7 : 1 }}
+                onMouseEnter={(e) => { if (!printing) (e.currentTarget as HTMLButtonElement).style.background = '#185D38' }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#217346' }}
+              >
+                {printing ? (
+                  <><Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} /> Printing...</>
+                ) : (
+                  <><Printer style={{ width: 14, height: 14 }} /> Print Receipt</>
+                )}
+              </button>
+            )}
             <button
               onClick={() => openPdf(receiptUrl)}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%', padding: '6px 12px', background: '#217346', color: '#fff', border: 'none', borderRadius: 2, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#185D38' }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#217346' }}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%', padding: '6px 12px', background: isElectron ? '#fff' : '#217346', color: isElectron ? '#212529' : '#fff', border: isElectron ? '1px solid #E0E0E0' : 'none', borderRadius: 2, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = isElectron ? '#F8F9FA' : '#185D38' }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = isElectron ? '#fff' : '#217346' }}
             >
               <Printer style={{ width: 13, height: 13 }} /> Print PDF Slip
             </button>

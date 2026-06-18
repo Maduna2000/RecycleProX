@@ -1,0 +1,138 @@
+import { NextResponse } from 'next/server'
+import { auth } from '@/auth'
+import { prisma } from '@/lib/db/prisma'
+import { getAllSettings } from '@/lib/services/settingsService'
+import { buildPurchaseReceipt, buildSaleReceipt } from '@/lib/print/thermal'
+import logger from '@/lib/logger'
+import Decimal from 'decimal.js'
+
+/**
+ * POST /api/print/slip
+ * Prints a purchase or sale receipt to the configured thermal printer.
+ * Body: { type: 'purchase' | 'sale', id: string }
+ */
+export async function POST(req: Request) {
+  const session = await auth()
+  if (!session) {
+    return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+  }
+
+  const { type, id } = await req.json()
+
+  if (!type || !id) {
+    return NextResponse.json({ error: 'Missing type or id' }, { status: 400 })
+  }
+
+  if (type !== 'purchase' && type !== 'sale') {
+    return NextResponse.json({ error: 'Invalid type' }, { status: 400 })
+  }
+
+  // Get printer config
+  const cfg = await getAllSettings()
+  if (!cfg.printerType || cfg.printerType === 'none') {
+    return NextResponse.json({ error: 'No printer configured' }, { status: 400 })
+  }
+
+  try {
+    let receiptBuffer: Buffer
+
+    if (type === 'purchase') {
+      // Fetch purchase with related data
+      const purchase = await prisma.purchase.findUnique({
+        where: { id },
+        include: {
+          customer: true,
+          lines: { include: { product: true } },
+        },
+      })
+
+      if (!purchase) {
+        return NextResponse.json({ error: 'Purchase not found' }, { status: 404 })
+      }
+
+      // Build receipt data
+      const lines = purchase.lines.map(line => ({
+        productName: line.product.name,
+        qty: line.qty,
+        unitPrice: line.unitPrice.toString(),
+        lineTotal: new Decimal(line.unitPrice).times(line.qty).toString(),
+      }))
+
+      receiptBuffer = await buildPurchaseReceipt({
+        refNumber: purchase.refNumber,
+        customerName: `${purchase.customer.firstName} ${purchase.customer.lastName}`,
+        customerIdNo: purchase.customer.idNumber ?? undefined,
+        lines,
+        totalAmount: purchase.totalAmount.toString(),
+        paymentMethod: purchase.paymentMethod,
+        cashierName: session.user.name ?? 'Cashier',
+        createdAt: purchase.createdAt,
+      })
+    } else {
+      // Fetch sale with related data
+      const sale = await prisma.sale.findUnique({
+        where: { id },
+        include: {
+          customer: true,
+          lines: { include: { product: true } },
+        },
+      })
+
+      if (!sale) {
+        return NextResponse.json({ error: 'Sale not found' }, { status: 404 })
+      }
+
+      // Build receipt data
+      const lines = sale.lines.map(line => ({
+        productName: line.product.name,
+        qty: line.qty,
+        unitPrice: line.unitPrice.toString(),
+        lineTotal: new Decimal(line.unitPrice).times(line.qty).toString(),
+      }))
+
+      receiptBuffer = await buildSaleReceipt({
+        refNumber: sale.refNumber,
+        buyerName: sale.customer ? `${sale.customer.firstName} ${sale.customer.lastName}` : undefined,
+        buyerIdNumber: sale.customer?.idNumber ?? undefined,
+        lines,
+        totalAmount: sale.totalAmount.toString(),
+        paymentMethod: sale.paymentMethod,
+        cashierName: session.user.name ?? 'Cashier',
+        createdAt: sale.createdAt,
+      })
+    }
+
+    // Connect to printer and send
+    const { ThermalPrinter, PrinterTypes, CharacterSet } = await import('node-thermal-printer')
+
+    const iface = cfg.printerType === 'tcp'
+      ? `tcp://${cfg.printerIp ?? '127.0.0.1'}:${cfg.printerTcpPort ?? '9100'}`
+      : cfg.printerSerialPort ?? 'COM1'
+
+    const printer = new ThermalPrinter({
+      type: PrinterTypes.EPSON,
+      interface: iface,
+      characterSet: CharacterSet.PC850_MULTILINGUAL,
+      removeSpecialCharacters: false,
+      lineCharacter: '-',
+    })
+
+    const connected = await printer.isPrinterConnected()
+    if (!connected) {
+      return NextResponse.json({ error: 'Printer not reachable' }, { status: 503 })
+    }
+
+    // Send the raw buffer to the printer
+    printer.raw(receiptBuffer)
+    await printer.execute()
+
+    logger.info({ type, id, iface }, 'receipt.printed')
+    return NextResponse.json({ success: true })
+  } catch (err) {
+    logger.error({ err, type, id }, 'print-slip.failed')
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : 'Print failed' },
+      { status: 500 }
+    )
+  }
+}
