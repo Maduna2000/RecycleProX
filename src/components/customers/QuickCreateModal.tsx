@@ -5,7 +5,6 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { QuickCreateSchema, type QuickCreateInput } from '@/lib/schemas/customer'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Loader2 } from 'lucide-react'
@@ -87,10 +86,47 @@ export function QuickCreateModal({ open, prefillQuery, onClose, onSuccess }: Pro
             {errors.phone && <p className="text-xs text-red-600 mt-1">{errors.phone.message}</p>}
           </div>
           <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
-            <Button type="submit" className="bg-green-600 hover:bg-green-700" disabled={loading}>
-              {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Creating...</> : 'Create Customer'}
-            </Button>
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={loading}
+              style={{
+                fontSize: 10,
+                padding: '1px 6px',
+                background: '#E0E0E0',
+                border: '1px solid #999',
+                borderRadius: 2,
+                cursor: loading ? 'not-allowed' : 'pointer',
+                opacity: loading ? 0.6 : 1,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 3,
+              }}
+              onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = '#D0D0D0' }}
+              onMouseLeave={(e) => { if (!loading) e.currentTarget.style.background = '#E0E0E0' }}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              style={{
+                fontSize: 10,
+                padding: '1px 6px',
+                background: '#E0E0E0',
+                border: '1px solid #999',
+                borderRadius: 2,
+                cursor: loading ? 'not-allowed' : 'pointer',
+                opacity: loading ? 0.6 : 1,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 3,
+              }}
+              onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = '#D0D0D0' }}
+              onMouseLeave={(e) => { if (!loading) e.currentTarget.style.background = '#E0E0E0' }}
+            >
+              {loading ? <><Loader2 style={{ width: 9, height: 9, animation: 'spin 1s linear infinite' }} />Creating...</> : 'Create Customer'}
+            </button>
           </div>
         </form>
       </DialogContent>

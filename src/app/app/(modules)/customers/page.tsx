@@ -6,7 +6,6 @@ import useSWR, { mutate } from 'swr'
 import { AlertTriangle, Loader2, Eye, ShieldBan, ShieldCheck, UserX, Trash2, UserMinus } from 'lucide-react'
 import { DataTable, Avatar, StatusBadge, type Column, type RowAction } from '@/components/ui/DataTable'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { PageShell } from '@/components/layout/PageShell'
 import { colors } from '@/lib/design-tokens'
@@ -63,14 +62,46 @@ function BlacklistModal({ customer, onClose, onSuccess }: {
             <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Fraudulent activity, stolen ID..." className="text-sm" />
           </div>
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
+            <button
+              onClick={onClose}
+              disabled={loading}
+              style={{
+                fontSize: 10,
+                padding: '1px 6px',
+                background: '#E0E0E0',
+                border: '1px solid #999',
+                borderRadius: 2,
+                cursor: loading ? 'not-allowed' : 'pointer',
+                opacity: loading ? 0.6 : 1,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 3,
+              }}
+              onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = '#D0D0D0' }}
+              onMouseLeave={(e) => { if (!loading) e.currentTarget.style.background = '#E0E0E0' }}
+            >
+              Cancel
+            </button>
             <button
               onClick={handleSubmit}
               disabled={loading || reason.trim().length < 10}
-              className="h-9 px-4 rounded text-sm font-medium text-white disabled:opacity-50"
-              style={{ background: colors.danger }}
+              style={{
+                fontSize: 10,
+                padding: '1px 6px',
+                background: colors.danger,
+                border: '1px solid #C82333',
+                borderRadius: 2,
+                color: '#fff',
+                cursor: (loading || reason.trim().length < 10) ? 'not-allowed' : 'pointer',
+                opacity: (loading || reason.trim().length < 10) ? 0.6 : 1,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 3,
+              }}
+              onMouseEnter={(e) => { if (!loading && reason.trim().length >= 10) e.currentTarget.style.background = '#A93226' }}
+              onMouseLeave={(e) => { if (!loading && reason.trim().length >= 10) e.currentTarget.style.background = colors.danger }}
             >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Blacklist'}
+              {loading ? <Loader2 style={{ width: 9, height: 9, animation: 'spin 1s linear infinite' }} /> : 'Blacklist'}
             </button>
           </div>
         </div>
@@ -442,14 +473,46 @@ function AccountsList({ onAddCustomer }: { onAddCustomer: () => void }) {
                 Dealer category and price group will be removed. Their account code will be retained for reference.
               </p>
               <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setConvertId(null)} disabled={convertLoading}>Cancel</Button>
+                <button
+                  onClick={() => setConvertId(null)}
+                  disabled={convertLoading}
+                  style={{
+                    fontSize: 10,
+                    padding: '1px 6px',
+                    background: '#E0E0E0',
+                    border: '1px solid #999',
+                    borderRadius: 2,
+                    cursor: convertLoading ? 'not-allowed' : 'pointer',
+                    opacity: convertLoading ? 0.6 : 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 3,
+                  }}
+                  onMouseEnter={(e) => { if (!convertLoading) e.currentTarget.style.background = '#D0D0D0' }}
+                  onMouseLeave={(e) => { if (!convertLoading) e.currentTarget.style.background = '#E0E0E0' }}
+                >
+                  Cancel
+                </button>
                 <button
                   onClick={() => handleConvertToCasual(convertId)}
                   disabled={convertLoading}
-                  className="h-9 px-4 rounded text-sm font-medium text-white disabled:opacity-50"
-                  style={{ background: colors.danger }}
+                  style={{
+                    fontSize: 10,
+                    padding: '1px 6px',
+                    background: colors.danger,
+                    border: '1px solid #C82333',
+                    borderRadius: 2,
+                    color: '#fff',
+                    cursor: convertLoading ? 'not-allowed' : 'pointer',
+                    opacity: convertLoading ? 0.6 : 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 3,
+                  }}
+                  onMouseEnter={(e) => { if (!convertLoading) e.currentTarget.style.background = '#A93226' }}
+                  onMouseLeave={(e) => { if (!convertLoading) e.currentTarget.style.background = colors.danger }}
                 >
-                  {convertLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Convert'}
+                  {convertLoading ? <Loader2 style={{ width: 9, height: 9, animation: 'spin 1s linear infinite' }} /> : 'Convert'}
                 </button>
               </div>
             </div>
@@ -467,14 +530,46 @@ function AccountsList({ onAddCustomer }: { onAddCustomer: () => void }) {
                 Permanently delete <strong style={{ color: colors.textPrimary }}>{deleteTarget.firstName} {deleteTarget.lastName}</strong>? This cannot be undone.
               </p>
               <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setDeleteId(null)} disabled={deleteLoading}>Cancel</Button>
+                <button
+                  onClick={() => setDeleteId(null)}
+                  disabled={deleteLoading}
+                  style={{
+                    fontSize: 10,
+                    padding: '1px 6px',
+                    background: '#E0E0E0',
+                    border: '1px solid #999',
+                    borderRadius: 2,
+                    cursor: deleteLoading ? 'not-allowed' : 'pointer',
+                    opacity: deleteLoading ? 0.6 : 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 3,
+                  }}
+                  onMouseEnter={(e) => { if (!deleteLoading) e.currentTarget.style.background = '#D0D0D0' }}
+                  onMouseLeave={(e) => { if (!deleteLoading) e.currentTarget.style.background = '#E0E0E0' }}
+                >
+                  Cancel
+                </button>
                 <button
                   onClick={() => handleDelete(deleteId)}
                   disabled={deleteLoading}
-                  className="h-9 px-4 rounded text-sm font-medium text-white disabled:opacity-50"
-                  style={{ background: colors.danger }}
+                  style={{
+                    fontSize: 10,
+                    padding: '1px 6px',
+                    background: colors.danger,
+                    border: '1px solid #C82333',
+                    borderRadius: 2,
+                    color: '#fff',
+                    cursor: deleteLoading ? 'not-allowed' : 'pointer',
+                    opacity: deleteLoading ? 0.6 : 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 3,
+                  }}
+                  onMouseEnter={(e) => { if (!deleteLoading) e.currentTarget.style.background = '#A93226' }}
+                  onMouseLeave={(e) => { if (!deleteLoading) e.currentTarget.style.background = colors.danger }}
                 >
-                  {deleteLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Delete'}
+                  {deleteLoading ? <Loader2 style={{ width: 9, height: 9, animation: 'spin 1s linear infinite' }} /> : 'Delete'}
                 </button>
               </div>
             </div>

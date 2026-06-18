@@ -139,18 +139,44 @@ export function ProcessPaymentModal({
             <button
               onClick={onClose}
               disabled={loading}
-              className="px-3 py-1.5 rounded text-xs font-medium border border-[#E0E0E0] bg-white disabled:opacity-50"
-              style={{ color: '#212529' }}
+              style={{
+                fontSize: 10,
+                padding: '1px 6px',
+                background: '#E0E0E0',
+                border: '1px solid #999',
+                borderRadius: 2,
+                cursor: loading ? 'not-allowed' : 'pointer',
+                opacity: loading ? 0.6 : 1,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 3,
+                color: '#212529',
+              }}
+              onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = '#D0D0D0' }}
+              onMouseLeave={(e) => { if (!loading) e.currentTarget.style.background = '#E0E0E0' }}
             >
               Cancel
             </button>
             <button
               onClick={handlePay}
               disabled={loading}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-white disabled:opacity-50"
-              style={{ background: '#217346' }}
+              style={{
+                fontSize: 10,
+                padding: '1px 6px',
+                background: '#E0E0E0',
+                border: '1px solid #999',
+                borderRadius: 2,
+                cursor: loading ? 'not-allowed' : 'pointer',
+                opacity: loading ? 0.6 : 1,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 3,
+                color: '#212529',
+              }}
+              onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = '#D0D0D0' }}
+              onMouseLeave={(e) => { if (!loading) e.currentTarget.style.background = '#E0E0E0' }}
             >
-              {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CreditCard className="w-3.5 h-3.5" />}
+              {loading ? <Loader2 style={{ width: 9, height: 9, animation: 'spin 1s linear infinite' }} /> : <CreditCard style={{ width: 9, height: 9 }} />}
               Process Payment
             </button>
           </div>

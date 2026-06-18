@@ -8,7 +8,6 @@ import Decimal from 'decimal.js'
 import { toast } from 'sonner'
 import { DataTable, Avatar, StatusBadge, type Column, type RowAction } from '@/components/ui/DataTable'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -295,10 +294,21 @@ export default function PaymentsPage() {
             {hasFilters && (
               <button
                 onClick={clearFilters}
-                className="h-7 px-2.5 text-xs flex items-center gap-1 border rounded hover:bg-[#F1F3F4] transition-colors"
-                style={{ borderColor: colors.border, color: colors.textSecondary }}
+                style={{
+                  fontSize: 10,
+                  padding: '1px 6px',
+                  background: '#E0E0E0',
+                  border: '1px solid #999',
+                  borderRadius: 2,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 3,
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = '#D0D0D0' }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = '#E0E0E0' }}
               >
-                <X className="w-3 h-3" /> Clear
+                <X style={{ width: 9, height: 9 }} /> Clear
               </button>
             )}
           </div>
@@ -418,7 +428,24 @@ function NewPaymentModal({ onClose, onSuccess }: { onClose: () => void; onSucces
                     </p>
                   )}
                 </div>
-                <Button variant="outline" size="sm" onClick={() => setCustomer(null)}>Change</Button>
+                <button
+                  onClick={() => setCustomer(null)}
+                  style={{
+                    fontSize: 10,
+                    padding: '1px 6px',
+                    background: '#E0E0E0',
+                    border: '1px solid #999',
+                    borderRadius: 2,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 3,
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = '#D0D0D0' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = '#E0E0E0' }}
+                >
+                  Change
+                </button>
               </div>
             )}
           </div>
@@ -476,15 +503,46 @@ function NewPaymentModal({ onClose, onSuccess }: { onClose: () => void; onSucces
           </div>
 
           <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
-            <Button
-              style={{ background: colors.action }}
-              className="hover:opacity-90"
+            <button
+              onClick={onClose}
+              disabled={loading}
+              style={{
+                fontSize: 10,
+                padding: '1px 6px',
+                background: '#E0E0E0',
+                border: '1px solid #999',
+                borderRadius: 2,
+                cursor: loading ? 'not-allowed' : 'pointer',
+                opacity: loading ? 0.6 : 1,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 3,
+              }}
+              onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = '#D0D0D0' }}
+              onMouseLeave={(e) => { if (!loading) e.currentTarget.style.background = '#E0E0E0' }}
+            >
+              Cancel
+            </button>
+            <button
               onClick={onSubmit}
               disabled={loading || !customer}
+              style={{
+                fontSize: 10,
+                padding: '1px 6px',
+                background: '#E0E0E0',
+                border: '1px solid #999',
+                borderRadius: 2,
+                cursor: (loading || !customer) ? 'not-allowed' : 'pointer',
+                opacity: (loading || !customer) ? 0.6 : 1,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 3,
+              }}
+              onMouseEnter={(e) => { if (!loading && customer) e.currentTarget.style.background = '#D0D0D0' }}
+              onMouseLeave={(e) => { if (!loading && customer) e.currentTarget.style.background = '#E0E0E0' }}
             >
-              {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving…</> : 'Record Payment'}
-            </Button>
+              {loading ? <><Loader2 style={{ width: 9, height: 9, animation: 'spin 1s linear infinite' }} /> Saving…</> : 'Record Payment'}
+            </button>
           </div>
         </div>
       </DialogContent>
@@ -536,10 +594,47 @@ function VoidPaymentModal({ payment, onClose, onSuccess }: { payment: Payment; o
             />
           </div>
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
-            <Button variant="destructive" onClick={onConfirm} disabled={loading || reason.trim().length < 5}>
-              {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Voiding…</> : 'Confirm Void'}
-            </Button>
+            <button
+              onClick={onClose}
+              disabled={loading}
+              style={{
+                fontSize: 10,
+                padding: '1px 6px',
+                background: '#E0E0E0',
+                border: '1px solid #999',
+                borderRadius: 2,
+                cursor: loading ? 'not-allowed' : 'pointer',
+                opacity: loading ? 0.6 : 1,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 3,
+              }}
+              onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = '#D0D0D0' }}
+              onMouseLeave={(e) => { if (!loading) e.currentTarget.style.background = '#E0E0E0' }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={onConfirm}
+              disabled={loading || reason.trim().length < 5}
+              style={{
+                fontSize: 10,
+                padding: '1px 6px',
+                background: colors.danger,
+                border: '1px solid #C82333',
+                borderRadius: 2,
+                color: '#fff',
+                cursor: (loading || reason.trim().length < 5) ? 'not-allowed' : 'pointer',
+                opacity: (loading || reason.trim().length < 5) ? 0.6 : 1,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 3,
+              }}
+              onMouseEnter={(e) => { if (!loading && reason.trim().length >= 5) e.currentTarget.style.background = '#A93226' }}
+              onMouseLeave={(e) => { if (!loading && reason.trim().length >= 5) e.currentTarget.style.background = colors.danger }}
+            >
+              {loading ? <><Loader2 style={{ width: 9, height: 9, animation: 'spin 1s linear infinite' }} /> Voiding…</> : 'Confirm Void'}
+            </button>
           </div>
         </div>
       </DialogContent>

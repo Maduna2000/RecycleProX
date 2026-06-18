@@ -251,10 +251,21 @@ export default function SalesPage() {
         {hasFilters && (
           <button
             onClick={clearFilters}
-            className="h-7 px-2.5 text-xs flex items-center gap-1 border rounded hover:bg-[#F1F3F4] transition-colors"
-            style={{ borderColor: colors.border, color: colors.textSecondary }}
+            style={{
+              fontSize: 10,
+              padding: '1px 6px',
+              background: '#E0E0E0',
+              border: '1px solid #999',
+              borderRadius: 2,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 3,
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = '#D0D0D0' }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = '#E0E0E0' }}
           >
-            <X className="w-3 h-3" /> Clear
+            <X style={{ width: 9, height: 9 }} /> Clear
           </button>
         )}
       </div>

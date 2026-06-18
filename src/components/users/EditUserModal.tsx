@@ -75,22 +75,22 @@ const selectDisabled: React.CSSProperties = {
   ...selectStyle, background: '#F5F5F5', color: '#6C757D', cursor: 'default',
 }
 const btnBase: React.CSSProperties = {
-  fontSize: 11, padding: '5px 14px', borderRadius: 2, cursor: 'pointer',
-  display: 'inline-flex', alignItems: 'center', gap: 6,
+  fontSize: 10, padding: '1px 6px', borderRadius: 2, cursor: 'pointer',
+  display: 'inline-flex', alignItems: 'center', gap: 3,
 }
 const cancelBtn: React.CSSProperties = {
   ...btnBase,
-  background: 'linear-gradient(180deg,#F5F5F5 0%,#E0E0E0 100%)',
-  border: '1px solid #ABABAB', color: '#333',
+  background: '#E0E0E0',
+  border: '1px solid #999', color: '#212529',
 }
 const submitBtn: React.CSSProperties = {
   ...btnBase,
-  background: 'linear-gradient(180deg,#10B981 0%,#059669 100%)',
-  border: '1px solid #059669', color: '#fff', fontWeight: 600,
+  background: '#E0E0E0',
+  border: '1px solid #999', color: '#212529',
 }
 const smallBtn: React.CSSProperties = {
-  fontSize: 10, padding: '2px 8px', borderRadius: 2, cursor: 'pointer',
-  background: '#f5f5f5', border: '1px solid #ccc', color: '#333',
+  fontSize: 10, padding: '1px 6px', borderRadius: 2, cursor: 'pointer',
+  background: '#E0E0E0', border: '1px solid #999', color: '#212529',
 }
 
 export function EditUserModal({ user, onClose, onSuccess }: { user: User; onClose: () => void; onSuccess: () => void }) {

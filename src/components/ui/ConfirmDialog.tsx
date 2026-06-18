@@ -271,31 +271,32 @@ interface ConfirmButtonProps {
 function ConfirmButton({ onClick, variant, bgColor, hoverColor, children }: ConfirmButtonProps) {
   const isCancel = variant === 'cancel'
 
+  // Windows aesthetic base style
   const baseStyle: React.CSSProperties = {
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 5,
-    padding: '6px 14px',
-    fontSize: fontSize.sm,
-    fontWeight: 600,
+    gap: 3,
+    padding: '1px 6px',
+    fontSize: 10,
     borderRadius: 2,
     cursor: 'pointer',
     transition: 'background 0.1s',
-    minWidth: 70,
   }
 
+  // Cancel button - Windows gray style
   const cancelStyle: React.CSSProperties = {
     ...baseStyle,
-    background: colors.surface,
-    border: `1px solid ${colors.border}`,
+    background: '#E0E0E0',
+    border: '1px solid #999',
     color: colors.textPrimary,
   }
 
+  // Confirm button - keeps variant color (danger stays red)
   const confirmStyle: React.CSSProperties = {
     ...baseStyle,
     background: bgColor ?? colors.danger,
-    border: 'none',
+    border: `1px solid ${hoverColor ?? '#C82333'}`,
     color: colors.textOnDark,
   }
 
@@ -305,14 +306,14 @@ function ConfirmButton({ onClick, variant, bgColor, hoverColor, children }: Conf
       style={isCancel ? cancelStyle : confirmStyle}
       onMouseEnter={(e) => {
         if (isCancel) {
-          e.currentTarget.style.background = '#F8F9FA'
+          e.currentTarget.style.background = '#D0D0D0'
         } else if (hoverColor) {
           e.currentTarget.style.background = hoverColor
         }
       }}
       onMouseLeave={(e) => {
         if (isCancel) {
-          e.currentTarget.style.background = colors.surface
+          e.currentTarget.style.background = '#E0E0E0'
         } else if (bgColor) {
           e.currentTarget.style.background = bgColor
         }

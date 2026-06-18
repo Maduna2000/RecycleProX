@@ -310,8 +310,18 @@ export function DataTable<T>({
                     <p className="text-sm" style={{ color: colors.textSecondary }}>{emptyMessage}</p>
                     {emptyAction && (
                       <button
-                        className="mt-2 px-4 py-1.5 text-xs text-white hover:opacity-90 transition-opacity"
-                        style={{ background: colors.action, borderRadius: 2 }}
+                        className="mt-2"
+                        style={{
+                          fontSize: 10,
+                          padding: '1px 6px',
+                          background: '#E0E0E0',
+                          border: '1px solid #999',
+                          borderRadius: 2,
+                          color: '#212529',
+                          cursor: 'pointer',
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = '#D0D0D0' }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = '#E0E0E0' }}
                         onClick={emptyAction.onClick}
                       >
                         {emptyAction.label}

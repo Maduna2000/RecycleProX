@@ -391,18 +391,18 @@ function FullscreenPhotoViewer({ order, onClose }: { order: OrderDetail | null; 
           <button
             onClick={onClose}
             style={{
-              padding: '6px 16px',
-              background: 'transparent',
-              border: `1px solid ${colors.border}`,
+              fontSize: 10,
+              padding: '1px 6px',
+              background: '#E0E0E0',
+              border: '1px solid #999',
               borderRadius: 2,
-              fontSize: fontSize.xs,
-              fontWeight: fontWeight.medium,
-              color: colors.textPrimary,
               cursor: 'pointer',
-              transition: 'background 150ms ease',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 3,
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = colors.bg }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = '#D0D0D0' }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = '#E0E0E0' }}
           >
             Close
           </button>
@@ -599,18 +599,42 @@ function VoidModal({
         <div className="px-5 py-3 border-t border-[#E0E0E0] flex justify-end gap-2">
           <button
             onClick={onClose}
-            className="px-4 py-1.5 border border-[#E0E0E0] text-xs hover:bg-[#F1F3F4] transition-colors"
-            style={{ borderRadius: 2 }}
+            style={{
+              fontSize: 10,
+              padding: '1px 6px',
+              background: '#E0E0E0',
+              border: '1px solid #999',
+              borderRadius: 2,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 3,
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = '#D0D0D0' }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = '#E0E0E0' }}
           >
             Cancel
           </button>
           <button
             onClick={handleVoid}
             disabled={loading}
-            className="px-4 py-1.5 text-xs text-white disabled:opacity-50 transition-colors flex items-center gap-1.5"
-            style={{ background: colors.danger, borderRadius: 2 }}
+            style={{
+              fontSize: 10,
+              padding: '1px 6px',
+              background: colors.danger,
+              border: '1px solid #C82333',
+              borderRadius: 2,
+              color: '#fff',
+              cursor: loading ? 'not-allowed' : 'pointer',
+              opacity: loading ? 0.6 : 1,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 3,
+            }}
+            onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = '#A93226' }}
+            onMouseLeave={(e) => { if (!loading) e.currentTarget.style.background = colors.danger }}
           >
-            {loading && <Loader2 className="w-3 h-3 animate-spin" />}
+            {loading && <Loader2 style={{ width: 9, height: 9, animation: 'spin 1s linear infinite' }} />}
             Void Order
           </button>
         </div>
@@ -734,18 +758,41 @@ function CreateOperatorPanel({
         <div className="flex justify-end gap-2 pt-1">
           <button
             onClick={onClose}
-            className="px-4 py-1.5 border border-[#E0E0E0] text-xs hover:bg-[#F1F3F4] transition-colors"
-            style={{ borderRadius: 2 }}
+            style={{
+              fontSize: 10,
+              padding: '1px 6px',
+              background: '#E0E0E0',
+              border: '1px solid #999',
+              borderRadius: 2,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 3,
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = '#D0D0D0' }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = '#E0E0E0' }}
           >
             Cancel
           </button>
           <button
             onClick={handleCreate}
             disabled={loading}
-            className="px-4 py-1.5 text-xs text-white disabled:opacity-50 flex items-center gap-1.5 transition-colors"
-            style={{ background: colors.action, borderRadius: 2 }}
+            style={{
+              fontSize: 10,
+              padding: '1px 6px',
+              background: '#E0E0E0',
+              border: '1px solid #999',
+              borderRadius: 2,
+              cursor: loading ? 'not-allowed' : 'pointer',
+              opacity: loading ? 0.6 : 1,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 3,
+            }}
+            onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = '#D0D0D0' }}
+            onMouseLeave={(e) => { if (!loading) e.currentTarget.style.background = '#E0E0E0' }}
           >
-            {loading && <Loader2 className="w-3 h-3 animate-spin" />}
+            {loading && <Loader2 style={{ width: 9, height: 9, animation: 'spin 1s linear infinite' }} />}
             Create Operator
           </button>
         </div>
@@ -1087,29 +1134,63 @@ function OrdersTab() {
         {hasFilters && (
           <button
             onClick={clearFilters}
-            className="flex items-center gap-1 h-7 px-2.5 border border-[#E0E0E0] text-[11px] text-[#6C757D] hover:bg-[#F1F3F4] transition-colors"
-            style={{ borderRadius: 2 }}
+            style={{
+              fontSize: 10,
+              padding: '1px 6px',
+              background: '#E0E0E0',
+              border: '1px solid #999',
+              borderRadius: 2,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 3,
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = '#D0D0D0' }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = '#E0E0E0' }}
           >
-            <X className="w-3 h-3" /> Reset
+            <X style={{ width: 9, height: 9 }} /> Reset
           </button>
         )}
 
         <div className="ml-auto flex items-center gap-1.5">
           <button
             onClick={() => fetchOrders(page)}
-            className="flex items-center gap-1 h-7 px-2.5 border border-[#E0E0E0] text-[11px] text-[#6C757D] hover:bg-[#F1F3F4] transition-colors"
-            style={{ borderRadius: 2 }}
+            style={{
+              fontSize: 10,
+              padding: '1px 6px',
+              background: '#E0E0E0',
+              border: '1px solid #999',
+              borderRadius: 2,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 3,
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = '#D0D0D0' }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = '#E0E0E0' }}
           >
-            <RefreshCw className="w-3 h-3" />
+            <RefreshCw style={{ width: 9, height: 9 }} />
           </button>
           <button
             onClick={handleExport}
             disabled={exporting}
-            className="flex items-center gap-1.5 h-7 px-2.5 border border-[#E0E0E0] text-[11px] text-[#6C757D] hover:bg-[#F1F3F4] disabled:opacity-50 transition-colors"
-            style={{ borderRadius: 2 }}
+            style={{
+              fontSize: 10,
+              padding: '1px 6px',
+              background: '#E0E0E0',
+              border: '1px solid #999',
+              borderRadius: 2,
+              cursor: exporting ? 'not-allowed' : 'pointer',
+              opacity: exporting ? 0.6 : 1,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 3,
+            }}
+            onMouseEnter={(e) => { if (!exporting) e.currentTarget.style.background = '#D0D0D0' }}
+            onMouseLeave={(e) => { if (!exporting) e.currentTarget.style.background = '#E0E0E0' }}
             title="Export CSV"
           >
-            {exporting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+            {exporting ? <Loader2 style={{ width: 9, height: 9, animation: 'spin 1s linear infinite' }} /> : <Download style={{ width: 9, height: 9 }} />}
             Export
           </button>
         </div>
@@ -1262,10 +1343,21 @@ function OperatorsTab() {
         <div className="ml-auto">
           <button
             onClick={() => setShowCreate(true)}
-            className="flex items-center gap-1.5 h-7 px-3 text-[11px] font-medium text-white transition-colors"
-            style={{ background: colors.action, borderRadius: 2 }}
+            style={{
+              fontSize: 10,
+              padding: '1px 6px',
+              background: '#E0E0E0',
+              border: '1px solid #999',
+              borderRadius: 2,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 3,
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = '#D0D0D0' }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = '#E0E0E0' }}
           >
-            <UserPlus className="w-3.5 h-3.5" /> Create Operator
+            <UserPlus style={{ width: 9, height: 9 }} /> Create Operator
           </button>
         </div>
       </div>

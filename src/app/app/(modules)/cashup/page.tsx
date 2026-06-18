@@ -6,7 +6,6 @@ import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Decimal from 'decimal.js'
 import { toast } from 'sonner'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -194,12 +193,31 @@ function CountCashModal({ counts, setCounts, notes, setNotes, submitting, handle
             />
           </div>
 
-          <Button className="w-full" size="sm" onClick={() => { void handleSubmit(); onClose() }} disabled={submitting}>
+          <button
+            style={{
+              fontSize: 10,
+              padding: '1px 6px',
+              background: '#E0E0E0',
+              border: '1px solid #999',
+              borderRadius: 2,
+              width: '100%',
+              cursor: submitting ? 'not-allowed' : 'pointer',
+              opacity: submitting ? 0.6 : 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 3,
+            }}
+            onClick={() => { void handleSubmit(); onClose() }}
+            disabled={submitting}
+            onMouseEnter={(e) => { if (!submitting) e.currentTarget.style.background = '#D0D0D0' }}
+            onMouseLeave={(e) => { if (!submitting) e.currentTarget.style.background = '#E0E0E0' }}
+          >
             {submitting
-              ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Submitting…</>
+              ? <><Loader2 style={{ width: 9, height: 9, animation: 'spin 1s linear infinite' }} />Submitting…</>
               : 'Submit Cash-Up'
             }
-          </Button>
+          </button>
         </div>
       </DialogContent>
     </Dialog>
@@ -344,11 +362,25 @@ export default function CashUpPage() {
             <p className="font-medium mb-1" style={{ color: colors.textPrimary }}>No session open for today</p>
             <p className="text-sm mb-5" style={{ color: colors.textSecondary }}>Open a session to begin tracking today&apos;s cash.</p>
             <button
-              onClick={handleOpen} disabled={opening}
-              className="flex items-center gap-1.5 px-4 py-1.5 rounded text-xs font-medium text-white mx-auto disabled:opacity-50"
-              style={{ background: colors.action }}
+              onClick={handleOpen}
+              disabled={opening}
+              style={{
+                fontSize: 10,
+                padding: '1px 6px',
+                background: '#E0E0E0',
+                border: '1px solid #999',
+                borderRadius: 2,
+                cursor: opening ? 'not-allowed' : 'pointer',
+                opacity: opening ? 0.6 : 1,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 3,
+                margin: '0 auto',
+              }}
+              onMouseEnter={(e) => { if (!opening) e.currentTarget.style.background = '#D0D0D0' }}
+              onMouseLeave={(e) => { if (!opening) e.currentTarget.style.background = '#E0E0E0' }}
             >
-              {opening ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Opening…</> : 'Open Session'}
+              {opening ? <><Loader2 style={{ width: 9, height: 9, animation: 'spin 1s linear infinite' }} /> Opening…</> : 'Open Session'}
             </button>
           </div>
         )}
@@ -497,9 +529,26 @@ export default function CashUpPage() {
                     {cashUp.status === 'submitted' && (
                       <div className="pt-2 border-t flex justify-end" style={{ borderColor: colors.border }}>
                         {isManager ? (
-                          <Button size="sm" onClick={handleApprove} disabled={approving}>
-                            {approving ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Approving...</> : <><Lock className="w-4 h-4 mr-2" />Approve Cash-Up</>}
-                          </Button>
+                          <button
+                            onClick={handleApprove}
+                            disabled={approving}
+                            style={{
+                              fontSize: 10,
+                              padding: '1px 6px',
+                              background: '#E0E0E0',
+                              border: '1px solid #999',
+                              borderRadius: 2,
+                              cursor: approving ? 'not-allowed' : 'pointer',
+                              opacity: approving ? 0.6 : 1,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 3,
+                            }}
+                            onMouseEnter={(e) => { if (!approving) e.currentTarget.style.background = '#D0D0D0' }}
+                            onMouseLeave={(e) => { if (!approving) e.currentTarget.style.background = '#E0E0E0' }}
+                          >
+                            {approving ? <><Loader2 style={{ width: 9, height: 9, animation: 'spin 1s linear infinite' }} />Approving...</> : <><Lock style={{ width: 9, height: 9 }} />Approve Cash-Up</>}
+                          </button>
                         ) : (
                           <p className="text-sm" style={{ color: colors.textSecondary }}>Awaiting manager approval</p>
                         )}

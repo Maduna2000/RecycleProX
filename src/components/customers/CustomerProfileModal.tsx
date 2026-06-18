@@ -89,10 +89,10 @@ const lblStyle: React.CSSProperties = {
   color: '#6C757D', marginBottom: 2,
 }
 const titleBtn: React.CSSProperties = {
-  fontSize: 11, padding: '2px 10px', cursor: 'pointer', borderRadius: 2,
-  background: 'linear-gradient(180deg,#F5F5F5 0%,#E0E0E0 100%)',
-  border: '1px solid #ABABAB', color: '#333',
-  display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' as const,
+  fontSize: 10, padding: '1px 6px', cursor: 'pointer', borderRadius: 2,
+  background: '#E0E0E0',
+  border: '1px solid #999', color: '#212529',
+  display: 'flex', alignItems: 'center', gap: 3, whiteSpace: 'nowrap' as const,
 }
 
 function Pill({ text, bg, color }: { text: string; bg: string; color: string }) {

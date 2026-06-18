@@ -193,21 +193,21 @@ function ModalBtn({
   icon?:     React.ReactNode
   children:  React.ReactNode
 }) {
+  // Windows aesthetic base style
   const base: React.CSSProperties = {
-    display: 'inline-flex', alignItems: 'center', gap: 5,
-    padding: '5px 12px', fontSize: 12, fontWeight: 600,
+    display: 'inline-flex', alignItems: 'center', gap: 3,
+    padding: '1px 6px', fontSize: 10,
     borderRadius: 2, cursor: disabled || loading ? 'not-allowed' : 'pointer',
-    opacity: disabled || loading ? 0.55 : 1, transition: 'background 0.1s',
-    lineHeight: 1.4,
+    opacity: disabled || loading ? 0.6 : 1, transition: 'background 0.1s',
   }
   const variants: Record<ModalBtnVariant, React.CSSProperties> = {
-    primary: { background: '#217346', color: '#fff',     border: 'none' },
-    outline: { background: '#fff',     color: '#212529', border: '1px solid #E0E0E0' },
-    danger:  { background: '#DC3545', color: '#fff',     border: 'none' },
+    primary: { background: '#E0E0E0', color: '#212529', border: '1px solid #999' },
+    outline: { background: '#E0E0E0', color: '#212529', border: '1px solid #999' },
+    danger:  { background: '#DC3545', color: '#fff',     border: '1px solid #C82333' },
   }
   const hovers: Record<ModalBtnVariant, string> = {
-    primary: '#185D38',
-    outline: '#F8F9FA',
+    primary: '#D0D0D0',
+    outline: '#D0D0D0',
     danger:  '#C82333',
   }
   const isDisabled = disabled || loading
@@ -220,7 +220,7 @@ function ModalBtn({
       onMouseEnter={isDisabled ? undefined : (e) => { (e.currentTarget as HTMLButtonElement).style.background = hovers[variant] }}
       onMouseLeave={isDisabled ? undefined : (e) => { (e.currentTarget as HTMLButtonElement).style.background = (variants[variant].background as string) }}
     >
-      {loading ? <Loader2 style={{ width: 13, height: 13, animation: 'spin 1s linear infinite' }} /> : icon}
+      {loading ? <Loader2 style={{ width: 9, height: 9, animation: 'spin 1s linear infinite' }} /> : icon}
       {children}
     </button>
   )

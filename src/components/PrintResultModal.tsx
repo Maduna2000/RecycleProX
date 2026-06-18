@@ -78,41 +78,41 @@ export function PrintResultModal({ type, id, refNumber, onClose, onViewPurchase,
               <button
                 onClick={printDirect}
                 disabled={printing}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%', padding: '8px 12px', background: '#217346', color: '#fff', border: 'none', borderRadius: 2, fontSize: 13, fontWeight: 700, cursor: printing ? 'not-allowed' : 'pointer', opacity: printing ? 0.7 : 1 }}
-                onMouseEnter={(e) => { if (!printing) (e.currentTarget as HTMLButtonElement).style.background = '#185D38' }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#217346' }}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, width: '100%', padding: '1px 6px', background: '#E0E0E0', color: '#212529', border: '1px solid #999', borderRadius: 2, fontSize: 10, cursor: printing ? 'not-allowed' : 'pointer', opacity: printing ? 0.6 : 1 }}
+                onMouseEnter={(e) => { if (!printing) (e.currentTarget as HTMLButtonElement).style.background = '#D0D0D0' }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#E0E0E0' }}
               >
                 {printing ? (
-                  <><Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} /> Printing...</>
+                  <><Loader2 style={{ width: 9, height: 9, animation: 'spin 1s linear infinite' }} /> Printing...</>
                 ) : (
-                  <><Printer style={{ width: 14, height: 14 }} /> Print Receipt</>
+                  <><Printer style={{ width: 9, height: 9 }} /> Print Receipt</>
                 )}
               </button>
             )}
             <button
               onClick={() => openPdf(receiptUrl)}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%', padding: '6px 12px', background: isElectron ? '#fff' : '#217346', color: isElectron ? '#212529' : '#fff', border: isElectron ? '1px solid #E0E0E0' : 'none', borderRadius: 2, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = isElectron ? '#F8F9FA' : '#185D38' }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = isElectron ? '#fff' : '#217346' }}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, width: '100%', padding: '1px 6px', background: '#E0E0E0', color: '#212529', border: '1px solid #999', borderRadius: 2, fontSize: 10, cursor: 'pointer' }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#D0D0D0' }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#E0E0E0' }}
             >
-              <Printer style={{ width: 13, height: 13 }} /> Print PDF Slip
+              <Printer style={{ width: 9, height: 9 }} /> Print PDF Slip
             </button>
             <button
               onClick={printThermal}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%', padding: '6px 12px', background: '#fff', color: '#212529', border: '1px solid #E0E0E0', borderRadius: 2, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#F8F9FA' }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#fff' }}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, width: '100%', padding: '1px 6px', background: '#E0E0E0', color: '#212529', border: '1px solid #999', borderRadius: 2, fontSize: 10, cursor: 'pointer' }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#D0D0D0' }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#E0E0E0' }}
             >
-              <Download style={{ width: 13, height: 13 }} /> Download Thermal Receipt
+              <Download style={{ width: 9, height: 9 }} /> Download Thermal Receipt
             </button>
             {type === 'purchase' && (
               <button
                 onClick={() => openPdf(vat264Url)}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%', padding: '6px 12px', background: '#fff', color: '#212529', border: '1px solid #E0E0E0', borderRadius: 2, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#F8F9FA' }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#fff' }}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, width: '100%', padding: '1px 6px', background: '#E0E0E0', color: '#212529', border: '1px solid #999', borderRadius: 2, fontSize: 10, cursor: 'pointer' }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#D0D0D0' }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#E0E0E0' }}
               >
-                <FileText style={{ width: 13, height: 13 }} /> Download VAT264
+                <FileText style={{ width: 9, height: 9 }} /> Download VAT264
               </button>
             )}
           </div>
@@ -122,16 +122,16 @@ export function PrintResultModal({ type, id, refNumber, onClose, onViewPurchase,
             {onViewPurchase ? (
               <button
                 onClick={onViewPurchase}
-                style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#6C757D', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 6px', borderRadius: 2 }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = '#212529' }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = '#6C757D' }}
+                style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 10, padding: '1px 6px', background: '#E0E0E0', border: '1px solid #999', borderRadius: 2, cursor: 'pointer', color: '#212529' }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#D0D0D0' }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#E0E0E0' }}
               >
-                <ExternalLink style={{ width: 12, height: 12 }} /> View Transaction
+                <ExternalLink style={{ width: 9, height: 9 }} /> View Transaction
               </button>
             ) : <span />}
             <div style={{ display: 'flex', gap: 6 }}>
               {onDone && <ModalBtn variant="outline" onClick={onDone}>Done</ModalBtn>}
-              <ModalBtn variant="primary" icon={<Plus style={{ width: 13, height: 13 }} />} onClick={onClose}>
+              <ModalBtn variant="primary" icon={<Plus style={{ width: 9, height: 9 }} />} onClick={onClose}>
                 New {label}
               </ModalBtn>
             </div>

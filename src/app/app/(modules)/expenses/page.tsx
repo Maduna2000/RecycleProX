@@ -302,16 +302,21 @@ export default function ExpensesPage() {
         {hasFilters && (
           <button
             onClick={clearFilters}
-            className="px-2.5 flex items-center gap-1 hover:bg-[#F1F3F4] transition-colors"
             style={{
-              height: 28,
-              border: `1px solid ${colors.border}`,
+              fontSize: 10,
+              padding: '1px 6px',
+              background: '#E0E0E0',
+              border: '1px solid #999',
               borderRadius: 2,
-              fontSize: fontSize.base,
-              color: colors.textSecondary,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 3,
             }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = '#D0D0D0' }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = '#E0E0E0' }}
           >
-            <X className="w-3 h-3" /> Clear
+            <X style={{ width: 9, height: 9 }} /> Clear
           </button>
         )}
       </div>
