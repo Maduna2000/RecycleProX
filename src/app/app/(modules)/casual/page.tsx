@@ -260,12 +260,22 @@ export default function CasualsPage() {
             <div className="ml-auto">
               <button
                 onClick={() => setImportOpen(true)}
-                className="flex items-center gap-1.5 h-7 px-3 text-xs font-medium transition-colors"
-                style={{ border: `1px solid ${colors.border}`, color: colors.textPrimary, background: colors.surface, borderRadius: layout.btnRadius }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = colors.toolbar)}
-                onMouseLeave={(e) => (e.currentTarget.style.background = colors.surface)}
+                style={{
+                  fontSize: 10,
+                  padding: '1px 6px',
+                  background: '#E0E0E0',
+                  border: '1px solid #999',
+                  borderRadius: 2,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 3,
+                  color: '#212529',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = '#D0D0D0' }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = '#E0E0E0' }}
               >
-                <Upload className="w-3.5 h-3.5" /> Import CSV
+                <Upload style={{ width: 9, height: 9 }} /> Import CSV
               </button>
             </div>
           )}
@@ -275,10 +285,18 @@ export default function CasualsPage() {
         <div className="flex flex-wrap gap-1 shrink-0">
           <button
             onClick={() => setLetter(null)}
-            className="px-2 py-0.5 text-xs font-medium rounded transition-colors"
-            style={letter === null
-              ? { background: colors.process, color: colors.surface }
-              : { background: colors.neutralBg, color: colors.textSecondary }}
+            style={{
+              fontSize: 10,
+              padding: '1px 6px',
+              background: letter === null ? '#C0C0C0' : '#E0E0E0',
+              border: '1px solid #999',
+              borderRadius: 2,
+              cursor: 'pointer',
+              color: '#212529',
+              fontWeight: letter === null ? 600 : 400,
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = '#D0D0D0' }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = letter === null ? '#C0C0C0' : '#E0E0E0' }}
           >
             All
           </button>
@@ -286,10 +304,18 @@ export default function CasualsPage() {
             <button
               key={l}
               onClick={() => { setLetter(l === letter ? null : l); setSearch('') }}
-              className="px-2 py-0.5 text-xs font-medium rounded transition-colors"
-              style={letter === l
-                ? { background: colors.process, color: colors.surface }
-                : { background: colors.neutralBg, color: colors.textSecondary }}
+              style={{
+                fontSize: 10,
+                padding: '1px 6px',
+                background: letter === l ? '#C0C0C0' : '#E0E0E0',
+                border: '1px solid #999',
+                borderRadius: 2,
+                cursor: 'pointer',
+                color: '#212529',
+                fontWeight: letter === l ? 600 : 400,
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = '#D0D0D0' }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = letter === l ? '#C0C0C0' : '#E0E0E0' }}
             >
               {l}
             </button>
@@ -513,10 +539,23 @@ function PromoteToAccountModal({ customerId, customerName, onClose, onSuccess }:
             <button
               onClick={handlePromote}
               disabled={loading}
-              className="h-9 px-4 rounded text-sm font-medium text-white disabled:opacity-50"
-              style={{ background: colors.action }}
+              style={{
+                fontSize: 10,
+                padding: '1px 6px',
+                background: '#E0E0E0',
+                border: '1px solid #999',
+                borderRadius: 2,
+                cursor: loading ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 3,
+                color: '#212529',
+                opacity: loading ? 0.6 : 1,
+              }}
+              onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = '#D0D0D0' }}
+              onMouseLeave={(e) => { if (!loading) e.currentTarget.style.background = '#E0E0E0' }}
             >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Promote →'}
+              {loading ? <Loader2 style={{ width: 9, height: 9 }} className="animate-spin" /> : 'Promote →'}
             </button>
           </div>
         </div>
@@ -634,12 +673,23 @@ function ImportCsvModal({ onClose, onSuccess }: { onClose: () => void; onSuccess
             <button
               onClick={handleImport}
               disabled={loading || !fileName}
-              className="h-9 px-4 rounded text-sm font-medium text-white transition-colors disabled:opacity-50"
-              style={{ background: colors.action }}
-              onMouseEnter={(e) => !loading && (e.currentTarget.style.background = '#185A38')}
-              onMouseLeave={(e) => !loading && (e.currentTarget.style.background = colors.action)}
+              style={{
+                fontSize: 10,
+                padding: '1px 6px',
+                background: '#E0E0E0',
+                border: '1px solid #999',
+                borderRadius: 2,
+                cursor: (loading || !fileName) ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 3,
+                color: '#212529',
+                opacity: (loading || !fileName) ? 0.6 : 1,
+              }}
+              onMouseEnter={(e) => { if (!loading && fileName) e.currentTarget.style.background = '#D0D0D0' }}
+              onMouseLeave={(e) => { if (!loading && fileName) e.currentTarget.style.background = '#E0E0E0' }}
             >
-              {loading ? <span className="flex items-center gap-1.5"><Loader2 className="w-4 h-4 animate-spin" />Importing…</span> : 'Import'}
+              {loading ? <><Loader2 style={{ width: 9, height: 9 }} className="animate-spin" />Importing…</> : 'Import'}
             </button>
           </div>
         </div>

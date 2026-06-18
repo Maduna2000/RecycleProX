@@ -24,7 +24,10 @@ export function WinButton({ onClick, disabled, children }: WinButtonProps) {
         alignItems: 'center',
         gap: 3,
         opacity: disabled ? 0.6 : 1,
+        color: '#212529',
       }}
+      onMouseEnter={(e) => { if (!disabled) e.currentTarget.style.background = '#D0D0D0' }}
+      onMouseLeave={(e) => { if (!disabled) e.currentTarget.style.background = '#E0E0E0' }}
     >
       {children}
     </button>

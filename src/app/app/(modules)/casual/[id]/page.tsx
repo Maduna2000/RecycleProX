@@ -131,15 +131,14 @@ export default function CasualCustomerDetailPage() {
   const fullName = `${customer.firstName} ${customer.lastName}`
 
   const titleBtn: React.CSSProperties = {
-    fontSize: 11, padding: '2px 10px', cursor: 'pointer', borderRadius: 2,
-    background: 'linear-gradient(180deg,#F5F5F5 0%,#E0E0E0 100%)',
-    border: '1px solid #ABABAB', color: '#333', display: 'flex', alignItems: 'center', gap: 4,
+    fontSize: 10, padding: '1px 6px', cursor: 'pointer', borderRadius: 2,
+    background: '#E0E0E0', border: '1px solid #999', color: '#212529',
+    display: 'flex', alignItems: 'center', gap: 3,
   }
   const saveBtn: React.CSSProperties = {
-    fontSize: 11, padding: '2px 10px', cursor: saving ? 'not-allowed' : 'pointer', borderRadius: 2,
-    background: 'linear-gradient(180deg,#10B981 0%,#059669 100%)',
-    border: '1px solid #059669', color: '#fff', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4,
-    opacity: saving ? 0.7 : 1,
+    fontSize: 10, padding: '1px 6px', cursor: saving ? 'not-allowed' : 'pointer', borderRadius: 2,
+    background: '#E0E0E0', border: '1px solid #999', color: '#212529',
+    display: 'flex', alignItems: 'center', gap: 3, opacity: saving ? 0.6 : 1,
   }
 
   return (
@@ -148,7 +147,12 @@ export default function CasualCustomerDetailPage() {
       {/* ── Title bar ─────────────────────────────────────────────────────────── */}
       <div style={{ background: 'linear-gradient(180deg,#EAEAEA 0%,#D4D4D4 100%)', borderBottom: '2px solid #B0B0B0', padding: '5px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <button onClick={() => router.push('/app/casual')} style={titleBtn}>← Casuals</button>
+          <button
+            onClick={() => router.push('/app/casual')}
+            style={titleBtn}
+            onMouseEnter={(e) => { e.currentTarget.style.background = '#D0D0D0' }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = '#E0E0E0' }}
+          >← Casuals</button>
           <span style={{ fontSize: 1, color: '#B0B0B0', userSelect: 'none' }}>│</span>
           <span style={{ fontSize: 13, fontWeight: 700, color: '#212529' }}>{fullName}</span>
           <Pill text="Casual Seller" bg="#FEF3C7" color="#92400E" />
@@ -158,12 +162,29 @@ export default function CasualCustomerDetailPage() {
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
           {!isEditing ? (
-            <button onClick={() => setIsEditing(true)} style={titleBtn}>✏  Edit</button>
+            <button
+              onClick={() => setIsEditing(true)}
+              style={titleBtn}
+              onMouseEnter={(e) => { e.currentTarget.style.background = '#D0D0D0' }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = '#E0E0E0' }}
+            >✏  Edit</button>
           ) : (
             <>
-              <button onClick={handleCancel} style={titleBtn} disabled={saving}>Cancel</button>
-              <button onClick={handleSubmit(onSubmit)} style={saveBtn} disabled={saving}>
-                {saving && <Loader2 style={{ width: 12, height: 12, animation: 'spin 1s linear infinite' }} />}
+              <button
+                onClick={handleCancel}
+                style={titleBtn}
+                disabled={saving}
+                onMouseEnter={(e) => { if (!saving) e.currentTarget.style.background = '#D0D0D0' }}
+                onMouseLeave={(e) => { if (!saving) e.currentTarget.style.background = '#E0E0E0' }}
+              >Cancel</button>
+              <button
+                onClick={handleSubmit(onSubmit)}
+                style={saveBtn}
+                disabled={saving}
+                onMouseEnter={(e) => { if (!saving) e.currentTarget.style.background = '#D0D0D0' }}
+                onMouseLeave={(e) => { if (!saving) e.currentTarget.style.background = '#E0E0E0' }}
+              >
+                {saving && <Loader2 style={{ width: 9, height: 9 }} className="animate-spin" />}
                 {saving ? 'Saving...' : '💾 Save'}
               </button>
             </>

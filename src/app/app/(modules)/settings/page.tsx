@@ -386,16 +386,44 @@ export default function SettingsPage() {
                 <button
                   disabled={syncing || !isOnline}
                   onClick={async () => { setSyncing(true); await triggerSync(); setPending(await getPendingCount()); setSyncing(false) }}
-                  style={{ height: 26, padding: '0 10px', borderRadius: 2, fontSize: 11, border: 'none', background: colors.actionBg, color: colors.action, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, opacity: syncing || !isOnline ? 0.4 : 1 }}
+                  style={{
+                    fontSize: 10,
+                    padding: '1px 6px',
+                    background: '#E0E0E0',
+                    border: '1px solid #999',
+                    borderRadius: 2,
+                    cursor: (syncing || !isOnline) ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 3,
+                    color: '#212529',
+                    opacity: (syncing || !isOnline) ? 0.6 : 1,
+                  }}
+                  onMouseEnter={(e) => { if (!syncing && isOnline) e.currentTarget.style.background = '#D0D0D0' }}
+                  onMouseLeave={(e) => { if (!syncing && isOnline) e.currentTarget.style.background = '#E0E0E0' }}
                 >
-                  {syncing ? <><Loader2 className="w-3 h-3 animate-spin" /> Syncing…</> : <><RefreshCw className="w-3 h-3" /> Sync Now{pendingCount > 0 ? ` (${pendingCount})` : ''}</>}
+                  {syncing ? <><Loader2 style={{ width: 9, height: 9 }} className="animate-spin" /> Syncing…</> : <><RefreshCw style={{ width: 9, height: 9 }} /> Sync Now{pendingCount > 0 ? ` (${pendingCount})` : ''}</>}
                 </button>
                 <button
                   disabled={seeding || !isOnline}
                   onClick={async () => { setSeeding(true); await runSeeder(true); setSeeding(false); toast.success('Offline data refreshed') }}
-                  style={{ height: 26, padding: '0 10px', borderRadius: 2, fontSize: 11, border: '1px solid #D0D0D0', background: '#F5F5F5', color: '#374151', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, opacity: seeding || !isOnline ? 0.4 : 1 }}
+                  style={{
+                    fontSize: 10,
+                    padding: '1px 6px',
+                    background: '#E0E0E0',
+                    border: '1px solid #999',
+                    borderRadius: 2,
+                    cursor: (seeding || !isOnline) ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 3,
+                    color: '#212529',
+                    opacity: (seeding || !isOnline) ? 0.6 : 1,
+                  }}
+                  onMouseEnter={(e) => { if (!seeding && isOnline) e.currentTarget.style.background = '#D0D0D0' }}
+                  onMouseLeave={(e) => { if (!seeding && isOnline) e.currentTarget.style.background = '#E0E0E0' }}
                 >
-                  {seeding ? <><Loader2 className="w-3 h-3 animate-spin" /> Refreshing…</> : <><RefreshCw className="w-3 h-3" /> Refresh Offline Data</>}
+                  {seeding ? <><Loader2 style={{ width: 9, height: 9 }} className="animate-spin" /> Refreshing…</> : <><RefreshCw style={{ width: 9, height: 9 }} /> Refresh Offline Data</>}
                 </button>
               </div>
             </div>

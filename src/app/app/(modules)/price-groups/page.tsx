@@ -196,12 +196,23 @@ function CreatePriceGroupModal({ onClose, onSuccess }: { onClose: () => void; on
             <button
               type="submit"
               disabled={loading}
-              className="flex items-center gap-1.5 h-9 px-4 rounded text-sm font-medium text-white transition-colors disabled:opacity-50"
-              style={{ background: colors.action }}
-              onMouseEnter={(e) => !loading && (e.currentTarget.style.background = colors.actionHover)}
-              onMouseLeave={(e) => !loading && (e.currentTarget.style.background = colors.action)}
+              style={{
+                fontSize: 10,
+                padding: '1px 6px',
+                background: '#E0E0E0',
+                border: '1px solid #999',
+                borderRadius: 2,
+                cursor: loading ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 3,
+                color: '#212529',
+                opacity: loading ? 0.6 : 1,
+              }}
+              onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = '#D0D0D0' }}
+              onMouseLeave={(e) => { if (!loading) e.currentTarget.style.background = '#E0E0E0' }}
             >
-              {loading ? <><Loader2 className="w-4 h-4 animate-spin" />Creating…</> : 'Create Group'}
+              {loading ? <><Loader2 style={{ width: 9, height: 9 }} className="animate-spin" />Creating…</> : 'Create Group'}
             </button>
           </div>
         </form>
