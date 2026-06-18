@@ -53,9 +53,9 @@ export async function POST(req: Request) {
       // Build receipt data
       const lines = purchase.lines.map(line => ({
         productName: line.product.name,
-        qty: line.qty,
+        qty: line.quantity,
         unitPrice: line.unitPrice.toString(),
-        lineTotal: new Decimal(line.unitPrice).times(line.qty).toString(),
+        lineTotal: new Decimal(line.unitPrice).times(line.quantity).toString(),
       }))
 
       receiptBuffer = await buildPurchaseReceipt({
