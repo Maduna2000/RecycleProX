@@ -91,6 +91,10 @@ export default function TradeCommoditiesPage() {
     // Reorder locally first for immediate feedback
     const newOrder = [...categories]
     const [moved] = newOrder.splice(fromIndex, 1)
+    if (!moved) {
+      setDraggedId(null)
+      return
+    }
     newOrder.splice(toIndex, 0, moved)
     const orderedIds = newOrder.map((c) => c.id)
 
