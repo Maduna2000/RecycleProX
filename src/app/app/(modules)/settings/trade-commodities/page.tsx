@@ -3,18 +3,14 @@
 import { useState } from 'react'
 import useSWR, { mutate } from 'swr'
 import { useSession } from 'next-auth/react'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
-import { WinButton } from '@/components/ui/WinButton'
-import { Plus, Loader2, GripVertical, Pencil, Trash2, ArrowLeft, ToggleLeft, ToggleRight } from 'lucide-react'
+import { Plus, Loader2, GripVertical, Pencil, Trash2, ArrowLeft, ToggleLeft, ToggleRight, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { CreateTradeCommodityCategorySchema, type CreateTradeCommodityCategoryInput, type CreateTradeCommodityCategoryFormInput } from '@/lib/schemas/tradeCommodity'
 import { colors } from '@/lib/design-tokens'
 import Link from 'next/link'
+import { WinButton } from '@/components/ui/WinButton'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -25,12 +21,35 @@ type TradeCommodityCategory = {
   isActive: boolean
 }
 
+// ─── Windows aesthetic styles ────────────────────────────────────────────────
 const TH: React.CSSProperties = {
   textAlign: 'left', padding: '0 10px', height: 28,
   fontSize: 10, fontWeight: 700, color: '#6C757D',
   textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap',
 }
 const TD: React.CSSProperties = { padding: '0 10px', fontSize: 12, color: '#212529' }
+
+const inp: React.CSSProperties = {
+  height: 26, width: '100%', borderRadius: 2,
+  border: '1px solid #ABABAB', padding: '0 7px',
+  fontSize: 12, color: '#212529', outline: 'none',
+  background: '#fff', boxSizing: 'border-box',
+}
+const lbl: React.CSSProperties = {
+  display: 'block', fontSize: 10, fontWeight: 700,
+  textTransform: 'uppercase', letterSpacing: '0.04em',
+  color: '#6C757D', marginBottom: 3,
+}
+const winBtn: React.CSSProperties = {
+  fontSize: 10, padding: '4px 12px', borderRadius: 2,
+  background: '#E0E0E0', border: '1px solid #999',
+  color: '#212529', cursor: 'pointer',
+  display: 'flex', alignItems: 'center', gap: 4,
+}
+const winBtnPrimary: React.CSSProperties = {
+  ...winBtn,
+  background: '#217346', border: '1px solid #176338', color: '#fff',
+}
 
 export default function TradeCommoditiesPage() {
   const { data: session } = useSession()
@@ -88,7 +107,6 @@ export default function TradeCommoditiesPage() {
       return
     }
 
-    // Reorder locally first for immediate feedback
     const newOrder = [...categories]
     const [moved] = newOrder.splice(fromIndex, 1)
     if (!moved) {
@@ -100,7 +118,6 @@ export default function TradeCommoditiesPage() {
 
     setDraggedId(null)
 
-    // Send to API
     const res = await fetch('/api/settings/trade-commodities/reorder', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -272,6 +289,33 @@ export default function TradeCommoditiesPage() {
   )
 }
 
+// ─── Windows-style Modal Wrapper ─────────────────────────────────────────────
+function WinModal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)' }} onClick={onClose} />
+      <div style={{ position: 'relative', width: 380, background: '#fff', border: '1px solid #B0B0B0', borderRadius: 2, boxShadow: '0 4px 20px rgba(0,0,0,0.25)' }}>
+        {/* Title bar */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', borderBottom: '2px solid #B0B0B0', background: 'linear-gradient(180deg,#EAEAEA 0%,#D4D4D4 100%)' }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: '#1B3A6B' }}>{title}</span>
+          <button
+            onClick={onClose}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 20, borderRadius: 2, border: 'none', background: 'transparent', cursor: 'pointer', color: '#6C757D' }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = '#E0E0E0')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+          >
+            <X style={{ width: 12, height: 12 }} />
+          </button>
+        </div>
+        {/* Content */}
+        <div style={{ padding: '12px 14px' }}>
+          {children}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function CreateCategoryModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
   const [loading, setLoading] = useState(false)
   const { register, handleSubmit, formState: { errors } } = useForm<CreateTradeCommodityCategoryFormInput, unknown, CreateTradeCommodityCategoryInput>({
@@ -299,30 +343,42 @@ function CreateCategoryModal({ onClose, onSuccess }: { onClose: () => void; onSu
   }
 
   return (
-    <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader><DialogTitle>New Trade Commodity Category</DialogTitle></DialogHeader>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-2">
-          <div>
-            <Label style={{ color: colors.textPrimary }}>Category Name</Label>
-            <Input
-              {...register('name')}
-              className="mt-1 border-rpx-border"
-              placeholder="e.g. Copper, Aluminium, E-Waste"
-              disabled={loading}
-              autoFocus
-            />
-            {errors.name && <p className="text-xs mt-1" style={{ color: colors.danger }}>{errors.name.message}</p>}
-          </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Creating…</> : 'Create'}
-            </Button>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
+    <WinModal title="New Trade Commodity Category" onClose={onClose}>
+      <form onSubmit={handleSubmit(onSubmit)}>
+        <div style={{ marginBottom: 12 }}>
+          <span style={lbl}>Category Name</span>
+          <input
+            {...register('name')}
+            style={inp}
+            placeholder="e.g. Copper, Aluminium, E-Waste"
+            disabled={loading}
+            autoFocus
+          />
+          {errors.name && <p style={{ fontSize: 10, color: colors.danger, marginTop: 3 }}>{errors.name.message}</p>}
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, paddingTop: 8, borderTop: '1px solid #E0E0E0' }}>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={loading}
+            style={{ ...winBtn, opacity: loading ? 0.6 : 1 }}
+            onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = '#D0D0D0' }}
+            onMouseLeave={(e) => { if (!loading) e.currentTarget.style.background = '#E0E0E0' }}
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={loading}
+            style={{ ...winBtnPrimary, opacity: loading ? 0.6 : 1 }}
+            onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = '#1a5c38' }}
+            onMouseLeave={(e) => { if (!loading) e.currentTarget.style.background = '#217346' }}
+          >
+            {loading ? <><Loader2 style={{ width: 10, height: 10, animation: 'spin 1s linear infinite' }} /> Creating…</> : 'Create'}
+          </button>
+        </div>
+      </form>
+    </WinModal>
   )
 }
 
@@ -361,28 +417,40 @@ function EditCategoryModal({
   }
 
   return (
-    <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader><DialogTitle>Edit Category</DialogTitle></DialogHeader>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-2">
-          <div>
-            <Label style={{ color: colors.textPrimary }}>Category Name</Label>
-            <Input
-              {...register('name')}
-              className="mt-1 border-rpx-border"
-              disabled={loading}
-              autoFocus
-            />
-            {errors.name && <p className="text-xs mt-1" style={{ color: colors.danger }}>{errors.name.message}</p>}
-          </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Saving…</> : 'Save Changes'}
-            </Button>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
+    <WinModal title="Edit Category" onClose={onClose}>
+      <form onSubmit={handleSubmit(onSubmit)}>
+        <div style={{ marginBottom: 12 }}>
+          <span style={lbl}>Category Name</span>
+          <input
+            {...register('name')}
+            style={inp}
+            disabled={loading}
+            autoFocus
+          />
+          {errors.name && <p style={{ fontSize: 10, color: colors.danger, marginTop: 3 }}>{errors.name.message}</p>}
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, paddingTop: 8, borderTop: '1px solid #E0E0E0' }}>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={loading}
+            style={{ ...winBtn, opacity: loading ? 0.6 : 1 }}
+            onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = '#D0D0D0' }}
+            onMouseLeave={(e) => { if (!loading) e.currentTarget.style.background = '#E0E0E0' }}
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={loading}
+            style={{ ...winBtnPrimary, opacity: loading ? 0.6 : 1 }}
+            onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = '#1a5c38' }}
+            onMouseLeave={(e) => { if (!loading) e.currentTarget.style.background = '#217346' }}
+          >
+            {loading ? <><Loader2 style={{ width: 10, height: 10, animation: 'spin 1s linear infinite' }} /> Saving…</> : 'Save Changes'}
+          </button>
+        </div>
+      </form>
+    </WinModal>
   )
 }
