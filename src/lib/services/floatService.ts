@@ -252,6 +252,67 @@ export async function listFloatMovements(opts?: {
   return { movements, total, page, pageSize }
 }
 
+// ─── Reverse Float Movement ─────────────────────────────────────────────────────
+
+export class FloatMovementReversalError extends Error {
+  code: 'NOT_FOUND' | 'NOT_LAST_MOVEMENT'
+  constructor(code: 'NOT_FOUND' | 'NOT_LAST_MOVEMENT', message: string) {
+    super(message)
+    this.name = 'FloatMovementReversalError'
+    this.code = code
+  }
+}
+
+/**
+ * Reverse (delete) a float movement. Only allowed if it's the most recent movement
+ * for that float record.
+ */
+export async function reverseFloatMovement(
+  movementId: string,
+  userId: string
+): Promise<{ reversedMovementId: string }> {
+  const movement = await prisma.floatMovement.findUnique({
+    where: { id: movementId },
+    include: { cashFloat: true },
+  })
+
+  if (!movement) {
+    throw new FloatMovementReversalError('NOT_FOUND', 'Movement not found')
+  }
+
+  // Check if this is the last movement for this float
+  const newerMovement = await prisma.floatMovement.findFirst({
+    where: {
+      cashFloatId: movement.cashFloatId,
+      createdAt: { gt: movement.createdAt },
+    },
+    orderBy: { createdAt: 'asc' },
+  })
+
+  if (newerMovement) {
+    throw new FloatMovementReversalError(
+      'NOT_LAST_MOVEMENT',
+      'Can only reverse the most recent movement'
+    )
+  }
+
+  // Delete the movement
+  await prisma.floatMovement.delete({ where: { id: movementId } })
+
+  logger.info(
+    {
+      movementId,
+      cashFloatId: movement.cashFloatId,
+      movementType: movement.movementType,
+      amount: movement.amount.toString(),
+      reversedByUserId: userId,
+    },
+    'float.movement.reversed'
+  )
+
+  return { reversedMovementId: movementId }
+}
+
 // ─── Float Reversal ────────────────────────────────────────────────────────────
 
 export type FloatReversalErrorCode =

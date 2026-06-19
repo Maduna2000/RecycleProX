@@ -72,6 +72,7 @@ export default function FloatPage() {
   const [saving, setSaving] = useState(false)
   const [reverseTarget, setReverseTarget] = useState<CashFloat | null>(null)
   const [reversing, setReversing] = useState(false)
+  const [reversingMovement, setReversingMovement] = useState(false)
   const [historyPage, setHistoryPage] = useState(1)
   const HISTORY_PAGE_SIZE = 5
 
@@ -169,6 +170,28 @@ export default function FloatPage() {
     } finally {
       setReversing(false)
       setReverseTarget(null)
+    }
+  }
+
+  async function handleReverseMovement(movementId: string) {
+    setReversingMovement(true)
+    try {
+      const res = await fetch(`/api/float/movement/${movementId}/reverse`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error((err as { error?: string }).error ?? 'Reversal failed')
+      }
+      toast.success('Movement reversed')
+      mutate('/api/float')
+      mutate('/api/float/today')
+      mutateCurrentFloat()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to reverse movement')
+    } finally {
+      setReversingMovement(false)
     }
   }
 
@@ -502,38 +525,70 @@ export default function FloatPage() {
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: '#F5F5F5', borderBottom: `1px solid ${colors.border}` }}>
-                    {['Time', 'Type', 'Amount', 'Balance After', 'Note'].map((h) => (
-                      <th key={h} style={{ textAlign: 'left', padding: '6px 12px', fontSize: 10, fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
+                    {['Time', 'Type', 'Amount', 'Balance After', 'Note', ...(isManager ? [''] : [])].map((h, idx) => (
+                      <th key={idx} style={{ textAlign: 'left', padding: '6px 12px', fontSize: 10, fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {movements.map((m, i) => (
-                    <tr key={m.id} style={{ background: i % 2 === 0 ? '#fff' : '#FAFAFA', borderBottom: `1px solid #F0F0F0` }}>
-                      <td style={{ padding: '6px 12px', fontSize: 11, color: colors.textSecondary }}>
-                        {new Date(m.createdAt).toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' })}
-                      </td>
-                      <td style={{ padding: '6px 12px' }}>
-                        <span style={{
-                          display: 'inline-flex', padding: '1px 6px', borderRadius: 3, fontSize: 11, fontWeight: 600,
-                          ...(m.movementType === 'top_up'
-                            ? { background: colors.actionBg, color: colors.action }
-                            : { background: '#F0F0F0', color: colors.textSecondary }),
-                        }}>
-                          {m.movementType === 'top_up' ? 'Top-Up' : m.movementType}
-                        </span>
-                      </td>
-                      <td style={{ padding: '6px 12px', fontSize: 12, fontFamily: 'monospace', fontWeight: 600, color: colors.action }}>
-                        +R {new Decimal(m.amount).toFixed(2)}
-                      </td>
-                      <td style={{ padding: '6px 12px', fontSize: 12, fontFamily: 'monospace', color: colors.textPrimary }}>
-                        R {new Decimal(m.balanceAfter).toFixed(2)}
-                      </td>
-                      <td style={{ padding: '6px 12px', fontSize: 11, color: colors.textSecondary }}>
-                        {m.referenceNote ?? '—'}
-                      </td>
-                    </tr>
-                  ))}
+                  {movements.map((m, i) => {
+                    const isLastMovement = i === movements.length - 1
+                    return (
+                      <tr key={m.id} style={{ background: i % 2 === 0 ? '#fff' : '#FAFAFA', borderBottom: `1px solid #F0F0F0` }}>
+                        <td style={{ padding: '6px 12px', fontSize: 11, color: colors.textSecondary }}>
+                          {new Date(m.createdAt).toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' })}
+                        </td>
+                        <td style={{ padding: '6px 12px' }}>
+                          <span style={{
+                            display: 'inline-flex', padding: '1px 6px', borderRadius: 3, fontSize: 11, fontWeight: 600,
+                            ...(m.movementType === 'top_up'
+                              ? { background: colors.actionBg, color: colors.action }
+                              : { background: '#F0F0F0', color: colors.textSecondary }),
+                          }}>
+                            {m.movementType === 'top_up' ? 'Top-Up' : m.movementType}
+                          </span>
+                        </td>
+                        <td style={{ padding: '6px 12px', fontSize: 12, fontFamily: 'monospace', fontWeight: 600, color: colors.action }}>
+                          +R {new Decimal(m.amount).toFixed(2)}
+                        </td>
+                        <td style={{ padding: '6px 12px', fontSize: 12, fontFamily: 'monospace', color: colors.textPrimary }}>
+                          R {new Decimal(m.balanceAfter).toFixed(2)}
+                        </td>
+                        <td style={{ padding: '6px 12px', fontSize: 11, color: colors.textSecondary }}>
+                          {m.referenceNote ?? '—'}
+                        </td>
+                        {isManager && (
+                          <td style={{ padding: '6px 12px', textAlign: 'right' }}>
+                            {isLastMovement && (
+                              <button
+                                type="button"
+                                onClick={() => handleReverseMovement(m.id)}
+                                disabled={reversingMovement}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 3,
+                                  padding: '1px 6px',
+                                  fontSize: 10,
+                                  background: '#E0E0E0',
+                                  border: '1px solid #999',
+                                  borderRadius: 2,
+                                  color: '#212529',
+                                  cursor: reversingMovement ? 'not-allowed' : 'pointer',
+                                  opacity: reversingMovement ? 0.6 : 1,
+                                }}
+                                onMouseEnter={(e) => { if (!reversingMovement) e.currentTarget.style.background = '#D0D0D0' }}
+                                onMouseLeave={(e) => { if (!reversingMovement) e.currentTarget.style.background = '#E0E0E0' }}
+                              >
+                                <Undo2 style={{ width: 9, height: 9 }} />
+                                {reversingMovement ? 'Reversing…' : 'Reverse'}
+                              </button>
+                            )}
+                          </td>
+                        )}
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
