@@ -2,7 +2,7 @@ import { z } from 'zod'
 
 export const CreateTradeCommodityCategorySchema = z.object({
   name: z.string().min(1, 'Name is required').max(80),
-  sortOrder: z.number().int().default(0),
+  sortOrder: z.number().int().optional().default(0),
 })
 
 export const UpdateTradeCommodityCategorySchema = CreateTradeCommodityCategorySchema.partial().extend({
@@ -14,6 +14,7 @@ export const ReorderTradeCommodityCategoriesSchema = z.object({
 })
 
 export type CreateTradeCommodityCategoryInput = z.infer<typeof CreateTradeCommodityCategorySchema>
+export type CreateTradeCommodityCategoryFormInput = z.input<typeof CreateTradeCommodityCategorySchema>
 export type UpdateTradeCommodityCategoryInput = z.infer<typeof UpdateTradeCommodityCategorySchema>
 export type ReorderTradeCommodityCategoriesInput = z.infer<typeof ReorderTradeCommodityCategoriesSchema>
 

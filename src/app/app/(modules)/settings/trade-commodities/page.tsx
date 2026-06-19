@@ -12,7 +12,7 @@ import { Plus, Loader2, GripVertical, Pencil, Trash2, ArrowLeft, ToggleLeft, Tog
 import { toast } from 'sonner'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { CreateTradeCommodityCategorySchema, type CreateTradeCommodityCategoryInput } from '@/lib/schemas/tradeCommodity'
+import { CreateTradeCommodityCategorySchema, type CreateTradeCommodityCategoryInput, type CreateTradeCommodityCategoryFormInput } from '@/lib/schemas/tradeCommodity'
 import { colors } from '@/lib/design-tokens'
 import Link from 'next/link'
 
@@ -274,7 +274,7 @@ export default function TradeCommoditiesPage() {
 
 function CreateCategoryModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
   const [loading, setLoading] = useState(false)
-  const { register, handleSubmit, formState: { errors } } = useForm<CreateTradeCommodityCategoryInput>({
+  const { register, handleSubmit, formState: { errors } } = useForm<CreateTradeCommodityCategoryFormInput, unknown, CreateTradeCommodityCategoryInput>({
     resolver: zodResolver(CreateTradeCommodityCategorySchema),
     defaultValues: { sortOrder: 0 },
   })
@@ -336,7 +336,7 @@ function EditCategoryModal({
   onSuccess: () => void
 }) {
   const [loading, setLoading] = useState(false)
-  const { register, handleSubmit, formState: { errors } } = useForm<CreateTradeCommodityCategoryInput>({
+  const { register, handleSubmit, formState: { errors } } = useForm<CreateTradeCommodityCategoryFormInput, unknown, CreateTradeCommodityCategoryInput>({
     resolver: zodResolver(CreateTradeCommodityCategorySchema),
     defaultValues: { name: category.name, sortOrder: category.sortOrder },
   })
