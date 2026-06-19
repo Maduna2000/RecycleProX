@@ -265,6 +265,31 @@ export default function SettingsPage() {
                 {SCALE_NUMS.map((n) => <ScaleRow key={n} n={n} form={form} set={set} />)}
               </div>
 
+              {/* ── Data Management ─── */}
+              <SHdr title="Data Management" />
+              <div style={{ padding: '10px 12px', borderBottom: '1px solid #E0E0E0' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: '#212529' }}>Trade Commodity Categories</span>
+                    <p style={{ fontSize: 11, color: '#6C757D', marginTop: 2 }}>
+                      Configure the list of commodities shown when registering account customers.
+                    </p>
+                  </div>
+                  <a
+                    href="/app/settings/trade-commodities"
+                    style={{
+                      fontSize: 11, padding: '4px 12px', borderRadius: 2,
+                      background: '#E0E0E0', border: '1px solid #999',
+                      color: '#212529', textDecoration: 'none', whiteSpace: 'nowrap',
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = '#D0D0D0')}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = '#E0E0E0')}
+                  >
+                    Manage →
+                  </a>
+                </div>
+              </div>
+
             </div>
           )}
         </div>
