@@ -133,32 +133,63 @@ function useToolbarButtons(pathname: string, role: string): ToolbarButton[] {
 // ─── ToolbarBtn ───────────────────────────────────────────────────────────────
 
 function ToolbarBtn({ btn }: { btn: ToolbarButton }) {
-  const base = cn(
-    'flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium',
-    'transition-all duration-100 focus:outline-none whitespace-nowrap',
-    'border rounded-sm',
-  )
-  const variants: Record<string, string> = {
-    primary:   'border-[#217346] text-[#217346] bg-transparent hover:bg-[#E6F2EC]',
-    secondary: 'border-[#185ABD] text-[#185ABD] bg-transparent hover:bg-[#EBF3FC]',
-    danger:    'border-[#C0392B] text-[#C0392B] bg-transparent hover:bg-red-50',
-    ghost:     'border-transparent text-[#6C757D] hover:border-[#D0D0D0] hover:bg-white hover:text-[#212529]',
+  const baseStyle: React.CSSProperties = {
+    fontSize: 10,
+    padding: '1px 6px',
+    background: btn.variant === 'danger' ? '#DC3545' : '#E0E0E0',
+    border: btn.variant === 'danger' ? '1px solid #C82333' : '1px solid #999',
+    borderRadius: 2,
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 3,
+    color: btn.variant === 'danger' ? '#fff' : '#212529',
+    textDecoration: 'none',
+    whiteSpace: 'nowrap',
   }
-  const cls = cn(base, variants[btn.variant])
+
+  const handleMouseEnter = (e: React.MouseEvent<HTMLElement>) => {
+    if (btn.variant === 'danger') {
+      e.currentTarget.style.background = '#A93226'
+    } else {
+      e.currentTarget.style.background = '#D0D0D0'
+    }
+  }
+
+  const handleMouseLeave = (e: React.MouseEvent<HTMLElement>) => {
+    if (btn.variant === 'danger') {
+      e.currentTarget.style.background = '#DC3545'
+    } else {
+      e.currentTarget.style.background = '#E0E0E0'
+    }
+  }
+
   const inner = (
     <>
-      <btn.icon className="w-3.5 h-3.5 shrink-0" />
+      <btn.icon style={{ width: 9, height: 9, flexShrink: 0 }} />
       {!btn.iconOnly && <span>{btn.label}</span>}
     </>
   )
   if (btn.href) {
-    return <Link href={btn.href} className={cls} title={btn.iconOnly ? btn.label : undefined}>{inner}</Link>
+    return (
+      <Link
+        href={btn.href}
+        style={baseStyle}
+        title={btn.iconOnly ? btn.label : undefined}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+      >
+        {inner}
+      </Link>
+    )
   }
   return (
     <button
-      className={cls}
+      style={baseStyle}
       title={btn.iconOnly ? btn.label : undefined}
       onClick={btn.onClick ?? (() => {})}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
       {inner}
     </button>
