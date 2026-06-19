@@ -9,7 +9,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { SetFloatSchema, type SetFloatFormInput, type SetFloatInput } from '@/lib/schemas/float'
 import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
-import { Loader2, Calendar, PlusCircle, Settings2, Undo2, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Loader2, Calendar, PlusCircle, Undo2, ChevronLeft, ChevronRight } from 'lucide-react'
 import Decimal from 'decimal.js'
 import { PageShell } from '@/components/layout/PageShell'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
@@ -70,11 +70,10 @@ export default function FloatPage() {
   const { data: history, isLoading: loadingHistory } = useSWR<CashFloat[]>('/api/float', fetcher)
   const { data: currentData, mutate: mutateCurrentFloat } = useSWR<CurrentFloatResponse>('/api/float/current', fetcher, { refreshInterval: 30000 })
   const [saving, setSaving] = useState(false)
-  const [showCorrectForm, setShowCorrectForm] = useState(false)
   const [reverseTarget, setReverseTarget] = useState<CashFloat | null>(null)
   const [reversing, setReversing] = useState(false)
   const [historyPage, setHistoryPage] = useState(1)
-  const HISTORY_PAGE_SIZE = 10
+  const HISTORY_PAGE_SIZE = 5
 
   const todayFloat      = todayData?.today ?? null
   const suggestedAmount = todayData?.suggestedAmount ?? null
@@ -115,7 +114,6 @@ export default function FloatPage() {
         mutate('/api/float/today')
         mutate('/api/float')
         mutateCurrentFloat()
-        setShowCorrectForm(false)
       }
       openingForm.reset({ floatDate: todayISO(), openingAmount: '' })
     } catch {
@@ -267,62 +265,6 @@ export default function FloatPage() {
                         {saving ? <><Loader2 style={{ width: 9, height: 9, animation: 'spin 1s linear infinite' }} /> Adding…</> : 'Add to Float'}
                       </button>
                     </form>
-                  </div>
-                )}
-
-                {/* Correct opening amount (collapsible) */}
-                {isManager && (
-                  <div>
-                    <button
-                      type="button"
-                      className="flex items-center gap-1 text-xs"
-                      style={{ color: colors.textSecondary }}
-                      onClick={() => setShowCorrectForm(v => !v)}
-                    >
-                      <Settings2 className="w-3 h-3" />
-                      {showCorrectForm ? 'Hide correction' : 'Correct opening amount'}
-                    </button>
-                    {showCorrectForm && (
-                      <form onSubmit={openingForm.handleSubmit(onSetOpening)} className="mt-2 space-y-2 p-3 rounded" style={{ background: '#FFF8E1', border: `1px solid ${colors.warning}40` }}>
-                        <p className="text-xs" style={{ color: colors.warning }}>This replaces today&apos;s opening amount. Use only to fix an entry error.</p>
-                        <div>
-                          <Label className="text-xs" style={{ color: colors.textSecondary }}>Corrected Opening Amount (R)</Label>
-                          <Input
-                            {...openingForm.register('openingAmount')}
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            className="mt-1 h-8 text-xs font-mono border-[#E0E0E0]"
-                            disabled={saving}
-                            placeholder="0.00"
-                          />
-                          <input type="hidden" {...openingForm.register('floatDate')} value={todayISO()} />
-                        </div>
-                        <button
-                          type="submit"
-                          disabled={saving}
-                          style={{
-                            width: '100%',
-                            fontSize: 10,
-                            padding: '1px 6px',
-                            background: '#E0E0E0',
-                            border: '1px solid #999',
-                            borderRadius: 2,
-                            cursor: saving ? 'not-allowed' : 'pointer',
-                            opacity: saving ? 0.6 : 1,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: 3,
-                            color: '#212529',
-                          }}
-                          onMouseEnter={(e) => { if (!saving) e.currentTarget.style.background = '#D0D0D0' }}
-                          onMouseLeave={(e) => { if (!saving) e.currentTarget.style.background = '#E0E0E0' }}
-                        >
-                          {saving ? <><Loader2 style={{ width: 9, height: 9, animation: 'spin 1s linear infinite' }} /> Saving…</> : 'Correct Opening Amount'}
-                        </button>
-                      </form>
-                    )}
                   </div>
                 )}
               </div>
