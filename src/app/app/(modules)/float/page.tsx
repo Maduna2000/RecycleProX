@@ -357,12 +357,20 @@ export default function FloatPage() {
                 <Calendar className="w-4 h-4" style={{ color: colors.textSecondary }} />
                 <h2 className="text-sm font-semibold" style={{ color: colors.textPrimary }}>Float History</h2>
               </div>
-              {isManager && history?.some(f => f.isLastEntry && f.canReverse) && (
+              {isManager && history && history.length > 0 && (
                 <button
                   type="button"
                   onClick={() => {
-                    const lastFloat = history?.find(f => f.isLastEntry && f.canReverse)
-                    if (lastFloat) setReverseTarget(lastFloat)
+                    const lastFloat = history.find(f => f.isLastEntry)
+                    if (!lastFloat) {
+                      toast.error('No float entry found')
+                      return
+                    }
+                    if (!lastFloat.canReverse) {
+                      toast.error('Cannot reverse: float has activity (purchases, sales, top-ups, or cashup)')
+                      return
+                    }
+                    setReverseTarget(lastFloat)
                   }}
                   style={{
                     display: 'inline-flex',
