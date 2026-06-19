@@ -59,12 +59,6 @@ const DOCUMENT_TYPE_LABELS: Record<string, string> = {
   other:                'Other',
 }
 
-const COMMODITY_OPTIONS = [
-  'Copper', 'Aluminium', 'Steel (Ferrous)', 'Non-Ferrous Metals',
-  'Stainless Steel', 'Lead', 'Brass', 'Iron', 'E-Waste (Electronics)',
-  'Plastic', 'Paper / Cardboard', 'Catalytic Converters', 'Batteries', 'Other',
-]
-
 const EDIT_TABS = ['Personal', 'Business', 'Banking', 'Compliance'] as const
 const PROFILE_TABS = ['Overview', 'Transactions', 'Documents', 'Blacklist'] as const
 
@@ -603,6 +597,11 @@ function EditCustomerModal({ customer, onClose, onSuccess }: {
   const [editTab, setEditTab] = useState<typeof EDIT_TABS[number]>('Personal')
   const { data: pgData } = useSWR<{ groups: { id: string; name: string; isActive: boolean }[] }>('/api/price-groups', fetcher)
   const priceGroups = (pgData?.groups ?? []).filter((g) => g.isActive)
+  const { data: tcData } = useSWR<{ categories: { id: string; name: string; isActive: boolean }[] }>(
+    '/api/settings/trade-commodities',
+    fetcher
+  )
+  const commodityOptions = tcData?.categories?.filter((c) => c.isActive).map((c) => c.name) ?? []
   const isCasual = customer.customerType === 'casual'
 
   // Get edit tabs based on customer type
@@ -871,7 +870,9 @@ function EditCustomerModal({ customer, onClose, onSuccess }: {
               <div>
                 <Label className="mb-2">Trade Commodities</Label>
                 <div className="grid grid-cols-2 gap-2 mt-1">
-                  {COMMODITY_OPTIONS.map((opt) => (
+                  {commodityOptions.length === 0 ? (
+                    <span className="text-sm text-gray-500 col-span-2">No categories configured</span>
+                  ) : commodityOptions.map((opt) => (
                     <label key={opt} className="flex items-center gap-2 text-sm cursor-pointer">
                       <input
                         type="checkbox"

@@ -341,6 +341,20 @@ model ProductCategory {
   stepConfig CategoryStepConfig?
 }
 
+// ─── Trade Commodity Categories (customer registration) ────────────────────────
+
+model TradeCommodityCategory {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([sortOrder])
+  @@index([isActive])
+}
+
 // ─── Category Step Configuration (Scale Station) ──────────────────────────────
 
 model CategoryStepConfig {

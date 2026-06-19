@@ -58,12 +58,6 @@ const DOCUMENT_TYPE_LABELS: Record<string, string> = {
 const TABS = ['Overview', 'Transactions', 'Documents', 'Blacklist'] as const
 const SECTION_TABS = ['Personal', 'Business', 'Banking', 'Compliance', 'Notes'] as const
 
-const COMMODITY_OPTIONS = [
-  'Copper', 'Aluminium', 'Steel (Ferrous)', 'Non-Ferrous Metals',
-  'Stainless Steel', 'Lead', 'Brass', 'Iron', 'E-Waste (Electronics)',
-  'Plastic', 'Paper / Cardboard', 'Catalytic Converters', 'Batteries', 'Other',
-]
-
 // ─── Shared styles — mirrors the Settings page design tokens ──────────────────
 const sectionHdr: React.CSSProperties = {
   background: 'linear-gradient(180deg,#FFFFFF 0%,#E8E8E8 100%)',
@@ -127,6 +121,12 @@ export default function CustomerDetailPage() {
   const { data: customer, isLoading } = useSWR<Customer>(`/api/customers/${id}`, fetcher)
   const { data: pgData } = useSWR<{ groups: { id: string; name: string; isActive: boolean }[] }>('/api/price-groups', fetcher)
   const priceGroups = (pgData?.groups ?? []).filter((g) => g.isActive)
+
+  const { data: tcData } = useSWR<{ categories: { id: string; name: string; isActive: boolean }[] }>(
+    '/api/settings/trade-commodities',
+    fetcher
+  )
+  const commodityOptions = tcData?.categories?.filter((c) => c.isActive).map((c) => c.name) ?? []
 
   const fmtDateInput = (v?: string | null) => {
     if (!v) return ''
@@ -453,7 +453,9 @@ export default function CustomerDetailPage() {
                     <div style={{ gridColumn: 'span 2' }}>
                       <span style={lbl}>Trade Commodities</span>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
-                        {COMMODITY_OPTIONS.map((opt) => (
+                        {commodityOptions.length === 0 ? (
+                          <span style={{ fontSize: 11, color: '#6C757D' }}>No categories configured</span>
+                        ) : commodityOptions.map((opt) => (
                           <label key={opt} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, cursor: isEditing ? 'pointer' : 'default', color: '#333' }}>
                             <input type="checkbox" checked={tradeCommodities.includes(opt)} onChange={() => isEditing && toggleCommodity(opt)} disabled={!isEditing || saving} style={{ width: 12, height: 12 }} />
                             {opt}

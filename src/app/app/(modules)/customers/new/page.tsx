@@ -11,12 +11,6 @@ import { CreateCustomerSchema, type CreateCustomerFormInput, type CreateCustomer
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
-const COMMODITY_OPTIONS = [
-  'Copper', 'Aluminium', 'Steel (Ferrous)', 'Non-Ferrous Metals',
-  'Stainless Steel', 'Lead', 'Brass', 'Iron', 'E-Waste (Electronics)',
-  'Plastic', 'Paper / Cardboard', 'Catalytic Converters', 'Batteries', 'Other',
-]
-
 const TITLE_OPTIONS = ['—', 'Mr', 'Mrs', 'Ms', 'Dr', 'Prof', 'Rev', 'Other']
 
 // ─── Shared field styles ──────────────────────────────────────────────────────
@@ -61,6 +55,12 @@ export default function NewAccountPage() {
 
   const { data: pgData } = useSWR<{ priceGroups: { id: string; name: string }[] }>('/api/price-groups', fetcher)
   const priceGroups = pgData?.priceGroups ?? []
+
+  const { data: tcData } = useSWR<{ categories: { id: string; name: string; isActive: boolean }[] }>(
+    '/api/settings/trade-commodities',
+    fetcher
+  )
+  const commodityOptions = tcData?.categories?.filter((c) => c.isActive).map((c) => c.name) ?? []
 
   const {
     register, handleSubmit, setValue, watch,
@@ -371,7 +371,11 @@ export default function NewAccountPage() {
                   className="border rounded-[2px] overflow-y-auto"
                   style={{ borderColor: '#ABABAB', height: 148, background: '#FFFFFF' }}
                 >
-                  {COMMODITY_OPTIONS.map((opt) => {
+                  {commodityOptions.length === 0 ? (
+                    <div className="flex items-center justify-center h-full text-[11px]" style={{ color: '#6C757D' }}>
+                      No categories configured
+                    </div>
+                  ) : commodityOptions.map((opt) => {
                     const checked = tradeCommodities.includes(opt)
                     return (
                       <label
