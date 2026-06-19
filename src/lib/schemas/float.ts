@@ -11,3 +11,9 @@ export const SetFloatSchema = z.object({
 
 export type SetFloatInput     = z.infer<typeof SetFloatSchema>
 export type SetFloatFormInput = z.input<typeof SetFloatSchema>
+
+export const ReverseFloatSchema = z.object({
+  reason: z.string().max(500).optional(),
+})
+
+export type ReverseFloatInput = z.infer<typeof ReverseFloatSchema>

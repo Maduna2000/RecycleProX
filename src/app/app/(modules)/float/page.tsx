@@ -9,9 +9,10 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { SetFloatSchema, type SetFloatFormInput, type SetFloatInput } from '@/lib/schemas/float'
 import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
-import { Loader2, Calendar, PlusCircle, Settings2 } from 'lucide-react'
+import { Loader2, Calendar, PlusCircle, Settings2, Undo2 } from 'lucide-react'
 import Decimal from 'decimal.js'
 import { PageShell } from '@/components/layout/PageShell'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { colors } from '@/lib/design-tokens'
 import { useOfflineMutation } from '@/hooks/useOfflineFetch'
 import { offlineDB } from '@/lib/offline/db'
@@ -30,6 +31,9 @@ type CashFloat = {
   floatDate: string
   openingAmount: string
   closingAmount?: string | null
+  currentBalance: string
+  isLastEntry: boolean
+  canReverse: boolean
   notes?: string | null
   createdAt: string
 }
@@ -67,6 +71,8 @@ export default function FloatPage() {
   const { data: currentData, mutate: mutateCurrentFloat } = useSWR<CurrentFloatResponse>('/api/float/current', fetcher, { refreshInterval: 30000 })
   const [saving, setSaving] = useState(false)
   const [showCorrectForm, setShowCorrectForm] = useState(false)
+  const [reverseTarget, setReverseTarget] = useState<CashFloat | null>(null)
+  const [reversing, setReversing] = useState(false)
 
   const todayFloat      = todayData?.today ?? null
   const suggestedAmount = todayData?.suggestedAmount ?? null
@@ -138,6 +144,31 @@ export default function FloatPage() {
       toast.error(err instanceof Error ? err.message : 'Failed to top up float')
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function handleReverse() {
+    if (!reverseTarget) return
+    setReversing(true)
+    try {
+      const res = await fetch(`/api/float/${reverseTarget.id}/reverse`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error((err as { error?: string }).error ?? 'Reversal failed')
+      }
+      toast.success('Float entry reversed')
+      mutate('/api/float')
+      mutate('/api/float/today')
+      mutateCurrentFloat()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to reverse float')
+    } finally {
+      setReversing(false)
+      setReverseTarget(null)
     }
   }
 
@@ -376,37 +407,83 @@ export default function FloatPage() {
           </div>
 
           {/* History */}
-          <div className="rounded border p-5 bg-white" style={{ borderColor: colors.border }}>
-            <div className="flex items-center gap-2 mb-4">
+          <div className="rounded border bg-white" style={{ borderColor: colors.border }}>
+            <div className="flex items-center gap-2 px-5 py-3" style={{ borderBottom: `1px solid ${colors.border}` }}>
               <Calendar className="w-4 h-4" style={{ color: colors.textSecondary }} />
               <h2 className="text-sm font-semibold" style={{ color: colors.textPrimary }}>Float History</h2>
               <span className="text-xs ml-1" style={{ color: colors.textSecondary }}>(last 30 days)</span>
             </div>
 
             {loadingHistory ? (
-              <div className="flex items-center gap-2 text-sm" style={{ color: colors.textSecondary }}>
+              <div className="flex items-center gap-2 text-sm p-5" style={{ color: colors.textSecondary }}>
                 <Loader2 className="w-4 h-4 animate-spin" /> Loading…
               </div>
             ) : !history?.length ? (
               <div className="text-center py-8 text-sm" style={{ color: colors.textSecondary }}>No float history</div>
             ) : (
-              <div className="space-y-0 overflow-y-auto max-h-96">
-                {history.map((f, i) => (
-                  <div key={f.id} className="flex items-center justify-between py-2.5" style={{ borderBottom: i < history.length - 1 ? `1px solid ${colors.bg}` : 'none' }}>
-                    <div>
-                      <p className="text-xs font-medium" style={{ color: colors.textPrimary }}>
-                        {new Date(f.floatDate).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })}
-                      </p>
-                      {f.notes && <p className="text-xs mt-0.5" style={{ color: colors.textSecondary }}>{f.notes}</p>}
-                    </div>
-                    <div className="text-right">
-                      <p className="font-mono font-semibold text-xs" style={{ color: colors.textPrimary }}>R {new Decimal(f.openingAmount).toFixed(2)}</p>
-                      {f.closingAmount && (
-                        <p className="font-mono text-xs mt-0.5" style={{ color: colors.textSecondary }}>Close: R {new Decimal(f.closingAmount).toFixed(2)}</p>
-                      )}
-                    </div>
-                  </div>
-                ))}
+              <div className="overflow-x-auto">
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: '#F5F5F5', borderBottom: `1px solid ${colors.border}` }}>
+                      <th style={{ textAlign: 'left', padding: '6px 12px', fontSize: 10, fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Date</th>
+                      <th style={{ textAlign: 'right', padding: '6px 12px', fontSize: 10, fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Opening Float</th>
+                      <th style={{ textAlign: 'right', padding: '6px 12px', fontSize: 10, fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Current Float</th>
+                      {isManager && <th style={{ width: 80, padding: '6px 12px' }}></th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {history.map((f, i) => (
+                      <tr key={f.id} style={{ background: i % 2 === 0 ? '#fff' : '#FAFAFA', borderBottom: `1px solid #F0F0F0` }}>
+                        <td style={{ padding: '8px 12px' }}>
+                          <p className="text-xs font-medium" style={{ color: colors.textPrimary }}>
+                            {new Date(f.floatDate).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          </p>
+                          {f.notes && <p className="text-xs mt-0.5" style={{ color: colors.textSecondary }}>{f.notes}</p>}
+                        </td>
+                        <td style={{ padding: '8px 12px', textAlign: 'right' }}>
+                          <span className="font-mono font-semibold text-xs" style={{ color: colors.textPrimary }}>
+                            R {new Decimal(f.openingAmount).toFixed(2)}
+                          </span>
+                        </td>
+                        <td style={{ padding: '8px 12px', textAlign: 'right' }}>
+                          <span className="font-mono font-semibold text-xs" style={{ color: f.closingAmount ? colors.textSecondary : colors.action }}>
+                            R {new Decimal(f.currentBalance).toFixed(2)}
+                          </span>
+                          {f.closingAmount && (
+                            <span className="text-xs ml-1" style={{ color: colors.textSecondary }}>(closed)</span>
+                          )}
+                        </td>
+                        {isManager && (
+                          <td style={{ padding: '8px 12px', textAlign: 'right' }}>
+                            {f.isLastEntry && f.canReverse && (
+                              <button
+                                type="button"
+                                onClick={() => setReverseTarget(f)}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 4,
+                                  padding: '2px 8px',
+                                  fontSize: 10,
+                                  background: colors.dangerBg,
+                                  border: `1px solid ${colors.danger}40`,
+                                  borderRadius: 2,
+                                  color: colors.danger,
+                                  cursor: 'pointer',
+                                }}
+                                onMouseEnter={(e) => { e.currentTarget.style.background = `${colors.danger}20` }}
+                                onMouseLeave={(e) => { e.currentTarget.style.background = colors.dangerBg }}
+                              >
+                                <Undo2 style={{ width: 10, height: 10 }} />
+                                Reverse
+                              </button>
+                            )}
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>
@@ -461,6 +538,20 @@ export default function FloatPage() {
           </div>
         )}
       </div>
+
+        {/* Reverse Float Confirmation Dialog */}
+        <ConfirmDialog
+          open={!!reverseTarget}
+          onOpenChange={(open) => { if (!open) setReverseTarget(null) }}
+          title="Reverse Float Entry?"
+          message={reverseTarget
+            ? `This will permanently delete the float entry for ${new Date(reverseTarget.floatDate).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })} with opening amount R ${new Decimal(reverseTarget.openingAmount).toFixed(2)}. This action cannot be undone.`
+            : ''
+          }
+          variant="danger"
+          confirmLabel={reversing ? 'Reversing…' : 'Reverse Entry'}
+          onConfirm={handleReverse}
+        />
     </PageShell>
   )
 }

@@ -38,9 +38,37 @@ export async function getFloatForDate(date: Date) {
 }
 
 export async function listFloats(limit = 30) {
-  return prisma.cashFloat.findMany({
+  const floats = await prisma.cashFloat.findMany({
     orderBy: { floatDate: 'desc' },
     take: limit,
+    include: { movements: { select: { movementType: true, amount: true } } },
+  })
+
+  return floats.map((f, index) => {
+    const opening = new Decimal(f.openingAmount.toString())
+    const topUps = f.movements
+      .filter((m) => m.movementType === 'top_up')
+      .reduce((acc, m) => acc.plus(m.amount.toString()), new Decimal(0))
+    const withdrawals = f.movements
+      .filter((m) => m.movementType === 'withdrawal' || m.movementType === 'adjustment')
+      .reduce((acc, m) => acc.plus(m.amount.toString()), new Decimal(0))
+
+    const currentBalance = f.closingAmount
+      ? new Decimal(f.closingAmount.toString())
+      : opening.plus(topUps).minus(withdrawals)
+
+    return {
+      id: f.id,
+      floatDate: f.floatDate,
+      openingAmount: f.openingAmount.toString(),
+      closingAmount: f.closingAmount?.toString() ?? null,
+      currentBalance: currentBalance.toFixed(2),
+      notes: f.notes,
+      createdByUserId: f.createdByUserId,
+      createdAt: f.createdAt,
+      updatedAt: f.updatedAt,
+      isLastEntry: index === 0,
+    }
   })
 }
 
@@ -222,4 +250,208 @@ export async function listFloatMovements(opts?: {
   ])
 
   return { movements, total, page, pageSize }
+}
+
+// ─── Float Reversal ────────────────────────────────────────────────────────────
+
+export type FloatReversalErrorCode =
+  | 'NOT_FOUND'
+  | 'NOT_LAST_ENTRY'
+  | 'HAS_PURCHASES'
+  | 'HAS_SALES'
+  | 'HAS_CASHUP'
+  | 'HAS_MOVEMENTS'
+
+export class FloatReversalError extends Error {
+  code: FloatReversalErrorCode
+  constructor(code: FloatReversalErrorCode, message: string) {
+    super(message)
+    this.name = 'FloatReversalError'
+    this.code = code
+  }
+}
+
+/**
+ * Pre-flight check to determine if a float can be reversed.
+ * Returns canReverse: true only if all safety checks pass.
+ */
+export async function canReverseFloat(floatId: string): Promise<{
+  canReverse: boolean
+  reason?: string
+  isLastEntry: boolean
+}> {
+  const floatRecord = await prisma.cashFloat.findUnique({
+    where: { id: floatId },
+    include: { movements: true },
+  })
+
+  if (!floatRecord) {
+    return { canReverse: false, reason: 'Float not found', isLastEntry: false }
+  }
+
+  const floatDate = floatRecord.floatDate
+  const startOfDay = new Date(floatDate)
+  startOfDay.setHours(0, 0, 0, 0)
+  const endOfDay = new Date(floatDate)
+  endOfDay.setHours(23, 59, 59, 999)
+
+  // Check if this is the last entry
+  const newerFloat = await prisma.cashFloat.findFirst({
+    where: { floatDate: { gt: floatDate } },
+    orderBy: { floatDate: 'asc' },
+  })
+
+  if (newerFloat) {
+    return { canReverse: false, reason: 'Not the most recent float entry', isLastEntry: false }
+  }
+
+  // Check for purchases on this date
+  const purchaseCount = await prisma.purchase.count({
+    where: {
+      createdAt: { gte: startOfDay, lte: endOfDay },
+      status: { not: 'voided' },
+    },
+  })
+
+  if (purchaseCount > 0) {
+    return { canReverse: false, reason: `${purchaseCount} purchase(s) exist for this date`, isLastEntry: true }
+  }
+
+  // Check for sales on this date
+  const saleCount = await prisma.sale.count({
+    where: {
+      createdAt: { gte: startOfDay, lte: endOfDay },
+      status: { not: 'voided' },
+    },
+  })
+
+  if (saleCount > 0) {
+    return { canReverse: false, reason: `${saleCount} sale(s) exist for this date`, isLastEntry: true }
+  }
+
+  // Check for cashup on this date
+  const cashUpCount = await prisma.cashUp.count({
+    where: { sessionDate: startOfDay },
+  })
+
+  if (cashUpCount > 0) {
+    return { canReverse: false, reason: 'Cash-up exists for this date', isLastEntry: true }
+  }
+
+  // Check for non-opening movements
+  const nonOpeningMovements = floatRecord.movements.filter((m) => m.movementType !== 'opening')
+
+  if (nonOpeningMovements.length > 0) {
+    return { canReverse: false, reason: `${nonOpeningMovements.length} movement(s) recorded`, isLastEntry: true }
+  }
+
+  return { canReverse: true, isLastEntry: true }
+}
+
+/**
+ * Reverse (delete) a float entry. Only allowed if:
+ * - Float exists
+ * - Is the most recent (last) float entry
+ * - No purchases on that date
+ * - No sales on that date
+ * - No cashup for that date
+ * - No non-opening movements (top-ups, withdrawals, adjustments)
+ */
+export async function reverseFloat(
+  floatId: string,
+  userId: string,
+  reason?: string
+): Promise<{ reversedFloatId: string; reversedDate: Date }> {
+  return prisma.$transaction(async (tx) => {
+    // 1. Fetch the float record
+    const floatRecord = await tx.cashFloat.findUnique({
+      where: { id: floatId },
+      include: { movements: true },
+    })
+
+    if (!floatRecord) {
+      throw new FloatReversalError('NOT_FOUND', 'Float record not found')
+    }
+
+    const floatDate = floatRecord.floatDate
+    const startOfDay = new Date(floatDate)
+    startOfDay.setHours(0, 0, 0, 0)
+    const endOfDay = new Date(floatDate)
+    endOfDay.setHours(23, 59, 59, 999)
+
+    // 2. Verify this is the LAST (most recent) float entry
+    const newerFloat = await tx.cashFloat.findFirst({
+      where: { floatDate: { gt: floatDate } },
+      orderBy: { floatDate: 'asc' },
+    })
+
+    if (newerFloat) {
+      throw new FloatReversalError(
+        'NOT_LAST_ENTRY',
+        `Cannot reverse: newer float exists for ${newerFloat.floatDate.toISOString().split('T')[0]}`
+      )
+    }
+
+    // 3. Check for purchases on this date
+    const purchaseCount = await tx.purchase.count({
+      where: {
+        createdAt: { gte: startOfDay, lte: endOfDay },
+        status: { not: 'voided' },
+      },
+    })
+
+    if (purchaseCount > 0) {
+      throw new FloatReversalError('HAS_PURCHASES', `Cannot reverse: ${purchaseCount} purchase(s) exist for this date`)
+    }
+
+    // 4. Check for sales on this date
+    const saleCount = await tx.sale.count({
+      where: {
+        createdAt: { gte: startOfDay, lte: endOfDay },
+        status: { not: 'voided' },
+      },
+    })
+
+    if (saleCount > 0) {
+      throw new FloatReversalError('HAS_SALES', `Cannot reverse: ${saleCount} sale(s) exist for this date`)
+    }
+
+    // 5. Check for cashup on this date
+    const cashUpCount = await tx.cashUp.count({
+      where: { sessionDate: startOfDay },
+    })
+
+    if (cashUpCount > 0) {
+      throw new FloatReversalError('HAS_CASHUP', 'Cannot reverse: cash-up session exists for this date')
+    }
+
+    // 6. Check for non-opening movements (top-ups, withdrawals, adjustments)
+    const nonOpeningMovements = floatRecord.movements.filter((m) => m.movementType !== 'opening')
+
+    if (nonOpeningMovements.length > 0) {
+      throw new FloatReversalError(
+        'HAS_MOVEMENTS',
+        `Cannot reverse: ${nonOpeningMovements.length} movement(s) recorded (top-ups/withdrawals)`
+      )
+    }
+
+    // 7. All checks passed - delete the float record (cascade deletes movements)
+    await tx.cashFloat.delete({ where: { id: floatId } })
+
+    // 8. Log the reversal action
+    logger.info(
+      {
+        floatId,
+        floatDate: floatDate.toISOString(),
+        reversedByUserId: userId,
+        reason,
+      },
+      'float.reversed'
+    )
+
+    return {
+      reversedFloatId: floatId,
+      reversedDate: floatDate,
+    }
+  })
 }
