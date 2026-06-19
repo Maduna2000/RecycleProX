@@ -9,7 +9,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { SetFloatSchema, type SetFloatFormInput, type SetFloatInput } from '@/lib/schemas/float'
 import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
-import { Loader2, Calendar, PlusCircle, Settings2, Undo2 } from 'lucide-react'
+import { Loader2, Calendar, PlusCircle, Settings2, Undo2, ChevronLeft, ChevronRight } from 'lucide-react'
 import Decimal from 'decimal.js'
 import { PageShell } from '@/components/layout/PageShell'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
@@ -73,6 +73,8 @@ export default function FloatPage() {
   const [showCorrectForm, setShowCorrectForm] = useState(false)
   const [reverseTarget, setReverseTarget] = useState<CashFloat | null>(null)
   const [reversing, setReversing] = useState(false)
+  const [historyPage, setHistoryPage] = useState(1)
+  const HISTORY_PAGE_SIZE = 10
 
   const todayFloat      = todayData?.today ?? null
   const suggestedAmount = todayData?.suggestedAmount ?? null
@@ -408,10 +410,37 @@ export default function FloatPage() {
 
           {/* History */}
           <div className="rounded border bg-white" style={{ borderColor: colors.border }}>
-            <div className="flex items-center gap-2 px-5 py-3" style={{ borderBottom: `1px solid ${colors.border}` }}>
-              <Calendar className="w-4 h-4" style={{ color: colors.textSecondary }} />
-              <h2 className="text-sm font-semibold" style={{ color: colors.textPrimary }}>Float History</h2>
-              <span className="text-xs ml-1" style={{ color: colors.textSecondary }}>(last 30 days)</span>
+            <div className="flex items-center justify-between px-5 py-3" style={{ borderBottom: `1px solid ${colors.border}` }}>
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4" style={{ color: colors.textSecondary }} />
+                <h2 className="text-sm font-semibold" style={{ color: colors.textPrimary }}>Float History</h2>
+              </div>
+              {isManager && history?.some(f => f.isLastEntry && f.canReverse) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const lastFloat = history?.find(f => f.isLastEntry && f.canReverse)
+                    if (lastFloat) setReverseTarget(lastFloat)
+                  }}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    padding: '1px 6px',
+                    fontSize: 10,
+                    background: '#E0E0E0',
+                    border: '1px solid #999',
+                    borderRadius: 2,
+                    color: '#212529',
+                    cursor: 'pointer',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = '#D0D0D0' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = '#E0E0E0' }}
+                >
+                  <Undo2 style={{ width: 10, height: 10 }} />
+                  Reverse Last Float
+                </button>
+              )}
             </div>
 
             {loadingHistory ? (
@@ -421,70 +450,93 @@ export default function FloatPage() {
             ) : !history?.length ? (
               <div className="text-center py-8 text-sm" style={{ color: colors.textSecondary }}>No float history</div>
             ) : (
-              <div className="overflow-x-auto">
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr style={{ background: '#F5F5F5', borderBottom: `1px solid ${colors.border}` }}>
-                      <th style={{ textAlign: 'left', padding: '6px 12px', fontSize: 10, fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Date</th>
-                      <th style={{ textAlign: 'right', padding: '6px 12px', fontSize: 10, fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Opening Float</th>
-                      <th style={{ textAlign: 'right', padding: '6px 12px', fontSize: 10, fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Current Float</th>
-                      {isManager && <th style={{ width: 80, padding: '6px 12px' }}></th>}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {history.map((f, i) => (
-                      <tr key={f.id} style={{ background: i % 2 === 0 ? '#fff' : '#FAFAFA', borderBottom: `1px solid #F0F0F0` }}>
-                        <td style={{ padding: '8px 12px' }}>
-                          <p className="text-xs font-medium" style={{ color: colors.textPrimary }}>
-                            {new Date(f.floatDate).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })}
-                          </p>
-                          {f.notes && <p className="text-xs mt-0.5" style={{ color: colors.textSecondary }}>{f.notes}</p>}
-                        </td>
-                        <td style={{ padding: '8px 12px', textAlign: 'right' }}>
-                          <span className="font-mono font-semibold text-xs" style={{ color: colors.textPrimary }}>
-                            R {new Decimal(f.openingAmount).toFixed(2)}
-                          </span>
-                        </td>
-                        <td style={{ padding: '8px 12px', textAlign: 'right' }}>
-                          <span className="font-mono font-semibold text-xs" style={{ color: f.closingAmount ? colors.textSecondary : colors.action }}>
-                            R {new Decimal(f.currentBalance).toFixed(2)}
-                          </span>
-                          {f.closingAmount && (
-                            <span className="text-xs ml-1" style={{ color: colors.textSecondary }}>(closed)</span>
-                          )}
-                        </td>
-                        {isManager && (
+              <>
+                <div className="overflow-x-auto">
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: '#F5F5F5', borderBottom: `1px solid ${colors.border}` }}>
+                        <th style={{ textAlign: 'left', padding: '6px 12px', fontSize: 10, fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Date</th>
+                        <th style={{ textAlign: 'right', padding: '6px 12px', fontSize: 10, fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Opening Float</th>
+                        <th style={{ textAlign: 'right', padding: '6px 12px', fontSize: 10, fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Current Float</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {history.slice((historyPage - 1) * HISTORY_PAGE_SIZE, historyPage * HISTORY_PAGE_SIZE).map((f, i) => (
+                        <tr key={f.id} style={{ background: i % 2 === 0 ? '#fff' : '#FAFAFA', borderBottom: `1px solid #F0F0F0` }}>
+                          <td style={{ padding: '8px 12px' }}>
+                            <p className="text-xs font-medium" style={{ color: colors.textPrimary }}>
+                              {new Date(f.floatDate).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })}
+                            </p>
+                            {f.notes && <p className="text-xs mt-0.5" style={{ color: colors.textSecondary }}>{f.notes}</p>}
+                          </td>
                           <td style={{ padding: '8px 12px', textAlign: 'right' }}>
-                            {f.isLastEntry && f.canReverse && (
-                              <button
-                                type="button"
-                                onClick={() => setReverseTarget(f)}
-                                style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: 4,
-                                  padding: '2px 8px',
-                                  fontSize: 10,
-                                  background: colors.dangerBg,
-                                  border: `1px solid ${colors.danger}40`,
-                                  borderRadius: 2,
-                                  color: colors.danger,
-                                  cursor: 'pointer',
-                                }}
-                                onMouseEnter={(e) => { e.currentTarget.style.background = `${colors.danger}20` }}
-                                onMouseLeave={(e) => { e.currentTarget.style.background = colors.dangerBg }}
-                              >
-                                <Undo2 style={{ width: 10, height: 10 }} />
-                                Reverse
-                              </button>
+                            <span className="font-mono font-semibold text-xs" style={{ color: colors.textPrimary }}>
+                              R {new Decimal(f.openingAmount).toFixed(2)}
+                            </span>
+                          </td>
+                          <td style={{ padding: '8px 12px', textAlign: 'right' }}>
+                            <span className="font-mono font-semibold text-xs" style={{ color: f.closingAmount ? colors.textSecondary : colors.action }}>
+                              R {new Decimal(f.currentBalance).toFixed(2)}
+                            </span>
+                            {f.closingAmount && (
+                              <span className="text-xs ml-1" style={{ color: colors.textSecondary }}>(closed)</span>
                             )}
                           </td>
-                        )}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {/* Pagination */}
+                {history.length > HISTORY_PAGE_SIZE && (
+                  <div className="flex items-center justify-between px-4 py-2" style={{ borderTop: `1px solid ${colors.border}` }}>
+                    <span className="text-xs" style={{ color: colors.textSecondary }}>
+                      Showing {(historyPage - 1) * HISTORY_PAGE_SIZE + 1}–{Math.min(historyPage * HISTORY_PAGE_SIZE, history.length)} of {history.length}
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        disabled={historyPage <= 1}
+                        onClick={() => setHistoryPage(p => p - 1)}
+                        style={{
+                          padding: '2px 6px',
+                          fontSize: 10,
+                          background: '#E0E0E0',
+                          border: '1px solid #999',
+                          borderRadius: 2,
+                          cursor: historyPage <= 1 ? 'not-allowed' : 'pointer',
+                          opacity: historyPage <= 1 ? 0.5 : 1,
+                        }}
+                        onMouseEnter={(e) => { if (historyPage > 1) e.currentTarget.style.background = '#D0D0D0' }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = '#E0E0E0' }}
+                      >
+                        <ChevronLeft style={{ width: 12, height: 12 }} />
+                      </button>
+                      <span className="text-xs px-2" style={{ color: colors.textPrimary }}>
+                        Page {historyPage} of {Math.ceil(history.length / HISTORY_PAGE_SIZE)}
+                      </span>
+                      <button
+                        type="button"
+                        disabled={historyPage >= Math.ceil(history.length / HISTORY_PAGE_SIZE)}
+                        onClick={() => setHistoryPage(p => p + 1)}
+                        style={{
+                          padding: '2px 6px',
+                          fontSize: 10,
+                          background: '#E0E0E0',
+                          border: '1px solid #999',
+                          borderRadius: 2,
+                          cursor: historyPage >= Math.ceil(history.length / HISTORY_PAGE_SIZE) ? 'not-allowed' : 'pointer',
+                          opacity: historyPage >= Math.ceil(history.length / HISTORY_PAGE_SIZE) ? 0.5 : 1,
+                        }}
+                        onMouseEnter={(e) => { if (historyPage < Math.ceil(history.length / HISTORY_PAGE_SIZE)) e.currentTarget.style.background = '#D0D0D0' }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = '#E0E0E0' }}
+                      >
+                        <ChevronRight style={{ width: 12, height: 12 }} />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
