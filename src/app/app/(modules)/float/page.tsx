@@ -82,8 +82,6 @@ export default function FloatPage() {
   const { data: currentData, mutate: mutateCurrentFloat } = useSWR<CurrentFloatResponse>('/api/float/current', fetcher, { refreshInterval: 30000 })
   const { data: liveStats } = useSWR<LiveStats>(`/api/cashup/live-stats?date=${todayISO()}`, fetcher, { refreshInterval: 30000 })
   const [saving, setSaving] = useState(false)
-  const [reverseTarget, setReverseTarget] = useState<CashFloat | null>(null)
-  const [reversing, setReversing] = useState(false)
   const [reversingMovement, setReversingMovement] = useState(false)
   const [historyPage, setHistoryPage] = useState(1)
   const HISTORY_PAGE_SIZE = 5
@@ -168,31 +166,6 @@ export default function FloatPage() {
       toast.error(err instanceof Error ? err.message : 'Failed to top up float')
     } finally {
       setSaving(false)
-    }
-  }
-
-  async function handleReverse() {
-    if (!reverseTarget) return
-    setReversing(true)
-    try {
-      const res = await fetch(`/api/float/${reverseTarget.id}/reverse`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error((err as { error?: string }).error ?? 'Reversal failed')
-      }
-      toast.success('Float entry reversed')
-      mutate('/api/float')
-      mutate('/api/float/today')
-      mutateCurrentFloat()
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to reverse float')
-    } finally {
-      setReversing(false)
-      setReverseTarget(null)
     }
   }
 
@@ -403,40 +376,6 @@ export default function FloatPage() {
                 <Calendar className="w-4 h-4" style={{ color: colors.textSecondary }} />
                 <h2 className="text-sm font-semibold" style={{ color: colors.textPrimary }}>Float History</h2>
               </div>
-              {isManager && history && history.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    const lastFloat = history.find(f => f.isLastEntry)
-                    if (!lastFloat) {
-                      toast.error('No float entry found')
-                      return
-                    }
-                    if (!lastFloat.canReverse) {
-                      toast.error('Cannot reverse: float has activity (purchases, sales, top-ups, or cashup)')
-                      return
-                    }
-                    setReverseTarget(lastFloat)
-                  }}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 4,
-                    padding: '1px 6px',
-                    fontSize: 10,
-                    background: '#E0E0E0',
-                    border: '1px solid #999',
-                    borderRadius: 2,
-                    color: '#212529',
-                    cursor: 'pointer',
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = '#D0D0D0' }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = '#E0E0E0' }}
-                >
-                  <Undo2 style={{ width: 10, height: 10 }} />
-                  Reverse Last Float
-                </button>
-              )}
             </div>
 
             {loadingHistory ? (
@@ -618,20 +557,6 @@ export default function FloatPage() {
           </div>
         )}
       </div>
-
-        {/* Reverse Float Confirmation Dialog */}
-        <ConfirmDialog
-          open={!!reverseTarget}
-          onOpenChange={(open) => { if (!open) setReverseTarget(null) }}
-          title="Reverse Float Entry?"
-          message={reverseTarget
-            ? `This will permanently delete the float entry for ${new Date(reverseTarget.floatDate).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })} with opening amount R ${new Decimal(reverseTarget.openingAmount).toFixed(2)}. This action cannot be undone.`
-            : ''
-          }
-          variant="danger"
-          confirmLabel={reversing ? 'Reversing…' : 'Reverse Entry'}
-          onConfirm={handleReverse}
-        />
     </PageShell>
   )
 }
