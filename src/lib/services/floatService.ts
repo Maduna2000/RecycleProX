@@ -321,7 +321,6 @@ export type FloatReversalErrorCode =
   | 'HAS_PURCHASES'
   | 'HAS_SALES'
   | 'HAS_CASHUP'
-  | 'HAS_MOVEMENTS'
 
 export class FloatReversalError extends Error {
   code: FloatReversalErrorCode
@@ -399,12 +398,8 @@ export async function canReverseFloat(floatId: string): Promise<{
     return { canReverse: false, reason: 'Cash-up exists for this date', isLastEntry: true }
   }
 
-  // Check for non-opening movements
-  const nonOpeningMovements = floatRecord.movements.filter((m) => m.movementType !== 'opening')
-
-  if (nonOpeningMovements.length > 0) {
-    return { canReverse: false, reason: `${nonOpeningMovements.length} movement(s) recorded`, isLastEntry: true }
-  }
+  // Top-ups and withdrawals are part of the float - they cascade delete with the float
+  // Only purchases, sales, and cashup should block reversal
 
   return { canReverse: true, isLastEntry: true }
 }
@@ -486,17 +481,8 @@ export async function reverseFloat(
       throw new FloatReversalError('HAS_CASHUP', 'Cannot reverse: cash-up session exists for this date')
     }
 
-    // 6. Check for non-opening movements (top-ups, withdrawals, adjustments)
-    const nonOpeningMovements = floatRecord.movements.filter((m) => m.movementType !== 'opening')
-
-    if (nonOpeningMovements.length > 0) {
-      throw new FloatReversalError(
-        'HAS_MOVEMENTS',
-        `Cannot reverse: ${nonOpeningMovements.length} movement(s) recorded (top-ups/withdrawals)`
-      )
-    }
-
-    // 7. All checks passed - delete the float record (cascade deletes movements)
+    // 6. All checks passed - delete the float record (cascade deletes movements)
+    // Note: Top-ups/withdrawals are part of the float and cascade delete automatically
     await tx.cashFloat.delete({ where: { id: floatId } })
 
     // 8. Log the reversal action

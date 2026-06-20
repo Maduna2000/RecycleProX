@@ -57,6 +57,17 @@ type TodayFloatResponse = {
   suggestedDate: string | null
 }
 
+type LiveStats = {
+  cashSales: string
+  cardSales: string
+  cashPurchases: string
+  cashPayments: string
+  expenses: string
+  loanAdvance: string
+  loanRepayment: string
+  floatTopUps: string
+}
+
 function todayISO() {
   return new Date().toISOString().split('T')[0]!
 }
@@ -69,6 +80,7 @@ export default function FloatPage() {
   const { data: todayData, isLoading: loadingToday } = useSWR<TodayFloatResponse>('/api/float/today', fetcher)
   const { data: history, isLoading: loadingHistory } = useSWR<CashFloat[]>('/api/float', fetcher)
   const { data: currentData, mutate: mutateCurrentFloat } = useSWR<CurrentFloatResponse>('/api/float/current', fetcher, { refreshInterval: 30000 })
+  const { data: liveStats } = useSWR<LiveStats>(`/api/cashup/live-stats?date=${todayISO()}`, fetcher, { refreshInterval: 30000 })
   const [saving, setSaving] = useState(false)
   const [reverseTarget, setReverseTarget] = useState<CashFloat | null>(null)
   const [reversing, setReversing] = useState(false)
@@ -80,7 +92,18 @@ export default function FloatPage() {
   const suggestedAmount = todayData?.suggestedAmount ?? null
   const suggestedDate   = todayData?.suggestedDate ?? null
   const movements       = currentData?.float?.movements ?? []
-  const currentBalance  = currentData?.float?.currentBalance ?? null
+
+  // Calculate Cal Float (expected cash in drawer) from live stats
+  // Formula: Opening + Top-ups + Cash Sales - Cash Purchases - Cash Payments - Expenses - Loan Advance + Loan Repayment
+  const calFloat = liveStats
+    ? new Decimal(liveStats.floatTopUps ?? '0')
+        .plus(new Decimal(liveStats.cashSales ?? '0'))
+        .minus(new Decimal(liveStats.cashPurchases ?? '0'))
+        .minus(new Decimal(liveStats.cashPayments ?? '0'))
+        .minus(new Decimal(liveStats.expenses ?? '0'))
+        .minus(new Decimal(liveStats.loanAdvance ?? '0'))
+        .plus(new Decimal(liveStats.loanRepayment ?? '0'))
+    : null
 
   // ── Opening float form (first-time set or correction) ──────────────────────
   const openingForm = useForm<SetFloatFormInput, unknown, SetFloatInput>({
@@ -218,11 +241,11 @@ export default function FloatPage() {
                   <p className="font-mono font-bold mt-1" style={{ fontSize: 24, color: '#92700F' }}>
                     R {new Decimal(todayFloat.openingAmount).toFixed(2)}
                   </p>
-                  {currentBalance && new Decimal(currentBalance).gt(new Decimal(todayFloat.openingAmount)) && (
+                  {calFloat && (
                     <>
-                      <p className="text-xs font-semibold uppercase tracking-wide mt-2" style={{ color: colors.action }}>Current Balance (after top-ups)</p>
+                      <p className="text-xs font-semibold uppercase tracking-wide mt-2" style={{ color: colors.action }}>Current Balance (Expected in Drawer)</p>
                       <p className="font-mono font-bold" style={{ fontSize: 20, color: colors.action }}>
-                        R {new Decimal(currentBalance).toFixed(2)}
+                        R {calFloat.toFixed(2)}
                       </p>
                     </>
                   )}
