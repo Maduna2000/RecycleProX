@@ -59,24 +59,33 @@ export function ProcessPaymentModal({
     fetchLoan()
   }, [purchase.customerId])
 
+  // Auto-fill amount with full remaining balance on mount
+  useEffect(() => {
+    if (remaining.gt(0)) {
+      setAmount(remaining.toFixed(2))
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   function validateAmount(raw: string): string | null {
     if (!raw.trim()) return 'Amount is required'
     if (!/^\d+(\.\d{1,2})?$/.test(raw)) return 'Enter a valid amount (e.g. 150.00)'
     const d = new Decimal(raw)
     if (d.lt(new Decimal('0.01'))) return 'Minimum amount is R0.01'
     if (d.gt(remaining)) return `Cannot exceed remaining balance of R ${remaining.toFixed(2)}`
+    // Full payment required
+    if (d.lt(remaining)) return `Full payment required. Must pay R ${remaining.toFixed(2)}`
     return null
   }
 
   async function handlePay() {
-    const err = validateAmount(amount)
-    if (err) { setAmountError(err); return }
+    // Always pay full remaining amount
+    const fullAmount = remaining.toFixed(2)
     setAmountError(null)
     setLoading(true)
     const res = await fetch(`/api/purchases/${purchase.id}/mark-paid`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ amount, paymentMethod: method }),
+      body: JSON.stringify({ amount: fullAmount, paymentMethod: method }),
     })
     setLoading(false)
     if (res.ok) {
@@ -133,27 +142,17 @@ export function ProcessPaymentModal({
             </div>
           )}
 
-          {/* Amount input */}
+          {/* Amount display - Full payment required */}
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="text-xs font-medium" style={{ color: '#6C757D' }}>Payment Amount</label>
-              <button
-                type="button"
-                onClick={() => { setAmount(remaining.toFixed(2)); setAmountError(null) }}
-                className="text-xs underline"
-                style={{ color: '#217346' }}
-              >
-                Pay full balance
-              </button>
+              <label className="text-xs font-medium" style={{ color: '#6C757D' }}>Payment Amount (Full Payment Required)</label>
             </div>
-            <Input
-              type="text"
-              inputMode="decimal"
-              placeholder="0.00"
-              value={amount}
-              onChange={(e) => { setAmount(e.target.value); setAmountError(null) }}
-              className="h-8 text-[12px] font-mono"
-            />
+            <div
+              className="h-8 flex items-center px-3 rounded border text-[12px] font-mono font-semibold"
+              style={{ background: '#F5F5F5', borderColor: '#E0E0E0', color: '#217346' }}
+            >
+              R {remaining.toFixed(2)}
+            </div>
             {amountError && (
               <p className="text-xs mt-1" style={{ color: '#DC3545' }}>{amountError}</p>
             )}
@@ -219,21 +218,21 @@ export function ProcessPaymentModal({
               style={{
                 fontSize: 10,
                 padding: '1px 6px',
-                background: '#E0E0E0',
-                border: '1px solid #999',
+                background: '#217346',
+                color: '#fff',
+                border: '1px solid #1A5A38',
                 borderRadius: 2,
                 cursor: loading ? 'not-allowed' : 'pointer',
                 opacity: loading ? 0.6 : 1,
                 display: 'flex',
                 alignItems: 'center',
                 gap: 3,
-                color: '#212529',
               }}
-              onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = '#D0D0D0' }}
-              onMouseLeave={(e) => { if (!loading) e.currentTarget.style.background = '#E0E0E0' }}
+              onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = '#1A5A38' }}
+              onMouseLeave={(e) => { if (!loading) e.currentTarget.style.background = '#217346' }}
             >
               {loading ? <Loader2 style={{ width: 9, height: 9, animation: 'spin 1s linear infinite' }} /> : <CreditCard style={{ width: 9, height: 9 }} />}
-              Process Payment
+              Process Full Payment
             </button>
           </div>
         </div>

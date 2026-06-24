@@ -3,7 +3,7 @@ import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { z } from 'zod'
 import Decimal from 'decimal.js'
-import { markPurchasePaid, PurchaseNotPendingError, PaymentExceedsBalanceError } from '@/lib/services/purchaseService'
+import { markPurchasePaid, PurchaseNotPendingError, PaymentExceedsBalanceError, PartialPaymentNotAllowedError } from '@/lib/services/purchaseService'
 
 const SettleSchema = z.object({
   amount: z
@@ -34,6 +34,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       return NextResponse.json({ error: err.message }, { status: 409 })
     }
     if (err instanceof PaymentExceedsBalanceError) {
+      return NextResponse.json({ error: err.message }, { status: 422 })
+    }
+    if (err instanceof PartialPaymentNotAllowedError) {
       return NextResponse.json({ error: err.message }, { status: 422 })
     }
     logger.error({ err }, 'PATCH /api/purchases/[id]/mark-paid failed')

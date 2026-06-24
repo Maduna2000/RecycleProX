@@ -364,6 +364,11 @@ export async function markPurchasePaid(
         throw new PaymentExceedsBalanceError(settleAmount.toFixed(2), outstanding.toFixed(2))
       }
 
+      // Full payment required - no partial payments allowed
+      if (settleAmount.lessThan(outstanding)) {
+        throw new PartialPaymentNotAllowedError(settleAmount.toFixed(2), outstanding.toFixed(2))
+      }
+
       const isFullySettled = currentPaid.plus(settleAmount).gte(totalAmount.minus(loanDeduction))
 
       const updated = await tx.purchase.update({
