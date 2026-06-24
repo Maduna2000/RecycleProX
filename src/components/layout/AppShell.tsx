@@ -14,6 +14,7 @@ import {
   Archive, Landmark,
   Wifi, WifiOff,
   Scale, ClipboardList,
+  Boxes, ArrowLeftRight, Grid3X3, SlidersHorizontal,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useOfflineStore } from '@/stores/offlineStore'
@@ -90,14 +91,19 @@ function useToolbarButtons(pathname: string, role: string): ToolbarButton[] {
       { label: 'Start Stocktake', icon: ClipboardCheck, href: '/app/stocktake', variant: 'primary' },
     ] : []
 
-  if (pathname === '/app/stock' || pathname.startsWith('/app/stock/'))
+  if (pathname === '/app/stock' || pathname.startsWith('/app/stock/')) {
+    const isOnHand    = pathname === '/app/stock'
+    const isMovements = pathname === '/app/stock/movements'
+    const isGrid      = pathname === '/app/stock/grid'
     return [
+      { label: 'Stock On Hand', icon: Boxes,             href: '/app/stock',           variant: isOnHand    ? 'primary' : 'secondary' as const },
+      { label: 'Movements',     icon: ArrowLeftRight,    href: '/app/stock/movements', variant: isMovements ? 'primary' : 'secondary' as const },
+      { label: 'Grid',          icon: Grid3X3,           href: '/app/stock/grid',      variant: isGrid      ? 'primary' : 'secondary' as const },
       ...(isMgr ? [
-        { label: 'Adjust',    icon: Plus,           href: '/app/stock',     variant: 'primary'  as const },
-        { label: 'Stocktake', icon: ClipboardCheck, href: '/app/stocktake', variant: 'ghost'    as const },
+        { label: 'Manual Adjustment', icon: SlidersHorizontal, href: '/app/stock?adjust=1', variant: 'ghost' as const },
       ] : []),
-      { label: 'Export Excel', icon: FileSpreadsheet, variant: 'ghost', iconOnly: true },
     ]
+  }
 
   if (pathname === '/app/price-groups' || pathname.startsWith('/app/price-groups/'))
     return []
