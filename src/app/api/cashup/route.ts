@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { OpenCashUpSchema } from '@/lib/schemas/cashup'
-import { openCashUp, listCashUps, getOpenSession } from '@/lib/services/cashUpService'
+import { openCashUp, listCashUps, getOpenSession, getAnyOpenSession } from '@/lib/services/cashUpService'
 
 // GET /api/cashup — list history OR ?today=1 for the open session
 export async function GET(req: NextRequest) {
@@ -13,6 +13,12 @@ export async function GET(req: NextRequest) {
 
   try {
     if (searchParams.get('today') === '1') {
+      // First check for any open session (could be from a previous day that needs submission)
+      const openSession = await getAnyOpenSession()
+      if (openSession) {
+        return NextResponse.json({ cashUp: openSession })
+      }
+      // No open session, check for today's submitted session
       const dateStr = searchParams.get('date') ?? undefined
       const cashUp = await getOpenSession(dateStr)
       return NextResponse.json({ cashUp })

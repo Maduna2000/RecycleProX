@@ -358,8 +358,11 @@ export default function CashUpPage() {
     )
   }
 
+  // Check if viewing previous day's session
+  const isPreviousDay = cashUp && cashUp.status === 'open' && sessionDate !== todayISO
+
   return (
-    <PageShell title="Cash-Up" subtitle={`${sessionDate} · Daily cash reconciliation`}>
+    <PageShell title="Cash-Up" subtitle={isPreviousDay ? `${sessionDate} · ⚠ Previous day — submit to continue` : `${sessionDate} · Daily cash reconciliation`}>
       <div className="max-w-6xl mx-auto w-full space-y-4 pb-6">
 
         {/* No session */}
@@ -399,6 +402,21 @@ export default function CashUpPage() {
 
         {cashUp && (
           <>
+            {/* Previous day warning — must submit before starting new day */}
+            {cashUp.status === 'open' && sessionDate !== todayISO && (
+              <div className="rounded border overflow-hidden" style={{ borderColor: colors.danger, background: colors.dangerBg }}>
+                <div className="px-4 py-3">
+                  <p className="font-semibold text-sm mb-1" style={{ color: colors.danger }}>
+                    ⚠ Previous Day&apos;s Cash-Up Not Submitted
+                  </p>
+                  <p className="text-sm" style={{ color: colors.textPrimary }}>
+                    You have an open session from <strong>{sessionDate}</strong> that needs to be submitted before you can start today&apos;s session.
+                    Please count your cash and submit the cash-up below.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Zero-float warning */}
             {cashUp.status === 'open' && new Decimal(cashUp.openingBalance ?? '0').isZero() && (
               <div className="flex items-center gap-2 rounded px-3 py-2 text-sm" style={{ background: colors.warningBg, color: colors.warning }}>
@@ -412,7 +430,8 @@ export default function CashUpPage() {
             {/* Status + refresh row */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                {cashUp.status === 'open'      && <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: colors.warningBg, color: colors.warning }}>Open</span>}
+                {cashUp.status === 'open' && isPreviousDay && <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: colors.dangerBg, color: colors.danger }}>Previous Day — Submit Required</span>}
+                {cashUp.status === 'open' && !isPreviousDay && <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: colors.warningBg, color: colors.warning }}>Open</span>}
                 {cashUp.status === 'submitted' && <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: colors.processBg, color: colors.process }}>Submitted — Awaiting Approval</span>}
                 {cashUp.status === 'approved'  && <span className="flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium" style={{ background: colors.actionBg, color: colors.action }}><CheckCircle2 className="w-3 h-3" />Approved</span>}
                 {cashUp.approvedAt && <span className="text-xs" style={{ color: colors.textMuted }}>{new Date(cashUp.approvedAt).toLocaleString('en-ZA')}</span>}

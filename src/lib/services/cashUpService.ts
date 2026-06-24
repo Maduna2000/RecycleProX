@@ -101,6 +101,15 @@ export async function getOpenSession(sessionDateStr?: string) {
   })
 }
 
+// ─── Get any open session (regardless of date) ────────────────────────────────
+// Used to check if there's an unsubmitted session from a previous day
+export async function getAnyOpenSession() {
+  return prisma.cashUp.findFirst({
+    where: { status: 'open' },
+    orderBy: { sessionDate: 'desc' },
+  })
+}
+
 // ─── Calculate system totals for a date ──────────────────────────────────────
 // Sums completed transactions for the session date (midnight to midnight).
 async function calcSystemTotals(sessionDate: Date, drawingsReceived = new Decimal(0), loansTotal = new Decimal(0)) {
