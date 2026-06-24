@@ -10,6 +10,7 @@ import { generateVat264 } from '@/lib/pdf/vat264'
 import { generateTransactionSlip } from '@/lib/pdf/slip'
 import { uploadBytes, purchaseVat264Key, purchaseNoteKey } from '@/lib/r2'
 import type { CreatePurchaseInput, VoidPurchaseInput } from '@/lib/schemas/purchase'
+import type { ProcessSplitPaymentInput } from '@/lib/schemas/splitPayment'
 
 // ─── Typed Errors ─────────────────────────────────────────────────────────────
 
@@ -395,6 +396,117 @@ export async function markPurchasePaid(
   logger.info(
     { purchaseId: id, userId, settleAmount: data.amount, isFullySettled: result.isFullySettled },
     'purchase.payment.recorded'
+  )
+  return result
+}
+
+// ─── Process Split Payment ────────────────────────────────────────────────────
+// Allows paying a purchase with multiple payment methods simultaneously.
+// Loan deduction is mandatory when customer has outstanding loan.
+
+export async function processSplitPayment(
+  id: string,
+  data: ProcessSplitPaymentInput,
+  userId: string
+) {
+  const result = await withSerializableRetry(() =>
+    prisma.$transaction(async (tx) => {
+      const purchase = await tx.purchase.findUniqueOrThrow({
+        where: { id },
+        include: { customer: true },
+      })
+
+      if (purchase.status !== 'pending') {
+        throw new PurchaseNotPendingError(purchase.status)
+      }
+
+      const totalAmount   = new Decimal(purchase.totalAmount.toString())
+      const currentPaid   = new Decimal(purchase.amountPaid.toString())
+      const existingLoan  = purchase.loanDeductionAmount
+        ? new Decimal(purchase.loanDeductionAmount.toString())
+        : new Decimal(0)
+
+      const cashAmt   = new Decimal(data.payments.cash   || '0')
+      const eftAmt    = new Decimal(data.payments.eft    || '0')
+      const chequeAmt = new Decimal(data.payments.cheque || '0')
+      const loanAmt   = new Decimal(data.payments.loan   || '0')
+
+      const paymentTotal = cashAmt.plus(eftAmt).plus(chequeAmt).plus(loanAmt)
+      const outstanding  = totalAmount.minus(existingLoan).minus(currentPaid)
+
+      if (paymentTotal.greaterThan(outstanding)) {
+        throw new PaymentExceedsBalanceError(paymentTotal.toFixed(2), outstanding.toFixed(2))
+      }
+
+      // Apply loan repayment if loan amount > 0
+      if (loanAmt.greaterThan(0)) {
+        await applyRepaymentTx(tx, purchase.customerId, loanAmt.toString(), userId, id)
+      }
+
+      const newLoanDeduction = existingLoan.plus(loanAmt)
+      const newPaid = currentPaid.plus(cashAmt).plus(eftAmt).plus(chequeAmt)
+      const isFullySettled = newPaid.plus(newLoanDeduction).gte(totalAmount)
+
+      // Determine primary payment method (largest non-loan amount)
+      let primaryMethod: 'cash' | 'eft' | 'cheque' = 'cash'
+      if (eftAmt.greaterThan(cashAmt) && eftAmt.greaterThan(chequeAmt)) {
+        primaryMethod = 'eft'
+      } else if (chequeAmt.greaterThan(cashAmt) && chequeAmt.greaterThan(eftAmt)) {
+        primaryMethod = 'cheque'
+      }
+
+      const updated = await tx.purchase.update({
+        where: { id },
+        data: {
+          amountPaid:          newPaid,
+          loanDeductionAmount: newLoanDeduction,
+          paymentMethod:       primaryMethod,
+          splitPayments: {
+            cash:   cashAmt.toFixed(2),
+            eft:    eftAmt.toFixed(2),
+            cheque: chequeAmt.toFixed(2),
+            loan:   loanAmt.toFixed(2),
+          },
+          ...(isFullySettled ? { status: 'completed' } : {}),
+        },
+      })
+
+      // Create Payment records for each method (for cash-up tracking)
+      const today = new Date()
+      const prefix = `PAY-${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`
+      const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+
+      const payments: Array<{ method: 'cash' | 'eft' | 'cheque'; amount: Decimal }> = []
+      if (cashAmt.greaterThan(0))   payments.push({ method: 'cash',   amount: cashAmt })
+      if (eftAmt.greaterThan(0))    payments.push({ method: 'eft',    amount: eftAmt })
+      if (chequeAmt.greaterThan(0)) payments.push({ method: 'cheque', amount: chequeAmt })
+
+      for (const p of payments) {
+        const payCount = await tx.payment.count({ where: { createdAt: { gte: startOfDay } } })
+        await tx.payment.create({
+          data: {
+            refNumber:       `${prefix}-${String(payCount + 1).padStart(4, '0')}`,
+            customerId:      purchase.customerId,
+            amount:          p.amount,
+            paymentMethod:   p.method,
+            notes:           `Split payment for ${purchase.refNumber} (${p.method})`,
+            createdByUserId: userId,
+          },
+        })
+      }
+
+      return { updated, isFullySettled }
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+  )
+
+  logger.info(
+    {
+      purchaseId: id,
+      userId,
+      splitPayments: data.payments,
+      isFullySettled: result.isFullySettled,
+    },
+    'purchase.split.payment.recorded'
   )
   return result
 }

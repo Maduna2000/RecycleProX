@@ -58,6 +58,14 @@ export async function GET(
       tareReason:  l.tareReason ?? undefined,
     }))
 
+    // Parse splitPayments from JSON if present
+    const splitPayments = purchase.splitPayments as {
+      cash: string
+      eft: string
+      cheque: string
+      loan: string
+    } | null
+
     if (format === 'thermal') {
       const { buildPurchaseReceipt } = await import('@/lib/print/thermal')
       const buf = await buildPurchaseReceipt({
@@ -69,6 +77,7 @@ export async function GET(
         paymentMethod: purchase.paymentMethod,
         cashierName:   session.user.name ?? 'Cashier',
         createdAt:     purchase.createdAt,
+        splitPayments: splitPayments ?? undefined,
       })
       return new NextResponse(buf.buffer as ArrayBuffer, {
         headers: {
@@ -96,6 +105,7 @@ export async function GET(
       status:              slipStatus,
       amountPaid:          slipAmountPaid,
       remainingLoanBalance,
+      splitPayments:  splitPayments ?? undefined,
       companyName:    settings.yardName,
       companyAddress: settings.yardAddress,
       companyPhone:   settings.yardPhone,

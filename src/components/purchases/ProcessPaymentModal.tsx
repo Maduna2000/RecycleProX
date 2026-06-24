@@ -1,12 +1,13 @@
 'use client'
 
-import { useState } from 'react'
-import { Loader2, CreditCard } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Loader2, CreditCard, AlertCircle, Split } from 'lucide-react'
 import { toast } from 'sonner'
 import Decimal from 'decimal.js'
 import { Dialog, DialogContent, ModalTitleBar } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
+import { SplitPaymentModal, type SplitPayTarget } from './SplitPaymentModal'
 
 export type PayTarget = {
   id: string
@@ -14,6 +15,7 @@ export type PayTarget = {
   totalAmount: string
   loanDeductionAmount: string
   amountPaid: string
+  customerId: string
 }
 
 export function ProcessPaymentModal({
@@ -25,15 +27,37 @@ export function ProcessPaymentModal({
   onClose: () => void
   onSuccess: () => void
 }) {
-  const [method,      setMethod]      = useState<'cash' | 'eft' | 'cheque'>('cash')
-  const [amount,      setAmount]      = useState('')
-  const [amountError, setAmountError] = useState<string | null>(null)
-  const [loading,     setLoading]     = useState(false)
+  const [method,          setMethod]          = useState<'cash' | 'eft' | 'cheque'>('cash')
+  const [amount,          setAmount]          = useState('')
+  const [amountError,     setAmountError]     = useState<string | null>(null)
+  const [loading,         setLoading]         = useState(false)
+  const [showSplit,       setShowSplit]       = useState(false)
+  const [outstandingLoan, setOutstandingLoan] = useState('0')
+  const [loanLoading,     setLoanLoading]     = useState(true)
 
   const totalAmount   = new Decimal(purchase.totalAmount)
   const loanDeduction = new Decimal(purchase.loanDeductionAmount)
   const alreadyPaid   = new Decimal(purchase.amountPaid)
   const remaining     = totalAmount.minus(loanDeduction).minus(alreadyPaid)
+  const outstandingDec = new Decimal(outstandingLoan || '0')
+
+  // Fetch customer's outstanding loan on mount
+  useEffect(() => {
+    async function fetchLoan() {
+      try {
+        const res = await fetch(`/api/loans/customer/${purchase.customerId}/outstanding`)
+        if (res.ok) {
+          const data = await res.json() as { outstanding?: string }
+          setOutstandingLoan(data.outstanding ?? '0')
+        }
+      } catch {
+        // Silently fail - loan alert just won't show
+      } finally {
+        setLoanLoading(false)
+      }
+    }
+    fetchLoan()
+  }, [purchase.customerId])
 
   function validateAmount(raw: string): string | null {
     if (!raw.trim()) return 'Amount is required'
@@ -94,6 +118,21 @@ export function ProcessPaymentModal({
             </div>
           </div>
 
+          {/* Loan alert - MANDATORY */}
+          {!loanLoading && outstandingDec.greaterThan(0) && (
+            <div className="flex items-start gap-2 px-3 py-2 rounded-lg" style={{ background: '#FFF3E0', border: '1px solid #FFCC80' }}>
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" style={{ color: '#E65100' }} />
+              <div>
+                <p className="text-xs font-medium" style={{ color: '#E65100' }}>
+                  Outstanding Loan: R {outstandingDec.toFixed(2)}
+                </p>
+                <p className="text-xs" style={{ color: '#EF6C00' }}>
+                  Use Split Payment to deduct loan from this payment.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Amount input */}
           <div>
             <div className="flex items-center justify-between mb-1">
@@ -134,6 +173,23 @@ export function ProcessPaymentModal({
               </SelectContent>
             </Select>
           </div>
+
+          {/* Split Payment button */}
+          <button
+            type="button"
+            onClick={() => setShowSplit(true)}
+            disabled={loading}
+            className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded text-xs font-medium"
+            style={{
+              background: '#E3F2FD',
+              border: '1px solid #90CAF9',
+              color: '#1565C0',
+              cursor: loading ? 'not-allowed' : 'pointer',
+            }}
+          >
+            <Split className="w-3.5 h-3.5" />
+            Split Payment (Multiple Methods)
+          </button>
 
           <div className="flex justify-end gap-2 pt-1">
             <button
@@ -182,6 +238,19 @@ export function ProcessPaymentModal({
           </div>
         </div>
       </DialogContent>
+
+      {/* Split Payment Modal */}
+      {showSplit && (
+        <SplitPaymentModal
+          purchase={purchase as SplitPayTarget}
+          outstandingLoan={outstandingLoan}
+          onClose={() => setShowSplit(false)}
+          onSuccess={() => {
+            setShowSplit(false)
+            onSuccess()
+          }}
+        />
+      )}
     </Dialog>
   )
 }

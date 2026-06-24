@@ -176,6 +176,7 @@ export default function UnpaidPurchasesPage() {
         totalAmount:         row.totalAmount,
         loanDeductionAmount: row.loanDeductionAmount ?? '0',
         amountPaid:          row.amountPaid,
+        customerId:          row.customer.id,
       }),
     },
     {

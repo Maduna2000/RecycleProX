@@ -24,6 +24,12 @@ export interface PurchaseReceiptData {
   paymentMethod: string
   cashierName:   string
   createdAt:     Date
+  splitPayments?: {
+    cash:   string
+    eft:    string
+    cheque: string
+    loan:   string
+  }
 }
 
 export interface SaleReceiptData {
@@ -82,6 +88,39 @@ function addTotal(printer: ThermalPrinter, totalAmount: string, paymentMethod: s
   printer.leftRight('Payment', paymentMethod.toUpperCase())
 }
 
+function addSplitPayments(
+  printer: ThermalPrinter,
+  splitPayments: { cash: string; eft: string; cheque: string; loan: string }
+) {
+  const cashAmt   = new Decimal(splitPayments.cash   || '0')
+  const eftAmt    = new Decimal(splitPayments.eft    || '0')
+  const chequeAmt = new Decimal(splitPayments.cheque || '0')
+  const loanAmt   = new Decimal(splitPayments.loan   || '0')
+
+  // Only show if at least one method has an amount
+  const hasAny = cashAmt.greaterThan(0) || eftAmt.greaterThan(0) ||
+                 chequeAmt.greaterThan(0) || loanAmt.greaterThan(0)
+  if (!hasAny) return
+
+  printer.drawLine()
+  printer.bold(true)
+  printer.println('PAYMENT BREAKDOWN')
+  printer.bold(false)
+
+  if (cashAmt.greaterThan(0)) {
+    printer.leftRight('Cash', `R ${cashAmt.toFixed(2)}`)
+  }
+  if (eftAmt.greaterThan(0)) {
+    printer.leftRight('EFT', `R ${eftAmt.toFixed(2)}`)
+  }
+  if (chequeAmt.greaterThan(0)) {
+    printer.leftRight('Cheque', `R ${chequeAmt.toFixed(2)}`)
+  }
+  if (loanAmt.greaterThan(0)) {
+    printer.leftRight('Loan Deduction', `R ${loanAmt.toFixed(2)}`)
+  }
+}
+
 function addFooter(printer: ThermalPrinter, cashierName: string) {
   printer.drawLine()
   printer.alignCenter()
@@ -114,6 +153,9 @@ export async function buildPurchaseReceipt(data: PurchaseReceiptData): Promise<B
 
   addLines(printer, data.lines)
   addTotal(printer, data.totalAmount, data.paymentMethod)
+  if (data.splitPayments) {
+    addSplitPayments(printer, data.splitPayments)
+  }
   addFooter(printer, data.cashierName)
 
   return Buffer.from(printer.getBuffer())

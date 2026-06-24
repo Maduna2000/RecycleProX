@@ -1,7 +1,3 @@
-// RecycleProX Basic — Prisma Schema
-// All monetary values: Decimal(18,2) — HARD RULE
-// All IDs: UUID — never auto-increment for business records
-
 generator client {
   provider      = "prisma-client-js"
   binaryTargets = ["native", "rhel-openssl-3.0.x"]
@@ -12,7 +8,704 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ─── Enums ────────────────────────────────────────────────────────────────────
+model User {
+  id                  String             @id @default(uuid())
+  fullName            String
+  username            String             @unique
+  passwordHash        String
+  pinHash             String?
+  role                UserRole
+  isActive            Boolean            @default(true)
+  forcePasswordChange Boolean            @default(true)
+  failedAttempts      Int                @default(0)
+  lockedAt            DateTime?
+  lastLoginAt         DateTime?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  createdByUserId     String?
+  operatedScaleOrders ScaleOrder[]       @relation("ScaleOrderOperator")
+  voidedScaleOrders   ScaleOrder[]       @relation("ScaleOrderVoidedBy")
+  stocktakes          Stocktake[]        @relation("StocktakeCreatedBy")
+  voidedStocktakes    Stocktake[]        @relation("StocktakeVoidedBy")
+  moduleAccess        UserModuleAccess[]
+}
+
+model UserModuleAccess {
+  id          String   @id @default(uuid())
+  userId      String
+  moduleKey   String
+  grantedById String?
+  grantedAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, moduleKey])
+  @@index([userId])
+  @@index([moduleKey])
+}
+
+model AuditLog {
+  id          BigInt      @id @default(autoincrement())
+  tableName   String
+  recordId    String
+  action      AuditAction
+  oldValues   Json?
+  newValues   Json?
+  changedById String?
+  ipAddress   String?
+  userAgent   String?
+  rowHash     String
+  createdAt   DateTime    @default(now())
+
+  @@index([tableName, recordId])
+  @@index([changedById])
+  @@index([createdAt])
+}
+
+model SystemSettings {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model Customer {
+  id                  String               @id @default(uuid())
+  customerType        CustomerType         @default(casual)
+  primaryFunction     PrimaryFunction      @default(supplier)
+  idNumber            String?              @unique
+  firstName           String
+  lastName            String
+  dateOfBirth         DateTime?
+  gender              Gender?
+  nationality         String?
+  companyName         String?
+  contactPerson       String?
+  phone               String
+  email               String?
+  physicalAddress     String?
+  postalAddress       String?
+  vatNumber           String?
+  bankName            String?
+  bankAccountNo       String?
+  bankBranchCode      String?
+  creditLimit         Decimal?             @db.Decimal(18, 2)
+  policeRegisterNo    String?
+  licenseNumber       String?
+  licenseExpiry       DateTime?
+  tradeCommodities    Json?
+  customerNotes       String?
+  idPhotoR2Key        String?
+  priceGroupId        String?
+  isActive            Boolean              @default(true)
+  blacklisted         Boolean              @default(false)
+  blacklistReason     String?
+  blacklistedAt       DateTime?
+  blacklistedById     String?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  createdByUserId     String?
+  dealerCategory      DealerCategory?
+  marketSector        MarketSector?
+  zeroRated           Boolean              @default(false)
+  accountCode         String?              @unique
+  companyRegNumber    String?
+  landline            String?
+  priceGroup          PriceGroup?          @relation(fields: [priceGroupId], references: [id])
+  documents           CustomerDocument[]
+  loans               Loan[]
+  loanRepayments      LoanRepayment[]
+  payments            Payment[]
+  purchases           Purchase[]
+  sales               Sale[]               @relation("SaleCustomer")
+  scaleOrders         ScaleOrder[]
+  transactionPayments TransactionPayment[]
+
+  @@index([idNumber])
+  @@index([phone])
+  @@index([lastName])
+  @@index([customerType])
+  @@index([companyName])
+  @@index([contactPerson])
+}
+
+model CustomerDocument {
+  id               String               @id @default(uuid())
+  customerId       String
+  documentType     CustomerDocumentType
+  r2Key            String
+  fileName         String
+  notes            String?
+  uploadedAt       DateTime             @default(now())
+  uploadedByUserId String?
+  customer         Customer             @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+}
+
+model Product {
+  id               String                      @id @default(uuid())
+  code             String                      @unique
+  name             String
+  category         String
+  unit             UnitOfMeasure               @default(kg)
+  defaultBuyPrice  Decimal                     @db.Decimal(18, 2)
+  defaultSellPrice Decimal                     @db.Decimal(18, 2)
+  isActive         Boolean                     @default(true)
+  sortOrder        Int                         @default(0)
+  createdAt        DateTime                    @default(now())
+  updatedAt        DateTime                    @updatedAt
+  minStockLevel    Decimal?                    @db.Decimal(18, 3)
+  buyMarginPct     Decimal?                    @db.Decimal(8, 4)
+  priceOverrides   PriceGroupProductOverride[]
+  priceHistory     PriceHistory[]
+  purchaseLines    PurchaseLine[]
+  saleLines        SaleLine[]
+  scaleOrders      ScaleOrder[]                @relation("ScaleOrderProduct")
+  scaleOrderLines  ScaleOrderLine[]            @relation("ScaleOrderLineProduct")
+  stockMovements   StockMovement[]
+  stocktakeEntries StocktakeEntry[]
+
+  @@index([category])
+  @@index([isActive])
+}
+
+model PriceGroup {
+  id          String                      @id @default(uuid())
+  name        String                      @unique
+  description String?
+  isDefault   Boolean                     @default(false)
+  isActive    Boolean                     @default(true)
+  createdAt   DateTime                    @default(now())
+  updatedAt   DateTime                    @updatedAt
+  customers   Customer[]
+  overrides   PriceGroupProductOverride[]
+}
+
+model PriceGroupProductOverride {
+  id           String     @id @default(uuid())
+  priceGroupId String
+  productId    String
+  buyPrice     Decimal    @db.Decimal(18, 2)
+  sellPrice    Decimal    @db.Decimal(18, 2)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  priceGroup   PriceGroup @relation(fields: [priceGroupId], references: [id], onDelete: Cascade)
+  product      Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([priceGroupId, productId])
+  @@index([productId])
+}
+
+model PriceHistory {
+  id          String   @id @default(uuid())
+  productId   String
+  buyPrice    Decimal  @db.Decimal(18, 2)
+  sellPrice   Decimal  @db.Decimal(18, 2)
+  changedById String?
+  reason      String?
+  createdAt   DateTime @default(now())
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@index([createdAt])
+}
+
+model ProductCategory {
+  id         String              @id @default(uuid())
+  name       String              @unique
+  colorHex   String?
+  sortOrder  Int                 @default(0)
+  isActive   Boolean             @default(true)
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+  iconName   String?
+  parentId   String?
+  stepConfig CategoryStepConfig?
+  parent     ProductCategory?    @relation("SubCategories", fields: [parentId], references: [id])
+  children   ProductCategory[]   @relation("SubCategories")
+}
+
+model TradeCommodityCategory {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([sortOrder])
+  @@index([isActive])
+}
+
+model CategoryStepConfig {
+  id              String          @id @default(uuid())
+  categoryId      String          @unique
+  requireWeight   Boolean         @default(true)
+  requirePhotos   Boolean         @default(true)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  createdByUserId String?
+  category        ProductCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@index([categoryId])
+}
+
+model Purchase {
+  id                      String                   @id @default(uuid())
+  refNumber               String                   @unique
+  customerId              String
+  status                  TxStatus                 @default(completed)
+  totalAmount             Decimal                  @db.Decimal(18, 2)
+  paymentMethod           PaymentMethod            @default(cash)
+  notes                   String?
+  voidedAt                DateTime?
+  voidedById              String?
+  voidReason              String?
+  createdByUserId         String?
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
+  signatureR2Key          String?
+  vat264R2Key             String?
+  loanDeductionAmount     Decimal?                 @db.Decimal(18, 2)
+  photoR2Keys             String[]
+  amountPaid              Decimal                  @default(0) @db.Decimal(18, 2)
+  hasOutstandingBalance   Boolean                  @default(false)
+  pdfEmailed              Boolean                  @default(false)
+  purchaseNoteR2Key       String?
+  vehicleReg              String?
+  wbTicketNumber          String?
+  splitPayments           Json?
+  loanRepayments          LoanRepayment[]
+  customer                Customer                 @relation(fields: [customerId], references: [id])
+  lines                   PurchaseLine[]
+  transactionPaymentLinks TransactionPaymentLink[]
+
+  @@index([customerId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([refNumber])
+  @@index([customerId, status, createdAt])
+}
+
+model PurchaseLine {
+  id              String   @id @default(uuid())
+  purchaseId      String
+  productId       String
+  quantity        Decimal  @db.Decimal(18, 3)
+  unitPrice       Decimal  @db.Decimal(18, 2)
+  lineTotal       Decimal  @db.Decimal(18, 2)
+  priceSource     String   @default("default")
+  createdAt       DateTime @default(now())
+  grossQty        Decimal? @db.Decimal(18, 3)
+  tareQty         Decimal? @db.Decimal(18, 3)
+  tareReason      String?
+  deductionQty    Decimal? @db.Decimal(18, 3)
+  deductionReason String?
+  product         Product  @relation(fields: [productId], references: [id])
+  purchase        Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+
+  @@index([purchaseId])
+  @@index([productId])
+}
+
+model Sale {
+  id                    String        @id @default(uuid())
+  refNumber             String        @unique
+  buyerId               String?
+  buyerName             String?
+  buyerIdNumber         String?
+  buyerPhone            String?
+  status                TxStatus      @default(completed)
+  totalAmount           Decimal       @db.Decimal(18, 2)
+  paymentMethod         PaymentMethod @default(cash)
+  notes                 String?
+  voidedAt              DateTime?
+  voidedById            String?
+  voidReason            String?
+  createdByUserId       String?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+  customerId            String?
+  photoR2Key            String?
+  amountPaid            Decimal?      @db.Decimal(18, 2)
+  hasOutstandingBalance Boolean       @default(false)
+  photoR2Keys           String[]      @default([])
+  customer              Customer?     @relation("SaleCustomer", fields: [customerId], references: [id])
+  lines                 SaleLine[]
+
+  @@index([buyerId])
+  @@index([customerId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([refNumber])
+}
+
+model SaleLine {
+  id              String   @id @default(uuid())
+  saleId          String
+  productId       String
+  quantity        Decimal  @db.Decimal(18, 3)
+  unitPrice       Decimal  @db.Decimal(18, 2)
+  lineTotal       Decimal  @db.Decimal(18, 2)
+  createdAt       DateTime @default(now())
+  deductionQty    Decimal? @db.Decimal(18, 3)
+  deductionReason String?
+  grossQty        Decimal? @db.Decimal(18, 3)
+  tareQty         Decimal? @db.Decimal(18, 3)
+  tareReason      String?
+  product         Product  @relation(fields: [productId], references: [id])
+  sale            Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
+
+  @@index([saleId])
+  @@index([productId])
+}
+
+model StockMovement {
+  id              String         @id @default(uuid())
+  productId       String
+  direction       StockDirection
+  quantity        Decimal        @db.Decimal(18, 3)
+  source          String
+  sourceId        String?
+  notes           String?
+  createdByUserId String?
+  createdAt       DateTime       @default(now())
+  product         Product        @relation(fields: [productId], references: [id])
+
+  @@index([productId])
+  @@index([direction])
+  @@index([source])
+  @@index([createdAt])
+  @@index([productId, createdAt])
+}
+
+model Payment {
+  id              String        @id @default(uuid())
+  refNumber       String        @unique
+  customerId      String?
+  amount          Decimal       @db.Decimal(18, 2)
+  paymentMethod   PaymentMethod @default(cash)
+  notes           String?
+  voidedAt        DateTime?
+  voidedById      String?
+  voidReason      String?
+  createdByUserId String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  customer        Customer?     @relation(fields: [customerId], references: [id])
+
+  @@index([customerId])
+  @@index([createdAt])
+  @@index([refNumber])
+}
+
+model ExpenseType {
+  id        String        @id @default(uuid())
+  name      String        @unique
+  parentId  String?
+  isActive  Boolean       @default(true)
+  sortOrder Int           @default(0)
+  createdAt DateTime      @default(now())
+  expenses  Expense[]
+  parent    ExpenseType?  @relation("children", fields: [parentId], references: [id])
+  children  ExpenseType[] @relation("children")
+
+  @@index([parentId])
+}
+
+model Expense {
+  id              String              @id @default(uuid())
+  refNumber       String              @unique
+  expenseTypeId   String
+  description     String
+  amount          Decimal             @db.Decimal(18, 2)
+  vatAmount       Decimal             @default(0) @db.Decimal(18, 2)
+  includesVat     Boolean             @default(false)
+  paymentMethod   PaymentMethod       @default(cash)
+  chequeNo        String?
+  status          ExpenseStatus       @default(pending)
+  approvedById    String?
+  approvedAt      DateTime?
+  cashUpId        String?
+  createdByUserId String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  expenseType     ExpenseType         @relation(fields: [expenseTypeId], references: [id])
+  attachments     ExpenseAttachment[]
+
+  @@index([expenseTypeId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model ExpenseAttachment {
+  id               String   @id @default(uuid())
+  expenseId        String
+  r2Key            String
+  fileName         String
+  notes            String?
+  uploadedAt       DateTime @default(now())
+  uploadedByUserId String?
+  expense          Expense  @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+
+  @@index([expenseId])
+}
+
+model CashFloat {
+  id              String          @id @default(uuid())
+  floatDate       DateTime        @unique @db.Date
+  openingAmount   Decimal         @db.Decimal(18, 2)
+  closingAmount   Decimal?        @db.Decimal(18, 2)
+  notes           String?
+  createdByUserId String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  movements       FloatMovement[]
+
+  @@index([floatDate])
+}
+
+model Stocktake {
+  id              String           @id @default(uuid())
+  refNumber       String           @unique
+  status          StocktakeStatus  @default(open)
+  notes           String?
+  createdByUserId String
+  completedAt     DateTime?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  stockSnapshot   Json?
+  voidReason      String?
+  voidedAt        DateTime?
+  voidedByUserId  String?
+  createdBy       User             @relation("StocktakeCreatedBy", fields: [createdByUserId], references: [id])
+  voidedBy        User?            @relation("StocktakeVoidedBy", fields: [voidedByUserId], references: [id])
+  entries         StocktakeEntry[]
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+model StocktakeEntry {
+  id          String    @id @default(uuid())
+  stocktakeId String
+  productId   String
+  systemQty   Decimal   @db.Decimal(18, 4)
+  countedQty  Decimal   @db.Decimal(18, 4)
+  variance    Decimal   @db.Decimal(18, 4)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  grossQty    Decimal?  @db.Decimal(18, 4)
+  tareQty     Decimal?  @db.Decimal(18, 4)
+  photoR2Key  String?
+  product     Product   @relation(fields: [productId], references: [id])
+  stocktake   Stocktake @relation(fields: [stocktakeId], references: [id], onDelete: Cascade)
+
+  @@unique([stocktakeId, productId])
+  @@index([stocktakeId])
+  @@index([productId])
+}
+
+model CashUp {
+  id                  String       @id @default(uuid())
+  sessionDate         DateTime     @db.Date
+  openedByUserId      String
+  openedAt            DateTime     @default(now())
+  closedByUserId      String?
+  closedAt            DateTime?
+  approvedByUserId    String?
+  approvedAt          DateTime?
+  status              CashUpStatus @default(open)
+  systemCashSales     Decimal      @default(0) @db.Decimal(18, 2)
+  systemCashPurchases Decimal      @default(0) @db.Decimal(18, 2)
+  systemCashPayments  Decimal      @default(0) @db.Decimal(18, 2)
+  systemCashExpected  Decimal      @default(0) @db.Decimal(18, 2)
+  openingBalance      Decimal      @default(0) @db.Decimal(18, 2)
+  drawingsReceived    Decimal      @default(0) @db.Decimal(18, 2)
+  expensesTotal       Decimal      @default(0) @db.Decimal(18, 2)
+  cardPaymentsTotal   Decimal      @default(0) @db.Decimal(18, 2)
+  loansTotal          Decimal      @default(0) @db.Decimal(18, 2)
+  finPeriodCumulative Decimal      @default(0) @db.Decimal(18, 2)
+  declaredCash        Decimal?     @db.Decimal(18, 2)
+  variance            Decimal?     @db.Decimal(18, 2)
+  notes               String?
+  denominations       Json?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  @@index([sessionDate])
+  @@index([status])
+  @@index([openedByUserId])
+}
+
+model Loan {
+  id              String          @id @default(uuid())
+  refNumber       String          @unique
+  customerId      String
+  principalAmount Decimal         @db.Decimal(18, 2)
+  balanceAmount   Decimal         @db.Decimal(18, 2)
+  paymentMethod   PaymentMethod   @default(cash)
+  notes           String?
+  status          LoanStatus      @default(active)
+  voidedAt        DateTime?
+  voidedById      String?
+  voidReason      String?
+  createdByUserId String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  customer        Customer        @relation(fields: [customerId], references: [id])
+  repayments      LoanRepayment[]
+
+  @@index([customerId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model LoanRepayment {
+  id              String        @id @default(uuid())
+  refNumber       String        @unique
+  loanId          String
+  customerId      String
+  amount          Decimal       @db.Decimal(18, 2)
+  paymentMethod   PaymentMethod @default(cash)
+  notes           String?
+  createdByUserId String?
+  createdAt       DateTime      @default(now())
+  purchaseId      String?
+  customer        Customer      @relation(fields: [customerId], references: [id])
+  loan            Loan          @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  purchase        Purchase?     @relation(fields: [purchaseId], references: [id])
+
+  @@index([loanId])
+  @@index([customerId])
+  @@index([purchaseId])
+  @@index([createdAt])
+}
+
+model PoliceVisit {
+  id              String   @id @default(uuid())
+  visitDate       DateTime @db.Date
+  officerName     String
+  badgeNumber     String?
+  stationName     String?
+  registerR2Key   String?
+  signatureR2Key  String?
+  notes           String?
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+
+  @@index([visitDate])
+  @@index([createdAt])
+}
+
+model MediaFile {
+  id               String   @id @default(uuid())
+  r2Key            String   @unique
+  fileName         String
+  mimeType         String
+  fileSizeBytes    Int?
+  linkedModel      String
+  linkedId         String
+  mediaType        String
+  uploadedByUserId String?
+  uploadedAt       DateTime @default(now())
+
+  @@index([linkedModel, linkedId])
+  @@index([uploadedAt])
+}
+
+model FloatMovement {
+  id              String            @id @default(uuid())
+  cashFloatId     String
+  movementType    FloatMovementType
+  amount          Decimal           @db.Decimal(18, 2)
+  balanceAfter    Decimal           @db.Decimal(18, 2)
+  referenceNote   String?
+  createdByUserId String?
+  createdAt       DateTime          @default(now())
+  cashFloat       CashFloat         @relation(fields: [cashFloatId], references: [id], onDelete: Cascade)
+
+  @@index([cashFloatId])
+  @@index([createdAt])
+}
+
+model TransactionPayment {
+  id              String                   @id @default(uuid())
+  refNumber       String                   @unique
+  customerId      String
+  totalAmount     Decimal                  @db.Decimal(18, 2)
+  paymentMethod   PaymentMethod            @default(cash)
+  notes           String?
+  createdByUserId String?
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+  customer        Customer                 @relation(fields: [customerId], references: [id])
+  purchaseLinks   TransactionPaymentLink[]
+
+  @@index([customerId])
+  @@index([createdAt])
+}
+
+model TransactionPaymentLink {
+  id                   String             @id @default(uuid())
+  transactionPaymentId String
+  purchaseId           String
+  amountAllocated      Decimal            @db.Decimal(18, 2)
+  createdAt            DateTime           @default(now())
+  purchase             Purchase           @relation(fields: [purchaseId], references: [id])
+  transactionPayment   TransactionPayment @relation(fields: [transactionPaymentId], references: [id], onDelete: Cascade)
+
+  @@unique([transactionPaymentId, purchaseId])
+  @@index([purchaseId])
+}
+
+model ScaleOrder {
+  id              String           @id @default(uuid())
+  orderNumber     String           @unique
+  customerId      String?
+  productId       String
+  weight          Decimal?         @db.Decimal(18, 3)
+  photoR2Keys     String[]
+  slipR2Key       String?
+  status          ScaleOrderStatus @default(pending)
+  operatorId      String
+  notes           String?
+  voidedAt        DateTime?
+  voidedById      String?
+  voidReason      String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  casualFirstName String?
+  casualLastName  String?
+  casualPhone     String?
+  lineCount       Int              @default(1)
+  casualIdNumber  String?
+  customer        Customer?        @relation(fields: [customerId], references: [id])
+  operator        User             @relation("ScaleOrderOperator", fields: [operatorId], references: [id])
+  product         Product          @relation("ScaleOrderProduct", fields: [productId], references: [id])
+  voidedBy        User?            @relation("ScaleOrderVoidedBy", fields: [voidedById], references: [id])
+  lines           ScaleOrderLine[]
+
+  @@index([customerId])
+  @@index([productId])
+  @@index([operatorId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model ScaleOrderLine {
+  id          String     @id @default(uuid())
+  orderId     String
+  productId   String
+  weight      Decimal?   @db.Decimal(18, 3)
+  photoR2Keys String[]
+  createdAt   DateTime   @default(now())
+  order       ScaleOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product     Product    @relation("ScaleOrderLineProduct", fields: [productId], references: [id])
+
+  @@index([orderId])
+  @@index([productId])
+}
 
 enum UserRole {
   admin
@@ -44,7 +737,6 @@ enum PaymentMethod {
   cheque
 }
 
-
 enum UnitOfMeasure {
   kg
   ton
@@ -56,7 +748,6 @@ enum StockDirection {
   in
   out
 }
-
 
 enum PrimaryFunction {
   customer
@@ -109,509 +800,11 @@ enum FloatMovementType {
   adjustment
 }
 
-// ─── Models ───────────────────────────────────────────────────────────────────
-
-model User {
-  id                   String    @id @default(uuid())
-  fullName             String
-  username             String    @unique
-  passwordHash         String
-  pinHash              String?
-  role                 UserRole
-  isActive             Boolean   @default(true)
-  forcePasswordChange  Boolean   @default(true)
-  failedAttempts       Int       @default(0)
-  lockedAt             DateTime?
-  lastLoginAt          DateTime?
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
-  createdByUserId      String?
-
-  stocktakes              Stocktake[]  @relation("StocktakeCreatedBy")
-  voidedStocktakes        Stocktake[]  @relation("StocktakeVoidedBy")
-  operatedScaleOrders     ScaleOrder[] @relation("ScaleOrderOperator")
-  voidedScaleOrders       ScaleOrder[] @relation("ScaleOrderVoidedBy")
-  moduleAccess            UserModuleAccess[]
-}
-
-// ─── User Module Access (per-user permission control) ────────────────────────
-
-model UserModuleAccess {
-  id          String   @id @default(uuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  moduleKey   String   // e.g., "/app/purchases", "/app/sales"
-  grantedById String?
-  grantedAt   DateTime @default(now())
-
-  @@unique([userId, moduleKey])
-  @@index([userId])
-  @@index([moduleKey])
-}
-
-model AuditLog {
-  id          BigInt      @id @default(autoincrement())
-  tableName   String
-  recordId    String
-  action      AuditAction
-  oldValues   Json?
-  newValues   Json?
-  changedById String?
-  ipAddress   String?
-  userAgent   String?
-  rowHash     String
-  createdAt   DateTime    @default(now())
-
-  @@index([tableName, recordId])
-  @@index([changedById])
-  @@index([createdAt])
-}
-
-model SystemSettings {
-  id        String   @id @default(uuid())
-  key       String   @unique
-  value     String
-  updatedAt DateTime @updatedAt
-}
-
-model Customer {
-  id               String          @id @default(uuid())
-  customerType     CustomerType    @default(casual)
-  primaryFunction  PrimaryFunction @default(supplier)
-  idNumber         String?         @unique
-  firstName        String
-  lastName         String
-  dateOfBirth      DateTime?
-  gender           Gender?
-  nationality      String?
-  accountCode      String?         @unique
-  companyName      String?
-  companyRegNumber String?
-  contactPerson    String?
-  phone            String
-  landline         String?
-  email            String?
-  physicalAddress  String?
-  postalAddress    String?
-  vatNumber        String?
-  bankName         String?
-  bankAccountNo    String?
-  bankBranchCode   String?
-  creditLimit      Decimal?        @db.Decimal(18, 2)
-  policeRegisterNo String?
-  licenseNumber    String?
-  licenseExpiry    DateTime?
-  tradeCommodities Json?           // String[] e.g. ["Copper","Aluminium","Steel"]
-  customerNotes    String?
-  idPhotoR2Key     String?
-  priceGroupId     String?
-  priceGroup       PriceGroup?     @relation(fields: [priceGroupId], references: [id])
-  purchases        Purchase[]
-  sales            Sale[]     @relation("SaleCustomer")
-  payments         Payment[]
-  loans            Loan[]
-  loanRepayments   LoanRepayment[]
-  marketSector     MarketSector?
-  dealerCategory   DealerCategory?
-  zeroRated        Boolean         @default(false)
-  isActive         Boolean         @default(true)
-  blacklisted      Boolean         @default(false)
-  blacklistReason  String?
-  blacklistedAt    DateTime?
-  blacklistedById  String?
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
-  createdByUserId  String?
-
-  documents            CustomerDocument[]
-  transactionPayments  TransactionPayment[]
-  scaleOrders          ScaleOrder[]
-
-  @@index([idNumber])
-  @@index([phone])
-  @@index([lastName])
-  @@index([customerType])
-  @@index([companyName])
-  @@index([contactPerson])
-}
-
-model CustomerDocument {
-  id               String               @id @default(uuid())
-  customerId       String
-  customer         Customer             @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  documentType     CustomerDocumentType
-  r2Key            String
-  fileName         String
-  notes            String?
-  uploadedAt       DateTime             @default(now())
-  uploadedByUserId String?
-
-  @@index([customerId])
-}
-
-// ─── Products & Pricing ───────────────────────────────────────────────────────
-
-model Product {
-  id               String          @id @default(uuid())
-  code             String          @unique
-  name             String
-  category         String
-  unit             UnitOfMeasure   @default(kg)
-  defaultBuyPrice  Decimal         @db.Decimal(18, 2)
-  defaultSellPrice Decimal         @db.Decimal(18, 2)
-  buyMarginPct     Decimal?        @db.Decimal(8, 4)    // display-only margin %
-  minStockLevel    Decimal?        @db.Decimal(18, 3)
-  isActive         Boolean         @default(true)
-  sortOrder        Int             @default(0)
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
-
-  priceOverrides      PriceGroupProductOverride[]
-  priceHistory        PriceHistory[]
-  purchaseLines       PurchaseLine[]
-  saleLines           SaleLine[]
-  stockMovements      StockMovement[]
-  stocktakeEntries    StocktakeEntry[]
-  scaleOrders         ScaleOrder[]     @relation("ScaleOrderProduct")
-  scaleOrderLines     ScaleOrderLine[] @relation("ScaleOrderLineProduct")
-
-  @@index([category])
-  @@index([isActive])
-}
-
-model PriceGroup {
-  id          String    @id @default(uuid())
-  name        String    @unique
-  description String?
-  isDefault   Boolean   @default(false)
-  isActive    Boolean   @default(true)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  customers   Customer[]
-  overrides   PriceGroupProductOverride[]
-}
-
-model PriceGroupProductOverride {
-  id           String     @id @default(uuid())
-  priceGroupId String
-  productId    String
-  buyPrice     Decimal    @db.Decimal(18, 2)
-  sellPrice    Decimal    @db.Decimal(18, 2)
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
-
-  priceGroup   PriceGroup @relation(fields: [priceGroupId], references: [id], onDelete: Cascade)
-  product      Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
-
-  @@unique([priceGroupId, productId])
-  @@index([productId])
-}
-
-model PriceHistory {
-  id          String   @id @default(uuid())
-  productId   String
-  buyPrice    Decimal  @db.Decimal(18, 2)
-  sellPrice   Decimal  @db.Decimal(18, 2)
-  changedById String?
-  reason      String?
-  createdAt   DateTime @default(now())
-
-  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-
-  @@index([productId])
-  @@index([createdAt])
-}
-
-// ─── Product Categories (dynamic lookup) ─────────────────────────────────────
-
-model ProductCategory {
-  id        String   @id @default(uuid())
-  name      String   @unique
-  colorHex  String?
-  iconName  String?
-  sortOrder Int      @default(0)
-  isActive  Boolean  @default(true)
-  parentId  String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  parent     ProductCategory?     @relation("SubCategories", fields: [parentId], references: [id])
-  children   ProductCategory[]    @relation("SubCategories")
-  stepConfig CategoryStepConfig?
-}
-
-// ─── Trade Commodity Categories (customer registration) ────────────────────────
-
-model TradeCommodityCategory {
-  id        String   @id @default(uuid())
-  name      String   @unique
-  sortOrder Int      @default(0)
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([sortOrder])
-  @@index([isActive])
-}
-
-// ─── Category Step Configuration (Scale Station) ──────────────────────────────
-
-model CategoryStepConfig {
-  id              String          @id @default(uuid())
-  categoryId      String          @unique
-  category        ProductCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-
-  requireWeight   Boolean         @default(true)
-  requirePhotos   Boolean         @default(true)
-
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
-  createdByUserId String?
-
-  @@index([categoryId])
-}
-
-// ─── Purchases (M5) ───────────────────────────────────────────────────────────
-
-model Purchase {
-  id              String        @id @default(uuid())
-  refNumber       String        @unique
-  customerId      String
-  customer        Customer      @relation(fields: [customerId], references: [id])
-  status          TxStatus      @default(completed)
-  totalAmount     Decimal       @db.Decimal(18, 2)
-  paymentMethod   PaymentMethod @default(cash)
-  notes           String?
-  loanDeductionAmount  Decimal?      @db.Decimal(18, 2)
-  amountPaid           Decimal       @default(0) @db.Decimal(18, 2)
-  signatureR2Key       String?
-  vat264R2Key          String?
-  purchaseNoteR2Key    String?
-  photoR2Keys          String[]
-  vehicleReg           String?
-  wbTicketNumber       String?
-  pdfEmailed           Boolean       @default(false)
-  hasOutstandingBalance Boolean      @default(false)
-  voidedAt        DateTime?
-  voidedById      String?
-  voidReason      String?
-  createdByUserId String?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-
-  lines                 PurchaseLine[]
-  loanRepayments        LoanRepayment[]
-  transactionPaymentLinks TransactionPaymentLink[]
-
-  @@index([customerId])
-  @@index([status])
-  @@index([createdAt])
-  @@index([refNumber])
-  @@index([customerId, status, createdAt])
-}
-
-model PurchaseLine {
-  id           String   @id @default(uuid())
-  purchaseId   String
-  purchase     Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
-  productId    String
-  product      Product  @relation(fields: [productId], references: [id])
-  quantity     Decimal  @db.Decimal(18, 3)   // net weight (gross - tare)
-  grossQty     Decimal? @db.Decimal(18, 3)   // raw scale reading
-  tareQty      Decimal? @db.Decimal(18, 3)   // tare deduction
-  tareReason   String?                        // e.g. "Bag", "Pallet", "Container"
-  unitPrice    Decimal  @db.Decimal(18, 2)
-  lineTotal    Decimal  @db.Decimal(18, 2)
-  priceSource     String   @default("default")
-  deductionQty    Decimal? @db.Decimal(18, 3)   // quantity deducted (e.g. contamination, damage)
-  deductionReason String?                        // reason for deduction
-  createdAt       DateTime @default(now())
-
-  @@index([purchaseId])
-  @@index([productId])
-}
-
-// ─── Sales (M6) ───────────────────────────────────────────────────────────────
-
-model Sale {
-  id                   String        @id @default(uuid())
-  refNumber            String        @unique
-  buyerId              String?
-  buyerName            String?
-  buyerIdNumber        String?
-  buyerPhone           String?
-  customerId           String?
-  customer             Customer?     @relation("SaleCustomer", fields: [customerId], references: [id])
-  status               TxStatus      @default(completed)
-  totalAmount          Decimal       @db.Decimal(18, 2)
-  paymentMethod        PaymentMethod @default(cash)
-  amountPaid           Decimal?      @db.Decimal(18, 2)
-  hasOutstandingBalance Boolean      @default(false)
-  notes                String?
-  photoR2Key           String?
-  photoR2Keys          String[]      @default([])
-  voidedAt             DateTime?
-  voidedById           String?
-  voidReason           String?
-  createdByUserId      String?
-  createdAt            DateTime      @default(now())
-  updatedAt            DateTime      @updatedAt
-
-  lines           SaleLine[]
-
-  @@index([buyerId])
-  @@index([customerId])
-  @@index([status])
-  @@index([createdAt])
-  @@index([refNumber])
-}
-
-model SaleLine {
-  id              String   @id @default(uuid())
-  saleId          String
-  sale            Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
-  productId       String
-  product         Product  @relation(fields: [productId], references: [id])
-  quantity        Decimal  @db.Decimal(18, 3)
-  grossQty        Decimal? @db.Decimal(18, 3)
-  tareQty         Decimal? @db.Decimal(18, 3)
-  tareReason      String?
-  deductionQty    Decimal? @db.Decimal(18, 3)
-  deductionReason String?
-  unitPrice       Decimal  @db.Decimal(18, 2)
-  lineTotal       Decimal  @db.Decimal(18, 2)
-  createdAt       DateTime @default(now())
-
-  @@index([saleId])
-  @@index([productId])
-}
-
-// ─── Stock (M8) ───────────────────────────────────────────────────────────────
-
-model StockMovement {
-  id              String         @id @default(uuid())
-  productId       String
-  product         Product        @relation(fields: [productId], references: [id])
-  direction       StockDirection
-  quantity        Decimal        @db.Decimal(18, 3)
-  source          String         // 'purchase' | 'sale' | 'manual_adjustment' | 'void_reversal'
-  sourceId        String?        // purchaseId / saleId for traceability
-  notes           String?
-  createdByUserId String?
-  createdAt       DateTime       @default(now())
-
-  @@index([productId])
-  @@index([direction])
-  @@index([source])
-  @@index([createdAt])
-  @@index([productId, createdAt])
-}
-
-// ─── Payments (M7) ────────────────────────────────────────────────────────────
-// Payments made OUT to account customers settling their purchase balance.
-
-model Payment {
-  id              String        @id @default(uuid())
-  refNumber       String        @unique
-  customerId      String?
-  customer        Customer?     @relation(fields: [customerId], references: [id])
-  amount          Decimal       @db.Decimal(18, 2)
-  paymentMethod   PaymentMethod @default(cash)
-  notes           String?
-  voidedAt        DateTime?
-  voidedById      String?
-  voidReason      String?
-  createdByUserId String?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-
-  @@index([customerId])
-  @@index([createdAt])
-  @@index([refNumber])
-}
-
-// ─── Expenses (M15) ───────────────────────────────────────────────────────────
-
 enum ExpenseStatus {
   pending
   approved
   voided
 }
-
-model ExpenseType {
-  id        String        @id @default(uuid())
-  name      String        @unique
-  parentId  String?
-  parent    ExpenseType?  @relation("children", fields: [parentId], references: [id])
-  children  ExpenseType[] @relation("children")
-  isActive  Boolean       @default(true)
-  sortOrder Int           @default(0)
-  createdAt DateTime      @default(now())
-
-  expenses  Expense[]
-
-  @@index([parentId])
-}
-
-model Expense {
-  id              String        @id @default(uuid())
-  refNumber       String        @unique
-  expenseTypeId   String
-  expenseType     ExpenseType   @relation(fields: [expenseTypeId], references: [id])
-  description     String
-  amount          Decimal       @db.Decimal(18, 2)
-  vatAmount       Decimal       @db.Decimal(18, 2) @default(0)
-  includesVat     Boolean       @default(false)
-  paymentMethod   PaymentMethod @default(cash)
-  chequeNo        String?
-  status          ExpenseStatus @default(pending)
-  approvedById    String?
-  approvedAt      DateTime?
-  cashUpId        String?
-  createdByUserId String?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-
-  attachments     ExpenseAttachment[]
-
-  @@index([expenseTypeId])
-  @@index([status])
-  @@index([createdAt])
-}
-
-model ExpenseAttachment {
-  id               String   @id @default(uuid())
-  expenseId        String
-  expense          Expense  @relation(fields: [expenseId], references: [id], onDelete: Cascade)
-  r2Key            String
-  fileName         String
-  notes            String?
-  uploadedAt       DateTime @default(now())
-  uploadedByUserId String?
-
-  @@index([expenseId])
-}
-
-// ─── Float (M16) ──────────────────────────────────────────────────────────────
-
-model CashFloat {
-  id              String   @id @default(uuid())
-  floatDate       DateTime @db.Date
-  openingAmount   Decimal  @db.Decimal(18, 2)
-  closingAmount   Decimal? @db.Decimal(18, 2)
-  notes           String?
-  createdByUserId String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  movements       FloatMovement[]
-
-  @@unique([floatDate])
-  @@index([floatDate])
-}
-
-// ─── Cash-up (M10) ────────────────────────────────────────────────────────────
 
 enum CashUpStatus {
   open
@@ -619,287 +812,14 @@ enum CashUpStatus {
   approved
 }
 
-// ─── Stocktake (M6 / Phase 6) ────────────────────────────────────────────────
-
 enum StocktakeStatus {
   open
   completed
   voided
 }
 
-model Stocktake {
-  id              String          @id @default(uuid())
-  refNumber       String          @unique
-  status          StocktakeStatus @default(open)
-  notes           String?
-  createdByUserId String
-  createdBy       User            @relation("StocktakeCreatedBy", fields: [createdByUserId], references: [id])
-  completedAt     DateTime?
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
-
-  // System quantity snapshot captured at creation (prevents race conditions)
-  stockSnapshot   Json?           // { productId: "systemQty", ... }
-
-  // Void support
-  voidedAt        DateTime?
-  voidedByUserId  String?
-  voidedBy        User?           @relation("StocktakeVoidedBy", fields: [voidedByUserId], references: [id])
-  voidReason      String?
-
-  entries         StocktakeEntry[]
-
-  @@index([status])
-  @@index([createdAt])
-}
-
-model StocktakeEntry {
-  id           String    @id @default(uuid())
-  stocktakeId  String
-  stocktake    Stocktake @relation(fields: [stocktakeId], references: [id], onDelete: Cascade)
-  productId    String
-  product      Product   @relation(fields: [productId], references: [id])
-  systemQty    Decimal   @db.Decimal(18, 4)
-  countedQty   Decimal   @db.Decimal(18, 4)  // net (gross - tare)
-  grossQty     Decimal?  @db.Decimal(18, 4)  // raw scale reading
-  tareQty      Decimal?  @db.Decimal(18, 4)  // tare deduction
-  photoR2Key   String?                        // scale snapshot photo
-  variance     Decimal   @db.Decimal(18, 4)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-
-  @@unique([stocktakeId, productId])
-  @@index([stocktakeId])
-  @@index([productId])
-}
-
-model CashUp {
-  id                  String        @id @default(uuid())
-  sessionDate         DateTime      @db.Date
-  openedByUserId      String
-  openedAt            DateTime      @default(now())
-  closedByUserId      String?
-  closedAt            DateTime?
-  approvedByUserId    String?
-  approvedAt          DateTime?
-  status              CashUpStatus  @default(open)
-
-  // System-calculated totals (from DB at close time)
-  systemCashSales     Decimal       @db.Decimal(18, 2) @default(0)
-  systemCashPurchases Decimal       @db.Decimal(18, 2) @default(0)
-  systemCashPayments  Decimal       @db.Decimal(18, 2) @default(0)
-  systemCashExpected  Decimal       @db.Decimal(18, 2) @default(0)
-
-  // Financial reconciliation fields (Phase 4)
-  openingBalance      Decimal       @db.Decimal(18, 2) @default(0)
-  drawingsReceived    Decimal       @db.Decimal(18, 2) @default(0)
-  expensesTotal       Decimal       @db.Decimal(18, 2) @default(0)
-  cardPaymentsTotal   Decimal       @db.Decimal(18, 2) @default(0)
-  loansTotal          Decimal       @db.Decimal(18, 2) @default(0)
-  finPeriodCumulative Decimal       @db.Decimal(18, 2) @default(0)
-
-  // Cashier-declared physical count
-  declaredCash        Decimal?      @db.Decimal(18, 2)
-  variance            Decimal?      @db.Decimal(18, 2)
-  notes               String?
-
-  // Denomination breakdown (JSON: { "200": 3, "100": 5, ... })
-  denominations       Json?
-
-  createdAt           DateTime      @default(now())
-  updatedAt           DateTime      @updatedAt
-
-  @@index([sessionDate])
-  @@index([status])
-  @@index([openedByUserId])
-}
-
-// ─── Loans (Feature 10) ───────────────────────────────────────────────────────
-
 enum LoanStatus {
   active
   settled
   voided
-}
-
-model Loan {
-  id              String        @id @default(uuid())
-  refNumber       String        @unique
-  customerId      String
-  customer        Customer      @relation(fields: [customerId], references: [id])
-  principalAmount Decimal       @db.Decimal(18, 2)
-  balanceAmount   Decimal       @db.Decimal(18, 2)
-  paymentMethod   PaymentMethod @default(cash)
-  notes           String?
-  status          LoanStatus    @default(active)
-  voidedAt        DateTime?
-  voidedById      String?
-  voidReason      String?
-  createdByUserId String?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-
-  repayments      LoanRepayment[]
-
-  @@index([customerId])
-  @@index([status])
-  @@index([createdAt])
-}
-
-model LoanRepayment {
-  id              String        @id @default(uuid())
-  refNumber       String        @unique
-  loanId          String
-  loan            Loan          @relation(fields: [loanId], references: [id], onDelete: Cascade)
-  customerId      String
-  customer        Customer      @relation(fields: [customerId], references: [id])
-  purchaseId      String?
-  purchase        Purchase?     @relation(fields: [purchaseId], references: [id])
-  amount          Decimal       @db.Decimal(18, 2)
-  paymentMethod   PaymentMethod @default(cash)
-  notes           String?
-  createdByUserId String?
-  createdAt       DateTime      @default(now())
-
-  @@index([loanId])
-  @@index([customerId])
-  @@index([purchaseId])
-  @@index([createdAt])
-}
-
-// ─── Police Visits (Feature 8) ────────────────────────────────────────────────
-
-model PoliceVisit {
-  id              String    @id @default(uuid())
-  visitDate       DateTime  @db.Date
-  officerName     String
-  badgeNumber     String?
-  stationName     String?
-  registerR2Key   String?
-  signatureR2Key  String?
-  notes           String?
-  createdByUserId String?
-  createdAt       DateTime  @default(now())
-
-  @@index([visitDate])
-  @@index([createdAt])
-}
-
-// ─── Media Files (centralized R2 media registry) ─────────────────────────────
-
-model MediaFile {
-  id               String   @id @default(uuid())
-  r2Key            String   @unique
-  fileName         String
-  mimeType         String
-  fileSizeBytes    Int?
-  linkedModel      String   // e.g. "Purchase", "Customer", "Sale", "StocktakeEntry"
-  linkedId         String   // UUID of the linked record
-  mediaType        String   // "signature" | "id_photo" | "vat264" | "purchase_note" | "scale_photo" | "other"
-  uploadedByUserId String?
-  uploadedAt       DateTime @default(now())
-
-  @@index([linkedModel, linkedId])
-  @@index([uploadedAt])
-}
-
-// ─── Float Movements (ledger for CashFloat top-ups / withdrawals) ────────────
-
-model FloatMovement {
-  id               String            @id @default(uuid())
-  cashFloatId      String
-  cashFloat        CashFloat         @relation(fields: [cashFloatId], references: [id], onDelete: Cascade)
-  movementType     FloatMovementType
-  amount           Decimal           @db.Decimal(18, 2)
-  balanceAfter     Decimal           @db.Decimal(18, 2)
-  referenceNote    String?
-  createdByUserId  String?
-  createdAt        DateTime          @default(now())
-
-  @@index([cashFloatId])
-  @@index([createdAt])
-}
-
-// ─── Transaction Payments (multi-ticket payment batching) ────────────────────
-
-model TransactionPayment {
-  id               String                  @id @default(uuid())
-  refNumber        String                  @unique
-  customerId       String
-  customer         Customer                @relation(fields: [customerId], references: [id])
-  totalAmount      Decimal                 @db.Decimal(18, 2)
-  paymentMethod    PaymentMethod           @default(cash)
-  notes            String?
-  createdByUserId  String?
-  createdAt        DateTime                @default(now())
-  updatedAt        DateTime                @updatedAt
-
-  purchaseLinks    TransactionPaymentLink[]
-
-  @@index([customerId])
-  @@index([createdAt])
-}
-
-model TransactionPaymentLink {
-  id                   String             @id @default(uuid())
-  transactionPaymentId String
-  transactionPayment   TransactionPayment @relation(fields: [transactionPaymentId], references: [id], onDelete: Cascade)
-  purchaseId           String
-  purchase             Purchase           @relation(fields: [purchaseId], references: [id])
-  amountAllocated      Decimal            @db.Decimal(18, 2)
-  createdAt            DateTime           @default(now())
-
-  @@unique([transactionPaymentId, purchaseId])
-  @@index([purchaseId])
-}
-
-// ─── Scale Station ────────────────────────────────────────────────────────────
-
-model ScaleOrder {
-  id              String           @id @default(uuid())
-  orderNumber     String           @unique
-  customerId      String?
-  casualFirstName String?
-  casualLastName  String?
-  casualPhone     String?
-  casualIdNumber  String?
-  productId       String
-  weight          Decimal?         @db.Decimal(18, 3)  // Nullable when weight step is skipped
-  photoR2Keys     String[]
-  lineCount       Int              @default(1)
-  slipR2Key       String?
-  status          ScaleOrderStatus @default(pending)
-  operatorId      String
-  notes           String?
-  voidedAt        DateTime?
-  voidedById      String?
-  voidReason      String?
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-
-  customer   Customer?  @relation(fields: [customerId], references: [id])
-  product    Product    @relation("ScaleOrderProduct", fields: [productId], references: [id])
-  operator   User       @relation("ScaleOrderOperator", fields: [operatorId], references: [id])
-  voidedBy   User?      @relation("ScaleOrderVoidedBy", fields: [voidedById], references: [id])
-  lines      ScaleOrderLine[]
-
-  @@index([customerId])
-  @@index([productId])
-  @@index([operatorId])
-  @@index([status])
-  @@index([createdAt])
-}
-
-model ScaleOrderLine {
-  id          String     @id @default(uuid())
-  orderId     String
-  order       ScaleOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productId   String
-  product     Product    @relation("ScaleOrderLineProduct", fields: [productId], references: [id])
-  weight      Decimal?   @db.Decimal(18, 3)  // Nullable when weight step is skipped
-  photoR2Keys String[]
-  createdAt   DateTime   @default(now())
-
-  @@index([orderId])
-  @@index([productId])
 }

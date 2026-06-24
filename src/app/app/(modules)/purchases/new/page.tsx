@@ -983,7 +983,7 @@ export default function NewPurchasePage() {
                       {actionMenuId === p.id && actionMenuRect && (
                         <div style={{ position: 'fixed', right: window.innerWidth - actionMenuRect.right, bottom: window.innerHeight - actionMenuRect.top + 2, zIndex: 9999, background: '#fff', border: '1px solid #C0C0C0', borderRadius: 3, boxShadow: '0 4px 12px rgba(0,0,0,0.15)', minWidth: 190 }}>
                           {([
-                            { label: 'Process Payment',        action: () => { setPayTarget({ id: p.id, ref: p.refNumber, totalAmount: p.totalAmount, loanDeductionAmount: p.loanDeductionAmount ?? '0', amountPaid: p.amountPaid }); setActionMenuId(null) } },
+                            { label: 'Process Payment',        action: () => { setPayTarget({ id: p.id, ref: p.refNumber, totalAmount: p.totalAmount, loanDeductionAmount: p.loanDeductionAmount ?? '0', amountPaid: p.amountPaid, customerId: p.customer.id }); setActionMenuId(null) } },
                             { label: 'Print Slip',             action: () => { setPrintDialog({ id: p.id, refNumber: p.refNumber }); setActionMenuId(null) } },
                             { label: 'View Customer History',  action: () => { router.push(`/app/customers/${p.customer.id}`); setActionMenuId(null) } },
                             { label: 'Log to Police Register', action: () => { router.push(`/app/police-register/new?purchaseId=${p.id}`); setActionMenuId(null) } },

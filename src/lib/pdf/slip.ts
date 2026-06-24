@@ -38,6 +38,13 @@ export interface TransactionSlipData {
   amountPaid?:           string   // decimal string — actual amount received so far
   status?:               'completed' | 'pending' | 'partial'
   remainingLoanBalance?: string   // outstanding loan balance after this purchase's deduction
+  // Split payment breakdown
+  splitPayments?: {
+    cash:   string
+    eft:    string
+    cheque: string
+    loan:   string
+  }
   // Company details from SystemSettings
   companyName?:   string
   companyAddress?:string
@@ -99,6 +106,14 @@ function estimateHeight(data: TransactionSlipData): number {
     if (data.status === 'partial') h += LINE_H + 3  // BALANCE DUE second line
   }
   h += LINE_H                       // payment method
+  // Split payment breakdown
+  if (data.splitPayments) {
+    h += LINE_H                     // "Payment Breakdown:" header
+    if (new Decimal(data.splitPayments.cash).greaterThan(0))   h += LINE_H
+    if (new Decimal(data.splitPayments.eft).greaterThan(0))    h += LINE_H
+    if (new Decimal(data.splitPayments.cheque).greaterThan(0)) h += LINE_H
+    if (new Decimal(data.splitPayments.loan).greaterThan(0))   h += LINE_H
+  }
   if (data.notes) h += LINE_H * 2
   h += 8                            // divider
   h += LINE_H                       // cashier
@@ -324,6 +339,47 @@ export async function generateTransactionSlip(data: TransactionSlipData): Promis
 
   page.drawText(`Payment: ${data.paymentMethod.toUpperCase()}`, { x: MARGIN, y: cursor, size: SMALL, font: reg, color: GRAY })
   nextLine(SMALL)
+
+  // ── Split Payment Breakdown ───────────────────────────────────────────────
+  if (data.splitPayments) {
+    cursor -= 4
+    page.drawText('Payment Breakdown:', { x: MARGIN, y: cursor, size: SMALL, font: bold, color: DGRAY })
+    nextLine(SMALL, 2)
+
+    const cashAmt   = new Decimal(data.splitPayments.cash   || '0')
+    const eftAmt    = new Decimal(data.splitPayments.eft    || '0')
+    const chequeAmt = new Decimal(data.splitPayments.cheque || '0')
+    const loanAmt   = new Decimal(data.splitPayments.loan   || '0')
+
+    if (cashAmt.greaterThan(0)) {
+      const cashStr = `E${cashAmt.toFixed(2)}`
+      const cw = reg.widthOfTextAtSize(cashStr, SMALL)
+      page.drawText('  Cash:', { x: MARGIN, y: cursor, size: SMALL, font: reg, color: GRAY })
+      page.drawText(cashStr, { x: W - MARGIN - cw, y: cursor, size: SMALL, font: reg, color: DGRAY })
+      nextLine(SMALL)
+    }
+    if (eftAmt.greaterThan(0)) {
+      const eftStr = `E${eftAmt.toFixed(2)}`
+      const ew = reg.widthOfTextAtSize(eftStr, SMALL)
+      page.drawText('  EFT:', { x: MARGIN, y: cursor, size: SMALL, font: reg, color: GRAY })
+      page.drawText(eftStr, { x: W - MARGIN - ew, y: cursor, size: SMALL, font: reg, color: DGRAY })
+      nextLine(SMALL)
+    }
+    if (chequeAmt.greaterThan(0)) {
+      const chequeStr = `E${chequeAmt.toFixed(2)}`
+      const qw = reg.widthOfTextAtSize(chequeStr, SMALL)
+      page.drawText('  Cheque:', { x: MARGIN, y: cursor, size: SMALL, font: reg, color: GRAY })
+      page.drawText(chequeStr, { x: W - MARGIN - qw, y: cursor, size: SMALL, font: reg, color: DGRAY })
+      nextLine(SMALL)
+    }
+    if (loanAmt.greaterThan(0)) {
+      const loanStr = `E${loanAmt.toFixed(2)}`
+      const lw = reg.widthOfTextAtSize(loanStr, SMALL)
+      page.drawText('  Loan Deduction:', { x: MARGIN, y: cursor, size: SMALL, font: reg, color: GRAY })
+      page.drawText(loanStr, { x: W - MARGIN - lw, y: cursor, size: SMALL, font: reg, color: DGRAY })
+      nextLine(SMALL)
+    }
+  }
 
   if (data.notes) {
     cursor -= 4
