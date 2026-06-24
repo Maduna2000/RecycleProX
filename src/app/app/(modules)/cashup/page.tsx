@@ -251,16 +251,21 @@ export default function CashUpPage() {
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
   const { mutate: offlineMutate } = useOfflineMutation()
 
-  const today = (() => {
+  const todayISO = (() => {
     const n = new Date()
     return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`
   })()
 
-  const CASHUP_KEY   = '/api/cashup?today=1'
-  const STATS_KEY    = `/api/cashup/live-stats?date=${today}`
-  const EXPENSES_KEY = `/api/expenses?from=${today}&to=${today}&page=1`
+  const CASHUP_KEY = '/api/cashup?today=1'
+  const { data, isLoading } = useSWR<{ cashUp: CashUp | null }>(CASHUP_KEY, fetcher)
 
-  const { data, isLoading }                          = useSWR<{ cashUp: CashUp | null }>(CASHUP_KEY, fetcher)
+  // Use the cashup session date for stats/expenses, not today's date
+  // This ensures we get data for the actual cashup session (which may span past midnight)
+  const sessionDate = data?.cashUp?.sessionDate?.split('T')[0] ?? todayISO
+
+  const STATS_KEY    = `/api/cashup/live-stats?date=${sessionDate}`
+  const EXPENSES_KEY = `/api/expenses?from=${sessionDate}&to=${sessionDate}&page=1`
+
   const { data: statsData, mutate: refreshStats }    = useSWR<LiveStats>(STATS_KEY, fetcher)
   const { data: expensesData, mutate: refreshExpenses } = useSWR<{ expenses: ExpenseItem[] }>(EXPENSES_KEY, fetcher)
 
@@ -300,8 +305,8 @@ export default function CashUpPage() {
     try {
       const { queued } = await offlineMutate({
         method: 'POST', url: '/api/cashup',
-        body: { sessionDate: today },
-        localId: `local_cashup_${today}`,
+        body: { sessionDate: todayISO },
+        localId: `local_cashup_${todayISO}`,
       })
       if (queued) toast.success('Cash-up session queued — will open when connected')
       else { toast.success('Cash-up session opened'); swrMutate(CASHUP_KEY) }
@@ -354,7 +359,7 @@ export default function CashUpPage() {
   }
 
   return (
-    <PageShell title="Cash-Up" subtitle={`${today} · Daily cash reconciliation`}>
+    <PageShell title="Cash-Up" subtitle={`${sessionDate} · Daily cash reconciliation`}>
       <div className="max-w-6xl mx-auto w-full space-y-4 pb-6">
 
         {/* No session */}
