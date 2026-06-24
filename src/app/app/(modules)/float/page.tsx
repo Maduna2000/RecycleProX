@@ -85,9 +85,11 @@ export default function FloatPage() {
 
   const { data: todayData, isLoading: loadingToday } = useSWR<TodayFloatResponse>('/api/float/today', fetcher)
   const { data: history, isLoading: loadingHistory } = useSWR<CashFloat[]>('/api/float', fetcher)
-  const { data: currentData, mutate: mutateCurrentFloat } = useSWR<CurrentFloatResponse>('/api/float/current', fetcher, { refreshInterval: 30000 })
-  const { data: liveStats } = useSWR<LiveStats>(`/api/cashup/live-stats?date=${todayISO()}`, fetcher, { refreshInterval: 30000 })
-  const { data: cashUpData } = useSWR<{ cashUp: CashUp | null }>('/api/cashup?today=1', fetcher, { refreshInterval: 30000 })
+  const { data: currentData, mutate: mutateCurrentFloat } = useSWR<CurrentFloatResponse>('/api/float/current', fetcher, { refreshInterval: 5000 })
+  const liveStatsKey = `/api/cashup/live-stats?date=${todayISO()}`
+  const cashUpKey = '/api/cashup?today=1'
+  const { data: liveStats, mutate: mutateLiveStats } = useSWR<LiveStats>(liveStatsKey, fetcher, { refreshInterval: 5000 })
+  const { data: cashUpData, mutate: mutateCashUp } = useSWR<{ cashUp: CashUp | null }>(cashUpKey, fetcher, { refreshInterval: 5000 })
   const [saving, setSaving] = useState(false)
   const [reversingMovement, setReversingMovement] = useState(false)
   const [historyPage, setHistoryPage] = useState(1)
@@ -150,6 +152,8 @@ export default function FloatPage() {
         mutate('/api/float/today')
         mutate('/api/float')
         mutateCurrentFloat()
+        mutateLiveStats()
+        mutateCashUp()
       }
       openingForm.reset({ floatDate: todayISO(), openingAmount: '' })
     } catch {
@@ -173,9 +177,14 @@ export default function FloatPage() {
       }
       toast.success(`Float topped up by R ${new Decimal(data.amount).toFixed(2)}`)
       topUpForm.reset({ amount: '', note: '' })
-      mutate('/api/float/today')
-      mutate('/api/float')
-      mutateCurrentFloat()
+      // Instantly refresh all float-related data
+      await Promise.all([
+        mutate('/api/float/today'),
+        mutate('/api/float'),
+        mutateCurrentFloat(),
+        mutateLiveStats(),
+        mutateCashUp(),
+      ])
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to top up float')
     } finally {
@@ -195,9 +204,14 @@ export default function FloatPage() {
         throw new Error((err as { error?: string }).error ?? 'Reversal failed')
       }
       toast.success('Movement reversed')
-      mutate('/api/float')
-      mutate('/api/float/today')
-      mutateCurrentFloat()
+      // Instantly refresh all float-related data
+      await Promise.all([
+        mutate('/api/float'),
+        mutate('/api/float/today'),
+        mutateCurrentFloat(),
+        mutateLiveStats(),
+        mutateCashUp(),
+      ])
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to reverse movement')
     } finally {
@@ -515,19 +529,21 @@ export default function FloatPage() {
                 <tbody>
                   {movements.map((m, i) => {
                     const isLastMovement = i === movements.length - 1
-                    // Calculate expected drawer balance after this movement
-                    // Formula: CashUp Opening + Float Balance After + Transactions
+                    // For the last movement, use calFloat directly so it matches "Current Balance"
+                    // For earlier movements, calculate based on that movement's float balance
                     const floatBalanceAfter = new Decimal(m.balanceAfter)
-                    const expectedInDrawer = cashUpOpeningBalance && liveStats
-                      ? cashUpOpeningBalance
-                          .plus(floatBalanceAfter)
-                          .plus(new Decimal(liveStats.cashSales ?? '0'))
-                          .minus(new Decimal(liveStats.cashPurchases ?? '0'))
-                          .minus(new Decimal(liveStats.cashPayments ?? '0'))
-                          .minus(new Decimal(liveStats.expenses ?? '0'))
-                          .minus(new Decimal(liveStats.loanAdvance ?? '0'))
-                          .plus(new Decimal(liveStats.loanRepayment ?? '0'))
-                      : floatBalanceAfter
+                    const expectedInDrawer = isLastMovement && calFloat
+                      ? calFloat
+                      : (cashUpOpeningBalance && liveStats
+                          ? cashUpOpeningBalance
+                              .plus(floatBalanceAfter)
+                              .plus(new Decimal(liveStats.cashSales ?? '0'))
+                              .minus(new Decimal(liveStats.cashPurchases ?? '0'))
+                              .minus(new Decimal(liveStats.cashPayments ?? '0'))
+                              .minus(new Decimal(liveStats.expenses ?? '0'))
+                              .minus(new Decimal(liveStats.loanAdvance ?? '0'))
+                              .plus(new Decimal(liveStats.loanRepayment ?? '0'))
+                          : floatBalanceAfter)
                     return (
                       <tr key={m.id} style={{ background: i % 2 === 0 ? '#fff' : '#FAFAFA', borderBottom: `1px solid #F0F0F0` }}>
                         <td style={{ padding: '6px 12px', fontSize: 11, color: colors.textSecondary }}>
