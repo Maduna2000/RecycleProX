@@ -67,6 +67,13 @@ type LiveStats = {
   floatTopUps: string
 }
 
+type CashUp = {
+  id: string
+  sessionDate: string
+  status: 'open' | 'submitted' | 'approved'
+  openingBalance: string
+}
+
 function todayISO() {
   return new Date().toISOString().split('T')[0]!
 }
@@ -80,6 +87,7 @@ export default function FloatPage() {
   const { data: history, isLoading: loadingHistory } = useSWR<CashFloat[]>('/api/float', fetcher)
   const { data: currentData, mutate: mutateCurrentFloat } = useSWR<CurrentFloatResponse>('/api/float/current', fetcher, { refreshInterval: 30000 })
   const { data: liveStats } = useSWR<LiveStats>(`/api/cashup/live-stats?date=${todayISO()}`, fetcher, { refreshInterval: 30000 })
+  const { data: cashUpData } = useSWR<{ cashUp: CashUp | null }>('/api/cashup?today=1', fetcher, { refreshInterval: 30000 })
   const [saving, setSaving] = useState(false)
   const [reversingMovement, setReversingMovement] = useState(false)
   const [historyPage, setHistoryPage] = useState(1)
@@ -90,10 +98,17 @@ export default function FloatPage() {
   const suggestedDate   = todayData?.suggestedDate ?? null
   const movements       = currentData?.float?.movements ?? []
 
+  // Get opening balance from cashup (carry-forward from previous day)
+  const cashUpOpeningBalance = cashUpData?.cashUp?.openingBalance
+    ? new Decimal(cashUpData.cashUp.openingBalance)
+    : null
+
   // Calculate Cal Float (expected cash in drawer) from live stats
-  // Formula: Opening + Top-ups + Cash Sales - Cash Purchases - Cash Payments - Expenses - Loan Advance + Loan Repayment
-  const calFloat = liveStats
-    ? new Decimal(liveStats.floatTopUps ?? '0')
+  // Formula: CashUp Opening Balance + Today's Float Top-ups + Cash Sales - Cash Purchases - Cash Payments - Expenses - Loan Advance + Loan Repayment
+  // Note: floatTopUps from live-stats includes today's float opening + any top-ups during the day
+  const calFloat = liveStats && cashUpOpeningBalance !== null
+    ? cashUpOpeningBalance
+        .plus(new Decimal(liveStats.floatTopUps ?? '0'))
         .plus(new Decimal(liveStats.cashSales ?? '0'))
         .minus(new Decimal(liveStats.cashPurchases ?? '0'))
         .minus(new Decimal(liveStats.cashPayments ?? '0'))
@@ -207,12 +222,23 @@ export default function FloatPage() {
               </div>
             ) : floatAlreadySet ? (
               <div className="space-y-3">
-                {/* Current balance card */}
+                {/* Balance cards */}
                 <div className="px-4 py-3 rounded" style={{ background: colors.warningBg, border: `1px solid ${colors.warning}40` }}>
-                  <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: colors.warning }}>Opening Float</p>
-                  <p className="font-mono font-bold mt-1" style={{ fontSize: 24, color: '#92700F' }}>
+                  {/* Opening Balance from Cashup (carry-forward from previous day) */}
+                  {cashUpOpeningBalance !== null && (
+                    <>
+                      <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: colors.textSecondary }}>Opening Balance (Carry-Forward)</p>
+                      <p className="font-mono font-bold mt-1" style={{ fontSize: 18, color: colors.textPrimary }}>
+                        R {cashUpOpeningBalance.toFixed(2)}
+                      </p>
+                    </>
+                  )}
+                  {/* Today's Float */}
+                  <p className="text-xs font-semibold uppercase tracking-wide mt-2" style={{ color: colors.warning }}>Today&apos;s Float (Drawings)</p>
+                  <p className="font-mono font-bold mt-1" style={{ fontSize: 18, color: '#92700F' }}>
                     R {new Decimal(todayFloat.openingAmount).toFixed(2)}
                   </p>
+                  {/* Current Balance (Expected in Drawer) */}
                   {calFloat && (
                     <>
                       <p className="text-xs font-semibold uppercase tracking-wide mt-2" style={{ color: colors.action }}>Current Balance (Expected in Drawer)</p>
