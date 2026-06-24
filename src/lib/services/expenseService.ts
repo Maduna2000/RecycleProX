@@ -274,8 +274,13 @@ export async function voidExpense(id: string, userId: string) {
 export async function getExpenseTotalsForDate(date: Date): Promise<Decimal> {
   const start = new Date(date); start.setHours(0, 0, 0, 0)
   const end   = new Date(date); end.setHours(23, 59, 59, 999)
+  // Include both pending and approved expenses (exclude only voided)
+  // Pending expenses reserve the money even before approval
   const result = await prisma.expense.aggregate({
-    where: { status: 'approved', createdAt: { gte: start, lte: end } },
+    where: {
+      status: { in: ['pending', 'approved'] },
+      createdAt: { gte: start, lte: end },
+    },
     _sum: { amount: true },
   })
   return new Decimal(result._sum.amount?.toString() ?? '0')
