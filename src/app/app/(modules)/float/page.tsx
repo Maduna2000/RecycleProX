@@ -227,21 +227,16 @@ export default function FloatPage() {
                   {/* Opening Balance from Cashup (carry-forward from previous day) */}
                   {cashUpOpeningBalance !== null && (
                     <>
-                      <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: colors.textSecondary }}>Opening Balance (Carry-Forward)</p>
-                      <p className="font-mono font-bold mt-1" style={{ fontSize: 18, color: colors.textPrimary }}>
+                      <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: colors.textSecondary }}>Opening Balance</p>
+                      <p className="font-mono font-bold mt-1" style={{ fontSize: 20, color: colors.textPrimary }}>
                         R {cashUpOpeningBalance.toFixed(2)}
                       </p>
                     </>
                   )}
-                  {/* Today's Float */}
-                  <p className="text-xs font-semibold uppercase tracking-wide mt-2" style={{ color: colors.warning }}>Today&apos;s Float (Drawings)</p>
-                  <p className="font-mono font-bold mt-1" style={{ fontSize: 18, color: '#92700F' }}>
-                    R {new Decimal(todayFloat.openingAmount).toFixed(2)}
-                  </p>
                   {/* Current Balance (Expected in Drawer) */}
                   {calFloat && (
                     <>
-                      <p className="text-xs font-semibold uppercase tracking-wide mt-2" style={{ color: colors.action }}>Current Balance (Expected in Drawer)</p>
+                      <p className="text-xs font-semibold uppercase tracking-wide mt-3" style={{ color: colors.action }}>Current Balance (Expected in Drawer)</p>
                       <p className="font-mono font-bold" style={{ fontSize: 20, color: colors.action }}>
                         R {calFloat.toFixed(2)}
                       </p>
