@@ -42,11 +42,10 @@ export async function createExpense(data: CreateExpenseInput, userId: string) {
     ? amount.times(vatRate.div(vatRate.plus(1))).toDecimalPlaces(2)
     : new Decimal(0)
 
-  // Link to today's open/submitted cash-up session if one exists
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
+  // Link to any open cash-up session (could be from a previous day that spans midnight)
   const openSession = await prisma.cashUp.findFirst({
-    where: { sessionDate: today, status: { in: ['open', 'submitted'] } },
+    where: { status: 'open' },
+    orderBy: { sessionDate: 'desc' },
   })
 
   // If isPending is false (default), auto-approve; otherwise leave as pending

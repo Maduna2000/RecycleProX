@@ -49,7 +49,12 @@ export async function POST(req: NextRequest) {
     const cashUp = await openCashUp(session.user.id, parsed.data.sessionDate)
     return NextResponse.json({ cashUp }, { status: 201 })
   } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to open cash-up session'
     logger.error({ err }, 'POST /api/cashup failed')
-    return NextResponse.json({ error: 'Failed to open cash-up session' }, { status: 500 })
+    // Return 409 Conflict if previous day's session is still open
+    if (message.includes('previous day')) {
+      return NextResponse.json({ error: message }, { status: 409 })
+    }
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
