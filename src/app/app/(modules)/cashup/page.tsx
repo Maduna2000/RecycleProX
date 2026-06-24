@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { CheckCircle2, Calculator, Clock, Loader2, Lock, RefreshCw, ExternalLink, X } from 'lucide-react'
-import { Dialog, DialogContent } from '@/components/ui/dialog'
+import { Dialog, DialogContent, ModalTitleBar, ModalBtn } from '@/components/ui/dialog'
 import { DENOMINATIONS, DENOMINATION_LABELS } from '@/lib/schemas/cashup'
 import { PageShell } from '@/components/layout/PageShell'
 import { colors } from '@/lib/design-tokens'
@@ -103,7 +103,7 @@ function VarianceRow({ variance }: { variance: string }) {
 }
 
 // ─── Count Cash modal ─────────────────────────────────────────────────────────
-function CountCashModal({ counts, setCounts, notes, setNotes, submitting, handleSubmit, onClose }: {
+function CountCashModal({ counts, setCounts, notes, setNotes, submitting, handleSubmit, onClose, expectedCash }: {
   counts: Record<number, number>
   setCounts: React.Dispatch<React.SetStateAction<Record<number, number>>>
   notes: string
@@ -111,29 +111,42 @@ function CountCashModal({ counts, setCounts, notes, setNotes, submitting, handle
   submitting: boolean
   handleSubmit: () => Promise<void>
   onClose: () => void
+  expectedCash: Decimal
 }) {
   const total = DENOMINATIONS.reduce(
     (s, d) => s.plus(new Decimal(counts[d] ?? 0).times(d).div(100)),
     new Decimal(0)
   )
+  const variance = total.minus(expectedCash)
+  const hasCounted = !total.isZero()
+
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-md" showCloseButton={false}>
-        {/* Title bar with close button — matches ManageCategoriesModal pattern */}
-        <div className="flex items-center justify-between pb-3 border-b" style={{ borderColor: colors.border }}>
-          <span className="font-semibold text-sm" style={{ color: colors.textPrimary }}>Count Cash</span>
-          <button onClick={onClose} className="rounded p-1 hover:bg-slate-100 transition-colors" aria-label="Close">
-            <X className="w-4 h-4" style={{ color: colors.textSecondary }} />
-          </button>
-        </div>
-        <div className="space-y-3 mt-1">
+      <DialogContent className="sm:max-w-md p-0" showCloseButton={false} style={{ borderRadius: 2, border: `1px solid ${colors.border}`, boxShadow: '0 4px 12px rgba(0,0,0,0.15)', background: colors.surface }}>
+        <ModalTitleBar title="Count Cash" onClose={onClose} />
+        <div style={{ padding: '12px 16px 16px' }} className="space-y-3">
+
+          {/* Expected cash in drawer - prominent display */}
+          <div style={{ background: colors.processBg, border: `1px solid ${colors.process}`, borderRadius: 3, padding: '10px 12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 11, fontWeight: 600, color: colors.process, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Expected in Drawer
+              </span>
+              <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 18, color: colors.process }}>
+                R {expectedCash.toFixed(2)}
+              </span>
+            </div>
+            <p style={{ fontSize: 10, marginTop: 4, color: colors.textSecondary }}>
+              This is the calculated amount based on opening balance, transactions, and expenses.
+            </p>
+          </div>
 
           {/* Denomination table — bordered, scrollable, one row per denomination */}
           <div style={{ border: `1px solid ${colors.border}`, borderRadius: 3, overflow: 'hidden' }}>
             {/* Column headers */}
             <div
               className="grid px-3 py-1.5 text-xs font-semibold uppercase tracking-wide"
-              style={{ gridTemplateColumns: '1fr 6rem 6rem', background: colors.toolbar, color: colors.textSecondary }}
+              style={{ gridTemplateColumns: '1fr 6rem 6rem', background: 'linear-gradient(180deg,#FFFFFF 0%,#E8E8E8 100%)', color: colors.textSecondary, borderBottom: `1px solid ${colors.border}` }}
             >
               <span>Denomination</span>
               <span className="text-center">Qty</span>
@@ -141,14 +154,14 @@ function CountCashModal({ counts, setCounts, notes, setNotes, submitting, handle
             </div>
 
             {/* One full-width row per denomination */}
-            <div style={{ maxHeight: 320, overflowY: 'auto' }}>
-              {DENOMINATIONS.map((d) => {
+            <div style={{ maxHeight: 260, overflowY: 'auto' }}>
+              {DENOMINATIONS.map((d, i) => {
                 const val = new Decimal(counts[d] ?? 0).times(d).div(100)
                 return (
                   <div
                     key={d}
-                    className="grid items-center px-3 py-2"
-                    style={{ gridTemplateColumns: '1fr 6rem 6rem', borderTop: `1px solid ${colors.border}` }}
+                    className="grid items-center px-3 py-1.5"
+                    style={{ gridTemplateColumns: '1fr 6rem 6rem', background: i % 2 === 0 ? '#fff' : '#FAFAFA', borderTop: i > 0 ? `1px solid ${colors.border}` : undefined }}
                   >
                     <span className="font-mono font-semibold text-sm" style={{ color: colors.textPrimary }}>
                       {DENOMINATION_LABELS[d]}
@@ -171,53 +184,65 @@ function CountCashModal({ counts, setCounts, notes, setNotes, submitting, handle
             </div>
           </div>
 
-          {/* Counted total */}
-          <div
-            className="flex justify-between items-center px-3 py-2 rounded text-sm font-semibold"
-            style={{ background: colors.toolbar, border: `1px solid ${colors.border}` }}
-          >
-            <span style={{ color: colors.textSecondary }}>Counted Total</span>
-            <span className="font-mono text-base" style={{ color: total.isZero() ? colors.textSecondary : colors.textPrimary }}>
-              R {total.toFixed(2)}
-            </span>
+          {/* Comparison: Expected vs Counted */}
+          <div style={{ border: `1px solid ${colors.border}`, borderRadius: 3, overflow: 'hidden' }}>
+            {/* Counted total */}
+            <div className="flex justify-between items-center px-3 py-2" style={{ background: 'linear-gradient(180deg,#FFFFFF 0%,#E8E8E8 100%)', borderBottom: `1px solid ${colors.border}` }}>
+              <span className="text-xs font-semibold uppercase" style={{ color: colors.textSecondary }}>Cash Counted</span>
+              <span className="font-mono font-bold text-base" style={{ color: total.isZero() ? colors.textSecondary : colors.textPrimary }}>
+                R {total.toFixed(2)}
+              </span>
+            </div>
+
+            {/* Variance row */}
+            {hasCounted ? (
+              <div
+                className="flex justify-between items-center px-3 py-2"
+                style={{
+                  background: variance.isZero() ? colors.actionBg : variance.gt(0) ? colors.processBg : colors.dangerBg,
+                }}
+              >
+                <span className="text-xs font-semibold uppercase" style={{ color: variance.isZero() ? colors.action : variance.gt(0) ? colors.process : colors.danger }}>
+                  {variance.isZero() ? 'Balanced' : variance.gt(0) ? 'Over' : 'Short'}
+                </span>
+                <span className="font-mono font-bold text-base" style={{ color: variance.isZero() ? colors.action : variance.gt(0) ? colors.process : colors.danger }}>
+                  {variance.gt(0) ? '+' : ''}R {variance.toFixed(2)}
+                </span>
+              </div>
+            ) : (
+              <div className="flex justify-between items-center px-3 py-2" style={{ background: colors.neutralBg }}>
+                <span className="text-xs font-semibold uppercase" style={{ color: colors.textSecondary }}>Variance</span>
+                <span className="text-xs italic" style={{ color: colors.textSecondary }}>Enter counts above</span>
+              </div>
+            )}
           </div>
 
           {/* Notes */}
           <div>
-            <Label className="text-xs" style={{ color: colors.textSecondary }}>Notes (optional)</Label>
+            <Label style={{ display: 'block', marginBottom: 4, fontSize: 10, fontWeight: 600, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              Notes <span style={{ fontWeight: 400, color: colors.textMuted, textTransform: 'none' }}>(optional)</span>
+            </Label>
             <Textarea
               value={notes}
               onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setNotes(e.target.value)}
               placeholder="Any comments about the count…"
-              className="mt-1 text-sm" rows={2} disabled={submitting}
+              style={{ fontSize: 12, border: `1px solid ${colors.border}`, borderRadius: 2, resize: 'vertical' }}
+              rows={2} disabled={submitting}
             />
           </div>
 
-          <button
-            style={{
-              fontSize: 10,
-              padding: '1px 6px',
-              background: '#E0E0E0',
-              border: '1px solid #999',
-              borderRadius: 2,
-              width: '100%',
-              cursor: submitting ? 'not-allowed' : 'pointer',
-              opacity: submitting ? 0.6 : 1,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 3,
-            }}
-            onClick={() => { void handleSubmit(); onClose() }}
-            disabled={submitting}
-            onMouseEnter={(e) => { if (!submitting) e.currentTarget.style.background = '#D0D0D0' }}
-            onMouseLeave={(e) => { if (!submitting) e.currentTarget.style.background = '#E0E0E0' }}
-          >
-            {submitting
-              ? <><Loader2 style={{ width: 9, height: 9, animation: 'spin 1s linear infinite' }} />Submitting…</>
-              : 'Submit Cash-Up'
-            }
-          </button>
+          {/* Footer buttons */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, paddingTop: 8, borderTop: `1px solid ${colors.border}` }}>
+            <ModalBtn onClick={onClose} disabled={submitting}>Cancel</ModalBtn>
+            <ModalBtn
+              variant="primary"
+              onClick={() => { void handleSubmit(); onClose() }}
+              disabled={submitting || !hasCounted}
+              loading={submitting}
+            >
+              Submit Cash-Up
+            </ModalBtn>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
@@ -293,50 +318,46 @@ function ManageSessionsModal({ sessions, onClose, onVoided }: {
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-lg" showCloseButton={false}>
-        <div className="flex items-center justify-between pb-3 border-b" style={{ borderColor: colors.border }}>
-          <span className="font-semibold text-sm" style={{ color: colors.textPrimary }}>
-            Manage Open Sessions ({sessions.length})
-          </span>
-          <button onClick={onClose} className="rounded p-1 hover:bg-slate-100 transition-colors" aria-label="Close">
-            <X className="w-4 h-4" style={{ color: colors.textSecondary }} />
-          </button>
-        </div>
+      <DialogContent className="sm:max-w-lg p-0" showCloseButton={false} style={{ borderRadius: 2, border: `1px solid ${colors.border}`, boxShadow: '0 4px 12px rgba(0,0,0,0.15)', background: colors.surface }}>
+        <ModalTitleBar title={`Manage Open Sessions (${sessions.length})`} onClose={onClose} />
 
-        <div className="space-y-3 mt-2">
+        <div style={{ padding: '12px 16px 16px' }} className="space-y-3">
           {/* Select All checkbox */}
           <label className="flex items-center gap-2 cursor-pointer">
             <input
               type="checkbox"
               checked={allSelected}
               onChange={toggleAll}
-              className="w-4 h-4 rounded border-gray-300"
+              style={{ width: 14, height: 14, cursor: 'pointer' }}
             />
-            <span className="text-sm font-medium" style={{ color: colors.textPrimary }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: colors.textPrimary }}>
               Select All ({sessions.length} sessions)
             </span>
           </label>
 
           {/* Session list */}
-          <div className="border rounded overflow-hidden" style={{ borderColor: colors.border, maxHeight: 300, overflowY: 'auto' }}>
-            {sessions.map((s) => {
+          <div style={{ border: `1px solid ${colors.border}`, borderRadius: 3, maxHeight: 300, overflowY: 'auto' }}>
+            {sessions.map((s, i) => {
               const date = s.sessionDate.split('T')[0]
               const openingBal = new Decimal(s.openingBalance ?? '0')
               return (
                 <label
                   key={s.id}
-                  className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-slate-50 border-b last:border-b-0"
-                  style={{ borderColor: colors.border }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', cursor: 'pointer',
+                    background: i % 2 === 0 ? '#fff' : '#FAFAFA',
+                    borderTop: i > 0 ? `1px solid ${colors.border}` : undefined,
+                  }}
                 >
                   <input
                     type="checkbox"
                     checked={selected.has(s.id)}
                     onChange={() => toggleSession(s.id)}
-                    className="w-4 h-4 rounded border-gray-300"
+                    style={{ width: 14, height: 14, cursor: 'pointer' }}
                   />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium" style={{ color: colors.textPrimary }}>{date}</p>
-                    <p className="text-xs" style={{ color: colors.textSecondary }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: 12, fontWeight: 600, color: colors.textPrimary, margin: 0 }}>{date}</p>
+                    <p style={{ fontSize: 10, color: colors.textSecondary, margin: 0 }}>
                       Opening: R {openingBal.toFixed(2)} · Opened {new Date(s.openedAt).toLocaleDateString('en-ZA')}
                     </p>
                   </div>
@@ -347,46 +368,34 @@ function ManageSessionsModal({ sessions, onClose, onVoided }: {
 
           {/* Void reason */}
           <div>
-            <Label className="text-xs" style={{ color: colors.textSecondary }}>Reason for voiding (required)</Label>
+            <Label style={{ display: 'block', marginBottom: 4, fontSize: 10, fontWeight: 600, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              Reason for voiding <span style={{ color: colors.danger }}>(required)</span>
+            </Label>
             <Textarea
               value={voidReason}
               onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setVoidReason(e.target.value)}
               placeholder="e.g., Unable to reconcile - data lost, Old test sessions..."
-              className="mt-1 text-sm" rows={2} disabled={voiding}
+              style={{ fontSize: 12, border: `1px solid ${colors.border}`, borderRadius: 2, resize: 'vertical' }}
+              rows={2} disabled={voiding}
             />
           </div>
 
-          {/* Actions */}
-          <div className="flex items-center justify-between pt-2">
-            <span className="text-xs" style={{ color: colors.textSecondary }}>
+          {/* Footer */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 8, borderTop: `1px solid ${colors.border}` }}>
+            <span style={{ fontSize: 11, color: colors.textSecondary }}>
               {selected.size} session{selected.size !== 1 ? 's' : ''} selected
             </span>
-            <button
-              onClick={handleBulkVoid}
-              disabled={voiding || selected.size === 0 || !voidReason.trim()}
-              style={{
-                fontSize: 11,
-                padding: '6px 16px',
-                background: selected.size > 0 && voidReason.trim() ? colors.danger : '#ccc',
-                color: '#fff',
-                border: 'none',
-                borderRadius: 3,
-                cursor: voiding || selected.size === 0 || !voidReason.trim() ? 'not-allowed' : 'pointer',
-                opacity: voiding ? 0.7 : 1,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-              }}
-            >
-              {voiding ? (
-                <>
-                  <Loader2 style={{ width: 12, height: 12, animation: 'spin 1s linear infinite' }} />
-                  Voiding {selected.size}...
-                </>
-              ) : (
-                `Void ${selected.size} Session${selected.size !== 1 ? 's' : ''}`
-              )}
-            </button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <ModalBtn onClick={onClose} disabled={voiding}>Cancel</ModalBtn>
+              <ModalBtn
+                variant="danger"
+                onClick={handleBulkVoid}
+                disabled={voiding || selected.size === 0 || !voidReason.trim()}
+                loading={voiding}
+              >
+                Void {selected.size} Session{selected.size !== 1 ? 's' : ''}
+              </ModalBtn>
+            </div>
           </div>
         </div>
       </DialogContent>
@@ -912,14 +921,29 @@ export default function CashUpPage() {
         )}
       </div>
 
-      {countCashOpen && (
-        <CountCashModal
-          counts={counts} setCounts={setCounts}
-          notes={notes} setNotes={setNotes}
-          submitting={submitting} handleSubmit={handleSubmit}
-          onClose={() => setCountCashOpen(false)}
-        />
-      )}
+      {countCashOpen && (() => {
+        // Calculate expected cash in drawer for the modal
+        const opening   = new Decimal(cashUp?.openingBalance ?? '0')
+        const draw      = new Decimal(stats?.floatTopUps ?? '0')
+        const totalCash = opening.plus(draw)
+        const cashSales = new Decimal(stats?.cashSales ?? '0')
+        const cashPurch = new Decimal(stats?.cashPurchases ?? '0')
+        const cashPay   = new Decimal(stats?.cashPayments ?? '0')
+        const exp       = new Decimal(stats?.expenses ?? '0')
+        const loanAdv   = new Decimal(stats?.loanAdvance ?? '0')
+        const loanRep   = new Decimal(stats?.loanRepayment ?? '0')
+        const expectedCash = totalCash.plus(cashSales).minus(cashPurch).minus(cashPay).minus(exp).minus(loanAdv).plus(loanRep)
+
+        return (
+          <CountCashModal
+            counts={counts} setCounts={setCounts}
+            notes={notes} setNotes={setNotes}
+            submitting={submitting} handleSubmit={handleSubmit}
+            onClose={() => setCountCashOpen(false)}
+            expectedCash={expectedCash}
+          />
+        )
+      })()}
 
       {manageSessionsOpen && openSessions.length > 0 && (
         <ManageSessionsModal
