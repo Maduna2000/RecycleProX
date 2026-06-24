@@ -293,6 +293,38 @@ export default function CashUpPage() {
   )
 
   const [countCashOpen, setCountCashOpen] = useState(false)
+  const [voiding, setVoiding] = useState(false)
+
+  // Fetch all open sessions to show count
+  const { data: openSessionsData } = useSWR<{ sessions: CashUp[] }>('/api/cashup/open-sessions', fetcher)
+  const openSessionsCount = openSessionsData?.sessions?.length ?? 0
+
+  async function handleVoidSession() {
+    if (!cashUp || !isManager) return
+    const reason = window.prompt('Enter reason for voiding this session (e.g., "Unable to reconcile - data lost"):')
+    if (!reason) return
+
+    setVoiding(true)
+    try {
+      const res = await fetch(`/api/cashup/${cashUp.id}/void`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason }),
+      })
+      if (res.ok) {
+        toast.success('Session voided')
+        swrMutate(CASHUP_KEY)
+        swrMutate('/api/cashup/open-sessions')
+      } else {
+        const j = await res.json()
+        toast.error(j.error ?? 'Failed to void session')
+      }
+    } catch {
+      toast.error('Failed to void session')
+    } finally {
+      setVoiding(false)
+    }
+  }
 
   const declaredCash = DENOMINATIONS.reduce(
     (acc, d) => acc.plus(new Decimal(counts[d] ?? 0).times(d).div(100)),
@@ -406,13 +438,44 @@ export default function CashUpPage() {
             {cashUp.status === 'open' && sessionDate !== todayISO && (
               <div className="rounded border overflow-hidden" style={{ borderColor: colors.danger, background: colors.dangerBg }}>
                 <div className="px-4 py-3">
-                  <p className="font-semibold text-sm mb-1" style={{ color: colors.danger }}>
-                    ⚠ Previous Day&apos;s Cash-Up Not Submitted
-                  </p>
-                  <p className="text-sm" style={{ color: colors.textPrimary }}>
-                    You have an open session from <strong>{sessionDate}</strong> that needs to be submitted before you can start today&apos;s session.
-                    Please count your cash and submit the cash-up below.
-                  </p>
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="font-semibold text-sm mb-1" style={{ color: colors.danger }}>
+                        ⚠ Previous Day&apos;s Cash-Up Not Submitted
+                        {openSessionsCount > 1 && (
+                          <span className="ml-2 px-1.5 py-0.5 rounded text-xs" style={{ background: colors.danger, color: '#fff' }}>
+                            {openSessionsCount} open sessions
+                          </span>
+                        )}
+                      </p>
+                      <p className="text-sm" style={{ color: colors.textPrimary }}>
+                        You have an open session from <strong>{sessionDate}</strong> that needs to be submitted before you can start today&apos;s session.
+                        {openSessionsCount > 1
+                          ? ' You have multiple old sessions — submit or void each one to proceed.'
+                          : ' Please count your cash and submit the cash-up below.'}
+                      </p>
+                    </div>
+                    {isManager && (
+                      <button
+                        onClick={handleVoidSession}
+                        disabled={voiding}
+                        style={{
+                          fontSize: 10,
+                          padding: '2px 8px',
+                          background: colors.danger,
+                          color: '#fff',
+                          border: 'none',
+                          borderRadius: 2,
+                          cursor: voiding ? 'not-allowed' : 'pointer',
+                          opacity: voiding ? 0.6 : 1,
+                          whiteSpace: 'nowrap',
+                          flexShrink: 0,
+                        }}
+                      >
+                        {voiding ? 'Voiding...' : 'Void Session'}
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             )}

@@ -135,6 +135,38 @@ export async function getAnyOpenSession() {
   })
 }
 
+// ─── Get all open sessions ────────────────────────────────────────────────────
+// Returns all sessions that are still 'open' (not submitted), ordered by date
+export async function getAllOpenSessions() {
+  return prisma.cashUp.findMany({
+    where: { status: 'open' },
+    orderBy: { sessionDate: 'desc' },
+  })
+}
+
+// ─── Void/cancel an old session ───────────────────────────────────────────────
+// Used to clean up sessions that can't be reconciled (e.g., too old)
+export async function voidCashUp(cashUpId: string, voidedByUserId: string, reason: string) {
+  const cashUp = await prisma.cashUp.findUniqueOrThrow({ where: { id: cashUpId } })
+
+  if (cashUp.status !== 'open') {
+    throw new Error(`Cannot void cash-up with status "${cashUp.status}"`)
+  }
+
+  const updated = await prisma.cashUp.update({
+    where: { id: cashUpId },
+    data: {
+      status: 'voided',
+      notes: `VOIDED: ${reason}`,
+      closedByUserId: voidedByUserId,
+      closedAt: new Date(),
+    },
+  })
+
+  logger.warn({ cashUpId, voidedByUserId, reason }, 'Cash-up session voided')
+  return updated
+}
+
 // ─── Calculate system totals for a date ──────────────────────────────────────
 // Sums completed transactions for the session date (midnight to midnight).
 async function calcSystemTotals(sessionDate: Date, drawingsReceived = new Decimal(0), loansTotal = new Decimal(0)) {
