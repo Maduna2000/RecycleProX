@@ -6,7 +6,6 @@ import { toast } from 'sonner'
 import Decimal from 'decimal.js'
 import { Dialog, DialogContent, ModalTitleBar } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Input } from '@/components/ui/input'
 import { SplitPaymentModal, type SplitPayTarget } from './SplitPaymentModal'
 
 export type PayTarget = {
@@ -28,8 +27,6 @@ export function ProcessPaymentModal({
   onSuccess: () => void
 }) {
   const [method,          setMethod]          = useState<'cash' | 'eft' | 'cheque'>('cash')
-  const [amount,          setAmount]          = useState('')
-  const [amountError,     setAmountError]     = useState<string | null>(null)
   const [loading,         setLoading]         = useState(false)
   const [showSplit,       setShowSplit]       = useState(false)
   const [outstandingLoan, setOutstandingLoan] = useState('0')
@@ -59,28 +56,9 @@ export function ProcessPaymentModal({
     fetchLoan()
   }, [purchase.customerId])
 
-  // Auto-fill amount with full remaining balance on mount
-  useEffect(() => {
-    if (remaining.gt(0)) {
-      setAmount(remaining.toFixed(2))
-    }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  function validateAmount(raw: string): string | null {
-    if (!raw.trim()) return 'Amount is required'
-    if (!/^\d+(\.\d{1,2})?$/.test(raw)) return 'Enter a valid amount (e.g. 150.00)'
-    const d = new Decimal(raw)
-    if (d.lt(new Decimal('0.01'))) return 'Minimum amount is R0.01'
-    if (d.gt(remaining)) return `Cannot exceed remaining balance of R ${remaining.toFixed(2)}`
-    // Full payment required
-    if (d.lt(remaining)) return `Full payment required. Must pay R ${remaining.toFixed(2)}`
-    return null
-  }
-
   async function handlePay() {
     // Always pay full remaining amount
     const fullAmount = remaining.toFixed(2)
-    setAmountError(null)
     setLoading(true)
     const res = await fetch(`/api/purchases/${purchase.id}/mark-paid`, {
       method: 'PATCH',
@@ -153,9 +131,6 @@ export function ProcessPaymentModal({
             >
               R {remaining.toFixed(2)}
             </div>
-            {amountError && (
-              <p className="text-xs mt-1" style={{ color: '#DC3545' }}>{amountError}</p>
-            )}
           </div>
 
           {/* Payment method */}
