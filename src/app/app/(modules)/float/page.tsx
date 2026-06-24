@@ -507,7 +507,7 @@ export default function FloatPage() {
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: '#F5F5F5', borderBottom: `1px solid ${colors.border}` }}>
-                    {['Time', 'Type', 'Amount', 'Balance After', 'Note', ...(isManager ? [''] : [])].map((h, idx) => (
+                    {['Time', 'Type', 'Amount', 'Expected in Drawer', 'Note', ...(isManager ? [''] : [])].map((h, idx) => (
                       <th key={idx} style={{ textAlign: 'left', padding: '6px 12px', fontSize: 10, fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
                     ))}
                   </tr>
@@ -515,6 +515,19 @@ export default function FloatPage() {
                 <tbody>
                   {movements.map((m, i) => {
                     const isLastMovement = i === movements.length - 1
+                    // Calculate expected drawer balance after this movement
+                    // Formula: CashUp Opening + Float Balance After + Transactions
+                    const floatBalanceAfter = new Decimal(m.balanceAfter)
+                    const expectedInDrawer = cashUpOpeningBalance && liveStats
+                      ? cashUpOpeningBalance
+                          .plus(floatBalanceAfter)
+                          .plus(new Decimal(liveStats.cashSales ?? '0'))
+                          .minus(new Decimal(liveStats.cashPurchases ?? '0'))
+                          .minus(new Decimal(liveStats.cashPayments ?? '0'))
+                          .minus(new Decimal(liveStats.expenses ?? '0'))
+                          .minus(new Decimal(liveStats.loanAdvance ?? '0'))
+                          .plus(new Decimal(liveStats.loanRepayment ?? '0'))
+                      : floatBalanceAfter
                     return (
                       <tr key={m.id} style={{ background: i % 2 === 0 ? '#fff' : '#FAFAFA', borderBottom: `1px solid #F0F0F0` }}>
                         <td style={{ padding: '6px 12px', fontSize: 11, color: colors.textSecondary }}>
@@ -533,8 +546,8 @@ export default function FloatPage() {
                         <td style={{ padding: '6px 12px', fontSize: 12, fontFamily: 'monospace', fontWeight: 600, color: colors.action }}>
                           +R {new Decimal(m.amount).toFixed(2)}
                         </td>
-                        <td style={{ padding: '6px 12px', fontSize: 12, fontFamily: 'monospace', color: colors.textPrimary }}>
-                          R {new Decimal(m.balanceAfter).toFixed(2)}
+                        <td style={{ padding: '6px 12px', fontSize: 12, fontFamily: 'monospace', color: colors.action }}>
+                          R {expectedInDrawer.toFixed(2)}
                         </td>
                         <td style={{ padding: '6px 12px', fontSize: 11, color: colors.textSecondary }}>
                           {m.referenceNote ?? '—'}
