@@ -419,6 +419,8 @@ model Expense {
   expenseTypeId   String
   description     String
   amount          Decimal             @db.Decimal(18, 2)
+  estimatedAmount Decimal?            @db.Decimal(18, 2)
+  changeReceived  Decimal?            @db.Decimal(18, 2)
   vatAmount       Decimal             @default(0) @db.Decimal(18, 2)
   includesVat     Boolean             @default(false)
   paymentMethod   PaymentMethod       @default(cash)

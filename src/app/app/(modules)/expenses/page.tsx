@@ -26,6 +26,7 @@ type ExpenseType = { id: string; name: string; parentId?: string | null }
 type Expense = {
   id: string; refNumber: string; description: string
   amount: string; vatAmount: string; includesVat: boolean
+  estimatedAmount?: string | null; changeReceived?: string | null
   paymentMethod: string; chequeNo?: string | null; status: string
   createdAt: string; updatedAt: string; createdByUserId?: string | null
   expenseType: { id: string; name: string }
@@ -42,10 +43,10 @@ export default function ExpensesPage() {
   const { confirm }   = useConfirm()
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
 
-  const [tab,            setTab]            = useState<PageTab>('Pending')
-  const [addOpen,        setAddOpen]        = useState(false)
-  const [addTypeOpen,    setAddTypeOpen]    = useState(false)
-  const [editingExpense, setEditingExpense] = useState<Expense | null>(null)
+  const [tab,              setTab]              = useState<PageTab>('Pending')
+  const [addOpen,          setAddOpen]          = useState(false)
+  const [addTypeOpen,      setAddTypeOpen]      = useState(false)
+  const [settlingExpense,  setSettlingExpense]  = useState<Expense | null>(null)
   const [search,         setSearch]         = useState('')
   const [from,           setFrom]           = useState('')
   const [to,             setTo]             = useState('')
@@ -214,14 +215,14 @@ export default function ExpensesPage() {
       onClick: (r) => router.push(`/app/expenses/${r.id}`),
     },
     {
-      label:   'Edit',
+      label:   'Update',
       icon:    Pencil,
       hidden:  (r) => {
         if (r.status !== 'pending') return true
         const isCreator = r.createdByUserId === session?.user?.id
         return !isCreator && !isManager
       },
-      onClick: (r) => setEditingExpense(r),
+      onClick: (r) => setSettlingExpense(r),
     },
     {
       label:   'View Slip',
@@ -366,12 +367,11 @@ export default function ExpensesPage() {
         />
       )}
 
-      {editingExpense && (
-        <AddExpenseModal
-          mode="edit"
-          expense={editingExpense}
-          onClose={() => setEditingExpense(null)}
-          onSuccess={() => { mutate(key); setEditingExpense(null) }}
+      {settlingExpense && (
+        <UpdatePendingExpenseModal
+          expense={settlingExpense}
+          onClose={() => setSettlingExpense(null)}
+          onSuccess={() => { mutate(key); setSettlingExpense(null) }}
         />
       )}
 
@@ -760,6 +760,257 @@ function AddExpenseModal({ mode, expense, onClose, onSuccess }: AddExpenseModalP
           onSuccess={() => { mutate('/api/expense-types'); setAddTypeOpen(false) }}
         />
       )}
+    </Dialog>
+  )
+}
+
+// ─── Update Pending Expense Modal (Settle with Change) ────────────────────────
+type UpdatePendingExpenseModalProps = {
+  expense: Expense
+  onClose: () => void
+  onSuccess: () => void
+}
+
+function UpdatePendingExpenseModal({ expense, onClose, onSuccess }: UpdatePendingExpenseModalProps) {
+  const [loading, setLoading] = useState(false)
+  const [changeReceived, setChangeReceived] = useState('')
+  const [slipFile, setSlipFile] = useState<File | null>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  const estimatedAmount = new Decimal(expense.estimatedAmount ?? expense.amount)
+  const changeDecimal = changeReceived ? new Decimal(changeReceived || '0') : new Decimal(0)
+  const actualAmount = estimatedAmount.minus(changeDecimal)
+  const isValidChange = changeDecimal.gte(0) && changeDecimal.lte(estimatedAmount) && actualAmount.gt(0)
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!isValidChange) return
+
+    setLoading(true)
+
+    // Upload slip first if provided
+    if (slipFile) {
+      try {
+        const presignRes = await fetch('/api/r2/upload-url', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            context: 'expense_attachment',
+            referenceId: expense.id,
+            contentType: slipFile.type,
+            fileSize: slipFile.size,
+          }),
+        })
+        if (presignRes.ok) {
+          const { uploadUrl, key } = await presignRes.json()
+          const uploadRes = await fetch(uploadUrl, {
+            method: 'PUT',
+            body: slipFile,
+            headers: { 'Content-Type': slipFile.type },
+          })
+          if (uploadRes.ok) {
+            await fetch(`/api/expenses/${expense.id}/attachments`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ r2Key: key, fileName: slipFile.name }),
+            })
+          }
+        }
+      } catch {
+        toast.warning('Slip upload failed. You can add it from expense details.')
+      }
+    }
+
+    // Settle the expense
+    const res = await fetch(`/api/expenses/${expense.id}/settle`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        changeReceived: parseFloat(changeReceived || '0'),
+        updatedAt: expense.updatedAt,
+      }),
+    })
+
+    setLoading(false)
+    if (res.ok) {
+      toast.success('Expense updated and approved')
+      onSuccess()
+    } else {
+      const j = await res.json()
+      toast.error(j.error ?? 'Failed to update expense')
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
+      <DialogContent
+        className="sm:max-w-md p-0"
+        showCloseButton={false}
+        style={{
+          borderRadius: 2,
+          border: `1px solid ${colors.border}`,
+          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+          background: colors.surface,
+        }}
+      >
+        {/* Windows-style title bar */}
+        <div
+          style={{
+            background: 'linear-gradient(180deg, #EAEAEA 0%, #D4D4D4 100%)',
+            borderBottom: `1px solid ${colors.border}`,
+            padding: '6px 8px 6px 12px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <span style={{ fontSize: fontSize.sm, fontWeight: 600, color: colors.textPrimary }}>
+            Update Pending Expense
+          </span>
+          <button
+            onClick={onClose}
+            style={{
+              width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'none', border: 'none', cursor: 'pointer', borderRadius: 2, color: colors.textSecondary,
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = '#C0392B'; e.currentTarget.style.color = '#fff' }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = colors.textSecondary }}
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          <div style={{ padding: '12px 16px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+
+            {/* Read-only expense info */}
+            <div style={{ background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 2, padding: 10 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', marginBottom: 6 }}>
+                Expense Info
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 12px', fontSize: 12 }}>
+                <span style={{ color: colors.textSecondary }}>Ref:</span>
+                <span style={{ fontFamily: 'monospace', fontWeight: 600, color: colors.textPrimary }}>{expense.refNumber}</span>
+                <span style={{ color: colors.textSecondary }}>Category:</span>
+                <span style={{ color: colors.textPrimary }}>{expense.expenseType.name}</span>
+                <span style={{ color: colors.textSecondary }}>Description:</span>
+                <span style={{ color: colors.textPrimary }}>{expense.description}</span>
+                <span style={{ color: colors.textSecondary }}>Estimated:</span>
+                <span style={{ fontFamily: 'monospace', fontWeight: 700, color: colors.warning }}>
+                  R {estimatedAmount.toFixed(2)}
+                </span>
+              </div>
+            </div>
+
+            {/* Change received input */}
+            <div>
+              <Label style={{ display: 'block', marginBottom: 4, fontSize: fontSize.sm, fontWeight: 600, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Change Received (R)
+              </Label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                max={estimatedAmount.toNumber()}
+                value={changeReceived}
+                onChange={(e) => setChangeReceived(e.target.value)}
+                disabled={loading}
+                placeholder="0.00"
+                style={{
+                  height: 32,
+                  border: `1px solid ${colors.border}`,
+                  borderRadius: 2,
+                  padding: '2px 8px',
+                  fontSize: 14,
+                  fontFamily: 'monospace',
+                }}
+              />
+              <p style={{ fontSize: 11, marginTop: 3, color: colors.textMuted }}>
+                Enter the amount of change you received back
+              </p>
+            </div>
+
+            {/* Calculated actual amount */}
+            <div style={{ background: isValidChange ? colors.actionBg : colors.dangerBg, border: `1px solid ${isValidChange ? colors.action : colors.danger}`, borderRadius: 2, padding: 10 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: isValidChange ? colors.action : colors.danger }}>
+                  Actual Expense:
+                </span>
+                <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 16, color: isValidChange ? colors.action : colors.danger }}>
+                  R {isValidChange ? actualAmount.toFixed(2) : '—'}
+                </span>
+              </div>
+              {!isValidChange && changeReceived && (
+                <p style={{ fontSize: 11, marginTop: 4, color: colors.danger }}>
+                  Change cannot exceed estimated amount. Actual amount must be greater than zero.
+                </p>
+              )}
+            </div>
+
+            {/* Slip upload */}
+            <div>
+              <Label style={{ display: 'block', marginBottom: 4, fontSize: fontSize.sm, fontWeight: 600, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Receipt / Slip <span style={{ fontWeight: 400, color: colors.textMuted, textTransform: 'none' }}>(recommended)</span>
+              </Label>
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png,.webp"
+                style={{ display: 'none' }}
+                onChange={(e) => setSlipFile(e.target.files?.[0] ?? null)}
+                disabled={loading}
+              />
+              {slipFile ? (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', border: `1px solid ${colors.border}`, borderRadius: 2, fontSize: fontSize.base, color: colors.textPrimary, background: colors.surface }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                    <Paperclip style={{ width: 13, height: 13, flexShrink: 0, color: colors.textSecondary }} />
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{slipFile.name}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { setSlipFile(null); if (fileRef.current) fileRef.current.value = '' }}
+                    style={{ marginLeft: 8, flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', color: colors.textSecondary, display: 'flex' }}
+                  >
+                    <X style={{ width: 13, height: 13 }} />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => fileRef.current?.click()}
+                  disabled={loading}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 10px', border: `1px dashed ${colors.border}`, borderRadius: 2, fontSize: fontSize.base, width: '100%', background: colors.bg, color: colors.textSecondary, cursor: 'pointer' }}
+                >
+                  <Upload style={{ width: 13, height: 13 }} />
+                  Upload receipt (PDF, JPG, PNG)
+                </button>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: 8,
+                marginTop: 8,
+                paddingTop: 12,
+                borderTop: `1px solid ${colors.border}`,
+              }}
+            >
+              <ModalBtn onClick={onClose} disabled={loading}>Cancel</ModalBtn>
+              <ModalBtn
+                type="submit"
+                variant="primary"
+                loading={loading}
+                disabled={!isValidChange || loading}
+              >
+                Update & Approve
+              </ModalBtn>
+            </div>
+          </div>
+        </form>
+      </DialogContent>
     </Dialog>
   )
 }

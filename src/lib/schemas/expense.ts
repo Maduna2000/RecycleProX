@@ -36,11 +36,20 @@ export const ApproveExpenseSchema = z.object({
   notes: z.string().optional(),
 })
 
-export type CreateExpenseTypeInput = z.infer<typeof CreateExpenseTypeSchema>
-export type CreateExpenseInput     = z.infer<typeof CreateExpenseSchema>
-export type CreateExpenseFormInput = z.input<typeof CreateExpenseSchema>
-export type ApproveExpenseInput    = z.infer<typeof ApproveExpenseSchema>
-export type UpdateExpenseInput     = z.infer<typeof UpdateExpenseSchema>
+export const SettlePendingExpenseSchema = z.object({
+  changeReceived: z.preprocess(
+    (v) => (v === '' || v === undefined || v === null ? 0 : parseFloat(String(v))),
+    z.number().min(0, 'Change cannot be negative'),
+  ),
+  updatedAt: z.string().datetime(),
+})
+
+export type CreateExpenseTypeInput      = z.infer<typeof CreateExpenseTypeSchema>
+export type CreateExpenseInput          = z.infer<typeof CreateExpenseSchema>
+export type CreateExpenseFormInput      = z.input<typeof CreateExpenseSchema>
+export type ApproveExpenseInput         = z.infer<typeof ApproveExpenseSchema>
+export type UpdateExpenseInput          = z.infer<typeof UpdateExpenseSchema>
+export type SettlePendingExpenseInput   = z.infer<typeof SettlePendingExpenseSchema>
 
 export const UploadExpenseAttachmentSchema = z.object({
   r2Key:    z.string().min(1),

@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/db/prisma'
 import Decimal from 'decimal.js'
 import logger from '@/lib/logger'
-import type { CreateExpenseInput, CreateExpenseTypeInput, UpdateExpenseInput } from '@/lib/schemas/expense'
+import type { CreateExpenseInput, CreateExpenseTypeInput, UpdateExpenseInput, SettlePendingExpenseInput } from '@/lib/schemas/expense'
 
 // ─── Ref number ───────────────────────────────────────────────────────────────
 
@@ -58,6 +58,8 @@ export async function createExpense(data: CreateExpenseInput, userId: string) {
       expenseTypeId:   data.expenseTypeId,
       description:     data.description,
       amount:          amount,
+      estimatedAmount: isPending ? amount : null,
+      changeReceived:  null,
       vatAmount:       vatAmount,
       includesVat:     data.includesVat ?? false,
       paymentMethod:   data.paymentMethod ?? 'cash',
@@ -166,6 +168,85 @@ export async function updateExpense(
     })
 
     logger.info({ expenseId, userId }, 'Expense updated')
+    return updated
+  })
+}
+
+export async function settlePendingExpense(
+  expenseId: string,
+  userId: string,
+  userRole: string,
+  data: SettlePendingExpenseInput
+) {
+  return prisma.$transaction(async (tx) => {
+    const expense = await tx.expense.findUnique({ where: { id: expenseId } })
+    if (!expense) {
+      throw new Error('Expense not found')
+    }
+
+    if (expense.status !== 'pending') {
+      throw new Error(expense.status === 'approved' ? 'Expense already approved' : 'Expense has been voided')
+    }
+
+    const isCreator = expense.createdByUserId === userId
+    const isManagerOrAdmin = ['admin', 'manager'].includes(userRole)
+    if (!isCreator && !isManagerOrAdmin) {
+      throw new Error('Not authorized to settle this expense')
+    }
+
+    // Optimistic locking check
+    const expectedUpdatedAt = new Date(data.updatedAt)
+    if (expense.updatedAt.getTime() !== expectedUpdatedAt.getTime()) {
+      throw new Error('Expense was modified by another user')
+    }
+
+    const changeReceived = new Decimal(data.changeReceived)
+    // Use estimatedAmount if available, otherwise fallback to current amount (for existing pending expenses)
+    const estimatedAmount = expense.estimatedAmount
+      ? new Decimal(expense.estimatedAmount.toString())
+      : new Decimal(expense.amount.toString())
+
+    // Validation: change cannot exceed estimated amount
+    if (changeReceived.greaterThan(estimatedAmount)) {
+      throw new Error('Change received cannot exceed the estimated amount')
+    }
+
+    // Calculate actual expense amount
+    const actualAmount = estimatedAmount.minus(changeReceived)
+    if (actualAmount.lessThanOrEqualTo(0)) {
+      throw new Error('Actual expense amount must be greater than zero')
+    }
+
+    // Recalculate VAT based on new actual amount
+    const vatSetting = await tx.systemSettings.findUnique({ where: { key: 'vatRate' } })
+    const vatRate = vatSetting ? new Decimal(vatSetting.value).div(100) : new Decimal('0.15')
+    const vatAmount = expense.includesVat
+      ? actualAmount.times(vatRate.div(vatRate.plus(1))).toDecimalPlaces(2)
+      : new Decimal(0)
+
+    // Update expense with actual amount, change received, and approve
+    const updated = await tx.expense.update({
+      where: { id: expenseId },
+      data: {
+        amount:          actualAmount,
+        estimatedAmount: estimatedAmount,
+        changeReceived:  changeReceived,
+        vatAmount:       vatAmount,
+        status:          'approved',
+        approvedById:    userId,
+        approvedAt:      new Date(),
+      },
+      include: { expenseType: true },
+    })
+
+    logger.info({
+      expenseId,
+      userId,
+      estimatedAmount: estimatedAmount.toString(),
+      changeReceived: changeReceived.toString(),
+      actualAmount: actualAmount.toString(),
+    }, 'Pending expense settled and approved')
+
     return updated
   })
 }
