@@ -86,10 +86,13 @@ export default function FloatPage() {
   const { data: todayData, isLoading: loadingToday } = useSWR<TodayFloatResponse>('/api/float/today', fetcher)
   const { data: history, isLoading: loadingHistory } = useSWR<CashFloat[]>('/api/float', fetcher)
   const { data: currentData, mutate: mutateCurrentFloat } = useSWR<CurrentFloatResponse>('/api/float/current', fetcher, { refreshInterval: 5000 })
-  const liveStatsKey = `/api/cashup/live-stats?date=${todayISO()}`
   const cashUpKey = '/api/cashup?today=1'
-  const { data: liveStats, mutate: mutateLiveStats } = useSWR<LiveStats>(liveStatsKey, fetcher, { refreshInterval: 5000 })
   const { data: cashUpData, mutate: mutateCashUp } = useSWR<{ cashUp: CashUp | null }>(cashUpKey, fetcher, { refreshInterval: 5000 })
+  // Use the cashup session date for live-stats, not today's date
+  // This ensures we get stats for the actual cashup session (which may span past midnight)
+  const cashUpSessionDate = cashUpData?.cashUp?.sessionDate?.split('T')[0] ?? todayISO()
+  const liveStatsKey = `/api/cashup/live-stats?date=${cashUpSessionDate}`
+  const { data: liveStats, mutate: mutateLiveStats } = useSWR<LiveStats>(liveStatsKey, fetcher, { refreshInterval: 5000 })
   const [saving, setSaving] = useState(false)
   const [reversingMovement, setReversingMovement] = useState(false)
   const [historyPage, setHistoryPage] = useState(1)
