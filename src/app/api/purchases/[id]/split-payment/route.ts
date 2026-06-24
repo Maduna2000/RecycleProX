@@ -6,6 +6,7 @@ import {
   processSplitPayment,
   PurchaseNotPendingError,
   PaymentExceedsBalanceError,
+  PartialPaymentNotAllowedError,
 } from '@/lib/services/purchaseService'
 
 export async function POST(
@@ -39,6 +40,9 @@ export async function POST(
       return NextResponse.json({ error: err.message }, { status: 409 })
     }
     if (err instanceof PaymentExceedsBalanceError) {
+      return NextResponse.json({ error: err.message }, { status: 422 })
+    }
+    if (err instanceof PartialPaymentNotAllowedError) {
       return NextResponse.json({ error: err.message }, { status: 422 })
     }
     logger.error({ err, id: params.id }, 'POST /api/purchases/[id]/split-payment failed')

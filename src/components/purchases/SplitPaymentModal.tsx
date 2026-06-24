@@ -102,11 +102,12 @@ export function SplitPaymentModal({
   const paymentTotal = cashAmt.plus(eftAmt).plus(chequeAmt).plus(loanAmt)
   const remaining = pendingAmount.minus(paymentTotal)
 
-  // Validation
+  // Validation - FULL PAYMENT REQUIRED
   function validate(): string | null {
     if (paymentTotal.isZero()) return 'Enter at least one payment amount'
     if (paymentTotal.greaterThan(pendingAmount)) return 'Total exceeds pending amount'
     if (loanAmt.greaterThan(outstandingDec)) return 'Loan amount exceeds outstanding loan'
+    if (remaining.greaterThan(0)) return `Full payment required. R ${remaining.toFixed(2)} still remaining.`
     return null
   }
 
@@ -170,7 +171,7 @@ export function SplitPaymentModal({
           {/* Pending amount banner */}
           <div className="px-3 py-2.5 rounded-lg" style={{ background: '#FFF8E1', border: '1px solid #FFE082' }}>
             <div className="flex justify-between items-center">
-              <span className="text-xs font-medium" style={{ color: '#F57F17' }}>Pending Amount</span>
+              <span className="text-xs font-medium" style={{ color: '#F57F17' }}>Amount to Pay (Full Payment Required)</span>
               <span className="font-mono font-bold" style={{ fontSize: 16, color: '#F57F17' }}>
                 R {pendingAmount.toFixed(2)}
               </span>
@@ -233,9 +234,9 @@ export function SplitPaymentModal({
               <span className="font-mono">R {paymentTotal.toFixed(2)}</span>
             </div>
             <div className="flex justify-between text-xs font-medium" style={{
-              color: remaining.isZero() ? '#217346' : remaining.lessThan(0) ? '#DC3545' : '#C9A020'
+              color: remaining.isZero() ? '#217346' : '#DC3545'
             }}>
-              <span>{remaining.isZero() ? 'Fully Covered' : remaining.lessThan(0) ? 'Over-payment' : 'Remaining'}</span>
+              <span>{remaining.isZero() ? 'Fully Covered' : remaining.lessThan(0) ? 'Over-payment' : 'Remaining (Must be R 0.00)'}</span>
               <span className="font-mono">{remaining.isZero() ? '✓' : `R ${remaining.abs().toFixed(2)}`}</span>
             </div>
           </div>
@@ -262,18 +263,18 @@ export function SplitPaymentModal({
             </button>
             <button
               onClick={handleSubmit}
-              disabled={loading || paymentTotal.isZero() || remaining.lessThan(0)}
+              disabled={loading || paymentTotal.isZero() || !remaining.isZero()}
               style={{
                 fontSize: 10, padding: '1px 6px',
                 background: '#217346', color: '#fff',
                 border: '1px solid #1A5A38', borderRadius: 2,
-                cursor: (loading || paymentTotal.isZero() || remaining.lessThan(0)) ? 'not-allowed' : 'pointer',
-                opacity: (loading || paymentTotal.isZero() || remaining.lessThan(0)) ? 0.6 : 1,
+                cursor: (loading || paymentTotal.isZero() || !remaining.isZero()) ? 'not-allowed' : 'pointer',
+                opacity: (loading || paymentTotal.isZero() || !remaining.isZero()) ? 0.6 : 1,
                 display: 'flex', alignItems: 'center', gap: 3,
               }}
             >
               {loading && <Loader2 style={{ width: 9, height: 9, animation: 'spin 1s linear infinite' }} />}
-              Process Split Payment
+              Process Full Payment
             </button>
           </div>
         </div>

@@ -43,6 +43,10 @@ export class PaymentExceedsBalanceError extends Error {
   constructor(settle: string, outstanding: string) { super(`Payment amount (R ${settle}) exceeds remaining balance (R ${outstanding})`); this.name = 'PaymentExceedsBalanceError' }
 }
 
+export class PartialPaymentNotAllowedError extends Error {
+  constructor(paid: string, outstanding: string) { super(`Full payment required. Paid R ${paid} but R ${outstanding} is owed.`); this.name = 'PartialPaymentNotAllowedError' }
+}
+
 // ─── Reference number generator ───────────────────────────────────────────────
 
 type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
@@ -436,6 +440,11 @@ export async function processSplitPayment(
 
       if (paymentTotal.greaterThan(outstanding)) {
         throw new PaymentExceedsBalanceError(paymentTotal.toFixed(2), outstanding.toFixed(2))
+      }
+
+      // Split payment requires FULL payment - no partial payments allowed
+      if (paymentTotal.lessThan(outstanding)) {
+        throw new PartialPaymentNotAllowedError(paymentTotal.toFixed(2), outstanding.toFixed(2))
       }
 
       // Apply loan repayment if loan amount > 0
