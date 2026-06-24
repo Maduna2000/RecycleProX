@@ -21,7 +21,7 @@ const fetcher = (url: string) => fetch(url).then((r) => r.json())
 type CashUp = {
   id: string
   sessionDate: string
-  status: 'open' | 'submitted' | 'approved'
+  status: 'open' | 'submitted' | 'approved' | 'voided'
   openedByUserId: string
   openedAt: string
   closedByUserId?: string
@@ -224,6 +224,176 @@ function CountCashModal({ counts, setCounts, notes, setNotes, submitting, handle
   )
 }
 
+// ─── Manage Open Sessions Modal ───────────────────────────────────────────────
+function ManageSessionsModal({ sessions, onClose, onVoided }: {
+  sessions: CashUp[]
+  onClose: () => void
+  onVoided: () => void
+}) {
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [voiding, setVoiding] = useState(false)
+  const [voidReason, setVoidReason] = useState('')
+
+  const allSelected = selected.size === sessions.length && sessions.length > 0
+
+  function toggleAll() {
+    if (allSelected) {
+      setSelected(new Set())
+    } else {
+      setSelected(new Set(sessions.map(s => s.id)))
+    }
+  }
+
+  function toggleSession(id: string) {
+    const next = new Set(selected)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    setSelected(next)
+  }
+
+  async function handleBulkVoid() {
+    if (selected.size === 0) {
+      toast.error('Please select at least one session to void')
+      return
+    }
+    if (!voidReason.trim()) {
+      toast.error('Please enter a reason for voiding')
+      return
+    }
+
+    setVoiding(true)
+    let successCount = 0
+    let failCount = 0
+
+    for (const id of Array.from(selected)) {
+      try {
+        const res = await fetch(`/api/cashup/${id}/void`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reason: voidReason }),
+        })
+        if (res.ok) successCount++
+        else failCount++
+      } catch {
+        failCount++
+      }
+    }
+
+    setVoiding(false)
+
+    if (successCount > 0) {
+      toast.success(`Voided ${successCount} session${successCount > 1 ? 's' : ''}`)
+      onVoided()
+      onClose()
+    }
+    if (failCount > 0) {
+      toast.error(`Failed to void ${failCount} session${failCount > 1 ? 's' : ''}`)
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
+      <DialogContent className="sm:max-w-lg" showCloseButton={false}>
+        <div className="flex items-center justify-between pb-3 border-b" style={{ borderColor: colors.border }}>
+          <span className="font-semibold text-sm" style={{ color: colors.textPrimary }}>
+            Manage Open Sessions ({sessions.length})
+          </span>
+          <button onClick={onClose} className="rounded p-1 hover:bg-slate-100 transition-colors" aria-label="Close">
+            <X className="w-4 h-4" style={{ color: colors.textSecondary }} />
+          </button>
+        </div>
+
+        <div className="space-y-3 mt-2">
+          {/* Select All checkbox */}
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={allSelected}
+              onChange={toggleAll}
+              className="w-4 h-4 rounded border-gray-300"
+            />
+            <span className="text-sm font-medium" style={{ color: colors.textPrimary }}>
+              Select All ({sessions.length} sessions)
+            </span>
+          </label>
+
+          {/* Session list */}
+          <div className="border rounded overflow-hidden" style={{ borderColor: colors.border, maxHeight: 300, overflowY: 'auto' }}>
+            {sessions.map((s) => {
+              const date = s.sessionDate.split('T')[0]
+              const openingBal = new Decimal(s.openingBalance ?? '0')
+              return (
+                <label
+                  key={s.id}
+                  className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-slate-50 border-b last:border-b-0"
+                  style={{ borderColor: colors.border }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selected.has(s.id)}
+                    onChange={() => toggleSession(s.id)}
+                    className="w-4 h-4 rounded border-gray-300"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium" style={{ color: colors.textPrimary }}>{date}</p>
+                    <p className="text-xs" style={{ color: colors.textSecondary }}>
+                      Opening: R {openingBal.toFixed(2)} · Opened {new Date(s.openedAt).toLocaleDateString('en-ZA')}
+                    </p>
+                  </div>
+                </label>
+              )
+            })}
+          </div>
+
+          {/* Void reason */}
+          <div>
+            <Label className="text-xs" style={{ color: colors.textSecondary }}>Reason for voiding (required)</Label>
+            <Textarea
+              value={voidReason}
+              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setVoidReason(e.target.value)}
+              placeholder="e.g., Unable to reconcile - data lost, Old test sessions..."
+              className="mt-1 text-sm" rows={2} disabled={voiding}
+            />
+          </div>
+
+          {/* Actions */}
+          <div className="flex items-center justify-between pt-2">
+            <span className="text-xs" style={{ color: colors.textSecondary }}>
+              {selected.size} session{selected.size !== 1 ? 's' : ''} selected
+            </span>
+            <button
+              onClick={handleBulkVoid}
+              disabled={voiding || selected.size === 0 || !voidReason.trim()}
+              style={{
+                fontSize: 11,
+                padding: '6px 16px',
+                background: selected.size > 0 && voidReason.trim() ? colors.danger : '#ccc',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 3,
+                cursor: voiding || selected.size === 0 || !voidReason.trim() ? 'not-allowed' : 'pointer',
+                opacity: voiding ? 0.7 : 1,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+              }}
+            >
+              {voiding ? (
+                <>
+                  <Loader2 style={{ width: 12, height: 12, animation: 'spin 1s linear infinite' }} />
+                  Voiding {selected.size}...
+                </>
+              ) : (
+                `Void ${selected.size} Session${selected.size !== 1 ? 's' : ''}`
+              )}
+            </button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 // ─── Compact unpaid card ──────────────────────────────────────────────────────
 function UnpaidCard({ label, total, count, href }: {
   label: string; total: string; count: number; href: string
@@ -294,10 +464,12 @@ export default function CashUpPage() {
 
   const [countCashOpen, setCountCashOpen] = useState(false)
   const [voiding, setVoiding] = useState(false)
+  const [manageSessionsOpen, setManageSessionsOpen] = useState(false)
 
   // Fetch all open sessions to show count
-  const { data: openSessionsData } = useSWR<{ sessions: CashUp[] }>('/api/cashup/open-sessions', fetcher)
-  const openSessionsCount = openSessionsData?.sessions?.length ?? 0
+  const { data: openSessionsData, mutate: refreshOpenSessions } = useSWR<{ sessions: CashUp[] }>('/api/cashup/open-sessions', fetcher)
+  const openSessions = openSessionsData?.sessions ?? []
+  const openSessionsCount = openSessions.length
 
   async function handleVoidSession() {
     if (!cashUp || !isManager) return
@@ -438,43 +610,56 @@ export default function CashUpPage() {
             {cashUp.status === 'open' && sessionDate !== todayISO && (
               <div className="rounded border overflow-hidden" style={{ borderColor: colors.danger, background: colors.dangerBg }}>
                 <div className="px-4 py-3">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <p className="font-semibold text-sm mb-1" style={{ color: colors.danger }}>
-                        ⚠ Previous Day&apos;s Cash-Up Not Submitted
-                        {openSessionsCount > 1 && (
-                          <span className="ml-2 px-1.5 py-0.5 rounded text-xs" style={{ background: colors.danger, color: '#fff' }}>
-                            {openSessionsCount} open sessions
-                          </span>
-                        )}
-                      </p>
-                      <p className="text-sm" style={{ color: colors.textPrimary }}>
-                        You have an open session from <strong>{sessionDate}</strong> that needs to be submitted before you can start today&apos;s session.
-                        {openSessionsCount > 1
-                          ? ' You have multiple old sessions — submit or void each one to proceed.'
-                          : ' Please count your cash and submit the cash-up below.'}
-                      </p>
-                    </div>
-                    {isManager && (
+                  <p className="font-semibold text-sm mb-1" style={{ color: colors.danger }}>
+                    ⚠ Previous Day&apos;s Cash-Up Not Submitted
+                    {openSessionsCount > 1 && (
+                      <span className="ml-2 px-1.5 py-0.5 rounded text-xs" style={{ background: colors.danger, color: '#fff' }}>
+                        {openSessionsCount} open sessions
+                      </span>
+                    )}
+                  </p>
+                  <p className="text-sm mb-3" style={{ color: colors.textPrimary }}>
+                    You have an open session from <strong>{sessionDate}</strong> that needs to be submitted before you can start today&apos;s session.
+                    {openSessionsCount > 1
+                      ? ' You have multiple old sessions — submit or void each one to proceed.'
+                      : ' Count your cash and submit below, or void this session if you cannot reconcile.'}
+                  </p>
+                  <div className="flex gap-2 flex-wrap">
+                    <button
+                      onClick={handleVoidSession}
+                      disabled={voiding}
+                      style={{
+                        fontSize: 11,
+                        padding: '4px 12px',
+                        background: colors.danger,
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: 2,
+                        cursor: voiding ? 'not-allowed' : 'pointer',
+                        opacity: voiding ? 0.6 : 1,
+                      }}
+                    >
+                      {voiding ? 'Voiding...' : 'Void This Session'}
+                    </button>
+                    {openSessionsCount > 1 && (
                       <button
-                        onClick={handleVoidSession}
-                        disabled={voiding}
+                        onClick={() => setManageSessionsOpen(true)}
                         style={{
-                          fontSize: 10,
-                          padding: '2px 8px',
-                          background: colors.danger,
+                          fontSize: 11,
+                          padding: '4px 12px',
+                          background: '#333',
                           color: '#fff',
                           border: 'none',
                           borderRadius: 2,
-                          cursor: voiding ? 'not-allowed' : 'pointer',
-                          opacity: voiding ? 0.6 : 1,
-                          whiteSpace: 'nowrap',
-                          flexShrink: 0,
+                          cursor: 'pointer',
                         }}
                       >
-                        {voiding ? 'Voiding...' : 'Void Session'}
+                        Manage All {openSessionsCount} Sessions
                       </button>
                     )}
+                    <span className="text-xs self-center" style={{ color: colors.textSecondary }}>
+                      (Cannot reconcile? Void to skip this session)
+                    </span>
                   </div>
                 </div>
               </div>
@@ -733,6 +918,17 @@ export default function CashUpPage() {
           notes={notes} setNotes={setNotes}
           submitting={submitting} handleSubmit={handleSubmit}
           onClose={() => setCountCashOpen(false)}
+        />
+      )}
+
+      {manageSessionsOpen && openSessions.length > 0 && (
+        <ManageSessionsModal
+          sessions={openSessions}
+          onClose={() => setManageSessionsOpen(false)}
+          onVoided={() => {
+            refreshOpenSessions()
+            swrMutate(CASHUP_KEY)
+          }}
         />
       )}
     </PageShell>
