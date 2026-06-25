@@ -6,15 +6,12 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { SetFloatSchema, type SetFloatFormInput, type SetFloatInput } from '@/lib/schemas/float'
 import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
 import { Loader2, Calendar, PlusCircle, Undo2, ChevronLeft, ChevronRight } from 'lucide-react'
 import Decimal from 'decimal.js'
 import { PageShell } from '@/components/layout/PageShell'
 import { colors } from '@/lib/design-tokens'
-import { useOfflineMutation } from '@/hooks/useOfflineFetch'
-import { offlineDB } from '@/lib/offline/db'
 import { z } from 'zod'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
@@ -81,9 +78,8 @@ function todayISO() {
 export default function FloatPage() {
   const { data: session } = useSession()
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
-  const { mutate: offlineMutate } = useOfflineMutation()
 
-  const { data: todayData, isLoading: loadingToday } = useSWR<TodayFloatResponse>('/api/float/today', fetcher)
+  const { isLoading: loadingToday } = useSWR<TodayFloatResponse>('/api/float/today', fetcher)
   const { data: history, isLoading: loadingHistory } = useSWR<CashFloat[]>('/api/float', fetcher)
   const { data: currentData, mutate: mutateCurrentFloat } = useSWR<CurrentFloatResponse>('/api/float/current', fetcher, { refreshInterval: 5000 })
   const cashUpKey = '/api/cashup?today=1'
@@ -98,10 +94,7 @@ export default function FloatPage() {
   const [historyPage, setHistoryPage] = useState(1)
   const HISTORY_PAGE_SIZE = 5
 
-  const todayFloat      = todayData?.today ?? null
-  const suggestedAmount = todayData?.suggestedAmount ?? null
-  const suggestedDate   = todayData?.suggestedDate ?? null
-  const movements       = currentData?.float?.movements ?? []
+  const movements = currentData?.float?.movements ?? []
 
   // Get opening balance from cashup (carry-forward from previous day)
   const cashUpOpeningBalance = cashUpData?.cashUp?.openingBalance
@@ -122,49 +115,11 @@ export default function FloatPage() {
         .plus(new Decimal(liveStats.loanRepayment ?? '0'))
     : null
 
-  // ── Opening float form (first-time set or correction) ──────────────────────
-  const openingForm = useForm<SetFloatFormInput, unknown, SetFloatInput>({
-    resolver: zodResolver(SetFloatSchema),
-    defaultValues: { floatDate: todayISO(), openingAmount: '' },
-  })
-
   // ── Top-up form (add to existing balance) ──────────────────────────────────
   const topUpForm = useForm<TopUpFormValues>({
     resolver: zodResolver(TopUpFormSchema),
     defaultValues: { amount: '', note: '' },
   })
-
-  async function onSetOpening(data: SetFloatInput) {
-    const localId = `local_${crypto.randomUUID()}`
-    setSaving(true)
-    try {
-      const { queued } = await offlineMutate({ method: 'POST', url: '/api/float', body: data, localId })
-      if (queued) {
-        await offlineDB.cashFloats.put({
-          id: localId,
-          floatDate: data.floatDate,
-          openingAmount: String(data.openingAmount),
-          notes: data.notes || undefined,
-          createdByUserId: session?.user?.id,
-          createdAt: new Date().toISOString(),
-          _offlineCreated: true,
-        })
-        toast.success('Float saved offline — will sync when connected')
-      } else {
-        toast.success('Opening float saved')
-        mutate('/api/float/today')
-        mutate('/api/float')
-        mutateCurrentFloat()
-        mutateLiveStats()
-        mutateCashUp()
-      }
-      openingForm.reset({ floatDate: todayISO(), openingAmount: '' })
-    } catch {
-      toast.error('Failed to save float')
-    } finally {
-      setSaving(false)
-    }
-  }
 
   async function onTopUp(data: TopUpFormValues) {
     setSaving(true)
@@ -222,8 +177,6 @@ export default function FloatPage() {
     }
   }
 
-  const floatAlreadySet = !!todayFloat
-
   return (
     <PageShell title="Float" subtitle="Opening cash float">
       <div className="max-w-3xl mx-auto w-full space-y-5 pb-6">
@@ -237,32 +190,23 @@ export default function FloatPage() {
               <div className="flex items-center gap-2 text-sm" style={{ color: colors.textSecondary }}>
                 <Loader2 className="w-4 h-4 animate-spin" /> Loading…
               </div>
-            ) : floatAlreadySet ? (
+            ) : (
               <div className="space-y-3">
                 {/* Balance cards */}
                 <div className="px-4 py-3 rounded" style={{ background: colors.warningBg, border: `1px solid ${colors.warning}40` }}>
                   {/* Opening Balance from Cashup (carry-forward from previous day) */}
-                  {cashUpOpeningBalance !== null && (
-                    <>
-                      <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: colors.textSecondary }}>Opening Balance</p>
-                      <p className="font-mono font-bold mt-1" style={{ fontSize: 20, color: colors.textPrimary }}>
-                        R {cashUpOpeningBalance.toFixed(2)}
-                      </p>
-                    </>
-                  )}
-                  {/* Current Balance (Expected in Drawer) */}
-                  {calFloat && (
-                    <>
-                      <p className="text-xs font-semibold uppercase tracking-wide mt-3" style={{ color: colors.action }}>Current Balance (Expected in Drawer)</p>
-                      <p className="font-mono font-bold" style={{ fontSize: 20, color: colors.action }}>
-                        R {calFloat.toFixed(2)}
-                      </p>
-                    </>
-                  )}
-                  <p className="text-xs mt-1" style={{ color: colors.textSecondary }}>
-                    {new Date(todayFloat.floatDate).toLocaleDateString('en-ZA', { dateStyle: 'full' })}
+                  <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: colors.textSecondary }}>Opening Balance</p>
+                  <p className="font-mono font-bold mt-1" style={{ fontSize: 20, color: colors.textPrimary }}>
+                    R {cashUpOpeningBalance?.toFixed(2) ?? '0.00'}
                   </p>
-                  {todayFloat.notes && <p className="text-xs mt-1" style={{ color: colors.textSecondary }}>{todayFloat.notes}</p>}
+                  {/* Current Balance (Expected in Drawer) */}
+                  <p className="text-xs font-semibold uppercase tracking-wide mt-3" style={{ color: colors.action }}>Current Balance (Expected in Drawer)</p>
+                  <p className="font-mono font-bold" style={{ fontSize: 20, color: colors.action }}>
+                    R {calFloat?.toFixed(2) ?? '0.00'}
+                  </p>
+                  <p className="text-xs mt-1" style={{ color: colors.textSecondary }}>
+                    {new Date().toLocaleDateString('en-ZA', { dateStyle: 'full' })}
+                  </p>
                 </div>
 
                 {/* Top-up form */}
@@ -322,85 +266,6 @@ export default function FloatPage() {
                       </button>
                     </form>
                   </div>
-                )}
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <div className="py-6 rounded text-center text-sm" style={{ background: colors.toolbar, border: `1px dashed ${colors.border}`, color: colors.textSecondary }}>
-                  No float set for today yet
-                </div>
-                {suggestedAmount && (
-                  <div className="rounded px-4 py-3" style={{ background: colors.processBg, border: `1px solid ${colors.process}30` }}>
-                    <p className="text-xs font-semibold" style={{ color: colors.process }}>Carry-Forward Available</p>
-                    <p className="text-xs mt-0.5" style={{ color: colors.textSecondary }}>
-                      Previous closing: <span className="font-mono font-semibold" style={{ color: colors.textPrimary }}>R {new Decimal(suggestedAmount).toFixed(2)}</span>
-                      {suggestedDate && (
-                        <> · {new Date(suggestedDate).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' })}</>
-                      )}
-                    </p>
-                    {isManager && (
-                      <button
-                        type="button"
-                        className="mt-2 text-xs font-medium underline"
-                        style={{ color: colors.process }}
-                        onClick={() => openingForm.setValue('openingAmount', new Decimal(suggestedAmount).toFixed(2))}
-                      >
-                        Use this amount →
-                      </button>
-                    )}
-                  </div>
-                )}
-
-                {isManager && (
-                  <form onSubmit={openingForm.handleSubmit(onSetOpening)} className="space-y-3 pt-3" style={{ borderTop: `1px solid ${colors.border}` }}>
-                    <p className="text-sm font-medium" style={{ color: colors.textPrimary }}>Set Opening Float</p>
-                    <div>
-                      <Label className="text-xs" style={{ color: colors.textSecondary }}>Date</Label>
-                      <Input {...openingForm.register('floatDate')} type="date" className="mt-1 h-8 text-xs border-[#E0E0E0]" disabled={saving} />
-                    </div>
-                    <div>
-                      <Label className="text-xs" style={{ color: colors.textSecondary }}>Opening Amount (R)</Label>
-                      <Input
-                        {...openingForm.register('openingAmount')}
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        className="mt-1 h-8 text-xs font-mono border-[#E0E0E0]"
-                        disabled={saving}
-                        placeholder="0.00"
-                      />
-                      {openingForm.formState.errors.openingAmount && (
-                        <p className="text-xs mt-1" style={{ color: colors.danger }}>{openingForm.formState.errors.openingAmount.message}</p>
-                      )}
-                    </div>
-                    <div>
-                      <Label className="text-xs" style={{ color: colors.textSecondary }}>Notes (optional)</Label>
-                      <Input {...openingForm.register('notes')} className="mt-1 h-8 text-xs border-[#E0E0E0]" disabled={saving} placeholder="e.g. Taken from safe" />
-                    </div>
-                    <button
-                      type="submit"
-                      disabled={saving}
-                      style={{
-                        width: '100%',
-                        fontSize: 10,
-                        padding: '1px 6px',
-                        background: '#E0E0E0',
-                        border: '1px solid #999',
-                        borderRadius: 2,
-                        cursor: saving ? 'not-allowed' : 'pointer',
-                        opacity: saving ? 0.6 : 1,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: 3,
-                        color: '#212529',
-                      }}
-                      onMouseEnter={(e) => { if (!saving) e.currentTarget.style.background = '#D0D0D0' }}
-                      onMouseLeave={(e) => { if (!saving) e.currentTarget.style.background = '#E0E0E0' }}
-                    >
-                      {saving ? <><Loader2 style={{ width: 9, height: 9, animation: 'spin 1s linear infinite' }} /> Saving…</> : 'Set Opening Float'}
-                    </button>
-                  </form>
                 )}
               </div>
             )}
@@ -513,13 +378,17 @@ export default function FloatPage() {
           </div>
         </div>
 
-        {/* Today's Movements */}
-        {movements.length > 0 && (
-          <div className="rounded border bg-white" style={{ borderColor: colors.border }}>
-            <div className="flex items-center justify-between px-5 py-3" style={{ borderBottom: `1px solid ${colors.border}` }}>
-              <h2 className="text-sm font-semibold" style={{ color: colors.textPrimary }}>Today&apos;s Float Movements</h2>
-              <span className="text-xs" style={{ color: colors.textSecondary }}>{movements.length} movement{movements.length !== 1 ? 's' : ''}</span>
+        {/* Today's Movements - always show */}
+        <div className="rounded border bg-white" style={{ borderColor: colors.border }}>
+          <div className="flex items-center justify-between px-5 py-3" style={{ borderBottom: `1px solid ${colors.border}` }}>
+            <h2 className="text-sm font-semibold" style={{ color: colors.textPrimary }}>Today&apos;s Float Movements</h2>
+            <span className="text-xs" style={{ color: colors.textSecondary }}>{movements.length} movement{movements.length !== 1 ? 's' : ''}</span>
+          </div>
+          {movements.length === 0 ? (
+            <div className="text-center py-8 text-sm" style={{ color: colors.textSecondary }}>
+              No float movements yet today
             </div>
+          ) : (
             <div className="overflow-x-auto">
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
@@ -606,8 +475,8 @@ export default function FloatPage() {
                 </tbody>
               </table>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </PageShell>
   )
