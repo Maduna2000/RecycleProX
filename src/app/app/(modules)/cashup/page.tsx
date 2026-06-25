@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { CheckCircle2, Calculator, Clock, Loader2, Lock, RefreshCw, ExternalLink } from 'lucide-react'
 import { Dialog, DialogContent, ModalTitleBar, ModalBtn } from '@/components/ui/dialog'
-import { DENOMINATIONS, DENOMINATION_LABELS } from '@/lib/schemas/cashup'
+import { DENOMINATIONS, DENOMINATION_LABELS, type Denomination } from '@/lib/schemas/cashup'
 import { PageShell } from '@/components/layout/PageShell'
 import { colors } from '@/lib/design-tokens'
 import { useOfflineMutation } from '@/hooks/useOfflineFetch'
@@ -126,7 +126,7 @@ function CountCashModal({ counts, setCounts, notes, setNotes, submitting, handle
   const rightDenoms = DENOMINATIONS.slice(midpoint)
 
   // Render a single denomination row
-  const renderDenomRow = (d: number, idx: number) => {
+  const renderDenomRow = (d: Denomination, idx: number) => {
     const val = new Decimal(counts[d] ?? 0).times(d).div(100)
     return (
       <div
