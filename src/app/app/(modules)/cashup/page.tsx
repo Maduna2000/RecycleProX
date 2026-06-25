@@ -120,102 +120,114 @@ function CountCashModal({ counts, setCounts, notes, setNotes, submitting, handle
   const variance = total.minus(expectedCash)
   const hasCounted = !total.isZero()
 
+  // Split denominations into two columns (left: first half, right: second half)
+  const midpoint = Math.ceil(DENOMINATIONS.length / 2)
+  const leftDenoms = DENOMINATIONS.slice(0, midpoint)
+  const rightDenoms = DENOMINATIONS.slice(midpoint)
+
+  // Render a single denomination row
+  const renderDenomRow = (d: number, idx: number) => {
+    const val = new Decimal(counts[d] ?? 0).times(d).div(100)
+    return (
+      <div
+        key={d}
+        className="flex items-center gap-2"
+        style={{ padding: '4px 8px', background: idx % 2 === 0 ? '#fff' : '#FAFAFA', borderTop: idx > 0 ? `1px solid ${colors.border}` : undefined }}
+      >
+        <span className="font-mono font-semibold text-xs flex-shrink-0" style={{ color: colors.textPrimary, width: 50 }}>
+          {DENOMINATION_LABELS[d]}
+        </span>
+        <Input
+          type="number" min={0}
+          value={(counts[d] ?? 0) === 0 ? '' : counts[d]}
+          onChange={(e) => setCounts((prev) => ({ ...prev, [d]: Math.max(0, parseInt(e.target.value || '0', 10)) }))}
+          className="w-12 text-center font-mono h-6 text-xs border-[#E0E0E0] px-1"
+          disabled={submitting} placeholder="0"
+        />
+        <span className="font-mono text-xs text-right flex-1" style={{ color: val.isZero() ? colors.textSecondary : colors.textPrimary }}>
+          R {val.toFixed(2)}
+        </span>
+      </div>
+    )
+  }
+
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-md p-0" showCloseButton={false} style={{ borderRadius: 2, border: `1px solid ${colors.border}`, boxShadow: '0 4px 12px rgba(0,0,0,0.15)', background: colors.surface }}>
+      <DialogContent className="sm:max-w-xl p-0" showCloseButton={false} style={{ borderRadius: 2, border: `1px solid ${colors.border}`, boxShadow: '0 4px 12px rgba(0,0,0,0.15)', background: colors.surface }}>
         <ModalTitleBar title="Count Cash" onClose={onClose} />
         <div style={{ padding: '12px 16px 16px' }} className="space-y-3">
 
-          {/* Expected cash in drawer - prominent display */}
-          <div style={{ background: colors.processBg, border: `1px solid ${colors.process}`, borderRadius: 3, padding: '10px 12px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: 11, fontWeight: 600, color: colors.process, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+          {/* Two-column layout: Denominations left/right, Summary below */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            {/* Left column - Notes/Coins (first half) */}
+            <div style={{ border: `1px solid ${colors.border}`, borderRadius: 3, overflow: 'hidden' }}>
+              <div
+                className="px-2 py-1 text-xs font-semibold uppercase tracking-wide"
+                style={{ background: 'linear-gradient(180deg,#FFFFFF 0%,#E8E8E8 100%)', color: colors.textSecondary, borderBottom: `1px solid ${colors.border}` }}
+              >
+                Notes
+              </div>
+              {leftDenoms.map((d, i) => renderDenomRow(d, i))}
+            </div>
+
+            {/* Right column - Coins (second half) */}
+            <div style={{ border: `1px solid ${colors.border}`, borderRadius: 3, overflow: 'hidden' }}>
+              <div
+                className="px-2 py-1 text-xs font-semibold uppercase tracking-wide"
+                style={{ background: 'linear-gradient(180deg,#FFFFFF 0%,#E8E8E8 100%)', color: colors.textSecondary, borderBottom: `1px solid ${colors.border}` }}
+              >
+                Coins
+              </div>
+              {rightDenoms.map((d, i) => renderDenomRow(d, i))}
+            </div>
+          </div>
+
+          {/* Summary section - full width */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            {/* Expected in Drawer */}
+            <div style={{ background: colors.processBg, border: `1px solid ${colors.process}`, borderRadius: 3, padding: '8px 10px' }}>
+              <span style={{ fontSize: 10, fontWeight: 600, color: colors.process, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block' }}>
                 Expected in Drawer
               </span>
-              <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 18, color: colors.process }}>
+              <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 16, color: colors.process }}>
                 R {expectedCash.toFixed(2)}
               </span>
             </div>
-            <p style={{ fontSize: 10, marginTop: 4, color: colors.textSecondary }}>
-              This is the calculated amount based on opening balance, transactions, and expenses.
-            </p>
-          </div>
 
-          {/* Denomination table — bordered, scrollable, one row per denomination */}
-          <div style={{ border: `1px solid ${colors.border}`, borderRadius: 3, overflow: 'hidden' }}>
-            {/* Column headers */}
-            <div
-              className="grid px-3 py-1.5 text-xs font-semibold uppercase tracking-wide"
-              style={{ gridTemplateColumns: '1fr 6rem 6rem', background: 'linear-gradient(180deg,#FFFFFF 0%,#E8E8E8 100%)', color: colors.textSecondary, borderBottom: `1px solid ${colors.border}` }}
-            >
-              <span>Denomination</span>
-              <span className="text-center">Qty</span>
-              <span className="text-right">Value</span>
-            </div>
-
-            {/* One full-width row per denomination */}
-            <div style={{ maxHeight: 260, overflowY: 'auto' }}>
-              {DENOMINATIONS.map((d, i) => {
-                const val = new Decimal(counts[d] ?? 0).times(d).div(100)
-                return (
-                  <div
-                    key={d}
-                    className="grid items-center px-3 py-1.5"
-                    style={{ gridTemplateColumns: '1fr 6rem 6rem', background: i % 2 === 0 ? '#fff' : '#FAFAFA', borderTop: i > 0 ? `1px solid ${colors.border}` : undefined }}
-                  >
-                    <span className="font-mono font-semibold text-sm" style={{ color: colors.textPrimary }}>
-                      {DENOMINATION_LABELS[d]}
-                    </span>
-                    <div className="flex justify-center">
-                      <Input
-                        type="number" min={0}
-                        value={(counts[d] ?? 0) === 0 ? '' : counts[d]}
-                        onChange={(e) => setCounts((prev) => ({ ...prev, [d]: Math.max(0, parseInt(e.target.value || '0', 10)) }))}
-                        className="w-16 text-center font-mono h-7 text-sm border-[#E0E0E0] px-1"
-                        disabled={submitting} placeholder="0"
-                      />
-                    </div>
-                    <span className="font-mono text-sm text-right" style={{ color: val.isZero() ? colors.textSecondary : colors.textPrimary }}>
-                      R {val.toFixed(2)}
-                    </span>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-
-          {/* Comparison: Expected vs Counted */}
-          <div style={{ border: `1px solid ${colors.border}`, borderRadius: 3, overflow: 'hidden' }}>
-            {/* Counted total */}
-            <div className="flex justify-between items-center px-3 py-2" style={{ background: 'linear-gradient(180deg,#FFFFFF 0%,#E8E8E8 100%)', borderBottom: `1px solid ${colors.border}` }}>
-              <span className="text-xs font-semibold uppercase" style={{ color: colors.textSecondary }}>Cash Counted</span>
-              <span className="font-mono font-bold text-base" style={{ color: total.isZero() ? colors.textSecondary : colors.textPrimary }}>
+            {/* Cash Counted */}
+            <div style={{ background: colors.neutralBg, border: `1px solid ${colors.border}`, borderRadius: 3, padding: '8px 10px' }}>
+              <span style={{ fontSize: 10, fontWeight: 600, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block' }}>
+                Cash Counted
+              </span>
+              <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 16, color: total.isZero() ? colors.textSecondary : colors.textPrimary }}>
                 R {total.toFixed(2)}
               </span>
             </div>
-
-            {/* Variance row */}
-            {hasCounted ? (
-              <div
-                className="flex justify-between items-center px-3 py-2"
-                style={{
-                  background: variance.isZero() ? colors.actionBg : variance.gt(0) ? colors.processBg : colors.dangerBg,
-                }}
-              >
-                <span className="text-xs font-semibold uppercase" style={{ color: variance.isZero() ? colors.action : variance.gt(0) ? colors.process : colors.danger }}>
-                  {variance.isZero() ? 'Balanced' : variance.gt(0) ? 'Over' : 'Short'}
-                </span>
-                <span className="font-mono font-bold text-base" style={{ color: variance.isZero() ? colors.action : variance.gt(0) ? colors.process : colors.danger }}>
-                  {variance.gt(0) ? '+' : ''}R {variance.toFixed(2)}
-                </span>
-              </div>
-            ) : (
-              <div className="flex justify-between items-center px-3 py-2" style={{ background: colors.neutralBg }}>
-                <span className="text-xs font-semibold uppercase" style={{ color: colors.textSecondary }}>Variance</span>
-                <span className="text-xs italic" style={{ color: colors.textSecondary }}>Enter counts above</span>
-              </div>
-            )}
           </div>
+
+          {/* Variance row - full width */}
+          {hasCounted ? (
+            <div
+              className="flex justify-between items-center px-3 py-2"
+              style={{
+                background: variance.isZero() ? colors.actionBg : variance.gt(0) ? colors.processBg : colors.dangerBg,
+                border: `1px solid ${variance.isZero() ? colors.action : variance.gt(0) ? colors.process : colors.danger}`,
+                borderRadius: 3,
+              }}
+            >
+              <span className="text-xs font-semibold uppercase" style={{ color: variance.isZero() ? colors.action : variance.gt(0) ? colors.process : colors.danger }}>
+                {variance.isZero() ? 'Balanced' : variance.gt(0) ? 'Over' : 'Short'}
+              </span>
+              <span className="font-mono font-bold text-base" style={{ color: variance.isZero() ? colors.action : variance.gt(0) ? colors.process : colors.danger }}>
+                {variance.gt(0) ? '+' : ''}R {variance.toFixed(2)}
+              </span>
+            </div>
+          ) : (
+            <div className="flex justify-between items-center px-3 py-2" style={{ background: colors.neutralBg, border: `1px solid ${colors.border}`, borderRadius: 3 }}>
+              <span className="text-xs font-semibold uppercase" style={{ color: colors.textSecondary }}>Variance</span>
+              <span className="text-xs italic" style={{ color: colors.textSecondary }}>Enter counts above</span>
+            </div>
+          )}
 
           {/* Notes */}
           <div>
