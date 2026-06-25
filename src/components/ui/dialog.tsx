@@ -149,12 +149,12 @@ function DialogDescription({
 function ModalTitleBar({ title, onClose }: { title: React.ReactNode; onClose: () => void }) {
   return (
     <div
-      className="-mx-4 -mt-4 mb-2 flex items-center justify-between px-3 select-none"
+      className="flex items-center justify-between px-3 select-none"
       style={{
         height: 28,
-        background: 'rgba(27,58,107,0.05)',
-        borderBottom: '1px solid rgba(0,0,0,0.07)',
-        borderRadius: '12px 12px 0 0',
+        background: 'linear-gradient(180deg,#EAEAEA 0%,#D4D4D4 100%)',
+        borderBottom: '1px solid #BEBEBE',
+        borderRadius: '2px 2px 0 0',
       }}
     >
       <span className="text-[12px] font-semibold text-[#374151]">{title}</span>
@@ -163,17 +163,17 @@ function ModalTitleBar({ title, onClose }: { title: React.ReactNode; onClose: ()
           onClick={onClose}
           title="Dismiss"
           aria-label="Dismiss"
-          className="w-7 h-7 flex items-center justify-center rounded text-[#6B7280] hover:text-[#374151] hover:bg-black/5 transition-colors"
+          className="w-6 h-5 flex items-center justify-center rounded-sm text-[#6B7280] hover:text-[#374151] hover:bg-black/10 transition-colors"
         >
-          <Minus className="w-3.5 h-3.5" />
+          <Minus className="w-3 h-3" />
         </button>
         <button
           onClick={onClose}
           title="Close"
           aria-label="Close"
-          className="w-7 h-7 flex items-center justify-center rounded text-[#6B7280] hover:text-red-600 hover:bg-red-50 transition-colors"
+          className="w-6 h-5 flex items-center justify-center rounded-sm text-[#6B7280] hover:text-white hover:bg-red-500 transition-colors"
         >
-          <X className="w-3.5 h-3.5" />
+          <X className="w-3 h-3" />
         </button>
       </div>
     </div>
