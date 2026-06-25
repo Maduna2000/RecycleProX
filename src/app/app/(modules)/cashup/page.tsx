@@ -153,7 +153,7 @@ function CountCashModal({ counts, setCounts, notes, setNotes, submitting, handle
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-xl p-0" showCloseButton={false} style={{ borderRadius: 2, border: `1px solid ${colors.border}`, boxShadow: '0 4px 12px rgba(0,0,0,0.15)', background: colors.surface }}>
+      <DialogContent className="sm:max-w-xl p-0 gap-0" showCloseButton={false} style={{ borderRadius: 2, border: `1px solid ${colors.border}`, boxShadow: '0 4px 12px rgba(0,0,0,0.15)', background: colors.surface }}>
         <ModalTitleBar title="Count Cash" onClose={onClose} />
         <div style={{ padding: '12px 16px 16px' }} className="space-y-3">
 
@@ -330,7 +330,7 @@ function ManageSessionsModal({ sessions, onClose, onVoided }: {
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-lg p-0" showCloseButton={false} style={{ borderRadius: 2, border: `1px solid ${colors.border}`, boxShadow: '0 4px 12px rgba(0,0,0,0.15)', background: colors.surface }}>
+      <DialogContent className="sm:max-w-lg p-0 gap-0" showCloseButton={false} style={{ borderRadius: 2, border: `1px solid ${colors.border}`, boxShadow: '0 4px 12px rgba(0,0,0,0.15)', background: colors.surface }}>
         <ModalTitleBar title={`Manage Open Sessions (${sessions.length})`} onClose={onClose} />
 
         <div style={{ padding: '12px 16px 16px' }} className="space-y-3">
