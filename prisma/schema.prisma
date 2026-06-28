@@ -511,6 +511,7 @@ model StocktakeEntry {
 model CashUp {
   id                  String       @id @default(uuid())
   sessionDate         DateTime     @db.Date
+  currency            Currency     @default(ZAR)
   openedByUserId      String
   openedAt            DateTime     @default(now())
   closedByUserId      String?
@@ -813,6 +814,11 @@ enum CashUpStatus {
   submitted
   approved
   voided
+}
+
+enum Currency {
+  ZAR  // South African Rand (R)
+  SZL  // Eswatini Lilangeni (E)
 }
 
 enum StocktakeStatus {

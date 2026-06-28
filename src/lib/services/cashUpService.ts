@@ -1,7 +1,7 @@
 import Decimal from 'decimal.js'
 import { prisma } from '@/lib/db/prisma'
 import logger from '@/lib/logger'
-import { SubmitCashUpInput, ApproveCashUpInput } from '@/lib/schemas/cashup'
+import { SubmitCashUpInput, ApproveCashUpInput, type Currency } from '@/lib/schemas/cashup'
 import { getMostRecentFloatBefore, updateClosingAmount, getDrawingsReceivedForDate } from './floatService'
 import { getExpenseTotalsForDate } from './expenseService'
 import { getLoanTotalsForDate } from './loanService'
@@ -21,7 +21,7 @@ function todayStr(): string {
 
 // ─── Open a cash-up session ───────────────────────────────────────────────────
 // Only one open session at a time is allowed. Must submit previous day's first.
-export async function openCashUp(openedByUserId: string, sessionDateStr?: string) {
+export async function openCashUp(openedByUserId: string, sessionDateStr?: string, currency: Currency = 'ZAR') {
   const dateStr = sessionDateStr ?? todayStr()
   const sessionDate = toDate(dateStr)
 
@@ -105,6 +105,7 @@ export async function openCashUp(openedByUserId: string, sessionDateStr?: string
   const cashUp = await prisma.cashUp.create({
     data: {
       sessionDate,
+      currency,
       openedByUserId,
       status: 'open',
       openingBalance: openingBalance,

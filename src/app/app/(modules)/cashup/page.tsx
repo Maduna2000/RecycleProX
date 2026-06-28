@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { CheckCircle2, Calculator, Clock, Loader2, Lock, RefreshCw, ExternalLink } from 'lucide-react'
 import { Dialog, DialogContent, ModalTitleBar, ModalBtn } from '@/components/ui/dialog'
-import { DENOMINATIONS, DENOMINATION_LABELS, type Denomination } from '@/lib/schemas/cashup'
+import { DENOMINATIONS, DENOMINATION_LABELS, type Denomination, CURRENCY_SYMBOLS, CURRENCY_LABELS, type Currency } from '@/lib/schemas/cashup'
 import { PageShell } from '@/components/layout/PageShell'
 import { colors } from '@/lib/design-tokens'
 import { useOfflineMutation } from '@/hooks/useOfflineFetch'
@@ -21,6 +21,7 @@ const fetcher = (url: string) => fetch(url).then((r) => r.json())
 type CashUp = {
   id: string
   sessionDate: string
+  currency: Currency
   status: 'open' | 'submitted' | 'approved' | 'voided'
   openedByUserId: string
   openedAt: string
@@ -486,6 +487,7 @@ export default function CashUpPage() {
   const [countCashOpen, setCountCashOpen] = useState(false)
   const [voiding, setVoiding] = useState(false)
   const [manageSessionsOpen, setManageSessionsOpen] = useState(false)
+  const [selectedCurrency, setSelectedCurrency] = useState<Currency>('ZAR')
 
   // Fetch all open sessions to show count
   const { data: openSessionsData, mutate: refreshOpenSessions } = useSWR<{ sessions: CashUp[] }>('/api/cashup/open-sessions', fetcher)
@@ -530,7 +532,7 @@ export default function CashUpPage() {
     try {
       const { queued } = await offlineMutate({
         method: 'POST', url: '/api/cashup',
-        body: { sessionDate: todayISO },
+        body: { sessionDate: todayISO, currency: selectedCurrency },
         localId: `local_cashup_${todayISO}`,
       })
       if (queued) toast.success('Cash-up session queued — will open when connected')
@@ -599,7 +601,29 @@ export default function CashUpPage() {
             <div className="p-8 text-center">
             <Clock className="w-10 h-10 mx-auto mb-3" style={{ color: colors.border }} />
             <p className="font-medium mb-1" style={{ color: colors.textPrimary }}>No session open for today</p>
-            <p className="text-sm mb-5" style={{ color: colors.textSecondary }}>Open a session to begin tracking today&apos;s cash.</p>
+            <p className="text-sm mb-4" style={{ color: colors.textSecondary }}>Select currency and open a session to begin tracking today&apos;s cash.</p>
+
+            {/* Currency selector */}
+            <div className="flex items-center justify-center gap-2 mb-4">
+              <label className="text-xs font-semibold" style={{ color: colors.textSecondary }}>Currency:</label>
+              <select
+                value={selectedCurrency}
+                onChange={(e) => setSelectedCurrency(e.target.value as Currency)}
+                disabled={opening}
+                style={{
+                  fontSize: 12,
+                  padding: '4px 8px',
+                  border: `1px solid ${colors.border}`,
+                  borderRadius: 2,
+                  background: '#fff',
+                  cursor: opening ? 'not-allowed' : 'pointer',
+                }}
+              >
+                <option value="ZAR">R - South African Rand</option>
+                <option value="SZL">E - Eswatini Lilangeni</option>
+              </select>
+            </div>
+
             <button
               onClick={handleOpen}
               disabled={opening}
@@ -741,6 +765,19 @@ export default function CashUpPage() {
                       </span>
                     </div>
                     <div className="p-4 space-y-1.5">
+
+                    {/* Currency selector - first field */}
+                    <div className="flex justify-between items-center text-sm pb-1.5 mb-1.5 border-b" style={{ borderColor: colors.border }}>
+                      <span style={{ color: colors.textSecondary }}>Currency</span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-semibold" style={{ color: colors.textPrimary }}>
+                          {CURRENCY_SYMBOLS[cashUp.currency ?? 'ZAR']}
+                        </span>
+                        <span className="text-xs" style={{ color: colors.textSecondary }}>
+                          ({CURRENCY_LABELS[cashUp.currency ?? 'ZAR']})
+                        </span>
+                      </div>
+                    </div>
 
                     {/* Opening + Drawings */}
                     <ReconRow label="Opening Balance" value={opening.toFixed(2)} positive />

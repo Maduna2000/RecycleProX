@@ -33,8 +33,23 @@ export const ApproveCashUpSchema = z.object({
   notes: z.string().max(500).optional(),
 })
 
+// Currency options
+export const CURRENCIES = ['ZAR', 'SZL'] as const
+export type Currency = (typeof CURRENCIES)[number]
+
+export const CURRENCY_SYMBOLS: Record<Currency, string> = {
+  ZAR: 'R',   // South African Rand
+  SZL: 'E',   // Eswatini Lilangeni
+}
+
+export const CURRENCY_LABELS: Record<Currency, string> = {
+  ZAR: 'South African Rand (R)',
+  SZL: 'Eswatini Lilangeni (E)',
+}
+
 export const OpenCashUpSchema = z.object({
   sessionDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD'),
+  currency: z.enum(CURRENCIES).optional().default('ZAR'),
 })
 
 export type SubmitCashUpInput  = z.infer<typeof SubmitCashUpSchema>

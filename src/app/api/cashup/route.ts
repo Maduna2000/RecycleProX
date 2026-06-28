@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
     }
 
-    const cashUp = await openCashUp(session.user.id, parsed.data.sessionDate)
+    const cashUp = await openCashUp(session.user.id, parsed.data.sessionDate, parsed.data.currency)
     return NextResponse.json({ cashUp }, { status: 201 })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to open cash-up session'
