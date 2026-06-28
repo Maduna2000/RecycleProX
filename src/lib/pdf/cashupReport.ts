@@ -50,7 +50,6 @@ const DARK_GRAY = rgb(0.25, 0.25, 0.25)
 const MEDIUM_GRAY = rgb(0.5, 0.5, 0.5)
 const LIGHT_GRAY = rgb(0.85, 0.85, 0.85)
 const VERY_LIGHT_GRAY = rgb(0.95, 0.95, 0.95)
-const WHITE = rgb(1, 1, 1)
 
 const ROWS_PER_PAGE = 28
 const ROW_H = 20
