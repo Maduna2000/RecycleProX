@@ -873,7 +873,7 @@ export default function CashUpPage() {
                       <div className="flex-1">
                         <ReconRow label="Drawings Received (+)" value={draw.toFixed(2)} positive currencySymbol={currSym} />
                       </div>
-                      {!isOpen && cashUp && (
+                      {cashUp && (
                         <ReportButton type="drawings-received" sessionId={cashUp.id} disabled={isOpen} />
                       )}
                     </div>
@@ -885,7 +885,7 @@ export default function CashUpPage() {
                         <div className="flex-1">
                           <ReconRow label="Cash Received / Sales (+)" value={cashSales.toFixed(2)} positive currencySymbol={currSym} />
                         </div>
-                        {!isOpen && cashUp && (
+                        {cashUp && (
                           <ReportButton type="cash-sales" sessionId={cashUp.id} disabled={isOpen} />
                         )}
                       </div>
@@ -896,7 +896,7 @@ export default function CashUpPage() {
                         <div className="flex-1">
                           <ReconRow label="Cash Purchases (−)" value={cashPurch.toFixed(2)} negative currencySymbol={currSym} />
                         </div>
-                        {!isOpen && cashUp && (
+                        {cashUp && (
                           <ReportButton type="cash-purchases" sessionId={cashUp.id} disabled={isOpen} />
                         )}
                       </div>
@@ -904,7 +904,7 @@ export default function CashUpPage() {
                         <div className="flex-1">
                           <ReconRow label="Account Payments (−)" value={cashPay.toFixed(2)} negative currencySymbol={currSym} />
                         </div>
-                        {!isOpen && cashUp && (
+                        {cashUp && (
                           <ReportButton type="account-payments" sessionId={cashUp.id} disabled={isOpen} />
                         )}
                       </div>
@@ -912,7 +912,7 @@ export default function CashUpPage() {
                         <div className="flex-1">
                           <ReconRow label="Expenses (−)" value={exp.toFixed(2)} negative currencySymbol={currSym} />
                         </div>
-                        {!isOpen && cashUp && (
+                        {cashUp && (
                           <ReportButton type="expenses" sessionId={cashUp.id} disabled={isOpen} />
                         )}
                       </div>
@@ -920,7 +920,7 @@ export default function CashUpPage() {
                         <div className="flex-1">
                           <ReconRow label="Loan Advance (−)" value={loanAdv.toFixed(2)} negative currencySymbol={currSym} />
                         </div>
-                        {!isOpen && cashUp && (
+                        {cashUp && (
                           <ReportButton type="loan-advances" sessionId={cashUp.id} disabled={isOpen} />
                         )}
                       </div>
@@ -928,7 +928,7 @@ export default function CashUpPage() {
                         <div className="flex-1">
                           <ReconRow label="Loans Repayment (+)" value={loanRep.toFixed(2)} positive currencySymbol={currSym} />
                         </div>
-                        {!isOpen && cashUp && (
+                        {cashUp && (
                           <ReportButton type="loan-repayments" sessionId={cashUp.id} disabled={isOpen} />
                         )}
                       </div>
