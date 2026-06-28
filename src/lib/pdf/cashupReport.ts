@@ -1,14 +1,14 @@
 /**
  * Cash-Up Report PDF generator.
  *
- * Generates professional A4 PDF reports for various cashup reconciliation data:
+ * Generates professional A4 PDF reports in black & white spreadsheet format:
  * - Cash Sales
  * - Cash Purchases
  * - Account Payments
  * - Expenses
  * - Loan Advances
  * - Loan Repayments
- * - Unpaid Purchases (Today / All Time)
+ * - Unpaid Purchases (Today / All)
  * - Card Sales
  * - Transferred Purchases
  * - Drawings Received
@@ -38,23 +38,25 @@ export interface ReportEntry {
   [key: string]: string | Date | number | null | undefined
 }
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+// ─── Constants (Black & White) ────────────────────────────────────────────────
 const PAGE_W = 595   // A4 portrait
 const PAGE_H = 842
 const MARGIN = 40
 const CONTENT_W = PAGE_W - MARGIN * 2
 
-const NAVY = rgb(0.11, 0.23, 0.42)      // #1B3A6B
-const GREEN = rgb(0.06, 0.72, 0.51)     // #10b981
-const DARK = rgb(0.13, 0.15, 0.16)
-const GRAY = rgb(0.42, 0.46, 0.49)
-const LGRAY = rgb(0.96, 0.96, 0.96)
+// Black and white colors only
+const BLACK = rgb(0, 0, 0)
+const DARK_GRAY = rgb(0.25, 0.25, 0.25)
+const MEDIUM_GRAY = rgb(0.5, 0.5, 0.5)
+const LIGHT_GRAY = rgb(0.85, 0.85, 0.85)
+const VERY_LIGHT_GRAY = rgb(0.95, 0.95, 0.95)
 const WHITE = rgb(1, 1, 1)
-const RED = rgb(0.75, 0.1, 0.1)
 
-const ROWS_PER_PAGE = 30
-const ROW_H = 18
+const ROWS_PER_PAGE = 28
+const ROW_H = 20
 const HEADER_ROW_H = 22
+const CELL_PADDING = 4
+const BORDER_WIDTH = 0.5
 
 // Column configurations for each report type
 interface ColumnConfig {
@@ -190,60 +192,31 @@ export async function generateCashupReport(data: CashupReportData): Promise<Uint
     const rows = chunks[pageIdx] ?? []
     let y = PAGE_H - MARGIN
 
-    // ── Header bar ────────────────────────────────────────────────────────────
-    y = drawHeader(page, bold, reg, data, pageIdx, totalPages)
+    // ── Header section ─────────────────────────────────────────────────────────
+    y = drawHeader(page, bold, reg, data, pageIdx, totalPages, y)
 
     // ── Company info (first page only) ────────────────────────────────────────
     if (pageIdx === 0) {
       y = drawCompanyInfo(page, bold, reg, data, y)
     }
 
-    // ── Column headers ────────────────────────────────────────────────────────
-    y = drawColumnHeaders(page, bold, columns, y, data.currencySymbol)
+    // ── Table header with borders ──────────────────────────────────────────────
+    y = drawTableHeader(page, bold, columns, y, data.currencySymbol)
 
-    // ── Data rows ─────────────────────────────────────────────────────────────
+    // ── Data rows with cell borders ────────────────────────────────────────────
     for (let i = 0; i < rows.length; i++) {
       const entry = rows[i]!
-      const bg = i % 2 === 0 ? WHITE : LGRAY
-      page.drawRectangle({ x: MARGIN, y: y - 4, width: CONTENT_W, height: ROW_H, color: bg })
-
-      let x = MARGIN
-      for (const col of columns) {
-        const colW = col.width * CONTENT_W
-        let value = formatValue(entry, col.key, data.currencySymbol)
-
-        // Truncate if too long
-        const maxChars = Math.floor(colW / 4.5)
-        if (value.length > maxChars) {
-          value = value.substring(0, maxChars - 1) + '…'
-        }
-
-        const textX = col.align === 'right'
-          ? x + colW - reg.widthOfTextAtSize(value, 8) - 4
-          : x + 4
-
-        page.drawText(value, {
-          x: textX,
-          y: y,
-          size: 8,
-          font: reg,
-          color: DARK,
-        })
-
-        x += colW
-      }
-
-      y -= ROW_H
+      const isAlternate = i % 2 === 1
+      y = drawDataRow(page, reg, columns, entry, y, data.currencySymbol, isAlternate)
     }
 
-    // ── Bottom rule ───────────────────────────────────────────────────────────
+    // ── Close table bottom border ──────────────────────────────────────────────
     page.drawLine({
-      start: { x: MARGIN, y: y + 2 },
-      end: { x: PAGE_W - MARGIN, y: y + 2 },
-      thickness: 0.5,
-      color: GRAY,
+      start: { x: MARGIN, y: y + ROW_H },
+      end: { x: PAGE_W - MARGIN, y: y + ROW_H },
+      thickness: BORDER_WIDTH,
+      color: BLACK,
     })
-    y -= 16
 
     // ── Summary on last page ──────────────────────────────────────────────────
     if (pageIdx === totalPages - 1) {
@@ -251,13 +224,7 @@ export async function generateCashupReport(data: CashupReportData): Promise<Uint
     }
 
     // ── Footer ────────────────────────────────────────────────────────────────
-    page.drawText(`Generated: ${data.generatedAt.toLocaleString('en-ZA')} · RecycleProX · Lariat Technologies`, {
-      x: MARGIN,
-      y: MARGIN - 10,
-      size: 6,
-      font: reg,
-      color: GRAY,
-    })
+    drawFooter(page, reg, data)
   }
 
   return doc.save()
@@ -271,28 +238,17 @@ function drawHeader(
   reg: PDFFont,
   data: CashupReportData,
   pageIdx: number,
-  totalPages: number
+  totalPages: number,
+  y: number
 ): number {
-  // Navy header bar
-  page.drawRectangle({ x: 0, y: PAGE_H - 55, width: PAGE_W, height: 55, color: NAVY })
-
-  // Report title
+  // Report title (black text, no background)
   const title = CASHUP_REPORT_LABELS[data.reportType].toUpperCase()
   page.drawText(title, {
     x: MARGIN,
-    y: PAGE_H - 28,
+    y,
     size: 14,
     font: bold,
-    color: WHITE,
-  })
-
-  // Subtitle
-  page.drawText('Cash-Up Session Report', {
-    x: MARGIN,
-    y: PAGE_H - 44,
-    size: 8,
-    font: reg,
-    color: rgb(0.7, 0.8, 1),
+    color: BLACK,
   })
 
   // Session date (right side)
@@ -300,23 +256,43 @@ function drawHeader(
   const dateWidth = bold.widthOfTextAtSize(dateStr, 10)
   page.drawText(dateStr, {
     x: PAGE_W - MARGIN - dateWidth,
-    y: PAGE_H - 28,
+    y,
     size: 10,
     font: bold,
-    color: WHITE,
+    color: BLACK,
+  })
+
+  y -= 14
+
+  // Subtitle
+  page.drawText('Cash-Up Session Report', {
+    x: MARGIN,
+    y,
+    size: 8,
+    font: reg,
+    color: MEDIUM_GRAY,
   })
 
   // Page number
   const pageText = `Page ${pageIdx + 1} of ${totalPages}`
   page.drawText(pageText, {
     x: PAGE_W - MARGIN - reg.widthOfTextAtSize(pageText, 8),
-    y: PAGE_H - 44,
+    y,
     size: 8,
     font: reg,
-    color: rgb(0.7, 0.8, 1),
+    color: MEDIUM_GRAY,
   })
 
-  return PAGE_H - 65
+  // Horizontal line separator
+  y -= 8
+  page.drawLine({
+    start: { x: MARGIN, y },
+    end: { x: PAGE_W - MARGIN, y },
+    thickness: 1,
+    color: BLACK,
+  })
+
+  return y - 12
 }
 
 function drawCompanyInfo(
@@ -331,7 +307,7 @@ function drawCompanyInfo(
     y,
     size: 10,
     font: bold,
-    color: DARK,
+    color: BLACK,
   })
   y -= 12
 
@@ -340,13 +316,13 @@ function drawCompanyInfo(
     y,
     size: 8,
     font: reg,
-    color: GRAY,
+    color: DARK_GRAY,
   })
 
   // Phone and VAT on same line if available
   let infoLine = ''
   if (data.companyPhone) infoLine += `Tel: ${data.companyPhone}`
-  if (data.companyVat) infoLine += (infoLine ? ' | ' : '') + `VAT: ${data.companyVat}`
+  if (data.companyVat) infoLine += (infoLine ? '  |  ' : '') + `VAT: ${data.companyVat}`
   if (infoLine) {
     y -= 10
     page.drawText(infoLine, {
@@ -354,45 +330,160 @@ function drawCompanyInfo(
       y,
       size: 8,
       font: reg,
-      color: GRAY,
+      color: DARK_GRAY,
     })
   }
 
   return y - 16
 }
 
-function drawColumnHeaders(
+function drawTableHeader(
   page: PDFPage,
   bold: PDFFont,
   columns: ColumnConfig[],
   y: number,
   currencySymbol: string
 ): number {
-  // Green header row
-  page.drawRectangle({ x: MARGIN, y: y - 6, width: CONTENT_W, height: HEADER_ROW_H, color: GREEN })
+  const headerY = y - HEADER_ROW_H
 
+  // Header background (light gray)
+  page.drawRectangle({
+    x: MARGIN,
+    y: headerY,
+    width: CONTENT_W,
+    height: HEADER_ROW_H,
+    color: LIGHT_GRAY,
+  })
+
+  // Draw outer border
+  page.drawRectangle({
+    x: MARGIN,
+    y: headerY,
+    width: CONTENT_W,
+    height: HEADER_ROW_H,
+    borderColor: BLACK,
+    borderWidth: BORDER_WIDTH,
+  })
+
+  // Draw column borders and text
   let x = MARGIN
-  for (const col of columns) {
+  for (let i = 0; i < columns.length; i++) {
+    const col = columns[i]!
     const colW = col.width * CONTENT_W
-    let label = col.label
 
-    // Append currency symbol to amount columns
+    // Draw vertical line (except for first column)
+    if (i > 0) {
+      page.drawLine({
+        start: { x, y: headerY },
+        end: { x, y: headerY + HEADER_ROW_H },
+        thickness: BORDER_WIDTH,
+        color: BLACK,
+      })
+    }
+
+    // Column label
+    let label = col.label
     if (col.align === 'right' && !label.includes('(')) {
       label = `${label} (${currencySymbol})`
     }
 
+    const textY = headerY + (HEADER_ROW_H - 8) / 2
+    const textX = col.align === 'right'
+      ? x + colW - bold.widthOfTextAtSize(label, 8) - CELL_PADDING
+      : x + CELL_PADDING
+
     page.drawText(label, {
-      x: x + 4,
-      y: y,
+      x: textX,
+      y: textY,
       size: 8,
       font: bold,
-      color: WHITE,
+      color: BLACK,
     })
 
     x += colW
   }
 
-  return y - HEADER_ROW_H - 4
+  return headerY
+}
+
+function drawDataRow(
+  page: PDFPage,
+  reg: PDFFont,
+  columns: ColumnConfig[],
+  entry: ReportEntry,
+  y: number,
+  currencySymbol: string,
+  isAlternate: boolean
+): number {
+  const rowY = y - ROW_H
+
+  // Alternate row background
+  if (isAlternate) {
+    page.drawRectangle({
+      x: MARGIN,
+      y: rowY,
+      width: CONTENT_W,
+      height: ROW_H,
+      color: VERY_LIGHT_GRAY,
+    })
+  }
+
+  // Draw cell borders
+  let x = MARGIN
+  for (let i = 0; i < columns.length; i++) {
+    const col = columns[i]!
+    const colW = col.width * CONTENT_W
+
+    // Draw vertical line (except for first column)
+    if (i > 0) {
+      page.drawLine({
+        start: { x, y: rowY },
+        end: { x, y: rowY + ROW_H },
+        thickness: BORDER_WIDTH,
+        color: BLACK,
+      })
+    }
+
+    // Cell value
+    let value = formatValue(entry, col.key, currencySymbol)
+
+    // Truncate if too long
+    const maxChars = Math.floor((colW - CELL_PADDING * 2) / 4.5)
+    if (value.length > maxChars) {
+      value = value.substring(0, maxChars - 1) + '…'
+    }
+
+    const textY = rowY + (ROW_H - 8) / 2
+    const textX = col.align === 'right'
+      ? x + colW - reg.widthOfTextAtSize(value, 8) - CELL_PADDING
+      : x + CELL_PADDING
+
+    page.drawText(value, {
+      x: textX,
+      y: textY,
+      size: 8,
+      font: reg,
+      color: BLACK,
+    })
+
+    x += colW
+  }
+
+  // Draw left and right borders
+  page.drawLine({
+    start: { x: MARGIN, y: rowY },
+    end: { x: MARGIN, y: rowY + ROW_H },
+    thickness: BORDER_WIDTH,
+    color: BLACK,
+  })
+  page.drawLine({
+    start: { x: PAGE_W - MARGIN, y: rowY },
+    end: { x: PAGE_W - MARGIN, y: rowY + ROW_H },
+    thickness: BORDER_WIDTH,
+    color: BLACK,
+  })
+
+  return rowY
 }
 
 function drawSummary(
@@ -403,28 +494,51 @@ function drawSummary(
   grandTotal: Decimal,
   y: number
 ): number {
-  // Summary row with green background
-  page.drawRectangle({ x: MARGIN, y: y - 4, width: CONTENT_W, height: 24, color: rgb(0.9, 0.97, 0.94) })
-  page.drawRectangle({ x: MARGIN, y: y - 4, width: CONTENT_W, height: 24, borderColor: GREEN, borderWidth: 1 })
+  y -= 8
+
+  // Summary row with border
+  const summaryH = 24
+  page.drawRectangle({
+    x: MARGIN,
+    y: y - summaryH,
+    width: CONTENT_W,
+    height: summaryH,
+    color: LIGHT_GRAY,
+    borderColor: BLACK,
+    borderWidth: 1,
+  })
+
+  const textY = y - summaryH + (summaryH - 9) / 2
 
   page.drawText(`Total Records: ${data.entries.length}`, {
-    x: MARGIN + 8,
-    y: y + 2,
+    x: MARGIN + CELL_PADDING,
+    y: textY,
     size: 9,
     font: reg,
-    color: DARK,
+    color: BLACK,
   })
 
   const totalText = `Grand Total: ${data.currencySymbol} ${grandTotal.toFixed(2)}`
   page.drawText(totalText, {
-    x: PAGE_W - MARGIN - bold.widthOfTextAtSize(totalText, 11) - 8,
-    y: y + 2,
+    x: PAGE_W - MARGIN - bold.widthOfTextAtSize(totalText, 11) - CELL_PADDING,
+    y: textY,
     size: 11,
     font: bold,
-    color: data.reportType.includes('unpaid') ? RED : GREEN,
+    color: BLACK,
   })
 
-  return y - 30
+  return y - summaryH - 8
+}
+
+function drawFooter(page: PDFPage, reg: PDFFont, data: CashupReportData): void {
+  const footerText = `Generated: ${data.generatedAt.toLocaleString('en-ZA')}  |  RecycleProX  |  Lariat Technologies`
+  page.drawText(footerText, {
+    x: MARGIN,
+    y: MARGIN - 10,
+    size: 6,
+    font: reg,
+    color: MEDIUM_GRAY,
+  })
 }
 
 function formatValue(entry: ReportEntry, key: string, currencySymbol: string): string {
@@ -442,22 +556,50 @@ function formatValue(entry: ReportEntry, key: string, currencySymbol: string): s
     return value.toLocaleDateString('en-ZA')
   }
 
-  // Handle createdAt specifically (stored as Date but accessed as time)
-  if (key === 'time' && entry['createdAt'] instanceof Date) {
-    return entry['createdAt'].toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' })
+  // Handle time field - extract from createdAt if available
+  if (key === 'time') {
+    const createdAt = entry['createdAt']
+    if (createdAt instanceof Date) {
+      return createdAt.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' })
+    }
+    // Try parsing as ISO string
+    if (typeof createdAt === 'string') {
+      const d = new Date(createdAt)
+      if (!isNaN(d.getTime())) {
+        return d.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' })
+      }
+    }
   }
 
-  // Handle date field
-  if (key === 'date' && entry['createdAt'] instanceof Date) {
-    return entry['createdAt'].toLocaleDateString('en-ZA')
+  // Handle date field - extract from createdAt if available
+  if (key === 'date') {
+    const createdAt = entry['createdAt']
+    if (createdAt instanceof Date) {
+      return createdAt.toLocaleDateString('en-ZA')
+    }
+    if (typeof createdAt === 'string') {
+      const d = new Date(createdAt)
+      if (!isNaN(d.getTime())) {
+        return d.toLocaleDateString('en-ZA')
+      }
+    }
   }
 
   // Handle amount fields - format with currency symbol
-  if (typeof value === 'string' && /^\d+(\.\d{1,2})?$/.test(value)) {
+  if (typeof value === 'string' && /^-?\d+(\.\d{1,2})?$/.test(value)) {
     const isAmountField = ['totalAmount', 'amount', 'principalAmount', 'balance', 'amountPaid'].includes(key)
     if (isAmountField) {
       return `${currencySymbol} ${new Decimal(value).toFixed(2)}`
     }
+  }
+
+  // Handle numbers
+  if (typeof value === 'number') {
+    const isAmountField = ['totalAmount', 'amount', 'principalAmount', 'balance', 'amountPaid'].includes(key)
+    if (isAmountField) {
+      return `${currencySymbol} ${new Decimal(value).toFixed(2)}`
+    }
+    return value.toString()
   }
 
   return String(value)

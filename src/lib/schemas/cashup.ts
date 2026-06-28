@@ -83,7 +83,7 @@ export const CASHUP_REPORT_LABELS: Record<CashupReportType, string> = {
   'loan-advances':         'Loan Advances',
   'loan-repayments':       'Loan Repayments',
   'unpaid-today':          'Unpaid Purchases (Today)',
-  'unpaid-all':            'Unpaid Purchases (All Time)',
+  'unpaid-all':            'Unpaid Purchases',
   'card-sales':            'Card Sales',
   'transferred-purchases': 'Transferred Purchases',
   'drawings-received':     'Drawings Received',
