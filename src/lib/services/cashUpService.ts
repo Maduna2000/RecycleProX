@@ -323,7 +323,6 @@ export async function getLiveStats(sessionDate: Date) {
     unpaidAllTimeAgg,
     approvedVariances,
     floatTopUpsAgg,
-    todayFloatRecord,
   ] = await Promise.all([
     prisma.sale.aggregate({
       _sum: { totalAmount: true },
@@ -359,11 +358,12 @@ export async function getLiveStats(sessionDate: Date) {
       _sum: { variance: true },
       where: { status: 'approved' },
     }),
+    // Drawings Received = only mid-day top-ups (FloatMovements), NOT the CashFloat.openingAmount
+    // CashFloat.openingAmount is the drawer starting cash which is already in CashUp.openingBalance
     prisma.floatMovement.aggregate({
       _sum: { amount: true },
       where: { movementType: 'top_up', createdAt: { gte: start, lte: end } },
     }),
-    prisma.cashFloat.findUnique({ where: { floatDate: start } }),
   ])
 
   return {
@@ -374,9 +374,8 @@ export async function getLiveStats(sessionDate: Date) {
     expenses:      expenses.toFixed(2),
     loanAdvance:   loanTotals.advanced,
     loanRepayment: loanTotals.repaid,
-    floatTopUps:   new Decimal(todayFloatRecord?.openingAmount?.toString() ?? '0')
-                     .plus(new Decimal(floatTopUpsAgg._sum.amount?.toString() ?? '0'))
-                     .toFixed(2),
+    // Drawings received = only mid-day top-ups, not the float opening amount
+    floatTopUps:   new Decimal(floatTopUpsAgg._sum.amount?.toString() ?? '0').toFixed(2),
     unpaidToday: {
       total: new Decimal(unpaidTodayAgg[0]?.total   ?? '0').toFixed(2),
       count: Number(unpaidTodayAgg[0]?.count   ?? 0),
@@ -704,12 +703,9 @@ export async function getDrawingsReceivedForDateReport(sessionDate: Date): Promi
   const start = new Date(sessionDate); start.setHours(0, 0, 0, 0)
   const end   = new Date(sessionDate); end.setHours(23, 59, 59, 999)
 
-  // Get float opening amount as the first "drawing"
-  const floatRecord = await prisma.cashFloat.findUnique({
-    where: { floatDate: start },
-  })
-
-  // Get all top-ups for the day
+  // Drawings Received = only mid-day top-ups (additional cash injected during the session)
+  // CashFloat.openingAmount is NOT included because it's the starting cash,
+  // which is already represented in CashUp.openingBalance
   const topUps = await prisma.floatMovement.findMany({
     where: {
       movementType: 'top_up',
@@ -718,31 +714,13 @@ export async function getDrawingsReceivedForDateReport(sessionDate: Date): Promi
     orderBy: { createdAt: 'asc' },
   })
 
-  const records: DrawingsReceivedRecord[] = []
-
-  // Add opening float if exists
-  if (floatRecord && new Decimal(floatRecord.openingAmount.toString()).gt(0)) {
-    records.push({
-      id: floatRecord.id,
-      createdAt: floatRecord.createdAt,
-      movementType: 'Opening Float',
-      notes: floatRecord.notes,
-      amount: new Decimal(floatRecord.openingAmount.toString()).toFixed(2),
-    })
-  }
-
-  // Add top-ups
-  topUps.forEach(t => {
-    records.push({
-      id: t.id,
-      createdAt: t.createdAt,
-      movementType: 'Top-Up',
-      notes: t.referenceNote,
-      amount: new Decimal(t.amount.toString()).toFixed(2),
-    })
-  })
-
-  return records
+  return topUps.map(t => ({
+    id: t.id,
+    createdAt: t.createdAt,
+    movementType: 'Top-Up',
+    notes: t.referenceNote,
+    amount: new Decimal(t.amount.toString()).toFixed(2),
+  }))
 }
 
 export interface CashUpHistoryRecord {
