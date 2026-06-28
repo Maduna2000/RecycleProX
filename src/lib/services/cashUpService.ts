@@ -222,7 +222,7 @@ export async function submitCashUp(
   }
 
   // Both drawingsReceived and loansTotal are fully server-derived — never from user input.
-  // drawingsReceived = today's opening float + any top-ups during the day.
+  // drawingsReceived = only mid-day top-ups (FloatMovements), NOT the opening float.
   const drawingsReceived = await getDrawingsReceivedForDate(cashUp.sessionDate)
   const loanTotals = await getLoanTotalsForDate(cashUp.sessionDate)
   // netCashOut is positive = cash went out as advances (reduces drawer), so we subtract it
