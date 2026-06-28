@@ -68,9 +68,10 @@ type ExpenseItem = {
 // ─── Reconciliation row ───────────────────────────────────────────────────────
 // positive = green. negative = neutral text with "−" prefix (NOT red — deductions are expected).
 // Red is reserved only for the VarianceRow when cash is short.
-function ReconRow({ label, value, positive, negative, highlight, muted, subtotal }: {
+function ReconRow({ label, value, positive, negative, highlight, muted, subtotal, currencySymbol = 'R' }: {
   label: string; value: string | undefined
   positive?: boolean; negative?: boolean; highlight?: boolean; muted?: boolean; subtotal?: boolean
+  currencySymbol?: string
 }) {
   const n = new Decimal(value ?? '0')
   const valueColor = positive && !n.isZero() ? colors.action
@@ -81,14 +82,14 @@ function ReconRow({ label, value, positive, negative, highlight, muted, subtotal
       style={subtotal ? { background: colors.toolbar } : undefined}>
       <span style={{ color: muted ? colors.textSecondary : colors.textSecondary }}>{label}</span>
       <span className="font-mono" style={{ color: valueColor }}>
-        {negative && !n.isZero() ? '−' : ''}R {n.abs().toFixed(2)}
+        {negative && !n.isZero() ? '−' : ''}{currencySymbol} {n.abs().toFixed(2)}
       </span>
     </div>
   )
 }
 
 // ─── Variance row — only shown after denominations entered ────────────────────
-function VarianceRow({ variance }: { variance: string }) {
+function VarianceRow({ variance, currencySymbol = 'R' }: { variance: string; currencySymbol?: string }) {
   const v = new Decimal(variance)
   const style = v.isZero()
     ? { background: colors.actionBg,  color: colors.action  }
@@ -98,13 +99,13 @@ function VarianceRow({ variance }: { variance: string }) {
   return (
     <div className="flex justify-between font-semibold rounded px-2 py-1.5 text-sm" style={style}>
       <span>Balance (Variance)</span>
-      <span className="font-mono">{v.gt(0) ? '+' : ''}R {v.toFixed(2)}</span>
+      <span className="font-mono">{v.gt(0) ? '+' : ''}{currencySymbol} {v.toFixed(2)}</span>
     </div>
   )
 }
 
 // ─── Count Cash modal ─────────────────────────────────────────────────────────
-function CountCashModal({ counts, setCounts, notes, setNotes, submitting, handleSubmit, onClose, expectedCash }: {
+function CountCashModal({ counts, setCounts, notes, setNotes, submitting, handleSubmit, onClose, expectedCash, currencySymbol = 'R' }: {
   counts: Record<number, number>
   setCounts: React.Dispatch<React.SetStateAction<Record<number, number>>>
   notes: string
@@ -113,6 +114,7 @@ function CountCashModal({ counts, setCounts, notes, setNotes, submitting, handle
   handleSubmit: () => Promise<void>
   onClose: () => void
   expectedCash: Decimal
+  currencySymbol?: string
 }) {
   const total = DENOMINATIONS.reduce(
     (s, d) => s.plus(new Decimal(counts[d] ?? 0).times(d).div(100)),
@@ -120,6 +122,46 @@ function CountCashModal({ counts, setCounts, notes, setNotes, submitting, handle
   )
   const variance = total.minus(expectedCash)
   const hasCounted = !total.isZero()
+
+  // Draggable state
+  const [position, setPosition] = useState<{ x: number; y: number } | null>(null)
+  const [dragging, setDragging] = useState(false)
+  const dragOffset = React.useRef({ x: 0, y: 0 })
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    // Only drag from title bar area
+    const rect = e.currentTarget.getBoundingClientRect()
+    setDragging(true)
+    if (position) {
+      dragOffset.current = { x: e.clientX - position.x, y: e.clientY - position.y }
+    } else {
+      // Initial position: center of screen
+      const dialogEl = e.currentTarget.closest('[role="dialog"]') as HTMLElement | null
+      if (dialogEl) {
+        const dialogRect = dialogEl.getBoundingClientRect()
+        dragOffset.current = { x: e.clientX - dialogRect.left, y: e.clientY - dialogRect.top }
+        setPosition({ x: dialogRect.left, y: dialogRect.top })
+      }
+    }
+    e.preventDefault()
+  }
+
+  React.useEffect(() => {
+    if (!dragging) return
+    const handleMouseMove = (e: MouseEvent) => {
+      setPosition({
+        x: e.clientX - dragOffset.current.x,
+        y: e.clientY - dragOffset.current.y,
+      })
+    }
+    const handleMouseUp = () => setDragging(false)
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mouseup', handleMouseUp)
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [dragging])
 
   // Split denominations into two columns (left: first half, right: second half)
   const midpoint = Math.ceil(DENOMINATIONS.length / 2)
@@ -146,16 +188,32 @@ function CountCashModal({ counts, setCounts, notes, setNotes, submitting, handle
           disabled={submitting} placeholder="0"
         />
         <span className="font-mono text-xs text-right flex-1" style={{ color: val.isZero() ? colors.textSecondary : colors.textPrimary }}>
-          R {val.toFixed(2)}
+          {currencySymbol} {val.toFixed(2)}
         </span>
       </div>
     )
   }
 
+  const dialogStyle: React.CSSProperties = position
+    ? { position: 'fixed', left: position.x, top: position.y, transform: 'none', margin: 0 }
+    : {}
+
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-xl p-0 gap-0" showCloseButton={false} style={{ borderRadius: 2, border: `1px solid ${colors.border}`, boxShadow: '0 4px 12px rgba(0,0,0,0.15)', background: colors.surface }}>
-        <ModalTitleBar title="Count Cash" onClose={onClose} />
+      <DialogContent
+        className="sm:max-w-xl p-0 gap-0"
+        showCloseButton={false}
+        style={{
+          borderRadius: 2,
+          border: `1px solid ${colors.border}`,
+          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+          background: colors.surface,
+          ...dialogStyle,
+        }}
+      >
+        <div onMouseDown={handleMouseDown} style={{ cursor: dragging ? 'grabbing' : 'grab' }}>
+          <ModalTitleBar title="Count Cash" onClose={onClose} />
+        </div>
         <div style={{ padding: '12px 16px 16px' }} className="space-y-3">
 
           {/* Two-column layout: Denominations left/right, Summary below */}
@@ -191,7 +249,7 @@ function CountCashModal({ counts, setCounts, notes, setNotes, submitting, handle
                 Expected in Drawer
               </span>
               <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 16, color: colors.process }}>
-                R {expectedCash.toFixed(2)}
+                {currencySymbol} {expectedCash.toFixed(2)}
               </span>
             </div>
 
@@ -201,7 +259,7 @@ function CountCashModal({ counts, setCounts, notes, setNotes, submitting, handle
                 Cash Counted
               </span>
               <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 16, color: total.isZero() ? colors.textSecondary : colors.textPrimary }}>
-                R {total.toFixed(2)}
+                {currencySymbol} {total.toFixed(2)}
               </span>
             </div>
           </div>
@@ -220,7 +278,7 @@ function CountCashModal({ counts, setCounts, notes, setNotes, submitting, handle
                 {variance.isZero() ? 'Balanced' : variance.gt(0) ? 'Over' : 'Short'}
               </span>
               <span className="font-mono font-bold text-base" style={{ color: variance.isZero() ? colors.action : variance.gt(0) ? colors.process : colors.danger }}>
-                {variance.gt(0) ? '+' : ''}R {variance.toFixed(2)}
+                {variance.gt(0) ? '+' : ''}{currencySymbol} {variance.toFixed(2)}
               </span>
             </div>
           ) : (
@@ -263,10 +321,11 @@ function CountCashModal({ counts, setCounts, notes, setNotes, submitting, handle
 }
 
 // ─── Manage Open Sessions Modal ───────────────────────────────────────────────
-function ManageSessionsModal({ sessions, onClose, onVoided }: {
+function ManageSessionsModal({ sessions, onClose, onVoided, currencySymbol = 'R' }: {
   sessions: CashUp[]
   onClose: () => void
   onVoided: () => void
+  currencySymbol?: string
 }) {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [voiding, setVoiding] = useState(false)
@@ -371,7 +430,7 @@ function ManageSessionsModal({ sessions, onClose, onVoided }: {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={{ fontSize: 12, fontWeight: 600, color: colors.textPrimary, margin: 0 }}>{date}</p>
                     <p style={{ fontSize: 10, color: colors.textSecondary, margin: 0 }}>
-                      Opening: R {openingBal.toFixed(2)} · Opened {new Date(s.openedAt).toLocaleDateString('en-ZA')}
+                      Opening: {currencySymbol} {openingBal.toFixed(2)} · Opened {new Date(s.openedAt).toLocaleDateString('en-ZA')}
                     </p>
                   </div>
                 </label>
@@ -417,8 +476,8 @@ function ManageSessionsModal({ sessions, onClose, onVoided }: {
 }
 
 // ─── Compact unpaid card ──────────────────────────────────────────────────────
-function UnpaidCard({ label, total, count, href }: {
-  label: string; total: string; count: number; href: string
+function UnpaidCard({ label, total, count, href, currencySymbol = 'R' }: {
+  label: string; total: string; count: number; href: string; currencySymbol?: string
 }) {
   const router = useRouter()
   return (
@@ -430,7 +489,7 @@ function UnpaidCard({ label, total, count, href }: {
         </button>
       </div>
       <div className="p-3">
-        <p className="font-mono font-bold text-base" style={{ color: colors.danger }}>R {new Decimal(total).toFixed(2)}</p>
+        <p className="font-mono font-bold text-base" style={{ color: colors.danger }}>{currencySymbol} {new Decimal(total).toFixed(2)}</p>
         <p className="text-xs mt-0.5" style={{ color: colors.textSecondary }}>{count} purchase{count !== 1 ? 's' : ''}</p>
       </div>
     </div>
@@ -710,7 +769,7 @@ export default function CashUpPage() {
             {/* Zero-float warning */}
             {cashUp.status === 'open' && new Decimal(cashUp.openingBalance ?? '0').isZero() && (
               <div className="flex items-center gap-2 rounded px-3 py-2 text-sm" style={{ background: colors.warningBg, color: colors.warning }}>
-                <span className="font-semibold">⚠ Opening balance is R 0.00.</span>
+                <span className="font-semibold">⚠ Opening balance is {CURRENCY_SYMBOLS[cashUp.currency ?? 'ZAR']} 0.00.</span>
                 <span>Set today&apos;s float in the</span>
                 <a href="/app/float" className="underline font-medium">Float module</a>
                 <span>before submitting.</span>
@@ -736,6 +795,7 @@ export default function CashUpPage() {
             {/* ── 2-column layout: left = reconciliation, right = count + panels ── */}
             {(() => {
               const isOpen    = cashUp.status === 'open'
+              const currSym   = CURRENCY_SYMBOLS[cashUp.currency ?? 'ZAR']
               const opening   = new Decimal(cashUp.openingBalance ?? '0')
               const draw      = new Decimal(isOpen ? (stats?.floatTopUps ?? '0') : (cashUp.drawingsReceived ?? '0'))
               const totalCash = opening.plus(draw)
@@ -797,31 +857,31 @@ export default function CashUpPage() {
                     </div>
 
                     {/* Opening + Drawings */}
-                    <ReconRow label="Opening Balance" value={opening.toFixed(2)} positive />
-                    <ReconRow label="Drawings Received (+)" value={draw.toFixed(2)} positive />
-                    <ReconRow label="Total Cash" value={totalCash.toFixed(2)} subtotal />
+                    <ReconRow label="Opening Balance" value={opening.toFixed(2)} positive currencySymbol={currSym} />
+                    <ReconRow label="Drawings Received (+)" value={draw.toFixed(2)} positive currencySymbol={currSym} />
+                    <ReconRow label="Total Cash" value={totalCash.toFixed(2)} subtotal currencySymbol={currSym} />
 
                     {/* Transaction rows */}
                     <div className="pt-1 space-y-1 border-t" style={{ borderColor: colors.border }}>
-                      <ReconRow label="Cash Received / Sales (+)"   value={cashSales.toFixed(2)} positive />
+                      <ReconRow label="Cash Received / Sales (+)"   value={cashSales.toFixed(2)} positive currencySymbol={currSym} />
                       {isOpen && cardSalesLive.gt(0) && (
-                        <ReconRow label="Card / EFT Sales (not in drawer)" value={cardSalesLive.toFixed(2)} muted />
+                        <ReconRow label="Card / EFT Sales (not in drawer)" value={cardSalesLive.toFixed(2)} muted currencySymbol={currSym} />
                       )}
-                      <ReconRow label="Cash Purchases (−)"          value={cashPurch.toFixed(2)} negative />
-                      <ReconRow label="Account Payments (−)"        value={cashPay.toFixed(2)}   negative />
-                      <ReconRow label="Expenses (−)"                value={exp.toFixed(2)}       negative />
-                      <ReconRow label="Loan Advance (−)"            value={loanAdv.toFixed(2)}   negative />
-                      <ReconRow label="Loans Repayment (+)"         value={loanRep.toFixed(2)}   positive />
+                      <ReconRow label="Cash Purchases (−)"          value={cashPurch.toFixed(2)} negative currencySymbol={currSym} />
+                      <ReconRow label="Account Payments (−)"        value={cashPay.toFixed(2)}   negative currencySymbol={currSym} />
+                      <ReconRow label="Expenses (−)"                value={exp.toFixed(2)}       negative currencySymbol={currSym} />
+                      <ReconRow label="Loan Advance (−)"            value={loanAdv.toFixed(2)}   negative currencySymbol={currSym} />
+                      <ReconRow label="Loans Repayment (+)"         value={loanRep.toFixed(2)}   positive currencySymbol={currSym} />
                     </div>
 
                     {/* Expected float */}
-                    <ReconRow label="Cal Float (Expected in Drawer)" value={calFloat.toFixed(2)} subtotal />
+                    <ReconRow label="Cal Float (Expected in Drawer)" value={calFloat.toFixed(2)} subtotal currencySymbol={currSym} />
 
                     {/* Cash counted + variance */}
                     <div className="pt-1.5 border-t space-y-1.5" style={{ borderColor: colors.border }}>
                       <div className="flex items-center gap-2">
                         <div className="flex-1">
-                          <ReconRow label="Cash On Hand (Counted)" value={declared.toFixed(2)} highlight />
+                          <ReconRow label="Cash On Hand (Counted)" value={declared.toFixed(2)} highlight currencySymbol={currSym} />
                         </div>
                         {isOpen && (
                           <button
@@ -834,7 +894,7 @@ export default function CashUpPage() {
                       </div>
                       {isOpen ? (
                         hasCounted ? (
-                          <VarianceRow variance={balance.toFixed(2)} />
+                          <VarianceRow variance={balance.toFixed(2)} currencySymbol={currSym} />
                         ) : (
                           <div className="flex justify-between items-center rounded px-2 py-1.5 text-sm" style={{ background: colors.toolbar }}>
                             <span style={{ color: colors.textSecondary }}>Balance (Variance)</span>
@@ -842,7 +902,7 @@ export default function CashUpPage() {
                           </div>
                         )
                       ) : (
-                        <VarianceRow variance={balance.toFixed(2)} />
+                        <VarianceRow variance={balance.toFixed(2)} currencySymbol={currSym} />
                       )}
                     </div>
 
@@ -850,7 +910,7 @@ export default function CashUpPage() {
                     <div className="pt-1.5 border-t flex justify-between text-sm font-medium" style={{ borderColor: colors.border }}>
                       <span style={{ color: colors.textSecondary }}>Fin Period Cumulative Balance</span>
                       <span className="font-mono" style={{ color: finCum.isZero() ? colors.textSecondary : finCum.gte(0) ? colors.process : colors.danger }}>
-                        {finCum.gt(0) ? '+' : ''}R {finCum.toFixed(2)}
+                        {finCum.gt(0) ? '+' : ''}{currSym} {finCum.toFixed(2)}
                       </span>
                     </div>
 
@@ -867,7 +927,7 @@ export default function CashUpPage() {
                               <div key={d} className="flex items-center gap-1.5 text-xs">
                                 <span className="font-mono font-semibold w-8 text-right shrink-0" style={{ color: colors.textPrimary }}>{DENOMINATION_LABELS[d]}</span>
                                 <span style={{ color: colors.textSecondary }}>×{c}</span>
-                                <span className="font-mono ml-auto" style={{ color: colors.textPrimary }}>R {val.toFixed(2)}</span>
+                                <span className="font-mono ml-auto" style={{ color: colors.textPrimary }}>{currSym} {val.toFixed(2)}</span>
                               </div>
                             )
                           })}
@@ -923,12 +983,14 @@ export default function CashUpPage() {
                       total={stats?.unpaidToday?.total ?? '0'}
                       count={stats?.unpaidToday?.count ?? 0}
                       href="/app/purchases/unpaid"
+                      currencySymbol={currSym}
                     />
                     <UnpaidCard
                       label="Total Unpaid Cash"
                       total={stats?.unpaidAllTime?.total ?? '0'}
                       count={stats?.unpaidAllTime?.count ?? 0}
                       href="/app/purchases/unpaid"
+                      currencySymbol={currSym}
                     />
 
                     {/* Card / EFT sales (submitted/approved) */}
@@ -938,7 +1000,7 @@ export default function CashUpPage() {
                           <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: colors.textSecondary }}>Card / EFT Sales</span>
                         </div>
                         <div className="p-3">
-                          <p className="font-mono font-bold" style={{ color: colors.process }}>R {new Decimal(cashUp.cardPaymentsTotal).toFixed(2)}</p>
+                          <p className="font-mono font-bold" style={{ color: colors.process }}>{currSym} {new Decimal(cashUp.cardPaymentsTotal).toFixed(2)}</p>
                           <p className="text-xs mt-0.5" style={{ color: colors.textSecondary }}>Excluded from cash reconciliation</p>
                         </div>
                       </div>
@@ -958,7 +1020,7 @@ export default function CashUpPage() {
                                 <p style={{ color: colors.textSecondary }}>{e.expenseType.name} · {e.paymentMethod}</p>
                               </div>
                               <div className="shrink-0 text-right">
-                                <p className="font-mono font-semibold" style={{ color: colors.textPrimary }}>R {new Decimal(e.amount).toFixed(2)}</p>
+                                <p className="font-mono font-semibold" style={{ color: colors.textPrimary }}>{currSym} {new Decimal(e.amount).toFixed(2)}</p>
                                 {e.status === 'approved' ? (
                                   <span className="text-[10px] font-medium" style={{ color: colors.action }}>✓ approved</span>
                                 ) : isManager ? (
@@ -989,6 +1051,7 @@ export default function CashUpPage() {
 
       {countCashOpen && (() => {
         // Calculate expected cash in drawer for the modal
+        const currSym   = CURRENCY_SYMBOLS[cashUp?.currency ?? 'ZAR']
         const opening   = new Decimal(cashUp?.openingBalance ?? '0')
         const draw      = new Decimal(stats?.floatTopUps ?? '0')
         const totalCash = opening.plus(draw)
@@ -1007,6 +1070,7 @@ export default function CashUpPage() {
             submitting={submitting} handleSubmit={handleSubmit}
             onClose={() => setCountCashOpen(false)}
             expectedCash={expectedCash}
+            currencySymbol={currSym}
           />
         )
       })()}
@@ -1019,6 +1083,7 @@ export default function CashUpPage() {
             refreshOpenSessions()
             swrMutate(CASHUP_KEY)
           }}
+          currencySymbol={CURRENCY_SYMBOLS[cashUp?.currency ?? 'ZAR']}
         />
       )}
     </PageShell>
