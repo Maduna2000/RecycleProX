@@ -407,3 +407,387 @@ export async function listCashUps(opts: { skip?: number; take?: number } = {}) {
   ])
   return { items, total }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// REPORT DATA FUNCTIONS
+// These functions fetch detailed records for PDF report generation
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface CashSaleRecord {
+  refNumber: string
+  createdAt: Date
+  customerName: string | null
+  description: string
+  totalAmount: string
+}
+
+export async function getCashSalesForDate(sessionDate: Date): Promise<CashSaleRecord[]> {
+  const start = new Date(sessionDate); start.setHours(0, 0, 0, 0)
+  const end   = new Date(sessionDate); end.setHours(23, 59, 59, 999)
+
+  const sales = await prisma.sale.findMany({
+    where: { paymentMethod: 'cash', status: 'completed', createdAt: { gte: start, lte: end } },
+    include: {
+      customer: { select: { firstName: true, lastName: true } },
+      lines: { select: { product: { select: { name: true } }, quantity: true } },
+    },
+    orderBy: { createdAt: 'asc' },
+  })
+
+  return sales.map(s => ({
+    refNumber: s.refNumber,
+    createdAt: s.createdAt,
+    customerName: s.customer ? `${s.customer.firstName} ${s.customer.lastName}` : s.buyerName ?? null,
+    description: s.lines.map((l: { product: { name: string }; quantity: unknown }) => `${l.product.name} x${l.quantity}`).join(', ') || 'N/A',
+    totalAmount: new Decimal(s.totalAmount.toString()).toFixed(2),
+  }))
+}
+
+export interface CashPurchaseRecord {
+  refNumber: string
+  createdAt: Date
+  supplierName: string
+  supplierId: string | null
+  items: string
+  totalAmount: string
+}
+
+export async function getCashPurchasesForDate(sessionDate: Date): Promise<CashPurchaseRecord[]> {
+  const start = new Date(sessionDate); start.setHours(0, 0, 0, 0)
+  const end   = new Date(sessionDate); end.setHours(23, 59, 59, 999)
+
+  const purchases = await prisma.purchase.findMany({
+    where: { paymentMethod: 'cash', status: 'completed', createdAt: { gte: start, lte: end } },
+    include: {
+      customer: { select: { firstName: true, lastName: true, idNumber: true } },
+      lines: { select: { product: { select: { name: true } }, quantity: true } },
+    },
+    orderBy: { createdAt: 'asc' },
+  })
+
+  return purchases.map(p => ({
+    refNumber: p.refNumber,
+    createdAt: p.createdAt,
+    supplierName: `${p.customer.firstName} ${p.customer.lastName}`,
+    supplierId: p.customer.idNumber,
+    items: p.lines.map((l: { product: { name: string }; quantity: unknown }) => `${l.product.name} x${l.quantity}`).join(', ') || 'N/A',
+    totalAmount: new Decimal(p.totalAmount.toString()).toFixed(2),
+  }))
+}
+
+export interface AccountPaymentRecord {
+  refNumber: string
+  createdAt: Date
+  customerName: string
+  notes: string | null
+  amount: string
+}
+
+export async function getAccountPaymentsForDate(sessionDate: Date): Promise<AccountPaymentRecord[]> {
+  const start = new Date(sessionDate); start.setHours(0, 0, 0, 0)
+  const end   = new Date(sessionDate); end.setHours(23, 59, 59, 999)
+
+  const payments = await prisma.payment.findMany({
+    where: { paymentMethod: 'cash', voidedAt: null, createdAt: { gte: start, lte: end } },
+    include: { customer: { select: { firstName: true, lastName: true } } },
+    orderBy: { createdAt: 'asc' },
+  })
+
+  return payments.map(p => ({
+    refNumber: p.refNumber,
+    createdAt: p.createdAt,
+    customerName: p.customer ? `${p.customer.firstName} ${p.customer.lastName}` : 'Unknown',
+    notes: p.notes,
+    amount: new Decimal(p.amount.toString()).toFixed(2),
+  }))
+}
+
+export interface ExpenseRecord {
+  refNumber: string
+  createdAt: Date
+  typeName: string
+  description: string | null
+  paymentMethod: string
+  amount: string
+}
+
+export async function getExpensesForDateReport(sessionDate: Date): Promise<ExpenseRecord[]> {
+  const start = new Date(sessionDate); start.setHours(0, 0, 0, 0)
+  const end   = new Date(sessionDate); end.setHours(23, 59, 59, 999)
+
+  const expenses = await prisma.expense.findMany({
+    where: {
+      status: { in: ['pending', 'approved'] },
+      createdAt: { gte: start, lte: end },
+    },
+    include: { expenseType: { select: { name: true } } },
+    orderBy: { createdAt: 'asc' },
+  })
+
+  return expenses.map(e => ({
+    refNumber: e.refNumber,
+    createdAt: e.createdAt,
+    typeName: e.expenseType.name,
+    description: e.description,
+    paymentMethod: e.paymentMethod,
+    amount: new Decimal(e.amount.toString()).toFixed(2),
+  }))
+}
+
+export interface LoanAdvanceRecord {
+  refNumber: string
+  createdAt: Date
+  customerName: string
+  customerId: string | null
+  principalAmount: string
+}
+
+export async function getLoanAdvancesForDate(sessionDate: Date): Promise<LoanAdvanceRecord[]> {
+  const start = new Date(sessionDate); start.setHours(0, 0, 0, 0)
+  const end   = new Date(sessionDate); end.setHours(23, 59, 59, 999)
+
+  const loans = await prisma.loan.findMany({
+    where: {
+      status: { not: 'voided' },
+      createdAt: { gte: start, lte: end },
+    },
+    include: { customer: { select: { firstName: true, lastName: true, idNumber: true } } },
+    orderBy: { createdAt: 'asc' },
+  })
+
+  return loans.map(l => ({
+    refNumber: l.refNumber,
+    createdAt: l.createdAt,
+    customerName: `${l.customer.firstName} ${l.customer.lastName}`,
+    customerId: l.customer.idNumber,
+    principalAmount: new Decimal(l.principalAmount.toString()).toFixed(2),
+  }))
+}
+
+export interface LoanRepaymentRecord {
+  id: string
+  createdAt: Date
+  customerName: string
+  loanRefNumber: string
+  amount: string
+}
+
+export async function getLoanRepaymentsForDate(sessionDate: Date): Promise<LoanRepaymentRecord[]> {
+  const start = new Date(sessionDate); start.setHours(0, 0, 0, 0)
+  const end   = new Date(sessionDate); end.setHours(23, 59, 59, 999)
+
+  const repayments = await prisma.loanRepayment.findMany({
+    where: { createdAt: { gte: start, lte: end } },
+    include: {
+      loan: {
+        select: {
+          refNumber: true,
+          customer: { select: { firstName: true, lastName: true } },
+        },
+      },
+    },
+    orderBy: { createdAt: 'asc' },
+  })
+
+  return repayments.map(r => ({
+    id: r.id,
+    createdAt: r.createdAt,
+    customerName: `${r.loan.customer.firstName} ${r.loan.customer.lastName}`,
+    loanRefNumber: r.loan.refNumber,
+    amount: new Decimal(r.amount.toString()).toFixed(2),
+  }))
+}
+
+export interface UnpaidPurchaseRecord {
+  refNumber: string
+  createdAt: Date
+  supplierName: string
+  totalAmount: string
+  amountPaid: string
+  balance: string
+}
+
+export async function getUnpaidPurchases(scope: 'today' | 'all', sessionDate?: Date): Promise<UnpaidPurchaseRecord[]> {
+  const whereClause: { status: 'pending'; createdAt?: { gte: Date; lte: Date } } = { status: 'pending' }
+
+  if (scope === 'today' && sessionDate) {
+    const start = new Date(sessionDate); start.setHours(0, 0, 0, 0)
+    const end   = new Date(sessionDate); end.setHours(23, 59, 59, 999)
+    whereClause.createdAt = { gte: start, lte: end }
+  }
+
+  const purchases = await prisma.purchase.findMany({
+    where: whereClause,
+    include: { customer: { select: { firstName: true, lastName: true } } },
+    orderBy: { createdAt: 'desc' },
+  })
+
+  return purchases.map(p => {
+    const total = new Decimal(p.totalAmount.toString())
+    const loanDeduction = new Decimal(p.loanDeductionAmount?.toString() ?? '0')
+    const paid = new Decimal(p.amountPaid.toString())
+    const balance = total.minus(loanDeduction).minus(paid)
+    return {
+      refNumber: p.refNumber,
+      createdAt: p.createdAt,
+      supplierName: `${p.customer.firstName} ${p.customer.lastName}`,
+      totalAmount: total.toFixed(2),
+      amountPaid: paid.plus(loanDeduction).toFixed(2),
+      balance: balance.toFixed(2),
+    }
+  })
+}
+
+export interface CardSaleRecord {
+  refNumber: string
+  createdAt: Date
+  customerName: string | null
+  paymentMethod: string
+  totalAmount: string
+}
+
+export async function getCardSalesForDate(sessionDate: Date): Promise<CardSaleRecord[]> {
+  const start = new Date(sessionDate); start.setHours(0, 0, 0, 0)
+  const end   = new Date(sessionDate); end.setHours(23, 59, 59, 999)
+
+  const sales = await prisma.sale.findMany({
+    where: { paymentMethod: 'card', status: 'completed', createdAt: { gte: start, lte: end } },
+    include: { customer: { select: { firstName: true, lastName: true } } },
+    orderBy: { createdAt: 'asc' },
+  })
+
+  return sales.map(s => ({
+    refNumber: s.refNumber,
+    createdAt: s.createdAt,
+    customerName: s.customer ? `${s.customer.firstName} ${s.customer.lastName}` : s.buyerName ?? null,
+    paymentMethod: s.paymentMethod,
+    totalAmount: new Decimal(s.totalAmount.toString()).toFixed(2),
+  }))
+}
+
+export interface TransferredPurchaseRecord {
+  refNumber: string
+  createdAt: Date
+  supplierName: string
+  bankRef: string | null
+  totalAmount: string
+}
+
+export async function getTransferredPurchasesForDate(sessionDate: Date): Promise<TransferredPurchaseRecord[]> {
+  const start = new Date(sessionDate); start.setHours(0, 0, 0, 0)
+  const end   = new Date(sessionDate); end.setHours(23, 59, 59, 999)
+
+  const purchases = await prisma.purchase.findMany({
+    where: { paymentMethod: 'eft', status: 'completed', createdAt: { gte: start, lte: end } },
+    include: { customer: { select: { firstName: true, lastName: true } } },
+    orderBy: { createdAt: 'asc' },
+  })
+
+  return purchases.map(p => ({
+    refNumber: p.refNumber,
+    createdAt: p.createdAt,
+    supplierName: `${p.customer.firstName} ${p.customer.lastName}`,
+    bankRef: p.notes,
+    totalAmount: new Decimal(p.totalAmount.toString()).toFixed(2),
+  }))
+}
+
+export interface DrawingsReceivedRecord {
+  id: string
+  createdAt: Date
+  movementType: string
+  notes: string | null
+  amount: string
+}
+
+export async function getDrawingsReceivedForDateReport(sessionDate: Date): Promise<DrawingsReceivedRecord[]> {
+  const start = new Date(sessionDate); start.setHours(0, 0, 0, 0)
+  const end   = new Date(sessionDate); end.setHours(23, 59, 59, 999)
+
+  // Get float opening amount as the first "drawing"
+  const floatRecord = await prisma.cashFloat.findUnique({
+    where: { floatDate: start },
+  })
+
+  // Get all top-ups for the day
+  const topUps = await prisma.floatMovement.findMany({
+    where: {
+      movementType: 'top_up',
+      createdAt: { gte: start, lte: end },
+    },
+    orderBy: { createdAt: 'asc' },
+  })
+
+  const records: DrawingsReceivedRecord[] = []
+
+  // Add opening float if exists
+  if (floatRecord && new Decimal(floatRecord.openingAmount.toString()).gt(0)) {
+    records.push({
+      id: floatRecord.id,
+      createdAt: floatRecord.createdAt,
+      movementType: 'Opening Float',
+      notes: floatRecord.notes,
+      amount: new Decimal(floatRecord.openingAmount.toString()).toFixed(2),
+    })
+  }
+
+  // Add top-ups
+  topUps.forEach(t => {
+    records.push({
+      id: t.id,
+      createdAt: t.createdAt,
+      movementType: 'Top-Up',
+      notes: t.referenceNote,
+      amount: new Decimal(t.amount.toString()).toFixed(2),
+    })
+  })
+
+  return records
+}
+
+export interface CashUpHistoryRecord {
+  id: string
+  sessionDate: Date
+  status: string
+  currency: string
+  variance: string | null
+  openingBalance: string
+  declaredCash: string | null
+  submittedAt: Date | null
+  approvedAt: Date | null
+}
+
+export async function getCashUpHistory(opts: {
+  skip?: number
+  take?: number
+  status?: string[]
+} = {}): Promise<{ items: CashUpHistoryRecord[]; total: number }> {
+  const { skip = 0, take = 50, status = ['submitted', 'approved'] } = opts
+
+  const whereClause = { status: { in: status as ('submitted' | 'approved')[] } }
+
+  const [items, total] = await Promise.all([
+    prisma.cashUp.findMany({
+      where: whereClause,
+      skip,
+      take,
+      orderBy: { sessionDate: 'desc' },
+    }),
+    prisma.cashUp.count({ where: whereClause }),
+  ])
+
+  return {
+    items: items.map(c => ({
+      id: c.id,
+      sessionDate: c.sessionDate,
+      status: c.status,
+      currency: c.currency,
+      variance: c.variance ? new Decimal(c.variance.toString()).toFixed(2) : null,
+      openingBalance: new Decimal(c.openingBalance.toString()).toFixed(2),
+      declaredCash: c.declaredCash ? new Decimal(c.declaredCash.toString()).toFixed(2) : null,
+      submittedAt: c.closedAt,
+      approvedAt: c.approvedAt,
+    })),
+    total,
+  }
+}

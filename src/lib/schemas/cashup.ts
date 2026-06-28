@@ -55,3 +55,40 @@ export const OpenCashUpSchema = z.object({
 export type SubmitCashUpInput  = z.infer<typeof SubmitCashUpSchema>
 export type ApproveCashUpInput = z.infer<typeof ApproveCashUpSchema>
 export type OpenCashUpInput    = z.infer<typeof OpenCashUpSchema>
+
+// ─── Report Types ─────────────────────────────────────────────────────────────
+export const CASHUP_REPORT_TYPES = [
+  'cash-sales',
+  'cash-purchases',
+  'account-payments',
+  'expenses',
+  'loan-advances',
+  'loan-repayments',
+  'unpaid-today',
+  'unpaid-all',
+  'card-sales',
+  'transferred-purchases',
+  'drawings-received',
+] as const
+
+export type CashupReportType = (typeof CASHUP_REPORT_TYPES)[number]
+
+export const CashupReportTypeSchema = z.enum(CASHUP_REPORT_TYPES)
+
+export const CASHUP_REPORT_LABELS: Record<CashupReportType, string> = {
+  'cash-sales':            'Cash Sales',
+  'cash-purchases':        'Cash Purchases',
+  'account-payments':      'Account Payments',
+  'expenses':              'Expenses',
+  'loan-advances':         'Loan Advances',
+  'loan-repayments':       'Loan Repayments',
+  'unpaid-today':          'Unpaid Purchases (Today)',
+  'unpaid-all':            'Unpaid Purchases (All Time)',
+  'card-sales':            'Card Sales',
+  'transferred-purchases': 'Transferred Purchases',
+  'drawings-received':     'Drawings Received',
+}
+
+export const CashupReportQuerySchema = z.object({
+  type: CashupReportTypeSchema,
+})

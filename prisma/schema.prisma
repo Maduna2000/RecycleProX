@@ -738,6 +738,7 @@ enum PaymentMethod {
   cash
   eft
   cheque
+  card
 }
 
 enum UnitOfMeasure {

@@ -9,12 +9,14 @@ import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { CheckCircle2, Calculator, Clock, Loader2, Lock, RefreshCw, ExternalLink } from 'lucide-react'
+import { CheckCircle2, Calculator, Clock, Loader2, Lock, RefreshCw, FileText, FolderOpen } from 'lucide-react'
 import { Dialog, DialogContent, ModalTitleBar, ModalBtn } from '@/components/ui/dialog'
 import { DENOMINATIONS, DENOMINATION_LABELS, type Denomination, CURRENCY_SYMBOLS, CURRENCY_LABELS, type Currency } from '@/lib/schemas/cashup'
 import { PageShell } from '@/components/layout/PageShell'
 import { colors } from '@/lib/design-tokens'
 import { useOfflineMutation } from '@/hooks/useOfflineFetch'
+import { ReportButton } from './_components/ReportButton'
+import { PreviousReportsModal } from './_components/PreviousReportsModal'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -474,17 +476,26 @@ function ManageSessionsModal({ sessions, onClose, onVoided, currencySymbol = 'R'
 }
 
 // ─── Compact unpaid card ──────────────────────────────────────────────────────
-function UnpaidCard({ label, total, count, href, currencySymbol = 'R' }: {
-  label: string; total: string; count: number; href: string; currencySymbol?: string
+function UnpaidCard({ label, total, count, sessionId, reportType, disabled = false, standalone = false, currencySymbol = 'R' }: {
+  label: string
+  total: string
+  count: number
+  sessionId?: string
+  reportType: 'unpaid-today' | 'unpaid-all'
+  disabled?: boolean
+  standalone?: boolean
+  currencySymbol?: string
 }) {
-  const router = useRouter()
   return (
     <div className="rounded border bg-white overflow-hidden" style={{ borderColor: colors.border }}>
       <div className="flex items-center justify-between" style={{ padding: '6px 12px', borderBottom: `1px solid ${colors.border}`, background: 'linear-gradient(180deg, #EAEAEA 0%, #D4D4D4 100%)' }}>
         <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: colors.textSecondary }}>{label}</span>
-        <button onClick={() => router.push(href)} className="flex items-center gap-1 text-xs font-medium" style={{ color: colors.process }}>
-          <ExternalLink className="w-3 h-3" /> Report
-        </button>
+        <ReportButton
+          type={reportType}
+          sessionId={sessionId ?? ''}
+          disabled={disabled}
+          standalone={standalone}
+        />
       </div>
       <div className="p-3">
         <p className="font-mono font-bold text-base" style={{ color: colors.danger }}>{currencySymbol} {new Decimal(total).toFixed(2)}</p>
@@ -544,6 +555,7 @@ export default function CashUpPage() {
   const [countCashOpen, setCountCashOpen] = useState(false)
   const [voiding, setVoiding] = useState(false)
   const [manageSessionsOpen, setManageSessionsOpen] = useState(false)
+  const [previousReportsOpen, setPreviousReportsOpen] = useState(false)
 
   // Fetch all open sessions to show count
   const { data: openSessionsData, mutate: refreshOpenSessions } = useSWR<{ sessions: CashUp[] }>('/api/cashup/open-sessions', fetcher)
@@ -803,6 +815,8 @@ export default function CashUpPage() {
               const exp       = new Decimal(isOpen ? (stats?.expenses      ?? '0') : (cashUp.expensesTotal ?? '0'))
               const loanAdv   = new Decimal(stats?.loanAdvance   ?? '0')
               const loanRep   = new Decimal(stats?.loanRepayment ?? '0')
+              const moneySpent = cashPurch.plus(cashPay).plus(exp).plus(loanAdv)
+              const netCash    = totalCash.minus(moneySpent)
               const calFloat  = totalCash.plus(cashSales).minus(cashPurch).minus(cashPay).minus(exp).minus(loanAdv).plus(loanRep)
               const declared  = isOpen ? declaredCash : new Decimal(cashUp.declaredCash ?? '0')
               const balance   = declared.minus(calFloat)
@@ -856,20 +870,75 @@ export default function CashUpPage() {
 
                     {/* Opening + Drawings */}
                     <ReconRow label="Opening Balance" value={opening.toFixed(2)} positive currencySymbol={currSym} />
-                    <ReconRow label="Drawings Received (+)" value={draw.toFixed(2)} positive currencySymbol={currSym} />
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1">
+                        <ReconRow label="Drawings Received (+)" value={draw.toFixed(2)} positive currencySymbol={currSym} />
+                      </div>
+                      {!isOpen && cashUp && (
+                        <ReportButton type="drawings-received" sessionId={cashUp.id} disabled={isOpen} />
+                      )}
+                    </div>
                     <ReconRow label="Total Cash" value={totalCash.toFixed(2)} subtotal currencySymbol={currSym} />
 
                     {/* Transaction rows */}
                     <div className="pt-1 space-y-1 border-t" style={{ borderColor: colors.border }}>
-                      <ReconRow label="Cash Received / Sales (+)"   value={cashSales.toFixed(2)} positive currencySymbol={currSym} />
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1">
+                          <ReconRow label="Cash Received / Sales (+)" value={cashSales.toFixed(2)} positive currencySymbol={currSym} />
+                        </div>
+                        {!isOpen && cashUp && (
+                          <ReportButton type="cash-sales" sessionId={cashUp.id} disabled={isOpen} />
+                        )}
+                      </div>
                       {isOpen && cardSalesLive.gt(0) && (
                         <ReconRow label="Card / EFT Sales (not in drawer)" value={cardSalesLive.toFixed(2)} muted currencySymbol={currSym} />
                       )}
-                      <ReconRow label="Cash Purchases (−)"          value={cashPurch.toFixed(2)} negative currencySymbol={currSym} />
-                      <ReconRow label="Account Payments (−)"        value={cashPay.toFixed(2)}   negative currencySymbol={currSym} />
-                      <ReconRow label="Expenses (−)"                value={exp.toFixed(2)}       negative currencySymbol={currSym} />
-                      <ReconRow label="Loan Advance (−)"            value={loanAdv.toFixed(2)}   negative currencySymbol={currSym} />
-                      <ReconRow label="Loans Repayment (+)"         value={loanRep.toFixed(2)}   positive currencySymbol={currSym} />
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1">
+                          <ReconRow label="Cash Purchases (−)" value={cashPurch.toFixed(2)} negative currencySymbol={currSym} />
+                        </div>
+                        {!isOpen && cashUp && (
+                          <ReportButton type="cash-purchases" sessionId={cashUp.id} disabled={isOpen} />
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1">
+                          <ReconRow label="Account Payments (−)" value={cashPay.toFixed(2)} negative currencySymbol={currSym} />
+                        </div>
+                        {!isOpen && cashUp && (
+                          <ReportButton type="account-payments" sessionId={cashUp.id} disabled={isOpen} />
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1">
+                          <ReconRow label="Expenses (−)" value={exp.toFixed(2)} negative currencySymbol={currSym} />
+                        </div>
+                        {!isOpen && cashUp && (
+                          <ReportButton type="expenses" sessionId={cashUp.id} disabled={isOpen} />
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1">
+                          <ReconRow label="Loan Advance (−)" value={loanAdv.toFixed(2)} negative currencySymbol={currSym} />
+                        </div>
+                        {!isOpen && cashUp && (
+                          <ReportButton type="loan-advances" sessionId={cashUp.id} disabled={isOpen} />
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1">
+                          <ReconRow label="Loans Repayment (+)" value={loanRep.toFixed(2)} positive currencySymbol={currSym} />
+                        </div>
+                        {!isOpen && cashUp && (
+                          <ReportButton type="loan-repayments" sessionId={cashUp.id} disabled={isOpen} />
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Money Spent & Net Cash summary */}
+                    <div className="pt-1 mt-1 border-t" style={{ borderColor: colors.border }}>
+                      <ReconRow label="Money Spent (−)" value={moneySpent.toFixed(2)} subtotal negative currencySymbol={currSym} />
+                      <ReconRow label="Net Cash" value={netCash.toFixed(2)} subtotal currencySymbol={currSym} />
                     </div>
 
                     {/* Expected float */}
@@ -980,16 +1049,63 @@ export default function CashUpPage() {
                       label="Today Unpaid Cash"
                       total={stats?.unpaidToday?.total ?? '0'}
                       count={stats?.unpaidToday?.count ?? 0}
-                      href="/app/purchases/unpaid"
+                      sessionId={cashUp.id}
+                      reportType="unpaid-today"
+                      disabled={isOpen}
                       currencySymbol={currSym}
                     />
                     <UnpaidCard
                       label="Total Unpaid Cash"
                       total={stats?.unpaidAllTime?.total ?? '0'}
                       count={stats?.unpaidAllTime?.count ?? 0}
-                      href="/app/purchases/unpaid"
+                      reportType="unpaid-all"
+                      standalone={true}
                       currencySymbol={currSym}
                     />
+
+                    {/* Additional Reports Card */}
+                    <div className="rounded border bg-white overflow-hidden" style={{ borderColor: colors.border }}>
+                      <div style={{ padding: '6px 12px', borderBottom: `1px solid ${colors.border}`, background: 'linear-gradient(180deg, #EAEAEA 0%, #D4D4D4 100%)' }}>
+                        <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: colors.textSecondary }}>Reports</span>
+                      </div>
+                      <div className="p-3 space-y-2">
+                        <ReportButton
+                          type="card-sales"
+                          sessionId={cashUp.id}
+                          label="Card Sales"
+                          disabled={isOpen}
+                          fullWidth
+                        />
+                        <ReportButton
+                          type="transferred-purchases"
+                          sessionId={cashUp.id}
+                          label="Transferred Purchases"
+                          disabled={isOpen}
+                          fullWidth
+                        />
+                        <button
+                          onClick={() => setPreviousReportsOpen(true)}
+                          style={{
+                            width: '100%',
+                            fontSize: 10,
+                            padding: '6px 12px',
+                            background: '#E0E0E0',
+                            border: '1px solid #999',
+                            borderRadius: 2,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 4,
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.background = '#D0D0D0'}
+                          onMouseLeave={(e) => e.currentTarget.style.background = '#E0E0E0'}
+                        >
+                          <FolderOpen style={{ width: 9, height: 9 }} />
+                          <span>Previous Reports</span>
+                        </button>
+                      </div>
+                    </div>
 
                     {/* Card / EFT sales (submitted/approved) */}
                     {!isOpen && new Decimal(cashUp.cardPaymentsTotal ?? '0').gt(0) && (
@@ -1083,6 +1199,10 @@ export default function CashUpPage() {
           }}
           currencySymbol={CURRENCY_SYMBOLS[cashUp?.currency ?? 'ZAR']}
         />
+      )}
+
+      {previousReportsOpen && (
+        <PreviousReportsModal onClose={() => setPreviousReportsOpen(false)} />
       )}
     </PageShell>
   )
