@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
 
   // Parse query params
   const scopeParam = req.nextUrl.searchParams.get('scope') ?? 'all'
-  const dateParam = req.nextUrl.searchParams.get('date')
+  const dateParam = req.nextUrl.searchParams.get('date') ?? undefined
 
   const parseResult = QuerySchema.safeParse({ scope: scopeParam, date: dateParam })
   if (!parseResult.success) {
