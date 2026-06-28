@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import { Dialog, DialogContent, ModalTitleBar, ModalBtn } from '@/components/ui/dialog'
 import { colors } from '@/lib/design-tokens'
 import Decimal from 'decimal.js'
-import { CASHUP_REPORT_LABELS, type CashupReportType, CASHUP_REPORT_TYPES, CURRENCY_SYMBOLS } from '@/lib/schemas/cashup'
+import { CASHUP_REPORT_LABELS, type CashupReportType, CURRENCY_SYMBOLS } from '@/lib/schemas/cashup'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -116,8 +116,6 @@ export function PreviousReportsModal({ onClose }: PreviousReportsModalProps) {
       toast.error(`Failed to download ${failCount} report${failCount > 1 ? 's' : ''}`)
     }
   }
-
-  const selectedSessionData = sessions.find((s) => s.id === selectedSession)
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>

@@ -273,8 +273,6 @@ function drawHeader(
   pageIdx: number,
   totalPages: number
 ): number {
-  const y = PAGE_H - MARGIN
-
   // Navy header bar
   page.drawRectangle({ x: 0, y: PAGE_H - 55, width: PAGE_W, height: 55, color: NAVY })
 

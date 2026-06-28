@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
-import { CashupReportQuerySchema, type CashupReportType, CASHUP_REPORT_LABELS } from '@/lib/schemas/cashup'
+import { CashupReportQuerySchema, type CashupReportType } from '@/lib/schemas/cashup'
 import { CURRENCY_SYMBOLS } from '@/lib/schemas/cashup'
 import { generateCashupReport, type ReportEntry } from '@/lib/pdf/cashupReport'
 import { getAllSettings } from '@/lib/services/settingsService'
