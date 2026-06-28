@@ -129,8 +129,6 @@ function CountCashModal({ counts, setCounts, notes, setNotes, submitting, handle
   const dragOffset = React.useRef({ x: 0, y: 0 })
 
   const handleMouseDown = (e: React.MouseEvent) => {
-    // Only drag from title bar area
-    const rect = e.currentTarget.getBoundingClientRect()
     setDragging(true)
     if (position) {
       dragOffset.current = { x: e.clientX - position.x, y: e.clientY - position.y }
