@@ -24,7 +24,6 @@ const MODULE_KEYS = [
   '/app/products',
   '/app/price-groups',
   '/app/reports',
-  '/app/loans',
   '/app/police-register',
   '/app/audit-log',
   '/app/settings',

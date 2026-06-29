@@ -40,7 +40,6 @@ const TILES: Tile[] = [
   { label: 'Cash Up',            subtitle: 'Daily Reconciliation', icon: Archive,       href: '/app/cashup',            group: 'amber' },
   { label: 'Expenses',           subtitle: 'Record & Approve',     icon: Wallet,        href: '/app/expenses',          group: 'amber' },
   { label: 'Float',              subtitle: 'Opening & Closing',    icon: Landmark,      href: '/app/float',             group: 'amber' },
-  { label: 'Loans',              subtitle: 'Customer Loan Ledger', icon: Banknote,      href: '/app/loans',             group: 'amber' },
   { label: 'Settings',           subtitle: 'System Configuration', icon: Settings,      href: '/app/settings',          group: 'grey'  },
 ]
 

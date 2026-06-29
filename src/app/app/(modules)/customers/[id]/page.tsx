@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { AlertTriangle, ShieldBan, ShieldCheck, Loader2 } from 'lucide-react'
 import { PhotoUploader, PhotoViewer } from '@/components/PhotoUploader'
+import { LoansTab } from '@/components/customers/LoansTab'
 import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
 import { useForm } from 'react-hook-form'
@@ -55,7 +56,8 @@ const DOCUMENT_TYPE_LABELS: Record<string, string> = {
   other:                'Other',
 }
 
-const TABS = ['Overview', 'Transactions', 'Documents', 'Blacklist'] as const
+const TABS_ACCOUNT = ['Overview', 'Transactions', 'Loans', 'Documents', 'Blacklist'] as const
+const TABS_CASUAL = ['Overview', 'Transactions', 'Documents', 'Blacklist'] as const
 const SECTION_TABS = ['Personal', 'Business', 'Banking', 'Compliance', 'Notes'] as const
 
 // ─── Shared styles — mirrors the Settings page design tokens ──────────────────
@@ -112,7 +114,8 @@ function Pill({ text, bg, color }: { text: string; bg: string; color: string }) 
 export default function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
-  const [tab, setTab] = useState<typeof TABS[number]>('Overview')
+  const { data: session } = useSession()
+  const [tab, setTab] = useState<string>('Overview')
   const [sectionTab, setSectionTab] = useState<typeof SECTION_TABS[number]>('Personal')
   const [isEditing, setIsEditing] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -127,6 +130,13 @@ export default function CustomerDetailPage() {
     fetcher
   )
   const commodityOptions = tcData?.categories?.filter((c) => c.isActive).map((c) => c.name) ?? []
+
+  // Fetch loan summary for sidebar (only for account customers)
+  const { data: loanData } = useSWR<{ summary: { outstanding: string } }>(
+    customer?.customerType === 'account' ? `/api/customers/${id}/loans` : null,
+    fetcher
+  )
+  const loanOutstanding = loanData?.summary?.outstanding ?? '0'
 
   const fmtDateInput = (v?: string | null) => {
     if (!v) return ''
@@ -264,7 +274,7 @@ export default function CustomerDetailPage() {
 
       {/* ── Tab strip ─────────────────────────────────────────────────────────── */}
       <div style={{ display: 'flex', borderBottom: '1px solid #C0C0C0', background: '#EFEFEF', flexShrink: 0 }}>
-        {TABS.map((t) => (
+        {(customer.customerType === 'account' ? TABS_ACCOUNT : TABS_CASUAL).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -539,6 +549,14 @@ export default function CustomerDetailPage() {
           )}
 
           {tab === 'Transactions' && <TransactionsTab customerId={id} />}
+          {tab === 'Loans' && customer.customerType === 'account' && (
+            <LoansTab
+              customerId={id}
+              customerName={fullName}
+              userRole={session?.user?.role ?? ''}
+              userAllowedModules={(session?.user as { allowedModules?: string[] })?.allowedModules ?? []}
+            />
+          )}
           {tab === 'Documents'    && <DocumentsTab customer={customer} onPhotoSaved={() => mutate(`/api/customers/${id}`)} />}
           {tab === 'Blacklist'    && (
             <BlacklistTab
@@ -589,6 +607,14 @@ export default function CustomerDetailPage() {
               <div>
                 <span style={lbl}>Price Group</span>
                 <span style={{ fontSize: 11, color: '#212529', fontWeight: 600 }}>{customer.priceGroup.name}</span>
+              </div>
+            )}
+            {customer.customerType === 'account' && parseFloat(loanOutstanding) > 0 && (
+              <div>
+                <span style={lbl}>Loan Balance</span>
+                <span style={{ fontSize: 11, fontFamily: 'monospace', fontWeight: 600, color: '#D97706' }}>
+                  R {parseFloat(loanOutstanding).toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
               </div>
             )}
           </div>

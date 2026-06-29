@@ -7,7 +7,7 @@ import {
   LayoutDashboard, ShoppingCart, TrendingUp, Users,
   Package, BarChart2, Settings, Settings2, LogOut, RefreshCw,
   Warehouse, DollarSign, Tag, Banknote, ShieldCheck, ShieldAlert,
-  Receipt, Coins, UserCheck, ClipboardList, HandCoins, Images,
+  Receipt, Coins, UserCheck, ClipboardList, Images,
   AlertCircle, Scale,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -33,7 +33,6 @@ const FINANCE: NavGroup = {
   heading: 'Finance',
   items: [
     { label: 'Payments',    href: '/app/payments',  icon: Banknote },
-    { label: 'Loans',       href: '/app/loans',     icon: HandCoins },
     { label: 'Expenses',    href: '/app/expenses',  icon: Receipt },
     { label: 'Cash-up',     href: '/app/cashup',    icon: DollarSign },
     { label: 'Cash Float',  href: '/app/float',     icon: Coins },
