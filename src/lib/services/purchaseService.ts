@@ -283,15 +283,16 @@ export async function voidPurchase(id: string, data: VoidPurchaseInput, voidedBy
   if (!purchase) throw new PurchaseNotFoundError(id)
   if (purchase.status === 'voided') throw new PurchaseAlreadyVoidedError(purchase.refNumber)
 
-  // Block voiding if the purchase date already has an approved cash-up
+  // Block voiding COMPLETED purchases if the date has an approved cash-up.
+  // Pending purchases can be voided anytime — they weren't included in cash-up totals.
   const sessionDate = new Date(purchase.createdAt)
   sessionDate.setHours(0, 0, 0, 0)
   const approvedCashUp = await prisma.cashUp.findFirst({
     where: { sessionDate, status: 'approved' },
   })
-  if (approvedCashUp) {
+  if (approvedCashUp && purchase.status === 'completed') {
     throw new Error(
-      `Cannot void purchase ${purchase.refNumber}: the cash-up for that date (${sessionDate.toISOString().slice(0, 10)}) has already been approved. Contact a manager to investigate discrepancies.`
+      `Cannot void completed purchase ${purchase.refNumber}: the cash-up for that date (${sessionDate.toISOString().slice(0, 10)}) has already been approved. Contact a manager to investigate discrepancies.`
     )
   }
 
