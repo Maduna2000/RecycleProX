@@ -14,16 +14,19 @@ import { generateTransactionSlip } from '@/lib/pdf/slip'
  */
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  // Await params for Next.js 15 compatibility
+  const { id } = await context.params
 
   const format = req.nextUrl.searchParams.get('format') ?? 'pdf'
 
   try {
     const [purchase, settings] = await Promise.all([
-      getPurchase(params.id),
+      getPurchase(id),
       getAllSettings(),
     ])
 
@@ -120,7 +123,7 @@ export async function GET(
       },
     })
   } catch (err) {
-    logger.error({ err, id: params.id }, 'GET /api/purchases/[id]/receipt failed')
+    logger.error({ err, purchaseId: id }, 'GET /api/purchases/[id]/receipt failed')
     return NextResponse.json({ error: 'Failed to generate receipt' }, { status: 500 })
   }
 }

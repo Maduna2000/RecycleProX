@@ -5,12 +5,18 @@ import { getPurchase } from '@/lib/services/purchaseService'
 import { getAllSettings } from '@/lib/services/settingsService'
 import { generateVat264 } from '@/lib/pdf/vat264'
 
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(
+  _req: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  // Await params for Next.js 15 compatibility
+  const { id } = await context.params
+
   try {
-    const purchase = await getPurchase(params.id)
+    const purchase = await getPurchase(id)
 
     // Load yard settings
     const settings = await getAllSettings()
@@ -74,7 +80,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
       },
     })
   } catch (err) {
-    logger.error({ err, id: params.id }, 'GET /api/purchases/[id]/vat264 failed')
+    logger.error({ err, purchaseId: id }, 'GET /api/purchases/[id]/vat264 failed')
     return NextResponse.json({ error: 'Failed to generate VAT264' }, { status: 500 })
   }
 }

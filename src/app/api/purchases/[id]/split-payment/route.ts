@@ -11,12 +11,15 @@ import {
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   const session = await auth()
   if (!session?.user) {
     return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   }
+
+  // Await params for Next.js 15 compatibility
+  const { id } = await context.params
 
   const body = await req.json().catch(() => ({}))
   const parsed = ProcessSplitPaymentSchema.safeParse(body)
@@ -30,7 +33,7 @@ export async function POST(
 
   try {
     const { updated, isFullySettled } = await processSplitPayment(
-      params.id,
+      id,
       parsed.data,
       session.user.id
     )
@@ -45,7 +48,7 @@ export async function POST(
     if (err instanceof PartialPaymentNotAllowedError) {
       return NextResponse.json({ error: err.message }, { status: 422 })
     }
-    logger.error({ err, id: params.id }, 'POST /api/purchases/[id]/split-payment failed')
+    logger.error({ err, purchaseId: id }, 'POST /api/purchases/[id]/split-payment failed')
     return NextResponse.json({ error: 'Failed to process split payment' }, { status: 500 })
   }
 }

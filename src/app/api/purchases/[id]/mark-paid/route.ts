@@ -16,9 +16,15 @@ const SettleSchema = z.object({
   paymentMethod: z.enum(['cash', 'eft', 'cheque']).default('cash'),
 })
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(
+  req: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+
+  // Await params for Next.js 15 compatibility
+  const { id } = await context.params
 
   const body   = await req.json().catch(() => ({}))
   const parsed = SettleSchema.safeParse(body)
@@ -27,7 +33,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 
   try {
-    const { updated } = await markPurchasePaid(params.id, parsed.data, session.user.id)
+    const { updated } = await markPurchasePaid(id, parsed.data, session.user.id)
     return NextResponse.json(updated)
   } catch (err) {
     if (err instanceof PurchaseNotPendingError) {
@@ -39,7 +45,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (err instanceof PartialPaymentNotAllowedError) {
       return NextResponse.json({ error: err.message }, { status: 422 })
     }
-    logger.error({ err }, 'PATCH /api/purchases/[id]/mark-paid failed')
+    logger.error({ err, purchaseId: id }, 'PATCH /api/purchases/[id]/mark-paid failed')
     return NextResponse.json({ error: 'Failed to process payment' }, { status: 500 })
   }
 }
