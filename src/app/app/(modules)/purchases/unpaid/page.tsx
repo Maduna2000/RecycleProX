@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import useSWR, { mutate } from 'swr'
-import { useRouter } from 'next/navigation'
 import { Search, Printer, Ban, CreditCard, Loader2, X } from 'lucide-react'
 import Decimal from 'decimal.js'
 import { DataTable, Avatar, type Column, type RowAction } from '@/components/ui/DataTable'
@@ -60,7 +59,6 @@ function balance(p: { totalAmount: string; amountPaid: string; loanDeductionAmou
 }
 
 export default function UnpaidPurchasesPage() {
-  const router = useRouter()
   const { data: session } = useSession()
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
 
@@ -265,7 +263,6 @@ export default function UnpaidPurchasesPage() {
           rowActions={rowActions}
           loading={isLoading}
           emptyMessage="No unpaid purchases — all purchases are settled."
-          emptyAction={{ label: '+ New Purchase', onClick: () => router.push('/app/purchases/new') }}
         />
       </div>
 
