@@ -68,7 +68,7 @@ function useToolbarButtons(pathname: string, role: string): ToolbarButton[] {
 
   if (pathname === '/app/payments' || pathname.startsWith('/app/payments/'))
     return [
-      { label: 'Record Payment', icon: Plus, href: '/app/payments', variant: 'primary' },
+      { label: 'Account Balances', icon: Users, href: '/app/payments/balances', variant: 'secondary' },
     ]
 
   if (pathname === '/app/expenses' || pathname.startsWith('/app/expenses/'))
