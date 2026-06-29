@@ -5,7 +5,7 @@ import {
   Users, UserRound, ShoppingCart, AlertCircle,
   Tag, CreditCard, ImageIcon, Scale,
   Package, ClipboardList, TrendingUp, BarChart2,
-  Archive, Wallet, Landmark, Settings, Banknote,
+  Archive, Wallet, Landmark, Settings,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
