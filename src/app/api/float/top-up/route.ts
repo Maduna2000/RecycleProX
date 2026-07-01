@@ -3,14 +3,14 @@ import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { z } from 'zod'
 import Decimal from 'decimal.js'
-import { addFloatMovement } from '@/lib/services/floatService'
+import { addFloatMovement, FloatMovementLockedError } from '@/lib/services/floatService'
 
 const TopUpSchema = z.object({
   amount: z
     .string()
     .min(1, 'Amount is required')
     .regex(/^\d+(\.\d{1,2})?$/, 'Must be a valid amount')
-    .refine((v) => new Decimal(v).gte(new Decimal('0.01')), { message: 'Minimum amount is E0.01' }),
+    .refine((v) => new Decimal(v).gte(new Decimal('0.01')), { message: 'Minimum amount is 0.01' }),
   note: z.string().max(200).optional(),
 })
 
@@ -33,6 +33,9 @@ export async function POST(req: NextRequest) {
     const result = await addFloatMovement('top_up', parsed.data.amount, parsed.data.note, session.user.id)
     return NextResponse.json(result, { status: 201 })
   } catch (err) {
+    if (err instanceof FloatMovementLockedError) {
+      return NextResponse.json({ error: err.message }, { status: 409 })
+    }
     logger.error({ err }, 'POST /api/float/top-up failed')
     return NextResponse.json({ error: 'Failed to record float top-up' }, { status: 500 })
   }

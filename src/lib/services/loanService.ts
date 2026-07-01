@@ -3,6 +3,7 @@ import logger from '@/lib/logger'
 import Decimal from 'decimal.js'
 import type { Prisma } from '@prisma/client'
 import type { CreateLoanInput, CreateRepaymentInput, VoidLoanInput } from '@/lib/schemas/loan'
+import { getDayBoundsSAST, todaySASTDate, todaySASTDateStr } from '@/lib/utils/dayBounds'
 
 // ─── Typed Errors ─────────────────────────────────────────────────────────────
 
@@ -37,17 +38,15 @@ export class CustomerInactiveError extends Error {
 // ─── Reference number generators ─────────────────────────────────────────────
 
 async function generateLoanRef(): Promise<string> {
-  const today = new Date()
-  const prefix = `LOA-${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`
-  const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+  const prefix = `LOA-${todaySASTDateStr().replace(/-/g, '')}`
+  const startOfDay = todaySASTDate()
   const count = await prisma.loan.count({ where: { createdAt: { gte: startOfDay } } })
   return `${prefix}-${String(count + 1).padStart(4, '0')}`
 }
 
 async function generateRepaymentRef(): Promise<string> {
-  const today = new Date()
-  const prefix = `REP-${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`
-  const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+  const prefix = `REP-${todaySASTDateStr().replace(/-/g, '')}`
+  const startOfDay = todaySASTDate()
   const count = await prisma.loanRepayment.count({ where: { createdAt: { gte: startOfDay } } })
   return `${prefix}-${String(count + 1).padStart(4, '0')}`
 }
@@ -64,9 +63,8 @@ export async function applyRepaymentTx(
   createdByUserId: string | undefined,
   purchaseId?: string,
 ): Promise<void> {
-  const today = new Date()
-  const prefix = `REP-${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`
-  const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+  const prefix = `REP-${todaySASTDateStr().replace(/-/g, '')}`
+  const startOfDay = todaySASTDate()
 
   // Count existing repayments today (outside this tx scope) as base sequence
   const baseCount = await tx.loanRepayment.count({ where: { createdAt: { gte: startOfDay } } })
@@ -313,29 +311,40 @@ export async function getCustomerLoanSummary(customerId: string) {
 // ─── Daily loan totals (for CashUp auto-calculation) ─────────────────────────
 
 export async function getLoanTotalsForDate(date: Date) {
-  const start = new Date(date); start.setHours(0, 0, 0, 0)
-  const end   = new Date(date); end.setHours(23, 59, 59, 999)
+  const { start, end } = getDayBoundsSAST(date)
 
-  const [advancedAgg, repaidAgg] = await Promise.all([
+  // Only cash-method loans/repayments affect the drawer. Repayments are always
+  // cash in practice (applyRepaymentTx hardcodes it — it's a deduction from a
+  // purchase payout, never handed over by the customer), but advances are
+  // genuinely reachable as EFT/cheque via the Create Loan dialog, so filtering
+  // matters there: an EFT advance never touches the physical drawer and must
+  // not reduce the day's expected cash.
+  const [advancedAgg, nonCashAdvancedAgg, repaidAgg] = await Promise.all([
     prisma.loan.aggregate({
-      where: { status: { not: 'voided' }, createdAt: { gte: start, lte: end } },
+      where: { status: { not: 'voided' }, paymentMethod: 'cash', createdAt: { gte: start, lte: end } },
+      _sum: { principalAmount: true },
+    }),
+    prisma.loan.aggregate({
+      where: { status: { not: 'voided' }, paymentMethod: { not: 'cash' }, createdAt: { gte: start, lte: end } },
       _sum: { principalAmount: true },
     }),
     prisma.loanRepayment.aggregate({
-      where: { createdAt: { gte: start, lte: end } },
+      where: { paymentMethod: 'cash', createdAt: { gte: start, lte: end } },
       _sum: { amount: true },
     }),
   ])
 
-  const advanced = new Decimal(advancedAgg._sum.principalAmount?.toString() ?? '0')
-  const repaid   = new Decimal(repaidAgg._sum.amount?.toString()             ?? '0')
+  const advanced        = new Decimal(advancedAgg._sum.principalAmount?.toString() ?? '0')
+  const nonCashAdvanced  = new Decimal(nonCashAdvancedAgg._sum.principalAmount?.toString() ?? '0')
+  const repaid           = new Decimal(repaidAgg._sum.amount?.toString() ?? '0')
   // Net cash impact: advances paid out minus repayments received back
   // Positive = net cash went out as loans (reduces drawer cash)
   const netCashOut = advanced.minus(repaid)
 
   return {
-    advanced:   advanced.toFixed(2),
-    repaid:     repaid.toFixed(2),
-    netCashOut: netCashOut.toFixed(2),
+    advanced:       advanced.toFixed(2),
+    nonCashAdvanced: nonCashAdvanced.toFixed(2),
+    repaid:         repaid.toFixed(2),
+    netCashOut:     netCashOut.toFixed(2),
   }
 }

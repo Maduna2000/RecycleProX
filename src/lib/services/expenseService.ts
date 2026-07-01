@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db/prisma'
 import Decimal from 'decimal.js'
 import logger from '@/lib/logger'
 import type { CreateExpenseInput, CreateExpenseTypeInput, UpdateExpenseInput, SettlePendingExpenseInput } from '@/lib/schemas/expense'
+import { getDayBoundsSAST, todaySASTDate } from '@/lib/utils/dayBounds'
 
 // ─── Ref number ───────────────────────────────────────────────────────────────
 
@@ -42,10 +43,12 @@ export async function createExpense(data: CreateExpenseInput, userId: string) {
     ? amount.times(vatRate.div(vatRate.plus(1))).toDecimalPlaces(2)
     : new Decimal(0)
 
-  // Link to any open cash-up session (could be from a previous day that spans midnight)
+  // Link only to *today's own* open cash-up session — not just any open session.
+  // A session left open past midnight (e.g. forgotten, or a long weekend) must
+  // not pull in expenses from later days; those fall through to the createdAt-based
+  // fallback in getExpenseTotalsForDate and get attributed to their own real date.
   const openSession = await prisma.cashUp.findFirst({
-    where: { status: 'open' },
-    orderBy: { sessionDate: 'desc' },
+    where: { status: 'open', sessionDate: todaySASTDate() },
   })
 
   // If isPending is false (default), auto-approve; otherwise leave as pending
@@ -271,8 +274,7 @@ export async function voidExpense(id: string, userId: string) {
 }
 
 export async function getExpenseTotalsForDate(date: Date): Promise<Decimal> {
-  const start = new Date(date); start.setHours(0, 0, 0, 0)
-  const end   = new Date(date); end.setHours(23, 59, 59, 999)
+  const { start, end } = getDayBoundsSAST(date)
 
   // Find the cashup session for this date
   const cashUp = await prisma.cashUp.findFirst({

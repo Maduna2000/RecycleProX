@@ -1,12 +1,19 @@
 import { prisma } from '@/lib/db/prisma'
+import { Prisma } from '@prisma/client'
 import Decimal from 'decimal.js'
 import logger from '@/lib/logger'
 import type { SetFloatInput } from '@/lib/schemas/float'
 import type { FloatMovementType } from '@prisma/client'
+import { withSerializableRetry } from '@/lib/db/withSerializableRetry'
+import { sastDateLabelToUTCDate, normalizeToDateLabel, getDayBoundsSAST, todaySASTDate } from '@/lib/utils/dayBounds'
+
+export class FloatMovementLockedError extends Error {
+  code = 'CASHUP_LOCKED' as const
+  constructor(message: string) { super(message); this.name = 'FloatMovementLockedError' }
+}
 
 export async function setFloat(data: SetFloatInput, userId: string) {
-  const floatDate = new Date(data.floatDate)
-  floatDate.setHours(0, 0, 0, 0)
+  const floatDate = sastDateLabelToUTCDate(data.floatDate)
 
   const record = await prisma.cashFloat.upsert({
     where: { floatDate },
@@ -26,15 +33,11 @@ export async function setFloat(data: SetFloatInput, userId: string) {
 }
 
 export async function getTodayFloat() {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  return prisma.cashFloat.findUnique({ where: { floatDate: today } })
+  return prisma.cashFloat.findUnique({ where: { floatDate: todaySASTDate() } })
 }
 
 export async function getFloatForDate(date: Date) {
-  const d = new Date(date)
-  d.setHours(0, 0, 0, 0)
-  return prisma.cashFloat.findUnique({ where: { floatDate: d } })
+  return prisma.cashFloat.findUnique({ where: { floatDate: normalizeToDateLabel(date) } })
 }
 
 export async function listFloats(limit = 30) {
@@ -78,8 +81,7 @@ export async function listFloats(limit = 30) {
  * manually set for today.
  */
 export async function getMostRecentFloatBefore(date: Date) {
-  const d = new Date(date)
-  d.setHours(0, 0, 0, 0)
+  const d = normalizeToDateLabel(date)
 
   return prisma.cashFloat.findFirst({
     where: { floatDate: { lt: d } },
@@ -94,8 +96,7 @@ export async function getMostRecentFloatBefore(date: Date) {
  * carry-forward chain is never broken.
  */
 export async function updateClosingAmount(date: Date, amount: Decimal) {
-  const d = new Date(date)
-  d.setHours(0, 0, 0, 0)
+  const d = normalizeToDateLabel(date)
 
   const existing = await prisma.cashFloat.findUnique({ where: { floatDate: d } })
   if (existing) {
@@ -113,8 +114,7 @@ export async function updateClosingAmount(date: Date, amount: Decimal) {
 // ─── Sum of top-up movements for a given date ────────────────────────────────
 
 export async function getFloatTopUpsForDate(date: Date): Promise<Decimal> {
-  const start = new Date(date); start.setHours(0, 0, 0, 0)
-  const end   = new Date(date); end.setHours(23, 59, 59, 999)
+  const { start, end } = getDayBoundsSAST(date)
 
   const result = await prisma.floatMovement.aggregate({
     _sum: { amount: true },
@@ -133,8 +133,7 @@ export async function getFloatTopUpsForDate(date: Date): Promise<Decimal> {
  * Drawings received = additional cash injected INTO the drawer during the day.
  */
 export async function getDrawingsReceivedForDate(date: Date): Promise<Decimal> {
-  const start = new Date(date); start.setHours(0, 0, 0, 0)
-  const end   = new Date(date); end.setHours(23, 59, 59, 999)
+  const { start, end } = getDayBoundsSAST(date)
 
   const topUpsResult = await prisma.floatMovement.aggregate({
     _sum: { amount: true },
@@ -147,7 +146,7 @@ export async function getDrawingsReceivedForDate(date: Date): Promise<Decimal> {
 // ─── Get current float with balance and movements ─────────────────────────────
 
 export async function getCurrentFloat() {
-  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const today = todaySASTDate()
 
   const record = await prisma.cashFloat.findUnique({
     where:   { floatDate: today },
@@ -173,42 +172,57 @@ export async function addFloatMovement(
   referenceNote: string | undefined,
   createdByUserId: string
 ) {
-  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const today = todaySASTDate()
 
-  // Ensure a float record exists for today
-  let floatRecord = await prisma.cashFloat.findUnique({ where: { floatDate: today } })
-  if (!floatRecord) {
-    const prev = await getMostRecentFloatBefore(today)
-    const opening = prev?.closingAmount ?? prev?.openingAmount ?? new Decimal(0)
-    floatRecord = await prisma.cashFloat.create({
-      data: { floatDate: today, openingAmount: new Decimal(opening.toString()), createdByUserId },
+  // Once today's cash-up has been submitted, its drawingsReceived figure is
+  // frozen — a movement added after that point would never be reflected in any
+  // reconciliation. Block it rather than silently lose track of the cash.
+  const todaysCashUp = await prisma.cashUp.findUnique({
+    where: { sessionDate: today },
+    select: { status: true },
+  })
+  if (todaysCashUp && (todaysCashUp.status === 'submitted' || todaysCashUp.status === 'approved')) {
+    throw new FloatMovementLockedError(
+      "Today's cash-up has already been submitted — this cannot be added until tomorrow's session opens"
+    )
+  }
+
+  return withSerializableRetry(() => prisma.$transaction(async (tx) => {
+    // Ensure a float record exists for today
+    let floatRecord = await tx.cashFloat.findUnique({ where: { floatDate: today } })
+    if (!floatRecord) {
+      const prev = await tx.cashFloat.findFirst({ where: { floatDate: { lt: today } }, orderBy: { floatDate: 'desc' } })
+      const opening = prev?.closingAmount ?? prev?.openingAmount ?? new Decimal(0)
+      floatRecord = await tx.cashFloat.create({
+        data: { floatDate: today, openingAmount: new Decimal(opening.toString()), createdByUserId },
+      })
+    }
+
+    // Compute current balance from last movement's balanceAfter
+    const lastMovement = await tx.floatMovement.findFirst({
+      where:   { cashFloatId: floatRecord.id },
+      orderBy: { createdAt: 'desc' },
     })
-  }
+    const currentBalance = lastMovement
+      ? new Decimal(lastMovement.balanceAfter.toString())
+      : new Decimal(floatRecord.openingAmount.toString())
 
-  // Compute current balance from last movement's balanceAfter
-  const lastMovement = await prisma.floatMovement.findFirst({
-    where:   { cashFloatId: floatRecord.id },
-    orderBy: { createdAt: 'desc' },
-  })
-  const currentBalance = lastMovement
-    ? new Decimal(lastMovement.balanceAfter.toString())
-    : new Decimal(floatRecord.openingAmount.toString())
+    const moveAmount = new Decimal(amount)
+    const balanceAfter = movementType === 'top_up' || movementType === 'opening'
+      ? currentBalance.plus(moveAmount)
+      : currentBalance.minus(moveAmount)   // withdrawal / adjustment
 
-  const moveAmount = new Decimal(amount)
-  const balanceAfter = movementType === 'top_up' || movementType === 'opening'
-    ? currentBalance.plus(moveAmount)
-    : currentBalance.minus(moveAmount)   // withdrawal / adjustment
+    if (balanceAfter.isNegative()) {
+      throw new Error(`Withdrawal of ${amount} would exceed float balance of ${currentBalance.toFixed(2)}`)
+    }
 
-  if (balanceAfter.isNegative()) {
-    throw new Error(`Withdrawal of ${amount} would exceed float balance of ${currentBalance.toFixed(2)}`)
-  }
+    const movement = await tx.floatMovement.create({
+      data: { cashFloatId: floatRecord.id, movementType, amount: moveAmount, balanceAfter, referenceNote, createdByUserId },
+    })
 
-  const movement = await prisma.floatMovement.create({
-    data: { cashFloatId: floatRecord.id, movementType, amount: moveAmount, balanceAfter, referenceNote, createdByUserId },
-  })
-
-  logger.info({ cashFloatId: floatRecord.id, movementType, amount, balanceAfter: balanceAfter.toFixed(2), createdByUserId }, 'float.movement.added')
-  return { movement, balanceAfter: balanceAfter.toFixed(2) }
+    logger.info({ cashFloatId: floatRecord.id, movementType, amount, balanceAfter: balanceAfter.toFixed(2), createdByUserId }, 'float.movement.added')
+    return { movement, balanceAfter: balanceAfter.toFixed(2) }
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }))
 }
 
 // ─── List float movements (with pagination) ───────────────────────────────────
@@ -343,10 +357,7 @@ export async function canReverseFloat(floatId: string): Promise<{
   }
 
   const floatDate = floatRecord.floatDate
-  const startOfDay = new Date(floatDate)
-  startOfDay.setHours(0, 0, 0, 0)
-  const endOfDay = new Date(floatDate)
-  endOfDay.setHours(23, 59, 59, 999)
+  const { start: startOfDay, end: endOfDay } = getDayBoundsSAST(floatDate)
 
   // Check if this is the last entry
   const newerFloat = await prisma.cashFloat.findFirst({
@@ -382,9 +393,9 @@ export async function canReverseFloat(floatId: string): Promise<{
     return { canReverse: false, reason: `${saleCount} sale(s) exist for this date`, isLastEntry: true }
   }
 
-  // Check for cashup on this date
+  // Check for cashup on this date (voided sessions are inert and don't block)
   const cashUpCount = await prisma.cashUp.count({
-    where: { sessionDate: startOfDay },
+    where: { sessionDate: floatDate, status: { not: 'voided' } },
   })
 
   if (cashUpCount > 0) {
@@ -423,10 +434,7 @@ export async function reverseFloat(
     }
 
     const floatDate = floatRecord.floatDate
-    const startOfDay = new Date(floatDate)
-    startOfDay.setHours(0, 0, 0, 0)
-    const endOfDay = new Date(floatDate)
-    endOfDay.setHours(23, 59, 59, 999)
+    const { start: startOfDay, end: endOfDay } = getDayBoundsSAST(floatDate)
 
     // 2. Verify this is the LAST (most recent) float entry
     const newerFloat = await tx.cashFloat.findFirst({
@@ -465,9 +473,9 @@ export async function reverseFloat(
       throw new FloatReversalError('HAS_SALES', `Cannot reverse: ${saleCount} sale(s) exist for this date`)
     }
 
-    // 5. Check for cashup on this date
+    // 5. Check for cashup on this date (voided sessions are inert and don't block)
     const cashUpCount = await tx.cashUp.count({
-      where: { sessionDate: startOfDay },
+      where: { sessionDate: floatDate, status: { not: 'voided' } },
     })
 
     if (cashUpCount > 0) {

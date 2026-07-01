@@ -13,14 +13,22 @@ export async function GET(req: NextRequest) {
 
   try {
     if (searchParams.get('today') === '1') {
-      // First check for any open session (could be from a previous day that needs submission)
+      const dateStr = searchParams.get('date') ?? undefined
+
+      // An explicit date was requested — honor it directly rather than letting
+      // an unrelated open session from another date silently override it.
+      if (dateStr) {
+        const cashUp = await getOpenSession(dateStr)
+        return NextResponse.json({ cashUp })
+      }
+
+      // No explicit date — check for any open session (could be from a previous
+      // day that needs submission) before falling back to today's session.
       const openSession = await getAnyOpenSession()
       if (openSession) {
         return NextResponse.json({ cashUp: openSession })
       }
-      // No open session, check for today's submitted session
-      const dateStr = searchParams.get('date') ?? undefined
-      const cashUp = await getOpenSession(dateStr)
+      const cashUp = await getOpenSession()
       return NextResponse.json({ cashUp })
     }
 

@@ -43,16 +43,19 @@ type CashUp = {
   variance?:           string
   notes?:              string
   denominations?: Record<string, number>
+  currencyWarning?: string | null
 }
 
 type LiveStats = {
   cashSales:     string
   cardSales:     string
+  cardOnlySales: string
   cashPurchases: string
   cashPayments:  string
   expenses:      string
   loanAdvance:   string
   loanRepayment: string
+  nonCashAdvanced: string
   floatTopUps:   string
   unpaidToday:   { total: string; count: number }
   unpaidAllTime: { total: string; count: number }
@@ -546,6 +549,7 @@ export default function CashUpPage() {
   const [opening,    setOpening]    = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [approving,  setApproving]  = useState(false)
+  const [rejecting,  setRejecting]  = useState(false)
   const [notes,      setNotes]      = useState('')
   const [counts, setCounts] = useState<Record<number, number>>(() =>
     Object.fromEntries(DENOMINATIONS.map((d) => [d, 0]))
@@ -660,6 +664,21 @@ export default function CashUpPage() {
     setApproving(false)
     if (res.ok) { toast.success('Cash-up approved'); swrMutate(CASHUP_KEY); refreshStats() }
     else { const j = await res.json(); toast.error(j.error ?? 'Failed to approve cash-up') }
+  }
+
+  async function handleReject() {
+    if (!cashUp) return
+    const reason = window.prompt('Enter reason for rejecting this cash-up (sent back to the cashier for correction):')
+    if (!reason) return
+    setRejecting(true)
+    const res = await fetch(`/api/cashup/${cashUp.id}/reject`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason }),
+    })
+    setRejecting(false)
+    if (res.ok) { toast.success('Cash-up rejected — sent back to cashier'); swrMutate(CASHUP_KEY); refreshStats() }
+    else { const j = await res.json(); toast.error(j.error ?? 'Failed to reject cash-up') }
   }
 
   if (isLoading) {
@@ -801,6 +820,12 @@ export default function CashUpPage() {
               )}
             </div>
 
+            {cashUp.currencyWarning && (
+              <div className="rounded px-3 py-2 text-xs font-medium" style={{ background: colors.warningBg, color: colors.warning }}>
+                ⚠ {cashUp.currencyWarning}
+              </div>
+            )}
+
             {/* ── 2-column layout: left = reconciliation, right = count + panels ── */}
             {(() => {
               const isOpen    = cashUp.status === 'open'
@@ -821,6 +846,7 @@ export default function CashUpPage() {
               const balance   = declared.minus(calFloat)
               const finCum    = new Decimal(stats?.finPeriodCumulative ?? '0')
               const cardSalesLive = new Decimal(stats?.cardSales ?? '0')
+              const nonCashAdvancedLive = new Decimal(stats?.nonCashAdvanced ?? '0')
 
               return (
                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
@@ -891,6 +917,9 @@ export default function CashUpPage() {
                       </div>
                       {isOpen && cardSalesLive.gt(0) && (
                         <ReconRow label="Card / EFT Sales (not in drawer)" value={cardSalesLive.toFixed(2)} muted currencySymbol={currSym} />
+                      )}
+                      {isOpen && nonCashAdvancedLive.gt(0) && (
+                        <ReconRow label="Non-Cash Loan Advances (excluded)" value={nonCashAdvancedLive.toFixed(2)} muted currencySymbol={currSym} />
                       )}
                       <div className="flex items-center gap-2">
                         <div className="flex-1">
@@ -1008,30 +1037,65 @@ export default function CashUpPage() {
                       </p>
                     )}
 
-                    {/* Approve button */}
+                    {/* Approve / Reject / Void buttons */}
                     {cashUp.status === 'submitted' && (
-                      <div className="pt-2 border-t flex justify-end" style={{ borderColor: colors.border }}>
+                      <div className="pt-2 border-t flex justify-end gap-2" style={{ borderColor: colors.border }}>
                         {isManager ? (
-                          <button
-                            onClick={handleApprove}
-                            disabled={approving}
-                            style={{
-                              fontSize: 10,
-                              padding: '1px 6px',
-                              background: '#E0E0E0',
-                              border: '1px solid #999',
-                              borderRadius: 2,
-                              cursor: approving ? 'not-allowed' : 'pointer',
-                              opacity: approving ? 0.6 : 1,
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 3,
-                            }}
-                            onMouseEnter={(e) => { if (!approving) e.currentTarget.style.background = '#D0D0D0' }}
-                            onMouseLeave={(e) => { if (!approving) e.currentTarget.style.background = '#E0E0E0' }}
-                          >
-                            {approving ? <><Loader2 style={{ width: 9, height: 9, animation: 'spin 1s linear infinite' }} />Approving...</> : <><Lock style={{ width: 9, height: 9 }} />Approve Cash-Up</>}
-                          </button>
+                          <>
+                            <button
+                              onClick={handleVoidSession}
+                              disabled={voiding}
+                              style={{
+                                fontSize: 10,
+                                padding: '1px 6px',
+                                background: '#E0E0E0',
+                                border: '1px solid #999',
+                                borderRadius: 2,
+                                cursor: voiding ? 'not-allowed' : 'pointer',
+                                opacity: voiding ? 0.6 : 1,
+                              }}
+                              onMouseEnter={(e) => { if (!voiding) e.currentTarget.style.background = '#D0D0D0' }}
+                              onMouseLeave={(e) => { if (!voiding) e.currentTarget.style.background = '#E0E0E0' }}
+                            >
+                              {voiding ? 'Voiding...' : 'Void'}
+                            </button>
+                            <button
+                              onClick={handleReject}
+                              disabled={rejecting}
+                              style={{
+                                fontSize: 10,
+                                padding: '1px 6px',
+                                background: colors.dangerBg,
+                                color: colors.danger,
+                                border: `1px solid ${colors.danger}`,
+                                borderRadius: 2,
+                                cursor: rejecting ? 'not-allowed' : 'pointer',
+                                opacity: rejecting ? 0.6 : 1,
+                              }}
+                            >
+                              {rejecting ? 'Rejecting...' : 'Reject — Send Back to Cashier'}
+                            </button>
+                            <button
+                              onClick={handleApprove}
+                              disabled={approving}
+                              style={{
+                                fontSize: 10,
+                                padding: '1px 6px',
+                                background: '#E0E0E0',
+                                border: '1px solid #999',
+                                borderRadius: 2,
+                                cursor: approving ? 'not-allowed' : 'pointer',
+                                opacity: approving ? 0.6 : 1,
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 3,
+                              }}
+                              onMouseEnter={(e) => { if (!approving) e.currentTarget.style.background = '#D0D0D0' }}
+                              onMouseLeave={(e) => { if (!approving) e.currentTarget.style.background = '#E0E0E0' }}
+                            >
+                              {approving ? <><Loader2 style={{ width: 9, height: 9, animation: 'spin 1s linear infinite' }} />Approving...</> : <><Lock style={{ width: 9, height: 9 }} />Approve Cash-Up</>}
+                            </button>
+                          </>
                         ) : (
                           <p className="text-sm" style={{ color: colors.textSecondary }}>Awaiting manager approval</p>
                         )}
@@ -1115,6 +1179,24 @@ export default function CashUpPage() {
                         <div className="p-3">
                           <p className="font-mono font-bold" style={{ color: colors.process }}>{currSym} {new Decimal(cashUp.cardPaymentsTotal).toFixed(2)}</p>
                           <p className="text-xs mt-0.5" style={{ color: colors.textSecondary }}>Excluded from cash reconciliation</p>
+                          {stats?.cardOnlySales && new Decimal(stats.cardOnlySales).gt(0) && (
+                            <p className="text-xs mt-1 pt-1 border-t" style={{ color: colors.textSecondary, borderColor: colors.border }}>
+                              Of which true card-swipe sales: {currSym} {new Decimal(stats.cardOnlySales).toFixed(2)} (see &quot;Card Sales&quot; report)
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Non-cash loan advances (submitted/approved) */}
+                    {!isOpen && stats?.nonCashAdvanced && new Decimal(stats.nonCashAdvanced).gt(0) && (
+                      <div className="rounded border bg-white overflow-hidden" style={{ borderColor: colors.border }}>
+                        <div style={{ padding: '6px 12px', borderBottom: `1px solid ${colors.border}`, background: 'linear-gradient(180deg, #EAEAEA 0%, #D4D4D4 100%)' }}>
+                          <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: colors.textSecondary }}>Non-Cash Loan Advances</span>
+                        </div>
+                        <div className="p-3">
+                          <p className="font-mono font-bold" style={{ color: colors.process }}>{currSym} {new Decimal(stats.nonCashAdvanced).toFixed(2)}</p>
+                          <p className="text-xs mt-0.5" style={{ color: colors.textSecondary }}>EFT/cheque advances — excluded from cash reconciliation</p>
                         </div>
                       </div>
                     )}

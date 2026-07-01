@@ -510,7 +510,7 @@ model StocktakeEntry {
 
 model CashUp {
   id                  String       @id @default(uuid())
-  sessionDate         DateTime     @db.Date
+  sessionDate         DateTime     @unique @db.Date
   currency            Currency     @default(ZAR)
   openedByUserId      String
   openedAt            DateTime     @default(now())
@@ -533,10 +533,12 @@ model CashUp {
   variance            Decimal?     @db.Decimal(18, 2)
   notes               String?
   denominations       Json?
+  rejectedByUserId    String?
+  rejectedAt          DateTime?
+  rejectionReason     String?
   createdAt           DateTime     @default(now())
   updatedAt           DateTime     @updatedAt
 
-  @@index([sessionDate])
   @@index([status])
   @@index([openedByUserId])
 }
