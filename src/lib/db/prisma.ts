@@ -44,11 +44,13 @@ prisma.$use(async (params, next) => {
     }
 
     // Extract changedById from the data args — covers createdByUserId, voidedById,
-    // approvedById, closedByUserId patterns used across all service functions.
+    // voidedByUserId (Stocktake's naming), approvedById, closedByUserId patterns
+    // used across all service functions.
     const dataArgs = (params.args?.data ?? {}) as Record<string, unknown>
     const changedById =
       (dataArgs.createdByUserId as string | undefined) ??
       (dataArgs.voidedById as string | undefined) ??
+      (dataArgs.voidedByUserId as string | undefined) ??
       (dataArgs.approvedById as string | undefined) ??
       (dataArgs.closedByUserId as string | undefined) ??
       (dataArgs.openedByUserId as string | undefined) ??

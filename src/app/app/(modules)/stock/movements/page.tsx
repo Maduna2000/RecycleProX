@@ -26,6 +26,7 @@ const SOURCE_LABELS: Record<string, string> = {
   sale: 'Sale',
   manual_adjustment: 'Manual Adj.',
   void_reversal: 'Void Reversal',
+  stocktake_adjustment: 'Stocktake Adj.',
 }
 
 export default function StockMovementsPage() {
@@ -153,6 +154,7 @@ export default function StockMovementsPage() {
           <option value="sale">Sale</option>
           <option value="manual_adjustment">Manual Adjustment</option>
           <option value="void_reversal">Void Reversal</option>
+          <option value="stocktake_adjustment">Stocktake Adjustment</option>
         </select>
         <input
           type="date"

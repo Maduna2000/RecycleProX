@@ -2,12 +2,13 @@ import { prisma } from '@/lib/db/prisma'
 import Decimal from 'decimal.js'
 import logger from '@/lib/logger'
 import { getStockOnHand, recordMovement } from './stockService'
-import type { Prisma } from '@prisma/client'
+import { Prisma } from '@prisma/client'
+import { withSerializableRetry } from '@/lib/db/withSerializableRetry'
 
 // ─── Ref number ───────────────────────────────────────────────────────────────
 
-async function nextRef(): Promise<string> {
-  const count = await prisma.stocktake.count()
+async function nextRef(tx: Prisma.TransactionClient): Promise<string> {
+  const count = await tx.stocktake.count()
   return `STK-${String(count + 1).padStart(5, '0')}`
 }
 
@@ -26,25 +27,31 @@ async function buildStockSnapshot(): Promise<Record<string, string>> {
 // ─── Create a new stocktake ───────────────────────────────────────────────────
 
 export async function createStocktake(userId: string, notes?: string) {
-  // Only one open stocktake at a time — prevents split system-qty snapshots
-  const existing = await prisma.stocktake.findFirst({ where: { status: 'open' } })
-  if (existing) {
-    throw new Error(`A stocktake (${existing.refNumber}) is already open. Complete it before starting a new one.`)
-  }
-
   // Capture system quantities for all products at this moment
   const stockSnapshot = await buildStockSnapshot()
 
-  const refNumber = await nextRef()
-  const stocktake = await prisma.stocktake.create({
-    data: {
-      refNumber,
-      notes,
-      createdByUserId: userId,
-      stockSnapshot: stockSnapshot as Prisma.InputJsonValue,
-    },
-    include: { entries: { include: { product: true } } },
-  })
+  const stocktake = await withSerializableRetry(() =>
+    prisma.$transaction(async (tx) => {
+      // Only one open stocktake at a time — prevents split system-qty snapshots.
+      // Check + create run inside the same Serializable transaction so two
+      // near-simultaneous "New Stocktake" requests can't both pass the check.
+      const existing = await tx.stocktake.findFirst({ where: { status: 'open' } })
+      if (existing) {
+        throw new Error(`A stocktake (${existing.refNumber}) is already open. Complete it before starting a new one.`)
+      }
+
+      const refNumber = await nextRef(tx)
+      return tx.stocktake.create({
+        data: {
+          refNumber,
+          notes,
+          createdByUserId: userId,
+          stockSnapshot: stockSnapshot as Prisma.InputJsonValue,
+        },
+        include: { entries: { include: { product: true } } },
+      })
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, maxWait: 10000, timeout: 30000 })
+  )
   logger.info({ stocktakeId: stocktake.id, userId, snapshotProductCount: Object.keys(stockSnapshot).length }, 'Stocktake created with snapshot')
   return stocktake
 }
@@ -165,7 +172,7 @@ export async function updateEntryPhoto(
 // records (source: 'stocktake_adjustment') so live stock is corrected.
 
 export async function completeStocktake(id: string, userId: string) {
-  const updated = await prisma.$transaction(async (tx) => {
+  const updated = await withSerializableRetry(() => prisma.$transaction(async (tx) => {
     // Load stocktake with entries INSIDE the transaction for isolation
     const stocktake = await tx.stocktake.findUniqueOrThrow({
       where: { id },
@@ -206,7 +213,7 @@ export async function completeStocktake(id: string, userId: string) {
     }
 
     return result
-  })
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, maxWait: 10000, timeout: 60000 }))
 
   logger.info({ stocktakeId: id, userId, entryCount: updated.entries.length }, 'Stocktake completed')
   return updated
@@ -216,7 +223,7 @@ export async function completeStocktake(id: string, userId: string) {
 // Reverses all stock movements created by the stocktake completion.
 
 export async function voidStocktake(id: string, userId: string, reason: string) {
-  const voided = await prisma.$transaction(async (tx) => {
+  const voided = await withSerializableRetry(() => prisma.$transaction(async (tx) => {
     // Load stocktake with entries inside transaction
     const stocktake = await tx.stocktake.findUniqueOrThrow({
       where: { id },
@@ -269,7 +276,7 @@ export async function voidStocktake(id: string, userId: string, reason: string) 
     })
 
     return result
-  })
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, maxWait: 10000, timeout: 60000 }))
 
   logger.info({ stocktakeId: id, userId, reason, entryCount: voided.entries.length }, 'Stocktake voided')
   return voided

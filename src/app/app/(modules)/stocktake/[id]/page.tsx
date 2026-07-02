@@ -6,9 +6,10 @@ import { useParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-import { Loader2, CheckCircle, AlertTriangle, Scale, RefreshCw, Camera, ExternalLink } from 'lucide-react'
+import { Loader2, CheckCircle, Ban, Scale, RefreshCw, Camera, ExternalLink } from 'lucide-react'
 import { toast } from 'sonner'
 import Decimal from 'decimal.js'
 import { format } from '@/lib/utils/format'
@@ -39,6 +40,11 @@ const scaleBtn: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 4, height: 24,
   padding: '0 8px', fontSize: 11, fontWeight: 600, borderRadius: 2,
   background: colors.process, border: `1px solid ${colors.processHover}`, color: colors.textOnDark, cursor: 'pointer',
+}
+const dangerBtn: React.CSSProperties = {
+  display: 'inline-flex', alignItems: 'center', gap: 4, height: 24,
+  padding: '0 8px', fontSize: 11, fontWeight: 600, borderRadius: 2,
+  background: colors.danger, border: `1px solid ${colors.danger}`, color: colors.textOnDark, cursor: 'pointer',
 }
 
 type Product = { id: string; code: string; name: string; unit: string; category: string }
@@ -122,6 +128,9 @@ export default function StocktakeDetailPage() {
   const [showCompleteDialog, setShowCompleteDialog] = useState(false)
   const [showRecountDialog, setShowRecountDialog] = useState(false)
   const [pendingRecount, setPendingRecount] = useState<{ productId: string; existingQty: string } | null>(null)
+  const [showVoidDialog, setShowVoidDialog] = useState(false)
+  const [voidReason, setVoidReason] = useState('')
+  const [voiding, setVoiding] = useState(false)
   const photoInputRef = useRef<HTMLInputElement>(null)
   const pendingPhotoEntryRef = useRef<string | null>(null)
 
@@ -260,6 +269,29 @@ export default function StocktakeDetailPage() {
     else { const j = await res.json() as { error?: string }; toast.error(j.error ?? 'Failed to complete') }
   }
 
+  async function performVoid() {
+    setVoiding(true)
+    try {
+      const res = await fetch(`/api/stocktake/${id}/void`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: voidReason }),
+      })
+      if (!res.ok) {
+        const j = await res.json() as { error?: string }
+        throw new Error(j.error ?? 'Failed to void stocktake')
+      }
+      toast.success('Stocktake voided — stock adjustments reversed')
+      setShowVoidDialog(false)
+      setVoidReason('')
+      mutate(`/api/stocktake/${id}`)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Failed to void stocktake')
+    } finally {
+      setVoiding(false)
+    }
+  }
+
   const products = productsData?.products ?? []
   const entries = stocktake?.entries ?? []
   const isOpen = stocktake?.status === 'open'
@@ -297,12 +329,23 @@ export default function StocktakeDetailPage() {
                 : <><CheckCircle style={{ width: 11, height: 11 }} aria-hidden="true" /> Complete Stocktake</>}
             </button>
           )}
+          {stocktake.status === 'completed' && (
+            <button onClick={() => setShowVoidDialog(true)} style={dangerBtn} aria-label="Void stocktake">
+              <Ban style={{ width: 11, height: 11 }} aria-hidden="true" /> Void
+            </button>
+          )}
         </div>
 
         {/* Info bar */}
         <div style={{ padding: '6px 12px', background: colors.surface, borderBottom: `1px solid ${colors.border}`, fontSize: 11, color: colors.textSecondary, flexShrink: 0 }}>
           Created by {stocktake.createdBy.fullName} · {format.datetime(stocktake.createdAt)}
           {stocktake.completedAt && ` · Completed ${format.datetime(stocktake.completedAt)}`}
+          {stocktake.status === 'voided' && stocktake.voidedAt && (
+            <span style={{ color: colors.danger }}>
+              {' · '}Voided {format.datetime(stocktake.voidedAt)}{stocktake.voidedBy && ` by ${stocktake.voidedBy.fullName}`}
+              {stocktake.voidReason && ` — Reason: ${stocktake.voidReason}`}
+            </span>
+          )}
           {stocktake.notes && <span style={{ marginLeft: 12, color: colors.textPrimary }}>{stocktake.notes}</span>}
         </div>
 
@@ -310,7 +353,7 @@ export default function StocktakeDetailPage() {
         <div style={{ flex: 1, overflow: 'auto', padding: 12 }}>
           {/* Summary stats */}
           {entries.length > 0 && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, marginBottom: 16 }}>
               <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 2, padding: 12, textAlign: 'center' }}>
                 <p style={{ fontSize: 20, fontWeight: 700, color: colors.textPrimary }}>{entries.length}</p>
                 <p style={{ fontSize: 10, color: colors.textSecondary, marginTop: 4 }}>Products Counted</p>
@@ -318,10 +361,6 @@ export default function StocktakeDetailPage() {
               <div style={{ background: variances.length > 0 ? colors.warningBg : colors.surface, border: `1px solid ${variances.length > 0 ? colors.warning : colors.border}`, borderRadius: 2, padding: 12, textAlign: 'center' }}>
                 <p style={{ fontSize: 20, fontWeight: 700, color: variances.length > 0 ? colors.warning : colors.textPrimary }}>{variances.length}</p>
                 <p style={{ fontSize: 10, color: colors.textSecondary, marginTop: 4 }}>Variances Found</p>
-              </div>
-              <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 2, padding: 12, textAlign: 'center' }}>
-                <p style={{ fontSize: 20, fontWeight: 700, color: colors.textPrimary }}>{products.length - countedIds.size}</p>
-                <p style={{ fontSize: 10, color: colors.textSecondary, marginTop: 4 }}>Products Remaining</p>
               </div>
             </div>
           )}
@@ -343,8 +382,9 @@ export default function StocktakeDetailPage() {
                       <SelectContent>
                         {products.map((p) => (
                           <SelectItem key={p.id} value={p.id}>
-                            <span style={{ color: countedIds.has(p.id) ? colors.textSecondary : colors.textPrimary }}>
-                              {p.name} ({p.code}){countedIds.has(p.id) ? ' ✓' : ''}
+                            <span style={{ color: colors.textPrimary }}>
+                              {p.name} ({p.code})
+                              {countedIds.has(p.id) && <span style={{ color: colors.process, fontWeight: 600 }}> · Recount</span>}
                             </span>
                           </SelectItem>
                         ))}
@@ -447,7 +487,6 @@ export default function StocktakeDetailPage() {
                     <th style={TH}>Net Counted</th>
                     <th style={TH}>Variance</th>
                     <th style={TH}>Photo</th>
-                    <th style={{ ...TH, width: 24 }}></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -522,9 +561,6 @@ export default function StocktakeDetailPage() {
                             )}
                           </div>
                         </td>
-                        <td style={TD}>
-                          {hasVariance && <AlertTriangle style={{ width: 14, height: 14, color: colors.warning }} />}
-                        </td>
                       </tr>
                     )
                   })}
@@ -543,13 +579,26 @@ export default function StocktakeDetailPage() {
             <AlertDialogTitle>Complete Stocktake?</AlertDialogTitle>
             <AlertDialogDescription>
               This will apply all variance adjustments to your stock levels. This action cannot be undone.
-              {variances.length > 0 && (
-                <span style={{ display: 'block', marginTop: 8, fontWeight: 500, color: colors.warning }}>
-                  {variances.length} variance{variances.length > 1 ? 's' : ''} will be applied.
-                </span>
-              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {variances.length > 0 && (
+            <div style={{ maxHeight: 160, overflowY: 'auto', border: `1px solid ${colors.border}`, borderRadius: 2, padding: 8 }}>
+              <p style={{ fontSize: 11, fontWeight: 600, color: colors.warning, marginBottom: 6 }}>
+                {variances.length} variance{variances.length > 1 ? 's' : ''} will be applied to stock:
+              </p>
+              {variances.map((v) => {
+                const variance = new Decimal(v.variance)
+                return (
+                  <div key={v.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, padding: '2px 0' }}>
+                    <span style={{ color: colors.textPrimary }}>{v.product.name}</span>
+                    <span style={{ fontFamily: 'monospace', fontWeight: 600, color: variance.gt(0) ? colors.action : colors.danger }}>
+                      {variance.gt(0) ? '+' : ''}{Number(v.variance).toFixed(2)} {v.product.unit}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={performComplete}>Complete Stocktake</AlertDialogAction>
@@ -570,6 +619,41 @@ export default function StocktakeDetailPage() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={() => { setShowRecountDialog(false); performSaveEntry() }}>Overwrite</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Void stocktake confirmation dialog */}
+      <AlertDialog open={showVoidDialog} onOpenChange={(open: boolean) => { setShowVoidDialog(open); if (!open) setVoidReason('') }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Void Stocktake?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will reverse every stock adjustment this stocktake applied. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div style={{ padding: '0 0 4px' }}>
+            <Label htmlFor="void-reason" style={{ fontSize: 11, fontWeight: 600, color: colors.textPrimary }}>Reason for voiding (required)</Label>
+            <Textarea
+              id="void-reason"
+              value={voidReason}
+              onChange={(e) => setVoidReason(e.target.value)}
+              placeholder="e.g. Counted wrong products in category X, re-doing the stocktake"
+              style={{ marginTop: 4, fontSize: 12, minHeight: 64 }}
+            />
+            <p style={{ fontSize: 10, color: colors.textSecondary, marginTop: 4 }}>
+              {voidReason.trim().length}/5 characters minimum
+            </p>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={performVoid}
+              disabled={voiding || voidReason.trim().length < 5}
+              style={{ opacity: (voiding || voidReason.trim().length < 5) ? 0.5 : 1 }}
+            >
+              {voiding ? 'Voiding...' : 'Void Stocktake'}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
