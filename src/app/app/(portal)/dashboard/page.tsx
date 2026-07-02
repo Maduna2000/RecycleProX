@@ -29,7 +29,7 @@ const TILES: Tile[] = [
   { label: 'Casual Details',     subtitle: 'Walk-in Sellers',      icon: UserRound,     href: '/app/casual',            group: 'navy'  },
   { label: 'Purchases',          subtitle: 'Buy Scrap',            icon: ShoppingCart,  href: '/app/purchases/new',     group: 'navy'  },
   { label: 'Unpaid Purchases',   subtitle: 'Outstanding Balances', icon: AlertCircle,   href: '/app/purchases/unpaid',  group: 'navy'  },
-  { label: 'Sales',              subtitle: 'Sell Stock',           icon: Tag,           href: '/app/sales',             group: 'blue'  },
+  { label: 'Sales',              subtitle: 'Sell Stock',           icon: Tag,           href: '/app/sales/new',         group: 'blue'  },
   { label: 'Sales Payments',     subtitle: 'Record Payments',      icon: CreditCard,    href: '/app/payments',          group: 'blue'  },
   { label: 'Photo Viewer',       subtitle: 'ID & Purchase Photos', icon: ImageIcon,     href: '/app/photos',            group: 'blue'  },
   { label: 'Weighbridge',        subtitle: 'Scale Integration',    icon: Scale,         href: '/app/weighbridge',       group: 'blue',  comingSoon: true },

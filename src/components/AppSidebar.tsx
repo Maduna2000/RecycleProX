@@ -24,7 +24,7 @@ const ALWAYS: NavGroup = {
   items: [
     { label: 'Dashboard',  href: '/app/dashboard',  icon: LayoutDashboard },
     { label: 'Purchases',  href: '/app/purchases/new',  icon: ShoppingCart },
-    { label: 'Sales',      href: '/app/sales',      icon: TrendingUp },
+    { label: 'Sales',      href: '/app/sales/new',  icon: TrendingUp },
     { label: 'Customers',  href: '/app/customers',  icon: Users },
   ],
 }
@@ -86,9 +86,12 @@ function isActive(pathname: string, href: string): boolean {
   if (href === '/app/settings' || href === '/app/scale') {
     return pathname === href || pathname === href + '/'
   }
-  // Purchases nav points to /new but should highlight for any /app/purchases/* route
+  // Purchases/Sales nav points to /new but should highlight for any sub-route
   if (href === '/app/purchases/new') {
     return pathname.startsWith('/app/purchases')
+  }
+  if (href === '/app/sales/new') {
+    return pathname.startsWith('/app/sales')
   }
   return pathname.startsWith(href)
 }
