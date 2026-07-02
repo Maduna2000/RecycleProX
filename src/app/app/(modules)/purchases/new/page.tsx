@@ -57,6 +57,7 @@ type LineItem = {
   deductionQty: string
   deductionReason: string
   unitPrice: string
+  vatApplied: boolean
   weighMode: boolean
   selectedScale: '1' | '2' | '3'
   weighingGross: boolean
@@ -84,7 +85,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 const emptyLine = (key: number): LineItem => ({
   key, productId: '', product: null, quantity: '', grossQty: '', tareQty: '',
-  tareReason: '', deductionQty: '', deductionReason: '', unitPrice: '',
+  tareReason: '', deductionQty: '', deductionReason: '', unitPrice: '', vatApplied: true,
   weighMode: false, selectedScale: '1', weighingGross: false, weighingTare: false,
 })
 
@@ -188,7 +189,12 @@ export default function NewPurchasePage() {
   const subTotal = lines.reduce((sum, l) => {
     return sum.plus(new Decimal(l.quantity || '0').times(new Decimal(l.unitPrice || '0')))
   }, new Decimal(0))
-  const vatAmount  = subTotal.times(vatRate)
+  // VAT only applies to lines with the per-line "Apply VAT" checkbox checked
+  const vatAmount = lines.reduce((sum, l) => {
+    if (!l.vatApplied) return sum
+    const lineSub = new Decimal(l.quantity || '0').times(new Decimal(l.unitPrice || '0'))
+    return sum.plus(lineSub.times(vatRate))
+  }, new Decimal(0))
   const grandTotal = subTotal.plus(vatAmount)
 
   const loanDeduct = deductLoan && deductionAmount && parseFloat(deductionAmount) > 0
@@ -674,7 +680,7 @@ export default function NewPurchasePage() {
                 const qty      = new Decimal(line.quantity  || '0')
                 const price    = new Decimal(line.unitPrice || '0')
                 const lineSub  = qty.times(price)
-                const lineVat  = lineSub.times(vatRate)
+                const lineVat  = line.vatApplied ? lineSub.times(vatRate) : new Decimal(0)
                 const lineTot  = lineSub.plus(lineVat)
 
                 return (
@@ -683,7 +689,7 @@ export default function NewPurchasePage() {
                     <div
                       style={{
                         display: 'grid',
-                        gridTemplateColumns: '1fr 72px 80px 80px 70px 80px 28px 26px',
+                        gridTemplateColumns: '1fr 72px 80px 80px 92px 80px 28px 26px',
                         gap: 4,
                         padding: '4px 8px',
                         alignItems: 'center',
@@ -727,10 +733,19 @@ export default function NewPurchasePage() {
                         {qty.gt(0) ? `R ${lineSub.toFixed(2)}` : '—'}
                       </span>
 
-                      {/* VAT */}
-                      <span style={{ fontSize: 11, fontFamily: 'monospace', padding: '0 4px', color: qty.gt(0) ? '#212529' : '#9CA3AF' }}>
-                        {qty.gt(0) ? `R ${lineVat.toFixed(2)}` : '—'}
-                      </span>
+                      {/* VAT — checkbox toggles whether this line's notional VAT is applied */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <input
+                          type="checkbox"
+                          checked={line.vatApplied}
+                          onChange={(e) => patchLine(line.key, { vatApplied: e.target.checked })}
+                          title="Apply VAT to this line"
+                          style={{ width: 12, height: 12, cursor: 'pointer', flexShrink: 0 }}
+                        />
+                        <span style={{ fontSize: 11, fontFamily: 'monospace', color: qty.gt(0) && line.vatApplied ? '#212529' : '#9CA3AF' }}>
+                          {qty.gt(0) ? `R ${lineVat.toFixed(2)}` : '—'}
+                        </span>
+                      </div>
 
                       {/* Total */}
                       <span style={{ fontSize: 11, fontFamily: 'monospace', fontWeight: 600, padding: '0 4px', color: qty.gt(0) ? '#217346' : '#9CA3AF' }}>
