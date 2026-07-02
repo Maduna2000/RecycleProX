@@ -56,6 +56,7 @@ type Sale = {
   refNumber: string
   status: 'completed' | 'voided' | 'pending'
   totalAmount: string
+  vatAmount?: string
   amountPaid?: string
   paymentMethod: string
   buyerName: string
@@ -226,6 +227,22 @@ export default function SaleDetailPage() {
                 ))}
               </tbody>
               <tfoot>
+                {sale.vatAmount && Number(sale.vatAmount) > 0 && (
+                  <>
+                    <tr style={{ background: 'linear-gradient(180deg,#F5F5F5 0%,#ECECEC 100%)' }}>
+                      <td colSpan={3} style={{ ...TD, textAlign: 'right', color: colors.textSecondary }}>Sub Total</td>
+                      <td style={{ ...TD, fontFamily: 'monospace', textAlign: 'right', color: colors.textPrimary }}>
+                        R {(Number(sale.totalAmount) - Number(sale.vatAmount)).toFixed(2)}
+                      </td>
+                    </tr>
+                    <tr style={{ background: 'linear-gradient(180deg,#F5F5F5 0%,#ECECEC 100%)' }}>
+                      <td colSpan={3} style={{ ...TD, textAlign: 'right', color: colors.textSecondary }}>VAT</td>
+                      <td style={{ ...TD, fontFamily: 'monospace', textAlign: 'right', color: colors.textSecondary }}>
+                        R {Number(sale.vatAmount).toFixed(2)}
+                      </td>
+                    </tr>
+                  </>
+                )}
                 <tr style={{ borderTop: `2px solid ${colors.border}`, background: 'linear-gradient(180deg,#F5F5F5 0%,#ECECEC 100%)' }}>
                   <td colSpan={3} style={{ ...TD, textAlign: 'right', fontWeight: 600, color: colors.textSecondary }}>Total</td>
                   <td style={{ ...TD, fontFamily: 'monospace', fontWeight: 700, fontSize: 14, textAlign: 'right', color: colors.action }}>

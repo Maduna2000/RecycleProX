@@ -317,6 +317,7 @@ model Sale {
   buyerPhone            String?
   status                TxStatus      @default(completed)
   totalAmount           Decimal       @db.Decimal(18, 2)
+  vatAmount             Decimal       @default(0) @db.Decimal(18, 2)
   paymentMethod         PaymentMethod @default(cash)
   notes                 String?
   voidedAt              DateTime?

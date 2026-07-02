@@ -3,12 +3,12 @@
 import { useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Plus, Trash2, Loader2, Scale, RefreshCw, Camera } from 'lucide-react'
+import { Plus, Trash2, Loader2, Scale, RefreshCw, Camera, ClipboardList } from 'lucide-react'
 import { toast } from 'sonner'
 import useSWR from 'swr'
 import { AccountSelectorPanel } from '@/components/customers/AccountSelectorPanel'
 import { PrintResultModal } from '@/components/PrintResultModal'
-import { ProcessPaymentModal, type PayTarget } from '@/components/sales/ProcessPaymentModal'
+import { RecordPaymentModal, type PayTarget } from '@/components/sales/RecordPaymentModal'
 import Decimal from 'decimal.js'
 import { colors } from '@/lib/design-tokens'
 import { useOfflineMutation } from '@/hooks/useOfflineFetch'
@@ -155,9 +155,15 @@ export default function NewSalePage() {
   }, {})
 
   // ── Derived calculations ──────────────────────────────────────────────────
-  const total = lines.reduce((sum, l) => {
+  // Zero-rated only for an account buyer explicitly flagged zero-rated; walk-in
+  // buyers (no linked Customer) are shown standard VAT, matching the server.
+  const vatRate = buyerMode === 'account' && customer?.zeroRated ? new Decimal(0) : new Decimal('0.15')
+
+  const subTotal = lines.reduce((sum, l) => {
     return sum.plus(new Decimal(l.quantity || '0').times(new Decimal(l.unitPrice || '0')))
   }, new Decimal(0))
+  const vatAmount = subTotal.times(vatRate)
+  const total     = subTotal.plus(vatAmount)
 
   const hasStockError = lines.some((l) => {
     if (!l.productId || !l.quantity) return false
@@ -555,13 +561,13 @@ export default function NewSalePage() {
               style={{
                 ...headerBg,
                 display: 'grid',
-                gridTemplateColumns: '1fr 72px 80px 80px 80px 28px 26px',
+                gridTemplateColumns: '1fr 60px 64px 64px 56px 64px 52px 28px 26px',
                 gap: 4,
                 padding: '4px 8px',
                 flexShrink: 0,
               }}
             >
-              {['Product', 'Qty (kg)', 'Sell Price', 'Sub Total', 'Stock', '', ''].map((h, i) => (
+              {['Product', 'Qty (kg)', 'Sell Price', 'Sub Total', 'VAT', 'Total', 'Stock', '', ''].map((h, i) => (
                 <span key={i} style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#374151' }}>{h}</span>
               ))}
             </div>
@@ -572,6 +578,8 @@ export default function NewSalePage() {
                 const qty      = new Decimal(line.quantity  || '0')
                 const price    = new Decimal(line.unitPrice || '0')
                 const lineSub  = qty.times(price)
+                const lineVat  = lineSub.times(vatRate)
+                const lineTot  = lineSub.plus(lineVat)
                 const onHand   = line.productId ? (stockMap.get(line.productId) ?? new Decimal(0)) : null
                 const overStock = onHand !== null && qty.gt(new Decimal(0)) && qty.gt(onHand)
 
@@ -581,7 +589,7 @@ export default function NewSalePage() {
                     <div
                       style={{
                         display: 'grid',
-                        gridTemplateColumns: '1fr 72px 80px 80px 80px 28px 26px',
+                        gridTemplateColumns: '1fr 60px 64px 64px 56px 64px 52px 28px 26px',
                         gap: 4,
                         padding: '4px 8px',
                         alignItems: 'center',
@@ -623,6 +631,16 @@ export default function NewSalePage() {
                       {/* Sub Total */}
                       <span style={{ fontSize: 11, fontFamily: 'monospace', padding: '0 4px', color: qty.gt(0) ? '#212529' : '#9CA3AF' }}>
                         {qty.gt(0) ? `R ${lineSub.toFixed(2)}` : '—'}
+                      </span>
+
+                      {/* VAT */}
+                      <span style={{ fontSize: 11, fontFamily: 'monospace', padding: '0 4px', color: qty.gt(0) ? '#212529' : '#9CA3AF' }}>
+                        {qty.gt(0) ? `R ${lineVat.toFixed(2)}` : '—'}
+                      </span>
+
+                      {/* Total */}
+                      <span style={{ fontSize: 11, fontFamily: 'monospace', fontWeight: 600, padding: '0 4px', color: qty.gt(0) ? '#217346' : '#9CA3AF' }}>
+                        {qty.gt(0) ? `R ${lineTot.toFixed(2)}` : '—'}
                       </span>
 
                       {/* Stock */}
@@ -824,6 +842,12 @@ export default function NewSalePage() {
               >
                 <RefreshCw style={{ width: 9, height: 9 }} /> Refresh
               </button>
+              <button
+                onClick={() => router.push('/app/sales')}
+                style={{ fontSize: 10, padding: '1px 6px', background: '#E0E0E0', border: '1px solid #999', borderRadius: 2, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}
+              >
+                <ClipboardList style={{ width: 9, height: 9 }} /> Edit Transaction
+              </button>
             </div>
 
             {/* Column headers */}
@@ -867,7 +891,7 @@ export default function NewSalePage() {
                         {actionMenuId === s.id && actionMenuRect && (
                           <div style={{ position: 'fixed', right: window.innerWidth - actionMenuRect.right, bottom: window.innerHeight - actionMenuRect.top + 2, zIndex: 9999, background: '#fff', border: '1px solid #C0C0C0', borderRadius: 3, boxShadow: '0 4px 12px rgba(0,0,0,0.15)', minWidth: 180 }}>
                             {([
-                              { label: 'Process Payment',    action: () => { setPayTarget({ id: s.id, ref: s.refNumber, totalAmount: s.totalAmount, amountPaid: s.amountPaid ?? '0' }); setActionMenuId(null) } },
+                              { label: 'Record Payment',     action: () => { setPayTarget({ id: s.id, ref: s.refNumber, totalAmount: s.totalAmount, amountPaid: s.amountPaid ?? '0' }); setActionMenuId(null) } },
                               { label: 'Print Slip',         action: () => { router.push(`/app/sales/${s.id}`); setActionMenuId(null) } },
                               { label: 'View Full Details',  action: () => { router.push(`/app/sales/${s.id}`); setActionMenuId(null) } },
                               { label: 'Reverse Sale',       destructive: true, action: () => { setVoidId(s.id); setActionMenuId(null) } },
@@ -924,7 +948,15 @@ export default function NewSalePage() {
 
           {/* Totals */}
           <div style={{ flexShrink: 0, padding: '6px 10px', borderTop: '2px solid #B0B0B0', background: '#F8F9FA', display: 'flex', justifyContent: 'flex-end' }}>
-            <div style={{ minWidth: 200, display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <div style={{ minWidth: 220, display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
+                <span style={{ color: '#6C757D' }}>Sub Total</span>
+                <span style={{ fontFamily: 'monospace', color: '#212529' }}>R {subTotal.toFixed(2)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
+                <span style={{ color: '#6C757D' }}>VAT ({buyerMode === 'account' && customer?.zeroRated ? '0%' : '15%'})</span>
+                <span style={{ fontFamily: 'monospace', color: '#6C757D' }}>R {vatAmount.toFixed(2)}</span>
+              </div>
               <div style={{ height: 1, background: '#C0C0C0', margin: '2px 0' }} />
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 700 }}>
                 <span style={{ color: '#212529' }}>Total</span>
@@ -1067,9 +1099,9 @@ export default function NewSalePage() {
         <div style={{ position: 'fixed', inset: 0, zIndex: 9998 }} onClick={() => setActionMenuId(null)} />
       )}
 
-      {/* Process Payment modal */}
+      {/* Record Payment modal */}
       {payTarget && (
-        <ProcessPaymentModal
+        <RecordPaymentModal
           sale={payTarget}
           onClose={() => setPayTarget(null)}
           onSuccess={() => { mutatePending(); setPayTarget(null) }}

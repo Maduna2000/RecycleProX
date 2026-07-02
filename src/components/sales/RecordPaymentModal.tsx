@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Loader2, CreditCard } from 'lucide-react'
+import { Loader2, HandCoins } from 'lucide-react'
 import { toast } from 'sonner'
 import Decimal from 'decimal.js'
 import { Dialog, DialogContent, ModalTitleBar } from '@/components/ui/dialog'
@@ -15,7 +15,7 @@ export type PayTarget = {
   amountPaid: string
 }
 
-export function ProcessPaymentModal({
+export function RecordPaymentModal({
   sale,
   onClose,
   onSuccess,
@@ -54,18 +54,18 @@ export function ProcessPaymentModal({
     })
     setLoading(false)
     if (res.ok) {
-      toast.success(`Payment processed for ${sale.ref}`)
+      toast.success(`Payment recorded for ${sale.ref}`)
       onSuccess()
     } else {
       const j = await res.json() as { error?: string }
-      toast.error(j.error ?? 'Failed to process payment')
+      toast.error(j.error ?? 'Failed to record payment')
     }
   }
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="sm:max-w-sm" showCloseButton={false}>
-        <ModalTitleBar title="Process Payment" onClose={onClose} />
+        <ModalTitleBar title="Record Payment" onClose={onClose} />
         <div className="space-y-4 mt-2">
           {/* Balance summary */}
           <div className="px-3 py-2.5 rounded-lg space-y-1" style={{ background: '#F8F9FA', border: '1px solid #E0E0E0' }}>
@@ -89,7 +89,7 @@ export function ProcessPaymentModal({
           {/* Amount input */}
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="text-xs font-medium" style={{ color: '#6C757D' }}>Payment Amount</label>
+              <label className="text-xs font-medium" style={{ color: '#6C757D' }}>Amount Received</label>
               <button
                 type="button"
                 onClick={() => { setAmount(remaining.toFixed(2)); setAmountError(null) }}
@@ -142,8 +142,8 @@ export function ProcessPaymentModal({
               className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-white disabled:opacity-50"
               style={{ background: '#217346' }}
             >
-              {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CreditCard className="w-3.5 h-3.5" />}
-              Process Payment
+              {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <HandCoins className="w-3.5 h-3.5" />}
+              Record Payment
             </button>
           </div>
         </div>

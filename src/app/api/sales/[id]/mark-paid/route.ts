@@ -19,6 +19,9 @@ const SettleSchema = z.object({
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+  if (!['admin', 'manager'].includes(session.user.role)) {
+    return NextResponse.json({ error: 'Forbidden — only managers can record payments' }, { status: 403 })
+  }
 
   const body   = await req.json().catch(() => ({}))
   const parsed = SettleSchema.safeParse(body)

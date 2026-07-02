@@ -21,7 +21,15 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   } catch (err) {
     if (err instanceof SaleNotFoundError) return NextResponse.json({ error: err.message }, { status: 404 })
     if (err instanceof SaleAlreadyVoidedError) return NextResponse.json({ error: err.message }, { status: 409 })
+
+    const message = err instanceof Error ? err.message : 'Failed to void sale'
     logger.error({ err }, 'POST /api/sales/[id]/void failed')
-    return NextResponse.json({ error: 'Failed to void sale' }, { status: 500 })
+
+    // If the error message contains "approved", return a 409 Conflict instead of 500
+    if (message.includes('approved')) {
+      return NextResponse.json({ error: message }, { status: 409 })
+    }
+
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

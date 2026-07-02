@@ -64,6 +64,15 @@ async function withSerializableRetry<T>(fn: () => Promise<T>): Promise<T> {
 // ─── Create Sale ──────────────────────────────────────────────────────────────
 
 export async function createSale(data: CreateSaleInput, createdByUserId?: string) {
+  // Resolve VAT rate server-side — never trust a client-supplied VAT figure.
+  // Zero-rated only when the sale is linked to a Customer explicitly flagged zero-rated;
+  // walk-in buyers (no linked Customer) are charged standard VAT.
+  let vatRate = new Decimal('0.15')
+  if (data.customerId) {
+    const customer = await prisma.customer.findUnique({ where: { id: data.customerId }, select: { zeroRated: true } })
+    if (customer?.zeroRated) vatRate = new Decimal(0)
+  }
+
   // Validate products outside transaction — read-only, no race risk
   const resolvedLines = await Promise.all(
     data.lines.map(async (line) => {
@@ -90,7 +99,9 @@ export async function createSale(data: CreateSaleInput, createdByUserId?: string
     })
   )
 
-  const totalAmount = resolvedLines.reduce((sum, l) => sum.plus(l.lineTotal), new Decimal(0))
+  const subTotal    = resolvedLines.reduce((sum, l) => sum.plus(l.lineTotal), new Decimal(0))
+  const vatAmount   = subTotal.times(vatRate)
+  const totalAmount = subTotal.plus(vatAmount)
 
   const sale = await withSerializableRetry(() =>
     prisma.$transaction(async (tx) => {
@@ -124,6 +135,7 @@ export async function createSale(data: CreateSaleInput, createdByUserId?: string
           buyerPhone:           data.buyerPhone,
           status:               isPending ? 'pending' : 'completed',
           totalAmount,
+          vatAmount,
           paymentMethod:        data.paymentMethod ?? 'cash',
           amountPaid:           isPending ? new Decimal(0) : totalAmount,
           hasOutstandingBalance: isPending,
@@ -159,10 +171,10 @@ export async function createSale(data: CreateSaleInput, createdByUserId?: string
       }
 
       return s
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, maxWait: 10000, timeout: 30000 })
   )
 
-  logger.info({ saleId: sale.id, refNumber: sale.refNumber, totalAmount: totalAmount.toFixed(2), createdByUserId }, 'sale.created')
+  logger.info({ saleId: sale.id, refNumber: sale.refNumber, subTotal: subTotal.toFixed(2), vatAmount: vatAmount.toFixed(2), totalAmount: totalAmount.toFixed(2), createdByUserId }, 'sale.created')
   return sale
 }
 
@@ -172,6 +184,19 @@ export async function voidSale(id: string, data: VoidSaleInput, voidedById?: str
   const sale = await prisma.sale.findUnique({ where: { id }, include: { lines: true } })
   if (!sale) throw new SaleNotFoundError(id)
   if (sale.status === 'voided') throw new SaleAlreadyVoidedError(sale.refNumber)
+
+  // Block voiding COMPLETED sales if the date has an approved cash-up.
+  // Pending sales can be voided anytime — they weren't included in cash-up totals.
+  const sessionDate = new Date(sale.createdAt)
+  sessionDate.setHours(0, 0, 0, 0)
+  const approvedCashUp = await prisma.cashUp.findFirst({
+    where: { sessionDate, status: 'approved' },
+  })
+  if (approvedCashUp && sale.status === 'completed') {
+    throw new Error(
+      `Cannot void completed sale ${sale.refNumber}: the cash-up for that date (${sessionDate.toISOString().slice(0, 10)}) has already been approved. Contact a manager to investigate discrepancies.`
+    )
+  }
 
   const updated = await prisma.$transaction(async (tx) => {
     const s = await tx.sale.update({
@@ -261,7 +286,7 @@ export async function markSalePaid(
       })
 
       return { updated, isFullySettled }
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, maxWait: 10000, timeout: 30000 })
   )
 
   logger.info(

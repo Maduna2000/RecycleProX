@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import useSWR, { mutate } from 'swr'
 import { useRouter } from 'next/navigation'
-import { Search, Printer, Ban, CreditCard, Loader2, X } from 'lucide-react'
+import { Search, Printer, Ban, HandCoins, Loader2, X } from 'lucide-react'
 import Decimal from 'decimal.js'
 import { DataTable, Avatar, type Column, type RowAction } from '@/components/ui/DataTable'
 import { InlineDetailPanel } from '@/components/ui/InlineDetailPanel'
@@ -11,7 +11,7 @@ import { Dialog, DialogContent, ModalTitleBar, ModalBtn } from '@/components/ui/
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { PageShell } from '@/components/layout/PageShell'
-import { ProcessPaymentModal, type PayTarget } from '@/components/sales/ProcessPaymentModal'
+import { RecordPaymentModal, type PayTarget } from '@/components/sales/RecordPaymentModal'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
 import { format } from '@/lib/utils/format'
 import { toast } from 'sonner'
@@ -166,8 +166,8 @@ export default function UnpaidSalesPage() {
 
   const rowActions: RowAction<Sale>[] = [
     {
-      label:   'Process Payment',
-      icon:    CreditCard,
+      label:   'Record Payment',
+      icon:    HandCoins,
       onClick: (row) => setPayTarget({
         id:          row.id,
         ref:         row.refNumber,
@@ -354,7 +354,7 @@ export default function UnpaidSalesPage() {
       </InlineDetailPanel>
 
       {payTarget && (
-        <ProcessPaymentModal
+        <RecordPaymentModal
           sale={payTarget}
           onClose={() => setPayTarget(null)}
           onSuccess={() => { mutate(KEY); setPayTarget(null) }}

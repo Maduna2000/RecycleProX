@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
+import Decimal from 'decimal.js'
 import { getSale } from '@/lib/services/saleService'
 import { getAllSettings } from '@/lib/services/settingsService'
 import { generateTransactionSlip } from '@/lib/pdf/slip'
@@ -53,6 +54,7 @@ export async function GET(
     }
 
     // Thermal-style PDF receipt
+    const vatAmount = new Decimal(sale.vatAmount.toString())
     const pdfBytes = await generateTransactionSlip({
       type:           'SALE',
       refNumber:      sale.refNumber,
@@ -63,6 +65,10 @@ export async function GET(
       partyPhone:     sale.buyerPhone ?? undefined,
       lines,
       totalAmount:    sale.totalAmount.toString(),
+      ...(vatAmount.greaterThan(0) ? {
+        vatAmount:      vatAmount.toFixed(2),
+        subtotalAmount: new Decimal(sale.totalAmount.toString()).minus(vatAmount).toFixed(2),
+      } : {}),
       paymentMethod:  sale.paymentMethod,
       cashierName:    session.user.name ?? 'Cashier',
       notes:          sale.notes ?? undefined,

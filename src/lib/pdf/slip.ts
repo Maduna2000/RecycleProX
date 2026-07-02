@@ -30,6 +30,8 @@ export interface TransactionSlipData {
   partyPhone?:    string
   lines:          SlipLine[]
   totalAmount:    string
+  subtotalAmount?: string   // pre-VAT subtotal — shown with vatAmount when VAT was charged
+  vatAmount?:      string   // VAT portion already included in totalAmount
   loanDeduction?: string    // optional loan deduction amount
   paymentMethod:  string
   cashierName:    string
@@ -94,6 +96,10 @@ function estimateHeight(data: TransactionSlipData): number {
   }
   if (data.lines.length > 1) h += LINE_H  // Total Qty row
   h += 8                            // divider
+  if (data.vatAmount && parseFloat(data.vatAmount) > 0) {
+    h += LINE_H + 2                 // Subtotal line
+    h += LINE_H + 2                 // VAT line
+  }
   if (data.loanDeduction && parseFloat(data.loanDeduction) > 0) {
     h += LINE_H + 2                 // gross payout line
     h += LINE_H + 2                 // loan deduction line
@@ -276,6 +282,20 @@ export async function generateTransactionSlip(data: TransactionSlipData): Promis
 
   // ── Totals ────────────────────────────────────────────────────────────────
   const grossTotal = `E${new Decimal(data.totalAmount).toFixed(2)}`
+
+  if (data.vatAmount && new Decimal(data.vatAmount).greaterThan(0) && data.subtotalAmount) {
+    const subStr = `E${new Decimal(data.subtotalAmount).toFixed(2)}`
+    const sw = reg.widthOfTextAtSize(subStr, NORMAL)
+    page.drawText('Subtotal:', { x: MARGIN,          y: cursor, size: NORMAL, font: reg, color: DGRAY })
+    page.drawText(subStr,      { x: W - MARGIN - sw,  y: cursor, size: NORMAL, font: reg, color: DGRAY })
+    nextLine(NORMAL, 2)
+
+    const vatStr = `E${new Decimal(data.vatAmount).toFixed(2)}`
+    const vw = reg.widthOfTextAtSize(vatStr, NORMAL)
+    page.drawText('VAT (15%):', { x: MARGIN,          y: cursor, size: NORMAL, font: reg, color: DGRAY })
+    page.drawText(vatStr,       { x: W - MARGIN - vw,  y: cursor, size: NORMAL, font: reg, color: DGRAY })
+    nextLine(NORMAL, 2)
+  }
 
   if (data.loanDeduction && new Decimal(data.loanDeduction).greaterThan(0)) {
     // Gross payout — label reg/gray, amount bold/black
