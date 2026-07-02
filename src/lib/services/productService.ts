@@ -63,6 +63,7 @@ export async function createProduct(data: CreateProductInput, createdById?: stri
       code: data.code,
       name: data.name,
       category: data.category,
+      categoryId: cat.id,
       unit: data.unit ?? 'kg',
       defaultBuyPrice: new Decimal(data.defaultBuyPrice),
       defaultSellPrice: new Decimal(data.defaultSellPrice),
@@ -79,16 +80,18 @@ export async function updateProduct(id: string, data: UpdateProductInput, update
   const existing = await prisma.product.findUnique({ where: { id } })
   if (!existing) throw new ProductNotFoundError(id)
 
+  let categoryId: string | undefined
   if (data.category !== undefined) {
     const cat = await prisma.productCategory.findUnique({ where: { name: data.category } })
     if (!cat) throw new Error(`Category "${data.category}" does not exist`)
+    categoryId = cat.id
   }
 
   const updated = await prisma.product.update({
     where: { id },
     data: {
       ...(data.name !== undefined && { name: data.name }),
-      ...(data.category !== undefined && { category: data.category }),
+      ...(data.category !== undefined && { category: data.category, categoryId }),
       ...(data.unit !== undefined && { unit: data.unit }),
       ...(data.defaultBuyPrice !== undefined && { defaultBuyPrice: new Decimal(data.defaultBuyPrice) }),
       ...(data.defaultSellPrice !== undefined && { defaultSellPrice: new Decimal(data.defaultSellPrice) }),

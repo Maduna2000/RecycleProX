@@ -147,6 +147,7 @@ model Product {
   code             String                      @unique
   name             String
   category         String
+  categoryId       String?
   unit             UnitOfMeasure               @default(kg)
   defaultBuyPrice  Decimal                     @db.Decimal(18, 2)
   defaultSellPrice Decimal                     @db.Decimal(18, 2)
@@ -156,6 +157,7 @@ model Product {
   updatedAt        DateTime                    @updatedAt
   minStockLevel    Decimal?                    @db.Decimal(18, 3)
   buyMarginPct     Decimal?                    @db.Decimal(8, 4)
+  categoryRef      ProductCategory?            @relation("ProductCategoryProducts", fields: [categoryId], references: [id])
   priceOverrides   PriceGroupProductOverride[]
   priceHistory     PriceHistory[]
   purchaseLines    PurchaseLine[]
@@ -166,6 +168,7 @@ model Product {
   stocktakeEntries StocktakeEntry[]
 
   @@index([category])
+  @@index([categoryId])
   @@index([isActive])
 }
 
@@ -223,6 +226,7 @@ model ProductCategory {
   stepConfig CategoryStepConfig?
   parent     ProductCategory?    @relation("SubCategories", fields: [parentId], references: [id])
   children   ProductCategory[]   @relation("SubCategories")
+  products   Product[]           @relation("ProductCategoryProducts")
 }
 
 model TradeCommodityCategory {
@@ -256,6 +260,7 @@ model Purchase {
   customerId              String
   status                  TxStatus                 @default(completed)
   totalAmount             Decimal                  @db.Decimal(18, 2)
+  vatAmount               Decimal?                 @db.Decimal(18, 2)
   paymentMethod           PaymentMethod            @default(cash)
   notes                   String?
   voidedAt                DateTime?
@@ -294,6 +299,8 @@ model PurchaseLine {
   quantity        Decimal  @db.Decimal(18, 3)
   unitPrice       Decimal  @db.Decimal(18, 2)
   lineTotal       Decimal  @db.Decimal(18, 2)
+  vatApplied      Boolean?
+  vatAmount       Decimal? @db.Decimal(18, 2)
   priceSource     String   @default("default")
   createdAt       DateTime @default(now())
   grossQty        Decimal? @db.Decimal(18, 3)

@@ -24,6 +24,7 @@ export const PurchaseLineSchema = z.object({
     .min(1, 'Required')
     .regex(/^\d+(\.\d{1,2})?$/, 'Must be a valid price')
     .refine((v) => parseFloat(v) >= 0, 'Price cannot be negative'),
+  vatApplied: z.boolean().default(true),
 }).superRefine((line, ctx) => {
   if (line.deductionQty && parseFloat(line.deductionQty) > 0 && !line.deductionReason) {
     ctx.addIssue({

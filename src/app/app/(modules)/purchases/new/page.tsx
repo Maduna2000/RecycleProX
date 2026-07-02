@@ -349,6 +349,7 @@ export default function NewPurchasePage() {
       ...(deduction ? { loanDeductionAmount: deduction } : {}),
       lines: validLines.map((l) => ({
         productId: l.productId, quantity: l.quantity, unitPrice: l.unitPrice,
+        vatApplied: l.vatApplied,
         ...(l.grossQty        ? { grossQty:        l.grossQty        } : {}),
         ...(l.tareQty         ? { tareQty:          l.tareQty         } : {}),
         ...(l.tareReason      ? { tareReason:       l.tareReason      } : {}),

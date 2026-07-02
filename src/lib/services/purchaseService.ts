@@ -9,6 +9,7 @@ import { getAllSettings } from '@/lib/services/settingsService'
 import { generateVat264 } from '@/lib/pdf/vat264'
 import { generateTransactionSlip } from '@/lib/pdf/slip'
 import { uploadBytes, purchaseVat264Key, purchaseNoteKey } from '@/lib/r2'
+import { VAT_RATE, purchaseHeaderVat } from '@/lib/utils/vat'
 import type { CreatePurchaseInput, VoidPurchaseInput } from '@/lib/schemas/purchase'
 import type { ProcessSplitPaymentInput } from '@/lib/schemas/splitPayment'
 
@@ -139,6 +140,10 @@ async function generateAndStorePurchasePdfs(purchase: PurchaseWithCustomerAndLin
       partyPhone:     purchase.customer.phone ?? undefined,
       lines:          slipLines,
       totalAmount:    purchase.totalAmount.toString(),
+      ...(purchase.vatAmount && new Decimal(purchase.vatAmount.toString()).greaterThan(0) ? {
+        vatAmount:      new Decimal(purchase.vatAmount.toString()).toFixed(2),
+        subtotalAmount: new Decimal(purchase.totalAmount.toString()).minus(purchase.vatAmount.toString()).toFixed(2),
+      } : {}),
       loanDeduction:  purchase.loanDeductionAmount?.toString(),
       paymentMethod:  purchase.paymentMethod,
       cashierName:    'System',
@@ -179,6 +184,10 @@ export async function createPurchase(data: CreatePurchaseInput, createdByUserId?
       const quantity = new Decimal(line.quantity)
       const lineTotal = unitPrice.times(quantity)
 
+      // Server-side VAT: only lines the cashier ticked, never for zero-rated customers
+      const vatApplied = (line.vatApplied ?? true) && !customer.zeroRated
+      const vatAmount = vatApplied ? lineTotal.times(VAT_RATE).toDecimalPlaces(2) : new Decimal(0)
+
       // Detect cashier override: submitted price differs from the resolved standard price
       const standardPrice = new Decimal(resolved.buyPrice.toString())
       const isOverride = !unitPrice.equals(standardPrice)
@@ -201,12 +210,17 @@ export async function createPurchase(data: CreatePurchaseInput, createdByUserId?
         deductionReason: line.deductionReason ?? undefined,
         unitPrice,
         lineTotal,
+        vatApplied,
+        vatAmount,
         priceSource,
       }
     })
   )
 
-  const totalAmount = resolvedLines.reduce((sum, l) => sum.plus(l.lineTotal), new Decimal(0))
+  const subTotal = resolvedLines.reduce((sum, l) => sum.plus(l.lineTotal), new Decimal(0))
+  const vatAmount = resolvedLines.reduce((sum, l) => sum.plus(l.vatAmount), new Decimal(0))
+  // VAT-inclusive grand total — matches the cash actually paid out to the supplier
+  const totalAmount = subTotal.plus(vatAmount)
 
   // Cap loan deduction at the total payout — never block the purchase
   const requestedDeduction = data.loanDeductionAmount ? new Decimal(data.loanDeductionAmount) : null
@@ -222,6 +236,7 @@ export async function createPurchase(data: CreatePurchaseInput, createdByUserId?
         customerId: data.customerId,
         status: data.status ?? 'completed',
         totalAmount,
+        vatAmount,
         loanDeductionAmount: deduction ?? undefined,
         paymentMethod: data.paymentMethod ?? 'cash',
         notes: data.notes,
@@ -237,6 +252,8 @@ export async function createPurchase(data: CreatePurchaseInput, createdByUserId?
             deductionReason: l.deductionReason,
             unitPrice:       l.unitPrice,
             lineTotal:       l.lineTotal,
+            vatApplied:      l.vatApplied,
+            vatAmount:       l.vatAmount,
             priceSource:     l.priceSource,
           })),
         },
@@ -612,11 +629,11 @@ export async function listPurchases(opts?: {
     prisma.purchase.count({ where }),
   ])
 
-  const VAT_DIVISOR = new Decimal('1.15')
   const purchases = rawPurchases.map((p) => {
     const total = new Decimal(p.totalAmount.toString())
-    const subTotal = p.customer.zeroRated ? total : total.div(VAT_DIVISOR).toDecimalPlaces(2)
-    const vatAmount = total.minus(subTotal).toDecimalPlaces(2)
+    // Persisted header VAT wins; legacy rows (null) derive from the inclusive total
+    const vatAmount = purchaseHeaderVat(p, p.customer.zeroRated)
+    const subTotal = total.minus(vatAmount).toDecimalPlaces(2)
     return { ...p, subTotal: subTotal.toFixed(2), vatAmount: vatAmount.toFixed(2) }
   })
 

@@ -101,6 +101,10 @@ export async function GET(
       partyPhone:     purchase.customer.phone ?? undefined,
       lines,
       totalAmount:    purchase.totalAmount.toString(),
+      ...(purchase.vatAmount && new Decimal(purchase.vatAmount.toString()).greaterThan(0) ? {
+        vatAmount:      new Decimal(purchase.vatAmount.toString()).toFixed(2),
+        subtotalAmount: new Decimal(purchase.totalAmount.toString()).minus(purchase.vatAmount.toString()).toFixed(2),
+      } : {}),
       loanDeduction:  purchase.loanDeductionAmount?.toString(),
       paymentMethod:  purchase.paymentMethod,
       cashierName:    session.user.name ?? 'Cashier',
