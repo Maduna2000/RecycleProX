@@ -45,6 +45,49 @@ export function purchaseHeaderVat(
   return gross.minus(gross.div(VAT_DIVISOR).toDecimalPlaces(2)).toDecimalPlaces(2)
 }
 
+export interface VatAmounts {
+  subTotal: Decimal
+  vat: Decimal
+  grandTotal: Decimal
+}
+
+/**
+ * Full sub/VAT/grand breakdown for a purchase line, handling the era split:
+ * - New rows (persisted vatAmount): lineTotal is ex-VAT, VAT sits on top →
+ *   grand = lineTotal + vatAmount.
+ * - Legacy rows (null vatAmount): lineTotal is the VAT-inclusive amount →
+ *   VAT is carved OUT of it, grand = lineTotal.
+ * Reports must use this (not ad-hoc addition) or legacy totals inflate.
+ */
+export function purchaseLineAmounts(
+  line: { vatAmount: DecimalLike | null; lineTotal: DecimalLike },
+  zeroRated: boolean
+): VatAmounts {
+  const lineTotal = new Decimal(line.lineTotal.toString())
+  if (line.vatAmount !== null && line.vatAmount !== undefined) {
+    const vat = new Decimal(line.vatAmount.toString())
+    return { subTotal: lineTotal, vat, grandTotal: lineTotal.plus(vat) }
+  }
+  if (zeroRated) return { subTotal: lineTotal, vat: new Decimal(0), grandTotal: lineTotal }
+  const subTotal = lineTotal.div(VAT_DIVISOR).toDecimalPlaces(2)
+  return { subTotal, vat: lineTotal.minus(subTotal), grandTotal: lineTotal }
+}
+
+/** Header-level equivalent of purchaseLineAmounts (totalAmount era split). */
+export function purchaseHeaderAmounts(
+  purchase: { vatAmount: DecimalLike | null; totalAmount: DecimalLike },
+  zeroRated: boolean
+): VatAmounts {
+  const total = new Decimal(purchase.totalAmount.toString())
+  if (purchase.vatAmount !== null && purchase.vatAmount !== undefined) {
+    const vat = new Decimal(purchase.vatAmount.toString())
+    return { subTotal: total.minus(vat), vat, grandTotal: total }
+  }
+  if (zeroRated) return { subTotal: total, vat: new Decimal(0), grandTotal: total }
+  const subTotal = total.div(VAT_DIVISOR).toDecimalPlaces(2)
+  return { subTotal, vat: total.minus(subTotal), grandTotal: total }
+}
+
 /**
  * Per-line VAT for a sale. Sales apply one uniform rate per sale (header
  * vatAmount is authoritative), so a line's share is exact: lineTotal × 0.15

@@ -44,3 +44,22 @@ export function todaySASTDateStr(): string {
 export function todaySASTDate(): Date {
   return sastDateLabelToUTCDate(todaySASTDateStr())
 }
+
+// UTC instant range covering an inclusive SAST calendar-day range — start of
+// the `from` day through end of the `to` day. All report builders use this;
+// none do their own date math.
+export function getRangeBoundsSAST(fromLabel: string, toLabel: string): { start: Date; end: Date } {
+  const { start } = getDayBoundsSAST(sastDateLabelToUTCDate(fromLabel))
+  const { end } = getDayBoundsSAST(sastDateLabelToUTCDate(toLabel))
+  return { start, end }
+}
+
+// The SAST calendar-day label ("YYYY-MM-DD") an arbitrary instant falls on —
+// for bucketing rows into days in per-day reports.
+export function sastDayLabelOfInstant(date: Date): string {
+  const shifted = new Date(date.getTime() + SAST_OFFSET_HOURS * 60 * 60 * 1000)
+  const y = shifted.getUTCFullYear()
+  const m = shifted.getUTCMonth()
+  const d = shifted.getUTCDate()
+  return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+}
