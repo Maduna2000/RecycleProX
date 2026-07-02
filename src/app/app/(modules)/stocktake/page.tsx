@@ -15,7 +15,7 @@ const fetcher = (url: string) => fetch(url).then((r) => r.json())
 type StocktakeItem = {
   id: string
   refNumber: string
-  status: 'open' | 'completed'
+  status: 'open' | 'completed' | 'voided'
   notes: string | null
   completedAt: string | null
   createdAt: string
@@ -31,9 +31,11 @@ const TH: React.CSSProperties = {
 }
 const TD: React.CSSProperties = { padding: '0 10px', fontSize: 12, color: '#212529' }
 
-function StatusBadge({ status }: { status: 'open' | 'completed' }) {
+function StatusBadge({ status }: { status: 'open' | 'completed' | 'voided' }) {
   if (status === 'open')
     return <span style={{ display: 'inline-flex', padding: '1px 6px', borderRadius: 3, fontSize: 11, fontWeight: 600, background: colors.actionBg, color: colors.action }}>Open</span>
+  if (status === 'voided')
+    return <span style={{ display: 'inline-flex', padding: '1px 6px', borderRadius: 3, fontSize: 11, fontWeight: 600, background: colors.dangerBg, color: colors.danger }}>Voided</span>
   return <span style={{ display: 'inline-flex', padding: '1px 6px', borderRadius: 3, fontSize: 11, fontWeight: 600, background: colors.neutralBg, color: colors.textSecondary }}>Completed</span>
 }
 

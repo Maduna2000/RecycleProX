@@ -8,7 +8,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
+import { Dialog, DialogContent, ModalTitleBar, ModalBtn } from '@/components/ui/dialog'
+import { WinButton } from '@/components/ui/WinButton'
 import { Loader2, CheckCircle, Ban, Scale, RefreshCw, Camera, ExternalLink } from 'lucide-react'
 import { toast } from 'sonner'
 import Decimal from 'decimal.js'
@@ -40,11 +41,6 @@ const scaleBtn: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 4, height: 24,
   padding: '0 8px', fontSize: 11, fontWeight: 600, borderRadius: 2,
   background: colors.process, border: `1px solid ${colors.processHover}`, color: colors.textOnDark, cursor: 'pointer',
-}
-const dangerBtn: React.CSSProperties = {
-  display: 'inline-flex', alignItems: 'center', gap: 4, height: 24,
-  padding: '0 8px', fontSize: 11, fontWeight: 600, borderRadius: 2,
-  background: colors.danger, border: `1px solid ${colors.danger}`, color: colors.textOnDark, cursor: 'pointer',
 }
 
 type Product = { id: string; code: string; name: string; unit: string; category: string }
@@ -323,16 +319,16 @@ export default function StocktakeDetailPage() {
           <StatusBadge status={stocktake.status} />
           <div style={{ flex: 1 }} />
           {isOpen && (
-            <button onClick={() => setShowCompleteDialog(true)} disabled={completing || entries.length === 0} style={{ ...priBtn, opacity: (completing || entries.length === 0) ? 0.5 : 1 }} aria-label="Complete stocktake">
+            <WinButton onClick={() => setShowCompleteDialog(true)} disabled={completing || entries.length === 0}>
               {completing
-                ? <><Loader2 style={{ width: 11, height: 11, animation: 'spin 1s linear infinite' }} aria-hidden="true" /> Completing...</>
-                : <><CheckCircle style={{ width: 11, height: 11 }} aria-hidden="true" /> Complete Stocktake</>}
-            </button>
+                ? <><Loader2 style={{ width: 9, height: 9 }} className="animate-spin" /> Completing…</>
+                : <><CheckCircle style={{ width: 9, height: 9 }} /> Complete Stocktake</>}
+            </WinButton>
           )}
           {stocktake.status === 'completed' && (
-            <button onClick={() => setShowVoidDialog(true)} style={dangerBtn} aria-label="Void stocktake">
-              <Ban style={{ width: 11, height: 11 }} aria-hidden="true" /> Void
-            </button>
+            <WinButton onClick={() => setShowVoidDialog(true)}>
+              <Ban style={{ width: 9, height: 9 }} /> Void
+            </WinButton>
           )}
         </div>
 
@@ -573,90 +569,92 @@ export default function StocktakeDetailPage() {
       <input ref={photoInputRef} type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }} onChange={handlePhotoSelected} aria-label="Upload photo file" />
 
       {/* Complete stocktake confirmation dialog */}
-      <AlertDialog open={showCompleteDialog} onOpenChange={setShowCompleteDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Complete Stocktake?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will apply all variance adjustments to your stock levels. This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          {variances.length > 0 && (
-            <div style={{ maxHeight: 160, overflowY: 'auto', border: `1px solid ${colors.border}`, borderRadius: 2, padding: 8 }}>
-              <p style={{ fontSize: 11, fontWeight: 600, color: colors.warning, marginBottom: 6 }}>
-                {variances.length} variance{variances.length > 1 ? 's' : ''} will be applied to stock:
-              </p>
-              {variances.map((v) => {
-                const variance = new Decimal(v.variance)
-                return (
-                  <div key={v.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, padding: '2px 0' }}>
-                    <span style={{ color: colors.textPrimary }}>{v.product.name}</span>
-                    <span style={{ fontFamily: 'monospace', fontWeight: 600, color: variance.gt(0) ? colors.action : colors.danger }}>
-                      {variance.gt(0) ? '+' : ''}{Number(v.variance).toFixed(2)} {v.product.unit}
-                    </span>
-                  </div>
-                )
-              })}
+      {showCompleteDialog && (
+        <Dialog open onOpenChange={(o) => { if (!o) setShowCompleteDialog(false) }}>
+          <DialogContent className="sm:max-w-md" showCloseButton={false}>
+            <ModalTitleBar title="Complete Stocktake?" onClose={() => setShowCompleteDialog(false)} />
+            <div className="space-y-3 mt-2">
+              <div style={{ background: colors.warningBg, border: `1px solid ${colors.warning}`, borderRadius: 3, padding: '10px 12px', fontSize: 12, color: '#92610A' }}>
+                This will apply all variance adjustments to your stock levels. This action cannot be undone.
+              </div>
+              {variances.length > 0 && (
+                <div style={{ maxHeight: 160, overflowY: 'auto', border: `1px solid ${colors.border}`, borderRadius: 3, padding: 8 }}>
+                  <p style={{ fontSize: 11, fontWeight: 600, color: colors.textSecondary, marginBottom: 6 }}>
+                    {variances.length} variance{variances.length > 1 ? 's' : ''} will be applied to stock:
+                  </p>
+                  {variances.map((v) => {
+                    const variance = new Decimal(v.variance)
+                    return (
+                      <div key={v.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, padding: '2px 0' }}>
+                        <span style={{ color: colors.textPrimary }}>{v.product.name}</span>
+                        <span style={{ fontFamily: 'monospace', fontWeight: 600, color: variance.gt(0) ? colors.action : colors.danger }}>
+                          {variance.gt(0) ? '+' : ''}{Number(v.variance).toFixed(2)} {v.product.unit}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+              <div className="flex justify-end gap-2 pt-2">
+                <ModalBtn onClick={() => setShowCompleteDialog(false)} disabled={completing}>Cancel</ModalBtn>
+                <ModalBtn variant="primary" onClick={performComplete} loading={completing}>Complete Stocktake</ModalBtn>
+              </div>
             </div>
-          )}
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={performComplete}>Complete Stocktake</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* Re-count confirmation dialog */}
-      <AlertDialog open={showRecountDialog} onOpenChange={(open: boolean) => { setShowRecountDialog(open); if (!open) setPendingRecount(null) }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Overwrite Previous Count?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This product was already counted with quantity: <strong>{pendingRecount?.existingQty}</strong>.
-              Do you want to overwrite it with the new quantity: <strong>{countedQty}</strong>?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => { setShowRecountDialog(false); performSaveEntry() }}>Overwrite</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {showRecountDialog && (
+        <Dialog open onOpenChange={(o) => { if (!o) { setShowRecountDialog(false); setPendingRecount(null) } }}>
+          <DialogContent className="sm:max-w-sm" showCloseButton={false}>
+            <ModalTitleBar title="Overwrite Previous Count?" onClose={() => { setShowRecountDialog(false); setPendingRecount(null) }} />
+            <div className="space-y-3 mt-2">
+              <div style={{ background: colors.warningBg, border: `1px solid ${colors.warning}`, borderRadius: 3, padding: '10px 12px', fontSize: 12, color: '#92610A' }}>
+                This product was already counted with quantity: <strong>{pendingRecount?.existingQty}</strong>.
+                Do you want to overwrite it with the new quantity: <strong>{countedQty}</strong>?
+              </div>
+              <div className="flex justify-end gap-2">
+                <ModalBtn onClick={() => { setShowRecountDialog(false); setPendingRecount(null) }}>Cancel</ModalBtn>
+                <ModalBtn variant="primary" onClick={() => { setShowRecountDialog(false); performSaveEntry() }}>Overwrite</ModalBtn>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* Void stocktake confirmation dialog */}
-      <AlertDialog open={showVoidDialog} onOpenChange={(open: boolean) => { setShowVoidDialog(open); if (!open) setVoidReason('') }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Void Stocktake?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will reverse every stock adjustment this stocktake applied. This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div style={{ padding: '0 0 4px' }}>
-            <Label htmlFor="void-reason" style={{ fontSize: 11, fontWeight: 600, color: colors.textPrimary }}>Reason for voiding (required)</Label>
-            <Textarea
-              id="void-reason"
-              value={voidReason}
-              onChange={(e) => setVoidReason(e.target.value)}
-              placeholder="e.g. Counted wrong products in category X, re-doing the stocktake"
-              style={{ marginTop: 4, fontSize: 12, minHeight: 64 }}
-            />
-            <p style={{ fontSize: 10, color: colors.textSecondary, marginTop: 4 }}>
-              {voidReason.trim().length}/5 characters minimum
-            </p>
-          </div>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={performVoid}
-              disabled={voiding || voidReason.trim().length < 5}
-              style={{ opacity: (voiding || voidReason.trim().length < 5) ? 0.5 : 1 }}
-            >
-              {voiding ? 'Voiding...' : 'Void Stocktake'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {showVoidDialog && (
+        <Dialog open onOpenChange={(o) => { if (!o) { setShowVoidDialog(false); setVoidReason('') } }}>
+          <DialogContent className="sm:max-w-md" showCloseButton={false}>
+            <ModalTitleBar title="Void Stocktake?" onClose={() => { setShowVoidDialog(false); setVoidReason('') }} />
+            <div className="space-y-3 mt-2">
+              <div style={{ background: colors.warningBg, border: `1px solid ${colors.warning}`, borderRadius: 3, padding: '10px 12px', fontSize: 12, color: '#92610A' }}>
+                This will reverse every stock adjustment this stocktake applied. This action cannot be undone.
+              </div>
+              <div>
+                <Label htmlFor="void-reason" style={{ fontSize: 11, fontWeight: 600, color: colors.textPrimary }}>Reason for voiding (required)</Label>
+                <Textarea
+                  id="void-reason"
+                  value={voidReason}
+                  onChange={(e) => setVoidReason(e.target.value)}
+                  placeholder="e.g. Counted wrong products in category X, re-doing the stocktake"
+                  style={{ marginTop: 4, fontSize: 12, minHeight: 64 }}
+                />
+                <p style={{ fontSize: 10, color: colors.textSecondary, marginTop: 4 }}>
+                  {voidReason.trim().length}/5 characters minimum
+                </p>
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <ModalBtn onClick={() => { setShowVoidDialog(false); setVoidReason('') }} disabled={voiding}>Cancel</ModalBtn>
+                <ModalBtn variant="danger" onClick={performVoid} loading={voiding} disabled={voidReason.trim().length < 5}>
+                  Void Stocktake
+                </ModalBtn>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   )
 }
