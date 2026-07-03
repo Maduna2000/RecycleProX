@@ -15,7 +15,7 @@
  * its own engine. Server-side only. Returns PDF bytes.
  */
 import { PDFDocument, rgb, StandardFonts, PDFPage, PDFFont } from 'pdf-lib'
-import type { FlatRow, ReportColumn, ReportDocument } from '@/lib/reports/types'
+import type { FlatRow, ReportDocument } from '@/lib/reports/types'
 import { flattenReportDocument } from '@/lib/reports/flatten'
 import { formatCell, formatDateSAST, formatDateTimeSAST } from '@/lib/reports/format'
 

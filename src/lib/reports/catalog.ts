@@ -191,6 +191,40 @@ export const REPORT_CATALOG: ReportCatalogEntry[] = [
     area: 'cash',
     filters: [],
   },
+  // ── Stock ──────────────────────────────────────────────────────────────────
+  {
+    id: 'stock-on-hand',
+    label: 'Stock On Hand Report',
+    description:
+      'On-hand quantity per product as at the end of the selected period, grouped by category and valued at buy or sell price.',
+    area: 'stock',
+    filters: [
+      {
+        key: 'valuation', label: 'Valuation', type: 'select',
+        options: [
+          { value: 'buy', label: 'Buy price (cost)' },
+          { value: 'sell', label: 'Sell price' },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'stock-movement',
+    label: 'Stock Movement Report',
+    description:
+      'Opening balance, in, out, and closing per product for the period — or per-movement detail (purchases, sales, adjustments, stocktakes).',
+    area: 'stock',
+    filters: [
+      {
+        key: 'mode', label: 'Mode', type: 'select',
+        options: [
+          { value: 'summary', label: 'Summary (per product)' },
+          { value: 'detail', label: 'Detail (per movement)' },
+        ],
+      },
+      { key: 'productId', label: 'Product', type: 'product' },
+    ],
+  },
 ]
 
 export const DEALER_CATEGORY_OPTIONS = [

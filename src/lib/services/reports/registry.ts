@@ -18,6 +18,8 @@ import {
   SalesByCustomerParamsSchema,
   ExpensesReportParamsSchema,
   LoanBookParamsSchema,
+  StockOnHandParamsSchema,
+  StockMovementParamsSchema,
 } from '@/lib/schemas/report'
 import {
   buildPurchasesByProductCategory,
@@ -40,6 +42,7 @@ import {
   buildVatSummary,
   buildCancelledTransactions,
 } from './builders/cash'
+import { buildStockOnHand, buildStockMovement } from './builders/stock'
 
 type MetaBase = Omit<ReportMeta, 'rowCount'>
 
@@ -110,6 +113,14 @@ export const REPORT_REGISTRY: Record<string, ReportDefinition> = {
   'cancelled-transactions': {
     paramsSchema: BaseReportParamsSchema,
     build: buildCancelledTransactions,
+  },
+  'stock-on-hand': {
+    paramsSchema: StockOnHandParamsSchema,
+    build: buildStockOnHand,
+  },
+  'stock-movement': {
+    paramsSchema: StockMovementParamsSchema,
+    build: buildStockMovement,
   },
 }
 
