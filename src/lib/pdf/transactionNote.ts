@@ -55,6 +55,12 @@ export interface TransactionNoteData {
   comments?: string
   voidReason?: string
 
+  /**
+   * Declaration paragraph printed above the totals (from Settings). Falls
+   * back to the standard lawful-owner / release-of-goods wording when unset.
+   */
+  declaration?: string
+
   lines: NoteLine[]
 
   subTotal: string
@@ -79,7 +85,6 @@ const COL_W = PAGE_W - MARGIN * 2
 
 const DARK = rgb(0.07, 0.07, 0.07)
 const GRAY = rgb(0.45, 0.45, 0.45)
-const LINE = rgb(0.6, 0.6, 0.6)
 const LGRAY = rgb(0.95, 0.95, 0.95)
 
 const ROW_H = 14
@@ -124,25 +129,16 @@ export async function generateTransactionNote(data: TransactionNoteData): Promis
   pages.push(page)
   let y = PAGE_H - MARGIN
 
-  // ── Logo box, top-left ──────────────────────────────────────────────────────
+  // ── Logo, top-left (no frame — transparent PNG sits on the page) ───────────
   if (logo) {
-    // Fit inside a 130×86pt frame, preserving aspect ratio, centred in the box
+    // Fit inside a 130×86pt area, preserving aspect ratio
     const BOX_W = 130
     const BOX_H = 86
-    const scale = Math.min((BOX_W - 10) / logo.width, (BOX_H - 10) / logo.height)
+    const scale = Math.min(BOX_W / logo.width, BOX_H / logo.height)
     const w = logo.width * scale
     const h = logo.height * scale
-    page.drawRectangle({
-      x: MARGIN, y: y - BOX_H, width: BOX_W, height: BOX_H,
-      borderColor: LINE, borderWidth: 0.8,
-    })
-    page.drawImage(logo, {
-      x: MARGIN + (BOX_W - w) / 2,
-      y: y - BOX_H + (BOX_H - h) / 2,
-      width: w,
-      height: h,
-    })
-    y -= BOX_H + 12
+    page.drawImage(logo, { x: MARGIN, y: y - h, width: w, height: h })
+    y -= h + 14
   } else {
     // No logo — company name takes its place
     page.drawText(sanitize(data.company.name), { x: MARGIN, y: y - 14, size: 15, font: bold, color: DARK })
@@ -152,12 +148,8 @@ export async function generateTransactionNote(data: TransactionNoteData): Promis
     y -= 42
   }
 
-  // ── Title row: "PURCHASE NOTE"  +  status centred ───────────────────────────
+  // ── Title row ───────────────────────────────────────────────────────────────
   page.drawText(data.type, { x: MARGIN, y, size: 13, font: bold, color: DARK })
-  const statusLabel = data.status === 'PAID' ? 'COPY' : data.status.toUpperCase()
-  page.drawText(statusLabel, {
-    x: PAGE_W / 2 - bold.widthOfTextAtSize(statusLabel, 13) / 2, y, size: 13, font: bold, color: DARK,
-  })
   y -= 24
 
   // ── Two-column info block ───────────────────────────────────────────────────
@@ -207,6 +199,13 @@ export async function generateTransactionNote(data: TransactionNoteData): Promis
   const LINE_GAP = 11.5
   left.forEach(([l, v], i) => infoLine(MARGIN, y - i * LINE_GAP, l, v))
   right.forEach(([l, v], i) => infoLine(rightX, y - i * LINE_GAP, l, v))
+
+  // Status label (COPY / UNPAID / VOIDED) on the PN Number row, far right
+  const statusLabel = data.status === 'PAID' ? 'COPY' : data.status.toUpperCase()
+  page.drawText(statusLabel, {
+    x: PAGE_W - MARGIN - bold.widthOfTextAtSize(statusLabel, 11), y: y - 1, size: 11, font: bold, color: DARK,
+  })
+
   y -= Math.max(left.length, right.length) * LINE_GAP + 12
 
   // ── Lines table ─────────────────────────────────────────────────────────────
@@ -298,19 +297,29 @@ export async function generateTransactionNote(data: TransactionNoteData): Promis
   // ── Declaration (left) + totals (right) ─────────────────────────────────────
   if (y - 70 < BOTTOM_LIMIT) newPage()
 
-  const declaration =
-    data.type === 'PURCHASE NOTE'
-      ? [
-          'I hereby state that I am the lawful owner of the material listed above and',
-          `have sold them to ${sanitize(data.company.name)} to dispose of as they see fit.`,
-          'Data Protection Act No. 5 of 2022 (Eswatini)',
-        ]
-      : [
-          `Goods listed above sold and released to ${sanitize(data.partyName)}.`,
-          'Errors and omissions excepted.',
-        ]
-  declaration.forEach((line, i) => {
-    page.drawText(line, { x: MARGIN, y: y - i * 10, size: 7.5, font: i === declaration.length - 1 ? reg : reg, color: i === declaration.length - 1 ? GRAY : DARK })
+  // Declaration text: Settings-provided wording wins; otherwise the standard
+  // fallback. Word-wrapped to leave room for the totals stack on the right.
+  const declarationText = data.declaration?.trim()
+    ? data.declaration.trim()
+    : data.type === 'PURCHASE NOTE'
+      ? `I hereby state that I am the lawful owner of the material listed above and have sold them to ${data.company.name} to dispose of as they see fit.`
+      : `Goods listed above sold and released to ${data.partyName}. Errors and omissions excepted.`
+
+  const declMaxW = COL_W - 230
+  const declLines: string[] = []
+  let current = ''
+  for (const word of sanitize(declarationText).split(/\s+/)) {
+    const candidate = current ? `${current} ${word}` : word
+    if (reg.widthOfTextAtSize(candidate, 7.5) > declMaxW && current) {
+      declLines.push(current)
+      current = word
+    } else {
+      current = candidate
+    }
+  }
+  if (current) declLines.push(current)
+  declLines.forEach((line, i) => {
+    page.drawText(line, { x: MARGIN, y: y - i * 10, size: 7.5, font: reg, color: DARK })
   })
 
   // Totals stack, right-aligned

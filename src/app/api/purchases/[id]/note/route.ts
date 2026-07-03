@@ -102,6 +102,7 @@ export async function GET(
       doneBy: doneByUser?.fullName ?? undefined,
       comments: purchase.notes ?? undefined,
       voidReason: purchase.voidReason ?? undefined,
+      declaration: settings['purchaseNoteDeclaration'] || undefined,
       lines,
       subTotal: header.subTotal.toFixed(2),
       vatAmount: header.vat.toFixed(2),

@@ -105,6 +105,7 @@ export async function GET(
       doneBy: doneByUser?.fullName ?? undefined,
       comments: sale.notes ?? undefined,
       voidReason: sale.voidReason ?? undefined,
+      declaration: settings['saleNoteDeclaration'] || undefined,
       lines,
       subTotal: grand.minus(vatAmount).toFixed(2),
       vatAmount: vatAmount.toFixed(2),

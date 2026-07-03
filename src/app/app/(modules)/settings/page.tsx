@@ -19,6 +19,7 @@ type PrinterType = 'none' | 'serial' | 'tcp'
 type SettingsMap = {
   yardName?: string; yardAddress?: string; yardPhone?: string
   vatNumber?: string; vatRate?: string; receiptFooter?: string
+  purchaseNoteDeclaration?: string; saleNoteDeclaration?: string
   companyLogoR2Key?: string
   defaultPin?: string
   printerType?: PrinterType; printerSerialPort?: string; printerBaudRate?: string
@@ -328,6 +329,24 @@ export default function SettingsPage() {
                   </Field>
                   <Field label="Receipt Footer Text">
                     <input value={form.receiptFooter ?? ''} onChange={(e) => set('receiptFooter', e.target.value)} placeholder="e.g. Thank you for your business. All sales subject to SA law." style={inp} />
+                  </Field>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px 12px', marginTop: 8 }}>
+                  <Field label="Purchase Note Declaration" hint="Printed above the totals on purchase notes. Leave blank for the standard lawful-owner wording.">
+                    <input
+                      value={form.purchaseNoteDeclaration ?? ''}
+                      onChange={(e) => set('purchaseNoteDeclaration', e.target.value)}
+                      placeholder="I hereby state that I am the lawful owner of the material listed above and have sold them to … to dispose of as they see fit."
+                      style={inp}
+                    />
+                  </Field>
+                  <Field label="Sale Note Declaration" hint="Printed above the totals on sale notes. Leave blank for the standard release-of-goods wording.">
+                    <input
+                      value={form.saleNoteDeclaration ?? ''}
+                      onChange={(e) => set('saleNoteDeclaration', e.target.value)}
+                      placeholder="Goods listed above sold and released to the buyer. Errors and omissions excepted."
+                      style={inp}
+                    />
                   </Field>
                 </div>
               </div>
