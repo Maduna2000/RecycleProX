@@ -1,6 +1,9 @@
 import { prisma } from '@/lib/db/prisma'
 import logger from '@/lib/logger'
 
+/** Setting key holding the R2 object key of the company logo (documents header). */
+export const LOGO_SETTING_KEY = 'companyLogoR2Key'
+
 export async function getAllSettings(): Promise<Record<string, string>> {
   const rows = await prisma.systemSettings.findMany()
   const settings: Record<string, string> = {}

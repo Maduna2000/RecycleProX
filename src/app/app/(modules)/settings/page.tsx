@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import useSWR, { mutate } from 'swr'
 import { useSession } from 'next-auth/react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -19,6 +19,7 @@ type PrinterType = 'none' | 'serial' | 'tcp'
 type SettingsMap = {
   yardName?: string; yardAddress?: string; yardPhone?: string
   vatNumber?: string; vatRate?: string; receiptFooter?: string
+  companyLogoR2Key?: string
   defaultPin?: string
   printerType?: PrinterType; printerSerialPort?: string; printerBaudRate?: string
   printerIp?: string; printerTcpPort?: string
@@ -72,6 +73,97 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 }
 
 type SerialPortInfo = { path: string; manufacturer: string | null }
+
+// ─── Company logo (used on purchase/sale notes and other documents) ───────────
+function LogoSection({ logoKey }: { logoKey?: string }) {
+  const [uploading, setUploading] = useState(false)
+  const [removing, setRemoving]   = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  const { data: urlData } = useSWR<{ url: string }>(
+    logoKey ? `/api/r2/view-url?key=${encodeURIComponent(logoKey)}` : null,
+    fetcher
+  )
+
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setUploading(true)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      const res = await fetch('/api/settings/logo', { method: 'POST', body: fd })
+      const j = await res.json() as { error?: string; width?: number; height?: number }
+      if (!res.ok) { toast.error(j.error ?? 'Upload failed'); return }
+      toast.success(`Logo uploaded (${j.width}×${j.height}px)`)
+      mutate('/api/settings')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  async function handleRemove() {
+    setRemoving(true)
+    try {
+      const res = await fetch('/api/settings/logo', { method: 'DELETE' })
+      if (!res.ok) { toast.error('Failed to remove logo'); return }
+      toast.success('Logo removed')
+      mutate('/api/settings')
+    } finally {
+      setRemoving(false)
+    }
+  }
+
+  const btn: React.CSSProperties = {
+    fontSize: 10, padding: '2px 8px', background: '#E0E0E0',
+    border: '1px solid #999', borderRadius: 2, cursor: 'pointer', color: '#212529',
+  }
+
+  return (
+    <>
+      <SHdr title="Company Logo" />
+      <div style={{ padding: '10px 12px', borderBottom: '1px solid #E0E0E0' }}>
+        <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+          {/* Preview on a checker background so transparency is visible */}
+          <div style={{
+            width: 180, height: 72, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            border: '1px solid #ABABAB', borderRadius: 2,
+            backgroundImage: 'linear-gradient(45deg,#ddd 25%,transparent 25%,transparent 75%,#ddd 75%),linear-gradient(45deg,#ddd 25%,#fff 25%,#fff 75%,#ddd 75%)',
+            backgroundSize: '12px 12px', backgroundPosition: '0 0, 6px 6px',
+          }}>
+            {logoKey && urlData?.url
+              // eslint-disable-next-line @next/next/no-img-element
+              ? <img src={urlData.url} alt="Company logo" style={{ maxWidth: 170, maxHeight: 62, objectFit: 'contain' }} />
+              : <span style={{ fontSize: 10, color: '#9CA3AF' }}>No logo uploaded</span>}
+          </div>
+          <div style={{ flex: 1 }}>
+            <p style={{ fontSize: 11, color: '#6C757D', marginBottom: 6 }}>
+              Shown on generated documents (purchase notes, sale notes). Requirements:
+            </p>
+            <ul style={{ fontSize: 10, color: '#9CA3AF', marginBottom: 8, paddingLeft: 16, listStyle: 'disc' }}>
+              <li>PNG with a <strong>transparent background</strong> (required)</li>
+              <li>Maximum file size 1 MB</li>
+              <li>Width 100–2000&nbsp;px</li>
+              <li>Square to wide shape — width:height between 1:1 and 5:1</li>
+            </ul>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <input ref={fileRef} type="file" accept="image/png" onChange={handleFile} style={{ display: 'none' }} />
+              <button style={btn} disabled={uploading} onClick={() => fileRef.current?.click()}>
+                {uploading ? 'Uploading…' : logoKey ? 'Replace Logo' : 'Upload Logo'}
+              </button>
+              {logoKey && (
+                <button style={{ ...btn, color: '#DC3545', borderColor: '#DC3545' }} disabled={removing} onClick={handleRemove}>
+                  {removing ? 'Removing…' : 'Remove'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
 
 function ScaleRow({ n, form, set }: { n: ScaleNum; form: SettingsMap; set: (k: keyof SettingsMap, v: string) => void }) {
   const type = (form[scaleKey(n, 'type')] ?? 'none') as ScaleType
@@ -219,6 +311,9 @@ export default function SettingsPage() {
                   </Field>
                 </div>
               </div>
+
+              {/* ── Company Logo ─── */}
+              <LogoSection logoKey={form.companyLogoR2Key || undefined} />
 
               {/* ── Tax & Receipts ─── */}
               <SHdr title="Tax &amp; Receipts" />

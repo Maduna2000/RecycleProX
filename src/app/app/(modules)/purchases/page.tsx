@@ -4,7 +4,7 @@ import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import useSWR, { mutate as swrMutate } from 'swr'
 import { useSession } from 'next-auth/react'
-import { Search, Ban, Printer, FileText, Loader2, X, AlertTriangle } from 'lucide-react'
+import { Search, Ban, Printer, FileText, FileDown, Loader2, X, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
 import Decimal from 'decimal.js'
 import { DataTable, StatusBadge, Avatar, type Column, type RowAction, type SortDir } from '@/components/ui/DataTable'
@@ -173,6 +173,16 @@ export default function PurchasesPage() {
       label:   'Print Slip',
       icon:    Printer,
       onClick: (row) => window.open(`/api/purchases/${row.id}/receipt?format=pdf`, '_blank'),
+    },
+    {
+      label:   'View Purchase Note',
+      icon:    FileText,
+      onClick: (row) => window.open(`/api/purchases/${row.id}/note`, '_blank'),
+    },
+    {
+      label:   'Download Purchase Note',
+      icon:    FileDown,
+      onClick: (row) => window.open(`/api/purchases/${row.id}/note?download=1`, '_blank'),
     },
     {
       label:   'Download VAT264',

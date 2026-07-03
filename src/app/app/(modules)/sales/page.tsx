@@ -4,7 +4,7 @@ import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import useSWR, { mutate as swrMutate } from 'swr'
 import { useSession } from 'next-auth/react'
-import { Search, Eye, Ban, Printer, Loader2, X } from 'lucide-react'
+import { Search, Eye, Ban, Printer, FileText, FileDown, Loader2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import Decimal from 'decimal.js'
 import { DataTable, StatusBadge, type Column, type RowAction, type SortDir } from '@/components/ui/DataTable'
@@ -184,6 +184,16 @@ export default function SalesPage() {
       label:   'Print Receipt',
       icon:    Printer,
       onClick: (row) => window.open(`/api/sales/${row.id}/receipt?format=pdf`, '_blank'),
+    },
+    {
+      label:   'View Sale Note',
+      icon:    FileText,
+      onClick: (row) => window.open(`/api/sales/${row.id}/note`, '_blank'),
+    },
+    {
+      label:   'Download Sale Note',
+      icon:    FileDown,
+      onClick: (row) => window.open(`/api/sales/${row.id}/note?download=1`, '_blank'),
     },
     {
       label:   'Void Sale',
