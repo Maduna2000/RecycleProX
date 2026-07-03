@@ -24,6 +24,134 @@ const fetcher = async (url: string) => {
   return body
 }
 
+interface CustomerHit {
+  id: string
+  firstName: string
+  lastName: string
+  companyName?: string | null
+  idNumber?: string | null
+}
+
+function customerLabel(c: CustomerHit): string {
+  return c.companyName?.trim() || `${c.firstName} ${c.lastName}`
+}
+
+/** Search-as-you-type customer picker backed by /api/customers?search=. */
+function CustomerSearchSelect({
+  label,
+  value,
+  onChange,
+}: {
+  label: string
+  value: string
+  onChange: (id: string) => void
+}) {
+  const [term, setTerm] = useState('')
+  const [debounced, setDebounced] = useState('')
+  const [chosen, setChosen] = useState<CustomerHit | null>(null)
+  const [open, setOpen] = useState(false)
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(term), 300)
+    return () => clearTimeout(t)
+  }, [term])
+
+  const { data } = useSWR<{ customers: CustomerHit[] }>(
+    open && debounced.length >= 2 ? `/api/customers?search=${encodeURIComponent(debounced)}&limit=10` : null,
+    fetcher
+  )
+
+  // External reset (e.g. switching reports clears the filter value)
+  useEffect(() => {
+    if (!value) { setChosen(null); setTerm('') }
+  }, [value])
+
+  return (
+    <div className="relative">
+      <Label className="text-xs mb-1 block" style={{ color: colors.textSecondary }}>
+        {label}
+      </Label>
+      <input
+        value={chosen ? customerLabel(chosen) : term}
+        placeholder="Type to search…"
+        onChange={(e) => {
+          setChosen(null)
+          onChange('')
+          setTerm(e.target.value)
+          setOpen(true)
+        }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 200)}
+        className="h-9 rounded border px-2 text-sm bg-white"
+        style={{ borderColor: colors.border, color: colors.textPrimary, minWidth: 200 }}
+      />
+      {open && !chosen && (data?.customers?.length ?? 0) > 0 && (
+        <div
+          className="absolute z-20 mt-1 w-full max-h-56 overflow-auto rounded border bg-white shadow"
+          style={{ borderColor: colors.border }}
+        >
+          {data!.customers.map((c) => (
+            <button
+              key={c.id}
+              className="block w-full text-left px-2 py-1.5 hover:bg-gray-100"
+              style={{ fontSize: fontSize.sm, color: colors.textPrimary }}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                setChosen(c)
+                setOpen(false)
+                onChange(c.id)
+              }}
+            >
+              {customerLabel(c)}
+              {c.idNumber && (
+                <span className="ml-2" style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>
+                  {c.idNumber}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** Product picker — full list loaded once (products list is small). */
+function ProductSelect({
+  label,
+  value,
+  onChange,
+  required,
+}: {
+  label: string
+  value: string
+  onChange: (id: string) => void
+  required?: boolean
+}) {
+  const { data } = useSWR<{ products: { id: string; code: string; name: string }[] }>(
+    '/api/products',
+    fetcher
+  )
+  return (
+    <div>
+      <Label className="text-xs mb-1 block" style={{ color: colors.textSecondary }}>
+        {label}
+      </Label>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="h-9 rounded border px-2 text-sm bg-white"
+        style={{ borderColor: colors.border, color: colors.textPrimary, minWidth: 200 }}
+      >
+        {!required && <option value="">All products</option>}
+        {(data?.products ?? []).map((p) => (
+          <option key={p.id} value={p.id}>{p.code} — {p.name}</option>
+        ))}
+      </select>
+    </div>
+  )
+}
+
 function FilterControl({
   spec,
   value,
@@ -33,6 +161,13 @@ function FilterControl({
   value: string
   onChange: (v: string) => void
 }) {
+  if (spec.type === 'customer') {
+    return <CustomerSearchSelect label={spec.label} value={value} onChange={onChange} />
+  }
+  if (spec.type === 'product') {
+    return <ProductSelect label={spec.label} value={value} onChange={onChange} required={spec.required} />
+  }
+
   const options =
     spec.type === 'dealerCategory' ? DEALER_CATEGORY_OPTIONS : spec.options ?? []
 
@@ -87,6 +222,8 @@ export function ReportViewer({ report }: ReportViewerProps) {
     { revalidateOnFocus: false }
   )
 
+  const missingRequired = report.filters.filter((f) => f.required && !filters[f.key])
+
   function handleRun() {
     setQuery(new URLSearchParams({ ...params, format: 'json' }).toString())
   }
@@ -114,12 +251,17 @@ export function ReportViewer({ report }: ReportViewerProps) {
         </div>
 
         <div className="flex flex-wrap items-center gap-2" style={{ borderTop: `1px solid ${colors.border}`, paddingTop: 12 }}>
-          <LegacyButton onClick={handleRun} disabled={isLoading}>
+          <LegacyButton onClick={handleRun} disabled={isLoading || missingRequired.length > 0}>
             {isLoading
               ? <><Loader2 style={{ width: 9, height: 9, animation: 'spin 1s linear infinite' }} /> Running…</>
               : 'Run Report'}
           </LegacyButton>
-          <DownloadButtons reportId={report.id} params={params} disabled={isLoading} />
+          <DownloadButtons reportId={report.id} params={params} disabled={isLoading || missingRequired.length > 0} />
+          {missingRequired.length > 0 && (
+            <span style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>
+              Select {missingRequired.map((f) => f.label).join(', ')} to run this report.
+            </span>
+          )}
           {data && (
             <span className="ml-auto" style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>
               {data.meta.rowCount} row{data.meta.rowCount === 1 ? '' : 's'}

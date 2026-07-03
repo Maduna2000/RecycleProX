@@ -12,6 +12,8 @@ import type { ReportGroup, ReportRow } from '@/lib/reports/types'
 export interface GroupLevelSpec<T> {
   /** Group band label for an item, e.g. "DEALER 1" or "NON-FERROUS". */
   label: (item: T) => string
+  /** Secondary band text (e.g. "PAID · Cash · 13:48" on a ticket band); read from the group's first item. */
+  meta?: (item: T) => string | undefined
   /** Labels forced to sort after everything else (e.g. UNCATEGORISED). */
   sortLast?: string[]
   /** Explicit label order; unlisted labels sort alphabetically after listed ones. */
@@ -137,9 +139,11 @@ function buildLevel<T>(
     }
 
     const inner = buildLevel(groupItems, levelIdx + 1, label, effectiveLevel + 1, opts)
+    const meta = spec.meta ? spec.meta(groupItems[0]!) : undefined
     groups.push({
       level: effectiveLevel,
       label,
+      ...(meta ? { meta } : {}),
       ...(inner.groups ? { groups: inner.groups } : {}),
       ...(inner.rows ? { rows: inner.rows } : {}),
       subtotal: formatTotals(sumMeasures(groupItems, opts.measures)),

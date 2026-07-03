@@ -37,6 +37,7 @@ export const REPORT_AREA_LABELS: Record<ReportArea, string> = {
 }
 
 export const REPORT_CATALOG: ReportCatalogEntry[] = [
+  // ── Purchases ──────────────────────────────────────────────────────────────
   {
     id: 'purchases-by-product-category',
     label: 'Purchases per Product Summary per Account Category',
@@ -45,6 +46,65 @@ export const REPORT_CATALOG: ReportCatalogEntry[] = [
     area: 'purchases',
     filters: [
       { key: 'dealerCategory', label: 'Account Category', type: 'dealerCategory' },
+    ],
+  },
+  {
+    id: 'purchases-daily',
+    label: 'Daily Purchases Report',
+    description:
+      'Every purchase ticket in the period, grouped by supplier with line detail, payment status and type, and totals per ticket and supplier.',
+    area: 'purchases',
+    filters: [
+      { key: 'customerId', label: 'Supplier', type: 'customer' },
+    ],
+  },
+  {
+    id: 'purchases-supplier-statement',
+    label: 'Paid Purchases per Supplier Statement',
+    description:
+      'One supplier’s paid purchases grouped by product, with weighbridge full/empty masses, VAT, and totals per product.',
+    area: 'purchases',
+    filters: [
+      { key: 'customerId', label: 'Supplier', type: 'customer', required: true },
+    ],
+  },
+  {
+    id: 'purchases-per-product-day',
+    label: 'Purchases per Product per Day',
+    description:
+      'Chronological purchase transactions under each product (grouped by category), with per-product and per-category totals.',
+    area: 'purchases',
+    filters: [
+      { key: 'productId', label: 'Product', type: 'product' },
+    ],
+  },
+  // ── Sales ──────────────────────────────────────────────────────────────────
+  {
+    id: 'sales-daily',
+    label: 'Daily Sales Report',
+    description:
+      'Every sale in the period, grouped by buyer with line detail, payment status and type, and totals per ticket and buyer.',
+    area: 'sales',
+    filters: [
+      { key: 'customerId', label: 'Customer', type: 'customer' },
+    ],
+  },
+  {
+    id: 'sales-by-product',
+    label: 'Sales per Product Summary',
+    description:
+      'Sold mass and revenue per product, grouped by product category, with weighted average price, VAT, and totals at every level.',
+    area: 'sales',
+    filters: [],
+  },
+  {
+    id: 'sales-by-customer',
+    label: 'Sales per Customer',
+    description:
+      'One row per sale under each buyer: date, reference, payment method and status, VAT, total, and outstanding balance.',
+    area: 'sales',
+    filters: [
+      { key: 'customerId', label: 'Customer', type: 'customer' },
     ],
   },
 ]

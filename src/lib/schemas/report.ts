@@ -4,38 +4,62 @@ const dateLabel = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-
 
 const MAX_RANGE_DAYS = 366
 
-/** Shared from/to range: to ≥ from, span capped at 366 days. */
-export const BaseReportParamsSchema = z
-  .object({
-    from: dateLabel,
-    to: dateLabel,
+/** Adds from/to with the shared range checks (to ≥ from, span ≤ 366 days). */
+function rangeParams<T extends z.ZodRawShape>(shape: T) {
+  return z.object({ from: dateLabel, to: dateLabel, ...shape }).superRefine((raw: unknown, ctx) => {
+    const p = raw as { from: string; to: string }
+    if (p.to < p.from) {
+      ctx.addIssue({ code: 'custom', message: '"to" must be on or after "from"', path: ['to'] })
+      return
+    }
+    const from = new Date(`${p.from}T00:00:00Z`).getTime()
+    const to = new Date(`${p.to}T00:00:00Z`).getTime()
+    if ((to - from) / 86_400_000 > MAX_RANGE_DAYS) {
+      ctx.addIssue({ code: 'custom', message: `Date range cannot exceed ${MAX_RANGE_DAYS} days`, path: ['to'] })
+    }
   })
-  .refine((p) => p.to >= p.from, { message: '"to" must be on or after "from"', path: ['to'] })
-  .refine(
-    (p) => {
-      const from = new Date(`${p.from}T00:00:00Z`).getTime()
-      const to = new Date(`${p.to}T00:00:00Z`).getTime()
-      return (to - from) / 86_400_000 <= MAX_RANGE_DAYS
-    },
-    { message: `Date range cannot exceed ${MAX_RANGE_DAYS} days`, path: ['to'] }
-  )
+}
 
 export const ReportFormatSchema = z.enum(['json', 'pdf', 'xlsx']).default('json')
 
 export const DealerCategorySchema = z.enum(['casual', 'dealer_1', 'dealer_2', 'dealer_3'])
 
-export const PurchasesByProductCategoryParamsSchema = z
-  .object({
-    from: dateLabel,
-    to: dateLabel,
-    dealerCategory: DealerCategorySchema.optional(),
-  })
-  .refine((p) => p.to >= p.from, { message: '"to" must be on or after "from"', path: ['to'] })
-  .refine(
-    (p) => (new Date(`${p.to}T00:00:00Z`).getTime() - new Date(`${p.from}T00:00:00Z`).getTime()) / 86_400_000 <= MAX_RANGE_DAYS,
-    { message: `Date range cannot exceed ${MAX_RANGE_DAYS} days`, path: ['to'] }
-  )
+export const BaseReportParamsSchema = rangeParams({})
+
+// ── Purchases ─────────────────────────────────────────────────────────────────
+export const PurchasesByProductCategoryParamsSchema = rangeParams({
+  dealerCategory: DealerCategorySchema.optional(),
+})
+
+export const PurchasesDailyParamsSchema = rangeParams({
+  customerId: z.string().uuid().optional(),
+})
+
+export const PurchasesSupplierStatementParamsSchema = rangeParams({
+  customerId: z.string().uuid({ message: 'Supplier is required' }),
+})
+
+export const PurchasesPerProductDayParamsSchema = rangeParams({
+  productId: z.string().uuid().optional(),
+})
+
+// ── Sales ─────────────────────────────────────────────────────────────────────
+export const SalesDailyParamsSchema = rangeParams({
+  customerId: z.string().uuid().optional(),
+})
+
+export const SalesByProductParamsSchema = rangeParams({})
+
+export const SalesByCustomerParamsSchema = rangeParams({
+  customerId: z.string().uuid().optional(),
+})
 
 export type BaseReportParams = z.infer<typeof BaseReportParamsSchema>
 export type ReportFormat = z.infer<typeof ReportFormatSchema>
 export type PurchasesByProductCategoryParams = z.infer<typeof PurchasesByProductCategoryParamsSchema>
+export type PurchasesDailyParams = z.infer<typeof PurchasesDailyParamsSchema>
+export type PurchasesSupplierStatementParams = z.infer<typeof PurchasesSupplierStatementParamsSchema>
+export type PurchasesPerProductDayParams = z.infer<typeof PurchasesPerProductDayParamsSchema>
+export type SalesDailyParams = z.infer<typeof SalesDailyParamsSchema>
+export type SalesByProductParams = z.infer<typeof SalesByProductParamsSchema>
+export type SalesByCustomerParams = z.infer<typeof SalesByCustomerParamsSchema>

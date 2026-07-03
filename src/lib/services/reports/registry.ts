@@ -7,8 +7,26 @@
 import type { z } from 'zod'
 import type { ReportDocument, ReportMeta } from '@/lib/reports/types'
 import { REPORT_CATALOG } from '@/lib/reports/catalog'
-import { PurchasesByProductCategoryParamsSchema } from '@/lib/schemas/report'
-import { buildPurchasesByProductCategory } from './builders/purchases'
+import {
+  PurchasesByProductCategoryParamsSchema,
+  PurchasesDailyParamsSchema,
+  PurchasesSupplierStatementParamsSchema,
+  PurchasesPerProductDayParamsSchema,
+  SalesDailyParamsSchema,
+  SalesByProductParamsSchema,
+  SalesByCustomerParamsSchema,
+} from '@/lib/schemas/report'
+import {
+  buildPurchasesByProductCategory,
+  buildPurchasesDaily,
+  buildPurchasesSupplierStatement,
+  buildPurchasesPerProductDay,
+} from './builders/purchases'
+import {
+  buildSalesDaily,
+  buildSalesByProduct,
+  buildSalesByCustomer,
+} from './builders/sales'
 
 type MetaBase = Omit<ReportMeta, 'rowCount'>
 
@@ -23,6 +41,30 @@ export const REPORT_REGISTRY: Record<string, ReportDefinition> = {
   'purchases-by-product-category': {
     paramsSchema: PurchasesByProductCategoryParamsSchema,
     build: buildPurchasesByProductCategory,
+  },
+  'purchases-daily': {
+    paramsSchema: PurchasesDailyParamsSchema,
+    build: buildPurchasesDaily,
+  },
+  'purchases-supplier-statement': {
+    paramsSchema: PurchasesSupplierStatementParamsSchema,
+    build: buildPurchasesSupplierStatement,
+  },
+  'purchases-per-product-day': {
+    paramsSchema: PurchasesPerProductDayParamsSchema,
+    build: buildPurchasesPerProductDay,
+  },
+  'sales-daily': {
+    paramsSchema: SalesDailyParamsSchema,
+    build: buildSalesDaily,
+  },
+  'sales-by-product': {
+    paramsSchema: SalesByProductParamsSchema,
+    build: buildSalesByProduct,
+  },
+  'sales-by-customer': {
+    paramsSchema: SalesByCustomerParamsSchema,
+    build: buildSalesByCustomer,
   },
 }
 
