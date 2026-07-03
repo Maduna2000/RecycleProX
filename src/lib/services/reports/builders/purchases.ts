@@ -126,7 +126,7 @@ export async function buildPurchasesByProductCategory(
         return {
           code: items[0]!.product.code,
           name: items[0]!.product.name,
-          avgPrice: mass.isZero() ? null : grand.div(mass).toFixed(6),
+          avgPrice: mass.isZero() ? null : grand.div(mass).toFixed(2),
           mass: mass.toFixed(3),
           subTotal: totals.subTotal!.toFixed(2),
           vat: totals.vat!.toFixed(2),
@@ -160,7 +160,7 @@ export async function buildPurchasesByProductCategory(
     columns: [
       { key: 'code', label: 'Code', width: 0.1, format: 'text', excelWidth: 12 },
       { key: 'name', label: 'Product', width: 0.26, format: 'text', excelWidth: 28 },
-      { key: 'avgPrice', label: 'Price Incl.', width: 0.14, align: 'right', format: 'money6', excelWidth: 14 },
+      { key: 'avgPrice', label: 'Price Incl.', width: 0.14, align: 'right', format: 'money', excelWidth: 14 },
       { key: 'mass', label: 'Mass', width: 0.12, align: 'right', format: 'mass', excelWidth: 12 },
       { key: 'subTotal', label: 'Sub Total', width: 0.13, align: 'right', format: 'money', excelWidth: 14 },
       { key: 'vat', label: 'VAT', width: 0.11, align: 'right', format: 'money', excelWidth: 12 },

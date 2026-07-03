@@ -56,10 +56,8 @@ export function formatCell(
   switch (format) {
     case 'money':
       return `${currencySymbol}${groupThousands(toFixedSafe(value, 2))}`
-    case 'money6':
-      return `${currencySymbol} ${toFixedSafe(value, 6)}`
     case 'mass':
-      return groupThousands(toFixedSafe(value, 3))
+      return groupThousands(toFixedSafe(value, 2))
     case 'qty':
       return groupThousands(toFixedSafe(value, 2))
     case 'int':

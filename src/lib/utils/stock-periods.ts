@@ -1,9 +1,13 @@
 /**
  * Stock period boundary calculations
- * Shared utility for stock grid routes
+ * Shared utility for stock grid and stock on hand routes
  */
 
-export function getPeriodBounds(period: 'daily' | 'weekly' | 'mtd', dateParam: string) {
+export type StockPeriod = 'daily' | 'weekly' | 'mtd' | 'yearly'
+
+export const STOCK_PERIODS: StockPeriod[] = ['daily', 'weekly', 'mtd', 'yearly']
+
+export function getPeriodBounds(period: StockPeriod, dateParam: string) {
   const [y, m, d] = dateParam.split('-').map(Number)
   const refDate = new Date(y!, m! - 1, d!)
 
@@ -20,6 +24,9 @@ export function getPeriodBounds(period: 'daily' | 'weekly' | 'mtd', dateParam: s
     periodStart = new Date(refDate)
     periodStart.setDate(refDate.getDate() - dow)
     periodStart.setHours(0, 0, 0, 0)
+  } else if (period === 'yearly') {
+    // YTD: 1 January to refDate
+    periodStart = new Date(y!, 0, 1, 0, 0, 0, 0)
   } else {
     // MTD: 1st of the month to refDate
     periodStart = new Date(y!, m! - 1, 1, 0, 0, 0, 0)

@@ -23,6 +23,23 @@ type StockEntry = {
   totalOut: string
   onHand: string
   hasMovements: boolean
+  /** Present when a period filter is active: balance before the period started. */
+  opening?: string
+}
+
+const PERIOD_OPTIONS = [
+  { value: '',       label: 'All Time' },
+  { value: 'daily',  label: 'Day' },
+  { value: 'weekly', label: 'Week' },
+  { value: 'mtd',    label: 'Month' },
+  { value: 'yearly', label: 'Year' },
+] as const
+
+const PERIOD_HINTS: Record<string, string> = {
+  daily:  'movements on the selected day',
+  weekly: 'movements in the Mon–Sun week containing the selected day',
+  mtd:    'movements from the 1st of the month to the selected day',
+  yearly: 'movements from 1 January to the selected day',
 }
 
 export default function StockPage() {
@@ -37,7 +54,8 @@ export default function StockPage() {
   const [categoryFilter,   setCategoryFilter]   = useState('')
   const [showZero,         setShowZero]         = useState(true)
   const [onHandSearch,     setOnHandSearch]     = useState('')
-  const [asAtDate,         setAsAtDate]         = useState(today)
+  const [period,           setPeriod]           = useState('')
+  const [periodDate,       setPeriodDate]       = useState(today)
   const [belowReorderOnly, setBelowReorderOnly] = useState(false)
 
   // Check for ?adjust=1 query parameter to auto-open modal
@@ -49,12 +67,10 @@ export default function StockPage() {
     }
   }, [searchParams, isManager, router])
 
-  // Today = live levels; a past date asks the API for levels as at that day
-  const isHistorical = asAtDate !== today
-  const { data: stockData } = useSWR<{ stock: StockEntry[] }>(
-    `/api/stock/on-hand${isHistorical ? `?asAt=${asAtDate}` : ''}`,
-    fetcher
-  )
+  // All Time = live levels; a period scopes In/Out to that window with an
+  // opening balance carried in
+  const stockKey = `/api/stock/on-hand${period ? `?period=${period}&date=${periodDate}` : ''}`
+  const { data: stockData } = useSWR<{ stock: StockEntry[] }>(stockKey, fetcher)
   const { expandCategory } = useProductCategories()
 
   const allStock = stockData?.stock ?? []
@@ -118,9 +134,20 @@ export default function StockPage() {
         </span>
       ),
     },
+    // Opening balance column only makes sense with a period window
+    ...(period ? [{
+      key: 'opening',
+      header: 'Opening',
+      width: '110px',
+      render: (r: StockEntry) => (
+        <span className="font-mono text-xs" style={{ color: colors.textSecondary }}>
+          {Number(r.opening ?? 0).toFixed(2)} {r.product.unit}
+        </span>
+      ),
+    } satisfies Column<StockEntry>] : []),
     {
       key: 'totalIn',
-      header: 'Total In',
+      header: period ? 'In' : 'Total In',
       width: '110px',
       render: (r) => (
         <span className="font-mono text-xs" style={{ color: colors.action }}>
@@ -130,7 +157,7 @@ export default function StockPage() {
     },
     {
       key: 'totalOut',
-      header: 'Total Out',
+      header: period ? 'Out' : 'Total Out',
       width: '110px',
       render: (r) => (
         <span className="font-mono text-xs" style={{ color: colors.danger }}>
@@ -191,26 +218,29 @@ export default function StockPage() {
           onChange={setCategoryFilter}
         />
         <label className="flex items-center gap-1.5 text-xs" style={{ color: colors.textSecondary }}>
-          As at
-          <input
-            type="date"
-            value={asAtDate}
-            max={today}
-            onChange={(e) => setAsAtDate(e.target.value || today)}
+          Period
+          <select
+            value={period}
+            onChange={(e) => setPeriod(e.target.value)}
             className="h-7 border rounded px-2 text-xs bg-white focus:outline-none border-[#E0E0E0] focus:border-[#185ABD]"
             style={{ color: colors.textPrimary }}
-            title="Show stock levels as at the end of this day"
-          />
-        </label>
-        {isHistorical && (
-          <button
-            onClick={() => setAsAtDate(today)}
-            className="h-7 px-2 text-xs rounded border bg-white"
-            style={{ color: colors.process, borderColor: colors.process }}
-            title="Back to live stock levels"
+            title="Track stock by day, week, month, or year"
           >
-            ← Live
-          </button>
+            {PERIOD_OPTIONS.map((p) => (
+              <option key={p.value} value={p.value}>{p.label}</option>
+            ))}
+          </select>
+        </label>
+        {period && (
+          <input
+            type="date"
+            value={periodDate}
+            max={today}
+            onChange={(e) => setPeriodDate(e.target.value || today)}
+            className="h-7 border rounded px-2 text-xs bg-white focus:outline-none border-[#E0E0E0] focus:border-[#185ABD]"
+            style={{ color: colors.textPrimary }}
+            title="Anchor date for the selected period"
+          />
         )}
         <label
           className="flex items-center gap-1.5 text-xs cursor-pointer"
@@ -237,9 +267,9 @@ export default function StockPage() {
           Below reorder only
         </label>
       </div>
-      {isHistorical && (
+      {period && (
         <p className="mb-2 text-xs shrink-0" style={{ color: colors.warning }}>
-          Showing stock levels as at end of {asAtDate} — not live.
+          Tracking {PERIOD_HINTS[period]} ({periodDate}) — On Hand = Opening + In − Out.
         </p>
       )}
       <div className="flex-1 min-h-0">
@@ -257,7 +287,7 @@ export default function StockPage() {
           products={allStock.map((s) => s.product)}
           onClose={() => setAdjustOpen(false)}
           onSuccess={() => {
-            mutate(`/api/stock/on-hand${isHistorical ? `?asAt=${asAtDate}` : ''}`)
+            mutate(stockKey)
             mutate('/api/stock/movements?pageSize=200')
             setAdjustOpen(false)
           }}

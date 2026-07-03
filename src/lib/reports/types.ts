@@ -12,8 +12,7 @@ export type ReportArea = 'purchases' | 'sales' | 'cash' | 'stock'
 /** How a column's raw cell string should be rendered. */
 export type ColumnFormat =
   | 'money'    // 2 dp, currency symbol, space-grouped thousands (E3 976.00)
-  | 'money6'   // 6 dp weighted-average price (R 3.189344)
-  | 'mass'     // 3 dp quantity
+  | 'mass'     // 2 dp quantity/weight
   | 'qty'      // 2 dp quantity
   | 'int'      // whole number
   | 'date'     // yyyy/mm/dd (SAST)

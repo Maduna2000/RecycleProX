@@ -93,6 +93,49 @@ export async function getStockOnHand(productId?: string, asAt?: Date) {
   })
 }
 
+// ─── Stock on hand for a period (opening / in / out / closing) ────────────────
+
+/**
+ * Period-scoped stock tracking: opening balance before `start`, in/out
+ * within [start, end], closing = opening + in − out. Drives the Day/Week/
+ * Month/Year filter on the Stock On Hand page.
+ */
+export async function getStockOnHandForPeriod(start: Date, end: Date, productId?: string) {
+  const sum = (direction: 'in' | 'out', createdAt: { lt?: Date; gte?: Date; lte?: Date }) =>
+    prisma.stockMovement.groupBy({
+      by: ['productId'],
+      where: { direction, createdAt, ...(productId && { productId }) },
+      _sum: { quantity: true },
+    }).then((rows) => new Map(rows.map((r) => [r.productId, new Decimal(r._sum.quantity?.toString() ?? '0')])))
+
+  const [openIn, openOut, periodIn, periodOut, products] = await Promise.all([
+    sum('in', { lt: start }),
+    sum('out', { lt: start }),
+    sum('in', { gte: start, lte: end }),
+    sum('out', { gte: start, lte: end }),
+    prisma.product.findMany({
+      where: { isActive: true, ...(productId ? { id: productId } : {}) },
+      orderBy: [{ category: 'asc' }, { name: 'asc' }],
+    }),
+  ])
+
+  const zero = new Decimal(0)
+  return products.map((p) => {
+    const opening = (openIn.get(p.id) ?? zero).minus(openOut.get(p.id) ?? zero)
+    const totalIn = periodIn.get(p.id) ?? zero
+    const totalOut = periodOut.get(p.id) ?? zero
+    const onHand = opening.plus(totalIn).minus(totalOut)
+    return {
+      product: p,
+      opening: opening.toFixed(2),
+      totalIn: totalIn.toFixed(2),
+      totalOut: totalOut.toFixed(2),
+      onHand: onHand.toFixed(2),
+      hasMovements: openIn.has(p.id) || openOut.has(p.id) || periodIn.has(p.id) || periodOut.has(p.id),
+    }
+  })
+}
+
 // ─── Manual stock adjustment ──────────────────────────────────────────────────
 
 export async function manualAdjustment(opts: {

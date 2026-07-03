@@ -14,8 +14,7 @@ import { formatDateSAST, formatDateTimeSAST, formatTimeSAST } from '@/lib/report
 
 const NUMBER_FORMATS: Record<string, string> = {
   money: '#,##0.00',
-  money6: '#,##0.000000',
-  mass: '#,##0.000',
+  mass: '#,##0.00',
   qty: '#,##0.00',
   int: '#,##0',
 }
