@@ -148,8 +148,12 @@ export async function generateTransactionNote(data: TransactionNoteData): Promis
     y -= 42
   }
 
-  // ── Title row ───────────────────────────────────────────────────────────────
+  // ── Title row: "PURCHASE NOTE  COPY" together on one line ───────────────────
   page.drawText(data.type, { x: MARGIN, y, size: 13, font: bold, color: DARK })
+  const statusLabel = data.status === 'PAID' ? 'COPY' : data.status.toUpperCase()
+  page.drawText(statusLabel, {
+    x: MARGIN + bold.widthOfTextAtSize(data.type, 13) + 14, y, size: 13, font: bold, color: DARK,
+  })
   y -= 24
 
   // ── Two-column info block ───────────────────────────────────────────────────
@@ -199,13 +203,6 @@ export async function generateTransactionNote(data: TransactionNoteData): Promis
   const LINE_GAP = 11.5
   left.forEach(([l, v], i) => infoLine(MARGIN, y - i * LINE_GAP, l, v))
   right.forEach(([l, v], i) => infoLine(rightX, y - i * LINE_GAP, l, v))
-
-  // Status label (COPY / UNPAID / VOIDED) on the PN Number row, far right
-  const statusLabel = data.status === 'PAID' ? 'COPY' : data.status.toUpperCase()
-  page.drawText(statusLabel, {
-    x: PAGE_W - MARGIN - bold.widthOfTextAtSize(statusLabel, 11), y: y - 1, size: 11, font: bold, color: DARK,
-  })
-
   y -= Math.max(left.length, right.length) * LINE_GAP + 12
 
   // ── Lines table ─────────────────────────────────────────────────────────────
