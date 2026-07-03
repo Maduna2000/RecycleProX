@@ -6,6 +6,7 @@ import { prisma } from '@/lib/db/prisma'
 import { getAllSettings, LOGO_SETTING_KEY } from '@/lib/services/settingsService'
 import { fetchR2Bytes } from '@/lib/r2'
 import { purchaseLineAmounts, purchaseHeaderAmounts } from '@/lib/utils/vat'
+import { CURRENCY_SYMBOLS } from '@/lib/schemas/cashup'
 import { generateTransactionNote, type NoteLine } from '@/lib/pdf/transactionNote'
 
 /**
@@ -32,9 +33,17 @@ export async function GET(
     })
     if (!purchase) return NextResponse.json({ error: 'Purchase not found' }, { status: 404 })
 
-    const settings = await getAllSettings()
+    const [settings, doneByUser, latestCashUp] = await Promise.all([
+      getAllSettings(),
+      purchase.createdByUserId
+        ? prisma.user.findUnique({ where: { id: purchase.createdByUserId }, select: { fullName: true } })
+        : null,
+      prisma.cashUp.findFirst({ orderBy: { sessionDate: 'desc' }, select: { currency: true } }),
+    ])
     const logoKey = settings[LOGO_SETTING_KEY]
     const logoPng = logoKey ? await fetchR2Bytes(logoKey) : null
+    const currencySymbol =
+      CURRENCY_SYMBOLS[latestCashUp?.currency as keyof typeof CURRENCY_SYMBOLS] ?? 'R'
 
     const zeroRated = purchase.customer.zeroRated
     const lines: NoteLine[] = purchase.lines.map((l) => {
@@ -48,6 +57,7 @@ export async function GET(
         tareQty: l.tareQty?.toString() ?? null,
         quantity: l.quantity.toString(),
         vat: a.vat.toFixed(2),
+        subTotal: a.subTotal.toFixed(2),
         lineTotal: a.grandTotal.toFixed(2),
       }
     })
@@ -67,11 +77,13 @@ export async function GET(
       : 'PAID'
 
     const customer = purchase.customer
+    const accountType = (customer.dealerCategory ?? customer.customerType).replace('_', ' ').toUpperCase()
     const pdfBytes = await generateTransactionNote({
       type: 'PURCHASE NOTE',
       refNumber: purchase.refNumber,
       date: purchase.createdAt,
       status,
+      currencySymbol,
       company: {
         name: settings['yardName'] ?? 'RecycleProX',
         address: settings['yardAddress'] ?? '',
@@ -80,22 +92,25 @@ export async function GET(
       },
       logoPng,
       partyLabel: 'Supplier',
+      accountLabel: customer.accountCode ? `${customer.accountCode} - ${accountType}` : accountType,
       partyName: customer.companyName?.trim() || `${customer.firstName} ${customer.lastName}`,
       partyIdNumber: customer.idNumber ?? undefined,
       partyPhone: customer.phone ?? undefined,
       partyAddress: customer.physicalAddress ?? undefined,
       vehicleReg: purchase.vehicleReg ?? undefined,
       wbTicketNumber: purchase.wbTicketNumber ?? undefined,
+      doneBy: doneByUser?.fullName ?? undefined,
+      comments: purchase.notes ?? undefined,
+      voidReason: purchase.voidReason ?? undefined,
       lines,
       subTotal: header.subTotal.toFixed(2),
       vatAmount: header.vat.toFixed(2),
       grandTotal: grand.toFixed(2),
       loanDeduction: deduction.greaterThan(0) ? deduction.toFixed(2) : undefined,
-      amountPaid: paid.greaterThan(0) || purchase.status === 'completed' ? (purchase.status === 'completed' && paid.isZero() ? grand.minus(deduction).toFixed(2) : paid.toFixed(2)) : undefined,
+      amountPaid: paid.greaterThan(0) ? paid.toFixed(2) : undefined,
       balanceDue: balance.greaterThan(0) ? balance.toFixed(2) : undefined,
       paymentMethod: purchase.paymentMethod,
       splitPayments: purchase.splitPayments as { cash?: string; eft?: string; cheque?: string; loan?: string } | null,
-      notes: purchase.notes ?? undefined,
       generatedAt: new Date(),
     })
 

@@ -6,6 +6,7 @@ import { prisma } from '@/lib/db/prisma'
 import { getAllSettings, LOGO_SETTING_KEY } from '@/lib/services/settingsService'
 import { fetchR2Bytes } from '@/lib/r2'
 import { saleLineVat } from '@/lib/utils/vat'
+import { CURRENCY_SYMBOLS } from '@/lib/schemas/cashup'
 import { generateTransactionNote, type NoteLine } from '@/lib/pdf/transactionNote'
 
 /**
@@ -32,13 +33,22 @@ export async function GET(
     })
     if (!sale) return NextResponse.json({ error: 'Sale not found' }, { status: 404 })
 
-    const settings = await getAllSettings()
+    const [settings, doneByUser, latestCashUp] = await Promise.all([
+      getAllSettings(),
+      sale.createdByUserId
+        ? prisma.user.findUnique({ where: { id: sale.createdByUserId }, select: { fullName: true } })
+        : null,
+      prisma.cashUp.findFirst({ orderBy: { sessionDate: 'desc' }, select: { currency: true } }),
+    ])
     const logoKey = settings[LOGO_SETTING_KEY]
     const logoPng = logoKey ? await fetchR2Bytes(logoKey) : null
+    const currencySymbol =
+      CURRENCY_SYMBOLS[latestCashUp?.currency as keyof typeof CURRENCY_SYMBOLS] ?? 'R'
 
     const saleHasVat = new Decimal(sale.vatAmount.toString()).greaterThan(0)
     const lines: NoteLine[] = sale.lines.map((l) => {
       const vat = saleLineVat(l, saleHasVat)
+      const excl = new Decimal(l.lineTotal.toString())
       return {
         code: l.product.code,
         name: l.product.name,
@@ -48,7 +58,8 @@ export async function GET(
         tareQty: l.tareQty?.toString() ?? null,
         quantity: l.quantity.toString(),
         vat: vat.toFixed(2),
-        lineTotal: new Decimal(l.lineTotal.toString()).plus(vat).toFixed(2),
+        subTotal: excl.toFixed(2),
+        lineTotal: excl.plus(vat).toFixed(2),
       }
     })
 
@@ -64,15 +75,20 @@ export async function GET(
       : sale.status === 'pending' ? (paid.greaterThan(0) ? 'PARTIAL' : 'UNPAID')
       : 'PAID'
 
-    const partyName = sale.customer
-      ? (sale.customer.companyName?.trim() || `${sale.customer.firstName} ${sale.customer.lastName}`)
+    const customer = sale.customer
+    const partyName = customer
+      ? (customer.companyName?.trim() || `${customer.firstName} ${customer.lastName}`)
       : (sale.buyerName?.trim() || 'Walk-in Buyer')
+    const accountType = customer
+      ? (customer.dealerCategory ?? customer.customerType).replace('_', ' ').toUpperCase()
+      : 'WALK-IN'
 
     const pdfBytes = await generateTransactionNote({
       type: 'SALE NOTE',
       refNumber: sale.refNumber,
       date: sale.createdAt,
       status,
+      currencySymbol,
       company: {
         name: settings['yardName'] ?? 'RecycleProX',
         address: settings['yardAddress'] ?? '',
@@ -81,10 +97,14 @@ export async function GET(
       },
       logoPng,
       partyLabel: 'Buyer',
+      accountLabel: customer?.accountCode ? `${customer.accountCode} - ${accountType}` : accountType,
       partyName,
-      partyIdNumber: sale.customer?.idNumber ?? sale.buyerIdNumber ?? undefined,
-      partyPhone: sale.customer?.phone ?? sale.buyerPhone ?? undefined,
-      partyAddress: sale.customer?.physicalAddress ?? undefined,
+      partyIdNumber: customer?.idNumber ?? sale.buyerIdNumber ?? undefined,
+      partyPhone: customer?.phone ?? sale.buyerPhone ?? undefined,
+      partyAddress: customer?.physicalAddress ?? undefined,
+      doneBy: doneByUser?.fullName ?? undefined,
+      comments: sale.notes ?? undefined,
+      voidReason: sale.voidReason ?? undefined,
       lines,
       subTotal: grand.minus(vatAmount).toFixed(2),
       vatAmount: vatAmount.toFixed(2),
@@ -92,7 +112,6 @@ export async function GET(
       amountPaid: paid.greaterThan(0) ? paid.toFixed(2) : undefined,
       balanceDue: balance.greaterThan(0) ? balance.toFixed(2) : undefined,
       paymentMethod: sale.paymentMethod,
-      notes: sale.notes ?? undefined,
       generatedAt: new Date(),
     })
 

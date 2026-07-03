@@ -1,9 +1,10 @@
 /**
- * Purchase Note / Sale Note — a proper A4 transaction document, generated for
- * every completed purchase or sale. Styled in the spirit of the VAT264 form
- * (colored header band, labeled field boxes) with the company logo when one
- * is configured in Settings, full line detail (weighbridge masses, per-line
- * VAT), a totals panel, and payment information. Server-side only.
+ * Purchase Note / Sale Note — A4 transaction document matching the yard's
+ * legacy note layout: company logo boxed top-left, "PURCHASE NOTE — COPY"
+ * heading, a two-column info block (account/party details left, document
+ * details right), a lines table with Price Excl/Incl and Gross/Tare/Nett
+ * weighbridge columns plus a mass totals row, and the lawful-owner
+ * declaration with the document total alongside. Server-side only.
  */
 import { PDFDocument, rgb, StandardFonts, PDFPage, PDFFont, PDFImage } from 'pdf-lib'
 import Decimal from 'decimal.js'
@@ -19,7 +20,10 @@ export interface NoteLine {
   tareQty?: string | null
   quantity: string
   vat: string
-  lineTotal: string // incl. VAT
+  /** Line total excl. VAT. */
+  subTotal: string
+  /** Line total incl. VAT. */
+  lineTotal: string
 }
 
 export interface TransactionNoteData {
@@ -27,19 +31,29 @@ export interface TransactionNoteData {
   refNumber: string
   date: Date
   status: string // PAID | UNPAID | PARTIAL | VOIDED
+  currencySymbol: string
 
   company: { name: string; address: string; phone?: string; vat?: string }
-  /** Transparent PNG bytes from Settings, drawn in the header when present. */
+  /** Transparent PNG bytes from Settings, boxed top-left when present. */
   logoPng?: Uint8Array | null
 
   partyLabel: string // 'Supplier' | 'Buyer'
+  /** e.g. "344 - CASUAL" (account code + type) */
+  accountLabel?: string
   partyName: string
   partyIdNumber?: string
   partyPhone?: string
   partyAddress?: string
+  partyVatNumber?: string
+  partyRegNumber?: string
 
   vehicleReg?: string
   wbTicketNumber?: string
+
+  /** Cashier / user who captured the transaction. */
+  doneBy?: string
+  comments?: string
+  voidReason?: string
 
   lines: NoteLine[]
 
@@ -52,7 +66,6 @@ export interface TransactionNoteData {
 
   paymentMethod: string
   splitPayments?: { cash?: string; eft?: string; cheque?: string; loan?: string } | null
-  notes?: string
 
   generatedAt: Date
 }
@@ -61,38 +74,32 @@ export interface TransactionNoteData {
 
 const PAGE_W = 595
 const PAGE_H = 842
-const MARGIN = 50
+const MARGIN = 46
 const COL_W = PAGE_W - MARGIN * 2
 
-const NAVY = rgb(0.11, 0.23, 0.42) // matches the app's #1B3A6B primary
-const NAVY_LIGHT = rgb(0.85, 0.89, 0.95)
 const DARK = rgb(0.07, 0.07, 0.07)
 const GRAY = rgb(0.45, 0.45, 0.45)
-const LGRAY = rgb(0.94, 0.94, 0.94)
-const WHITE = rgb(1, 1, 1)
+const LINE = rgb(0.6, 0.6, 0.6)
+const LGRAY = rgb(0.95, 0.95, 0.95)
 
-const ROW_H = 16
-const BOTTOM_LIMIT = MARGIN + 40
+const ROW_H = 14
+const BOTTOM_LIMIT = MARGIN + 34
 
-interface Fonts { bold: PDFFont; reg: PDFFont }
+function money(symbol: string, v: string | undefined | null): string {
+  if (v === undefined || v === null || v === '') return ''
+  return `${symbol}${new Decimal(v).toFixed(2)}`
+}
 
-function money(v: string | undefined | null): string {
-  if (v === undefined || v === null || v === '') return '0.00'
-  return new Decimal(v).toFixed(2)
+function qty(v: string | undefined | null): string {
+  if (v === undefined || v === null || v === '') return '0'
+  const d = new Decimal(v)
+  // Legacy style: trim trailing zeros (1412, 2.4, 1414.4)
+  return d.toDecimalPlaces(2).toString()
 }
 
 function sanitize(text: string): string {
   // eslint-disable-next-line no-control-regex
   return text.replace(/[^\x20-\xFF–—‘’“”•…]/g, '?')
-}
-
-function drawField(page: PDFPage, label: string, value: string, x: number, y: number, width: number, fonts: Fonts) {
-  page.drawRectangle({ x, y: y - 14, width, height: 18, color: LGRAY, borderColor: GRAY, borderWidth: 0.5 })
-  page.drawText(label, { x: x + 4, y: y + 2, size: 7, font: fonts.reg, color: GRAY })
-  const maxChars = Math.floor((width - 8) / 4.6)
-  let text = sanitize(value || '—')
-  if (text.length > maxChars) text = text.slice(0, maxChars - 1) + '…'
-  page.drawText(text, { x: x + 4, y: y - 9, size: 9, font: fonts.bold, color: DARK })
 }
 
 // ─── Main export ──────────────────────────────────────────────────────────────
@@ -101,7 +108,7 @@ export async function generateTransactionNote(data: TransactionNoteData): Promis
   const doc = await PDFDocument.create()
   const bold = await doc.embedFont(StandardFonts.HelveticaBold)
   const reg = await doc.embedFont(StandardFonts.Helvetica)
-  const fonts: Fonts = { bold, reg }
+  const sym = data.currencySymbol
 
   let logo: PDFImage | null = null
   if (data.logoPng && data.logoPng.length > 0) {
@@ -115,226 +122,217 @@ export async function generateTransactionNote(data: TransactionNoteData): Promis
   const pages: PDFPage[] = []
   let page = doc.addPage([PAGE_W, PAGE_H])
   pages.push(page)
+  let y = PAGE_H - MARGIN
 
-  // ── Header band ─────────────────────────────────────────────────────────────
-  const HEADER_H = 86
-  page.drawRectangle({ x: 0, y: PAGE_H - HEADER_H, width: PAGE_W, height: HEADER_H, color: NAVY })
-
-  let textX = MARGIN
+  // ── Logo box, top-left ──────────────────────────────────────────────────────
   if (logo) {
-    // Fit the logo into a 44pt-high box, preserving aspect ratio, on a white
-    // chip so dark logos stay visible against the navy band
-    const maxH = 44
-    const maxW = 160
-    const scale = Math.min(maxH / logo.height, maxW / logo.width)
+    // Fit inside a 130×86pt frame, preserving aspect ratio, centred in the box
+    const BOX_W = 130
+    const BOX_H = 86
+    const scale = Math.min((BOX_W - 10) / logo.width, (BOX_H - 10) / logo.height)
     const w = logo.width * scale
     const h = logo.height * scale
-    const pad = 5
     page.drawRectangle({
-      x: MARGIN - pad, y: PAGE_H - 18 - h - pad,
-      width: w + pad * 2, height: h + pad * 2, color: WHITE,
+      x: MARGIN, y: y - BOX_H, width: BOX_W, height: BOX_H,
+      borderColor: LINE, borderWidth: 0.8,
     })
-    page.drawImage(logo, { x: MARGIN, y: PAGE_H - 18 - h, width: w, height: h })
-    textX = MARGIN
+    page.drawImage(logo, {
+      x: MARGIN + (BOX_W - w) / 2,
+      y: y - BOX_H + (BOX_H - h) / 2,
+      width: w,
+      height: h,
+    })
+    y -= BOX_H + 12
+  } else {
+    // No logo — company name takes its place
+    page.drawText(sanitize(data.company.name), { x: MARGIN, y: y - 14, size: 15, font: bold, color: DARK })
+    if (data.company.address) {
+      page.drawText(sanitize(data.company.address), { x: MARGIN, y: y - 27, size: 8, font: reg, color: GRAY })
+    }
+    y -= 42
   }
 
-  const companyY = logo ? PAGE_H - 72 : PAGE_H - 32
-  page.drawText(sanitize(data.company.name), {
-    x: textX, y: companyY, size: logo ? 10 : 16, font: bold, color: WHITE,
+  // ── Title row: "PURCHASE NOTE"  +  status centred ───────────────────────────
+  page.drawText(data.type, { x: MARGIN, y, size: 13, font: bold, color: DARK })
+  const statusLabel = data.status === 'PAID' ? 'COPY' : data.status.toUpperCase()
+  page.drawText(statusLabel, {
+    x: PAGE_W / 2 - bold.widthOfTextAtSize(statusLabel, 13) / 2, y, size: 13, font: bold, color: DARK,
   })
-  if (!logo) {
-    page.drawText(sanitize(data.company.address), { x: MARGIN, y: PAGE_H - 48, size: 8, font: reg, color: NAVY_LIGHT })
-    let line3 = ''
-    if (data.company.phone) line3 += `Tel: ${data.company.phone}`
-    if (data.company.vat) line3 += (line3 ? '   ' : '') + `VAT: ${data.company.vat}`
-    if (line3) page.drawText(sanitize(line3), { x: MARGIN, y: PAGE_H - 60, size: 8, font: reg, color: NAVY_LIGHT })
+  y -= 24
+
+  // ── Two-column info block ───────────────────────────────────────────────────
+  const rightX = PAGE_W / 2 + 40
+
+  function infoLine(x: number, yy: number, label: string, value: string | undefined) {
+    page.drawText(`${label}:`, { x, y: yy, size: 7.5, font: bold, color: DARK })
+    if (value) {
+      let text = sanitize(value)
+      const maxChars = 44
+      if (text.length > maxChars) text = text.slice(0, maxChars - 1) + '…'
+      page.drawText(text, { x: x + bold.widthOfTextAtSize(`${label}: `, 7.5) + 2, y: yy, size: 7.5, font: reg, color: DARK })
+    }
   }
 
-  // Right block: document type / ref / date / status
-  const title = data.type
-  const titleW = bold.widthOfTextAtSize(title, 18)
-  page.drawText(title, { x: PAGE_W - MARGIN - titleW, y: PAGE_H - 34, size: 18, font: bold, color: WHITE })
-  const refStr = `No: ${data.refNumber}`
-  page.drawText(refStr, {
-    x: PAGE_W - MARGIN - bold.widthOfTextAtSize(refStr, 10), y: PAGE_H - 50, size: 10, font: bold, color: WHITE,
-  })
-  const dateStr = data.date.toLocaleString('en-ZA', {
-    timeZone: 'Africa/Johannesburg', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
-  })
-  page.drawText(dateStr, {
-    x: PAGE_W - MARGIN - reg.widthOfTextAtSize(dateStr, 9), y: PAGE_H - 63, size: 9, font: reg, color: NAVY_LIGHT,
-  })
-  const statusStr = data.status.toUpperCase()
-  page.drawText(statusStr, {
-    x: PAGE_W - MARGIN - bold.widthOfTextAtSize(statusStr, 9), y: PAGE_H - 77, size: 9, font: bold,
-    color: statusStr === 'VOIDED' ? rgb(1, 0.6, 0.6) : rgb(0.65, 0.9, 0.65),
-  })
-
-  let y = PAGE_H - HEADER_H - 16
-
-  // ── Company details (when the logo displaced them from the band) ───────────
-  if (logo) {
-    let infoLine = sanitize(data.company.address)
-    if (data.company.phone) infoLine += `   Tel: ${data.company.phone}`
-    if (data.company.vat) infoLine += `   VAT: ${data.company.vat}`
-    page.drawText(infoLine, { x: MARGIN, y, size: 8, font: reg, color: GRAY })
-    y -= 16
+  const left: [string, string | undefined][] = [
+    ['Account Name', data.accountLabel ?? data.partyName],
+    ['Address', data.partyAddress],
+    ['Vat Number', data.partyVatNumber ?? 'None'],
+    ['Reg Number', data.partyRegNumber],
+    ['ID Number', data.partyIdNumber],
+    ['Name', data.partyName],
+    ['Tel', data.partyPhone],
+    ['Transporter / Vehicle', data.vehicleReg],
+    ['Weighbridge Ticket', data.wbTicketNumber],
+  ]
+  const noteNoLabel = data.type === 'PURCHASE NOTE' ? 'PN Number' : 'SN Number'
+  const right: [string, string | undefined][] = [
+    [noteNoLabel, data.refNumber],
+    ['Payment Method', data.splitPayments ? 'Split' : data.paymentMethod.toUpperCase()],
+    ['Transaction Done By', data.doneBy],
+    ['Transaction Date', data.date.toLocaleString('en-ZA', {
+      timeZone: 'Africa/Johannesburg', year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+    })],
+    ['Comments', data.comments],
+    ['Return Reason', data.voidReason],
+  ]
+  if (data.splitPayments) {
+    const parts: string[] = []
+    for (const [k, v] of Object.entries(data.splitPayments)) {
+      if (v && new Decimal(v).greaterThan(0)) parts.push(`${k.toUpperCase()} ${money(sym, v)}`)
+    }
+    if (parts.length) right.splice(2, 0, ['Split Detail', parts.join('  ')])
   }
 
-  // ── Party + transaction detail fields ───────────────────────────────────────
-  page.drawText(`${data.partyLabel.toUpperCase()} DETAILS`, { x: MARGIN, y, size: 8, font: bold, color: NAVY })
-  y -= 6
-
-  const halfW = (COL_W - 8) / 2
-  const thirdW = (COL_W - 16) / 3
-  drawField(page, `${data.partyLabel} Name`, data.partyName, MARGIN, y, halfW, fonts)
-  drawField(page, 'ID / Registration Number', data.partyIdNumber ?? '', MARGIN + halfW + 8, y, halfW, fonts)
-  y -= 26
-  drawField(page, 'Phone', data.partyPhone ?? '', MARGIN, y, thirdW, fonts)
-  drawField(page, 'Vehicle Reg', data.vehicleReg ?? '', MARGIN + thirdW + 8, y, thirdW, fonts)
-  drawField(page, 'Weighbridge Ticket', data.wbTicketNumber ?? '', MARGIN + (thirdW + 8) * 2, y, thirdW, fonts)
-  y -= 26
-  if (data.partyAddress) {
-    drawField(page, 'Address', data.partyAddress, MARGIN, y, COL_W, fonts)
-    y -= 26
-  }
-  y -= 6
+  const LINE_GAP = 11.5
+  left.forEach(([l, v], i) => infoLine(MARGIN, y - i * LINE_GAP, l, v))
+  right.forEach(([l, v], i) => infoLine(rightX, y - i * LINE_GAP, l, v))
+  y -= Math.max(left.length, right.length) * LINE_GAP + 12
 
   // ── Lines table ─────────────────────────────────────────────────────────────
   const cols = [
-    { label: '#', w: 0.05, align: 'left' as const },
-    { label: 'Code', w: 0.1, align: 'left' as const },
-    { label: 'Product', w: 0.23, align: 'left' as const },
-    { label: 'Price', w: 0.1, align: 'right' as const },
-    { label: 'WB Full', w: 0.09, align: 'right' as const },
-    { label: 'WB Empty', w: 0.09, align: 'right' as const },
-    { label: 'Nett Qty', w: 0.1, align: 'right' as const },
-    { label: 'VAT', w: 0.1, align: 'right' as const },
-    { label: 'Total', w: 0.14, align: 'right' as const },
+    { label: 'Prod ID', w: 0.08, align: 'left' as const },
+    { label: 'Product Name', w: 0.2, align: 'left' as const },
+    { label: 'Price Excl', w: 0.09, align: 'right' as const },
+    { label: 'Price Incl', w: 0.09, align: 'right' as const },
+    { label: 'Gross', w: 0.08, align: 'right' as const },
+    { label: 'Tare', w: 0.07, align: 'right' as const },
+    { label: 'Nett', w: 0.08, align: 'right' as const },
+    { label: 'Sub Total', w: 0.11, align: 'right' as const },
+    { label: 'VAT', w: 0.09, align: 'right' as const },
+    { label: 'Grand Total', w: 0.11, align: 'right' as const },
   ]
 
-  function drawLinesHeader() {
-    page.drawRectangle({ x: MARGIN, y: y - ROW_H, width: COL_W, height: ROW_H, color: NAVY })
+  function drawCell(text: string, colIdx: number, yy: number, font: PDFFont, size = 7.5) {
     let x = MARGIN
-    for (const c of cols) {
-      const cw = c.w * COL_W
-      const label = c.label
-      const tx = c.align === 'right' ? x + cw - bold.widthOfTextAtSize(label, 7.5) - 4 : x + 4
-      page.drawText(label, { x: tx, y: y - ROW_H + 4.5, size: 7.5, font: bold, color: WHITE })
-      x += cw
-    }
-    y -= ROW_H
+    for (let i = 0; i < colIdx; i++) x += cols[i]!.w * COL_W
+    const cw = cols[colIdx]!.w * COL_W
+    let t = sanitize(text)
+    const maxChars = Math.floor((cw - 4) / (size * 0.52))
+    if (t.length > maxChars) t = t.slice(0, maxChars - 1) + '…'
+    const tx = cols[colIdx]!.align === 'right' ? x + cw - font.widthOfTextAtSize(t, size) - 2 : x + 2
+    page.drawText(t, { x: tx, y: yy, size, font, color: DARK })
+  }
+
+  function drawTableHeader() {
+    page.drawLine({ start: { x: MARGIN, y: y + 4 }, end: { x: PAGE_W - MARGIN, y: y + 4 }, thickness: 0.8, color: DARK })
+    cols.forEach((c, i) => drawCell(c.label, i, y - 8, bold))
+    page.drawLine({ start: { x: MARGIN, y: y - 12 }, end: { x: PAGE_W - MARGIN, y: y - 12 }, thickness: 0.5, color: DARK })
+    y -= 12 + 4
   }
 
   function newPage() {
     page = doc.addPage([PAGE_W, PAGE_H])
     pages.push(page)
     y = PAGE_H - MARGIN
-    drawLinesHeader()
+    drawTableHeader()
   }
 
-  drawLinesHeader()
+  drawTableHeader()
+
+  let grossSum = new Decimal(0)
+  let tareSum = new Decimal(0)
+  let nettSum = new Decimal(0)
 
   data.lines.forEach((l, idx) => {
     if (y - ROW_H < BOTTOM_LIMIT) newPage()
-    const shade = idx % 2 === 1
-    if (shade) page.drawRectangle({ x: MARGIN, y: y - ROW_H, width: COL_W, height: ROW_H, color: LGRAY })
-    page.drawRectangle({ x: MARGIN, y: y - ROW_H, width: COL_W, height: ROW_H, borderColor: GRAY, borderWidth: 0.4 })
+    if (idx % 2 === 1) {
+      page.drawRectangle({ x: MARGIN, y: y - ROW_H + 3, width: COL_W, height: ROW_H, color: LGRAY })
+    }
+    const gross = l.grossQty ? new Decimal(l.grossQty) : null
+    const tare = l.tareQty ? new Decimal(l.tareQty) : null
+    const nett = new Decimal(l.quantity)
+    if (gross) grossSum = grossSum.plus(gross)
+    if (tare) tareSum = tareSum.plus(tare)
+    nettSum = nettSum.plus(nett)
+
+    const priceExcl = new Decimal(l.unitPrice)
+    const priceIncl = nett.isZero() ? priceExcl : new Decimal(l.lineTotal).div(nett)
 
     const values = [
-      String(idx + 1),
       l.code,
       l.name,
-      money(l.unitPrice),
-      l.grossQty ? new Decimal(l.grossQty).toFixed(2) : '—',
-      l.tareQty ? new Decimal(l.tareQty).toFixed(2) : '—',
-      `${new Decimal(l.quantity).toFixed(2)} ${l.unit}`,
-      money(l.vat),
-      money(l.lineTotal),
+      money(sym, priceExcl.toFixed(3)),
+      money(sym, priceIncl.toFixed(3)),
+      gross ? qty(gross.toString()) : '0',
+      tare ? qty(tare.toString()) : '0',
+      qty(nett.toString()),
+      money(sym, l.subTotal),
+      new Decimal(l.vat).greaterThan(0) ? money(sym, l.vat) : '',
+      money(sym, l.lineTotal),
     ]
-    let x = MARGIN
-    cols.forEach((c, ci) => {
-      const cw = c.w * COL_W
-      let text = sanitize(values[ci]!)
-      const maxChars = Math.floor((cw - 8) / 4.2)
-      if (text.length > maxChars) text = text.slice(0, maxChars - 1) + '…'
-      const tx = c.align === 'right' ? x + cw - reg.widthOfTextAtSize(text, 8) - 4 : x + 4
-      page.drawText(text, { x: tx, y: y - ROW_H + 4.5, size: 8, font: reg, color: DARK })
-      x += cw
-    })
+    values.forEach((v, ci) => drawCell(v, ci, y - 8, reg))
     y -= ROW_H
   })
 
-  // ── Totals panel (right) + payment info (left) ──────────────────────────────
-  if (y - 120 < BOTTOM_LIMIT) newPage()
-  y -= 12
+  // Mass totals row (Gross / Tare / Nett)
+  if (y - ROW_H < BOTTOM_LIMIT) newPage()
+  page.drawLine({ start: { x: MARGIN, y: y + 2 }, end: { x: PAGE_W - MARGIN, y: y + 2 }, thickness: 0.5, color: DARK })
+  drawCell('Totals :', 3, y - 8, bold)
+  drawCell(qty(grossSum.toString()), 4, y - 8, bold)
+  drawCell(qty(tareSum.toString()), 5, y - 8, bold)
+  drawCell(qty(nettSum.toString()), 6, y - 8, bold)
+  page.drawLine({ start: { x: MARGIN, y: y - 12 }, end: { x: PAGE_W - MARGIN, y: y - 12 }, thickness: 0.8, color: DARK })
+  y -= ROW_H + 10
 
-  const panelW = 220
-  const panelX = PAGE_W - MARGIN - panelW
-  const totals: [string, string, boolean][] = [
-    ['Sub Total', money(data.subTotal), false],
-    ['VAT', money(data.vatAmount), false],
-    ['Grand Total', money(data.grandTotal), true],
-  ]
-  if (data.loanDeduction && new Decimal(data.loanDeduction).greaterThan(0)) {
-    totals.push(['Loan Deduction', `-${money(data.loanDeduction)}`, false])
-  }
-  if (data.amountPaid !== undefined) totals.push(['Amount Paid', money(data.amountPaid), false])
-  if (data.balanceDue && new Decimal(data.balanceDue).greaterThan(0)) {
-    totals.push(['Balance Due', money(data.balanceDue), true])
-  }
+  // ── Declaration (left) + totals (right) ─────────────────────────────────────
+  if (y - 70 < BOTTOM_LIMIT) newPage()
 
-  let ty = y
-  for (const [label, value, emphasis] of totals) {
-    const h = emphasis ? 20 : 16
-    page.drawRectangle({
-      x: panelX, y: ty - h, width: panelW, height: h,
-      color: emphasis ? NAVY_LIGHT : WHITE, borderColor: GRAY, borderWidth: 0.5,
-    })
-    page.drawText(label, { x: panelX + 6, y: ty - h + (emphasis ? 6 : 4.5), size: emphasis ? 9 : 8, font: emphasis ? bold : reg, color: DARK })
-    const vFont = emphasis ? bold : reg
-    const vSize = emphasis ? 10 : 8.5
-    page.drawText(value, {
-      x: panelX + panelW - vFont.widthOfTextAtSize(value, vSize) - 6,
-      y: ty - h + (emphasis ? 5 : 4.5), size: vSize, font: vFont, color: DARK,
-    })
-    ty -= h
-  }
-
-  // Payment block on the left
-  let py = y - 4
-  page.drawText('PAYMENT', { x: MARGIN, y: py, size: 8, font: bold, color: NAVY })
-  py -= 12
-  page.drawText(`Method: ${sanitize(data.splitPayments ? 'Split' : data.paymentMethod.toUpperCase())}`, {
-    x: MARGIN, y: py, size: 8.5, font: reg, color: DARK,
+  const declaration =
+    data.type === 'PURCHASE NOTE'
+      ? [
+          'I hereby state that I am the lawful owner of the material listed above and',
+          `have sold them to ${sanitize(data.company.name)} to dispose of as they see fit.`,
+          'Data Protection Act No. 5 of 2022 (Eswatini)',
+        ]
+      : [
+          `Goods listed above sold and released to ${sanitize(data.partyName)}.`,
+          'Errors and omissions excepted.',
+        ]
+  declaration.forEach((line, i) => {
+    page.drawText(line, { x: MARGIN, y: y - i * 10, size: 7.5, font: i === declaration.length - 1 ? reg : reg, color: i === declaration.length - 1 ? GRAY : DARK })
   })
-  py -= 12
-  if (data.splitPayments) {
-    const parts: string[] = []
-    for (const [k, v] of Object.entries(data.splitPayments)) {
-      if (v && new Decimal(v).greaterThan(0)) parts.push(`${k.toUpperCase()}: ${money(v)}`)
-    }
-    if (parts.length) {
-      page.drawText(parts.join('   '), { x: MARGIN, y: py, size: 8, font: reg, color: GRAY })
-      py -= 12
-    }
-  }
-  if (data.notes) {
-    let notes = sanitize(`Notes: ${data.notes}`)
-    if (notes.length > 90) notes = notes.slice(0, 89) + '…'
-    page.drawText(notes, { x: MARGIN, y: py, size: 8, font: reg, color: GRAY })
-    py -= 12
-  }
 
-  y = Math.min(ty, py) - 24
-
-  // ── Signature rule ──────────────────────────────────────────────────────────
-  if (y < BOTTOM_LIMIT + 20) { newPage(); y -= 10 }
-  const sigW = 180
-  page.drawLine({ start: { x: MARGIN, y }, end: { x: MARGIN + sigW, y }, thickness: 0.7, color: DARK })
-  page.drawText(`${data.partyLabel} Signature`, { x: MARGIN, y: y - 10, size: 7.5, font: reg, color: GRAY })
-  page.drawLine({ start: { x: PAGE_W - MARGIN - sigW, y }, end: { x: PAGE_W - MARGIN, y }, thickness: 0.7, color: DARK })
-  page.drawText('Authorised Signature', { x: PAGE_W - MARGIN - sigW, y: y - 10, size: 7.5, font: reg, color: GRAY })
+  // Totals stack, right-aligned
+  const totalsRows: [string, string, boolean][] = [['Total:', money(sym, data.grandTotal), true]]
+  if (data.loanDeduction && new Decimal(data.loanDeduction).greaterThan(0)) {
+    totalsRows.push(['Loan Deduction:', `-${money(sym, data.loanDeduction)}`, false])
+  }
+  if (data.amountPaid !== undefined && data.amountPaid !== null) {
+    totalsRows.push(['Amount Paid:', money(sym, data.amountPaid), false])
+  }
+  if (data.balanceDue && new Decimal(data.balanceDue).greaterThan(0)) {
+    totalsRows.push(['Balance Due:', money(sym, data.balanceDue), true])
+  }
+  let ty = y
+  for (const [label, value, emphasis] of totalsRows) {
+    const f = emphasis ? bold : reg
+    const size = emphasis ? 10 : 8.5
+    const valueW = f.widthOfTextAtSize(value, size)
+    page.drawText(label, { x: PAGE_W - MARGIN - 160, y: ty, size, font: f, color: DARK })
+    page.drawText(value, { x: PAGE_W - MARGIN - valueW, y: ty, size, font: f, color: DARK })
+    ty -= emphasis ? 15 : 12
+  }
 
   // ── Footers ─────────────────────────────────────────────────────────────────
   const generated = `Generated: ${data.generatedAt.toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg' })}  |  ${sanitize(data.company.name)}  |  RecycleProX`
