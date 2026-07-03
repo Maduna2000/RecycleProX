@@ -107,6 +107,90 @@ export const REPORT_CATALOG: ReportCatalogEntry[] = [
       { key: 'customerId', label: 'Customer', type: 'customer' },
     ],
   },
+  // ── Cash & Financial ───────────────────────────────────────────────────────
+  {
+    id: 'cashup-history',
+    label: 'Cash-Up History',
+    description:
+      'One row per cash-up session: opening balance, system cash sales/purchases, expenses, expected vs declared cash, and variance.',
+    area: 'cash',
+    filters: [],
+  },
+  {
+    id: 'expenses',
+    label: 'Expenses Report',
+    description:
+      'Expenses grouped by category (parent → sub-type) with description, payment method, VAT, and totals per category.',
+    area: 'cash',
+    filters: [
+      {
+        key: 'status', label: 'Status', type: 'select',
+        options: [
+          { value: 'approved', label: 'Approved' },
+          { value: 'pending', label: 'Pending' },
+          { value: 'all', label: 'All (not voided)' },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'float-log',
+    label: 'Float Log Report',
+    description:
+      'Float movements per day — opening, top-ups, withdrawals, adjustments — with time, reference, running balance, and day totals.',
+    area: 'cash',
+    filters: [],
+  },
+  {
+    id: 'cash-on-hand',
+    label: 'Cash on Hand Report',
+    description:
+      'Denomination counts (R200 → 50c) declared at each submitted/approved cash-up, with counted total vs declared cash and variance.',
+    area: 'cash',
+    filters: [],
+  },
+  {
+    id: 'loan-book',
+    label: 'Loan Book Report',
+    description:
+      'Advances and repayments per customer in chronological order with a running balance — repayments reference their purchase note.',
+    area: 'cash',
+    filters: [
+      { key: 'customerId', label: 'Customer', type: 'customer' },
+      {
+        key: 'status', label: 'Loan Status', type: 'select',
+        options: [
+          { value: 'active', label: 'Active' },
+          { value: 'settled', label: 'Settled' },
+          { value: 'all', label: 'All (not voided)' },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'profit-summary',
+    label: 'Profit Summary',
+    description:
+      'Revenue vs cost of goods vs expenses: gross profit, net profit, margin, and the loan book position for the period.',
+    area: 'cash',
+    filters: [],
+  },
+  {
+    id: 'vat-summary',
+    label: 'VAT Summary',
+    description:
+      'Daily output VAT (sales) against input VAT (purchases and expenses) with the net VAT position for the period.',
+    area: 'cash',
+    filters: [],
+  },
+  {
+    id: 'cancelled-transactions',
+    label: 'Cancelled / Voided Transactions',
+    description:
+      'All voided purchases and sales in the period with who they were for, the void reason, and amounts.',
+    area: 'cash',
+    filters: [],
+  },
 ]
 
 export const DEALER_CATEGORY_OPTIONS = [

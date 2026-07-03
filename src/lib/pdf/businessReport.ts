@@ -44,10 +44,12 @@ const BORDER_WIDTH = 0.5
 const DATA_FONT_SIZE = 7.5
 const CHAR_W = 4.2 // approx Helvetica width at 7.5pt, for truncation budgeting
 
-// WinAnsi-safe: pdf-lib throws on chars outside Latin-1; replace rather than crash.
+// WinAnsi-safe: pdf-lib throws on chars outside WinAnsi; replace rather than
+// crash. Latin-1 plus the typographic chars WinAnsi does encode (dashes,
+// curly quotes, ellipsis, bullet) pass through.
 function sanitize(text: string): string {
   // eslint-disable-next-line no-control-regex
-  return text.replace(/[^\x20-\xFF]/g, '?')
+  return text.replace(/[^\x20-\xFF–—‘’“”•…]/g, '?')
 }
 
 function truncate(text: string, maxWidthPt: number): string {

@@ -54,6 +54,16 @@ export const SalesByCustomerParamsSchema = rangeParams({
   customerId: z.string().uuid().optional(),
 })
 
+// ── Cash & Financial ──────────────────────────────────────────────────────────
+export const ExpensesReportParamsSchema = rangeParams({
+  status: z.enum(['approved', 'pending', 'all']).optional(),
+})
+
+export const LoanBookParamsSchema = rangeParams({
+  customerId: z.string().uuid().optional(),
+  status: z.enum(['active', 'settled', 'all']).optional(),
+})
+
 export type BaseReportParams = z.infer<typeof BaseReportParamsSchema>
 export type ReportFormat = z.infer<typeof ReportFormatSchema>
 export type PurchasesByProductCategoryParams = z.infer<typeof PurchasesByProductCategoryParamsSchema>
@@ -63,3 +73,5 @@ export type PurchasesPerProductDayParams = z.infer<typeof PurchasesPerProductDay
 export type SalesDailyParams = z.infer<typeof SalesDailyParamsSchema>
 export type SalesByProductParams = z.infer<typeof SalesByProductParamsSchema>
 export type SalesByCustomerParams = z.infer<typeof SalesByCustomerParamsSchema>
+export type ExpensesReportParams = z.infer<typeof ExpensesReportParamsSchema>
+export type LoanBookParams = z.infer<typeof LoanBookParamsSchema>

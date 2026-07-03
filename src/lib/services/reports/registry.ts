@@ -8,6 +8,7 @@ import type { z } from 'zod'
 import type { ReportDocument, ReportMeta } from '@/lib/reports/types'
 import { REPORT_CATALOG } from '@/lib/reports/catalog'
 import {
+  BaseReportParamsSchema,
   PurchasesByProductCategoryParamsSchema,
   PurchasesDailyParamsSchema,
   PurchasesSupplierStatementParamsSchema,
@@ -15,6 +16,8 @@ import {
   SalesDailyParamsSchema,
   SalesByProductParamsSchema,
   SalesByCustomerParamsSchema,
+  ExpensesReportParamsSchema,
+  LoanBookParamsSchema,
 } from '@/lib/schemas/report'
 import {
   buildPurchasesByProductCategory,
@@ -27,6 +30,16 @@ import {
   buildSalesByProduct,
   buildSalesByCustomer,
 } from './builders/sales'
+import {
+  buildCashupHistory,
+  buildExpensesReport,
+  buildFloatLog,
+  buildCashOnHand,
+  buildLoanBook,
+  buildProfitSummary,
+  buildVatSummary,
+  buildCancelledTransactions,
+} from './builders/cash'
 
 type MetaBase = Omit<ReportMeta, 'rowCount'>
 
@@ -65,6 +78,38 @@ export const REPORT_REGISTRY: Record<string, ReportDefinition> = {
   'sales-by-customer': {
     paramsSchema: SalesByCustomerParamsSchema,
     build: buildSalesByCustomer,
+  },
+  'cashup-history': {
+    paramsSchema: BaseReportParamsSchema,
+    build: buildCashupHistory,
+  },
+  'expenses': {
+    paramsSchema: ExpensesReportParamsSchema,
+    build: buildExpensesReport,
+  },
+  'float-log': {
+    paramsSchema: BaseReportParamsSchema,
+    build: buildFloatLog,
+  },
+  'cash-on-hand': {
+    paramsSchema: BaseReportParamsSchema,
+    build: buildCashOnHand,
+  },
+  'loan-book': {
+    paramsSchema: LoanBookParamsSchema,
+    build: buildLoanBook,
+  },
+  'profit-summary': {
+    paramsSchema: BaseReportParamsSchema,
+    build: buildProfitSummary,
+  },
+  'vat-summary': {
+    paramsSchema: BaseReportParamsSchema,
+    build: buildVatSummary,
+  },
+  'cancelled-transactions': {
+    paramsSchema: BaseReportParamsSchema,
+    build: buildCancelledTransactions,
   },
 }
 
