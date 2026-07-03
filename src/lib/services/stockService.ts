@@ -37,13 +37,19 @@ export async function recordMovement(
 
 // ─── Stock on hand per product ────────────────────────────────────────────────
 
-export async function getStockOnHand(productId?: string) {
+/**
+ * On-hand levels from the movement ledger. `asAt` cuts the ledger off at
+ * that instant — "what was on hand as at that date" — omit it for live
+ * levels.
+ */
+export async function getStockOnHand(productId?: string, asAt?: Date) {
   // Aggregate IN movements
   const inAgg = await prisma.stockMovement.groupBy({
     by: ['productId'],
     where: {
       direction: 'in',
       ...(productId && { productId }),
+      ...(asAt && { createdAt: { lte: asAt } }),
     },
     _sum: { quantity: true },
   })
@@ -54,6 +60,7 @@ export async function getStockOnHand(productId?: string) {
     where: {
       direction: 'out',
       ...(productId && { productId }),
+      ...(asAt && { createdAt: { lte: asAt } }),
     },
     _sum: { quantity: true },
   })

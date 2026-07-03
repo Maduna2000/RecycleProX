@@ -4,10 +4,10 @@ import { useState, useEffect } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import useSWR, { mutate } from 'swr'
 import { useSession } from 'next-auth/react'
-import { Loader2, TrendingUp, TrendingDown, Minus, AlertTriangle, Search } from 'lucide-react'
+import { TrendingUp, TrendingDown, Minus, AlertTriangle, Search } from 'lucide-react'
 import { toast } from 'sonner'
 import { DataTable, type Column } from '@/components/ui/DataTable'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, ModalTitleBar, ModalBtn } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -31,10 +31,14 @@ export default function StockPage() {
   const { data: session } = useSession()
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
 
-  const [adjustOpen,     setAdjustOpen]     = useState(false)
-  const [categoryFilter, setCategoryFilter] = useState('')
-  const [showZero,       setShowZero]       = useState(true)
-  const [onHandSearch,   setOnHandSearch]   = useState('')
+  const today = new Date().toISOString().split('T')[0]!
+
+  const [adjustOpen,       setAdjustOpen]       = useState(false)
+  const [categoryFilter,   setCategoryFilter]   = useState('')
+  const [showZero,         setShowZero]         = useState(true)
+  const [onHandSearch,     setOnHandSearch]     = useState('')
+  const [asAtDate,         setAsAtDate]         = useState(today)
+  const [belowReorderOnly, setBelowReorderOnly] = useState(false)
 
   // Check for ?adjust=1 query parameter to auto-open modal
   useEffect(() => {
@@ -45,7 +49,12 @@ export default function StockPage() {
     }
   }, [searchParams, isManager, router])
 
-  const { data: stockData } = useSWR<{ stock: StockEntry[] }>('/api/stock/on-hand', fetcher)
+  // Today = live levels; a past date asks the API for levels as at that day
+  const isHistorical = asAtDate !== today
+  const { data: stockData } = useSWR<{ stock: StockEntry[] }>(
+    `/api/stock/on-hand${isHistorical ? `?asAt=${asAtDate}` : ''}`,
+    fetcher
+  )
   const { expandCategory } = useProductCategories()
 
   const allStock = stockData?.stock ?? []
@@ -54,6 +63,10 @@ export default function StockPage() {
   const stock = allStock.filter((s) => {
     if (!showZero && parseFloat(s.onHand) === 0 && !s.hasMovements) return false
     if (categoryNames && !categoryNames.has(s.product.category)) return false
+    if (belowReorderOnly) {
+      const min = s.product.minStockLevel ? parseFloat(s.product.minStockLevel) : null
+      if (min === null || parseFloat(s.onHand) >= min) return false
+    }
     if (onHandSearch) {
       const q = onHandSearch.toLowerCase()
       if (!s.product.name.toLowerCase().includes(q) && !s.product.code.toLowerCase().includes(q)) return false
@@ -177,6 +190,28 @@ export default function StockPage() {
           value={categoryFilter}
           onChange={setCategoryFilter}
         />
+        <label className="flex items-center gap-1.5 text-xs" style={{ color: colors.textSecondary }}>
+          As at
+          <input
+            type="date"
+            value={asAtDate}
+            max={today}
+            onChange={(e) => setAsAtDate(e.target.value || today)}
+            className="h-7 border rounded px-2 text-xs bg-white focus:outline-none border-[#E0E0E0] focus:border-[#185ABD]"
+            style={{ color: colors.textPrimary }}
+            title="Show stock levels as at the end of this day"
+          />
+        </label>
+        {isHistorical && (
+          <button
+            onClick={() => setAsAtDate(today)}
+            className="h-7 px-2 text-xs rounded border bg-white"
+            style={{ color: colors.process, borderColor: colors.process }}
+            title="Back to live stock levels"
+          >
+            ← Live
+          </button>
+        )}
         <label
           className="flex items-center gap-1.5 text-xs cursor-pointer"
           style={{ color: colors.textSecondary }}
@@ -189,7 +224,24 @@ export default function StockPage() {
           />
           Show zero stock
         </label>
+        <label
+          className="flex items-center gap-1.5 text-xs cursor-pointer"
+          style={{ color: colors.textSecondary }}
+        >
+          <input
+            type="checkbox"
+            checked={belowReorderOnly}
+            onChange={(e) => setBelowReorderOnly(e.target.checked)}
+            className="rounded"
+          />
+          Below reorder only
+        </label>
       </div>
+      {isHistorical && (
+        <p className="mb-2 text-xs shrink-0" style={{ color: colors.warning }}>
+          Showing stock levels as at end of {asAtDate} — not live.
+        </p>
+      )}
       <div className="flex-1 min-h-0">
         <DataTable
           columns={onHandColumns}
@@ -205,7 +257,7 @@ export default function StockPage() {
           products={allStock.map((s) => s.product)}
           onClose={() => setAdjustOpen(false)}
           onSuccess={() => {
-            mutate('/api/stock/on-hand')
+            mutate(`/api/stock/on-hand${isHistorical ? `?asAt=${asAtDate}` : ''}`)
             mutate('/api/stock/movements?pageSize=200')
             setAdjustOpen(false)
           }}
@@ -251,8 +303,8 @@ function AdjustmentModal({
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader><DialogTitle>Manual Stock Adjustment</DialogTitle></DialogHeader>
+      <DialogContent className="sm:max-w-md" showCloseButton={false}>
+        <ModalTitleBar title="Manual Stock Adjustment" onClose={onClose} />
         <div className="space-y-4 mt-2">
           <div>
             <Label>Product</Label>
@@ -311,46 +363,10 @@ function AdjustmentModal({
           </div>
 
           <div className="flex justify-end gap-2 pt-2">
-            <button
-              onClick={onClose}
-              disabled={loading}
-              style={{
-                fontSize: 10,
-                padding: '1px 6px',
-                background: '#E0E0E0',
-                border: '1px solid #999',
-                borderRadius: 2,
-                cursor: loading ? 'not-allowed' : 'pointer',
-                opacity: loading ? 0.6 : 1,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 3,
-              }}
-              onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = '#D0D0D0' }}
-              onMouseLeave={(e) => { if (!loading) e.currentTarget.style.background = '#E0E0E0' }}
-            >
-              Cancel
-            </button>
-            <button
-              onClick={onSubmit}
-              disabled={loading}
-              style={{
-                fontSize: 10,
-                padding: '1px 6px',
-                background: '#E0E0E0',
-                border: '1px solid #999',
-                borderRadius: 2,
-                cursor: loading ? 'not-allowed' : 'pointer',
-                opacity: loading ? 0.6 : 1,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 3,
-              }}
-              onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = '#D0D0D0' }}
-              onMouseLeave={(e) => { if (!loading) e.currentTarget.style.background = '#E0E0E0' }}
-            >
-              {loading ? <><Loader2 style={{ width: 9, height: 9, animation: 'spin 1s linear infinite' }} /> Saving…</> : 'Record Adjustment'}
-            </button>
+            <ModalBtn onClick={onClose} disabled={loading}>Cancel</ModalBtn>
+            <ModalBtn variant="primary" onClick={onSubmit} loading={loading}>
+              {loading ? 'Saving…' : 'Record Adjustment'}
+            </ModalBtn>
           </div>
         </div>
       </DialogContent>
