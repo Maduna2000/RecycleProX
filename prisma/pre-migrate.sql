@@ -81,5 +81,14 @@ BEGIN
     ) pc
     WHERE p."categoryId" IS NULL
       AND lower(regexp_replace(p."category", '[^a-zA-Z0-9]', '', 'g')) = pc.norm;
+    -- Pass 3: normalize the legacy free-text category string to the linked
+    -- category's display name (e.g. 'non_ferrous' → 'Non-Ferrous'), so every
+    -- name-based filter/grouping matches all products uniformly. Products
+    -- created/edited via the UI keep both fields in sync going forward.
+    UPDATE "Product" p
+    SET "category" = pc."name"
+    FROM "ProductCategory" pc
+    WHERE p."categoryId" = pc.id
+      AND p."category" <> pc."name";
   END IF;
 END $$;

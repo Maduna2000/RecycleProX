@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { PageShell } from '@/components/layout/PageShell'
+import { CategoryFilterSelect, useProductCategories } from '@/components/products/CategoryFilterSelect'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
@@ -22,17 +23,6 @@ type StockEntry = {
   totalOut: string
   onHand: string
   hasMovements: boolean
-}
-
-const CATEGORY_LABELS: Record<string, string> = {
-  ferrous: 'Ferrous',
-  non_ferrous: 'Non-Ferrous',
-  copper: 'Copper',
-  aluminium: 'Aluminium',
-  plastic: 'Plastic',
-  paper: 'Paper',
-  e_waste: 'E-Waste',
-  other: 'Other',
 }
 
 export default function StockPage() {
@@ -56,11 +46,14 @@ export default function StockPage() {
   }, [searchParams, isManager, router])
 
   const { data: stockData } = useSWR<{ stock: StockEntry[] }>('/api/stock/on-hand', fetcher)
+  const { expandCategory } = useProductCategories()
 
   const allStock = stockData?.stock ?? []
+  // A parent category selection covers its sub-categories too
+  const categoryNames = categoryFilter ? expandCategory(categoryFilter) : null
   const stock = allStock.filter((s) => {
     if (!showZero && parseFloat(s.onHand) === 0 && !s.hasMovements) return false
-    if (categoryFilter && s.product.category !== categoryFilter) return false
+    if (categoryNames && !categoryNames.has(s.product.category)) return false
     if (onHandSearch) {
       const q = onHandSearch.toLowerCase()
       if (!s.product.name.toLowerCase().includes(q) && !s.product.code.toLowerCase().includes(q)) return false
@@ -108,7 +101,7 @@ export default function StockPage() {
           className="px-2 py-0.5 rounded text-xs font-medium"
           style={{ background: colors.neutralBg, color: colors.textSecondary }}
         >
-          {CATEGORY_LABELS[r.product.category] ?? r.product.category}
+          {r.product.category}
         </span>
       ),
     },
@@ -178,17 +171,12 @@ export default function StockPage() {
             className="pl-7 pr-3 h-7 text-xs rounded border bg-white focus:outline-none w-44 border-[#E0E0E0] focus:border-[#185ABD]"
           />
         </div>
-        <select
+        <CategoryFilterSelect
           className="h-7 border rounded px-2 text-xs bg-white focus:outline-none border-[#E0E0E0] focus:border-[#185ABD]"
           style={{ color: colors.textPrimary }}
           value={categoryFilter}
-          onChange={(e) => setCategoryFilter(e.target.value)}
-        >
-          <option value="">All Categories</option>
-          {Object.entries(CATEGORY_LABELS).map(([v, l]) => (
-            <option key={v} value={v}>{l}</option>
-          ))}
-        </select>
+          onChange={setCategoryFilter}
+        />
         <label
           className="flex items-center gap-1.5 text-xs cursor-pointer"
           style={{ color: colors.textSecondary }}

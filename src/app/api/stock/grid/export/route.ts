@@ -6,12 +6,7 @@ import { getPeriodBounds } from '@/lib/utils/stock-periods'
 import { prisma } from '@/lib/db/prisma'
 import { Prisma } from '@prisma/client'
 import Decimal from 'decimal.js'
-
-const CATEGORY_LABELS: Record<string, string> = {
-  ferrous: 'Ferrous', non_ferrous: 'Non-Ferrous', copper: 'Copper',
-  aluminium: 'Aluminium', plastic: 'Plastic', paper: 'Paper',
-  e_waste: 'E-Waste', other: 'Other',
-}
+import { expandCategoryNames } from '@/lib/services/productService'
 
 /**
  * GET /api/stock/grid/export?period=daily|weekly|mtd&date=YYYY-MM-DD&category=
@@ -33,9 +28,10 @@ export async function GET(req: NextRequest) {
   try {
     const { periodStart, periodEnd, openingCutoff } = getPeriodBounds(period, dateParam)
 
+    // A parent category selection covers its sub-categories too
     const productWhere: Prisma.ProductWhereInput = {
       isActive: true,
-      ...(category ? { category } : undefined),
+      ...(category ? { category: { in: await expandCategoryNames(category) } } : undefined),
     }
 
     const [products, movements] = await Promise.all([
@@ -74,7 +70,7 @@ export async function GET(req: NextRequest) {
       return {
         Code:           p.code,
         Product:        p.name,
-        Category:       CATEGORY_LABELS[p.category] ?? p.category,
+        Category:       p.category,
         Unit:           p.unit,
         'Opening Qty':  openingQty.toFixed(2),
         'Purchased':    purchasedQty.toFixed(2),

@@ -472,3 +472,17 @@ export async function deleteCategory(id: string) {
 export async function countProductsForCategory(name: string): Promise<number> {
   return prisma.product.count({ where: { category: name, isActive: true } })
 }
+
+/**
+ * Names covered by a category filter selection: a parent category covers
+ * itself plus its sub-categories; a child (or unknown name) covers itself.
+ * Use for `category: { in: expandCategoryNames(name) }` filters.
+ */
+export async function expandCategoryNames(name: string): Promise<string[]> {
+  const cat = await prisma.productCategory.findUnique({
+    where: { name },
+    include: { children: { where: { isActive: true }, select: { name: true } } },
+  })
+  if (!cat) return [name]
+  return [cat.name, ...cat.children.map((c) => c.name)]
+}

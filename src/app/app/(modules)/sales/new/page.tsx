@@ -59,11 +59,6 @@ type PendingSale = {
   createdAt: string
 }
 
-const CATEGORY_LABELS: Record<string, string> = {
-  ferrous: 'Ferrous', non_ferrous: 'Non-Ferrous', copper: 'Copper',
-  aluminium: 'Aluminium', plastic: 'Plastic', paper: 'Paper', e_waste: 'E-Waste', other: 'Other',
-}
-
 const emptyLine = (key: number): LineItem => ({
   key, productId: '', product: null, quantity: '', grossQty: '', tareQty: '',
   tareReason: '', deductionQty: '', deductionReason: '', unitPrice: '',
@@ -604,7 +599,7 @@ export default function NewSalePage() {
                       >
                         <option value="">Select…</option>
                         {Object.entries(productsByCategory).map(([cat, prods]) => (
-                          <optgroup key={cat} label={CATEGORY_LABELS[cat] ?? cat}>
+                          <optgroup key={cat} label={cat}>
                             {prods.map((p) => (
                               <option key={p.id} value={p.id}>{p.name} ({p.unit})</option>
                             ))}

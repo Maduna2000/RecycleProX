@@ -9,6 +9,7 @@ import { DataTable, type Column } from '@/components/ui/DataTable'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { PageShell } from '@/components/layout/PageShell'
+import { CategoryFilterSelect } from '@/components/products/CategoryFilterSelect'
 import { colors, fontSize } from '@/lib/design-tokens'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
@@ -26,17 +27,6 @@ type GridRow = {
   closingQty: string
   closingValue: string
   buyPrice: string
-}
-
-const CATEGORY_LABELS: Record<string, string> = {
-  ferrous: 'Ferrous',
-  non_ferrous: 'Non-Ferrous',
-  copper: 'Copper',
-  aluminium: 'Aluminium',
-  plastic: 'Plastic',
-  paper: 'Paper',
-  e_waste: 'E-Waste',
-  other: 'Other',
 }
 
 export default function StockGridPage() {
@@ -81,7 +71,7 @@ export default function StockGridPage() {
       width: '100px',
       render: (r) => (
         <span style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>
-          {CATEGORY_LABELS[r.category] ?? r.category}
+          {r.category}
         </span>
       ),
     },
@@ -178,17 +168,12 @@ export default function StockGridPage() {
         </div>
         <div>
           <p className="text-xs font-medium mb-1" style={{ color: colors.textSecondary }}>Category</p>
-          <select
+          <CategoryFilterSelect
             className="border rounded px-2 h-8 text-xs bg-white focus:outline-none"
             style={{ color: colors.textPrimary, borderColor: colors.border }}
             value={gridCategory}
-            onChange={(e) => setGridCategory(e.target.value)}
-          >
-            <option value="">All Categories</option>
-            {Object.entries(CATEGORY_LABELS).map(([v, l]) => (
-              <option key={v} value={v}>{l}</option>
-            ))}
-          </select>
+            onChange={setGridCategory}
+          />
         </div>
         <button
           onClick={handleExport}

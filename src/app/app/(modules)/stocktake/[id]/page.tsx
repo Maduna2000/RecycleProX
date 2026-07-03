@@ -69,11 +69,6 @@ type Stocktake = {
   entries: StocktakeEntry[]
 }
 
-const CATEGORY_LABELS: Record<string, string> = {
-  ferrous: 'Ferrous', non_ferrous: 'Non-Ferrous', copper: 'Copper',
-  aluminium: 'Aluminium', plastic: 'Plastic', paper: 'Paper', e_waste: 'E-Waste', other: 'Other',
-}
-
 function StatusBadge({ status }: { status: 'open' | 'completed' | 'voided' }) {
   const styleMap: Record<string, React.CSSProperties> = {
     open: { background: colors.actionBg, color: colors.action, border: `1px solid ${colors.action}` },
@@ -498,7 +493,7 @@ export default function StocktakeDetailPage() {
                         </td>
                         <td style={TD}>
                           <span style={{ padding: '2px 6px', borderRadius: 2, fontSize: 10, background: colors.neutralBg, color: colors.textSecondary }}>
-                            {CATEGORY_LABELS[e.product.category] ?? e.product.category}
+                            {e.product.category}
                           </span>
                         </td>
                         <td style={{ ...TD, fontFamily: 'monospace' }}>{Number(e.systemQty).toFixed(2)} {e.product.unit}</td>
