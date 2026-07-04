@@ -79,6 +79,13 @@ export interface ReportDocument {
   reportId: string
   title: string
   subtitle?: string
+  /**
+   * PDF body style. 'grid' (default) = boxed bands and bordered cells;
+   * 'ledger' = the open ruled layout of the legacy Lariat summaries: plain
+   * bold group headings, column labels sharing a row with the material-class
+   * band between thin rules, borderless rows, bold subtotal lines.
+   */
+  pdfStyle?: 'grid' | 'ledger'
   params: {
     from: string
     to: string

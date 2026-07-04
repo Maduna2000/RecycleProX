@@ -152,6 +152,7 @@ export async function buildPurchasesByProductCategory(
   return {
     reportId: 'purchases-by-product-category',
     title: 'Purchases per Product Summary per Account Category',
+    pdfStyle: 'ledger',
     params: {
       from: params.from,
       to: params.to,

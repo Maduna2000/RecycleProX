@@ -108,7 +108,13 @@ function newPage(ctx: Ctx, first: boolean): void {
   ctx.pages.push(ctx.page)
   ctx.y = PAGE_H - MARGIN
   drawPageHeader(ctx, first)
-  drawTableHeader(ctx)
+  if (ctx.report.pdfStyle === 'ledger') {
+    // Ledger layout draws its column labels with each material-class band;
+    // only continuation pages need a bare columns row for context.
+    if (!first) drawLedgerColumnsRow(ctx, undefined)
+  } else {
+    drawTableHeader(ctx)
+  }
 }
 
 function ensureSpace(ctx: Ctx, needed: number): void {
@@ -202,9 +208,148 @@ function drawTableHeader(ctx: Ctx): void {
   ctx.y = headerY
 }
 
+// ─── Ledger layout (legacy Lariat open ruled style) ──────────────────────────
+
+const LEDGER_ROW_H = 12.5
+const LEDGER_BAND_H = 16
+
+/** Column labels row; when a material-class band label is given it shares the row (legacy style). */
+function drawLedgerColumnsRow(ctx: Ctx, bandLabel: string | undefined): void {
+  const { page, bold, report } = ctx
+  const rowY = ctx.y - LEDGER_BAND_H
+
+  page.drawLine({
+    start: { x: MARGIN, y: ctx.y }, end: { x: PAGE_W - MARGIN, y: ctx.y },
+    thickness: 0.9, color: BLACK,
+  })
+
+  if (bandLabel) {
+    page.drawText(truncate(sanitize(bandLabel), CONTENT_W * 0.3), {
+      x: MARGIN, y: rowY + 4.5, size: 9, font: bold, color: BLACK,
+    })
+  }
+
+  let x = MARGIN
+  for (const col of report.columns) {
+    const colW = col.width * CONTENT_W
+    // Legacy leaves the leading text columns unlabeled — the band name owns that space
+    if (col.align === 'right') {
+      const label = truncate(sanitize(col.label), colW)
+      page.drawText(label, {
+        x: x + colW - bold.widthOfTextAtSize(label, 7.5) - CELL_PADDING,
+        y: rowY + 5, size: 7.5, font: bold, color: BLACK,
+      })
+    }
+    x += colW
+  }
+
+  page.drawLine({
+    start: { x: MARGIN, y: rowY }, end: { x: PAGE_W - MARGIN, y: rowY },
+    thickness: 0.5, color: BLACK,
+  })
+  ctx.y = rowY
+}
+
+function drawLedgerGroupHeader(ctx: Ctx, row: FlatRow): void {
+  const { page, bold } = ctx
+  if (row.level === 0) {
+    // Account category: plain bold heading, breathing room above
+    ctx.y -= 6
+    const rowY = ctx.y - 14
+    page.drawText(truncate(sanitize(row.label ?? ''), CONTENT_W), {
+      x: MARGIN, y: rowY + 2, size: 10, font: bold, color: BLACK,
+    })
+    ctx.y = rowY
+    return
+  }
+  if (row.level === 1) {
+    // Material class shares the row with the column labels
+    drawLedgerColumnsRow(ctx, row.label)
+    return
+  }
+  // Subcategory: small bold label on its own line
+  const rowY = ctx.y - LEDGER_ROW_H
+  page.drawText(truncate(sanitize(row.label ?? ''), CONTENT_W * 0.4), {
+    x: MARGIN + 2, y: rowY + 3, size: 7.5, font: bold, color: BLACK,
+  })
+  ctx.y = rowY
+}
+
+function drawLedgerDataRow(ctx: Ctx, row: FlatRow): void {
+  const rowY = ctx.y - LEDGER_ROW_H
+  drawCellsInColumns(ctx, row.cells ?? {}, rowY, LEDGER_ROW_H, ctx.reg, DATA_FONT_SIZE, false)
+  ctx.y = rowY
+}
+
+function drawLedgerTotalRow(ctx: Ctx, row: FlatRow, grand: boolean): void {
+  const { page, bold, report } = ctx
+  const level = row.level
+  const h = grand || level === 0 ? 16 : 14
+  const rowY = ctx.y - h
+
+  // Rule above the totals row — heavier for higher levels
+  const thickness = grand ? 1.2 : level === 0 ? 1 : level === 1 ? 0.8 : 0.5
+  page.drawLine({
+    start: { x: MARGIN, y: ctx.y - 1.5 }, end: { x: PAGE_W - MARGIN, y: ctx.y - 1.5 },
+    thickness, color: BLACK,
+  })
+  if (grand) {
+    page.drawLine({
+      start: { x: MARGIN, y: ctx.y - 3.5 }, end: { x: PAGE_W - MARGIN, y: ctx.y - 3.5 },
+      thickness: 0.5, color: BLACK,
+    })
+  }
+
+  // Legacy shows just the group name (no "TOTAL:"), right-aligned before the amounts
+  const cells = row.cells ?? {}
+  const firstMeasureIdx = report.columns.findIndex((c) =>
+    Object.prototype.hasOwnProperty.call(cells, c.key)
+  )
+  const labelSpanW = report.columns
+    .slice(0, firstMeasureIdx === -1 ? report.columns.length : firstMeasureIdx)
+    .reduce((w, c) => w + c.width * CONTENT_W, 0)
+  const size = grand || level === 0 ? 9 : 8
+  const label = truncate(
+    sanitize(grand ? (row.label ?? 'GRAND TOTAL:') : (row.label ?? '').replace(/\s+TOTAL:$/, '')),
+    Math.max(labelSpanW, 120)
+  )
+  page.drawText(label, {
+    x: Math.max(MARGIN, MARGIN + labelSpanW - bold.widthOfTextAtSize(label, size) - 10),
+    y: rowY + (h - size) / 2, size, font: bold, color: BLACK,
+  })
+
+  drawCellsInColumns(ctx, cells, rowY, h, bold, DATA_FONT_SIZE, false)
+  ctx.y = rowY
+  if (grand || level === 0) ctx.y -= 4
+}
+
 // ─── Row rendering ────────────────────────────────────────────────────────────
 
 function drawFlatRow(ctx: Ctx, row: FlatRow, next: FlatRow | undefined): void {
+  if (ctx.report.pdfStyle === 'ledger') {
+    switch (row.type) {
+      case 'groupHeader': {
+        const lookahead = next?.type === 'groupHeader' ? LEDGER_BAND_H + LEDGER_ROW_H * 2 : LEDGER_ROW_H * 2
+        ensureSpace(ctx, LEDGER_BAND_H + lookahead)
+        drawLedgerGroupHeader(ctx, row)
+        break
+      }
+      case 'data':
+        ensureSpace(ctx, LEDGER_ROW_H)
+        drawLedgerDataRow(ctx, row)
+        break
+      case 'subtotal':
+        ensureSpace(ctx, 18)
+        drawLedgerTotalRow(ctx, row, false)
+        break
+      case 'grandTotal':
+        ensureSpace(ctx, 24)
+        drawLedgerTotalRow(ctx, row, true)
+        break
+    }
+    return
+  }
+
   switch (row.type) {
     case 'groupHeader': {
       // Never strand a band at a page bottom: need the band + ~2 rows,
