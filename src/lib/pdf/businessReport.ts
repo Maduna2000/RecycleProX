@@ -66,6 +66,12 @@ interface Ctx {
   pages: PDFPage[]
   page: PDFPage
   y: number
+  /**
+   * Ledger mode: when no level-1 band exists to carry the column labels
+   * (flat reports, or ticket bands that carry meta instead), draw a bare
+   * columns row at the top of every page including the first.
+   */
+  ledgerTopColumns: boolean
 }
 
 export async function generateBusinessReportPdf(report: ReportDocument): Promise<Uint8Array> {
@@ -75,7 +81,12 @@ export async function generateBusinessReportPdf(report: ReportDocument): Promise
 
   const flat = flattenReportDocument(report)
 
-  const ctx: Ctx = { doc, report, bold, reg, pages: [], page: undefined as unknown as PDFPage, y: 0 }
+  const hasPlainClassBands = flat.some((r) => r.type === 'groupHeader' && r.level === 1 && !r.meta)
+  const ctx: Ctx = {
+    doc, report, bold, reg, pages: [],
+    page: undefined as unknown as PDFPage, y: 0,
+    ledgerTopColumns: !hasPlainClassBands,
+  }
   newPage(ctx, true)
 
   for (let i = 0; i < flat.length; i++) {
@@ -109,9 +120,9 @@ function newPage(ctx: Ctx, first: boolean): void {
   ctx.y = PAGE_H - MARGIN
   drawPageHeader(ctx, first)
   if (ctx.report.pdfStyle === 'ledger') {
-    // Ledger layout draws its column labels with each material-class band;
-    // only continuation pages need a bare columns row for context.
-    if (!first) drawLedgerColumnsRow(ctx, undefined)
+    // Class bands carry the column labels when they exist; otherwise (and on
+    // continuation pages) a bare columns row provides the context.
+    if (!first || ctx.ledgerTopColumns) drawLedgerColumnsRow(ctx, undefined)
   } else {
     drawTableHeader(ctx)
   }
@@ -213,6 +224,16 @@ function drawTableHeader(ctx: Ctx): void {
 const LEDGER_ROW_H = 12.5
 const LEDGER_BAND_H = 16
 
+/** Width of the leading (left-aligned) columns — the space a band label may occupy. */
+function ledgerLabelSpan(ctx: Ctx): number {
+  let span = 0
+  for (const col of ctx.report.columns) {
+    if (col.align === 'right') break
+    span += col.width * CONTENT_W
+  }
+  return Math.max(span, CONTENT_W * 0.25)
+}
+
 /** Column labels row; when a material-class band label is given it shares the row (legacy style). */
 function drawLedgerColumnsRow(ctx: Ctx, bandLabel: string | undefined): void {
   const { page, bold, report } = ctx
@@ -224,7 +245,7 @@ function drawLedgerColumnsRow(ctx: Ctx, bandLabel: string | undefined): void {
   })
 
   if (bandLabel) {
-    page.drawText(truncate(sanitize(bandLabel), CONTENT_W * 0.3), {
+    page.drawText(truncate(sanitize(bandLabel), ledgerLabelSpan(ctx)), {
       x: MARGIN, y: rowY + 4.5, size: 9, font: bold, color: BLACK,
     })
   }
@@ -234,7 +255,11 @@ function drawLedgerColumnsRow(ctx: Ctx, bandLabel: string | undefined): void {
     const colW = col.width * CONTENT_W
     // Legacy leaves the leading text columns unlabeled — the band name owns that space
     if (col.align === 'right') {
-      const label = truncate(sanitize(col.label), colW)
+      // Measure precisely — header labels are short and often just fit
+      let label = sanitize(col.label)
+      while (label.length > 3 && bold.widthOfTextAtSize(label, 7.5) > colW - CELL_PADDING) {
+        label = label.slice(0, -2) + '…'
+      }
       page.drawText(label, {
         x: x + colW - bold.widthOfTextAtSize(label, 7.5) - CELL_PADDING,
         y: rowY + 5, size: 7.5, font: bold, color: BLACK,
@@ -262,9 +287,28 @@ function drawLedgerGroupHeader(ctx: Ctx, row: FlatRow): void {
     ctx.y = rowY
     return
   }
-  if (row.level === 1) {
+  if (row.level === 1 && !row.meta) {
     // Material class shares the row with the column labels
     drawLedgerColumnsRow(ctx, row.label)
+    return
+  }
+  if (row.level === 1) {
+    // Ticket-style band: label left, meta (date · status · method) right,
+    // under a thin rule — column labels live at the top of the page instead
+    const rowY = ctx.y - LEDGER_BAND_H
+    page.drawLine({
+      start: { x: MARGIN, y: ctx.y - 2 }, end: { x: PAGE_W - MARGIN, y: ctx.y - 2 },
+      thickness: 0.5, color: BLACK,
+    })
+    page.drawText(truncate(sanitize(row.label ?? ''), CONTENT_W * 0.45), {
+      x: MARGIN, y: rowY + 3.5, size: 8.5, font: bold, color: BLACK,
+    })
+    const meta = truncate(sanitize(row.meta ?? ''), CONTENT_W * 0.5)
+    page.drawText(meta, {
+      x: PAGE_W - MARGIN - ctx.reg.widthOfTextAtSize(meta, 7.5),
+      y: rowY + 4, size: 7.5, font: ctx.reg, color: DARK_GRAY,
+    })
+    ctx.y = rowY
     return
   }
   // Subcategory: small bold label on its own line
