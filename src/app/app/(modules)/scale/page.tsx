@@ -52,10 +52,6 @@ function orderProductNames(o: ScaleOrder): string {
   return orderLines(o).map(l => l.product.name).join(', ')
 }
 
-function orderCategories(o: ScaleOrder): string {
-  return Array.from(new Set(orderLines(o).map(l => l.product.category))).join(', ')
-}
-
 type StatsData = {
   todayTotal:     number
   todayPending:   number
@@ -1025,15 +1021,15 @@ function OrdersTab() {
       },
     },
     {
-      key: 'product', header: 'Products', width: '170px',
+      key: 'product', header: 'Product', width: '150px',
       render: (o) => {
         const lines = orderLines(o)
-        const names = orderProductNames(o)
+        // Show only the first product to keep rows aligned; the full list is on hover
         return (
-          <span className="truncate block" title={names} style={{ fontSize: fontSize.xs }}>
-            {names}
+          <span className="truncate block" title={orderProductNames(o)} style={{ fontSize: fontSize.xs }}>
+            {lines[0]!.product.name}
             {lines.length > 1 && (
-              <span className="ml-1" style={{ color: colors.textSecondary }}>({lines.length})</span>
+              <span className="ml-1" style={{ color: colors.textSecondary }}>+{lines.length - 1} more</span>
             )}
           </span>
         )
@@ -1042,9 +1038,12 @@ function OrdersTab() {
     {
       key: 'category', header: 'Category', width: '110px',
       render: (o) => {
-        const cats = orderCategories(o)
+        const cats = Array.from(new Set(orderLines(o).map(l => l.product.category)))
         return (
-          <span className="truncate block" title={cats} style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>{cats}</span>
+          <span className="truncate block" title={cats.join(', ')} style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>
+            {cats[0]}
+            {cats.length > 1 && <span className="ml-1">+{cats.length - 1}</span>}
+          </span>
         )
       },
     },
