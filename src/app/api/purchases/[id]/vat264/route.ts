@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
+import { prisma } from '@/lib/db/prisma'
 import { getPurchase } from '@/lib/services/purchaseService'
 import { getAllSettings } from '@/lib/services/settingsService'
+import { CURRENCY_SYMBOLS } from '@/lib/schemas/cashup'
 import { generateVat264 } from '@/lib/pdf/vat264'
 
 export async function GET(
@@ -18,8 +20,13 @@ export async function GET(
   try {
     const purchase = await getPurchase(id)
 
-    // Load yard settings
-    const settings = await getAllSettings()
+    // Load yard settings + operating currency (from the latest cash-up)
+    const [settings, latestCashUp] = await Promise.all([
+      getAllSettings(),
+      prisma.cashUp.findFirst({ orderBy: { sessionDate: 'desc' }, select: { currency: true } }),
+    ])
+    const currencySymbol =
+      CURRENCY_SYMBOLS[latestCashUp?.currency as keyof typeof CURRENCY_SYMBOLS] ?? 'R'
 
     // Load signature bytes if stored in R2
     let signatureBytes: Uint8Array | undefined
@@ -69,6 +76,7 @@ export async function GET(
       lines,
       totalAmount:   purchase.totalAmount.toString(),
       paymentMethod: purchase.paymentMethod,
+      currencySymbol,
       signatureBytes,
     })
 

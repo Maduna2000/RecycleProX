@@ -9,6 +9,7 @@ import { getAllSettings } from '@/lib/services/settingsService'
 import { generateVat264 } from '@/lib/pdf/vat264'
 import { generateTransactionSlip } from '@/lib/pdf/slip'
 import { uploadBytes, purchaseVat264Key, purchaseNoteKey } from '@/lib/r2'
+import { CURRENCY_SYMBOLS } from '@/lib/schemas/cashup'
 import { VAT_RATE, purchaseHeaderVat } from '@/lib/utils/vat'
 import type { CreatePurchaseInput, VoidPurchaseInput } from '@/lib/schemas/purchase'
 import type { ProcessSplitPaymentInput } from '@/lib/schemas/splitPayment'
@@ -84,7 +85,12 @@ type PurchaseWithCustomerAndLines = Prisma.PurchaseGetPayload<{
 }>
 
 async function generateAndStorePurchasePdfs(purchase: PurchaseWithCustomerAndLines): Promise<void> {
-  const settings = await getAllSettings()
+  const [settings, latestCashUp] = await Promise.all([
+    getAllSettings(),
+    prisma.cashUp.findFirst({ orderBy: { sessionDate: 'desc' }, select: { currency: true } }),
+  ])
+  const currencySymbol =
+    CURRENCY_SYMBOLS[latestCashUp?.currency as keyof typeof CURRENCY_SYMBOLS] ?? 'R'
 
   const vat264Lines = purchase.lines.map((l) => ({
     description: l.product.name,
@@ -110,6 +116,7 @@ async function generateAndStorePurchasePdfs(purchase: PurchaseWithCustomerAndLin
       lines:          vat264Lines,
       totalAmount:    purchase.totalAmount.toString(),
       paymentMethod:  purchase.paymentMethod,
+      currencySymbol,
     })
     const key = purchaseVat264Key(purchase.id)
     await uploadBytes(key, bytes, 'application/pdf')
