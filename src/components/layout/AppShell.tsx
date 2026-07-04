@@ -7,8 +7,8 @@ import { useState, useEffect, useCallback } from 'react'
 import useSWR from 'swr'
 import Decimal from 'decimal.js'
 import {
-  RefreshCw, Plus, Printer,
-  BarChart2, ClipboardCheck, FileSpreadsheet,
+  RefreshCw, Plus,
+  BarChart2, ClipboardCheck,
   Download, LogOut, Settings,
   Users, UserPlus, ChevronRight,
   Archive, Landmark,
@@ -114,13 +114,9 @@ function useToolbarButtons(pathname: string, role: string): ToolbarButton[] {
       { label: 'Repayment', icon: BarChart2, variant: 'secondary', iconOnly: true },
     ]
 
+  // Reports has its own in-page Run/Download controls — no toolbar actions
   if (pathname === '/app/reports' || pathname.startsWith('/app/reports/'))
-    return !isMgr ? [] : [
-      { label: 'Generate',     icon: BarChart2,       variant: 'primary' },
-      { label: 'Export CSV',   icon: Download,        variant: 'secondary', iconOnly: true },
-      { label: 'Export Excel', icon: FileSpreadsheet, variant: 'ghost',    iconOnly: true },
-      { label: 'Print',        icon: Printer,         variant: 'ghost',    iconOnly: true },
-    ]
+    return []
 
   if (pathname === '/app/audit-log' || pathname.startsWith('/app/audit-log/'))
     return isAdmin ? [

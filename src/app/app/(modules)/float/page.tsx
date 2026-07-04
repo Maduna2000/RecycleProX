@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import useSWR, { mutate } from 'swr'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -76,6 +77,7 @@ function todayISO() {
 }
 
 export default function FloatPage() {
+  const router = useRouter()
   const { data: session } = useSession()
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
 
@@ -143,6 +145,8 @@ export default function FloatPage() {
         mutateLiveStats(),
         mutateCashUp(),
       ])
+      // Float recorded — close the module and return to the dashboard
+      router.push('/app/dashboard')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to top up float')
     } finally {
