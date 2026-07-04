@@ -25,21 +25,32 @@ export async function GET(req: NextRequest) {
     search:     p.get('search')     ?? undefined,
   })
 
-  const rows = orders.map(o => ({
-    'Order #':       o.orderNumber,
-    'Date':          new Date(o.createdAt).toLocaleDateString('en-ZA'),
-    'Time':          new Date(o.createdAt).toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' }),
-    'Customer':      resolveCustomerName(o),
-    'Phone':         resolveCustomerPhone(o),
-    'Category':      o.product.category,
-    'Product':       o.product.name,
-    'Weight':        o.weight ? new Decimal(o.weight.toString()).toFixed(2) : '—',
-    'Unit':          o.product.unit,
-    'Status':        o.status,
-    'Operator':      o.operator.fullName,
-    'Notes':         o.notes ?? '',
-    'Void Reason':   o.voidReason ?? '',
-  }))
+  // One row per product line — the order header only carries the first line.
+  // Legacy orders without line rows fall back to the header product/weight.
+  const rows = orders.flatMap(o => {
+    const lines = o.lines.length > 0
+      ? o.lines.map(l => ({ product: l.product, weight: l.weight }))
+      : [{ product: o.product, weight: o.weight }]
+    const orderTotal = lines
+      .reduce((sum, l) => sum.plus(l.weight ? l.weight.toString() : 0), new Decimal(0))
+      .toFixed(2)
+    return lines.map(l => ({
+      'Order #':          o.orderNumber,
+      'Date':             new Date(o.createdAt).toLocaleDateString('en-ZA'),
+      'Time':             new Date(o.createdAt).toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' }),
+      'Customer':         resolveCustomerName(o),
+      'Phone':            resolveCustomerPhone(o),
+      'Category':         l.product.category,
+      'Product':          l.product.name,
+      'Weight':           l.weight ? new Decimal(l.weight.toString()).toFixed(2) : '—',
+      'Unit':             l.product.unit,
+      'Order Total (kg)': orderTotal,
+      'Status':           o.status,
+      'Operator':         o.operator.fullName,
+      'Notes':            o.notes ?? '',
+      'Void Reason':      o.voidReason ?? '',
+    }))
+  })
 
   try {
     const ws = XLSX.utils.json_to_sheet(rows)

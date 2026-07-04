@@ -213,7 +213,24 @@ export async function listScaleOrders(filters: ScaleOrderFilters) {
   if (filters.status)     where.status     = filters.status
   if (filters.operatorId) where.operatorId = filters.operatorId
   if (filters.productId)  where.productId  = filters.productId
-  if (filters.categoryName) where.product   = { category: filters.categoryName }
+
+  // Category must match ANY line of the order (orders can carry multiple
+  // products); a parent category also matches its sub-categories. Legacy
+  // orders without line rows fall back to the header product.
+  if (filters.categoryName) {
+    const categoryMatch: Prisma.ProductWhereInput = {
+      OR: [
+        { category: filters.categoryName },
+        { categoryRef: { parent: { name: filters.categoryName } } },
+      ],
+    }
+    andConditions.push({
+      OR: [
+        { lines: { some: { product: categoryMatch } } },
+        { lines: { none: {} }, product: categoryMatch },
+      ],
+    })
+  }
 
   if (filters.customerType === 'account') {
     andConditions.push({ customerId: { not: null } })
@@ -291,25 +308,32 @@ export async function getScaleStats() {
   const today = new Date()
   const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate())
 
-  const [todayTotal, todayPending, todayProcessed, todayVoided, totalWeightResult] = await prisma.$transaction([
+  const [todayTotal, todayPending, todayProcessed, todayVoided, lineWeightSum, legacyWeightSum] = await prisma.$transaction([
     prisma.scaleOrder.count({ where: { createdAt: { gte: startOfDay } } }),
     prisma.scaleOrder.count({ where: { createdAt: { gte: startOfDay }, status: 'pending' } }),
     prisma.scaleOrder.count({ where: { createdAt: { gte: startOfDay }, status: 'processed' } }),
     prisma.scaleOrder.count({ where: { createdAt: { gte: startOfDay }, status: 'voided' } }),
+    // Sum EVERY line's weight — the order header only carries the first line
+    prisma.scaleOrderLine.aggregate({
+      where: { order: { createdAt: { gte: startOfDay }, status: { not: 'voided' } } },
+      _sum: { weight: true },
+    }),
+    // Legacy orders created before per-line rows existed
     prisma.scaleOrder.aggregate({
-      where: { createdAt: { gte: startOfDay }, status: { not: 'voided' } },
+      where: { createdAt: { gte: startOfDay }, status: { not: 'voided' }, lines: { none: {} } },
       _sum: { weight: true },
     }),
   ])
+
+  const todayWeight = new Decimal(lineWeightSum._sum.weight?.toString() ?? '0')
+    .plus(legacyWeightSum._sum.weight?.toString() ?? '0')
 
   return {
     todayTotal,
     todayPending,
     todayProcessed,
     todayVoided,
-    todayWeightKg: totalWeightResult._sum.weight
-      ? new Decimal(totalWeightResult._sum.weight.toString()).toFixed(2)
-      : '0.00',
+    todayWeightKg: todayWeight.toFixed(2),
   }
 }
 

@@ -18,17 +18,42 @@ import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+type ScaleOrderLine = {
+  weight:  string | null
+  product: { name: string; unit: string; category: string }
+}
+
 type ScaleOrder = {
   id:          string
   orderNumber: string
   status:      'pending' | 'processed' | 'voided'
-  weight:      string
+  /** Legacy header field — first line only. Use lines[] for the full order. */
+  weight:      string | null
   createdAt:   string
   photoR2Keys: string[]
   notes?:      string
   customer:    { id: string; firstName: string; lastName: string; phone: string; customerType?: string } | null
-  product:     { id: string; name: string; category: { id: string; name: string } }
+  product:     { id: string; name: string; unit?: string; category: string }
   operator:    { id: string; fullName: string }
+  lines?:      ScaleOrderLine[]
+}
+
+/** All product lines of an order; legacy orders without line rows fall back to the header product. */
+function orderLines(o: ScaleOrder): ScaleOrderLine[] {
+  if (o.lines && o.lines.length > 0) return o.lines
+  return [{ weight: o.weight, product: { name: o.product.name, unit: o.product.unit ?? 'kg', category: o.product.category } }]
+}
+
+function orderTotalWeight(o: ScaleOrder): number {
+  return orderLines(o).reduce((sum, l) => sum + (l.weight ? Number(l.weight) : 0), 0)
+}
+
+function orderProductNames(o: ScaleOrder): string {
+  return orderLines(o).map(l => l.product.name).join(', ')
+}
+
+function orderCategories(o: ScaleOrder): string {
+  return Array.from(new Set(orderLines(o).map(l => l.product.category))).join(', ')
 }
 
 type StatsData = {
@@ -808,7 +833,7 @@ function OrdersTab() {
   const [status,       setStatus]       = useState('')
   const [dateFrom,     setDateFrom]     = useState('')
   const [dateTo,       setDateTo]       = useState('')
-  const [categoryId,   setCategoryId]   = useState('')
+  const [categoryName, setCategoryName] = useState('')
   const [operatorId,   setOperatorId]   = useState('')
   const [customerType, setCustomerType] = useState('')
   const [page,         setPage]         = useState(1)
@@ -828,11 +853,11 @@ function OrdersTab() {
   const debouncedSearch = useDebounce(search, 300)
   const abortRef = useRef<AbortController | null>(null)
 
-  const hasFilters = !!(search || status || dateFrom || dateTo || categoryId || operatorId || customerType)
+  const hasFilters = !!(search || status || dateFrom || dateTo || categoryName || operatorId || customerType)
 
   function clearFilters() {
     setSearch(''); setStatus(''); setDateFrom(''); setDateTo('')
-    setCategoryId(''); setOperatorId(''); setCustomerType(''); setPage(1)
+    setCategoryName(''); setOperatorId(''); setCustomerType(''); setPage(1)
   }
 
   const fetchOrders = useCallback(async (pg: number) => {
@@ -846,7 +871,7 @@ function OrdersTab() {
       ...(status          && { status }),
       ...(dateFrom        && { dateFrom }),
       ...(dateTo          && { dateTo }),
-      ...(categoryId      && { categoryId }),
+      ...(categoryName    && { categoryName }),
       ...(operatorId      && { operatorId }),
       ...(customerType    && { customerType }),
     })
@@ -861,25 +886,25 @@ function OrdersTab() {
     } finally {
       setLoading(false)
     }
-  }, [debouncedSearch, status, dateFrom, dateTo, categoryId, operatorId, customerType])
+  }, [debouncedSearch, status, dateFrom, dateTo, categoryName, operatorId, customerType])
 
   // When filters change, reset to page 1; when page changes, fetch that page
-  const prevFiltersRef = useRef({ debouncedSearch, status, dateFrom, dateTo, categoryId, operatorId, customerType })
+  const prevFiltersRef = useRef({ debouncedSearch, status, dateFrom, dateTo, categoryName, operatorId, customerType })
   useEffect(() => {
     const prev = prevFiltersRef.current
     const filtersChanged =
       prev.debouncedSearch !== debouncedSearch || prev.status !== status ||
       prev.dateFrom !== dateFrom || prev.dateTo !== dateTo ||
-      prev.categoryId !== categoryId || prev.operatorId !== operatorId ||
+      prev.categoryName !== categoryName || prev.operatorId !== operatorId ||
       prev.customerType !== customerType
-    prevFiltersRef.current = { debouncedSearch, status, dateFrom, dateTo, categoryId, operatorId, customerType }
+    prevFiltersRef.current = { debouncedSearch, status, dateFrom, dateTo, categoryName, operatorId, customerType }
     if (filtersChanged) {
       setPage(1)
       fetchOrders(1)
     } else {
       fetchOrders(page)
     }
-  }, [fetchOrders, page, debouncedSearch, status, dateFrom, dateTo, categoryId, operatorId, customerType]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [fetchOrders, page, debouncedSearch, status, dateFrom, dateTo, categoryName, operatorId, customerType]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     fetcher('/api/scale/operators?limit=100')
@@ -925,24 +950,29 @@ function OrdersTab() {
         ...(status          && { status }),
         ...(dateFrom        && { dateFrom }),
         ...(dateTo          && { dateTo }),
-        ...(categoryId      && { categoryId }),
+        ...(categoryName    && { categoryName }),
         ...(operatorId      && { operatorId }),
         ...(customerType    && { customerType }),
       })
       const data = await fetcher(`/api/scale/orders?${params}`)
       const rows: ScaleOrder[] = data.orders ?? []
-      const headers = ['Order #', 'Date', 'Customer', 'Type', 'Product', 'Category', 'Weight (kg)', 'Status', 'Operator']
-      const lines = rows.map(o => [
-        o.orderNumber,
-        new Date(o.createdAt).toLocaleString('en-ZA'),
-        o.customer ? `${o.customer.firstName} ${o.customer.lastName}` : 'Walk-in',
-        o.customer?.customerType === 'account' ? 'Account' : 'Walk-in',
-        o.product.name,
-        o.product.category.name,
-        o.weight ?? '—',
-        o.status,
-        o.operator.fullName,
-      ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
+      const headers = ['Order #', 'Date', 'Customer', 'Type', 'Product', 'Category', 'Weight (kg)', 'Order Total (kg)', 'Status', 'Operator']
+      // One row per product line so every weight is captured
+      const lines = rows.flatMap(o => {
+        const total = orderTotalWeight(o).toFixed(2)
+        return orderLines(o).map(l => [
+          o.orderNumber,
+          new Date(o.createdAt).toLocaleString('en-ZA'),
+          o.customer ? `${o.customer.firstName} ${o.customer.lastName}` : 'Walk-in',
+          o.customer?.customerType === 'account' ? 'Account' : 'Walk-in',
+          l.product.name,
+          l.product.category,
+          l.weight ? Number(l.weight).toFixed(2) : '—',
+          total,
+          o.status,
+          o.operator.fullName,
+        ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
+      })
       const csv = [headers.join(','), ...lines].join('\n')
       const blob = new Blob([csv], { type: 'text/csv' })
       const url  = URL.createObjectURL(blob)
@@ -995,24 +1025,43 @@ function OrdersTab() {
       },
     },
     {
-      key: 'product', header: 'Product', width: '130px',
-      render: (o) => (
-        <span className="truncate block" title={o.product.name} style={{ fontSize: fontSize.xs }}>{o.product.name}</span>
-      ),
+      key: 'product', header: 'Products', width: '170px',
+      render: (o) => {
+        const lines = orderLines(o)
+        const names = orderProductNames(o)
+        return (
+          <span className="truncate block" title={names} style={{ fontSize: fontSize.xs }}>
+            {names}
+            {lines.length > 1 && (
+              <span className="ml-1" style={{ color: colors.textSecondary }}>({lines.length})</span>
+            )}
+          </span>
+        )
+      },
     },
     {
       key: 'category', header: 'Category', width: '110px',
-      render: (o) => (
-        <span style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>{o.product.category.name}</span>
-      ),
+      render: (o) => {
+        const cats = orderCategories(o)
+        return (
+          <span className="truncate block" title={cats} style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>{cats}</span>
+        )
+      },
     },
     {
-      key: 'weight', header: 'Weight', width: '90px',
-      render: (o) => (
-        <span className="block text-right" style={{ fontSize: fontSize.xs, fontWeight: fontWeight.semibold, fontFamily: 'monospace' }}>
-          {o.weight ? `${Number(o.weight).toFixed(2)} kg` : '—'}
-        </span>
-      ),
+      key: 'weight', header: 'Total Weight', width: '100px',
+      render: (o) => {
+        const total = orderTotalWeight(o)
+        return (
+          <span
+            className="block text-right"
+            title={orderLines(o).map(l => `${l.product.name}: ${l.weight ? Number(l.weight).toFixed(2) : '—'} ${l.product.unit}`).join('\n')}
+            style={{ fontSize: fontSize.xs, fontWeight: fontWeight.semibold, fontFamily: 'monospace' }}
+          >
+            {total > 0 ? `${total.toFixed(2)} kg` : '—'}
+          </span>
+        )
+      },
     },
     {
       key: 'status', header: 'Status', width: '90px',
@@ -1095,13 +1144,13 @@ function OrdersTab() {
         </select>
 
         <select
-          value={categoryId}
-          onChange={e => { setCategoryId(e.target.value); setPage(1) }}
+          value={categoryName}
+          onChange={e => { setCategoryName(e.target.value); setPage(1) }}
           className="h-7 px-2 border border-[#E0E0E0] bg-white focus:outline-none focus:border-[#185ABD] text-[12px] text-[#212529]"
           style={{ borderRadius: 2 }}
         >
           <option value="">All Categories</option>
-          {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
         </select>
 
         <select
