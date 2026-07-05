@@ -393,7 +393,7 @@ export default function NewSalePage() {
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
 
           {/* Title bar */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', borderBottom: '2px solid #B0B0B0', background: 'linear-gradient(180deg,#EAEAEA 0%,#D4D4D4 100%)', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderBottom: '2px solid #B0B0B0', background: 'linear-gradient(180deg,#EAEAEA 0%,#D4D4D4 100%)', flexShrink: 0 }}>
             <span style={{ fontSize: 12, fontWeight: 700, color: '#1B3A6B', marginRight: 2 }}>Buyer Name</span>
 
             {/* Walk-in / Account toggle */}
@@ -436,11 +436,11 @@ export default function NewSalePage() {
           <div style={{ width: 310, flexShrink: 0, display: 'flex', flexDirection: 'column', borderRight: '1px solid #C0C0C0', overflowY: 'auto' }}>
 
           {/* Buyer selector area */}
-          <div style={{ flexShrink: 0, padding: '8px 10px', borderBottom: '1px solid #E0E0E0' }}>
+          <div style={{ flexShrink: 0, padding: '5px 10px', borderBottom: '1px solid #E0E0E0' }}>
 
             {/* Walk-in fields */}
             {buyerMode === 'walkin' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                 <div>
                   <p style={{ fontSize: 10, fontWeight: 600, color: '#6C757D', marginBottom: 2 }}>
                     Buyer Name <span style={{ color: '#EF4444' }}>*</span>
@@ -449,7 +449,7 @@ export default function NewSalePage() {
                     value={buyerName}
                     onChange={(e) => setBuyerName(e.target.value)}
                     placeholder="Name or company…"
-                    style={{ height: 28, width: '100%', fontSize: 12, padding: '0 8px', border: '1px solid #ABABAB', borderRadius: 2, outline: 'none', color: '#212529' }}
+                    style={{ height: 26, width: '100%', fontSize: 12, padding: '0 8px', border: '1px solid #ABABAB', borderRadius: 2, outline: 'none', color: '#212529' }}
                   />
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
@@ -460,7 +460,7 @@ export default function NewSalePage() {
                       onChange={(e) => setBuyerIdNumber(e.target.value)}
                       placeholder="13 digits"
                       maxLength={13}
-                      style={{ height: 28, width: '100%', fontSize: 11, fontFamily: 'monospace', padding: '0 8px', border: '1px solid #ABABAB', borderRadius: 2, outline: 'none', color: '#212529' }}
+                      style={{ height: 26, width: '100%', fontSize: 11, fontFamily: 'monospace', padding: '0 8px', border: '1px solid #ABABAB', borderRadius: 2, outline: 'none', color: '#212529' }}
                     />
                   </div>
                   <div>
@@ -469,7 +469,7 @@ export default function NewSalePage() {
                       value={buyerPhone}
                       onChange={(e) => setBuyerPhone(e.target.value)}
                       placeholder="e.g. 0821234567"
-                      style={{ height: 28, width: '100%', fontSize: 11, padding: '0 8px', border: '1px solid #ABABAB', borderRadius: 2, outline: 'none', color: '#212529' }}
+                      style={{ height: 26, width: '100%', fontSize: 11, padding: '0 8px', border: '1px solid #ABABAB', borderRadius: 2, outline: 'none', color: '#212529' }}
                     />
                   </div>
                 </div>
@@ -515,18 +515,18 @@ export default function NewSalePage() {
           </div>
 
           {/* Comments */}
-          <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8, padding: '5px 10px', borderBottom: '1px solid #E0E0E0' }}>
+          <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8, padding: '3px 10px', borderBottom: '1px solid #E0E0E0' }}>
             <label style={{ fontSize: 11, fontWeight: 600, color: '#374151', whiteSpace: 'nowrap' }}>Comments:</label>
             <input
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Any remarks…"
-              style={{ flex: 1, fontSize: 12, padding: '3px 8px', border: '1px solid #ABABAB', borderRadius: 2, color: '#212529', outline: 'none' }}
+              style={{ flex: 1, fontSize: 12, padding: '2px 8px', border: '1px solid #ABABAB', borderRadius: 2, color: '#212529', outline: 'none' }}
             />
           </div>
 
           {/* Payment Type */}
-          <div style={{ flexShrink: 0, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px 10px', padding: '6px 10px' }}>
+          <div style={{ flexShrink: 0, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '3px 10px', padding: '3px 10px' }}>
             <label style={{ fontSize: 11, fontWeight: 600, color: '#374151', whiteSpace: 'nowrap', width: '100%' }}>Payment Type:</label>
             {(['unpaid', 'cash', 'cheque', 'eft'] as const).map((type) => (
               <label key={type} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#374151', cursor: 'pointer' }}>
@@ -820,10 +820,10 @@ export default function NewSalePage() {
           {/* end Two-column body */}
 
           {/* ── Pending Sales ──────────────────────────────────────────────── */}
-          <div style={{ flexShrink: 0, borderTop: '2px solid #B0B0B0', display: 'flex', flexDirection: 'column', height: 165 }}>
+          <div style={{ flexShrink: 0, borderTop: '2px solid #B0B0B0', display: 'flex', flexDirection: 'column', height: 85 }}>
 
             {/* Header */}
-            <div style={{ ...headerBg, padding: '4px 8px', display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+            <div style={{ ...headerBg, padding: '3px 8px', display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
               <span style={{ fontSize: 11, fontWeight: 700, color: '#1B3A6B' }}>Pending Sales</span>
               {pendingSales.length > 0 && (
                 <span style={{ fontSize: 10, fontWeight: 700, background: '#F59E0B', color: '#fff', borderRadius: 10, padding: '0 5px', minWidth: 18, textAlign: 'center' }}>
@@ -846,7 +846,7 @@ export default function NewSalePage() {
             </div>
 
             {/* Column headers */}
-            <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr 48px 80px 80px 60px 28px', gap: 4, padding: '3px 8px', background: '#F8F9FA', borderBottom: '1px solid #D0D0D0', flexShrink: 0 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr 48px 80px 80px 60px 28px', gap: 4, padding: '2px 8px', background: '#F8F9FA', borderBottom: '1px solid #D0D0D0', flexShrink: 0 }}>
               {['Ref #', 'Buyer', 'Lines', 'Total', 'Balance', 'Time', ''].map((h, i) => (
                 <span key={i} style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#6C757D' }}>{h}</span>
               ))}
@@ -855,7 +855,7 @@ export default function NewSalePage() {
             {/* Rows */}
             <div style={{ overflowY: 'auto', flex: 1 }}>
               {pendingSales.length === 0 ? (
-                <div style={{ padding: '16px 8px', textAlign: 'center', fontSize: 11, color: '#9CA3AF' }}>
+                <div style={{ padding: '8px 8px', textAlign: 'center', fontSize: 11, color: '#9CA3AF' }}>
                   No pending sales
                 </div>
               ) : pendingSales.map((s) => {
@@ -942,7 +942,7 @@ export default function NewSalePage() {
           </div>
 
           {/* Totals */}
-          <div style={{ flexShrink: 0, padding: '6px 10px', borderTop: '2px solid #B0B0B0', background: '#F8F9FA', display: 'flex', justifyContent: 'flex-end' }}>
+          <div style={{ flexShrink: 0, padding: '4px 10px', borderTop: '2px solid #B0B0B0', background: '#F8F9FA', display: 'flex', justifyContent: 'flex-end' }}>
             <div style={{ minWidth: 220, display: 'flex', flexDirection: 'column', gap: 2 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
                 <span style={{ color: '#6C757D' }}>Sub Total</span>

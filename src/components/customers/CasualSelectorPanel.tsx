@@ -309,14 +309,14 @@ export const CasualSelectorPanel = forwardRef<CasualSelectorPanelRef, Props>(
 
     // ── Styles ────────────────────────────────────────────────────────────────
 
-    const inputCls  = 'h-8 text-[12px] focus:ring-1 focus:ring-[#185ABD]'
+    const inputCls  = 'h-7 text-[12px] focus:ring-1 focus:ring-[#185ABD]'
     const lockedCls = isLocked ? 'bg-[#F8F9FA]' : ''
     const isBlacklisted = existingCustomer?.blacklisted === true
 
     // ── Render ────────────────────────────────────────────────────────────────
 
     return (
-      <div className="space-y-2">
+      <div className="space-y-1">
         {/* Row 1: National ID + inline Scan ID button */}
         <div className="flex gap-2">
           <div className="relative flex-1">
@@ -338,7 +338,7 @@ export const CasualSelectorPanel = forwardRef<CasualSelectorPanelRef, Props>(
             disabled={scanStatus === 'scanning'}
             onClick={() => fileInputRef.current?.click()}
             title={scanR2Key ? 'Re-scan ID document' : 'Scan ID document — upload a photo'}
-            className="h-8 px-2.5 rounded border flex items-center gap-1.5 text-[11px] font-medium
+            className="h-7 px-2.5 rounded border flex items-center gap-1.5 text-[11px] font-medium
                        transition-colors border-[#185ABD] text-[#185ABD] bg-blue-50 hover:bg-blue-100
                        disabled:opacity-50 disabled:cursor-not-allowed shrink-0 whitespace-nowrap"
           >
