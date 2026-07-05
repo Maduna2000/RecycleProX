@@ -454,6 +454,20 @@ export function AppShell({
   const toolbarBtns = useToolbarButtons(pathname, role)
   const moduleName  = getModuleName(pathname)
 
+  // Pages are designed for ≥760px viewport height; on shorter windows
+  // (small laptops, OS display scaling) scale the whole shell down like
+  // a browser zoom-out so nothing gets crushed or cut off.
+  const [uiScale, setUiScale] = useState(1)
+  useEffect(() => {
+    function fit() {
+      const s = Math.min(1, Math.max(0.7, window.innerHeight / 760))
+      setUiScale(Math.round(s * 1000) / 1000)
+    }
+    fit()
+    window.addEventListener('resize', fit)
+    return () => window.removeEventListener('resize', fit)
+  }, [])
+
   // Dynamic route title (for detail pages like /app/purchases/[id])
   const { title: recordTitle, isDetailPage, parentPath, parentLabel } = useRecordTitle(pathname)
 
@@ -474,7 +488,11 @@ export function AppShell({
   return (
     <div
       className="flex flex-col overflow-hidden"
-      style={{ height: '100dvh', fontFamily: 'var(--rpx-font, system-ui)' }}
+      style={{
+        height: uiScale === 1 ? '100dvh' : `calc(100dvh / ${uiScale})`,
+        zoom: uiScale === 1 ? undefined : uiScale,
+        fontFamily: 'var(--rpx-font, system-ui)',
+      }}
     >
       {/* ── ZONE 1: Title Bar ─────────────────────────────────── */}
       <header
