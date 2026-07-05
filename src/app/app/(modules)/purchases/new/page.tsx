@@ -469,7 +469,7 @@ export default function NewPurchasePage() {
       <div style={{ display: 'flex', flex: 1, minHeight: 0, background: '#fff', border: '1px solid #B0B0B0', borderRadius: 2, overflow: 'hidden' }}>
 
         {/* ── LEFT COLUMN ──────────────────────────────────────────────── */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflowX: 'hidden', overflowY: 'auto' }}>
 
           {/* Title bar — Customer Name label + Casual/Account toggle + GRV/Invoice */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', borderBottom: '2px solid #B0B0B0', background: 'linear-gradient(180deg,#EAEAEA 0%,#D4D4D4 100%)', flexShrink: 0 }}>
@@ -516,7 +516,7 @@ export default function NewPurchasePage() {
           </div>
 
           {/* ── Two-column body ───────────────────────────────────────────── */}
-          <div style={{ flex: 1, minHeight: 0, display: 'flex', overflow: 'hidden' }}>
+          <div style={{ flex: 1, minHeight: 225, display: 'flex', overflow: 'hidden' }}>
 
           {/* Customer sub-panel (left) */}
           <div style={{ width: 310, flexShrink: 0, display: 'flex', flexDirection: 'column', borderRight: '1px solid #C0C0C0', overflowY: 'auto' }}>
@@ -927,7 +927,7 @@ export default function NewPurchasePage() {
           {/* end Two-column body */}
 
           {/* ── Pending Purchases ──────────────────────────────────────────── */}
-          <div style={{ flexShrink: 0, borderTop: '2px solid #B0B0B0', display: 'flex', flexDirection: 'column', height: 165 }}>
+          <div style={{ flex: '0 1 165px', minHeight: 40, borderTop: '2px solid #B0B0B0', display: 'flex', flexDirection: 'column' }}>
 
             {/* Header */}
             <div style={{ ...headerBg, padding: '4px 8px', display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
