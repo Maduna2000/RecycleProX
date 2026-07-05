@@ -820,7 +820,7 @@ export default function NewSalePage() {
           {/* end Two-column body */}
 
           {/* ── Pending Sales ──────────────────────────────────────────────── */}
-          <div style={{ flex: '0 1 165px', minHeight: 40, borderTop: '2px solid #B0B0B0', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ flex: '0 1 110px', minHeight: 28, borderTop: '2px solid #B0B0B0', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
             {/* Header */}
             <div style={{ ...headerBg, padding: '4px 8px', display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
