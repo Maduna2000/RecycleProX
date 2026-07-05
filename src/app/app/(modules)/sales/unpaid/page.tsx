@@ -85,9 +85,6 @@ export default function UnpaidSalesPage() {
   )
 
   const grandTotal = sales.reduce((acc, s) => acc.plus(outstanding(s)), new Decimal(0))
-  const subtitle   = !isLoading
-    ? `${sales.length} unpaid sale${sales.length !== 1 ? 's' : ''}`
-    : 'Deferred payment sales'
 
   const columns: Column<Sale>[] = [
     {
@@ -190,7 +187,7 @@ export default function UnpaidSalesPage() {
   ]
 
   return (
-    <PageShell title="Unpaid Sales" subtitle={subtitle}>
+    <PageShell>
 
       {/* Grand total banner */}
       {!isLoading && sales.length > 0 && (

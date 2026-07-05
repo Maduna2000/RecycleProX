@@ -249,8 +249,6 @@ export default function ExpensesPage() {
 
   return (
     <PageShell
-      title="Expenses"
-      subtitle={`${data?.total ?? expenses.length} expenses`}
       tabs={pageTabs}
       activeTab={tab}
       onTabChange={(v) => setTab(v as PageTab)}
@@ -320,6 +318,9 @@ export default function ExpensesPage() {
             <X style={{ width: 9, height: 9 }} /> Clear
           </button>
         )}
+        <span className="ml-auto" style={{ fontSize: 11, color: '#6C757D' }}>
+          {data?.total ?? expenses.length} expenses
+        </span>
       </div>
 
       {/* Approved total banner */}

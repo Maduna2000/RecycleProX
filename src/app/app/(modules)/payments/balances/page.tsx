@@ -87,10 +87,12 @@ export default function AccountBalancesPage() {
   ]
 
   return (
-    <PageShell
-      title="Account Balances"
-      subtitle={outstandingCount > 0 ? `${outstandingCount} with outstanding balance · R ${totalOutstanding.toFixed(2)} total` : 'Customer account balances'}
-    >
+    <PageShell>
+      {outstandingCount > 0 && (
+        <p className="shrink-0 text-xs" style={{ color: '#6C757D' }}>
+          {outstandingCount} with outstanding balance · R {totalOutstanding.toFixed(2)} total
+        </p>
+      )}
       <div className="flex-1 min-h-0">
         <DataTable
           columns={balanceColumns}

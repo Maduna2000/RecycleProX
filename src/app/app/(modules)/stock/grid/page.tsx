@@ -140,10 +140,7 @@ export default function StockGridPage() {
   ]
 
   return (
-    <PageShell
-      title="Stock Grid"
-      subtitle={`${gridData?.grid?.length ?? 0} products`}
-    >
+    <PageShell>
       <div className="flex flex-wrap gap-3 items-end shrink-0 mb-3">
         <div>
           <p className="text-xs font-medium mb-1" style={{ color: colors.textSecondary }}>Period</p>
@@ -175,11 +172,13 @@ export default function StockGridPage() {
             onChange={setGridCategory}
           />
         </div>
+        <span className="ml-auto" style={{ fontSize: 11, color: '#6C757D', paddingBottom: 3 }}>
+          {gridData?.grid?.length ?? 0} products
+        </span>
         <button
           onClick={handleExport}
           disabled={exporting}
           style={{
-            marginLeft: 'auto',
             fontSize: 10,
             padding: '1px 6px',
             background: '#E0E0E0',

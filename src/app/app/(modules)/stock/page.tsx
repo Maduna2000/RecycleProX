@@ -197,10 +197,7 @@ export default function StockPage() {
   ].filter(Boolean).join(' · ')
 
   return (
-    <PageShell
-      title="Stock On Hand"
-      subtitle={subtitleParts}
-    >
+    <PageShell>
       <div className="flex gap-2 flex-wrap items-center shrink-0 mb-3">
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3" style={{ color: colors.textSecondary }} />
@@ -266,6 +263,7 @@ export default function StockPage() {
           />
           Below reorder only
         </label>
+        <span className="ml-auto" style={{ fontSize: 11, color: '#6C757D' }}>{subtitleParts}</span>
       </div>
       {period && (
         <p className="mb-2 text-xs shrink-0" style={{ color: colors.warning }}>

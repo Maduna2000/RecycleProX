@@ -87,9 +87,6 @@ export default function UnpaidPurchasesPage() {
   )
 
   const grandTotal = purchases.reduce((acc, p) => acc.plus(balance(p)), new Decimal(0))
-  const subtitle   = !isLoading
-    ? `${purchases.length} unpaid purchase${purchases.length !== 1 ? 's' : ''}`
-    : 'Deferred payment purchases'
 
   const columns: Column<Purchase>[] = [
     {
@@ -192,7 +189,7 @@ export default function UnpaidPurchasesPage() {
   ]
 
   return (
-    <PageShell title="Unpaid Purchases" subtitle={subtitle}>
+    <PageShell>
 
       {/* Grand total banner */}
       {!isLoading && purchases.length > 0 && (

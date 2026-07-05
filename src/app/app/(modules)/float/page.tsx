@@ -182,7 +182,7 @@ export default function FloatPage() {
   }
 
   return (
-    <PageShell title="Float" subtitle="Opening cash float">
+    <PageShell>
       <div className="max-w-3xl mx-auto w-full space-y-5 pb-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
 

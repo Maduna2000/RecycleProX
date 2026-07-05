@@ -194,10 +194,7 @@ export default function PurchasesPage() {
   ]
 
   return (
-    <PageShell
-      title="Purchases"
-      subtitle={`${data?.total ?? 0} total records`}
-    >
+    <PageShell>
       {/* Filters */}
       <div className="flex gap-2 flex-wrap shrink-0 mb-3 items-center">
         <div className="relative">

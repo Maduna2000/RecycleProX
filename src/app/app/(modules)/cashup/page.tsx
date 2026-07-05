@@ -683,7 +683,7 @@ export default function CashUpPage() {
 
   if (isLoading) {
     return (
-      <PageShell title="Cash-Up" subtitle="Daily reconciliation">
+      <PageShell>
         <div className="flex items-center justify-center h-40 text-sm" style={{ color: colors.textSecondary }}>
           Loading…
         </div>
@@ -695,7 +695,7 @@ export default function CashUpPage() {
   const isPreviousDay = cashUp && cashUp.status === 'open' && sessionDate !== todayISO
 
   return (
-    <PageShell title="Cash-Up" subtitle={isPreviousDay ? `${sessionDate} · ⚠ Previous day — submit to continue` : `${sessionDate} · Daily cash reconciliation`}>
+    <PageShell>
       <div className="max-w-6xl mx-auto w-full space-y-4 pb-6">
 
         {/* No session */}
@@ -807,6 +807,7 @@ export default function CashUpPage() {
             {/* Status + refresh row */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
+                <span className="text-xs" style={{ color: colors.textMuted }}>{sessionDate}</span>
                 {cashUp.status === 'open' && isPreviousDay && <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: colors.dangerBg, color: colors.danger }}>Previous Day — Submit Required</span>}
                 {cashUp.status === 'open' && !isPreviousDay && <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: colors.warningBg, color: colors.warning }}>Open</span>}
                 {cashUp.status === 'submitted' && <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: colors.processBg, color: colors.process }}>Submitted — Awaiting Approval</span>}

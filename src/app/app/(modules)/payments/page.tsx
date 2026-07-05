@@ -132,10 +132,7 @@ export default function PaymentsPage() {
   ]
 
   return (
-    <PageShell
-      title="Payments"
-      subtitle="Payment history"
-    >
+    <PageShell>
       <div className="flex gap-2 flex-wrap items-center shrink-0 mb-3">
         <div className="relative">
           <Search

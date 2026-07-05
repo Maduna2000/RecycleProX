@@ -59,9 +59,6 @@ export default function CasualsPage() {
     letter ? c.lastName.toUpperCase().startsWith(letter) : true,
   )
 
-  const count = data?.total ?? 0
-  const subtitle = `${count} casual seller${count !== 1 ? 's' : ''} on record`
-
   function refreshList() {
     mutate((key) => typeof key === 'string' && key.includes('/api/customers'), undefined, { revalidate: true })
   }
@@ -198,7 +195,7 @@ export default function CasualsPage() {
   ]
 
   return (
-    <PageShell title="Casuals" subtitle={subtitle}>
+    <PageShell>
       <div className="flex flex-col flex-1 min-h-0 gap-3">
 
         {/* Filter bar */}

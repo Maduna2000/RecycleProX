@@ -1721,8 +1721,6 @@ function ScaleManagementInner() {
 
   return (
     <PageShell
-      title="Scale Station"
-      subtitle="View scale orders, manage operators, and process transactions"
       tabs={TABS}
       activeTab={activeTab}
       onTabChange={changeTab}

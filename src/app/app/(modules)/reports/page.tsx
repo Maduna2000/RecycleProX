@@ -37,7 +37,7 @@ export default function ReportsPage() {
 
   if (!isManager) {
     return (
-      <PageShell title="Reports" subtitle="Business reports and record keeping">
+      <PageShell>
         <div className="flex items-center justify-center h-40 text-sm" style={{ color: colors.textSecondary }}>
           Access restricted to managers and administrators.
         </div>
@@ -51,8 +51,6 @@ export default function ReportsPage() {
 
   return (
     <PageShell
-      title="Reports"
-      subtitle="Business reports and record keeping"
       tabs={TABS}
       activeTab={tab}
       onTabChange={setTab}

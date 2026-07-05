@@ -79,7 +79,6 @@ export default function AuditLogPage() {
   }
 
   const totalPages = data ? Math.ceil(data.total / PAGE_SIZE) : 0
-  const subtitle   = data ? `${data.total.toLocaleString()} entries` : 'System activity trail'
   const hasFilters = !!(table || action || from)
 
   const fromIdx = (page - 1) * PAGE_SIZE + 1
@@ -91,7 +90,7 @@ export default function AuditLogPage() {
   function clearFilters() { setTable(''); setAction(''); setFrom(''); setTo(today); setPage(1) }
 
   return (
-    <PageShell title="Audit Log" subtitle={subtitle}>
+    <PageShell>
       <div className="flex flex-col flex-1 min-h-0 gap-3">
 
         {/* Filter bar */}

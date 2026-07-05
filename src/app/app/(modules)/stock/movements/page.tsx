@@ -128,10 +128,7 @@ export default function StockMovementsPage() {
   ]
 
   return (
-    <PageShell
-      title="Stock Movements"
-      subtitle={`${movementsData?.total ?? 0} movements recorded`}
-    >
+    <PageShell>
       <div className="flex gap-2 flex-wrap items-center shrink-0 mb-3">
         <select
           className="h-7 border rounded px-2 text-xs bg-white focus:outline-none border-[#E0E0E0] focus:border-[#185ABD]"
@@ -192,6 +189,9 @@ export default function StockMovementsPage() {
             <X style={{ width: 9, height: 9 }} /> Clear
           </button>
         )}
+        <span className="ml-auto" style={{ fontSize: 11, color: '#6C757D' }}>
+          {movementsData?.total ?? 0} movements recorded
+        </span>
       </div>
       <div className="flex-1 min-h-0">
         <DataTable

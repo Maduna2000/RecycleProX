@@ -609,8 +609,6 @@ export default function PhotosPage() {
 
   return (
     <PageShell
-      title="Photo Viewer"
-      subtitle="Browse purchases, sales, weighbridge images and ID photos"
       tabs={TABS}
       activeTab={activeTab}
       onTabChange={setActiveTab}
