@@ -390,7 +390,7 @@ export default function NewSalePage() {
       <div style={{ display: 'flex', flex: 1, minHeight: 0, background: '#fff', border: '1px solid #B0B0B0', borderRadius: 2, overflow: 'hidden' }}>
 
         {/* ── LEFT COLUMN ──────────────────────────────────────────────── */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflowX: 'hidden', overflowY: 'auto' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
 
           {/* Title bar */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', borderBottom: '2px solid #B0B0B0', background: 'linear-gradient(180deg,#EAEAEA 0%,#D4D4D4 100%)', flexShrink: 0 }}>
@@ -430,7 +430,7 @@ export default function NewSalePage() {
           </div>
 
           {/* ── Two-column body ───────────────────────────────────────────── */}
-          <div style={{ flex: 1, minHeight: 240, display: 'flex', overflow: 'hidden' }}>
+          <div style={{ flex: 1, minHeight: 0, display: 'flex', overflow: 'hidden' }}>
 
           {/* Buyer sub-panel (left 310px) */}
           <div style={{ width: 310, flexShrink: 0, display: 'flex', flexDirection: 'column', borderRight: '1px solid #C0C0C0', overflowY: 'auto' }}>
@@ -820,7 +820,7 @@ export default function NewSalePage() {
           {/* end Two-column body */}
 
           {/* ── Pending Sales ──────────────────────────────────────────────── */}
-          <div style={{ flex: '0 1 110px', minHeight: 28, borderTop: '2px solid #B0B0B0', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div style={{ flexShrink: 0, borderTop: '2px solid #B0B0B0', display: 'flex', flexDirection: 'column', height: 165 }}>
 
             {/* Header */}
             <div style={{ ...headerBg, padding: '4px 8px', display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
