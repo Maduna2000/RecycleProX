@@ -9,7 +9,6 @@ import useSWR from 'swr'
 import { CasualSelectorPanel, type CasualSelectorPanelRef } from '@/components/customers/CasualSelectorPanel'
 import { AccountSelectorPanel } from '@/components/customers/AccountSelectorPanel'
 import { PrintResultModal } from '@/components/PrintResultModal'
-import { ProcessPaymentModal, type PayTarget } from '@/components/purchases/ProcessPaymentModal'
 import Decimal from 'decimal.js'
 import { colors } from '@/lib/design-tokens'
 import { useOfflineMutation } from '@/hooks/useOfflineFetch'
@@ -128,7 +127,6 @@ export default function NewPurchasePage() {
   // ── Pending purchases action state ──────────────────────────────────────
   const [actionMenuId,  setActionMenuId]  = useState<string | null>(null)
   const [actionMenuRect, setActionMenuRect] = useState<DOMRect | null>(null)
-  const [payTarget,     setPayTarget]     = useState<PayTarget | null>(null)
   const [voidId,        setVoidId]        = useState<string | null>(null)
   const [voidReason,    setVoidReason]    = useState('')
   const [actionLoading, setActionLoading] = useState(false)
@@ -994,8 +992,6 @@ export default function NewPurchasePage() {
                       {actionMenuId === p.id && actionMenuRect && (
                         <div style={{ position: 'fixed', right: window.innerWidth - actionMenuRect.right, bottom: window.innerHeight - actionMenuRect.top + 2, zIndex: 9999, background: '#fff', border: '1px solid #C0C0C0', borderRadius: 3, boxShadow: '0 4px 12px rgba(0,0,0,0.15)', minWidth: 190 }}>
                           {([
-                            { label: 'Process Payment',        action: () => { setPayTarget({ id: p.id, ref: p.refNumber, totalAmount: p.totalAmount, loanDeductionAmount: p.loanDeductionAmount ?? '0', amountPaid: p.amountPaid, customerId: p.customer.id }); setActionMenuId(null) } },
-                            { label: 'Print Slip',             action: () => { setPrintDialog({ id: p.id, refNumber: p.refNumber }); setActionMenuId(null) } },
                             { label: 'View Customer History',  action: () => { router.push(`/app/customers/${p.customer.id}`); setActionMenuId(null) } },
                             { label: 'Log to Police Register', action: () => { router.push(`/app/police-register/new?purchaseId=${p.id}`); setActionMenuId(null) } },
                             { label: 'Reverse Purchase', destructive: true, action: () => { setVoidId(p.id); setActionMenuId(null) } },
@@ -1208,15 +1204,6 @@ export default function NewPurchasePage() {
         <div
           style={{ position: 'fixed', inset: 0, zIndex: 9998 }}
           onClick={() => setActionMenuId(null)}
-        />
-      )}
-
-      {/* Process Payment modal (from pending purchases action menu) */}
-      {payTarget && (
-        <ProcessPaymentModal
-          purchase={payTarget}
-          onClose={() => setPayTarget(null)}
-          onSuccess={() => { mutatePending(); setPayTarget(null) }}
         />
       )}
 
