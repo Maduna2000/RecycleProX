@@ -3,8 +3,9 @@ import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { UpdatePriceGroupSchema } from '@/lib/schemas/product'
 import {
-  getPriceGroupWithOverrides, updatePriceGroup,
+  getPriceGroupWithOverrides, updatePriceGroup, deletePriceGroup,
   PriceGroupNotFoundError, DuplicatePriceGroupNameError,
+  PriceGroupInUseError, DefaultPriceGroupDeleteError,
 } from '@/lib/services/productService'
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
@@ -40,5 +41,24 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     if (err instanceof DuplicatePriceGroupNameError) return NextResponse.json({ error: err.message }, { status: 409 })
     logger.error({ err }, 'PUT /api/price-groups/[id] failed')
     return NextResponse.json({ error: 'Failed to update price group' }, { status: 500 })
+  }
+}
+
+export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+  const session = await auth()
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!['admin', 'manager'].includes(session.user.role)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  try {
+    await deletePriceGroup(params.id, session.user.id)
+    return NextResponse.json({ success: true })
+  } catch (err) {
+    if (err instanceof PriceGroupNotFoundError) return NextResponse.json({ error: err.message }, { status: 404 })
+    if (err instanceof DefaultPriceGroupDeleteError) return NextResponse.json({ error: err.message }, { status: 409 })
+    if (err instanceof PriceGroupInUseError) return NextResponse.json({ error: err.message }, { status: 409 })
+    logger.error({ err }, 'DELETE /api/price-groups/[id] failed')
+    return NextResponse.json({ error: 'Failed to delete price group' }, { status: 500 })
   }
 }

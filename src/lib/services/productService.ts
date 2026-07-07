@@ -42,6 +42,20 @@ export class DuplicatePriceGroupNameError extends Error {
   }
 }
 
+export class PriceGroupInUseError extends Error {
+  constructor(public customerCount: number) {
+    super(`Price group is assigned to ${customerCount} customer${customerCount === 1 ? '' : 's'} and cannot be deleted`)
+    this.name = 'PriceGroupInUseError'
+  }
+}
+
+export class DefaultPriceGroupDeleteError extends Error {
+  constructor() {
+    super('The default price group cannot be deleted — set another group as default first')
+    this.name = 'DefaultPriceGroupDeleteError'
+  }
+}
+
 export class ProductInUseError extends Error {
   constructor(public counts: { purchases: number; sales: number; stock: number }) {
     super('Product is referenced by existing transactions')
@@ -288,6 +302,23 @@ export async function updatePriceGroup(id: string, data: UpdatePriceGroupInput, 
 
   logger.info({ priceGroupId: id, updatedById }, 'priceGroup.updated')
   return updated
+}
+
+export async function deletePriceGroup(id: string, deletedById?: string) {
+  const group = await prisma.priceGroup.findUnique({
+    where: { id },
+    include: { _count: { select: { customers: true } } },
+  })
+  if (!group) throw new PriceGroupNotFoundError(id)
+  if (group.isDefault) throw new DefaultPriceGroupDeleteError()
+  if (group._count.customers > 0) throw new PriceGroupInUseError(group._count.customers)
+
+  await prisma.$transaction([
+    prisma.priceGroupProductOverride.deleteMany({ where: { priceGroupId: id } }),
+    prisma.priceGroup.delete({ where: { id } }),
+  ])
+
+  logger.info({ priceGroupId: id, deletedById }, 'priceGroup.deleted')
 }
 
 export async function listPriceGroups() {
