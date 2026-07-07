@@ -11,6 +11,7 @@ import { useOfflineStore } from '@/stores/offlineStore'
 import { triggerSync, getPendingCount } from '@/lib/offline/sync'
 import { runSeeder } from '@/lib/offline/seeder'
 import { DEFAULT_POLICE_SERVICE_NAME, DEFAULT_POLICE_LEGAL_NOTE } from '@/lib/police-defaults'
+import { inp, HEADER_GRAD, NAVY, Btn, Field, PortalPage } from '@/components/rpx'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -38,39 +39,11 @@ function scaleKey<T extends string>(n: ScaleNum, field: T) {
   return `scale${n}${field.charAt(0).toUpperCase() + field.slice(1)}` as keyof SettingsMap
 }
 
-// ─── Shared styles ─────────────────────────────────────────────────────────────
-const sectionHdr: React.CSSProperties = {
-  background: 'linear-gradient(180deg,#FFFFFF 0%,#E8E8E8 100%)',
-  borderBottom: '1px solid #C0C0C0',
-  padding: '4px 10px',
-  flexShrink: 0,
-}
-const inp: React.CSSProperties = {
-  height: 26, width: '100%', borderRadius: 2,
-  border: '1px solid #ABABAB', padding: '0 7px',
-  fontSize: 12, color: '#212529', outline: 'none',
-  background: '#fff', boxSizing: 'border-box',
-}
-const lbl: React.CSSProperties = {
-  display: 'block', fontSize: 10, fontWeight: 700,
-  textTransform: 'uppercase', letterSpacing: '0.04em',
-  color: '#6C757D', marginBottom: 3,
-}
-
+// ─── Section header (portal card-section style) ───────────────────────────────
 function SHdr({ title }: { title: string }) {
   return (
-    <div style={sectionHdr}>
-      <span style={{ fontSize: 11, fontWeight: 700, color: '#1B3A6B' }}>{title}</span>
-    </div>
-  )
-}
-
-function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <span style={lbl}>{label}</span>
-      {children}
-      {hint && <p style={{ fontSize: 10, color: '#9CA3AF', marginTop: 2 }}>{hint}</p>}
+    <div style={{ background: HEADER_GRAD, borderBottom: '1px solid #C0C0C0', padding: '4px 10px', flexShrink: 0 }}>
+      <span style={{ fontSize: 11, fontWeight: 700, color: NAVY }}>{title}</span>
     </div>
   )
 }
@@ -118,11 +91,6 @@ function LogoSection({ logoKey }: { logoKey?: string }) {
     }
   }
 
-  const btn: React.CSSProperties = {
-    fontSize: 10, padding: '2px 8px', background: '#E0E0E0',
-    border: '1px solid #999', borderRadius: 2, cursor: 'pointer', color: '#212529',
-  }
-
   return (
     <>
       <SHdr title="Company Logo" />
@@ -152,13 +120,13 @@ function LogoSection({ logoKey }: { logoKey?: string }) {
             </ul>
             <div style={{ display: 'flex', gap: 6 }}>
               <input ref={fileRef} type="file" accept="image/png" onChange={handleFile} style={{ display: 'none' }} />
-              <button style={btn} disabled={uploading} onClick={() => fileRef.current?.click()}>
+              <Btn size="sm" loading={uploading} onClick={() => fileRef.current?.click()}>
                 {uploading ? 'Uploading…' : logoKey ? 'Replace Logo' : 'Upload Logo'}
-              </button>
+              </Btn>
               {logoKey && (
-                <button style={{ ...btn, color: '#DC3545', borderColor: '#DC3545' }} disabled={removing} onClick={handleRemove}>
+                <Btn size="sm" variant="danger" loading={removing} onClick={handleRemove}>
                   {removing ? 'Removing…' : 'Remove'}
-                </button>
+                </Btn>
               )}
             </div>
           </div>
@@ -275,19 +243,11 @@ export default function SettingsPage() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-
-      {/* Outer bordered container */}
-      <div style={{ display: 'flex', flex: 1, minHeight: 0, background: '#fff', border: '1px solid #B0B0B0', borderRadius: 2, overflow: 'hidden' }}>
+    <PortalPage title="System Configuration">
+      <div style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
 
         {/* ── LEFT COLUMN ──────────────────────────────────────────────── */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
-
-          {/* Title bar */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 10px', borderBottom: '2px solid #B0B0B0', background: 'linear-gradient(180deg,#EAEAEA 0%,#D4D4D4 100%)', flexShrink: 0 }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: '#1B3A6B' }}>Settings</span>
-            <span style={{ fontSize: 11, color: '#6C757D' }}>System configuration</span>
-          </div>
 
           {isLoading ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 32, color: colors.textSecondary }}>
@@ -415,18 +375,9 @@ export default function SettingsPage() {
                       Configure the list of commodities shown when registering account customers.
                     </p>
                   </div>
-                  <a
-                    href="/app/settings/trade-commodities"
-                    style={{
-                      fontSize: 11, padding: '4px 12px', borderRadius: 2,
-                      background: '#E0E0E0', border: '1px solid #999',
-                      color: '#212529', textDecoration: 'none', whiteSpace: 'nowrap',
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = '#D0D0D0')}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = '#E0E0E0')}
-                  >
+                  <Btn size="sm" href="/app/settings/trade-commodities" style={{ whiteSpace: 'nowrap' }}>
                     Manage →
-                  </a>
+                  </Btn>
                 </div>
               </div>
 
@@ -439,8 +390,8 @@ export default function SettingsPage() {
         <div style={{ width: 260, display: 'flex', flexDirection: 'column', borderLeft: '1px solid #C0C0C0', flexShrink: 0 }}>
 
           {/* Title bar (right) */}
-          <div style={{ padding: '5px 10px', borderBottom: '2px solid #B0B0B0', background: 'linear-gradient(180deg,#EAEAEA 0%,#D4D4D4 100%)', flexShrink: 0 }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: '#1B3A6B', display: 'flex', alignItems: 'center', gap: 5 }}>
+          <div style={{ padding: '5px 10px', borderBottom: '2px solid #B0B0B0', background: HEADER_GRAD, flexShrink: 0 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: NAVY, display: 'flex', alignItems: 'center', gap: 5 }}>
               <Printer style={{ width: 12, height: 12 }} /> Devices &amp; Sync
             </span>
           </div>
@@ -512,12 +463,9 @@ export default function SettingsPage() {
 
               {form.printerType && form.printerType !== 'none' && (
                 <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <button
-                    onClick={testPrint} disabled={testingPrinter}
-                    style={{ height: 24, padding: '0 10px', borderRadius: 2, fontSize: 11, border: '1px solid #ABABAB', background: '#F5F5F5', color: '#374151', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, opacity: testingPrinter ? 0.5 : 1 }}
-                  >
-                    {testingPrinter ? <><Loader2 className="w-3 h-3 animate-spin" /> Testing…</> : <><Printer className="w-3 h-3" /> Test Print</>}
-                  </button>
+                  <Btn size="sm" icon={Printer} loading={testingPrinter} onClick={testPrint}>
+                    {testingPrinter ? 'Testing…' : 'Test Print'}
+                  </Btn>
                   {printerStatus === 'ok' && (
                     <span style={{ fontSize: 10, color: colors.action, display: 'flex', alignItems: 'center', gap: 3 }}>
                       <CheckCircle2 className="w-3 h-3" /> Connected
@@ -547,49 +495,25 @@ export default function SettingsPage() {
                   ? `${pendingCount} transaction${pendingCount > 1 ? 's' : ''} queued and waiting to sync.`
                   : 'All transactions are synced.'}
               </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <button
-                  disabled={syncing || !isOnline}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+                <Btn
+                  size="sm"
+                  icon={RefreshCw}
+                  loading={syncing}
+                  disabled={!isOnline}
                   onClick={async () => { setSyncing(true); await triggerSync(); setPending(await getPendingCount()); setSyncing(false) }}
-                  style={{
-                    fontSize: 10,
-                    padding: '1px 6px',
-                    background: '#E0E0E0',
-                    border: '1px solid #999',
-                    borderRadius: 2,
-                    cursor: (syncing || !isOnline) ? 'not-allowed' : 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 3,
-                    color: '#212529',
-                    opacity: (syncing || !isOnline) ? 0.6 : 1,
-                  }}
-                  onMouseEnter={(e) => { if (!syncing && isOnline) e.currentTarget.style.background = '#D0D0D0' }}
-                  onMouseLeave={(e) => { if (!syncing && isOnline) e.currentTarget.style.background = '#E0E0E0' }}
                 >
-                  {syncing ? <><Loader2 style={{ width: 9, height: 9 }} className="animate-spin" /> Syncing…</> : <><RefreshCw style={{ width: 9, height: 9 }} /> Sync Now{pendingCount > 0 ? ` (${pendingCount})` : ''}</>}
-                </button>
-                <button
-                  disabled={seeding || !isOnline}
+                  {syncing ? 'Syncing…' : `Sync Now${pendingCount > 0 ? ` (${pendingCount})` : ''}`}
+                </Btn>
+                <Btn
+                  size="sm"
+                  icon={RefreshCw}
+                  loading={seeding}
+                  disabled={!isOnline}
                   onClick={async () => { setSeeding(true); await runSeeder(true); setSeeding(false); toast.success('Offline data refreshed') }}
-                  style={{
-                    fontSize: 10,
-                    padding: '1px 6px',
-                    background: '#E0E0E0',
-                    border: '1px solid #999',
-                    borderRadius: 2,
-                    cursor: (seeding || !isOnline) ? 'not-allowed' : 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 3,
-                    color: '#212529',
-                    opacity: (seeding || !isOnline) ? 0.6 : 1,
-                  }}
-                  onMouseEnter={(e) => { if (!seeding && isOnline) e.currentTarget.style.background = '#D0D0D0' }}
-                  onMouseLeave={(e) => { if (!seeding && isOnline) e.currentTarget.style.background = '#E0E0E0' }}
                 >
-                  {seeding ? <><Loader2 style={{ width: 9, height: 9 }} className="animate-spin" /> Refreshing…</> : <><RefreshCw style={{ width: 9, height: 9 }} /> Refresh Offline Data</>}
-                </button>
+                  {seeding ? 'Refreshing…' : 'Refresh Offline Data'}
+                </Btn>
               </div>
             </div>
 
@@ -598,18 +522,13 @@ export default function SettingsPage() {
         {/* end RIGHT COLUMN */}
 
       </div>
-      {/* end outer bordered container */}
 
       {/* ── Bottom action bar ─────────────────────────────────────────── */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', padding: '6px 16px', borderTop: '2px solid #B0B0B0', background: 'linear-gradient(180deg,#F5F5F5 0%,#E8E8E8 100%)', flexShrink: 0 }}>
-        <button
-          onClick={handleSave} disabled={saving}
-          style={{ height: 28, padding: '0 24px', borderRadius: 2, fontSize: 12, fontWeight: 700, background: '#217346', border: '1px solid #176338', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, opacity: saving ? 0.6 : 1 }}
-        >
-          {saving ? <><Loader2 style={{ width: 13, height: 13 }} className="animate-spin" /> Saving…</> : <><Save style={{ width: 13, height: 13 }} /> Save Settings</>}
-        </button>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', padding: '8px 16px', borderTop: '1px solid #E0E0E0', background: '#F8F9FA', flexShrink: 0 }}>
+        <Btn variant="primary" icon={Save} loading={saving} onClick={handleSave}>
+          {saving ? 'Saving…' : 'Save Settings'}
+        </Btn>
       </div>
-
-    </div>
+    </PortalPage>
   )
 }

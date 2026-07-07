@@ -3,14 +3,18 @@
 import { useState } from 'react'
 import useSWR, { mutate } from 'swr'
 import { useSession } from 'next-auth/react'
-import { Plus, Loader2, GripVertical, Pencil, Trash2, ArrowLeft, ToggleLeft, ToggleRight, X } from 'lucide-react'
+import { Plus, Loader2, GripVertical, Pencil, Trash2, ArrowLeft, ToggleLeft, ToggleRight } from 'lucide-react'
 import { toast } from 'sonner'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { CreateTradeCommodityCategorySchema, type CreateTradeCommodityCategoryInput, type CreateTradeCommodityCategoryFormInput } from '@/lib/schemas/tradeCommodity'
 import { colors } from '@/lib/design-tokens'
-import Link from 'next/link'
-import { WinButton } from '@/components/ui/WinButton'
+import { Dialog } from '@/components/ui/dialog'
+import {
+  inp, lbl, TH, TD, HEADER_GRAD,
+  Btn, PortalPage, EmptyHint,
+  RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter,
+} from '@/components/rpx'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -19,36 +23,6 @@ type TradeCommodityCategory = {
   name: string
   sortOrder: number
   isActive: boolean
-}
-
-// ─── Windows aesthetic styles ────────────────────────────────────────────────
-const TH: React.CSSProperties = {
-  textAlign: 'left', padding: '0 10px', height: 28,
-  fontSize: 10, fontWeight: 700, color: '#6C757D',
-  textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap',
-}
-const TD: React.CSSProperties = { padding: '0 10px', fontSize: 12, color: '#212529' }
-
-const inp: React.CSSProperties = {
-  height: 26, width: '100%', borderRadius: 2,
-  border: '1px solid #ABABAB', padding: '0 7px',
-  fontSize: 12, color: '#212529', outline: 'none',
-  background: '#fff', boxSizing: 'border-box',
-}
-const lbl: React.CSSProperties = {
-  display: 'block', fontSize: 10, fontWeight: 700,
-  textTransform: 'uppercase', letterSpacing: '0.04em',
-  color: '#6C757D', marginBottom: 3,
-}
-const winBtn: React.CSSProperties = {
-  fontSize: 10, padding: '4px 12px', borderRadius: 2,
-  background: '#E0E0E0', border: '1px solid #999',
-  color: '#212529', cursor: 'pointer',
-  display: 'flex', alignItems: 'center', gap: 4,
-}
-const winBtnPrimary: React.CSSProperties = {
-  ...winBtn,
-  background: '#217346', border: '1px solid #176338', color: '#fff',
 }
 
 export default function TradeCommoditiesPage() {
@@ -140,22 +114,16 @@ export default function TradeCommoditiesPage() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, background: '#fff', border: '1px solid #B0B0B0', borderRadius: 2, overflow: 'hidden' }}>
-
-        {/* Title bar */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 10px', borderBottom: '2px solid #B0B0B0', background: 'linear-gradient(180deg,#EAEAEA 0%,#D4D4D4 100%)', flexShrink: 0 }}>
-          <Link href="/app/settings" style={{ display: 'flex', alignItems: 'center', color: '#6C757D' }}>
-            <ArrowLeft style={{ width: 14, height: 14 }} />
-          </Link>
-          <span style={{ fontSize: 13, fontWeight: 700, color: '#1B3A6B' }}>Trade Commodity Categories</span>
-          <span style={{ fontSize: 11, color: '#6C757D' }}>{categories.filter((c) => c.isActive).length} active</span>
-          <div style={{ flex: 1 }} />
-          <WinButton onClick={() => setCreateOpen(true)}>
-            <Plus style={{ width: 9, height: 9 }} /> Add Category
-          </WinButton>
-        </div>
-
+    <>
+    <PortalPage
+      title={`Trade Commodities (${categories.filter((c) => c.isActive).length} active)`}
+      actions={
+        <>
+          <Btn size="sm" icon={ArrowLeft} href="/app/settings">Settings</Btn>
+          <Btn variant="primary" size="sm" icon={Plus} onClick={() => setCreateOpen(true)}>Add Category</Btn>
+        </>
+      }
+    >
         {/* Help text */}
         <div style={{ padding: '8px 12px', background: '#FAFAFA', borderBottom: '1px solid #E0E0E0', fontSize: 11, color: '#6C757D' }}>
           Manage the list of trade commodity categories shown when registering account customers.
@@ -169,13 +137,11 @@ export default function TradeCommoditiesPage() {
               <Loader2 className="w-4 h-4 animate-spin" /> Loading…
             </div>
           ) : categories.length === 0 ? (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 120, color: '#6C757D', fontSize: 12 }}>
-              No categories created yet. Click &quot;Add Category&quot; to get started.
-            </div>
+            <EmptyHint text='No categories created yet. Click "Add Category" to get started.' height={120} />
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
-                <tr style={{ background: 'linear-gradient(180deg,#FFFFFF 0%,#E8E8E8 100%)', borderBottom: '1px solid #C0C0C0' }}>
+                <tr style={{ background: HEADER_GRAD, borderBottom: '1px solid #C0C0C0' }}>
                   <th style={{ ...TH, width: 32 }}></th>
                   <th style={TH}>Name</th>
                   <th style={{ ...TH, width: 80 }}>Status</th>
@@ -263,7 +229,7 @@ export default function TradeCommoditiesPage() {
             </table>
           )}
         </div>
-      </div>
+    </PortalPage>
 
       {createOpen && (
         <CreateCategoryModal
@@ -285,34 +251,7 @@ export default function TradeCommoditiesPage() {
           }}
         />
       )}
-    </div>
-  )
-}
-
-// ─── Windows-style Modal Wrapper ─────────────────────────────────────────────
-function WinModal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
-  return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)' }} onClick={onClose} />
-      <div style={{ position: 'relative', width: 380, background: '#fff', border: '1px solid #B0B0B0', borderRadius: 2, boxShadow: '0 4px 20px rgba(0,0,0,0.25)' }}>
-        {/* Title bar */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', borderBottom: '2px solid #B0B0B0', background: 'linear-gradient(180deg,#EAEAEA 0%,#D4D4D4 100%)' }}>
-          <span style={{ fontSize: 12, fontWeight: 700, color: '#1B3A6B' }}>{title}</span>
-          <button
-            onClick={onClose}
-            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 20, borderRadius: 2, border: 'none', background: 'transparent', cursor: 'pointer', color: '#6C757D' }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = '#E0E0E0')}
-            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-          >
-            <X style={{ width: 12, height: 12 }} />
-          </button>
-        </div>
-        {/* Content */}
-        <div style={{ padding: '12px 14px' }}>
-          {children}
-        </div>
-      </div>
-    </div>
+    </>
   )
 }
 
@@ -343,42 +282,30 @@ function CreateCategoryModal({ onClose, onSuccess }: { onClose: () => void; onSu
   }
 
   return (
-    <WinModal title="New Trade Commodity Category" onClose={onClose}>
-      <form onSubmit={handleSubmit(onSubmit)}>
-        <div style={{ marginBottom: 12 }}>
-          <span style={lbl}>Category Name</span>
-          <input
-            {...register('name')}
-            style={inp}
-            placeholder="e.g. Copper, Aluminium, E-Waste"
-            disabled={loading}
-            autoFocus
-          />
-          {errors.name && <p style={{ fontSize: 10, color: colors.danger, marginTop: 3 }}>{errors.name.message}</p>}
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, paddingTop: 8, borderTop: '1px solid #E0E0E0' }}>
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={loading}
-            style={{ ...winBtn, opacity: loading ? 0.6 : 1 }}
-            onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = '#D0D0D0' }}
-            onMouseLeave={(e) => { if (!loading) e.currentTarget.style.background = '#E0E0E0' }}
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={loading}
-            style={{ ...winBtnPrimary, opacity: loading ? 0.6 : 1 }}
-            onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = '#1a5c38' }}
-            onMouseLeave={(e) => { if (!loading) e.currentTarget.style.background = '#217346' }}
-          >
-            {loading ? <><Loader2 style={{ width: 10, height: 10, animation: 'spin 1s linear infinite' }} /> Creating…</> : 'Create'}
-          </button>
-        </div>
-      </form>
-    </WinModal>
+    <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
+      <RpxDialogContent maxWidth={400}>
+        <RpxDialogHeader title="New Trade Commodity Category" onClose={onClose} />
+        <form onSubmit={handleSubmit(onSubmit)}>
+          <RpxDialogBody>
+            <span style={lbl}>Category Name</span>
+            <input
+              {...register('name')}
+              style={inp}
+              placeholder="e.g. Copper, Aluminium, E-Waste"
+              disabled={loading}
+              autoFocus
+            />
+            {errors.name && <p style={{ fontSize: 10, color: colors.danger, marginTop: 3 }}>{errors.name.message}</p>}
+          </RpxDialogBody>
+          <RpxDialogFooter>
+            <Btn onClick={onClose} disabled={loading}>Cancel</Btn>
+            <Btn variant="primary" type="submit" loading={loading}>
+              {loading ? 'Creating…' : 'Create'}
+            </Btn>
+          </RpxDialogFooter>
+        </form>
+      </RpxDialogContent>
+    </Dialog>
   )
 }
 
@@ -417,40 +344,28 @@ function EditCategoryModal({
   }
 
   return (
-    <WinModal title="Edit Category" onClose={onClose}>
-      <form onSubmit={handleSubmit(onSubmit)}>
-        <div style={{ marginBottom: 12 }}>
-          <span style={lbl}>Category Name</span>
-          <input
-            {...register('name')}
-            style={inp}
-            disabled={loading}
-            autoFocus
-          />
-          {errors.name && <p style={{ fontSize: 10, color: colors.danger, marginTop: 3 }}>{errors.name.message}</p>}
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, paddingTop: 8, borderTop: '1px solid #E0E0E0' }}>
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={loading}
-            style={{ ...winBtn, opacity: loading ? 0.6 : 1 }}
-            onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = '#D0D0D0' }}
-            onMouseLeave={(e) => { if (!loading) e.currentTarget.style.background = '#E0E0E0' }}
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={loading}
-            style={{ ...winBtnPrimary, opacity: loading ? 0.6 : 1 }}
-            onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = '#1a5c38' }}
-            onMouseLeave={(e) => { if (!loading) e.currentTarget.style.background = '#217346' }}
-          >
-            {loading ? <><Loader2 style={{ width: 10, height: 10, animation: 'spin 1s linear infinite' }} /> Saving…</> : 'Save Changes'}
-          </button>
-        </div>
-      </form>
-    </WinModal>
+    <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
+      <RpxDialogContent maxWidth={400}>
+        <RpxDialogHeader title="Edit Category" onClose={onClose} />
+        <form onSubmit={handleSubmit(onSubmit)}>
+          <RpxDialogBody>
+            <span style={lbl}>Category Name</span>
+            <input
+              {...register('name')}
+              style={inp}
+              disabled={loading}
+              autoFocus
+            />
+            {errors.name && <p style={{ fontSize: 10, color: colors.danger, marginTop: 3 }}>{errors.name.message}</p>}
+          </RpxDialogBody>
+          <RpxDialogFooter>
+            <Btn onClick={onClose} disabled={loading}>Cancel</Btn>
+            <Btn variant="primary" type="submit" loading={loading}>
+              {loading ? 'Saving…' : 'Save Changes'}
+            </Btn>
+          </RpxDialogFooter>
+        </form>
+      </RpxDialogContent>
+    </Dialog>
   )
 }

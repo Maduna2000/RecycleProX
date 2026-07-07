@@ -4,9 +4,9 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { CreateUserSchema, type CreateUserInput } from '@/lib/schemas/auth'
-import { Dialog, DialogContent } from '@/components/ui/dialog'
-import { Loader2 } from 'lucide-react'
+import { Dialog } from '@/components/ui/dialog'
 import { toast } from 'sonner'
+import { inp, lbl, Btn, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
 
 // Module options for permission control
 const MODULE_OPTIONS = [
@@ -28,50 +28,6 @@ const MODULE_OPTIONS = [
   { key: '/app/audit-log', label: 'Audit Log' },
   { key: '/app/settings', label: 'Settings' },
 ]
-
-// ─── Shared styles (matching profile pages) ─────────────────────────────────────
-const modalHdr: React.CSSProperties = {
-  background: 'linear-gradient(180deg,#EAEAEA 0%,#D4D4D4 100%)',
-  borderBottom: '2px solid #B0B0B0',
-  padding: '8px 16px',
-  borderRadius: '6px 6px 0 0',
-  margin: '-24px -24px 16px -24px',
-}
-const lbl: React.CSSProperties = {
-  display: 'block', fontSize: 10, fontWeight: 700,
-  textTransform: 'uppercase', letterSpacing: '0.04em',
-  color: '#6C757D', marginBottom: 4,
-}
-const inp: React.CSSProperties = {
-  height: 28, width: '100%', borderRadius: 2,
-  border: '1px solid #ABABAB', padding: '0 8px',
-  fontSize: 12, color: '#212529', background: '#fff',
-  outline: 'none', boxSizing: 'border-box',
-}
-const selectStyle: React.CSSProperties = {
-  height: 28, width: '100%', borderRadius: 2,
-  border: '1px solid #ABABAB', padding: '0 8px',
-  fontSize: 12, color: '#212529', background: '#fff',
-  outline: 'none', boxSizing: 'border-box',
-}
-const btnBase: React.CSSProperties = {
-  fontSize: 10, padding: '1px 6px', borderRadius: 2, cursor: 'pointer',
-  display: 'inline-flex', alignItems: 'center', gap: 3,
-}
-const cancelBtn: React.CSSProperties = {
-  ...btnBase,
-  background: '#E0E0E0',
-  border: '1px solid #999', color: '#212529',
-}
-const submitBtn: React.CSSProperties = {
-  ...btnBase,
-  background: '#E0E0E0',
-  border: '1px solid #999', color: '#212529',
-}
-const smallBtn: React.CSSProperties = {
-  fontSize: 10, padding: '1px 6px', borderRadius: 2, cursor: 'pointer',
-  background: '#E0E0E0', border: '1px solid #999', color: '#212529',
-}
 
 export function CreateUserModal({ open, onClose, onSuccess }: { open: boolean; onClose: () => void; onSuccess: () => void }) {
   const [loading, setLoading] = useState(false)
@@ -148,12 +104,10 @@ export function CreateUserModal({ open, onClose, onSuccess }: { open: boolean; o
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) handleClose() }}>
-      <DialogContent className="sm:max-w-lg p-6 max-h-[90vh] overflow-y-auto">
-        <div style={modalHdr}>
-          <span style={{ fontSize: 13, fontWeight: 700, color: '#212529' }}>Add User</span>
-        </div>
-
-        <form onSubmit={handleSubmit(onSubmit)} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <RpxDialogContent maxWidth={520}>
+        <RpxDialogHeader title="Add User" onClose={handleClose} />
+        <form onSubmit={handleSubmit(onSubmit)} style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+        <RpxDialogBody style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div>
             <span style={lbl}>Full Name</span>
             <input {...register('fullName')} disabled={loading} style={inp} />
@@ -177,7 +131,7 @@ export function CreateUserModal({ open, onClose, onSuccess }: { open: boolean; o
             <select
               onChange={(e) => handleRoleChange(e.target.value)}
               disabled={loading}
-              style={selectStyle}
+              style={inp}
               value={selectedRole}
             >
               <option value="" disabled>Select role...</option>
@@ -195,8 +149,8 @@ export function CreateUserModal({ open, onClose, onSuccess }: { open: boolean; o
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                 <span style={lbl}>Module Access</span>
                 <div style={{ display: 'flex', gap: 4 }}>
-                  <button type="button" onClick={selectAllModules} style={smallBtn}>Select All</button>
-                  <button type="button" onClick={clearAllModules} style={smallBtn}>Clear All</button>
+                  <Btn size="sm" onClick={selectAllModules}>Select All</Btn>
+                  <Btn size="sm" onClick={clearAllModules}>Clear All</Btn>
                 </div>
               </div>
               <div style={{
@@ -255,17 +209,15 @@ export function CreateUserModal({ open, onClose, onSuccess }: { open: boolean; o
             </p>
           )}
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
-            <button type="button" onClick={handleClose} disabled={loading} style={cancelBtn}>
-              Cancel
-            </button>
-            <button type="submit" disabled={loading} style={{ ...submitBtn, opacity: loading ? 0.7 : 1, cursor: loading ? 'not-allowed' : 'pointer' }}>
-              {loading && <Loader2 style={{ width: 12, height: 12, animation: 'spin 1s linear infinite' }} />}
-              {loading ? 'Creating...' : 'Create User'}
-            </button>
-          </div>
+        </RpxDialogBody>
+        <RpxDialogFooter>
+          <Btn onClick={handleClose} disabled={loading}>Cancel</Btn>
+          <Btn variant="primary" type="submit" loading={loading}>
+            {loading ? 'Creating...' : 'Create User'}
+          </Btn>
+        </RpxDialogFooter>
         </form>
-      </DialogContent>
+      </RpxDialogContent>
     </Dialog>
   )
 }

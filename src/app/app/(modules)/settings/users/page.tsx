@@ -10,8 +10,7 @@ import { ResetPasswordModal } from '@/components/users/ResetPasswordModal'
 import { MoreVertical, Search, Unlock, UserCheck, UserX, KeyRound, Plus, ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import { colors } from '@/lib/design-tokens'
-import Link from 'next/link'
-import { WinButton } from '@/components/ui/WinButton'
+import { inp, TH, TD, HEADER_GRAD, Btn, Field, PortalPage, FilterBar, EmptyHint } from '@/components/rpx'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -19,28 +18,6 @@ type User = {
   id: string; fullName: string; username: string; role: string
   isActive: boolean; lockedAt: string | null; lastLoginAt: string | null
   allowedModules?: string[]
-}
-
-// ─── Windows aesthetic styles ────────────────────────────────────────────────
-const TH: React.CSSProperties = {
-  textAlign: 'left', padding: '0 10px', height: 28,
-  fontSize: 10, fontWeight: 700, color: '#6C757D',
-  textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap',
-}
-const TD: React.CSSProperties = { padding: '0 10px', fontSize: 12, color: '#212529' }
-
-const inp: React.CSSProperties = {
-  height: 26, width: '100%', borderRadius: 2,
-  border: '1px solid #ABABAB', padding: '0 7px 0 26px',
-  fontSize: 12, color: '#212529', outline: 'none',
-  background: '#fff', boxSizing: 'border-box',
-}
-
-const selectStyle: React.CSSProperties = {
-  height: 26, borderRadius: 2,
-  border: '1px solid #ABABAB', padding: '0 7px',
-  fontSize: 12, color: '#212529', background: '#fff',
-  outline: 'none', boxSizing: 'border-box',
 }
 
 function StatusBadge({ user }: { user: User }) {
@@ -144,51 +121,49 @@ export default function UsersPage() {
   function closeMenu() { setMenuOpenId(null); setMenuPos(null) }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, background: '#fff', border: '1px solid #B0B0B0', borderRadius: 2, overflow: 'hidden' }}>
-
-        {/* Title bar */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 10px', borderBottom: '2px solid #B0B0B0', background: 'linear-gradient(180deg,#EAEAEA 0%,#D4D4D4 100%)', flexShrink: 0 }}>
-          <Link href="/app/settings" style={{ display: 'flex', alignItems: 'center', color: '#6C757D' }}>
-            <ArrowLeft style={{ width: 14, height: 14 }} />
-          </Link>
-          <span style={{ fontSize: 13, fontWeight: 700, color: '#1B3A6B' }}>Users</span>
-          <span style={{ fontSize: 11, color: '#6C757D' }}>{users.length} user{users.length !== 1 ? 's' : ''}</span>
-          <div style={{ flex: 1 }} />
-          <WinButton onClick={() => setCreateOpen(true)}>
-            <Plus style={{ width: 9, height: 9 }} /> Add User
-          </WinButton>
-        </div>
-
+    <>
+    <PortalPage
+      title={`Users (${users.length})`}
+      actions={
+        <>
+          <Btn size="sm" icon={ArrowLeft} href="/app/settings">Settings</Btn>
+          <Btn variant="primary" size="sm" icon={Plus} onClick={() => setCreateOpen(true)}>Add User</Btn>
+        </>
+      }
+    >
         {/* Filters */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: '#FAFAFA', borderBottom: '1px solid #E0E0E0', flexShrink: 0 }}>
-          <div style={{ position: 'relative' }}>
-            <Search style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', width: 12, height: 12, color: '#6C757D' }} />
-            <input
-              placeholder="Search name or username…"
-              style={{ ...inp, width: 200 }}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-          <select
-            style={selectStyle}
-            value={roleFilter}
-            onChange={(e) => setRoleFilter(e.target.value)}
-          >
-            <option value="">All Roles</option>
-            <option value="admin">Admin</option>
-            <option value="manager">Manager</option>
-            <option value="cashier">Cashier</option>
-            <option value="scale_operator">Scale Operator</option>
-          </select>
-        </div>
+        <FilterBar>
+          <Field label="Search" width={220}>
+            <div style={{ position: 'relative' }}>
+              <Search style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', width: 12, height: 12, color: '#6C757D' }} />
+              <input
+                placeholder="Search name or username…"
+                style={{ ...inp, paddingLeft: 26 }}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+          </Field>
+          <Field label="Role" width={160}>
+            <select
+              style={inp}
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value)}
+            >
+              <option value="">All Roles</option>
+              <option value="admin">Admin</option>
+              <option value="manager">Manager</option>
+              <option value="cashier">Cashier</option>
+              <option value="scale_operator">Scale Operator</option>
+            </select>
+          </Field>
+        </FilterBar>
 
         {/* Table */}
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
-              <tr style={{ background: 'linear-gradient(180deg,#FFFFFF 0%,#E8E8E8 100%)', borderBottom: '1px solid #C0C0C0' }}>
+              <tr style={{ background: HEADER_GRAD, borderBottom: '1px solid #C0C0C0' }}>
                 <th style={TH}>Full Name</th>
                 <th style={TH}>Username</th>
                 <th style={TH}>Role</th>
@@ -226,15 +201,15 @@ export default function UsersPage() {
               ))}
               {!users.length && (
                 <tr>
-                  <td colSpan={6} style={{ padding: '32px 10px', textAlign: 'center', fontSize: 12, color: '#6C757D' }}>
-                    No users found
+                  <td colSpan={6}>
+                    <EmptyHint text="No users found" height={120} />
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
-      </div>
+    </PortalPage>
 
       {/* Fixed dropdown menu */}
       {menuOpenId && menuPos && (
@@ -301,6 +276,6 @@ export default function UsersPage() {
       <CreateUserModal open={createOpen} onClose={() => setCreateOpen(false)} onSuccess={() => mutate(`/api/users?${query}`)} />
       {editUser && <EditUserModal user={editUser} onClose={() => setEditUser(null)} onSuccess={() => mutate(`/api/users?${query}`)} />}
       {resetUser && <ResetPasswordModal user={resetUser} onClose={() => setResetUser(null)} />}
-    </div>
+    </>
   )
 }
