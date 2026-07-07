@@ -7,7 +7,7 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { Download, Loader2, FileSpreadsheet } from 'lucide-react'
-import { LegacyButton } from './LegacyButton'
+import { ActionButton } from './ActionButton'
 
 interface DownloadButtonsProps {
   reportId: string
@@ -44,16 +44,16 @@ export function DownloadButtons({ reportId, params, disabled }: DownloadButtonsP
 
   return (
     <div className="flex gap-2">
-      <LegacyButton onClick={() => download('pdf')} disabled={disabled || busy !== null}>
+      <ActionButton onClick={() => download('pdf')} disabled={disabled || busy !== null}>
         {busy === 'pdf'
-          ? <Loader2 style={{ width: 9, height: 9, animation: 'spin 1s linear infinite' }} />
-          : <Download style={{ width: 9, height: 9 }} />} Download PDF
-      </LegacyButton>
-      <LegacyButton onClick={() => download('xlsx')} disabled={disabled || busy !== null}>
+          ? <Loader2 style={{ width: 13, height: 13, animation: 'spin 1s linear infinite' }} />
+          : <Download style={{ width: 13, height: 13 }} />} Download PDF
+      </ActionButton>
+      <ActionButton onClick={() => download('xlsx')} disabled={disabled || busy !== null}>
         {busy === 'xlsx'
-          ? <Loader2 style={{ width: 9, height: 9, animation: 'spin 1s linear infinite' }} />
-          : <FileSpreadsheet style={{ width: 9, height: 9 }} />} Download Excel
-      </LegacyButton>
+          ? <Loader2 style={{ width: 13, height: 13, animation: 'spin 1s linear infinite' }} />
+          : <FileSpreadsheet style={{ width: 13, height: 13 }} />} Download Excel
+      </ActionButton>
     </div>
   )
 }

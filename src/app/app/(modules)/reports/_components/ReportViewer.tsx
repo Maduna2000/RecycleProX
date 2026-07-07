@@ -6,13 +6,13 @@
  */
 import { useEffect, useMemo, useState } from 'react'
 import useSWR from 'swr'
-import { Loader2 } from 'lucide-react'
+import { Loader2, X } from 'lucide-react'
 import type { ReportCatalogEntry, FilterSpec } from '@/lib/reports/catalog'
 import { DEALER_CATEGORY_OPTIONS } from '@/lib/reports/catalog'
 import type { ReportDocument } from '@/lib/reports/types'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
 import { Label } from '@/components/ui/label'
-import { LegacyButton } from './LegacyButton'
+import { ActionButton } from './ActionButton'
 import { DateRangeFilter } from './DateRangeFilter'
 import { DownloadButtons } from './DownloadButtons'
 import { ReportPreviewTable } from './ReportPreviewTable'
@@ -66,25 +66,48 @@ function CustomerSearchSelect({
     if (!value) { setChosen(null); setTerm('') }
   }, [value])
 
+  const active = !!chosen
+
   return (
     <div className="relative">
       <Label className="text-xs mb-1 block" style={{ color: colors.textSecondary }}>
         {label}
       </Label>
-      <input
-        value={chosen ? customerLabel(chosen) : term}
-        placeholder="Type to search…"
-        onChange={(e) => {
-          setChosen(null)
-          onChange('')
-          setTerm(e.target.value)
-          setOpen(true)
+      <div
+        className="flex items-center h-9 rounded-md"
+        style={{
+          border: `1px solid ${active ? colors.process : colors.border}`,
+          background: active ? colors.processBg : colors.surface,
+          minWidth: 220,
         }}
-        onFocus={() => setOpen(true)}
-        onBlur={() => setTimeout(() => setOpen(false), 200)}
-        className="h-9 rounded border px-2 text-sm bg-white"
-        style={{ borderColor: colors.border, color: colors.textPrimary, minWidth: 200 }}
-      />
+      >
+        <input
+          value={chosen ? customerLabel(chosen) : term}
+          placeholder="Type to search…"
+          onChange={(e) => {
+            setChosen(null)
+            onChange('')
+            setTerm(e.target.value)
+            setOpen(true)
+          }}
+          onFocus={() => setOpen(true)}
+          onBlur={() => setTimeout(() => setOpen(false), 200)}
+          className="flex-1 min-w-0 bg-transparent text-sm outline-none px-2"
+          style={{ color: active ? colors.textPrimary : colors.textSecondary, fontWeight: active ? fontWeight.medium : fontWeight.regular }}
+        />
+        {active && (
+          <button
+            type="button"
+            aria-label={`Clear ${label}`}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => { setChosen(null); setTerm(''); onChange('') }}
+            className="flex items-center px-2"
+            style={{ color: colors.textSecondary, background: 'none', border: 'none', cursor: 'pointer' }}
+          >
+            <X style={{ width: 12, height: 12 }} />
+          </button>
+        )}
+      </div>
       {open && !chosen && (data?.customers?.length ?? 0) > 0 && (
         <div
           className="absolute z-20 mt-1 w-full max-h-56 overflow-auto rounded border bg-white shadow"
@@ -116,6 +139,39 @@ function CustomerSearchSelect({
   )
 }
 
+/**
+ * Shared select for report filters — the "active" (non-default) state is
+ * shown via a tinted fill + accent border, so a glance at the filter row
+ * shows exactly which filters are currently narrowing the report.
+ */
+function FilterSelect({
+  value,
+  onChange,
+  children,
+}: {
+  value: string
+  onChange: (v: string) => void
+  children: React.ReactNode
+}) {
+  const active = !!value
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="h-9 rounded-md px-2 text-sm cursor-pointer outline-none"
+      style={{
+        border: `1px solid ${active ? colors.process : colors.border}`,
+        background: active ? colors.processBg : colors.surface,
+        color: active ? colors.textPrimary : colors.textSecondary,
+        fontWeight: active ? fontWeight.medium : fontWeight.regular,
+        minWidth: 170,
+      }}
+    >
+      {children}
+    </select>
+  )
+}
+
 /** Product picker — full list loaded once (products list is small). */
 function ProductSelect({
   label,
@@ -137,17 +193,12 @@ function ProductSelect({
       <Label className="text-xs mb-1 block" style={{ color: colors.textSecondary }}>
         {label}
       </Label>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="h-9 rounded border px-2 text-sm bg-white"
-        style={{ borderColor: colors.border, color: colors.textPrimary, minWidth: 200 }}
-      >
+      <FilterSelect value={value} onChange={onChange}>
         {!required && <option value="">All products</option>}
         {(data?.products ?? []).map((p) => (
           <option key={p.id} value={p.id}>{p.code} — {p.name}</option>
         ))}
-      </select>
+      </FilterSelect>
     </div>
   )
 }
@@ -176,17 +227,12 @@ function FilterControl({
       <Label className="text-xs mb-1 block" style={{ color: colors.textSecondary }}>
         {spec.label}
       </Label>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="h-9 rounded border px-2 text-sm bg-white"
-        style={{ borderColor: colors.border, color: colors.textPrimary, minWidth: 160 }}
-      >
+      <FilterSelect value={value} onChange={onChange}>
         {!spec.required && <option value="">All</option>}
         {options.map((o) => (
           <option key={o.value} value={o.value}>{o.label}</option>
         ))}
-      </select>
+      </FilterSelect>
     </div>
   )
 }
@@ -223,6 +269,7 @@ export function ReportViewer({ report }: ReportViewerProps) {
   )
 
   const missingRequired = report.filters.filter((f) => f.required && !filters[f.key])
+  const hasActiveFilters = Object.values(filters).some(Boolean)
 
   function handleRun() {
     setQuery(new URLSearchParams({ ...params, format: 'json' }).toString())
@@ -238,24 +285,40 @@ export function ReportViewer({ report }: ReportViewerProps) {
           <p style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>{report.description}</p>
         </div>
 
-        <div className="flex flex-wrap items-end gap-3" style={{ borderTop: `1px solid ${colors.border}`, paddingTop: 12 }}>
-          <DateRangeFilter from={from} to={to} onChange={(f, t) => { setFrom(f); setTo(t) }} />
-          {report.filters.map((spec) => (
-            <FilterControl
-              key={spec.key}
-              spec={spec}
-              value={filters[spec.key] ?? ''}
-              onChange={(v) => setFilters((prev) => ({ ...prev, [spec.key]: v }))}
-            />
-          ))}
+        <div style={{ borderTop: `1px solid ${colors.border}`, paddingTop: 12 }}>
+          <div className="flex items-center justify-between mb-2">
+            <span style={{ fontSize: fontSize.xs, fontWeight: fontWeight.semibold, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              Filters
+            </span>
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={() => setFilters({})}
+                style={{ fontSize: fontSize.xs, fontWeight: fontWeight.medium, color: colors.process, background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
+          <div className="flex flex-wrap items-end gap-3">
+            <DateRangeFilter from={from} to={to} onChange={(f, t) => { setFrom(f); setTo(t) }} />
+            {report.filters.map((spec) => (
+              <FilterControl
+                key={spec.key}
+                spec={spec}
+                value={filters[spec.key] ?? ''}
+                onChange={(v) => setFilters((prev) => ({ ...prev, [spec.key]: v }))}
+              />
+            ))}
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2" style={{ borderTop: `1px solid ${colors.border}`, paddingTop: 12 }}>
-          <LegacyButton onClick={handleRun} disabled={isLoading || missingRequired.length > 0}>
+          <ActionButton variant="primary" onClick={handleRun} disabled={isLoading || missingRequired.length > 0}>
             {isLoading
-              ? <><Loader2 style={{ width: 9, height: 9, animation: 'spin 1s linear infinite' }} /> Running…</>
+              ? <><Loader2 style={{ width: 13, height: 13, animation: 'spin 1s linear infinite' }} /> Running…</>
               : 'Run Report'}
-          </LegacyButton>
+          </ActionButton>
           <DownloadButtons reportId={report.id} params={params} disabled={isLoading || missingRequired.length > 0} />
           {missingRequired.length > 0 && (
             <span style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>
