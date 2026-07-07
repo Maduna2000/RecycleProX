@@ -17,9 +17,12 @@
 
 export const colors = {
   // Brand
-  /** Navy — top nav bar, active tab background */
+  /** Navy — top nav bar, active tab background, primary buttons (see @/components/rpx Btn) */
   primary:       '#1B3A6B',
-  /** Emerald-500 — primary action buttons (Confirm, Save, Complete) */
+  /**
+   * Emerald-500 — success/status green ONLY (badges, positive money, net weight).
+   * NOT for buttons: primary actions use the navy Btn from @/components/rpx.
+   */
   action:        '#10b981',
   /** Blue — secondary buttons, links, info states */
   process:       '#185ABD',
@@ -164,6 +167,7 @@ export const tw = {
   // Common combinations
   card:          'bg-white border border-rpx-border rounded-lg',
   inputBase:     'border border-rpx-border rounded-md focus:outline-none focus:border-rpx-blue',
+  /** @deprecated Use the navy <Btn variant="primary"> from @/components/rpx instead. */
   btnPrimary:    'bg-rpx-green text-white hover:opacity-90',
   btnSecondary:  'border border-rpx-blue text-rpx-blue bg-white hover:bg-rpx-hover',
   btnDanger:     'border border-rpx-red text-rpx-red bg-white hover:bg-red-50',
@@ -214,12 +218,12 @@ export const spacing: Record<number, number> = {
 export const layout = {
   /** All cards, table wrappers */
   cardRadius:    8,
-  /** All buttons */
-  btnRadius:     6,
-  /** Input / select fields */
-  inputRadius:   6,
-  /** Height of each table data row */
-  tableRowH:     40,
+  /** All buttons (portal house style) */
+  btnRadius:     3,
+  /** Input / select fields (portal house style) */
+  inputRadius:   2,
+  /** Height of each table data row (portal house style) */
+  tableRowH:     30,
   /** Top nav zone height */
   navbarH:       48,
   /** Contextual toolbar zone height */

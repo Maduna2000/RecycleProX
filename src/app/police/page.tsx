@@ -18,6 +18,10 @@ import {
   ArrowLeft, Clock, AlertTriangle, X, User as UserIcon, Package, CalendarDays,
 } from 'lucide-react'
 import { POLICE_VISIT_REASONS, VISIT_REASON_LABELS } from '@/lib/schemas/police'
+import {
+  NAVY, inp, lbl, TH, TD, btnPrimary, btnSecondary, btnDanger,
+  TabStrip, EmptyHint, SectionLabel, DL, Drawer,
+} from '@/components/rpx'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -105,44 +109,7 @@ type Product = { id: string; name: string; unit: string }
 
 type SettingsMap = Record<string, string | undefined>
 
-// ─── Shared styles (house style) ──────────────────────────────────────────────
-
-const NAVY = '#1B3A6B'
-
-const inp: React.CSSProperties = {
-  height: 30, width: '100%', borderRadius: 2,
-  border: '1px solid #ABABAB', padding: '0 8px',
-  fontSize: 13, color: '#212529', outline: 'none',
-  background: '#fff', boxSizing: 'border-box',
-}
-const lbl: React.CSSProperties = {
-  display: 'block', fontSize: 10, fontWeight: 700,
-  textTransform: 'uppercase', letterSpacing: '0.04em',
-  color: '#6C757D', marginBottom: 3,
-}
-const TH: React.CSSProperties = {
-  textAlign: 'left', padding: '0 10px', height: 30,
-  fontSize: 10, fontWeight: 700, color: '#6C757D',
-  textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap',
-}
-const TD: React.CSSProperties = { padding: '4px 10px', fontSize: 12, color: '#212529' }
-
-const btnPrimary: React.CSSProperties = {
-  display: 'inline-flex', alignItems: 'center', gap: 6,
-  fontSize: 12, fontWeight: 600, padding: '7px 16px',
-  background: NAVY, color: '#fff', border: 'none',
-  borderRadius: 3, cursor: 'pointer',
-}
-const btnSecondary: React.CSSProperties = {
-  display: 'inline-flex', alignItems: 'center', gap: 5,
-  fontSize: 11, fontWeight: 600, padding: '5px 12px',
-  background: '#E0E0E0', color: '#212529', border: '1px solid #999',
-  borderRadius: 2, cursor: 'pointer',
-}
-const btnDanger: React.CSSProperties = {
-  ...btnSecondary,
-  background: '#DC3545', color: '#fff', border: '1px solid #C82333',
-}
+// ─── Page helpers ─────────────────────────────────────────────────────────────
 
 function todayYMD(): string {
   const n = new Date()
@@ -504,24 +471,12 @@ function ActiveSession({
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: 2, padding: '8px 16px 0', flexShrink: 0 }}>
-        {TABS.map((t) => (
-          <button
-            key={t.value}
-            onClick={() => setTab(t.value)}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-              padding: '7px 16px', fontSize: 12, fontWeight: 600,
-              border: '1px solid #B0B0B0', borderBottom: 'none',
-              borderRadius: '4px 4px 0 0', cursor: 'pointer',
-              background: tab === t.value ? '#fff' : '#DDD',
-              color: tab === t.value ? NAVY : '#6C757D',
-            }}
-          >
-            <t.icon style={{ width: 13, height: 13 }} /> {t.label}
-          </button>
-        ))}
-      </div>
+      <TabStrip
+        tabs={TABS}
+        active={tab}
+        onChange={(v) => setTab(v as SearchTab)}
+        style={{ padding: '8px 16px 0' }}
+      />
 
       {/* Tab content */}
       <div style={{ flex: 1, minHeight: 0, margin: '0 16px 16px', background: '#fff', border: '1px solid #B0B0B0', borderRadius: '0 3px 3px 3px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -1207,18 +1162,6 @@ function DoneScreen({ visit, onFinish }: { visit: Visit; onFinish: () => void })
 
 // ─── Small shared pieces ──────────────────────────────────────────────────────
 
-function EmptyHint({ text }: { text: string }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 160, color: '#6C757D', fontSize: 12.5 }}>
-      {text}
-    </div>
-  )
-}
-
-function SectionLabel({ text }: { text: string }) {
-  return <p style={{ ...lbl, marginTop: 12, marginBottom: 6 }}>{text}</p>
-}
-
 function BlacklistBadge() {
   return (
     <span style={{ display: 'inline-flex', marginLeft: 6, padding: '1px 6px', borderRadius: 3, fontSize: 10, fontWeight: 700, background: '#FDECEA', color: '#DC3545', verticalAlign: 'middle' }}>
@@ -1234,19 +1177,6 @@ function BlacklistNotice({ reason }: { reason: string | null }) {
         <AlertTriangle style={{ width: 12, height: 12, display: 'inline', verticalAlign: '-2px' }} /> This person is blacklisted at this yard
       </p>
       {reason && <p style={{ margin: '3px 0 0', fontSize: 11.5, color: '#8A2530' }}>Reason: {reason}</p>}
-    </div>
-  )
-}
-
-function DL({ rows }: { rows: [string, string][] }) {
-  return (
-    <div style={{ marginBottom: 6 }}>
-      {rows.map(([k, v]) => (
-        <div key={k} style={{ display: 'flex', padding: '3px 0', borderBottom: '1px solid #F5F5F5' }}>
-          <span style={{ width: 130, fontSize: 11, fontWeight: 700, color: '#6C757D', textTransform: 'uppercase', letterSpacing: '0.03em', flexShrink: 0 }}>{k}</span>
-          <span style={{ fontSize: 12.5, color: '#212529' }}>{v}</span>
-        </div>
-      ))}
     </div>
   )
 }
@@ -1298,21 +1228,3 @@ function PhotoStrip({ urls, label }: { urls: string[]; label: string | null }) {
   )
 }
 
-function Drawer({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
-  return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 90 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.35)' }} onClick={onClose} />
-      <div style={{ position: 'absolute', top: 0, right: 0, bottom: 0, width: '100%', maxWidth: 520, background: '#fff', boxShadow: '-4px 0 24px rgba(0,0,0,0.25)', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', borderBottom: '2px solid #B0B0B0', background: 'linear-gradient(180deg,#EAEAEA 0%,#D4D4D4 100%)', flexShrink: 0 }}>
-          <span style={{ fontSize: 13, fontWeight: 700, color: NAVY }}>{title}</span>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
-            <X style={{ width: 16, height: 16, color: '#6C757D' }} />
-          </button>
-        </div>
-        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '14px 16px' }}>
-          {children}
-        </div>
-      </div>
-    </div>
-  )
-}

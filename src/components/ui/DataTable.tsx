@@ -4,6 +4,7 @@ import { useState, useRef } from 'react'
 import { ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight, MoreHorizontal, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { colors, fontSize, fontWeight, layout } from '@/lib/design-tokens'
+import { Btn } from '@/components/rpx'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -227,7 +228,7 @@ export function DataTable<T>({
               borderBottom: '2px solid #B0B0B0',
             }}>
               {multiSelect && (
-                <th style={{ width: 36, height: 32, padding: '0 10px', borderRight: '1px solid #D0D0D0' }}>
+                <th style={{ width: 36, height: 30, padding: '0 10px', borderRight: '1px solid #D0D0D0' }}>
                   <input
                     type="checkbox"
                     checked={allSelected}
@@ -249,12 +250,12 @@ export function DataTable<T>({
                       col.sortable && 'cursor-pointer select-none hover:bg-[#D6E8FF]/60',
                     )}
                     style={{
-                      fontSize:      11,
-                      fontWeight:    600,
-                      letterSpacing: '0.06em',
-                      color:         '#374151',
+                      fontSize:      10,
+                      fontWeight:    700,
+                      letterSpacing: '0.05em',
+                      color:         '#6C757D',
                       textTransform: 'uppercase',
-                      height:        32,
+                      height:        30,
                       width:         col.width,
                       borderRight:   colBorder(isLastData),
                     }}
@@ -276,7 +277,7 @@ export function DataTable<T>({
                 )
               })}
               {hasActions && (
-                <th className="w-10" style={{ height: 32, borderRight: 'none' }} />
+                <th className="w-10" style={{ height: 30, borderRight: 'none' }} />
               )}
             </tr>
           </thead>
@@ -309,23 +310,9 @@ export function DataTable<T>({
                     )}
                     <p className="text-sm" style={{ color: colors.textSecondary }}>{emptyMessage}</p>
                     {emptyAction && (
-                      <button
-                        className="mt-2"
-                        style={{
-                          fontSize: 10,
-                          padding: '1px 6px',
-                          background: '#E0E0E0',
-                          border: '1px solid #999',
-                          borderRadius: 2,
-                          color: '#212529',
-                          cursor: 'pointer',
-                        }}
-                        onMouseEnter={(e) => { e.currentTarget.style.background = '#D0D0D0' }}
-                        onMouseLeave={(e) => { e.currentTarget.style.background = '#E0E0E0' }}
-                        onClick={emptyAction.onClick}
-                      >
+                      <Btn variant="secondary" style={{ marginTop: 8 }} onClick={emptyAction.onClick}>
                         {emptyAction.label}
-                      </button>
+                      </Btn>
                     )}
                   </div>
                 </td>
@@ -359,7 +346,7 @@ export function DataTable<T>({
                     {multiSelect && (
                       <td
                         className="border-b border-[#E0E0E0]"
-                        style={{ width: 36, height: 32, padding: '0 10px', borderRight: '1px solid #D0D0D0' }}
+                        style={{ width: 36, height: 30, padding: '0 10px', borderRight: '1px solid #D0D0D0' }}
                         onClick={(e) => e.stopPropagation()}
                       >
                         <input
@@ -380,9 +367,10 @@ export function DataTable<T>({
                       return (
                         <td
                           key={col.key}
-                          className="px-3 border-b border-[#E0E0E0]"
+                          className="border-b border-[#E0E0E0]"
                           style={{
-                            height:      32,
+                            height:      30,
+                            padding:     '4px 10px',
                             fontSize:    12,
                             color:       isSelected || isChecked ? '#00205B' : '#212529',
                             borderRight: colBorder(isLastData),
@@ -395,7 +383,7 @@ export function DataTable<T>({
                     {hasActions && (
                       <td
                         className="px-2 border-b border-[#E0E0E0]"
-                        style={{ height: 32, borderRight: 'none' }}
+                        style={{ height: 30, borderRight: 'none' }}
                         onClick={(e) => e.stopPropagation()}
                       >
                         <ActionsDropdown row={row} actions={rowActions!} />

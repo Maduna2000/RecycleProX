@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import { X } from 'lucide-react'
+import { NAVY, BAR_GRAD } from '@/components/rpx'
 
 interface InlineDetailPanelProps {
   open:     boolean
@@ -45,9 +46,12 @@ export function InlineDetailPanel({
         flexShrink: 0,
       }}
     >
-      <div className="flex items-center justify-between px-4 py-2 border-b border-[#F1F3F4] bg-[#F8F9FA]">
+      <div
+        className="flex items-center justify-between px-4"
+        style={{ height: 34, background: BAR_GRAD, borderBottom: '2px solid #B0B0B0', flexShrink: 0 }}
+      >
         {title && (
-          <p className="text-xs font-semibold text-[#6C757D] uppercase tracking-wide">{title}</p>
+          <p style={{ fontSize: 13, fontWeight: 700, color: NAVY, margin: 0 }}>{title}</p>
         )}
         <button
           className="ml-auto p-1 rounded hover:bg-[#E0E0E0] text-[#6C757D] hover:text-[#212529] transition-colors"

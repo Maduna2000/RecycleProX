@@ -1,0 +1,217 @@
+'use client'
+
+/**
+ * Layout primitives of the officer-portal look: folder tabs on a white
+ * content card, filter bars, field wrappers, and small display helpers.
+ */
+
+import { NAVY, CARD_BORDER, lbl } from './styles'
+
+// ─── Field / FormLabel ────────────────────────────────────────────────────────
+
+export function FormLabel({ required, children }: { required?: boolean; children: React.ReactNode }) {
+  return (
+    <label style={lbl}>
+      {children}
+      {required && <span style={{ color: '#DC3545' }}> *</span>}
+    </label>
+  )
+}
+
+/** Label-above-control wrapper for filter bars and forms. */
+export function Field({
+  label,
+  required,
+  hint,
+  width,
+  style,
+  children,
+}: {
+  label: string
+  required?: boolean
+  hint?: string
+  width?: number | string
+  style?: React.CSSProperties
+  children: React.ReactNode
+}) {
+  return (
+    <div style={{ width, ...style }}>
+      <FormLabel required={required}>{label}</FormLabel>
+      {children}
+      {hint && <p style={{ fontSize: 10, color: '#9CA3AF', margin: '2px 0 0' }}>{hint}</p>}
+    </div>
+  )
+}
+
+// ─── TabStrip ─────────────────────────────────────────────────────────────────
+
+export interface RpxTab {
+  value:  string
+  label:  string
+  icon?:  React.ElementType
+  count?: number
+}
+
+/** Folder-style tabs — white active, gray inactive, attached to the card below. */
+export function TabStrip({
+  tabs,
+  active,
+  onChange,
+  style,
+}: {
+  tabs: RpxTab[]
+  active: string
+  onChange: (value: string) => void
+  style?: React.CSSProperties
+}) {
+  return (
+    <div style={{ display: 'flex', gap: 2, flexShrink: 0, ...style }}>
+      {tabs.map((t) => {
+        const isActive = t.value === active
+        return (
+          <button
+            key={t.value}
+            onClick={() => onChange(t.value)}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              padding: '7px 16px', fontSize: 12, fontWeight: 600,
+              border: '1px solid #B0B0B0', borderBottom: 'none',
+              borderRadius: '4px 4px 0 0', cursor: 'pointer',
+              background: isActive ? '#fff' : '#DDD',
+              color: isActive ? NAVY : '#6C757D',
+            }}
+          >
+            {t.icon && <t.icon style={{ width: 13, height: 13 }} />}
+            {t.label}
+            {t.count !== undefined && (
+              <span style={{
+                fontSize: 10, fontWeight: 700, padding: '0 5px',
+                borderRadius: 8, background: isActive ? '#EBF3FC' : '#CFCFCF',
+                color: isActive ? NAVY : '#555',
+              }}>
+                {t.count}
+              </span>
+            )}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+// ─── ContentCard ──────────────────────────────────────────────────────────────
+
+/** White content card; `attached` squares the top-left corner under tabs. */
+export function ContentCard({
+  attached,
+  style,
+  children,
+}: {
+  attached?: boolean
+  style?: React.CSSProperties
+  children: React.ReactNode
+}) {
+  return (
+    <div
+      style={{
+        flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column',
+        background: '#fff', border: CARD_BORDER, overflow: 'hidden',
+        borderRadius: attached ? '0 3px 3px 3px' : 3,
+        ...style,
+      }}
+    >
+      {children}
+    </div>
+  )
+}
+
+// ─── PortalPage ───────────────────────────────────────────────────────────────
+
+/**
+ * The standard page silhouette: folder tabs (or a single title tab) with a
+ * right-aligned action slot, above an attached white content card.
+ */
+export function PortalPage({
+  tabs,
+  active,
+  onChange,
+  title,
+  actions,
+  children,
+  cardStyle,
+}: {
+  tabs?: RpxTab[]
+  active?: string
+  onChange?: (value: string) => void
+  /** Used as the single tab label when no `tabs` are given. */
+  title?: string
+  actions?: React.ReactNode
+  children: React.ReactNode
+  cardStyle?: React.CSSProperties
+}) {
+  const resolvedTabs: RpxTab[] = tabs ?? [{ value: '_page', label: title ?? '' }]
+  const resolvedActive = tabs ? (active ?? tabs[0]?.value ?? '') : '_page'
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, flexShrink: 0 }}>
+        <TabStrip tabs={resolvedTabs} active={resolvedActive} onChange={onChange ?? (() => {})} />
+        <div style={{ flex: 1 }} />
+        {actions && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingBottom: 5 }}>
+            {actions}
+          </div>
+        )}
+      </div>
+      <ContentCard attached style={cardStyle}>
+        {children}
+      </ContentCard>
+    </div>
+  )
+}
+
+// ─── FilterBar ────────────────────────────────────────────────────────────────
+
+/** The filter/search row that sits at the top of a content card. */
+export function FilterBar({ style, children }: { style?: React.CSSProperties; children: React.ReactNode }) {
+  return (
+    <div
+      style={{
+        display: 'flex', alignItems: 'flex-end', gap: 10,
+        padding: '10px 14px', borderBottom: '1px solid #E0E0E0',
+        flexShrink: 0, flexWrap: 'wrap',
+        ...style,
+      }}
+    >
+      {children}
+    </div>
+  )
+}
+
+// ─── Small display helpers ────────────────────────────────────────────────────
+
+export function EmptyHint({ text, height = 160 }: { text: string; height?: number }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height, color: '#6C757D', fontSize: 12.5 }}>
+      {text}
+    </div>
+  )
+}
+
+export function SectionLabel({ text }: { text: string }) {
+  return <p style={{ ...lbl, marginTop: 12, marginBottom: 6 }}>{text}</p>
+}
+
+/** Definition list — label/value rows with hairline separators. */
+export function DL({ rows }: { rows: [string, React.ReactNode][] }) {
+  return (
+    <div style={{ marginBottom: 6 }}>
+      {rows.map(([k, v]) => (
+        <div key={k} style={{ display: 'flex', padding: '3px 0', borderBottom: '1px solid #F5F5F5' }}>
+          <span style={{ width: 130, fontSize: 11, fontWeight: 700, color: '#6C757D', textTransform: 'uppercase', letterSpacing: '0.03em', flexShrink: 0 }}>{k}</span>
+          <span style={{ fontSize: 12.5, color: '#212529' }}>{v}</span>
+        </div>
+      ))}
+    </div>
+  )
+}

@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useCallback, createContext, useContext, ReactNode } from 'react'
-import { Dialog, DialogContent } from '@/components/ui/dialog'
-import { AlertTriangle, Trash2, X, HelpCircle } from 'lucide-react'
+import { Dialog } from '@/components/ui/dialog'
+import { AlertTriangle, Trash2, HelpCircle } from 'lucide-react'
 import { colors, fontSize } from '@/lib/design-tokens'
+import { Btn, RpxDialogContent, RpxDialogHeader, RpxDialogFooter } from '@/components/rpx'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -162,50 +163,8 @@ function ConfirmDialogInner({
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onCancel() }}>
-      <DialogContent
-        className="sm:max-w-sm p-0"
-        showCloseButton={false}
-        style={{
-          borderRadius: 2,
-          border: `1px solid ${colors.border}`,
-          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-          background: colors.surface,
-        }}
-      >
-        {/* Windows-style title bar */}
-        <div
-          style={{
-            background: 'linear-gradient(180deg, #EAEAEA 0%, #D4D4D4 100%)',
-            borderBottom: `1px solid ${colors.border}`,
-            padding: '6px 8px 6px 12px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}
-        >
-          <span style={{ fontSize: fontSize.sm, fontWeight: 600, color: colors.textPrimary }}>
-            {title}
-          </span>
-          <button
-            onClick={onCancel}
-            style={{
-              width: 20,
-              height: 20,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              borderRadius: 2,
-              color: colors.textSecondary,
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = '#C0392B'; e.currentTarget.style.color = '#fff' }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = colors.textSecondary }}
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
-        </div>
+      <RpxDialogContent maxWidth={400}>
+        <RpxDialogHeader title={title} onClose={onCancel} />
 
         {/* Content */}
         <div style={{ padding: '16px 20px', display: 'flex', gap: 12 }}>
@@ -230,97 +189,19 @@ function ConfirmDialogInner({
           </div>
         </div>
 
-        {/* Footer */}
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'flex-end',
-            gap: 8,
-            padding: '12px 16px',
-            borderTop: `1px solid ${colors.border}`,
-            background: 'linear-gradient(180deg, #F5F5F5 0%, #ECECEC 100%)',
-          }}
-        >
-          <ConfirmButton onClick={onCancel} variant="cancel">
-            {cancelLabel}
-          </ConfirmButton>
-          <ConfirmButton
+        <RpxDialogFooter>
+          <Btn onClick={onCancel}>{cancelLabel}</Btn>
+          <Btn
+            variant={variant === 'danger' ? 'danger' : 'primary'}
+            style={variant !== 'danger' ? { background: config.confirmBg } : undefined}
+            hoverBg={variant !== 'danger' ? config.confirmHover : undefined}
             onClick={onConfirm}
-            variant="confirm"
-            bgColor={config.confirmBg}
-            hoverColor={config.confirmHover}
           >
             {confirmLabel}
-          </ConfirmButton>
-        </div>
-      </DialogContent>
+          </Btn>
+        </RpxDialogFooter>
+      </RpxDialogContent>
     </Dialog>
-  )
-}
-
-// ─── Button Component ─────────────────────────────────────────────────────────
-
-interface ConfirmButtonProps {
-  onClick: () => void
-  variant: 'confirm' | 'cancel'
-  bgColor?: string
-  hoverColor?: string
-  children: ReactNode
-}
-
-function ConfirmButton({ onClick, variant, bgColor, hoverColor, children }: ConfirmButtonProps) {
-  const isCancel = variant === 'cancel'
-
-  // Windows aesthetic base style
-  const baseStyle: React.CSSProperties = {
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 3,
-    padding: '1px 6px',
-    fontSize: 10,
-    borderRadius: 2,
-    cursor: 'pointer',
-    transition: 'background 0.1s',
-  }
-
-  // Cancel button - Windows gray style
-  const cancelStyle: React.CSSProperties = {
-    ...baseStyle,
-    background: '#E0E0E0',
-    border: '1px solid #999',
-    color: colors.textPrimary,
-  }
-
-  // Confirm button - keeps variant color (danger stays red)
-  const confirmStyle: React.CSSProperties = {
-    ...baseStyle,
-    background: bgColor ?? colors.danger,
-    border: `1px solid ${hoverColor ?? '#C82333'}`,
-    color: colors.textOnDark,
-  }
-
-  return (
-    <button
-      onClick={onClick}
-      style={isCancel ? cancelStyle : confirmStyle}
-      onMouseEnter={(e) => {
-        if (isCancel) {
-          e.currentTarget.style.background = '#D0D0D0'
-        } else if (hoverColor) {
-          e.currentTarget.style.background = hoverColor
-        }
-      }}
-      onMouseLeave={(e) => {
-        if (isCancel) {
-          e.currentTarget.style.background = '#E0E0E0'
-        } else if (bgColor) {
-          e.currentTarget.style.background = bgColor
-        }
-      }}
-    >
-      {children}
-    </button>
   )
 }
 
