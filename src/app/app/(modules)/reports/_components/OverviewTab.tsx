@@ -8,9 +8,9 @@ import { useState } from 'react'
 import useSWR from 'swr'
 import Decimal from 'decimal.js'
 import { Loader2, TrendingUp, ShoppingCart, Users, ArrowRightLeft, Receipt, Download } from 'lucide-react'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { colors, fontSize } from '@/lib/design-tokens'
+import { ActionButton } from './ActionButton'
+import { DateRangeFilter } from './DateRangeFilter'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -82,93 +82,24 @@ export function OverviewTab() {
     URL.revokeObjectURL(url)
   }
 
-  const PRESETS = [
-    { label: 'Today',       from: today,                                                                                              to: today },
-    { label: 'Last 7 days', from: (() => { const d = new Date(); d.setDate(d.getDate() - 6); return d.toISOString().split('T')[0]! })(), to: today },
-    { label: 'This week',   from: (() => { const d = new Date(); d.setDate(d.getDate() - d.getDay()); return d.toISOString().split('T')[0]! })(), to: today },
-    { label: 'This month',  from: monthStart,                                                                                         to: today },
-  ]
-
   return (
     <div className="max-w-4xl mx-auto w-full space-y-5 pb-6">
 
       {/* Date range controls */}
-      <div className="rounded border p-5 space-y-3 bg-white" style={{ borderColor: colors.border }}>
-        <div className="flex flex-wrap items-end gap-3">
-          <div>
-            <Label className="text-xs mb-1 block" style={{ color: colors.textSecondary }}>From</Label>
-            <Input type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} className="w-40 h-9 text-sm" />
-          </div>
-          <div>
-            <Label className="text-xs mb-1 block" style={{ color: colors.textSecondary }}>To</Label>
-            <Input type="date" value={to} min={from} max={today} onChange={(e) => setTo(e.target.value)} className="w-40 h-9 text-sm" />
-          </div>
-          <button
-            onClick={handleRun}
-            disabled={isLoading}
-            style={{
-              fontSize: 10,
-              padding: '1px 6px',
-              background: '#E0E0E0',
-              border: '1px solid #999',
-              borderRadius: 2,
-              cursor: isLoading ? 'not-allowed' : 'pointer',
-              opacity: isLoading ? 0.6 : 1,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 3,
-              color: '#212529',
-            }}
-            onMouseEnter={(e) => { if (!isLoading) e.currentTarget.style.background = '#D0D0D0' }}
-            onMouseLeave={(e) => { if (!isLoading) e.currentTarget.style.background = '#E0E0E0' }}
-          >
-            {isLoading ? <><Loader2 style={{ width: 9, height: 9, animation: 'spin 1s linear infinite' }} /> Loading…</> : 'Run Report'}
-          </button>
+      <div className="rounded border p-4 space-y-3 bg-white" style={{ borderColor: colors.border }}>
+        <DateRangeFilter from={from} to={to} onChange={(f, t) => { setFrom(f); setTo(t) }} />
+
+        <div className="flex flex-wrap items-center gap-2" style={{ borderTop: `1px solid ${colors.border}`, paddingTop: 12 }}>
+          <ActionButton variant="primary" onClick={handleRun} disabled={isLoading}>
+            {isLoading
+              ? <><Loader2 style={{ width: 13, height: 13, animation: 'spin 1s linear infinite' }} /> Loading…</>
+              : 'Run Report'}
+          </ActionButton>
           {data && (
-            <button
-              onClick={exportCSV}
-              style={{
-                fontSize: 10,
-                padding: '1px 6px',
-                background: '#E0E0E0',
-                border: '1px solid #999',
-                borderRadius: 2,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 3,
-                color: '#212529',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = '#D0D0D0' }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = '#E0E0E0' }}
-            >
-              <Download style={{ width: 9, height: 9 }} /> Export CSV
-            </button>
+            <ActionButton onClick={exportCSV}>
+              <Download style={{ width: 13, height: 13 }} /> Export CSV
+            </ActionButton>
           )}
-        </div>
-        <div className="flex gap-2 flex-wrap" style={{ borderTop: `1px solid ${colors.border}`, paddingTop: 10 }}>
-          {PRESETS.map((p) => (
-            <button
-              key={p.label}
-              onClick={() => { setFrom(p.from); setTo(p.to); setQuery(`from=${p.from}&to=${p.to}`) }}
-              style={{
-                fontSize: 10,
-                padding: '1px 6px',
-                background: '#E0E0E0',
-                border: '1px solid #999',
-                borderRadius: 2,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 3,
-                color: '#212529',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = '#D0D0D0' }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = '#E0E0E0' }}
-            >
-              {p.label}
-            </button>
-          ))}
         </div>
       </div>
 
