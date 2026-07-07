@@ -546,6 +546,27 @@ function ActiveSession({
 
 type GuardedFetch = (url: string) => Promise<Response | null>
 
+/**
+ * Download a PDF through the session guard (409 ends the session cleanly).
+ * Returns an error message, or null on success / session end.
+ */
+async function downloadPdf(guardedFetch: GuardedFetch, url: string, filename: string): Promise<string | null> {
+  const res = await guardedFetch(url)
+  if (!res) return null
+  if (!res.ok) {
+    const j = await res.json().catch(() => ({})) as { error?: string }
+    return j.error ?? 'Download failed'
+  }
+  const blob = await res.blob()
+  const objectUrl = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = objectUrl
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(objectUrl)
+  return null
+}
+
 // ─── Register by Date tab ─────────────────────────────────────────────────────
 
 function RegisterTab({ visitId, guardedFetch }: { visitId: string; guardedFetch: GuardedFetch }) {
@@ -690,6 +711,22 @@ function PersonTab({ visitId, guardedFetch }: { visitId: string; guardedFetch: G
   const [error, setError]           = useState<string | null>(null)
   const [detail, setDetail]         = useState<PersonDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState<string | null>(null)
+  const [reportBusy, setReportBusy] = useState(false)
+
+  async function handlePersonReport(customerId: string, fullName: string) {
+    if (reportBusy) return
+    setReportBusy(true)
+    try {
+      const err = await downloadPdf(
+        guardedFetch,
+        `/api/police-search/person/${customerId}/report?visitId=${visitId}`,
+        `person-record-${fullName.replace(/[^\w-]/g, '-')}.pdf`
+      )
+      if (err) setError(err)
+    } finally {
+      setReportBusy(false)
+    }
+  }
 
   async function handleSearch(e?: React.FormEvent) {
     e?.preventDefault()
@@ -783,6 +820,15 @@ function PersonTab({ visitId, guardedFetch }: { visitId: string; guardedFetch: G
       {detail && (
         <Drawer title={detail.customer.fullName} onClose={() => setDetail(null)}>
           {detail.customer.blacklisted && <BlacklistNotice reason={detail.customer.blacklistReason} />}
+          <button
+            onClick={() => handlePersonReport(detail.customer.customerId, detail.customer.fullName)}
+            disabled={reportBusy}
+            style={{ ...btnPrimary, padding: '6px 14px', marginBottom: 12, opacity: reportBusy ? 0.6 : 1, cursor: reportBusy ? 'wait' : 'pointer' }}
+          >
+            {reportBusy
+              ? <><Loader2 className="animate-spin" style={{ width: 12, height: 12 }} /> Preparing…</>
+              : <><FileDown style={{ width: 12, height: 12 }} /> Download Person Record (PDF)</>}
+          </button>
           <div style={{ display: 'flex', gap: 14, marginBottom: 12 }}>
             {detail.customer.idPhotoUrl && <PhotoImg src={detail.customer.idPhotoUrl} alt="ID photo" big />}
             <div style={{ flex: 1 }}>
@@ -837,6 +883,8 @@ function GoodsTab({ visitId, guardedFetch }: { visitId: string; guardedFetch: Gu
   const [loading, setLoading]     = useState(false)
   const [error, setError]         = useState<string | null>(null)
   const [detail, setDetail]       = useState<GoodsRow | null>(null)
+  const [lastQuery, setLastQuery] = useState<{ productId: string; from: string; to: string; minQty: string } | null>(null)
+  const [reportBusy, setReportBusy] = useState(false)
 
   async function handleSearch() {
     if (loading || !productId) return
@@ -853,8 +901,28 @@ function GoodsTab({ visitId, guardedFetch }: { visitId: string; guardedFetch: Gu
       if (!res.ok || !j.rows) { setError(j.error ?? 'Search failed'); return }
       setRows(j.rows)
       setProductName(j.productName ?? null)
+      setLastQuery({ productId, from, to, minQty })
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleGoodsReport() {
+    if (reportBusy || !lastQuery) return
+    setReportBusy(true)
+    try {
+      const params = new URLSearchParams({ visitId, productId: lastQuery.productId })
+      if (lastQuery.from)   params.set('from', lastQuery.from)
+      if (lastQuery.to)     params.set('to', lastQuery.to)
+      if (lastQuery.minQty) params.set('minQuantity', lastQuery.minQty)
+      const err = await downloadPdf(
+        guardedFetch,
+        `/api/police-search/goods/report?${params.toString()}`,
+        `goods-trace-${(productName ?? 'product').replace(/[^\w-]/g, '-')}.pdf`
+      )
+      if (err) setError(err)
+    } finally {
+      setReportBusy(false)
     }
   }
 
@@ -884,6 +952,14 @@ function GoodsTab({ visitId, guardedFetch }: { visitId: string; guardedFetch: Gu
           {loading ? <Loader2 className="animate-spin" style={{ width: 12, height: 12 }} /> : <Search style={{ width: 12, height: 12 }} />}
           Trace Goods
         </button>
+        {rows && rows.length > 0 && lastQuery && (
+          <button style={{ ...btnSecondary, opacity: reportBusy ? 0.6 : 1, cursor: reportBusy ? 'wait' : 'pointer' }} onClick={handleGoodsReport} disabled={reportBusy}>
+            {reportBusy
+              ? <Loader2 className="animate-spin" style={{ width: 11, height: 11 }} />
+              : <FileDown style={{ width: 11, height: 11 }} />}
+            Download Report (PDF)
+          </button>
+        )}
         {error && <span style={{ fontSize: 12, color: '#DC3545' }}>{error}</span>}
       </div>
 

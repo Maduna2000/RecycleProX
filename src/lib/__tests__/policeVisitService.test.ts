@@ -40,6 +40,8 @@ import {
   searchRegisterByDate,
   searchPersons,
   searchGoods,
+  getPersonRecordReport,
+  getGoodsTraceReport,
   PoliceVisitNotActiveError,
   INSPECTION_IDLE_TIMEOUT_MS,
 } from '@/lib/services/policeVisitService'
@@ -275,6 +277,68 @@ describe('searchGoods', () => {
 
     expect(productName).toBe('Copper')
     expect(rows[0]).toMatchObject({ supplierName: 'Sipho Dlamini', quantity: '50', lineTotal: '4500.00' })
+  })
+})
+
+// ─── Downloadable reports ─────────────────────────────────────────────────────
+
+describe('getPersonRecordReport', () => {
+  it('logs the download as a person disclosure with the records count', async () => {
+    mocked(prisma.policeVisit.findUnique).mockResolvedValue(activeVisit() as never)
+    mocked(prisma.customer.findUnique).mockResolvedValue({
+      id: 'c-1', firstName: 'Sipho', lastName: 'Dlamini', idNumber: '8501015800083',
+      dateOfBirth: null, gender: null, nationality: null, phone: '0821234567',
+      email: null, physicalAddress: '12 Main Rd', postalAddress: null,
+      blacklisted: false, blacklistReason: null, idPhotoR2Key: null,
+      purchases: [PURCHASE, PURCHASE],
+    } as never)
+    mocked(prisma.policeSearchLog.create).mockResolvedValue({} as never)
+    mocked(prisma.systemSettings.findMany).mockResolvedValue([] as never)
+
+    const result = await getPersonRecordReport('visit-1', 'c-1')
+    expect(result).not.toBeNull()
+    expect(result!.customer.firstName).toBe('Sipho')
+
+    const log = (mocked(prisma.policeSearchLog.create).mock.calls[0]![0] as { data: Record<string, unknown> }).data
+    expect(log).toMatchObject({
+      searchType:  'person',
+      queryText:   'report: Sipho Dlamini (8501015800083)',
+      resultCount: 2,
+    })
+  })
+
+  it('refuses when the inspection session is not active', async () => {
+    mocked(prisma.policeVisit.findUnique).mockResolvedValue(activeVisit({ status: 'completed' }) as never)
+    await expect(getPersonRecordReport('visit-1', 'c-1')).rejects.toBeInstanceOf(PoliceVisitNotActiveError)
+    expect(mocked(prisma.policeSearchLog.create)).not.toHaveBeenCalled()
+  })
+})
+
+describe('getGoodsTraceReport', () => {
+  it('logs the download with a report-prefixed query text', async () => {
+    mocked(prisma.policeVisit.findUnique).mockResolvedValue(activeVisit() as never)
+    mocked(prisma.product.findUnique).mockResolvedValue({ name: 'Copper', unit: 'kg' } as never)
+    mocked(prisma.purchaseLine.findMany).mockResolvedValue([{
+      purchaseId: 'p-1',
+      quantity: { toString: () => '50' },
+      lineTotal: { toString: () => '4500.00' },
+      product: { unit: 'kg' },
+      purchase: { refNumber: 'PUR-001', createdAt: new Date(), photoR2Keys: [], customer: PURCHASE.customer },
+    }] as never)
+    mocked(prisma.policeSearchLog.create).mockResolvedValue({} as never)
+    mocked(prisma.systemSettings.findMany).mockResolvedValue([] as never)
+
+    const result = await getGoodsTraceReport('visit-1', { productId: 'prod-1', from: '2026-07-01', to: '2026-07-07' })
+    expect(result).not.toBeNull()
+    expect(result!.product.name).toBe('Copper')
+    expect(result!.lines).toHaveLength(1)
+
+    const log = (mocked(prisma.policeSearchLog.create).mock.calls[0]![0] as { data: Record<string, unknown> }).data
+    expect(log).toMatchObject({
+      searchType:  'goods',
+      queryText:   'report: Copper · 2026-07-01 to 2026-07-07',
+      resultCount: 1,
+    })
   })
 })
 

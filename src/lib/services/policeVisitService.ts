@@ -505,6 +505,111 @@ export async function searchGoods(
   return { rows, productName: product?.name ?? null }
 }
 
+// ─── Search-result report data (officer downloads) ───────────────────────────
+
+/**
+ * Person record report: full identity details + ID photo bytes + transaction
+ * history. The download is logged against the visit like a search.
+ */
+export async function getPersonRecordReport(visitId: string, customerId: string) {
+  const visit = await getActiveVisitOrThrow(visitId)
+
+  const customer = await prisma.$transaction(async (tx) => {
+    const found = await tx.customer.findUnique({
+      where:   { id: customerId },
+      include: {
+        purchases: {
+          where:   { status: 'completed' },
+          orderBy: { createdAt: 'desc' },
+          take:    200,
+          include: { lines: { include: { product: true } } },
+        },
+      },
+    })
+    await tx.policeSearchLog.create({
+      data: {
+        visitId,
+        searchType:  'person',
+        queryText:   found
+          ? `report: ${found.firstName} ${found.lastName}${found.idNumber ? ` (${found.idNumber})` : ''}`
+          : `report: unknown customer ${customerId}`,
+        resultCount: found ? found.purchases.length : 0,
+      },
+    })
+    return found
+  })
+
+  if (!customer) return null
+
+  const [settingsRows, idPhotoBytes] = await Promise.all([
+    prisma.systemSettings.findMany(),
+    customer.idPhotoR2Key
+      ? fetchR2Bytes(customer.idPhotoR2Key).catch((err) => {
+          logger.warn({ err, customerId }, 'police.report-id-photo-fetch-failed')
+          return null
+        })
+      : Promise.resolve(null),
+  ])
+  const settings = Object.fromEntries(settingsRows.map((s) => [s.key, s.value]))
+
+  logger.info({ visitId, customerId, officerName: visit.officerName }, 'police-report.person-downloaded')
+  return { visit, customer, settings, idPhotoBytes }
+}
+
+/**
+ * Goods trace report: purchase lines of a product across a date range.
+ * The download is logged against the visit like a search.
+ */
+export async function getGoodsTraceReport(
+  visitId: string,
+  opts: { productId: string; from?: string; to?: string; minQuantity?: number }
+) {
+  const visit = await getActiveVisitOrThrow(visitId)
+
+  const createdAt: Prisma.DateTimeFilter | undefined =
+    opts.from || opts.to
+      ? {
+          ...(opts.from ? { gte: dayStart(opts.from) } : {}),
+          ...(opts.to   ? { lte: dayEnd(opts.to) }     : {}),
+        }
+      : undefined
+
+  const { lines, product } = await prisma.$transaction(async (tx) => {
+    const foundProduct = await tx.product.findUnique({
+      where:  { id: opts.productId },
+      select: { name: true, unit: true },
+    })
+    const foundLines = await tx.purchaseLine.findMany({
+      where: {
+        productId: opts.productId,
+        ...(opts.minQuantity ? { quantity: { gte: opts.minQuantity } } : {}),
+        purchase: { status: 'completed', ...(createdAt ? { createdAt } : {}) },
+      },
+      include: { purchase: { include: { customer: true } }, product: true },
+      orderBy: { createdAt: 'desc' },
+      take:    500,
+    })
+    const rangeText = [opts.from, opts.to].filter(Boolean).join(' to ') || 'all dates'
+    await tx.policeSearchLog.create({
+      data: {
+        visitId,
+        searchType:  'goods',
+        queryText:   `report: ${foundProduct?.name ?? opts.productId} · ${rangeText}${opts.minQuantity ? ` · min ${opts.minQuantity}` : ''}`,
+        resultCount: foundLines.length,
+      },
+    })
+    return { lines: foundLines, product: foundProduct }
+  })
+
+  if (!product) return null
+
+  const settingsRows = await prisma.systemSettings.findMany()
+  const settings = Object.fromEntries(settingsRows.map((s) => [s.key, s.value]))
+
+  logger.info({ visitId, productId: opts.productId, officerName: visit.officerName }, 'police-report.goods-downloaded')
+  return { visit, product, lines, settings }
+}
+
 // ─── Certificate data ─────────────────────────────────────────────────────────
 
 export async function getVisitForCertificate(id: string) {
