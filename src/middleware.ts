@@ -52,9 +52,18 @@ export default auth((req: NextRequest & { auth: { user?: SessionUser } | null })
   const session = req.auth
 
   // Public routes — always allow
-  if (pathname.startsWith('/login') || pathname.startsWith('/police') ||
+  if (pathname.startsWith('/login') ||
       pathname === '/api/r2/test' || pathname === '/scale/login' ||
       pathname.startsWith('/api/mobile/')) {
+    return NextResponse.next()
+  }
+
+  // Police officer portal — staff-launched; any staff role except scale operators
+  if (pathname.startsWith('/police')) {
+    if (!session) return NextResponse.redirect(new URL('/login', req.url))
+    if (session.user?.role === 'scale_operator') {
+      return NextResponse.redirect(new URL('/scale', req.url))
+    }
     return NextResponse.next()
   }
 
@@ -137,5 +146,5 @@ export default auth((req: NextRequest & { auth: { user?: SessionUser } | null })
 })
 
 export const config = {
-  matcher: ['/app/:path*', '/scale/:path*', '/api/:path*'],
+  matcher: ['/app/:path*', '/scale/:path*', '/police/:path*', '/police', '/api/:path*'],
 }

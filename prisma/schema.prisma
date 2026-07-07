@@ -596,18 +596,41 @@ model LoanRepayment {
 }
 
 model PoliceVisit {
-  id              String   @id @default(uuid())
-  visitDate       DateTime @db.Date
-  officerName     String
-  badgeNumber     String?
-  stationName     String?
-  registerR2Key   String?
-  signatureR2Key  String?
-  notes           String?
-  createdByUserId String?
-  createdAt       DateTime @default(now())
+  id               String             @id @default(uuid())
+  visitDate        DateTime           @db.Date
+  officerName      String
+  badgeNumber      String?
+  stationName      String?
+  rank             String?
+  contactNumber    String?
+  visitReason      PoliceVisitReason?
+  visitNote        String?
+  status           PoliceVisitStatus  @default(completed)
+  startedAt        DateTime?
+  signedAt         DateTime?
+  launchedByUserId String?
+  registerR2Key    String?
+  signatureR2Key   String?
+  notes            String?
+  createdByUserId  String?
+  createdAt        DateTime           @default(now())
+  searchLogs       PoliceSearchLog[]
 
   @@index([visitDate])
+  @@index([createdAt])
+  @@index([status])
+}
+
+model PoliceSearchLog {
+  id          String           @id @default(uuid())
+  visitId     String
+  searchType  PoliceSearchType
+  queryText   String
+  resultCount Int
+  createdAt   DateTime         @default(now())
+  visit       PoliceVisit      @relation(fields: [visitId], references: [id], onDelete: Cascade)
+
+  @@index([visitId])
   @@index([createdAt])
 }
 
@@ -842,4 +865,23 @@ enum LoanStatus {
   active
   settled
   voided
+}
+
+enum PoliceVisitStatus {
+  active
+  completed
+  expired
+}
+
+enum PoliceVisitReason {
+  routine_inspection
+  stolen_goods_investigation
+  person_enquiry
+  other
+}
+
+enum PoliceSearchType {
+  register_by_date
+  person
+  goods
 }

@@ -56,7 +56,9 @@ export async function POST(req: NextRequest) {
 
   const d = parsed.data
   const [y, m, day] = d.visitDate.split('-').map(Number)
-  const visitDate = new Date(y!, m! - 1, day!)
+  // UTC midnight — @db.Date truncates the UTC value, so local midnight would
+  // shift to the previous day in timezones ahead of UTC.
+  const visitDate = new Date(Date.UTC(y!, m! - 1, day!))
 
   try {
     const visit = await createPoliceVisit(

@@ -10,6 +10,7 @@ import { colors } from '@/lib/design-tokens'
 import { useOfflineStore } from '@/stores/offlineStore'
 import { triggerSync, getPendingCount } from '@/lib/offline/sync'
 import { runSeeder } from '@/lib/offline/seeder'
+import { DEFAULT_POLICE_SERVICE_NAME, DEFAULT_POLICE_LEGAL_NOTE } from '@/lib/police-defaults'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -22,6 +23,7 @@ type SettingsMap = {
   purchaseNoteDeclaration?: string; saleNoteDeclaration?: string
   companyLogoR2Key?: string
   defaultPin?: string
+  police_service_name?: string; police_legal_note?: string
   printerType?: PrinterType; printerSerialPort?: string; printerBaudRate?: string
   printerIp?: string; printerTcpPort?: string
   scale1Type?: ScaleType; scale1Ip?: string; scale1Port?: string; scale1SerialPort?: string; scale1BaudRate?: string
@@ -346,6 +348,30 @@ export default function SettingsPage() {
                       onChange={(e) => set('saleNoteDeclaration', e.target.value)}
                       placeholder="Goods listed above sold and released to the buyer. Errors and omissions excepted."
                       style={inp}
+                    />
+                  </Field>
+                </div>
+              </div>
+
+              {/* ── Police Register ─── */}
+              <SHdr title="Police Register" />
+              <div style={{ padding: '10px 12px', borderBottom: '1px solid #E0E0E0' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px 12px' }}>
+                  <Field label="Police Service Name" hint="Shown on the officer portal and printed on register documents.">
+                    <input
+                      value={form.police_service_name ?? ''}
+                      onChange={(e) => set('police_service_name', e.target.value)}
+                      placeholder={DEFAULT_POLICE_SERVICE_NAME}
+                      style={inp}
+                    />
+                  </Field>
+                  <Field label="Legal / Retention Note" hint="Compliance wording shown on the portal and printed on the daily register and inspection certificates.">
+                    <textarea
+                      value={form.police_legal_note ?? ''}
+                      onChange={(e) => set('police_legal_note', e.target.value)}
+                      placeholder={DEFAULT_POLICE_LEGAL_NOTE}
+                      rows={2}
+                      style={{ ...inp, height: 'auto', padding: '5px 7px', resize: 'vertical' }}
                     />
                   </Field>
                 </div>

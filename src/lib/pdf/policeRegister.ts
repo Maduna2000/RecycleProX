@@ -1,9 +1,9 @@
 /**
  * Police Register PDF generator.
  *
- * Eswatini second-hand goods dealers are required to keep a register of every
- * purchase from the public, available for inspection by the Eswatini Police
- * Service (EPS) in accordance with applicable trade regulations.
+ * Second-hand goods dealers are required to keep a register of every purchase
+ * from the public, available for inspection by the police service configured
+ * in Settings → Police Register (SAPS by default).
  *
  * Columns: #, Time, Supplier Name, ID Number, Address, Items, Total Paid
  *
@@ -32,6 +32,7 @@ export interface PoliceRegisterData {
   entries:   RegisterEntry[]
   dealerName: string       // business name
   dealerAddress: string
+  policeServiceName: string
   generatedAt: Date
 }
 
@@ -99,7 +100,7 @@ export async function generatePoliceRegister(data: PoliceRegisterData): Promise<
     page.drawText('SECOND-HAND GOODS DEALER — PURCHASE REGISTER', {
       x: MARGIN, y: PAGE_H - 26, size: 13, font: bold, color: WHITE,
     })
-    page.drawText('Eswatini Dealers in Second-Hand Goods Regulations', {
+    page.drawText(`Available for inspection by the ${data.policeServiceName}`, {
       x: MARGIN, y: PAGE_H - 44, size: 8, font: reg, color: rgb(0.7, 0.8, 1),
     })
 
@@ -243,7 +244,7 @@ export async function generatePoliceRegister(data: PoliceRegisterData): Promise<
         x: MARGIN + 350, y, size: 8, font: reg, color: DARK,
       })
       y -= 14
-      page.drawText('EPS Officer Signature: ____________________________', {
+      page.drawText('Police Officer Signature: ____________________________', {
         x: MARGIN, y, size: 8, font: reg, color: DARK,
       })
       page.drawText('Badge No: ________________', {

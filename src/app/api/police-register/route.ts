@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { generatePoliceRegister } from '@/lib/pdf/policeRegister'
 import { getPurchasesForRegister } from '@/lib/services/policeVisitService'
+import { DEFAULT_POLICE_SERVICE_NAME } from '@/lib/police-defaults'
 
 /**
  * GET /api/police-register?date=YYYY-MM-DD
@@ -30,9 +31,10 @@ export async function GET(req: NextRequest) {
     const pdfBytes = await generatePoliceRegister({
       date,
       entries,
-      dealerName:    settings['yardName']    ?? 'Renovo Pro',
-      dealerAddress: settings['yardAddress'] ?? 'Mbabane, Eswatini',
-      generatedAt:   new Date(),
+      dealerName:        settings['yardName']    ?? 'Renovo Pro',
+      dealerAddress:     settings['yardAddress'] ?? '—',
+      policeServiceName: settings['police_service_name'] ?? DEFAULT_POLICE_SERVICE_NAME,
+      generatedAt:       new Date(),
     })
 
     const filename = `police-register-${dateParam}.pdf`

@@ -4,22 +4,44 @@ import { useState, useRef, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import useSWR, { mutate } from 'swr'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { FileDown, Loader2, Pen, CheckCircle, ExternalLink, RotateCcw } from 'lucide-react'
+import { FileDown, Loader2, Pen, CheckCircle, ExternalLink, RotateCcw, ChevronDown, ChevronRight, OctagonX, ShieldCheck } from 'lucide-react'
 import { toast } from 'sonner'
 import { colors } from '@/lib/design-tokens'
+import { DEFAULT_POLICE_SERVICE_NAME, DEFAULT_POLICE_LEGAL_NOTE } from '@/lib/police-defaults'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
+
+type SearchLog = {
+  id: string
+  searchType: 'register_by_date' | 'person' | 'goods'
+  queryText: string
+  resultCount: number
+  createdAt: string
+}
 
 type PoliceVisit = {
   id: string
   visitDate: string
   officerName: string
-  badgeNumber?: string
-  stationName?: string
-  registerUrl?: string
-  signatureUrl?: string
-  notes?: string
+  rank?: string | null
+  badgeNumber?: string | null
+  stationName?: string | null
+  status: 'active' | 'completed' | 'expired'
+  startedAt?: string | null
+  signedAt?: string | null
+  visitReason?: string | null
+  launchedByName?: string | null
+  registerUrl?: string | null
+  signatureUrl?: string | null
+  notes?: string | null
   createdAt: string
+  searchLogs?: SearchLog[]
+}
+
+const SEARCH_TYPE_LABELS: Record<SearchLog['searchType'], string> = {
+  register_by_date: 'Register by date',
+  person:           'Person search',
+  goods:            'Goods search',
 }
 
 const TABS = [
@@ -68,9 +90,13 @@ export default function PoliceRegisterPage() {
 
   const { data: visitsData, isLoading: visitsLoading } =
     useSWR<{ visits: PoliceVisit[]; total: number }>(
-      tab === 'Visit History' ? '/api/police-visits?limit=20' : null,
+      tab === 'Visit History' ? '/api/police-visits?limit=50' : null,
       fetcher
     )
+
+  const { data: settings } = useSWR<Record<string, string | undefined>>('/api/settings', fetcher)
+  const serviceName = settings?.police_service_name ?? DEFAULT_POLICE_SERVICE_NAME
+  const legalNote   = settings?.police_legal_note   ?? DEFAULT_POLICE_LEGAL_NOTE
 
   if (!isManager) {
     return (
@@ -122,7 +148,7 @@ export default function PoliceRegisterPage() {
       toast.success('Visit recorded. You can now capture the officer\'s signature.')
       setPendingVisitId(j.visit.id)
       setSigDialogOpen(true)
-      mutate('/api/police-visits?limit=20')
+      mutate('/api/police-visits?limit=50')
     } else {
       toast.warning('PDF downloaded but failed to record visit')
     }
@@ -224,12 +250,19 @@ export default function PoliceRegisterPage() {
                 </div>
               </div>
 
-              {/* Legal note */}
+              {/* Legal note (configurable in Settings → Police Register) */}
               <div style={{ background: colors.processBg, border: `1px solid ${colors.process}`, borderRadius: 2, padding: '8px 12px', fontSize: 11 }}>
-                <p style={{ fontWeight: 700, color: colors.process, margin: '0 0 3px' }}>Legal requirement</p>
-                <p style={{ color: colors.processHover, margin: 0 }}>
-                  This register must be kept for at least 5 years and made available to the Eswatini Police Service (EPS) on request.
-                  Each page must be signed by the dealer.
+                <p style={{ fontWeight: 700, color: colors.process, margin: '0 0 3px' }}>Legal requirement — {serviceName}</p>
+                <p style={{ color: colors.processHover, margin: 0 }}>{legalNote}</p>
+              </div>
+
+              {/* Officer portal pointer */}
+              <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8, background: '#fff', border: '1px solid #D0D0D0', borderRadius: 2, padding: '8px 12px' }}>
+                <ShieldCheck style={{ width: 14, height: 14, color: '#1B3A6B', flexShrink: 0 }} />
+                <p style={{ fontSize: 11, color: '#6C757D', margin: 0 }}>
+                  Visiting officers can search the register themselves at the{' '}
+                  <a href="/police" style={{ color: colors.process, fontWeight: 600 }}>Officer Portal</a>
+                  {' '}— each session is logged and signed.
                 </p>
               </div>
             </div>
@@ -245,48 +278,7 @@ export default function PoliceRegisterPage() {
                 No visits recorded yet
               </div>
             ) : (
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
-                  <tr style={{ background: 'linear-gradient(180deg,#FFFFFF 0%,#E8E8E8 100%)', borderBottom: '1px solid #C0C0C0' }}>
-                    {['Date', 'Officer', 'Badge', 'Station', 'Signature', 'Register', 'Recorded'].map((h) => (
-                      <th key={h} style={TH}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {visitsData.visits.map((v, i) => (
-                    <tr key={v.id} style={{ background: i % 2 === 1 ? '#FAFAFA' : '#fff', borderBottom: '1px solid #F0F0F0', height: 30 }}>
-                      <td style={{ ...TD, whiteSpace: 'nowrap', fontWeight: 600 }}>
-                        {new Date(v.visitDate).toLocaleDateString('en-ZA')}
-                      </td>
-                      <td style={TD}>{v.officerName}</td>
-                      <td style={{ ...TD, color: '#6C757D', fontSize: 11 }}>{v.badgeNumber ?? '—'}</td>
-                      <td style={{ ...TD, color: '#6C757D', fontSize: 11 }}>{v.stationName ?? '—'}</td>
-                      <td style={TD}>
-                        {v.signatureUrl ? (
-                          <a href={v.signatureUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: colors.process, textDecoration: 'none' }}>
-                            <ExternalLink style={{ width: 11, height: 11 }} /> View
-                          </a>
-                        ) : (
-                          <span style={{ display: 'inline-flex', padding: '1px 6px', borderRadius: 3, fontSize: 11, fontWeight: 600, background: colors.warningBg, color: colors.warning }}>Pending</span>
-                        )}
-                      </td>
-                      <td style={TD}>
-                        {v.registerUrl ? (
-                          <a href={v.registerUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: colors.process, textDecoration: 'none' }}>
-                            <ExternalLink style={{ width: 11, height: 11 }} /> View PDF
-                          </a>
-                        ) : (
-                          <span style={{ fontSize: 11, color: '#6C757D' }}>—</span>
-                        )}
-                      </td>
-                      <td style={{ ...TD, color: '#6C757D', fontSize: 11, whiteSpace: 'nowrap' }}>
-                        {new Date(v.createdAt).toLocaleDateString('en-ZA')}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <VisitHistoryTable visits={visitsData.visits} />
             )
           )}
         </div>
@@ -296,10 +288,181 @@ export default function PoliceRegisterPage() {
         <SignatureDialog
           visitId={pendingVisitId}
           onClose={() => { setSigDialogOpen(false); setPendingVisitId(null) }}
-          onSaved={() => { setSigDialogOpen(false); setPendingVisitId(null); mutate('/api/police-visits?limit=20'); toast.success('Signature saved') }}
+          onSaved={() => { setSigDialogOpen(false); setPendingVisitId(null); mutate('/api/police-visits?limit=50'); toast.success('Signature saved') }}
         />
       )}
     </div>
+  )
+}
+
+// ─── Visit History table ──────────────────────────────────────────────────────
+
+function StatusBadge({ status }: { status: PoliceVisit['status'] }) {
+  const style: Record<PoliceVisit['status'], { bg: string; fg: string; label: string }> = {
+    active:    { bg: '#E7F1FF', fg: '#185ABD', label: 'Active' },
+    completed: { bg: '#E6F4EA', fg: '#1C8743', label: 'Completed' },
+    expired:   { bg: '#FDECEA', fg: '#DC3545', label: 'Expired' },
+  }
+  const s = style[status]
+  return (
+    <span style={{ display: 'inline-flex', padding: '1px 8px', borderRadius: 3, fontSize: 11, fontWeight: 700, background: s.bg, color: s.fg }}>
+      {s.label}
+    </span>
+  )
+}
+
+function VisitHistoryTable({ visits }: { visits: PoliceVisit[] }) {
+  const [expanded, setExpanded] = useState<string | null>(null)
+  const [forceEnding, setForceEnding] = useState<string | null>(null)
+
+  async function handleForceEnd(visitId: string) {
+    if (forceEnding) return
+    setForceEnding(visitId)
+    try {
+      const res = await fetch(`/api/police-visits/${visitId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'force_end' }),
+      })
+      if (res.ok) {
+        toast.success('Inspection session ended')
+        mutate('/api/police-visits?limit=50')
+      } else {
+        const j = await res.json().catch(() => ({})) as { error?: string }
+        toast.error(j.error ?? 'Failed to end session')
+      }
+    } finally {
+      setForceEnding(null)
+    }
+  }
+
+  return (
+    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+      <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
+        <tr style={{ background: 'linear-gradient(180deg,#FFFFFF 0%,#E8E8E8 100%)', borderBottom: '1px solid #C0C0C0' }}>
+          {['', 'Date', 'Officer', 'Badge', 'Station', 'Status', 'Searches', 'Signature', 'Certificate', ''].map((h, i) => (
+            <th key={i} style={TH}>{h}</th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {visits.map((v, i) => {
+          const isOpen = expanded === v.id
+          const logs = v.searchLogs ?? []
+          return (
+            <FragmentRow key={v.id}>
+              <tr
+                onClick={() => setExpanded(isOpen ? null : v.id)}
+                style={{ background: i % 2 === 1 ? '#FAFAFA' : '#fff', borderBottom: isOpen ? 'none' : '1px solid #F0F0F0', height: 30, cursor: 'pointer' }}
+              >
+                <td style={{ ...TD, width: 24 }}>
+                  {isOpen ? <ChevronDown style={{ width: 12, height: 12, color: '#6C757D' }} /> : <ChevronRight style={{ width: 12, height: 12, color: '#6C757D' }} />}
+                </td>
+                <td style={{ ...TD, whiteSpace: 'nowrap', fontWeight: 600 }}>
+                  {new Date(v.visitDate).toLocaleDateString('en-ZA')}
+                </td>
+                <td style={TD}>{v.rank ? `${v.rank} ` : ''}{v.officerName}</td>
+                <td style={{ ...TD, color: '#6C757D', fontSize: 11 }}>{v.badgeNumber ?? '—'}</td>
+                <td style={{ ...TD, color: '#6C757D', fontSize: 11 }}>{v.stationName ?? '—'}</td>
+                <td style={TD}><StatusBadge status={v.status} /></td>
+                <td style={{ ...TD, textAlign: 'center' }}>{logs.length}</td>
+                <td style={TD}>
+                  {v.signatureUrl ? (
+                    <a href={v.signatureUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: colors.process, textDecoration: 'none' }}>
+                      <ExternalLink style={{ width: 11, height: 11 }} /> View
+                    </a>
+                  ) : v.status === 'active' ? (
+                    <span style={{ display: 'inline-flex', padding: '1px 6px', borderRadius: 3, fontSize: 11, fontWeight: 600, background: colors.warningBg, color: colors.warning }}>Pending</span>
+                  ) : (
+                    <span style={{ fontSize: 11, color: '#6C757D' }}>—</span>
+                  )}
+                </td>
+                <td style={TD}>
+                  <a
+                    href={`/api/police-visits/${v.id}/certificate`}
+                    onClick={(e) => e.stopPropagation()}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: colors.process, textDecoration: 'none' }}
+                  >
+                    <FileDown style={{ width: 11, height: 11 }} /> PDF
+                  </a>
+                </td>
+                <td style={{ ...TD, whiteSpace: 'nowrap' }}>
+                  {v.status === 'active' && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleForceEnd(v.id) }}
+                      disabled={forceEnding === v.id}
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 3,
+                        fontSize: 10, fontWeight: 600, padding: '2px 8px',
+                        background: '#FDECEA', color: '#DC3545',
+                        border: '1px solid #DC3545', borderRadius: 2,
+                        cursor: forceEnding === v.id ? 'wait' : 'pointer',
+                      }}
+                    >
+                      {forceEnding === v.id
+                        ? <Loader2 style={{ width: 10, height: 10 }} className="animate-spin" />
+                        : <OctagonX style={{ width: 10, height: 10 }} />}
+                      Force End
+                    </button>
+                  )}
+                </td>
+              </tr>
+              {isOpen && (
+                <tr style={{ background: '#F8F9FB', borderBottom: '1px solid #E0E0E0' }}>
+                  <td colSpan={10} style={{ padding: '10px 16px 12px 34px' }}>
+                    <div style={{ display: 'flex', gap: 24, marginBottom: logs.length ? 8 : 0, flexWrap: 'wrap' }}>
+                      <MetaItem label="Reason"      value={v.visitReason ? v.visitReason.replace(/_/g, ' ') : '—'} />
+                      <MetaItem label="Started"     value={v.startedAt ? new Date(v.startedAt).toLocaleString('en-ZA') : '—'} />
+                      <MetaItem label="Signed"      value={v.signedAt ? new Date(v.signedAt).toLocaleString('en-ZA') : v.status === 'expired' ? 'Not signed (expired)' : '—'} />
+                      <MetaItem label="Launched by" value={v.launchedByName ?? '—'} />
+                      {v.notes && <MetaItem label="Notes" value={v.notes} />}
+                    </div>
+                    {logs.length === 0 ? (
+                      <p style={{ fontSize: 11, color: '#6C757D', margin: 0 }}>No searches were performed during this visit.</p>
+                    ) : (
+                      <table style={{ width: '100%', borderCollapse: 'collapse', background: '#fff', border: '1px solid #E0E0E0' }}>
+                        <thead>
+                          <tr style={{ borderBottom: '1px solid #E0E0E0' }}>
+                            {['Time', 'Search Type', 'Query', 'Results'].map((h) => (
+                              <th key={h} style={{ ...TH, height: 24 }}>{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {logs.map((l) => (
+                            <tr key={l.id} style={{ borderBottom: '1px solid #F0F0F0' }}>
+                              <td style={{ ...TD, whiteSpace: 'nowrap', fontSize: 11 }}>
+                                {new Date(l.createdAt).toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' })}
+                              </td>
+                              <td style={{ ...TD, fontSize: 11, fontWeight: 600 }}>{SEARCH_TYPE_LABELS[l.searchType]}</td>
+                              <td style={{ ...TD, fontSize: 11 }}>{l.queryText}</td>
+                              <td style={{ ...TD, fontSize: 11, textAlign: 'center' }}>{l.resultCount}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </td>
+                </tr>
+              )}
+            </FragmentRow>
+          )
+        })}
+      </tbody>
+    </table>
+  )
+}
+
+function FragmentRow({ children }: { children: React.ReactNode }) {
+  return <>{children}</>
+}
+
+function MetaItem({ label, value }: { label: string; value: string }) {
+  return (
+    <span style={{ fontSize: 11 }}>
+      <span style={{ fontWeight: 700, color: '#6C757D', textTransform: 'uppercase', letterSpacing: '0.04em', fontSize: 10 }}>{label}: </span>
+      <span style={{ color: '#212529' }}>{value}</span>
+    </span>
   )
 }
 

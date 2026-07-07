@@ -15,6 +15,7 @@ import {
   Wifi, WifiOff,
   Scale, ClipboardList,
   Boxes, ArrowLeftRight, Grid3X3, SlidersHorizontal,
+  ShieldCheck, History,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useOfflineStore } from '@/stores/offlineStore'
@@ -303,6 +304,64 @@ function ScalePopup() {
   )
 }
 
+// ─── PolicePopup ──────────────────────────────────────────────────────────────
+
+function PolicePopup({ role }: { role: string }) {
+  const [open, setOpen] = useState(false)
+  const isManager = role === 'admin' || role === 'manager'
+
+  const tiles = [
+    { label: 'Officer Portal', icon: ShieldCheck, href: '/police', desc: 'Officer registers & searches the register' },
+    ...(isManager ? [
+      { label: 'Register Admin', icon: History, href: '/app/police-register', desc: 'Daily register PDF & visit history' },
+    ] : []),
+  ]
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium transition-all duration-100 focus:outline-none whitespace-nowrap border rounded-sm border-[#185ABD] text-[#185ABD] bg-transparent hover:bg-[#EBF3FC]"
+        title="Police Register"
+        aria-label="Police Register shortcuts"
+      >
+        <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+        <span>Police</span>
+      </button>
+
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-full mt-1 w-64 bg-white rounded-sm shadow-2xl border border-[#E0E0E0] py-1.5 z-50">
+            <p className="px-3 pb-1.5 pt-0.5 text-[10px] font-semibold text-[#6C757D] uppercase tracking-widest border-b border-[#F1F3F4]">
+              Police Register
+            </p>
+            {tiles.map((t) => (
+              <Link
+                key={t.href}
+                href={t.href}
+                onClick={() => setOpen(false)}
+                className="flex items-start gap-2.5 px-3 py-2 hover:bg-[#EBF3FC] transition-colors"
+              >
+                <div
+                  className="w-7 h-7 rounded flex items-center justify-center shrink-0 mt-0.5"
+                  style={{ background: '#EBF3FC' }}
+                >
+                  <t.icon className="w-3.5 h-3.5" style={{ color: '#185ABD' }} />
+                </div>
+                <div>
+                  <p className="text-[12px] font-medium text-[#212529]">{t.label}</p>
+                  <p className="text-[10px] text-[#6C757D]">{t.desc}</p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 // ─── OfflineChip ──────────────────────────────────────────────────────────────
 
 function OfflineChip() {
@@ -432,8 +491,11 @@ function DashboardStatsBar({ fullName, role }: { fullName: string; role: string 
 
       <div className="flex-1" />
 
-      {/* Scale popup — far right */}
-      <ScalePopup />
+      {/* Police + Scale popups — far right */}
+      <div className="flex items-center gap-1.5">
+        <PolicePopup role={role} />
+        {isManager && <ScalePopup />}
+      </div>
     </>
   )
 }
@@ -531,8 +593,8 @@ export function AppShell({
       {/* ── ZONE 2: Contextual Toolbar ────────────────────────── */}
       {(() => {
         const isDashboard   = pathname === '/app/dashboard'
-        const showScaleBtn  = isDashboard && (role === 'admin' || role === 'manager')
-        const showToolbar   = toolbarBtns.length > 0 || showScaleBtn
+        const showDashBar   = isDashboard   // all app roles get welcome + police portal access
+        const showToolbar   = toolbarBtns.length > 0 || showDashBar
         if (!showToolbar) return null
         return (
           <div
@@ -544,7 +606,7 @@ export function AppShell({
             }}
           >
             {toolbarBtns.map((btn, i) => <ToolbarBtn key={i} btn={btn} />)}
-            {showScaleBtn && <DashboardStatsBar fullName={fullName} role={role} />}
+            {showDashBar && <DashboardStatsBar fullName={fullName} role={role} />}
           </div>
         )
       })()}
