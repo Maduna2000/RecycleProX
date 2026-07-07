@@ -85,7 +85,7 @@ export async function GET(
       status,
       currencySymbol,
       company: {
-        name: settings['yardName'] ?? 'RecycleProX',
+        name: settings['yardName'] ?? 'Renovo Pro',
         address: settings['yardAddress'] ?? '',
         phone: settings['yardPhone'] ?? undefined,
         vat: settings['yardVat'] ?? settings['vatNumber'] ?? undefined,

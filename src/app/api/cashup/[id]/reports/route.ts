@@ -76,7 +76,7 @@ export async function GET(
       sessionDate: cashUp.sessionDate,
       currency: cashUp.currency,
       currencySymbol,
-      companyName: settings['yardName'] ?? 'RecycleProX',
+      companyName: settings['yardName'] ?? 'Renovo Pro',
       companyAddress: settings['yardAddress'] ?? '',
       companyPhone: settings['yardPhone'] ?? undefined,
       companyVat: settings['yardVat'] ?? undefined,

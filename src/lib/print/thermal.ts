@@ -47,7 +47,7 @@ export interface SaleReceiptData {
 function addHeader(printer: ThermalPrinter, title: string, refNumber: string, date: Date) {
   printer.alignCenter()
   printer.bold(true)
-  printer.println('LARIAT TECHNOLOGIES')
+  printer.println('GOLDEN KEY INVESTMENTS (PTY) LTD')
   printer.bold(false)
   printer.println('Renovo Pro')
   printer.drawLine()
@@ -126,7 +126,6 @@ function addFooter(printer: ThermalPrinter, cashierName: string) {
   printer.alignCenter()
   printer.println(`Cashier: ${cashierName}`)
   printer.println('Thank you for your business!')
-  printer.println('www.lariat.co.za')
   printer.cut()
 }
 

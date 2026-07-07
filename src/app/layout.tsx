@@ -15,7 +15,7 @@ const geistMono = localFont({
 
 export const metadata: Metadata = {
   title: 'Renovo Pro',
-  description: 'Yard management system by Lariat Technologies',
+  description: 'Yard management system by Golden Key Investments (Pty) Ltd',
 }
 
 export default function RootLayout({

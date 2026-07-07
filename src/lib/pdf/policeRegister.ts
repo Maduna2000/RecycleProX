@@ -253,7 +253,7 @@ export async function generatePoliceRegister(data: PoliceRegisterData): Promise<
     }
 
     // Footer
-    page.drawText(`Generated: ${data.generatedAt.toLocaleString('en-ZA')} · Renovo Pro · Lariat Technologies`, {
+    page.drawText(`Generated: ${data.generatedAt.toLocaleString('en-ZA')} · Renovo Pro · Golden Key Investments (Pty) Ltd`, {
       x: MARGIN, y: MARGIN, size: 6, font: reg, color: GRAY,
     })
   }

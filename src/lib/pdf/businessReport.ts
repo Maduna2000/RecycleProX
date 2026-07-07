@@ -585,7 +585,7 @@ function drawSummaryBlock(ctx: Ctx): void {
 function stampFooters(ctx: Ctx): void {
   const { pages, reg, report } = ctx
   const total = pages.length
-  const generated = `Generated: ${formatDateTimeSAST(report.meta.generatedAt)} by ${sanitize(report.meta.generatedBy)}  |  ${sanitize(report.meta.company.name)}  |  RecycleProX`
+  const generated = `Generated: ${formatDateTimeSAST(report.meta.generatedAt)} by ${sanitize(report.meta.generatedBy)}  |  ${sanitize(report.meta.company.name)}  |  Renovo Pro`
   for (let i = 0; i < total; i++) {
     const page = pages[i]!
     page.drawText(generated, {

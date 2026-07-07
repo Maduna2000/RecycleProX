@@ -68,7 +68,7 @@ export async function GET(req: NextRequest) {
       sessionDate: reportDate,
       currency: 'ZAR',
       currencySymbol: 'R',
-      companyName: settings['yardName'] ?? 'RecycleProX',
+      companyName: settings['yardName'] ?? 'Renovo Pro',
       companyAddress: settings['yardAddress'] ?? '',
       companyPhone: settings['yardPhone'] ?? undefined,
       companyVat: settings['yardVat'] ?? undefined,

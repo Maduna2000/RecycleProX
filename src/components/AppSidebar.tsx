@@ -119,7 +119,7 @@ export function AppSidebar({ role, fullName }: { role: string; fullName: string;
         </div>
         <div>
           <p className="font-bold text-sm" style={{ color: '#212529' }}>Renovo Pro</p>
-          <p className="text-xs" style={{ color: '#6C757D' }}>Lariat Technologies</p>
+          <p className="text-xs" style={{ color: '#6C757D' }}>Golden Key Investments</p>
         </div>
       </div>
 

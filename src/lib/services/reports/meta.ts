@@ -21,7 +21,7 @@ export async function buildReportMeta(generatedBy: string): Promise<Omit<ReportM
     generatedAt: new Date().toISOString(),
     generatedBy,
     company: {
-      name: settings['yardName'] ?? 'RecycleProX',
+      name: settings['yardName'] ?? 'Renovo Pro',
       address: settings['yardAddress'] ?? '',
       phone: settings['yardPhone'] ?? undefined,
       vat: settings['yardVat'] ?? settings['vatNumber'] ?? undefined,

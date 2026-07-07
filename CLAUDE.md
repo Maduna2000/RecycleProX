@@ -1,8 +1,10 @@
-# RecycleProX Basic — Master Rules (CLAUDE.md)
+# Renovo Pro — Master Rules (CLAUDE.md)
 
 ## Project
-RecycleProX Basic — production-grade recycling yard management system.
-Lariat Technologies, Pretoria, South Africa.
+Renovo Pro — production-grade recycling yard management system.
+Golden Key Investments (Pty) Ltd, Pretoria, South Africa.
+(Feature reference: replicates the legacy "RecycleProX" software — never use
+that name or "Lariat Technologies" in user-facing output.)
 
 ## Stack
 Next.js 14 App Router · TypeScript strict · Prisma ORM · PostgreSQL

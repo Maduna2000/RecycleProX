@@ -218,7 +218,7 @@ export async function generateInspectionCertificate(data: InspectionCertificateD
 
     // Footer
     page.drawText(
-      `Certificate ${data.visitId} · Generated: ${data.generatedAt.toLocaleString('en-ZA')} · Renovo Pro · Lariat Technologies`,
+      `Certificate ${data.visitId} · Generated: ${data.generatedAt.toLocaleString('en-ZA')} · Renovo Pro · Golden Key Investments (Pty) Ltd`,
       { x: MARGIN, y: 30, size: 6, font: reg, color: GRAY }
     )
   }

@@ -1,4 +1,4 @@
-{
+﻿{
   "name": "renovopro",
   "version": "0.1.0",
   "private": true,
@@ -15,7 +15,7 @@
     "electron:build": "next build && electron-builder"
   },
   "build": {
-    "appId": "za.co.lariat.renovopro",
+    "appId": "za.co.goldenkey.renovopro",
     "productName": "Renovo Pro",
     "files": [
       "electron/**/*",

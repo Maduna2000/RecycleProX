@@ -530,7 +530,7 @@ function drawSummary(
 }
 
 function drawFooter(page: PDFPage, reg: PDFFont, data: CashupReportData): void {
-  const footerText = `Generated: ${data.generatedAt.toLocaleString('en-ZA')}  |  RecycleProX  |  Lariat Technologies`
+  const footerText = `Generated: ${data.generatedAt.toLocaleString('en-ZA')}  |  Renovo Pro  |  Golden Key Investments (Pty) Ltd`
   page.drawText(footerText, {
     x: MARGIN,
     y: MARGIN - 10,

@@ -341,7 +341,7 @@ export async function generateTransactionNote(data: TransactionNoteData): Promis
   }
 
   // ── Footers ─────────────────────────────────────────────────────────────────
-  const generated = `Generated: ${data.generatedAt.toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg' })}  |  ${sanitize(data.company.name)}  |  RecycleProX`
+  const generated = `Generated: ${data.generatedAt.toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg' })}  |  ${sanitize(data.company.name)}  |  Renovo Pro`
   pages.forEach((pg, i) => {
     pg.drawText(generated, { x: MARGIN, y: MARGIN - 18, size: 6.5, font: reg, color: GRAY })
     const pageText = `Page ${i + 1} of ${pages.length}`
