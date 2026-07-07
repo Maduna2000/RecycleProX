@@ -77,9 +77,9 @@ type PendingPurchase = {
   createdAt: string
 }
 
-const emptyLine = (key: number): LineItem => ({
+const emptyLine = (key: number, vatApplied = true): LineItem => ({
   key, productId: '', product: null, quantity: '', grossQty: '', tareQty: '',
-  tareReason: '', deductionQty: '', deductionReason: '', unitPrice: '', vatApplied: true,
+  tareReason: '', deductionQty: '', deductionReason: '', unitPrice: '', vatApplied,
   weighMode: false, selectedScale: '1', weighingGross: false, weighingTare: false,
 })
 
@@ -197,7 +197,7 @@ export default function NewPurchasePage() {
 
   // ── Line management ──────────────────────────────────────────────────────
   function addLine() {
-    setLines((prev) => [...prev, emptyLine(keyCounter)])
+    setLines((prev) => [...prev, emptyLine(keyCounter, !customer?.zeroRated)])
     setKeyCounter((k) => k + 1)
   }
 
@@ -292,6 +292,8 @@ export default function NewPurchasePage() {
     setDeductLoan(false)
     setDeductionAmount('')
     setShowAllProducts(false)
+    // Apply VAT automatically based on the account's VAT setting
+    setLines((prev) => prev.map((l) => ({ ...l, vatApplied: !c.zeroRated })))
   }, [])
 
   function switchCustomerType(type: 'casual' | 'account') {
@@ -657,7 +659,7 @@ export default function NewPurchasePage() {
               style={{
                 ...headerBg,
                 display: 'grid',
-                gridTemplateColumns: '1fr 72px 80px 80px 70px 80px 28px 26px',
+                gridTemplateColumns: '1fr 72px 80px 80px 92px 80px 28px 26px',
                 gap: 4,
                 padding: '4px 8px',
                 flexShrink: 0,
@@ -736,9 +738,11 @@ export default function NewPurchasePage() {
                           title="Apply VAT to this line"
                           style={{ width: 12, height: 12, cursor: 'pointer', flexShrink: 0 }}
                         />
-                        <span style={{ fontSize: 11, fontFamily: 'monospace', color: qty.gt(0) && line.vatApplied ? '#212529' : '#9CA3AF' }}>
-                          {qty.gt(0) ? `R ${lineVat.toFixed(2)}` : '—'}
-                        </span>
+                        {qty.gt(0) && (
+                          <span style={{ fontSize: 11, fontFamily: 'monospace', color: line.vatApplied ? '#212529' : '#9CA3AF' }}>
+                            R {lineVat.toFixed(2)}
+                          </span>
+                        )}
                       </div>
 
                       {/* Total */}

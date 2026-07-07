@@ -428,8 +428,8 @@ export default function CustomerDetailPage() {
                     <div>
                       <span style={lbl}>VAT Status</span>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, height: 26 }}>
-                        <input type="checkbox" checked={watch('zeroRated') ?? false} onChange={(e) => setValue('zeroRated', e.target.checked)} disabled={!isEditing || saving} style={{ width: 14, height: 14, cursor: isEditing ? 'pointer' : 'default' }} />
-                        <span style={{ fontSize: 12, color: '#212529' }}>Zero Rated</span>
+                        <input type="checkbox" checked={!(watch('zeroRated') ?? false)} onChange={(e) => setValue('zeroRated', !e.target.checked)} disabled={!isEditing || saving} style={{ width: 14, height: 14, cursor: isEditing ? 'pointer' : 'default' }} />
+                        <span style={{ fontSize: 12, color: '#212529' }}>Apply VAT</span>
                       </div>
                     </div>
                     <div>

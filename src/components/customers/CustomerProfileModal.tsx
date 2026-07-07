@@ -328,7 +328,7 @@ function OverviewTab({ customer }: { customer: Customer }) {
         <Field label="Primary Function" value={fmt(customer.primaryFunction)} />
         <Field label="Market Sector"    value={customer.marketSector === 'formal' ? 'Formal' : customer.marketSector === 'informal' ? 'Informal' : null} />
         <Field label="Dealer Category"  value={customer.dealerCategory ? DEALER_LABELS[customer.dealerCategory] : null} />
-        <Field label="VAT"              value={customer.zeroRated ? 'Zero Rated' : 'Standard'} />
+        <Field label="Apply VAT"        value={customer.zeroRated ? 'No' : 'Yes'} />
         <Field label="Price Group"      value={customer.priceGroup?.name ?? null} />
         <Field label="Credit Limit"     value={fmtMoney(customer.creditLimit)} />
         <Field label="Company Name"     value={fmt(customer.companyName)} />
@@ -798,13 +798,13 @@ function EditCustomerModal({ customer, onClose, onSuccess }: {
               </div>
               <div className="flex items-center justify-between p-3 rounded-lg bg-yellow-50 border border-yellow-200">
                 <div>
-                  <Label className="text-yellow-800">Zero-Rated VAT</Label>
-                  <p className="text-xs text-yellow-700 mt-0.5">No VAT will be charged on this account&apos;s transactions</p>
+                  <Label className="text-yellow-800">Apply VAT</Label>
+                  <p className="text-xs text-yellow-700 mt-0.5">When unchecked, no VAT will be charged on this account&apos;s transactions</p>
                 </div>
                 <input
                   type="checkbox"
-                  checked={watch('zeroRated') ?? false}
-                  onChange={(e) => setValue('zeroRated', e.target.checked)}
+                  checked={!(watch('zeroRated') ?? false)}
+                  onChange={(e) => setValue('zeroRated', !e.target.checked)}
                   className="w-4 h-4 rounded border-gray-300 text-green-600 cursor-pointer"
                 />
               </div>

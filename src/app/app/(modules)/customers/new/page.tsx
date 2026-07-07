@@ -252,7 +252,7 @@ export default function NewAccountPage() {
                 <input {...register('policeRegisterNo')} className={inputCls} style={inputStyle} disabled={loading} />
               </Field>
 
-              {/* Zero Rated VAT */}
+              {/* Apply VAT (stored inverted as zeroRated) */}
               <div
                 className="flex items-center gap-2 py-1.5 px-2 rounded-[2px] border mt-1"
                 style={{ borderColor: '#F59E0B', background: zeroRated ? '#FFFBEB' : '#FAFAFA' }}
@@ -260,17 +260,17 @@ export default function NewAccountPage() {
                 <input
                   type="checkbox"
                   className="w-3.5 h-3.5"
-                  checked={zeroRated}
-                  onChange={(e) => setValue('zeroRated', e.target.checked)}
+                  checked={!zeroRated}
+                  onChange={(e) => setValue('zeroRated', !e.target.checked)}
                   disabled={loading}
-                  id="zeroRatedCheck"
+                  id="applyVatCheck"
                 />
-                <label htmlFor="zeroRatedCheck" className="cursor-pointer text-[12px] font-bold" style={{ color: '#92400E' }}>
-                  Zero Rated VAT
+                <label htmlFor="applyVatCheck" className="cursor-pointer text-[12px] font-bold" style={{ color: '#92400E' }}>
+                  Apply VAT
                 </label>
                 {zeroRated && (
                   <span className="text-[10px] ml-1" style={{ color: '#78350F' }}>
-                    — No VAT charged on this account&apos;s transactions
+                    No VAT charged on this account&apos;s transactions
                   </span>
                 )}
               </div>
