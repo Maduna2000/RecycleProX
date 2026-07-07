@@ -43,6 +43,7 @@ yarn-error.log*
 next-env.d.ts
 
 .env
+.mcp.json
 
 .vercel
 

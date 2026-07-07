@@ -3,5 +3,6 @@
         "\"terminal.integrated.windowsUseConptyDll\"": true,
         "\"terminal.integrated.windowsEnableConpty\"": true
     },
-    "java.compile.nullAnalysis.mode": "automatic"
+    "java.compile.nullAnalysis.mode": "automatic",
+    "python.terminal.useEnvFile": true
 }

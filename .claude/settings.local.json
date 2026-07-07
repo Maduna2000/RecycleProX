@@ -67,7 +67,23 @@
       "Bash(dir:*)",
       "Bash(git commit:*)",
       "Bash(ls:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(claude plugin *)",
+      "PowerShell(irm https://claude.ai/install.ps1 | iex)",
+      "Bash(git --version)",
+      "Bash(gh --version)",
+      "Bash(npm --version)",
+      "Bash(docker --version)",
+      "PowerShell(winget install --id GitHub.cli -e --source winget --accept-package-agreements --accept-source-agreements)",
+      "PowerShell(& \"C:\\\\Users\\\\DE ARK TECH\\\\.local\\\\bin\\\\claude.exe\" plugin install frontend-design@claude-plugins-official)",
+      "PowerShell(& \"C:\\\\Users\\\\DE ARK TECH\\\\.local\\\\bin\\\\claude.exe\" plugin marketplace list)",
+      "Bash(npx prisma *)",
+      "Bash(netstat -ano)",
+      "Bash(tail -30 \"/c/Users/DEARKT~1/AppData/Local/Temp/claude/c--Users-DE-ARK-TECH-RecycleProX/df4347fe-82d1-4f42-9d57-60d4c71b28c2/tasks/buo2l3pst.output\")",
+      "Read(//c/Users/DEARKT~1/AppData/Local/Temp/claude/c--Users-DE-ARK-TECH-RecycleProX/df4347fe-82d1-4f42-9d57-60d4c71b28c2/tasks/**)",
+      "WebSearch",
+      "WebFetch(domain:www.saps.gov.za)",
+      "PowerShell(node \"C:\\\\Users\\\\DEARKT~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-DE-ARK-TECH-RecycleProX\\\\94fed4c6-58af-4199-ba69-b8a8d00b6461\\\\scratchpad\\\\verify-police.js\")"
     ]
   }
 }
