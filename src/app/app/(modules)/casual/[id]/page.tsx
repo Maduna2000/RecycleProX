@@ -3,11 +3,14 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import useSWR, { mutate } from 'swr'
-import { Loader2 } from 'lucide-react'
+import { ArrowLeft, Save, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
+import { inp, lbl, HEADER_GRAD, NAVY, Btn, TabStrip, PortalPage } from '@/components/rpx'
+
+const inpDisabled: React.CSSProperties = { ...inp, background: '#F5F5F5', color: '#6C757D', cursor: 'default' }
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -32,34 +35,10 @@ const EditCasualSchema = z.object({
 
 type EditCasualInput = z.infer<typeof EditCasualSchema>
 
-// ─── Shared styles ─────────────────────────────────────────────────────────────
-const sectionHdr: React.CSSProperties = {
-  background: 'linear-gradient(180deg,#FFFFFF 0%,#E8E8E8 100%)',
-  borderBottom: '1px solid #C0C0C0',
-  padding: '4px 10px',
-  flexShrink: 0,
-}
-const lbl: React.CSSProperties = {
-  display: 'block', fontSize: 10, fontWeight: 700,
-  textTransform: 'uppercase', letterSpacing: '0.04em',
-  color: '#6C757D', marginBottom: 2,
-}
-
-// Input styles (like Settings page)
-const inp: React.CSSProperties = {
-  height: 26, width: '100%', borderRadius: 2,
-  border: '1px solid #ABABAB', padding: '0 7px',
-  fontSize: 12, color: '#212529', background: '#fff',
-  outline: 'none', boxSizing: 'border-box',
-}
-const inpDisabled: React.CSSProperties = {
-  ...inp, background: '#F5F5F5', color: '#6C757D', cursor: 'default',
-}
-
 function SHdr({ title }: { title: string }) {
   return (
-    <div style={sectionHdr}>
-      <span style={{ fontSize: 11, fontWeight: 700, color: '#1B3A6B' }}>{title}</span>
+    <div style={{ background: HEADER_GRAD, borderBottom: '1px solid #C0C0C0', padding: '4px 10px', flexShrink: 0 }}>
+      <span style={{ fontSize: 11, fontWeight: 700, color: NAVY }}>{title}</span>
     </div>
   )
 }
@@ -130,87 +109,39 @@ export default function CasualCustomerDetailPage() {
 
   const fullName = `${customer.firstName} ${customer.lastName}`
 
-  const titleBtn: React.CSSProperties = {
-    fontSize: 10, padding: '1px 6px', cursor: 'pointer', borderRadius: 2,
-    background: '#E0E0E0', border: '1px solid #999', color: '#212529',
-    display: 'flex', alignItems: 'center', gap: 3,
-  }
-  const saveBtn: React.CSSProperties = {
-    fontSize: 10, padding: '1px 6px', cursor: saving ? 'not-allowed' : 'pointer', borderRadius: 2,
-    background: '#E0E0E0', border: '1px solid #999', color: '#212529',
-    display: 'flex', alignItems: 'center', gap: 3, opacity: saving ? 0.6 : 1,
-  }
-
   return (
-    <div style={{ border: '1px solid #B0B0B0', borderRadius: 2, background: '#F5F5F5', display: 'flex', flexDirection: 'column' }}>
-
-      {/* ── Title bar ─────────────────────────────────────────────────────────── */}
-      <div style={{ background: 'linear-gradient(180deg,#EAEAEA 0%,#D4D4D4 100%)', borderBottom: '2px solid #B0B0B0', padding: '5px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <button
-            onClick={() => router.push('/app/casual')}
-            style={titleBtn}
-            onMouseEnter={(e) => { e.currentTarget.style.background = '#D0D0D0' }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = '#E0E0E0' }}
-          >← Casuals</button>
-          <span style={{ fontSize: 1, color: '#B0B0B0', userSelect: 'none' }}>│</span>
-          <span style={{ fontSize: 13, fontWeight: 700, color: '#212529' }}>{fullName}</span>
-          <Pill text="Casual Seller" bg="#FEF3C7" color="#92400E" />
-          {customer.idNumber && (
-            <span style={{ fontSize: 11, fontFamily: 'monospace', color: '#6C757D' }}>·  {customer.idNumber}</span>
-          )}
-        </div>
-        <div style={{ display: 'flex', gap: 6 }}>
-          {!isEditing ? (
-            <button
-              onClick={() => setIsEditing(true)}
-              style={titleBtn}
-              onMouseEnter={(e) => { e.currentTarget.style.background = '#D0D0D0' }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = '#E0E0E0' }}
-            >✏  Edit</button>
-          ) : (
-            <>
-              <button
-                onClick={handleCancel}
-                style={titleBtn}
-                disabled={saving}
-                onMouseEnter={(e) => { if (!saving) e.currentTarget.style.background = '#D0D0D0' }}
-                onMouseLeave={(e) => { if (!saving) e.currentTarget.style.background = '#E0E0E0' }}
-              >Cancel</button>
-              <button
-                onClick={handleSubmit(onSubmit)}
-                style={saveBtn}
-                disabled={saving}
-                onMouseEnter={(e) => { if (!saving) e.currentTarget.style.background = '#D0D0D0' }}
-                onMouseLeave={(e) => { if (!saving) e.currentTarget.style.background = '#E0E0E0' }}
-              >
-                {saving && <Loader2 style={{ width: 9, height: 9 }} className="animate-spin" />}
-                {saving ? 'Saving...' : '💾 Save'}
-              </button>
-            </>
-          )}
-        </div>
+    <PortalPage
+      title={fullName}
+      actions={
+        !isEditing ? (
+          <Btn size="sm" icon={Pencil} onClick={() => setIsEditing(true)}>Edit</Btn>
+        ) : (
+          <>
+            <Btn size="sm" onClick={handleCancel} disabled={saving}>Cancel</Btn>
+            <Btn variant="primary" size="sm" icon={Save} loading={saving} onClick={handleSubmit(onSubmit)}>
+              {saving ? 'Saving...' : 'Save'}
+            </Btn>
+          </>
+        )
+      }
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, background: '#F5F5F5' }}>
+      {/* ── Sub-header ────────────────────────────────────────────────────────── */}
+      <div style={{ padding: '6px 10px', borderBottom: '1px solid #E0E0E0', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+        <Btn size="sm" icon={ArrowLeft} onClick={() => router.push('/app/casual')}>Casuals</Btn>
+        <Pill text="Casual Seller" bg="#FEF3C7" color="#92400E" />
+        {customer.idNumber && (
+          <span style={{ fontSize: 11, fontFamily: 'monospace', color: '#6C757D' }}>·  {customer.idNumber}</span>
+        )}
       </div>
 
       {/* ── Tab strip ─────────────────────────────────────────────────────────── */}
-      <div style={{ display: 'flex', borderBottom: '1px solid #C0C0C0', background: '#EFEFEF', flexShrink: 0 }}>
-        {TABS.map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            style={{
-              padding: '5px 14px', fontSize: 11, cursor: 'pointer',
-              fontWeight: tab === t ? 700 : 400,
-              background: tab === t ? '#fff' : 'transparent',
-              borderRight: '1px solid #D0D0D0',
-              borderBottom: tab === t ? '2px solid #217346' : '2px solid transparent',
-              color: tab === t ? '#217346' : '#555',
-            }}
-          >
-            {t}
-          </button>
-        ))}
-      </div>
+      <TabStrip
+        tabs={TABS.map((t) => ({ value: t, label: t }))}
+        active={tab}
+        onChange={(v) => setTab(v as typeof TABS[number])}
+        style={{ padding: '8px 10px 0', background: '#F5F5F5' }}
+      />
 
       {/* ── Two-column layout: main content + sidebar ─────────────────────────── */}
       <div style={{ display: 'flex', alignItems: 'flex-start' }}>
@@ -221,30 +152,15 @@ export default function CasualCustomerDetailPage() {
           {tab === 'Overview' && (
             <div>
               {/* Secondary Tab Strip for sections */}
-              <div style={{ display: 'flex', borderBottom: '1px solid #C0C0C0', background: '#EFEFEF', flexShrink: 0 }}>
-                {(customer.customerNotes || isEditing
+              <TabStrip
+                tabs={(customer.customerNotes || isEditing
                   ? SECTION_TABS
                   : SECTION_TABS.filter(t => t !== 'Notes')
-                ).map((t) => (
-                  <button
-                    key={t}
-                    onClick={() => setSectionTab(t)}
-                    style={{
-                      padding: '5px 14px',
-                      fontSize: 11,
-                      cursor: 'pointer',
-                      fontWeight: sectionTab === t ? 700 : 400,
-                      background: sectionTab === t ? '#fff' : 'transparent',
-                      border: 'none',
-                      borderRight: '1px solid #D0D0D0',
-                      borderBottom: sectionTab === t ? '2px solid #217346' : '2px solid transparent',
-                      color: sectionTab === t ? '#217346' : '#555',
-                    }}
-                  >
-                    {t}
-                  </button>
-                ))}
-              </div>
+                ).map((t) => ({ value: t, label: t }))}
+                active={sectionTab}
+                onChange={(v) => setSectionTab(v as typeof SECTION_TABS[number])}
+                style={{ padding: '8px 10px 0', background: '#EFEFEF' }}
+              />
 
               {/* Section Content - Personal */}
               {sectionTab === 'Personal' && (
@@ -332,7 +248,8 @@ export default function CasualCustomerDetailPage() {
 
         </div>
       </div>
-    </div>
+      </div>
+    </PortalPage>
   )
 }
 

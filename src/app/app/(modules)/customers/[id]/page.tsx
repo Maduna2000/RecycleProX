@@ -3,11 +3,8 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import useSWR, { mutate } from 'swr'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { AlertTriangle, ShieldBan, ShieldCheck, Loader2 } from 'lucide-react'
+import { Dialog } from '@/components/ui/dialog'
+import { ArrowLeft, AlertTriangle, ShieldBan, ShieldCheck, Save, Pencil } from 'lucide-react'
 import { PhotoUploader, PhotoViewer } from '@/components/PhotoUploader'
 import { LoansTab } from '@/components/customers/LoansTab'
 import { useSession } from 'next-auth/react'
@@ -21,6 +18,15 @@ import {
   type UpdateCustomerFormInput,
   type BlacklistInput,
 } from '@/lib/schemas/customer'
+import {
+  inp, lbl, HEADER_GRAD, NAVY,
+  Btn, TabStrip, PortalPage,
+  RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter,
+} from '@/components/rpx'
+
+const selectStyle = inp
+const inpDisabled: React.CSSProperties = { ...inp, background: '#F5F5F5', color: '#6C757D', cursor: 'default' }
+const selectDisabled = inpDisabled
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -60,43 +66,10 @@ const TABS_ACCOUNT = ['Overview', 'Transactions', 'Loans', 'Documents', 'Blackli
 const TABS_CASUAL = ['Overview', 'Transactions', 'Documents', 'Blacklist'] as const
 const SECTION_TABS = ['Personal', 'Business', 'Banking', 'Compliance', 'Notes'] as const
 
-// ─── Shared styles — mirrors the Settings page design tokens ──────────────────
-const sectionHdr: React.CSSProperties = {
-  background: 'linear-gradient(180deg,#FFFFFF 0%,#E8E8E8 100%)',
-  borderBottom: '1px solid #C0C0C0',
-  padding: '4px 10px',
-  flexShrink: 0,
-}
-const lbl: React.CSSProperties = {
-  display: 'block', fontSize: 10, fontWeight: 700,
-  textTransform: 'uppercase', letterSpacing: '0.04em',
-  color: '#6C757D', marginBottom: 2,
-}
-
-// Input styles (like Settings page)
-const inp: React.CSSProperties = {
-  height: 26, width: '100%', borderRadius: 2,
-  border: '1px solid #ABABAB', padding: '0 7px',
-  fontSize: 12, color: '#212529', background: '#fff',
-  outline: 'none', boxSizing: 'border-box',
-}
-const inpDisabled: React.CSSProperties = {
-  ...inp, background: '#F5F5F5', color: '#6C757D', cursor: 'default',
-}
-const selectStyle: React.CSSProperties = {
-  height: 26, width: '100%', borderRadius: 2,
-  border: '1px solid #ABABAB', padding: '0 7px',
-  fontSize: 12, color: '#212529', background: '#fff',
-  outline: 'none', boxSizing: 'border-box',
-}
-const selectDisabled: React.CSSProperties = {
-  ...selectStyle, background: '#F5F5F5', color: '#6C757D', cursor: 'default',
-}
-
 function SHdr({ title }: { title: string }) {
   return (
-    <div style={sectionHdr}>
-      <span style={{ fontSize: 11, fontWeight: 700, color: '#1B3A6B' }}>{title}</span>
+    <div style={{ background: HEADER_GRAD, borderBottom: '1px solid #C0C0C0', padding: '4px 10px', flexShrink: 0 }}>
+      <span style={{ fontSize: 11, fontWeight: 700, color: NAVY }}>{title}</span>
     </div>
   )
 }
@@ -212,50 +185,35 @@ export default function CustomerDetailPage() {
   const fullName    = `${customer.firstName} ${customer.lastName}`
   const fmtDate     = (v?: string | null) => v ? new Date(v).toLocaleDateString('en-ZA') : '—'
 
-  const titleBtn: React.CSSProperties = {
-    fontSize: 11, padding: '2px 10px', cursor: 'pointer', borderRadius: 2,
-    background: 'linear-gradient(180deg,#F5F5F5 0%,#E0E0E0 100%)',
-    border: '1px solid #ABABAB', color: '#333', display: 'flex', alignItems: 'center', gap: 4,
-  }
-  const saveBtn: React.CSSProperties = {
-    fontSize: 11, padding: '2px 10px', cursor: saving ? 'not-allowed' : 'pointer', borderRadius: 2,
-    background: 'linear-gradient(180deg,#10B981 0%,#059669 100%)',
-    border: '1px solid #059669', color: '#fff', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4,
-    opacity: saving ? 0.7 : 1,
-  }
-
   return (
-    <div style={{ border: '1px solid #B0B0B0', borderRadius: 2, background: '#F5F5F5', display: 'flex', flexDirection: 'column' }}>
-
-      {/* ── Title bar ─────────────────────────────────────────────────────────── */}
-      <div style={{ background: 'linear-gradient(180deg,#EAEAEA 0%,#D4D4D4 100%)', borderBottom: '2px solid #B0B0B0', padding: '5px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <button onClick={() => router.back()} style={titleBtn}>← Customers</button>
-          <span style={{ fontSize: 1, color: '#B0B0B0', userSelect: 'none' }}>│</span>
-          <span style={{ fontSize: 13, fontWeight: 700, color: '#212529' }}>{fullName}</span>
-          <span style={{ fontSize: 11, color: '#6C757D' }}>·  {customer.customerType === 'account' ? 'Account Customer' : 'Casual Customer'}</span>
-          {customer.accountCode && (
-            <span style={{ fontSize: 11, fontFamily: 'monospace', fontWeight: 700, color: '#1B3A6B', background: '#E8EFF8', border: '1px solid #B0C4DE', borderRadius: 2, padding: '1px 6px' }}>
-              {customer.accountCode}
-            </span>
-          )}
-          {customer.idNumber && (
-            <span style={{ fontSize: 11, fontFamily: 'monospace', color: '#6C757D' }}>·  {customer.idNumber}</span>
-          )}
-        </div>
-        <div style={{ display: 'flex', gap: 6 }}>
-          {!isEditing ? (
-            <button onClick={() => setIsEditing(true)} style={titleBtn}>✏  Edit</button>
-          ) : (
-            <>
-              <button onClick={handleCancel} style={titleBtn} disabled={saving}>Cancel</button>
-              <button onClick={handleSubmit(onSubmit)} style={saveBtn} disabled={saving}>
-                {saving && <Loader2 style={{ width: 12, height: 12, animation: 'spin 1s linear infinite' }} />}
-                {saving ? 'Saving...' : '💾 Save'}
-              </button>
-            </>
-          )}
-        </div>
+    <PortalPage
+      title={fullName}
+      actions={
+        !isEditing ? (
+          <Btn size="sm" icon={Pencil} onClick={() => setIsEditing(true)}>Edit</Btn>
+        ) : (
+          <>
+            <Btn size="sm" onClick={handleCancel} disabled={saving}>Cancel</Btn>
+            <Btn variant="primary" size="sm" icon={Save} loading={saving} onClick={handleSubmit(onSubmit)}>
+              {saving ? 'Saving...' : 'Save'}
+            </Btn>
+          </>
+        )
+      }
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, background: '#F5F5F5' }}>
+      {/* ── Sub-header ────────────────────────────────────────────────────────── */}
+      <div style={{ padding: '6px 10px', borderBottom: '1px solid #E0E0E0', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+        <Btn size="sm" icon={ArrowLeft} onClick={() => router.back()}>Customers</Btn>
+        <span style={{ fontSize: 11, color: '#6C757D' }}>{customer.customerType === 'account' ? 'Account Customer' : 'Casual Customer'}</span>
+        {customer.accountCode && (
+          <span style={{ fontSize: 11, fontFamily: 'monospace', fontWeight: 700, color: NAVY, background: '#E8EFF8', border: '1px solid #B0C4DE', borderRadius: 2, padding: '1px 6px' }}>
+            {customer.accountCode}
+          </span>
+        )}
+        {customer.idNumber && (
+          <span style={{ fontSize: 11, fontFamily: 'monospace', color: '#6C757D' }}>·  {customer.idNumber}</span>
+        )}
       </div>
 
       {/* ── Blacklist banner ──────────────────────────────────────────────────── */}
@@ -273,24 +231,12 @@ export default function CustomerDetailPage() {
       )}
 
       {/* ── Tab strip ─────────────────────────────────────────────────────────── */}
-      <div style={{ display: 'flex', borderBottom: '1px solid #C0C0C0', background: '#EFEFEF', flexShrink: 0 }}>
-        {(customer.customerType === 'account' ? TABS_ACCOUNT : TABS_CASUAL).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            style={{
-              padding: '5px 14px', fontSize: 11, cursor: 'pointer',
-              fontWeight: tab === t ? 700 : 400,
-              background: tab === t ? '#fff' : 'transparent',
-              borderRight: '1px solid #D0D0D0',
-              borderBottom: tab === t ? '2px solid #217346' : '2px solid transparent',
-              color: tab === t ? '#217346' : '#555',
-            }}
-          >
-            {t}
-          </button>
-        ))}
-      </div>
+      <TabStrip
+        tabs={(customer.customerType === 'account' ? TABS_ACCOUNT : TABS_CASUAL).map((t) => ({ value: t, label: t }))}
+        active={tab}
+        onChange={setTab}
+        style={{ padding: '8px 10px 0', background: '#F5F5F5' }}
+      />
 
       {/* ── Two-column layout: main content + sidebar ─────────────────────────── */}
       <div style={{ display: 'flex', alignItems: 'flex-start' }}>
@@ -301,30 +247,15 @@ export default function CustomerDetailPage() {
           {tab === 'Overview' && (
             <div>
               {/* Secondary Tab Strip for sections */}
-              <div style={{ display: 'flex', borderBottom: '1px solid #C0C0C0', background: '#EFEFEF', flexShrink: 0 }}>
-                {(customer.customerNotes || isEditing
+              <TabStrip
+                tabs={(customer.customerNotes || isEditing
                   ? SECTION_TABS
                   : SECTION_TABS.filter(t => t !== 'Notes')
-                ).map((t) => (
-                  <button
-                    key={t}
-                    onClick={() => setSectionTab(t)}
-                    style={{
-                      padding: '5px 14px',
-                      fontSize: 11,
-                      cursor: 'pointer',
-                      fontWeight: sectionTab === t ? 700 : 400,
-                      background: sectionTab === t ? '#fff' : 'transparent',
-                      border: 'none',
-                      borderRight: '1px solid #D0D0D0',
-                      borderBottom: sectionTab === t ? '2px solid #217346' : '2px solid transparent',
-                      color: sectionTab === t ? '#217346' : '#555',
-                    }}
-                  >
-                    {t}
-                  </button>
-                ))}
-              </div>
+                ).map((t) => ({ value: t, label: t }))}
+                active={sectionTab}
+                onChange={(v) => setSectionTab(v as typeof SECTION_TABS[number])}
+                style={{ padding: '8px 10px 0', background: '#EFEFEF' }}
+              />
 
               {/* Section Content - Personal */}
               {sectionTab === 'Personal' && (
@@ -620,20 +551,19 @@ export default function CustomerDetailPage() {
           </div>
 
           <SHdr title="Actions" />
-          <div style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 5 }}>
-            <button
+          <div style={{ padding: '8px 10px' }}>
+            <Btn
+              size="sm"
+              icon={customer.blacklisted ? ShieldCheck : ShieldBan}
+              variant={customer.blacklisted ? 'secondary' : 'danger'}
               onClick={() => setTab('Blacklist')}
-              style={{
-                fontSize: 11, padding: '4px 8px', borderRadius: 2, cursor: 'pointer', width: '100%', textAlign: 'left',
-                background: customer.blacklisted ? 'linear-gradient(180deg,#DCFCE7 0%,#BBF7D0 100%)' : 'linear-gradient(180deg,#FEE2E2 0%,#FECACA 100%)',
-                border: `1px solid ${customer.blacklisted ? '#86EFAC' : '#FCA5A5'}`,
-                color: customer.blacklisted ? '#166534' : '#991B1B',
-              }}
+              style={{ width: '100%', justifyContent: 'flex-start' }}
             >
-              {customer.blacklisted ? '✓  Remove Blacklist' : '⚠  Blacklist'}
-            </button>
+              {customer.blacklisted ? 'Remove Blacklist' : 'Blacklist'}
+            </Btn>
           </div>
         </div>
+      </div>
       </div>
 
       {/* ── Modals ────────────────────────────────────────────────────────────── */}
@@ -644,7 +574,7 @@ export default function CustomerDetailPage() {
           onSuccess={() => { mutate(`/api/customers/${id}`); setBlacklistOpen(false) }}
         />
       )}
-    </div>
+    </PortalPage>
   )
 }
 
@@ -759,8 +689,10 @@ function DocumentsTab({ customer, onPhotoSaved }: { customer: Customer; onPhotoS
               <option key={v} value={v}>{l}</option>
             ))}
           </select>
-          <label style={{ cursor: uploading ? 'not-allowed' : 'pointer', opacity: uploading ? 0.5 : 1, fontSize: 11, padding: '2px 10px', background: 'linear-gradient(180deg,#F5F5F5 0%,#E0E0E0 100%)', border: '1px solid #ABABAB', borderRadius: 2, color: '#333' }}>
-            {uploading ? 'Uploading…' : '+ Upload Document'}
+          <label style={{ display: 'inline-block', cursor: uploading ? 'not-allowed' : 'pointer' }}>
+            <span style={{ pointerEvents: 'none' }}>
+              <Btn size="sm" loading={uploading}>{uploading ? 'Uploading…' : '+ Upload Document'}</Btn>
+            </span>
             <input type="file" style={{ display: 'none' }} accept=".pdf,.jpg,.jpeg,.png" onChange={handleDocUpload} disabled={uploading} />
           </label>
         </div>
@@ -828,22 +760,12 @@ function BlacklistTab({ customer, onAction, onUnblacklist }: {
                 </p>
               )}
             </div>
-            <button
-              onClick={onUnblacklist}
-              style={{ fontSize: 11, padding: '4px 12px', background: 'linear-gradient(180deg,#DCFCE7 0%,#BBF7D0 100%)', border: '1px solid #86EFAC', borderRadius: 2, cursor: 'pointer', color: '#166534', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}
-            >
-              <ShieldCheck style={{ width: 12, height: 12 }} /> Remove from Blacklist
-            </button>
+            <Btn icon={ShieldCheck} onClick={onUnblacklist}>Remove from Blacklist</Btn>
           </>
         ) : (
           <>
             <p style={{ fontSize: 12, color: '#6C757D', marginBottom: 10 }}>This customer is not blacklisted.</p>
-            <button
-              onClick={onAction}
-              style={{ fontSize: 11, padding: '4px 12px', background: 'linear-gradient(180deg,#FEE2E2 0%,#FECACA 100%)', border: '1px solid #FCA5A5', borderRadius: 2, cursor: 'pointer', color: '#991B1B', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}
-            >
-              <ShieldBan style={{ width: 12, height: 12 }} /> Blacklist Customer
-            </button>
+            <Btn variant="danger" icon={ShieldBan} onClick={onAction}>Blacklist Customer</Btn>
           </>
         )}
       </div>
@@ -868,22 +790,22 @@ function BlacklistModal({ customerId, onClose, onSuccess }: { customerId: string
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader><DialogTitle>Blacklist Customer</DialogTitle></DialogHeader>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-2">
-          <div>
-            <Label>Reason <span className="text-gray-400 font-normal">(min 10 chars)</span></Label>
-            <Input {...register('reason')} className="mt-1" placeholder="Reason for blacklisting..." disabled={loading} />
-            {errors.reason && <p className="text-xs text-red-600 mt-1">{errors.reason.message}</p>}
-          </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
-            <Button type="submit" variant="destructive" disabled={loading}>
-              {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Blacklisting...</> : 'Blacklist Customer'}
-            </Button>
-          </div>
+      <RpxDialogContent maxWidth={440}>
+        <RpxDialogHeader title="Blacklist Customer" onClose={onClose} />
+        <form onSubmit={handleSubmit(onSubmit)}>
+          <RpxDialogBody>
+            <span style={lbl}>Reason (min 10 chars)</span>
+            <input {...register('reason')} style={inp} placeholder="Reason for blacklisting..." disabled={loading} />
+            {errors.reason && <p style={{ fontSize: 10, color: '#DC2626', marginTop: 3 }}>{errors.reason.message}</p>}
+          </RpxDialogBody>
+          <RpxDialogFooter>
+            <Btn onClick={onClose} disabled={loading}>Cancel</Btn>
+            <Btn variant="danger" type="submit" loading={loading}>
+              {loading ? 'Blacklisting...' : 'Blacklist Customer'}
+            </Btn>
+          </RpxDialogFooter>
         </form>
-      </DialogContent>
+      </RpxDialogContent>
     </Dialog>
   )
 }

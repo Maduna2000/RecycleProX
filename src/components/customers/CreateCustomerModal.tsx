@@ -5,15 +5,14 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import useSWR from 'swr'
 import { CreateCustomerSchema, type CreateCustomerInput, type CreateCustomerFormInput } from '@/lib/schemas/customer'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
+import { Dialog } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { validateSaId } from '@/lib/utils/saId'
 import Link from 'next/link'
+import { Btn, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -64,17 +63,18 @@ export function CreateCustomerModal({ open, onClose, onSuccess, defaultType = 'c
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) { reset(); setDuplicate(null); onClose() } }}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>Add Customer</DialogTitle></DialogHeader>
+      <RpxDialogContent maxWidth={560} style={{ maxHeight: '90vh' }}>
+        <RpxDialogHeader title="Add Customer" onClose={onClose} />
+        <RpxDialogBody>
 
         {duplicate && (
-          <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+          <div className="p-3 mb-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
             A customer with this ID already exists.{' '}
             <Link href={`/app/customers/${duplicate.id}`} className="underline font-medium" onClick={onClose}>View existing record →</Link>
           </div>
         )}
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-2">
+        <form id="create-customer-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label>Customer Type</Label>
@@ -155,14 +155,15 @@ export function CreateCustomerModal({ open, onClose, onSuccess, defaultType = 'c
             </div>
           )}
 
-          <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
-            <Button type="submit" className="bg-green-600 hover:bg-green-700" disabled={loading}>
-              {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Creating...</> : 'Create Customer'}
-            </Button>
-          </div>
         </form>
-      </DialogContent>
+        </RpxDialogBody>
+        <RpxDialogFooter>
+          <Btn onClick={onClose} disabled={loading}>Cancel</Btn>
+          <Btn variant="primary" type="submit" form="create-customer-form" loading={loading}>
+            {loading ? 'Creating...' : 'Create Customer'}
+          </Btn>
+        </RpxDialogFooter>
+      </RpxDialogContent>
     </Dialog>
   )
 }

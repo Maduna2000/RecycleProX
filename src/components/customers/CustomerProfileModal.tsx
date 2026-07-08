@@ -5,8 +5,8 @@ import useSWR, { mutate } from 'swr'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Dialog, DialogContent, ModalTitleBar, ModalBtn } from '@/components/ui/dialog'
-import { AlertTriangle, ShieldBan, ShieldCheck, Loader2, Camera } from 'lucide-react'
+import { Dialog } from '@/components/ui/dialog'
+import { AlertTriangle, ShieldBan, ShieldCheck, Loader2, Camera, Pencil } from 'lucide-react'
 import { PhotoUploader, PhotoViewer } from '@/components/PhotoUploader'
 import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
@@ -20,6 +20,7 @@ import {
   type BlacklistInput,
 } from '@/lib/schemas/customer'
 import { colors } from '@/lib/design-tokens'
+import { Btn, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -131,8 +132,8 @@ export function CustomerProfileModal({
 
   return (
     <Dialog open={!!customerId} onOpenChange={(o) => { if (!o) handleClose() }}>
-      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col overflow-hidden p-0" showCloseButton={false}>
-        <ModalTitleBar title="Customer Profile" onClose={handleClose} />
+      <RpxDialogContent maxWidth={760} style={{ maxHeight: '90vh' }}>
+        <RpxDialogHeader title="Customer Profile" onClose={handleClose} />
 
         {isLoading && (
           <div className="flex items-center justify-center h-40">
@@ -177,7 +178,7 @@ export function CustomerProfileModal({
                     ? <Pill text="Blacklisted" bg="#FEE2E2" color="#B91C1C" />
                     : <Pill text="Active" bg="#DCFCE7" color="#166534" />}
                 </div>
-                <button onClick={() => setEditOpen(true)} style={{ ...titleBtn, fontSize: 10, padding: '2px 8px' }}>✏ Edit</button>
+                <Btn size="sm" icon={Pencil} onClick={() => setEditOpen(true)}>Edit</Btn>
               </div>
               <div style={{ display: 'flex', gap: 10, marginTop: 2 }}>
                 {customer.idNumber && (
@@ -258,7 +259,7 @@ export function CustomerProfileModal({
             onSuccess={() => { refreshCustomer(); setBlacklistOpen(false) }}
           />
         )}
-      </DialogContent>
+      </RpxDialogContent>
     </Dialog>
   )
 }
@@ -575,12 +576,12 @@ function BlacklistTab({ customer, onAction, onUnblacklist }: {
                 <p style={{ fontSize: 11, color: '#FC8181', margin: 0 }}>Since {new Date(customer.blacklistedAt).toLocaleDateString('en-ZA')}</p>
               )}
             </div>
-            <ModalBtn variant="outline" onClick={onUnblacklist} icon={<ShieldCheck style={{ width: 14, height: 14 }} />}>Remove from Blacklist</ModalBtn>
+            <Btn icon={ShieldCheck} onClick={onUnblacklist}>Remove from Blacklist</Btn>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <p style={{ fontSize: 12, color: '#6C757D', margin: 0 }}>This customer is not blacklisted.</p>
-            <ModalBtn variant="danger" onClick={onAction} icon={<ShieldBan style={{ width: 14, height: 14 }} />}>Blacklist Customer</ModalBtn>
+            <Btn variant="danger" icon={ShieldBan} onClick={onAction}>Blacklist Customer</Btn>
           </div>
         )}
       </div>
@@ -673,8 +674,9 @@ function EditCustomerModal({ customer, onClose, onSuccess }: {
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto" showCloseButton={false}>
-        <ModalTitleBar title="Edit Customer" onClose={onClose} />
+      <RpxDialogContent maxWidth={680} style={{ maxHeight: '90vh' }}>
+        <RpxDialogHeader title="Edit Customer" onClose={onClose} />
+        <RpxDialogBody>
         <div className="flex gap-1 border-b -mx-1 mb-4">
           {/* Only show tabs if not casual (casuals only have Personal) */}
           {!isCasual && editTabs.map((t) => (
@@ -692,7 +694,7 @@ function EditCustomerModal({ customer, onClose, onSuccess }: {
           ))}
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)}>
+        <form id="edit-customer-form" onSubmit={handleSubmit(onSubmit)}>
           {editTab === 'Personal' && (
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
@@ -931,12 +933,13 @@ function EditCustomerModal({ customer, onClose, onSuccess }: {
             </div>
           )}
 
-          <div className="flex justify-end gap-2 pt-4 mt-4 border-t">
-            <ModalBtn type="button" variant="outline" onClick={onClose} disabled={loading}>Cancel</ModalBtn>
-            <ModalBtn type="submit" variant="primary" loading={loading}>Save Changes</ModalBtn>
-          </div>
         </form>
-      </DialogContent>
+        </RpxDialogBody>
+        <RpxDialogFooter>
+          <Btn onClick={onClose} disabled={loading}>Cancel</Btn>
+          <Btn variant="primary" type="submit" form="edit-customer-form" loading={loading}>Save Changes</Btn>
+        </RpxDialogFooter>
+      </RpxDialogContent>
     </Dialog>
   )
 }
@@ -965,20 +968,20 @@ function BlacklistModal({ customerId, onClose, onSuccess }: {
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-md" showCloseButton={false}>
-        <ModalTitleBar title="Blacklist Customer" onClose={onClose} />
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-2">
-          <div>
+      <RpxDialogContent maxWidth={440}>
+        <RpxDialogHeader title="Blacklist Customer" onClose={onClose} />
+        <form onSubmit={handleSubmit(onSubmit)}>
+          <RpxDialogBody>
             <Label>Reason <span className="text-gray-400 font-normal">(min 10 chars)</span></Label>
             <Input {...register('reason')} className="mt-1" placeholder="Reason for blacklisting..." disabled={loading} />
             {errors.reason && <p className="text-xs text-red-600 mt-1">{errors.reason.message}</p>}
-          </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <ModalBtn type="button" variant="outline" onClick={onClose} disabled={loading}>Cancel</ModalBtn>
-            <ModalBtn type="submit" variant="danger" loading={loading}>Blacklist Customer</ModalBtn>
-          </div>
+          </RpxDialogBody>
+          <RpxDialogFooter>
+            <Btn onClick={onClose} disabled={loading}>Cancel</Btn>
+            <Btn variant="danger" type="submit" loading={loading}>Blacklist Customer</Btn>
+          </RpxDialogFooter>
         </form>
-      </DialogContent>
+      </RpxDialogContent>
     </Dialog>
   )
 }

@@ -35,6 +35,8 @@ export interface BtnProps {
   loading?:  boolean
   disabled?: boolean
   type?:     'button' | 'submit'
+  /** Associates this button with a <form> elsewhere in the DOM (id reference). */
+  form?:     string
   href?:     string
   target?:   string
   title?:    string
@@ -56,6 +58,7 @@ export function Btn({
   loading,
   disabled,
   type = 'button',
+  form,
   href,
   target,
   title,
@@ -111,6 +114,7 @@ export function Btn({
   return (
     <button
       type={type}
+      form={form}
       title={title}
       disabled={inactive}
       style={merged}

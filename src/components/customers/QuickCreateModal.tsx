@@ -4,12 +4,12 @@ import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { QuickCreateSchema, type QuickCreateInput } from '@/lib/schemas/customer'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { validateSaId } from '@/lib/utils/saId'
+import { Btn, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
 
 type Customer = {
   id: string; firstName: string; lastName: string; idNumber: string | null
@@ -57,9 +57,10 @@ export function QuickCreateModal({ open, prefillQuery, onClose, onSuccess }: Pro
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) { reset(); onClose() } }}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader><DialogTitle>Quick Create Customer</DialogTitle></DialogHeader>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-2">
+      <RpxDialogContent maxWidth={440}>
+        <RpxDialogHeader title="Quick Create Customer" onClose={onClose} />
+        <RpxDialogBody>
+        <form id="quick-create-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div>
             <Label>National ID Number</Label>
             <Input {...register('idNumber')} className="mt-1" placeholder="National ID" disabled={loading} />
@@ -85,51 +86,15 @@ export function QuickCreateModal({ open, prefillQuery, onClose, onSuccess }: Pro
             <Input {...register('phone')} className="mt-1" placeholder="76 123 456" disabled={loading} />
             {errors.phone && <p className="text-xs text-red-600 mt-1">{errors.phone.message}</p>}
           </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={loading}
-              style={{
-                fontSize: 10,
-                padding: '1px 6px',
-                background: '#E0E0E0',
-                border: '1px solid #999',
-                borderRadius: 2,
-                cursor: loading ? 'not-allowed' : 'pointer',
-                opacity: loading ? 0.6 : 1,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 3,
-              }}
-              onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = '#D0D0D0' }}
-              onMouseLeave={(e) => { if (!loading) e.currentTarget.style.background = '#E0E0E0' }}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              style={{
-                fontSize: 10,
-                padding: '1px 6px',
-                background: '#E0E0E0',
-                border: '1px solid #999',
-                borderRadius: 2,
-                cursor: loading ? 'not-allowed' : 'pointer',
-                opacity: loading ? 0.6 : 1,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 3,
-              }}
-              onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = '#D0D0D0' }}
-              onMouseLeave={(e) => { if (!loading) e.currentTarget.style.background = '#E0E0E0' }}
-            >
-              {loading ? <><Loader2 style={{ width: 9, height: 9, animation: 'spin 1s linear infinite' }} />Creating...</> : 'Create Customer'}
-            </button>
-          </div>
         </form>
-      </DialogContent>
+        </RpxDialogBody>
+        <RpxDialogFooter>
+          <Btn onClick={onClose} disabled={loading}>Cancel</Btn>
+          <Btn variant="primary" type="submit" form="quick-create-form" loading={loading}>
+            {loading ? 'Creating...' : 'Create Customer'}
+          </Btn>
+        </RpxDialogFooter>
+      </RpxDialogContent>
     </Dialog>
   )
 }

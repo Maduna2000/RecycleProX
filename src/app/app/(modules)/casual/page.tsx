@@ -4,14 +4,16 @@ import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import useSWR, { mutate } from 'swr'
 import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Search, Loader2, Upload, Download, CheckCircle2, AlertCircle, ShieldBan, ShieldCheck, UserX, Trash2, UserCheck, Eye } from 'lucide-react'
+import { Dialog } from '@/components/ui/dialog'
+import { Search, Upload, Download, CheckCircle2, AlertCircle, ShieldBan, ShieldCheck, UserX, Trash2, UserCheck, Eye } from 'lucide-react'
 import { toast } from 'sonner'
 import { useSession } from 'next-auth/react'
-import { PageShell } from '@/components/layout/PageShell'
 import { DataTable, StatusBadge, Column, RowAction } from '@/components/ui/DataTable'
-import { colors, fontSize, layout } from '@/lib/design-tokens'
+import { colors, fontSize } from '@/lib/design-tokens'
+import {
+  inp, Btn, Field, FilterBar, PortalPage,
+  RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter,
+} from '@/components/rpx'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -195,132 +197,66 @@ export default function CasualsPage() {
   ]
 
   return (
-    <PageShell>
-      <div className="flex flex-col flex-1 min-h-0 gap-3">
+    <PortalPage
+      title="Casual Sellers"
+      actions={isManager ? <Btn variant="primary" size="sm" icon={Upload} onClick={() => setImportOpen(true)}>Import CSV</Btn> : undefined}
+    >
+      <div className="flex flex-col flex-1 min-h-0">
 
         {/* Filter bar */}
-        <div className="flex flex-wrap items-center gap-2 shrink-0">
-          <div className="relative">
-            <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: colors.textMuted }} />
-            <input
-              value={search}
-              onChange={(e) => { setSearch(e.target.value); setLetter(null) }}
-              placeholder="Search by name or ID number…"
-              className="pl-7 h-7 text-xs border rounded bg-white focus:outline-none"
-              style={{ borderColor: colors.border, borderRadius: layout.inputRadius, width: 240 }}
-              onFocus={(e) => (e.currentTarget.style.borderColor = colors.borderFocus)}
-              onBlur={(e)  => (e.currentTarget.style.borderColor = colors.border)}
-            />
-          </div>
-
-          <select
-            className="h-7 rounded px-2 text-xs bg-white focus:outline-none border"
-            style={{ color: colors.textPrimary, borderColor: colors.border }}
-            value={showBlacklisted}
-            onChange={(e) => setShowBlacklisted(e.target.value)}
-          >
-            <option value="">All Status</option>
-            <option value="false">Active Only</option>
-            <option value="true">Blacklisted Only</option>
-          </select>
-
-          <select
-            className="h-7 rounded px-2 text-xs bg-white focus:outline-none border"
-            style={{ color: colors.textPrimary, borderColor: colors.border }}
-            value={dealerCategory}
-            onChange={(e) => setDealerCategory(e.target.value)}
-          >
-            <option value="">All Categories</option>
-            <option value="casual">Casual</option>
-            <option value="dealer_1">Dealer 1</option>
-            <option value="dealer_2">Dealer 2</option>
-            <option value="dealer_3">Dealer 3</option>
-          </select>
-
-          <select
-            className="h-7 rounded px-2 text-xs bg-white focus:outline-none border"
-            style={{ color: colors.textPrimary, borderColor: colors.border }}
-            value={primaryFunction}
-            onChange={(e) => setPrimaryFunction(e.target.value)}
-          >
-            <option value="">All Functions</option>
-            <option value="supplier">Supplier</option>
-            <option value="customer">Customer</option>
-            <option value="both">Both</option>
-          </select>
-
-          <span className="text-xs" style={{ color: colors.textSecondary }}>
+        <FilterBar>
+          <Field label="Search" width={230}>
+            <div style={{ position: 'relative' }}>
+              <Search style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', width: 12, height: 12, color: '#6C757D' }} />
+              <input
+                value={search}
+                onChange={(e) => { setSearch(e.target.value); setLetter(null) }}
+                placeholder="Search by name or ID number…"
+                style={{ ...inp, paddingLeft: 26 }}
+              />
+            </div>
+          </Field>
+          <Field label="Status" width={130}>
+            <select style={inp} value={showBlacklisted} onChange={(e) => setShowBlacklisted(e.target.value)}>
+              <option value="">All Status</option>
+              <option value="false">Active Only</option>
+              <option value="true">Blacklisted Only</option>
+            </select>
+          </Field>
+          <Field label="Category" width={130}>
+            <select style={inp} value={dealerCategory} onChange={(e) => setDealerCategory(e.target.value)}>
+              <option value="">All Categories</option>
+              <option value="casual">Casual</option>
+              <option value="dealer_1">Dealer 1</option>
+              <option value="dealer_2">Dealer 2</option>
+              <option value="dealer_3">Dealer 3</option>
+            </select>
+          </Field>
+          <Field label="Function" width={130}>
+            <select style={inp} value={primaryFunction} onChange={(e) => setPrimaryFunction(e.target.value)}>
+              <option value="">All Functions</option>
+              <option value="supplier">Supplier</option>
+              <option value="customer">Customer</option>
+              <option value="both">Both</option>
+            </select>
+          </Field>
+          <span style={{ fontSize: 11, color: '#6C757D', marginLeft: 'auto', paddingBottom: 8 }}>
             {customers.length} casual{customers.length !== 1 ? 's' : ''}
           </span>
-
-          {isManager && (
-            <div className="ml-auto">
-              <button
-                onClick={() => setImportOpen(true)}
-                style={{
-                  fontSize: 10,
-                  padding: '1px 6px',
-                  background: '#E0E0E0',
-                  border: '1px solid #999',
-                  borderRadius: 2,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 3,
-                  color: '#212529',
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = '#D0D0D0' }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = '#E0E0E0' }}
-              >
-                <Upload style={{ width: 9, height: 9 }} /> Import CSV
-              </button>
-            </div>
-          )}
-        </div>
+        </FilterBar>
 
         {/* A–Z quick filter */}
-        <div className="flex flex-wrap gap-1 shrink-0">
-          <button
-            onClick={() => setLetter(null)}
-            style={{
-              fontSize: 10,
-              padding: '1px 6px',
-              background: letter === null ? '#C0C0C0' : '#E0E0E0',
-              border: '1px solid #999',
-              borderRadius: 2,
-              cursor: 'pointer',
-              color: '#212529',
-              fontWeight: letter === null ? 600 : 400,
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = '#D0D0D0' }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = letter === null ? '#C0C0C0' : '#E0E0E0' }}
-          >
-            All
-          </button>
+        <div className="flex flex-wrap gap-1 shrink-0" style={{ padding: '8px 14px 0' }}>
+          <Btn size="sm" variant={letter === null ? 'primary' : 'secondary'} onClick={() => setLetter(null)}>All</Btn>
           {ALPHA.map((l) => (
-            <button
-              key={l}
-              onClick={() => { setLetter(l === letter ? null : l); setSearch('') }}
-              style={{
-                fontSize: 10,
-                padding: '1px 6px',
-                background: letter === l ? '#C0C0C0' : '#E0E0E0',
-                border: '1px solid #999',
-                borderRadius: 2,
-                cursor: 'pointer',
-                color: '#212529',
-                fontWeight: letter === l ? 600 : 400,
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = '#D0D0D0' }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = letter === l ? '#C0C0C0' : '#E0E0E0' }}
-            >
+            <Btn key={l} size="sm" variant={letter === l ? 'primary' : 'secondary'} onClick={() => { setLetter(l === letter ? null : l); setSearch('') }}>
               {l}
-            </button>
+            </Btn>
           ))}
         </div>
 
         {/* DataTable */}
-        <div className="flex-1 min-h-0">
+        <div className="flex-1 min-h-0" style={{ padding: 10 }}>
           <DataTable
             columns={columns}
             rows={customers}
@@ -359,30 +295,23 @@ export default function CasualsPage() {
 
         {deleteId && deleteTarget && (
           <Dialog open onOpenChange={(o) => { if (!o) setDeleteId(null) }}>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader><DialogTitle>Delete Customer</DialogTitle></DialogHeader>
-              <div className="space-y-4 mt-2">
-                <p className="text-sm" style={{ color: colors.textSecondary }}>
+            <RpxDialogContent maxWidth={440}>
+              <RpxDialogHeader title="Delete Customer" onClose={() => setDeleteId(null)} />
+              <RpxDialogBody>
+                <p style={{ fontSize: 12.5, color: colors.textSecondary, margin: 0 }}>
                   Are you sure you want to permanently delete <strong style={{ color: colors.textPrimary }}>{deleteTarget.firstName} {deleteTarget.lastName}</strong>?
                   This action cannot be undone and will remove all associated records.
                 </p>
-                <div className="flex justify-end gap-2">
-                  <Button variant="outline" onClick={() => setDeleteId(null)} disabled={deleteLoading}>Cancel</Button>
-                  <button
-                    onClick={() => handleDelete(deleteId)}
-                    disabled={deleteLoading}
-                    className="h-9 px-4 rounded text-sm font-medium text-white transition-colors disabled:opacity-50"
-                    style={{ background: colors.danger }}
-                  >
-                    {deleteLoading ? <span className="flex items-center gap-1.5"><Loader2 className="w-4 h-4 animate-spin" />Deleting…</span> : 'Delete'}
-                  </button>
-                </div>
-              </div>
-            </DialogContent>
+              </RpxDialogBody>
+              <RpxDialogFooter>
+                <Btn onClick={() => setDeleteId(null)} disabled={deleteLoading}>Cancel</Btn>
+                <Btn variant="danger" loading={deleteLoading} onClick={() => handleDelete(deleteId)}>Delete</Btn>
+              </RpxDialogFooter>
+            </RpxDialogContent>
           </Dialog>
         )}
       </div>
-    </PageShell>
+    </PortalPage>
   )
 }
 
@@ -406,35 +335,28 @@ function BlacklistModal({ customer, onClose, onSuccess }: { customer: Customer; 
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader><DialogTitle>Blacklist Customer</DialogTitle></DialogHeader>
-        <div className="space-y-4 mt-2">
-          <p className="text-sm" style={{ color: colors.textSecondary }}>
+      <RpxDialogContent maxWidth={440}>
+        <RpxDialogHeader title="Blacklist Customer" onClose={onClose} />
+        <RpxDialogBody>
+          <p style={{ fontSize: 12.5, color: colors.textSecondary, margin: '0 0 12px' }}>
             Blacklisting <strong style={{ color: colors.textPrimary }}>{customer.firstName} {customer.lastName}</strong> will prevent them from transacting.
           </p>
-          <div>
-            <label className="text-xs font-medium" style={{ color: colors.textSecondary }}>Reason (min 10 characters)</label>
-            <Input
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder="Reason for blacklisting…"
-              className="mt-1 border-[#E0E0E0]"
-              disabled={loading}
-            />
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
-            <button
-              onClick={handleSubmit}
-              disabled={loading || reason.length < 10}
-              className="h-9 px-4 rounded text-sm font-medium text-white transition-colors disabled:opacity-50"
-              style={{ background: colors.danger }}
-            >
-              {loading ? <span className="flex items-center gap-1.5"><Loader2 className="w-4 h-4 animate-spin" />Blacklisting…</span> : 'Blacklist'}
-            </button>
-          </div>
-        </div>
-      </DialogContent>
+          <label className="text-xs font-medium" style={{ color: colors.textSecondary }}>Reason (min 10 characters)</label>
+          <Input
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="Reason for blacklisting…"
+            className="mt-1 border-[#E0E0E0]"
+            disabled={loading}
+          />
+        </RpxDialogBody>
+        <RpxDialogFooter>
+          <Btn onClick={onClose} disabled={loading}>Cancel</Btn>
+          <Btn variant="danger" loading={loading} disabled={reason.length < 10} onClick={handleSubmit}>
+            Blacklist
+          </Btn>
+        </RpxDialogFooter>
+      </RpxDialogContent>
     </Dialog>
   )
 }
@@ -478,10 +400,10 @@ function PromoteToAccountModal({ customerId, customerName, onClose, onSuccess }:
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader><DialogTitle>Promote to Account</DialogTitle></DialogHeader>
-        <div className="space-y-4 mt-2">
-          <p className="text-sm" style={{ color: colors.textSecondary }}>
+      <RpxDialogContent maxWidth={440}>
+        <RpxDialogHeader title="Promote to Account" onClose={onClose} />
+        <RpxDialogBody>
+          <p style={{ fontSize: 12.5, color: colors.textSecondary, margin: '0 0 12px' }}>
             Promoting <strong style={{ color: colors.textPrimary }}>{customerName}</strong> to an account customer. An account code will be auto-assigned.
           </p>
 
@@ -530,33 +452,12 @@ function PromoteToAccountModal({ customerId, customerName, onClose, onSuccess }:
               </select>
             </div>
           </div>
-
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
-            <button
-              onClick={handlePromote}
-              disabled={loading}
-              style={{
-                fontSize: 10,
-                padding: '1px 6px',
-                background: '#E0E0E0',
-                border: '1px solid #999',
-                borderRadius: 2,
-                cursor: loading ? 'not-allowed' : 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 3,
-                color: '#212529',
-                opacity: loading ? 0.6 : 1,
-              }}
-              onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = '#D0D0D0' }}
-              onMouseLeave={(e) => { if (!loading) e.currentTarget.style.background = '#E0E0E0' }}
-            >
-              {loading ? <Loader2 style={{ width: 9, height: 9 }} className="animate-spin" /> : 'Promote →'}
-            </button>
-          </div>
-        </div>
-      </DialogContent>
+        </RpxDialogBody>
+        <RpxDialogFooter>
+          <Btn onClick={onClose} disabled={loading}>Cancel</Btn>
+          <Btn variant="primary" loading={loading} onClick={handlePromote}>Promote →</Btn>
+        </RpxDialogFooter>
+      </RpxDialogContent>
     </Dialog>
   )
 }
@@ -606,10 +507,10 @@ function ImportCsvModal({ onClose, onSuccess }: { onClose: () => void; onSuccess
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader><DialogTitle>Import Casual Customers from CSV</DialogTitle></DialogHeader>
-
-        <div className="space-y-4 mt-2">
+      <RpxDialogContent maxWidth={560}>
+        <RpxDialogHeader title="Import Casual Customers from CSV" onClose={onClose} />
+        <RpxDialogBody>
+        <div className="space-y-4">
           <div className="flex items-center justify-between">
             <p className="text-sm" style={{ color: colors.textSecondary }}>
               Upload a CSV file with customer details. Existing customers (matched by ID number) will be updated.
@@ -665,32 +566,15 @@ function ImportCsvModal({ onClose, onSuccess }: { onClose: () => void; onSuccess
             </div>
           )}
 
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={onClose} disabled={loading}>Close</Button>
-            <button
-              onClick={handleImport}
-              disabled={loading || !fileName}
-              style={{
-                fontSize: 10,
-                padding: '1px 6px',
-                background: '#E0E0E0',
-                border: '1px solid #999',
-                borderRadius: 2,
-                cursor: (loading || !fileName) ? 'not-allowed' : 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 3,
-                color: '#212529',
-                opacity: (loading || !fileName) ? 0.6 : 1,
-              }}
-              onMouseEnter={(e) => { if (!loading && fileName) e.currentTarget.style.background = '#D0D0D0' }}
-              onMouseLeave={(e) => { if (!loading && fileName) e.currentTarget.style.background = '#E0E0E0' }}
-            >
-              {loading ? <><Loader2 style={{ width: 9, height: 9 }} className="animate-spin" />Importing…</> : 'Import'}
-            </button>
-          </div>
         </div>
-      </DialogContent>
+        </RpxDialogBody>
+        <RpxDialogFooter>
+          <Btn onClick={onClose} disabled={loading}>Close</Btn>
+          <Btn variant="primary" loading={loading} disabled={!fileName} onClick={handleImport}>
+            Import
+          </Btn>
+        </RpxDialogFooter>
+      </RpxDialogContent>
     </Dialog>
   )
 }

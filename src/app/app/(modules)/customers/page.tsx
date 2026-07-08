@@ -3,14 +3,16 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import useSWR, { mutate } from 'swr'
-import { AlertTriangle, Loader2, Eye, ShieldBan, ShieldCheck, UserX, Trash2, UserMinus } from 'lucide-react'
+import { AlertTriangle, Eye, ShieldBan, ShieldCheck, UserX, Trash2, UserMinus, Search } from 'lucide-react'
 import { DataTable, Avatar, StatusBadge, type Column, type RowAction } from '@/components/ui/DataTable'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { PageShell } from '@/components/layout/PageShell'
+import { Dialog } from '@/components/ui/dialog'
 import { colors } from '@/lib/design-tokens'
 import { toast } from 'sonner'
 import { useSession } from 'next-auth/react'
+import {
+  inp, lbl, Btn, Field, FilterBar, PortalPage,
+  RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter,
+} from '@/components/rpx'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -51,61 +53,22 @@ function BlacklistModal({ customer, onClose, onSuccess }: {
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader><DialogTitle>Blacklist Customer</DialogTitle></DialogHeader>
-        <div className="space-y-4 mt-2">
-          <p className="text-sm" style={{ color: colors.textSecondary }}>
+      <RpxDialogContent maxWidth={440}>
+        <RpxDialogHeader title="Blacklist Customer" onClose={onClose} />
+        <RpxDialogBody>
+          <p style={{ fontSize: 12.5, color: colors.textSecondary, margin: '0 0 12px' }}>
             Blacklisting <strong style={{ color: colors.textPrimary }}>{customer.firstName} {customer.lastName}</strong> will prevent them from transacting.
           </p>
-          <div>
-            <label className="text-xs font-medium block mb-1" style={{ color: colors.textSecondary }}>Reason (min 10 characters)</label>
-            <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Fraudulent activity, stolen ID..." className="text-sm" />
-          </div>
-          <div className="flex justify-end gap-2">
-            <button
-              onClick={onClose}
-              disabled={loading}
-              style={{
-                fontSize: 10,
-                padding: '1px 6px',
-                background: '#E0E0E0',
-                border: '1px solid #999',
-                borderRadius: 2,
-                cursor: loading ? 'not-allowed' : 'pointer',
-                opacity: loading ? 0.6 : 1,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 3,
-              }}
-              onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = '#D0D0D0' }}
-              onMouseLeave={(e) => { if (!loading) e.currentTarget.style.background = '#E0E0E0' }}
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSubmit}
-              disabled={loading || reason.trim().length < 10}
-              style={{
-                fontSize: 10,
-                padding: '1px 6px',
-                background: colors.danger,
-                border: '1px solid #C82333',
-                borderRadius: 2,
-                color: '#fff',
-                cursor: (loading || reason.trim().length < 10) ? 'not-allowed' : 'pointer',
-                opacity: (loading || reason.trim().length < 10) ? 0.6 : 1,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 3,
-              }}
-              onMouseEnter={(e) => { if (!loading && reason.trim().length >= 10) e.currentTarget.style.background = '#A93226' }}
-              onMouseLeave={(e) => { if (!loading && reason.trim().length >= 10) e.currentTarget.style.background = colors.danger }}
-            >
-              {loading ? <Loader2 style={{ width: 9, height: 9, animation: 'spin 1s linear infinite' }} /> : 'Blacklist'}
-            </button>
-          </div>
-        </div>
-      </DialogContent>
+          <span style={lbl}>Reason (min 10 characters)</span>
+          <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Fraudulent activity, stolen ID..." style={inp} />
+        </RpxDialogBody>
+        <RpxDialogFooter>
+          <Btn onClick={onClose} disabled={loading}>Cancel</Btn>
+          <Btn variant="danger" loading={loading} disabled={reason.trim().length < 10} onClick={handleSubmit}>
+            Blacklist
+          </Btn>
+        </RpxDialogFooter>
+      </RpxDialogContent>
     </Dialog>
   )
 }
@@ -383,62 +346,50 @@ function AccountsList({ onAddCustomer }: { onAddCustomer: () => void }) {
   ]
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 gap-3">
+    <div className="flex flex-col flex-1 min-h-0">
       {/* Filters */}
-      <div className="flex gap-2 flex-wrap items-center shrink-0">
-        <div className="relative flex-1 max-w-xs">
-          <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3" style={{ color: colors.textSecondary }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-          </svg>
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search name, ID, phone…"
-            className="w-full pl-7 pr-3 h-7 text-xs rounded border bg-white focus:outline-none"
-            style={{ borderColor: colors.border }}
-            onFocus={(e) => (e.currentTarget.style.borderColor = colors.borderFocus)}
-            onBlur={(e)  => (e.currentTarget.style.borderColor = colors.border)}
-          />
-        </div>
-        <select
-          className="h-7 rounded px-2 text-xs bg-white focus:outline-none border"
-          style={{ color: colors.textPrimary, borderColor: colors.border }}
-          value={showBlacklisted}
-          onChange={(e) => setShowBlacklisted(e.target.value)}
-        >
-          <option value="">All Status</option>
-          <option value="false">Active Only</option>
-          <option value="true">Blacklisted Only</option>
-        </select>
-        <select
-          className="h-7 rounded px-2 text-xs bg-white focus:outline-none border"
-          style={{ color: colors.textPrimary, borderColor: colors.border }}
-          value={dealerCategory}
-          onChange={(e) => setDealerCategory(e.target.value)}
-        >
-          <option value="">All Categories</option>
-          <option value="casual">Casual</option>
-          <option value="dealer_1">Dealer 1</option>
-          <option value="dealer_2">Dealer 2</option>
-          <option value="dealer_3">Dealer 3</option>
-        </select>
-        <select
-          className="h-7 rounded px-2 text-xs bg-white focus:outline-none border"
-          style={{ color: colors.textPrimary, borderColor: colors.border }}
-          value={primaryFunction}
-          onChange={(e) => setPrimaryFunction(e.target.value)}
-        >
-          <option value="">All Functions</option>
-          <option value="supplier">Supplier</option>
-          <option value="customer">Customer</option>
-          <option value="both">Both</option>
-        </select>
-        <span className="text-xs ml-auto" style={{ color: colors.textSecondary }}>
+      <FilterBar>
+        <Field label="Search" width={230}>
+          <div style={{ position: 'relative' }}>
+            <Search style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', width: 12, height: 12, color: '#6C757D' }} />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search name, ID, phone…"
+              style={{ ...inp, paddingLeft: 26 }}
+            />
+          </div>
+        </Field>
+        <Field label="Status" width={130}>
+          <select style={inp} value={showBlacklisted} onChange={(e) => setShowBlacklisted(e.target.value)}>
+            <option value="">All Status</option>
+            <option value="false">Active Only</option>
+            <option value="true">Blacklisted Only</option>
+          </select>
+        </Field>
+        <Field label="Category" width={130}>
+          <select style={inp} value={dealerCategory} onChange={(e) => setDealerCategory(e.target.value)}>
+            <option value="">All Categories</option>
+            <option value="casual">Casual</option>
+            <option value="dealer_1">Dealer 1</option>
+            <option value="dealer_2">Dealer 2</option>
+            <option value="dealer_3">Dealer 3</option>
+          </select>
+        </Field>
+        <Field label="Function" width={130}>
+          <select style={inp} value={primaryFunction} onChange={(e) => setPrimaryFunction(e.target.value)}>
+            <option value="">All Functions</option>
+            <option value="supplier">Supplier</option>
+            <option value="customer">Customer</option>
+            <option value="both">Both</option>
+          </select>
+        </Field>
+        <span style={{ fontSize: 11, color: '#6C757D', marginLeft: 'auto', paddingBottom: 8 }}>
           {customers.length} account{customers.length !== 1 ? 's' : ''}
         </span>
-      </div>
+      </FilterBar>
 
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0" style={{ padding: 10 }}>
         <DataTable
           columns={columns}
           rows={customers}
@@ -463,117 +414,43 @@ function AccountsList({ onAddCustomer }: { onAddCustomer: () => void }) {
       {/* Convert to Casual confirm */}
       {convertId && convertTarget && (
         <Dialog open onOpenChange={(o) => { if (!o) setConvertId(null) }}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader><DialogTitle>Convert to Casual Seller</DialogTitle></DialogHeader>
-            <div className="space-y-4 mt-2">
-              <p className="text-sm" style={{ color: colors.textSecondary }}>
+          <RpxDialogContent maxWidth={440}>
+            <RpxDialogHeader title="Convert to Casual Seller" onClose={() => setConvertId(null)} />
+            <RpxDialogBody>
+              <p style={{ fontSize: 12.5, color: colors.textSecondary, margin: '0 0 10px' }}>
                 Convert <strong style={{ color: colors.textPrimary }}>{convertTarget.firstName} {convertTarget.lastName}</strong> to a casual seller?
               </p>
-              <p className="text-xs px-3 py-2 rounded" style={{ background: colors.warningBg, color: colors.warning }}>
+              <p style={{ fontSize: 11, padding: '6px 10px', borderRadius: 2, background: colors.warningBg, color: colors.warning, margin: 0 }}>
                 Dealer category and price group will be removed. Their account code will be retained for reference.
               </p>
-              <div className="flex justify-end gap-2">
-                <button
-                  onClick={() => setConvertId(null)}
-                  disabled={convertLoading}
-                  style={{
-                    fontSize: 10,
-                    padding: '1px 6px',
-                    background: '#E0E0E0',
-                    border: '1px solid #999',
-                    borderRadius: 2,
-                    cursor: convertLoading ? 'not-allowed' : 'pointer',
-                    opacity: convertLoading ? 0.6 : 1,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 3,
-                  }}
-                  onMouseEnter={(e) => { if (!convertLoading) e.currentTarget.style.background = '#D0D0D0' }}
-                  onMouseLeave={(e) => { if (!convertLoading) e.currentTarget.style.background = '#E0E0E0' }}
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => handleConvertToCasual(convertId)}
-                  disabled={convertLoading}
-                  style={{
-                    fontSize: 10,
-                    padding: '1px 6px',
-                    background: colors.danger,
-                    border: '1px solid #C82333',
-                    borderRadius: 2,
-                    color: '#fff',
-                    cursor: convertLoading ? 'not-allowed' : 'pointer',
-                    opacity: convertLoading ? 0.6 : 1,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 3,
-                  }}
-                  onMouseEnter={(e) => { if (!convertLoading) e.currentTarget.style.background = '#A93226' }}
-                  onMouseLeave={(e) => { if (!convertLoading) e.currentTarget.style.background = colors.danger }}
-                >
-                  {convertLoading ? <Loader2 style={{ width: 9, height: 9, animation: 'spin 1s linear infinite' }} /> : 'Convert'}
-                </button>
-              </div>
-            </div>
-          </DialogContent>
+            </RpxDialogBody>
+            <RpxDialogFooter>
+              <Btn onClick={() => setConvertId(null)} disabled={convertLoading}>Cancel</Btn>
+              <Btn variant="danger" loading={convertLoading} onClick={() => handleConvertToCasual(convertId)}>
+                Convert
+              </Btn>
+            </RpxDialogFooter>
+          </RpxDialogContent>
         </Dialog>
       )}
 
       {/* Delete confirm */}
       {deleteId && deleteTarget && (
         <Dialog open onOpenChange={(o) => { if (!o) setDeleteId(null) }}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader><DialogTitle>Delete Customer</DialogTitle></DialogHeader>
-            <div className="space-y-4 mt-2">
-              <p className="text-sm" style={{ color: colors.textSecondary }}>
+          <RpxDialogContent maxWidth={440}>
+            <RpxDialogHeader title="Delete Customer" onClose={() => setDeleteId(null)} />
+            <RpxDialogBody>
+              <p style={{ fontSize: 12.5, color: colors.textSecondary, margin: 0 }}>
                 Permanently delete <strong style={{ color: colors.textPrimary }}>{deleteTarget.firstName} {deleteTarget.lastName}</strong>? This cannot be undone.
               </p>
-              <div className="flex justify-end gap-2">
-                <button
-                  onClick={() => setDeleteId(null)}
-                  disabled={deleteLoading}
-                  style={{
-                    fontSize: 10,
-                    padding: '1px 6px',
-                    background: '#E0E0E0',
-                    border: '1px solid #999',
-                    borderRadius: 2,
-                    cursor: deleteLoading ? 'not-allowed' : 'pointer',
-                    opacity: deleteLoading ? 0.6 : 1,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 3,
-                  }}
-                  onMouseEnter={(e) => { if (!deleteLoading) e.currentTarget.style.background = '#D0D0D0' }}
-                  onMouseLeave={(e) => { if (!deleteLoading) e.currentTarget.style.background = '#E0E0E0' }}
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => handleDelete(deleteId)}
-                  disabled={deleteLoading}
-                  style={{
-                    fontSize: 10,
-                    padding: '1px 6px',
-                    background: colors.danger,
-                    border: '1px solid #C82333',
-                    borderRadius: 2,
-                    color: '#fff',
-                    cursor: deleteLoading ? 'not-allowed' : 'pointer',
-                    opacity: deleteLoading ? 0.6 : 1,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 3,
-                  }}
-                  onMouseEnter={(e) => { if (!deleteLoading) e.currentTarget.style.background = '#A93226' }}
-                  onMouseLeave={(e) => { if (!deleteLoading) e.currentTarget.style.background = colors.danger }}
-                >
-                  {deleteLoading ? <Loader2 style={{ width: 9, height: 9, animation: 'spin 1s linear infinite' }} /> : 'Delete'}
-                </button>
-              </div>
-            </div>
-          </DialogContent>
+            </RpxDialogBody>
+            <RpxDialogFooter>
+              <Btn onClick={() => setDeleteId(null)} disabled={deleteLoading}>Cancel</Btn>
+              <Btn variant="danger" loading={deleteLoading} onClick={() => handleDelete(deleteId)}>
+                Delete
+              </Btn>
+            </RpxDialogFooter>
+          </RpxDialogContent>
         </Dialog>
       )}
     </div>
@@ -585,8 +462,11 @@ export default function AccountsPage() {
   const router = useRouter()
 
   return (
-    <PageShell>
+    <PortalPage
+      title="Accounts"
+      actions={<Btn variant="primary" size="sm" onClick={() => router.push('/app/customers/new')}>+ Add Account</Btn>}
+    >
       <AccountsList onAddCustomer={() => router.push('/app/customers/new')} />
-    </PageShell>
+    </PortalPage>
   )
 }

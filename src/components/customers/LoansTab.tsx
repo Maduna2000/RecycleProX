@@ -5,12 +5,13 @@ import useSWR, { mutate } from 'swr'
 import { Loader2, MoreHorizontal } from 'lucide-react'
 import { toast } from 'sonner'
 import Decimal from 'decimal.js'
-import { Dialog, DialogContent, ModalTitleBar, ModalBtn } from '@/components/ui/dialog'
+import { Dialog } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { format } from '@/lib/utils/format'
+import { HEADER_GRAD, NAVY, lbl, Btn, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -57,28 +58,10 @@ const PAYMENT_METHODS = [
   { value: 'cheque', label: 'Cheque' },
 ]
 
-// ─── Shared styles (matching customer profile page) ──────────────────────────
-const sectionHdr: React.CSSProperties = {
-  background: 'linear-gradient(180deg,#FFFFFF 0%,#E8E8E8 100%)',
-  borderBottom: '1px solid #C0C0C0',
-  padding: '4px 10px',
-  flexShrink: 0,
-}
-
-const lbl: React.CSSProperties = {
-  display: 'block',
-  fontSize: 10,
-  fontWeight: 700,
-  textTransform: 'uppercase',
-  letterSpacing: '0.04em',
-  color: '#6C757D',
-  marginBottom: 2,
-}
-
 function SHdr({ title }: { title: string }) {
   return (
-    <div style={sectionHdr}>
-      <span style={{ fontSize: 11, fontWeight: 700, color: '#1B3A6B' }}>{title}</span>
+    <div style={{ background: HEADER_GRAD, borderBottom: '1px solid #C0C0C0', padding: '4px 10px', flexShrink: 0 }}>
+      <span style={{ fontSize: 11, fontWeight: 700, color: NAVY }}>{title}</span>
     </div>
   )
 }
@@ -424,9 +407,10 @@ function CreateLoanDialog({
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="max-w-md" showCloseButton={false}>
-        <ModalTitleBar title={`Create Loan for ${customerName}`} onClose={onClose} />
-        <div className="space-y-4 pt-2">
+      <RpxDialogContent maxWidth={440}>
+        <RpxDialogHeader title={`Create Loan for ${customerName}`} onClose={onClose} />
+        <RpxDialogBody>
+        <div className="space-y-4">
           <div>
             <Label>Amount (R) *</Label>
             <Input
@@ -466,21 +450,15 @@ function CreateLoanDialog({
               maxLength={500}
             />
           </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <ModalBtn onClick={onClose} disabled={loading}>
-              Cancel
-            </ModalBtn>
-            <ModalBtn
-              variant="primary"
-              onClick={onSubmit}
-              disabled={loading || !amount}
-              loading={loading}
-            >
-              Create Loan
-            </ModalBtn>
-          </div>
         </div>
-      </DialogContent>
+        </RpxDialogBody>
+        <RpxDialogFooter>
+          <Btn onClick={onClose} disabled={loading}>Cancel</Btn>
+          <Btn variant="primary" onClick={onSubmit} disabled={!amount} loading={loading}>
+            Create Loan
+          </Btn>
+        </RpxDialogFooter>
+      </RpxDialogContent>
     </Dialog>
   )
 }
@@ -520,9 +498,10 @@ function VoidLoanDialog({
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="max-w-md" showCloseButton={false}>
-        <ModalTitleBar title="Void Loan" onClose={onClose} />
-        <div className="space-y-4 pt-2">
+      <RpxDialogContent maxWidth={440}>
+        <RpxDialogHeader title="Void Loan" onClose={onClose} />
+        <RpxDialogBody>
+        <div className="space-y-4">
           <div
             className="rounded p-3 text-sm"
             style={{ background: '#FEF2F2', border: '1px solid #FECACA' }}
@@ -546,21 +525,15 @@ function VoidLoanDialog({
               maxLength={500}
             />
           </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <ModalBtn onClick={onClose} disabled={loading}>
-              Cancel
-            </ModalBtn>
-            <ModalBtn
-              variant="danger"
-              onClick={onSubmit}
-              disabled={loading || reason.length < 5}
-              loading={loading}
-            >
-              Void Loan
-            </ModalBtn>
-          </div>
         </div>
-      </DialogContent>
+        </RpxDialogBody>
+        <RpxDialogFooter>
+          <Btn onClick={onClose} disabled={loading}>Cancel</Btn>
+          <Btn variant="danger" onClick={onSubmit} disabled={reason.length < 5} loading={loading}>
+            Void Loan
+          </Btn>
+        </RpxDialogFooter>
+      </RpxDialogContent>
     </Dialog>
   )
 }
