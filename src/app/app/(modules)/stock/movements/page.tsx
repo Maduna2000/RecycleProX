@@ -5,8 +5,8 @@ import useSWR from 'swr'
 import { X } from 'lucide-react'
 import { DataTable, type Column } from '@/components/ui/DataTable'
 import { format } from '@/lib/utils/format'
-import { PageShell } from '@/components/layout/PageShell'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
+import { inp, Btn, Field, PortalPage, FilterBar } from '@/components/rpx'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -128,72 +128,39 @@ export default function StockMovementsPage() {
   ]
 
   return (
-    <PageShell>
-      <div className="flex gap-2 flex-wrap items-center shrink-0 mb-3">
-        <select
-          className="h-7 border rounded px-2 text-xs bg-white focus:outline-none border-[#E0E0E0] focus:border-[#185ABD]"
-          style={{ color: colors.textPrimary }}
-          value={movDirection}
-          onChange={(e) => setMovDirection(e.target.value)}
-        >
-          <option value="">All Directions</option>
-          <option value="in">In</option>
-          <option value="out">Out</option>
-        </select>
-        <select
-          className="h-7 border rounded px-2 text-xs bg-white focus:outline-none border-[#E0E0E0] focus:border-[#185ABD]"
-          style={{ color: colors.textPrimary }}
-          value={movSource}
-          onChange={(e) => setMovSource(e.target.value)}
-        >
-          <option value="">All Sources</option>
-          <option value="purchase">Purchase</option>
-          <option value="sale">Sale</option>
-          <option value="manual_adjustment">Manual Adjustment</option>
-          <option value="void_reversal">Void Reversal</option>
-          <option value="stocktake_adjustment">Stocktake Adjustment</option>
-        </select>
-        <input
-          type="date"
-          value={movFrom}
-          onChange={(e) => setMovFrom(e.target.value)}
-          className="h-7 border rounded px-2 text-xs bg-white focus:outline-none border-[#E0E0E0] focus:border-[#185ABD]"
-          style={{ color: movFrom ? colors.textPrimary : colors.textSecondary }}
-          title="From date"
-        />
-        <input
-          type="date"
-          value={movTo}
-          onChange={(e) => setMovTo(e.target.value)}
-          className="h-7 border rounded px-2 text-xs bg-white focus:outline-none border-[#E0E0E0] focus:border-[#185ABD]"
-          style={{ color: movTo ? colors.textPrimary : colors.textSecondary }}
-          title="To date"
-        />
+    <PortalPage title="Stock Movements">
+      <FilterBar>
+        <Field label="Direction" width={130}>
+          <select value={movDirection} onChange={(e) => setMovDirection(e.target.value)} style={inp}>
+            <option value="">All Directions</option>
+            <option value="in">In</option>
+            <option value="out">Out</option>
+          </select>
+        </Field>
+        <Field label="Source" width={170}>
+          <select value={movSource} onChange={(e) => setMovSource(e.target.value)} style={inp}>
+            <option value="">All Sources</option>
+            <option value="purchase">Purchase</option>
+            <option value="sale">Sale</option>
+            <option value="manual_adjustment">Manual Adjustment</option>
+            <option value="void_reversal">Void Reversal</option>
+            <option value="stocktake_adjustment">Stocktake Adjustment</option>
+          </select>
+        </Field>
+        <Field label="From" width={145}>
+          <input type="date" value={movFrom} onChange={(e) => setMovFrom(e.target.value)} style={inp} />
+        </Field>
+        <Field label="To" width={145}>
+          <input type="date" value={movTo} onChange={(e) => setMovTo(e.target.value)} style={inp} />
+        </Field>
         {hasMovFilters && (
-          <button
-            onClick={clearMovFilters}
-            style={{
-              fontSize: 10,
-              padding: '1px 6px',
-              background: '#E0E0E0',
-              border: '1px solid #999',
-              borderRadius: 2,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 3,
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = '#D0D0D0' }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = '#E0E0E0' }}
-          >
-            <X style={{ width: 9, height: 9 }} /> Clear
-          </button>
+          <Btn size="sm" icon={X} onClick={clearMovFilters}>Clear</Btn>
         )}
-        <span className="ml-auto" style={{ fontSize: 11, color: '#6C757D' }}>
+        <span style={{ marginLeft: 'auto', fontSize: 11, color: '#6C757D', paddingBottom: 8 }}>
           {movementsData?.total ?? 0} movements recorded
         </span>
-      </div>
-      <div className="flex-1 min-h-0">
+      </FilterBar>
+      <div className="flex-1 min-h-0" style={{ padding: 10 }}>
         <DataTable
           columns={movementColumns}
           rows={movements}
@@ -204,6 +171,6 @@ export default function StockMovementsPage() {
           pageSize={200}
         />
       </div>
-    </PageShell>
+    </PortalPage>
   )
 }

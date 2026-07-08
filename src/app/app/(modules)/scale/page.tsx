@@ -13,8 +13,8 @@ import {
 import { toast } from 'sonner'
 import { DataTable, StatusBadge, type Column, type RowAction } from '@/components/ui/DataTable'
 import { InlineDetailPanel } from '@/components/ui/InlineDetailPanel'
-import { PageShell } from '@/components/layout/PageShell'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
+import { Btn, PortalPage } from '@/components/rpx'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1720,27 +1720,20 @@ function ScaleManagementInner() {
   }
 
   return (
-    <PageShell
-      tabs={TABS}
-      activeTab={activeTab}
-      onTabChange={changeTab}
-      action={
-        <a
-          href="/scale"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border transition-colors"
-          style={{ borderColor: colors.process, color: colors.process, borderRadius: 2 }}
-        >
-          <Scale className="w-3.5 h-3.5" />
+    <PortalPage
+      tabs={[...TABS]}
+      active={activeTab}
+      onChange={changeTab}
+      actions={
+        <Btn size="sm" icon={Scale} href="/scale" target="_blank">
           Open Scale Station
-        </a>
+        </Btn>
       }
     >
       {activeTab === 'orders'    && <OrdersTab />}
       {activeTab === 'operators' && <OperatorsTab />}
       {activeTab === 'config'    && <ConfigTab />}
-    </PageShell>
+    </PortalPage>
   )
 }
 

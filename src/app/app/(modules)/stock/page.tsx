@@ -7,13 +7,16 @@ import { useSession } from 'next-auth/react'
 import { TrendingUp, TrendingDown, Minus, AlertTriangle, Search } from 'lucide-react'
 import { toast } from 'sonner'
 import { DataTable, type Column } from '@/components/ui/DataTable'
-import { Dialog, DialogContent, ModalTitleBar, ModalBtn } from '@/components/ui/dialog'
+import { Dialog } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { PageShell } from '@/components/layout/PageShell'
 import { CategoryFilterSelect, useProductCategories } from '@/components/products/CategoryFilterSelect'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
+import {
+  inp, Btn, Field, PortalPage, FilterBar,
+  RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter,
+} from '@/components/rpx'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -197,51 +200,56 @@ export default function StockPage() {
   ].filter(Boolean).join(' · ')
 
   return (
-    <PageShell>
-      <div className="flex gap-2 flex-wrap items-center shrink-0 mb-3">
-        <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3" style={{ color: colors.textSecondary }} />
-          <input
-            value={onHandSearch}
-            onChange={(e) => setOnHandSearch(e.target.value)}
-            placeholder="Search product..."
-            className="pl-7 pr-3 h-7 text-xs rounded border bg-white focus:outline-none w-44 border-[#E0E0E0] focus:border-[#185ABD]"
+    <PortalPage
+      title="Stock On Hand"
+      actions={isManager ? <Btn variant="primary" size="sm" onClick={() => setAdjustOpen(true)}>Manual Adjustment</Btn> : undefined}
+    >
+      <FilterBar>
+        <Field label="Search" width={180}>
+          <div style={{ position: 'relative' }}>
+            <Search style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', width: 12, height: 12, color: '#6C757D' }} />
+            <input
+              value={onHandSearch}
+              onChange={(e) => setOnHandSearch(e.target.value)}
+              placeholder="Search product..."
+              style={{ ...inp, paddingLeft: 26 }}
+            />
+          </div>
+        </Field>
+        <Field label="Category" width={160}>
+          <CategoryFilterSelect
+            style={inp}
+            value={categoryFilter}
+            onChange={setCategoryFilter}
           />
-        </div>
-        <CategoryFilterSelect
-          className="h-7 border rounded px-2 text-xs bg-white focus:outline-none border-[#E0E0E0] focus:border-[#185ABD]"
-          style={{ color: colors.textPrimary }}
-          value={categoryFilter}
-          onChange={setCategoryFilter}
-        />
-        <label className="flex items-center gap-1.5 text-xs" style={{ color: colors.textSecondary }}>
-          Period
+        </Field>
+        <Field label="Period" width={130}>
           <select
             value={period}
             onChange={(e) => setPeriod(e.target.value)}
-            className="h-7 border rounded px-2 text-xs bg-white focus:outline-none border-[#E0E0E0] focus:border-[#185ABD]"
-            style={{ color: colors.textPrimary }}
+            style={inp}
             title="Track stock by day, week, month, or year"
           >
             {PERIOD_OPTIONS.map((p) => (
               <option key={p.value} value={p.value}>{p.label}</option>
             ))}
           </select>
-        </label>
+        </Field>
         {period && (
-          <input
-            type="date"
-            value={periodDate}
-            max={today}
-            onChange={(e) => setPeriodDate(e.target.value || today)}
-            className="h-7 border rounded px-2 text-xs bg-white focus:outline-none border-[#E0E0E0] focus:border-[#185ABD]"
-            style={{ color: colors.textPrimary }}
-            title="Anchor date for the selected period"
-          />
+          <Field label="Anchor Date" width={150}>
+            <input
+              type="date"
+              value={periodDate}
+              max={today}
+              onChange={(e) => setPeriodDate(e.target.value || today)}
+              style={inp}
+              title="Anchor date for the selected period"
+            />
+          </Field>
         )}
         <label
           className="flex items-center gap-1.5 text-xs cursor-pointer"
-          style={{ color: colors.textSecondary }}
+          style={{ color: colors.textSecondary, paddingBottom: 8 }}
         >
           <input
             type="checkbox"
@@ -253,7 +261,7 @@ export default function StockPage() {
         </label>
         <label
           className="flex items-center gap-1.5 text-xs cursor-pointer"
-          style={{ color: colors.textSecondary }}
+          style={{ color: colors.textSecondary, paddingBottom: 8 }}
         >
           <input
             type="checkbox"
@@ -263,14 +271,14 @@ export default function StockPage() {
           />
           Below reorder only
         </label>
-        <span className="ml-auto" style={{ fontSize: 11, color: '#6C757D' }}>{subtitleParts}</span>
-      </div>
+        <span style={{ marginLeft: 'auto', fontSize: 11, color: '#6C757D', paddingBottom: 8 }}>{subtitleParts}</span>
+      </FilterBar>
       {period && (
-        <p className="mb-2 text-xs shrink-0" style={{ color: colors.warning }}>
+        <p style={{ margin: '8px 14px 0', fontSize: 11, color: colors.warning }}>
           Tracking {PERIOD_HINTS[period]} ({periodDate}) — On Hand = Opening + In − Out.
         </p>
       )}
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0" style={{ padding: 10 }}>
         <DataTable
           columns={onHandColumns}
           rows={stock}
@@ -291,7 +299,7 @@ export default function StockPage() {
           }}
         />
       )}
-    </PageShell>
+    </PortalPage>
   )
 }
 
@@ -331,9 +339,10 @@ function AdjustmentModal({
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-md" showCloseButton={false}>
-        <ModalTitleBar title="Manual Stock Adjustment" onClose={onClose} />
-        <div className="space-y-4 mt-2">
+      <RpxDialogContent maxWidth={480}>
+        <RpxDialogHeader title="Manual Stock Adjustment" onClose={onClose} />
+        <RpxDialogBody>
+        <div className="space-y-4">
           <div>
             <Label>Product</Label>
             <select
@@ -390,14 +399,15 @@ function AdjustmentModal({
             />
           </div>
 
-          <div className="flex justify-end gap-2 pt-2">
-            <ModalBtn onClick={onClose} disabled={loading}>Cancel</ModalBtn>
-            <ModalBtn variant="primary" onClick={onSubmit} loading={loading}>
-              {loading ? 'Saving…' : 'Record Adjustment'}
-            </ModalBtn>
-          </div>
         </div>
-      </DialogContent>
+        </RpxDialogBody>
+        <RpxDialogFooter>
+          <Btn onClick={onClose} disabled={loading}>Cancel</Btn>
+          <Btn variant="primary" loading={loading} onClick={onSubmit}>
+            Record Adjustment
+          </Btn>
+        </RpxDialogFooter>
+      </RpxDialogContent>
     </Dialog>
   )
 }

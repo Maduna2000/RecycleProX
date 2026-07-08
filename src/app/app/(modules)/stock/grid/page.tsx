@@ -6,11 +6,9 @@ import { Loader2, Download } from 'lucide-react'
 import { toast } from 'sonner'
 import Decimal from 'decimal.js'
 import { DataTable, type Column } from '@/components/ui/DataTable'
-import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { PageShell } from '@/components/layout/PageShell'
 import { CategoryFilterSelect } from '@/components/products/CategoryFilterSelect'
 import { colors, fontSize } from '@/lib/design-tokens'
+import { inp, Btn, Field, PortalPage, FilterBar } from '@/components/rpx'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -140,66 +138,30 @@ export default function StockGridPage() {
   ]
 
   return (
-    <PageShell>
-      <div className="flex flex-wrap gap-3 items-end shrink-0 mb-3">
-        <div>
-          <p className="text-xs font-medium mb-1" style={{ color: colors.textSecondary }}>Period</p>
-          <Select value={gridPeriod} onValueChange={(v) => setGridPeriod(v as 'daily' | 'weekly' | 'mtd')}>
-            <SelectTrigger className="w-36 h-8 text-xs"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="daily">Daily</SelectItem>
-              <SelectItem value="weekly">Weekly</SelectItem>
-              <SelectItem value="mtd">Month to Date</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <p className="text-xs font-medium mb-1" style={{ color: colors.textSecondary }}>Date</p>
-          <Input
-            type="date"
-            value={gridDate}
-            max={today}
-            onChange={(e) => setGridDate(e.target.value)}
-            className="w-40 h-8 text-xs"
-          />
-        </div>
-        <div>
-          <p className="text-xs font-medium mb-1" style={{ color: colors.textSecondary }}>Category</p>
-          <CategoryFilterSelect
-            className="border rounded px-2 h-8 text-xs bg-white focus:outline-none"
-            style={{ color: colors.textPrimary, borderColor: colors.border }}
-            value={gridCategory}
-            onChange={setGridCategory}
-          />
-        </div>
-        <span className="ml-auto" style={{ fontSize: 11, color: '#6C757D', paddingBottom: 3 }}>
+    <PortalPage title="Stock Grid">
+      <FilterBar>
+        <Field label="Period" width={150}>
+          <select value={gridPeriod} onChange={(e) => setGridPeriod(e.target.value as 'daily' | 'weekly' | 'mtd')} style={inp}>
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="mtd">Month to Date</option>
+          </select>
+        </Field>
+        <Field label="Date" width={160}>
+          <input type="date" value={gridDate} max={today} onChange={(e) => setGridDate(e.target.value)} style={inp} />
+        </Field>
+        <Field label="Category" width={160}>
+          <CategoryFilterSelect style={inp} value={gridCategory} onChange={setGridCategory} />
+        </Field>
+        <span style={{ marginLeft: 'auto', fontSize: 11, color: '#6C757D', paddingBottom: 8 }}>
           {gridData?.grid?.length ?? 0} products
         </span>
-        <button
-          onClick={handleExport}
-          disabled={exporting}
-          style={{
-            fontSize: 10,
-            padding: '1px 6px',
-            background: '#E0E0E0',
-            border: '1px solid #999',
-            borderRadius: 2,
-            cursor: exporting ? 'not-allowed' : 'pointer',
-            opacity: exporting ? 0.6 : 1,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 3,
-          }}
-          onMouseEnter={(e) => { if (!exporting) e.currentTarget.style.background = '#D0D0D0' }}
-          onMouseLeave={(e) => { if (!exporting) e.currentTarget.style.background = '#E0E0E0' }}
-        >
-          {exporting
-            ? <><Loader2 style={{ width: 9, height: 9, animation: 'spin 1s linear infinite' }} /> Exporting…</>
-            : <><Download style={{ width: 9, height: 9 }} /> Export Excel</>}
-        </button>
-      </div>
+        <Btn size="sm" icon={Download} loading={exporting} onClick={handleExport}>
+          Export Excel
+        </Btn>
+      </FilterBar>
 
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0" style={{ padding: 10 }}>
         {gridLoading ? (
           <div className="flex items-center justify-center h-32 gap-2" style={{ color: colors.textSecondary }}>
             <Loader2 className="w-4 h-4 animate-spin" /> Building grid…
@@ -213,6 +175,6 @@ export default function StockGridPage() {
           />
         )}
       </div>
-    </PageShell>
+    </PortalPage>
   )
 }

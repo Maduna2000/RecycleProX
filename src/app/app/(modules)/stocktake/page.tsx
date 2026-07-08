@@ -6,9 +6,9 @@ import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { Plus, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { WinButton } from '@/components/ui/WinButton'
 import { format } from '@/lib/utils/format'
 import { colors } from '@/lib/design-tokens'
+import { TH, TD, HEADER_GRAD, Btn, PortalPage, EmptyHint } from '@/components/rpx'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -22,14 +22,6 @@ type StocktakeItem = {
   createdBy: { fullName: string }
   _count: { entries: number }
 }
-
-const TH: React.CSSProperties = {
-  textAlign: 'left', padding: '0 10px', height: 28,
-  fontSize: 10, fontWeight: 700, color: '#6C757D',
-  textTransform: 'uppercase', letterSpacing: '0.05em',
-  whiteSpace: 'nowrap',
-}
-const TD: React.CSSProperties = { padding: '0 10px', fontSize: 12, color: '#212529' }
 
 function StatusBadge({ status }: { status: 'open' | 'completed' | 'voided' }) {
   if (status === 'open')
@@ -76,21 +68,10 @@ export default function StocktakePage() {
   const count = data?.total ?? 0
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, background: '#fff', border: '1px solid #B0B0B0', borderRadius: 2, overflow: 'hidden' }}>
-
-        {/* Title bar */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 10px', borderBottom: '2px solid #B0B0B0', background: 'linear-gradient(180deg,#EAEAEA 0%,#D4D4D4 100%)', flexShrink: 0 }}>
-          <span style={{ fontSize: 13, fontWeight: 700, color: '#1B3A6B' }}>Stocktake</span>
-          <span style={{ fontSize: 11, color: '#6C757D' }}>{count} on record</span>
-          <div style={{ flex: 1 }} />
-          <WinButton onClick={handleCreate} disabled={creating}>
-            {creating
-              ? <><Loader2 style={{ width: 9, height: 9 }} className="animate-spin" />Creating…</>
-              : <><Plus style={{ width: 9, height: 9 }} />New Stocktake</>}
-          </WinButton>
-        </div>
-
+    <PortalPage
+      title={`Stocktake (${count} on record)`}
+      actions={<Btn variant="primary" size="sm" icon={Plus} loading={creating} onClick={handleCreate}>New Stocktake</Btn>}
+    >
         {/* Table */}
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
           {isLoading ? (
@@ -98,13 +79,11 @@ export default function StocktakePage() {
               <Loader2 style={{ width: 14, height: 14 }} className="animate-spin" /> Loading…
             </div>
           ) : items.length === 0 ? (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 120, color: '#6C757D', fontSize: 12 }}>
-              No stocktakes yet — create one to start counting
-            </div>
+            <EmptyHint text="No stocktakes yet — create one to start counting" />
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
-                <tr style={{ background: 'linear-gradient(180deg,#FFFFFF 0%,#E8E8E8 100%)', borderBottom: '1px solid #C0C0C0' }}>
+                <tr style={{ background: HEADER_GRAD, borderBottom: '1px solid #C0C0C0' }}>
                   {['Ref #', 'Status', 'Products Counted', 'Created By', 'Date', 'Completed'].map((h) => (
                     <th key={h} style={TH}>{h}</th>
                   ))}
@@ -131,7 +110,6 @@ export default function StocktakePage() {
             </table>
           )}
         </div>
-      </div>
-    </div>
+    </PortalPage>
   )
 }

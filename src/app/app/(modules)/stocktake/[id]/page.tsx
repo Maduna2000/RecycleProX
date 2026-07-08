@@ -8,24 +8,19 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Dialog, DialogContent, ModalTitleBar, ModalBtn } from '@/components/ui/dialog'
-import { WinButton } from '@/components/ui/WinButton'
+import { Dialog } from '@/components/ui/dialog'
 import { Loader2, CheckCircle, Ban, Scale, RefreshCw, Camera, ExternalLink } from 'lucide-react'
 import { toast } from 'sonner'
 import Decimal from 'decimal.js'
 import { format } from '@/lib/utils/format'
 import { colors } from '@/lib/design-tokens'
+import {
+  TH, TD,
+  Btn, PortalPage,
+  RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter,
+} from '@/components/rpx'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
-
-// Windows aesthetic styles
-const TH: React.CSSProperties = {
-  textAlign: 'left', padding: '0 8px', height: 28,
-  fontSize: 10, fontWeight: 700, color: colors.textSecondary,
-  textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap',
-  background: 'linear-gradient(180deg,#F5F5F5 0%,#ECECEC 100%)',
-}
-const TD: React.CSSProperties = { padding: '8px', fontSize: 12, color: colors.textPrimary }
 
 const secBtn: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 4, height: 24,
@@ -305,26 +300,25 @@ export default function StocktakeDetailPage() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, padding: 8 }}>
-      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, background: '#fff', border: '1px solid #B0B0B0', borderRadius: 2, overflow: 'hidden' }}>
-
-        {/* Title bar */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 10px', borderBottom: '2px solid #B0B0B0', background: 'linear-gradient(180deg,#EAEAEA 0%,#D4D4D4 100%)', flexShrink: 0 }}>
-          <span style={{ fontSize: 13, fontWeight: 700, color: colors.primary, fontFamily: 'monospace' }}>{stocktake.refNumber}</span>
-          <StatusBadge status={stocktake.status} />
-          <div style={{ flex: 1 }} />
+    <>
+    <PortalPage
+      title={stocktake.refNumber}
+      actions={
+        <>
           {isOpen && (
-            <WinButton onClick={() => setShowCompleteDialog(true)} disabled={completing || entries.length === 0}>
-              {completing
-                ? <><Loader2 style={{ width: 9, height: 9 }} className="animate-spin" /> Completing…</>
-                : <><CheckCircle style={{ width: 9, height: 9 }} /> Complete Stocktake</>}
-            </WinButton>
+            <Btn variant="primary" size="sm" icon={CheckCircle} loading={completing} disabled={entries.length === 0} onClick={() => setShowCompleteDialog(true)}>
+              Complete Stocktake
+            </Btn>
           )}
           {stocktake.status === 'completed' && (
-            <WinButton onClick={() => setShowVoidDialog(true)}>
-              <Ban style={{ width: 9, height: 9 }} /> Void
-            </WinButton>
+            <Btn variant="danger" size="sm" icon={Ban} onClick={() => setShowVoidDialog(true)}>Void</Btn>
           )}
+        </>
+      }
+    >
+        {/* Sub-header: status */}
+        <div style={{ padding: '8px 12px', borderBottom: '1px solid #E0E0E0', flexShrink: 0 }}>
+          <StatusBadge status={stocktake.status} />
         </div>
 
         {/* Info bar */}
@@ -560,15 +554,16 @@ export default function StocktakeDetailPage() {
             )}
           </div>
         </div>
-      </div>
+    </PortalPage>
       <input ref={photoInputRef} type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }} onChange={handlePhotoSelected} aria-label="Upload photo file" />
 
       {/* Complete stocktake confirmation dialog */}
       {showCompleteDialog && (
         <Dialog open onOpenChange={(o) => { if (!o) setShowCompleteDialog(false) }}>
-          <DialogContent className="sm:max-w-md" showCloseButton={false}>
-            <ModalTitleBar title="Complete Stocktake?" onClose={() => setShowCompleteDialog(false)} />
-            <div className="space-y-3 mt-2">
+          <RpxDialogContent maxWidth={480}>
+            <RpxDialogHeader title="Complete Stocktake?" onClose={() => setShowCompleteDialog(false)} />
+            <RpxDialogBody>
+            <div className="space-y-3">
               <div style={{ background: colors.warningBg, border: `1px solid ${colors.warning}`, borderRadius: 3, padding: '10px 12px', fontSize: 12, color: '#92610A' }}>
                 This will apply all variance adjustments to your stock levels. This action cannot be undone.
               </div>
@@ -590,40 +585,42 @@ export default function StocktakeDetailPage() {
                   })}
                 </div>
               )}
-              <div className="flex justify-end gap-2 pt-2">
-                <ModalBtn onClick={() => setShowCompleteDialog(false)} disabled={completing}>Cancel</ModalBtn>
-                <ModalBtn variant="primary" onClick={performComplete} loading={completing}>Complete Stocktake</ModalBtn>
-              </div>
             </div>
-          </DialogContent>
+            </RpxDialogBody>
+            <RpxDialogFooter>
+              <Btn onClick={() => setShowCompleteDialog(false)} disabled={completing}>Cancel</Btn>
+              <Btn variant="primary" loading={completing} onClick={performComplete}>Complete Stocktake</Btn>
+            </RpxDialogFooter>
+          </RpxDialogContent>
         </Dialog>
       )}
 
       {/* Re-count confirmation dialog */}
       {showRecountDialog && (
         <Dialog open onOpenChange={(o) => { if (!o) { setShowRecountDialog(false); setPendingRecount(null) } }}>
-          <DialogContent className="sm:max-w-sm" showCloseButton={false}>
-            <ModalTitleBar title="Overwrite Previous Count?" onClose={() => { setShowRecountDialog(false); setPendingRecount(null) }} />
-            <div className="space-y-3 mt-2">
+          <RpxDialogContent maxWidth={420}>
+            <RpxDialogHeader title="Overwrite Previous Count?" onClose={() => { setShowRecountDialog(false); setPendingRecount(null) }} />
+            <RpxDialogBody>
               <div style={{ background: colors.warningBg, border: `1px solid ${colors.warning}`, borderRadius: 3, padding: '10px 12px', fontSize: 12, color: '#92610A' }}>
                 This product was already counted with quantity: <strong>{pendingRecount?.existingQty}</strong>.
                 Do you want to overwrite it with the new quantity: <strong>{countedQty}</strong>?
               </div>
-              <div className="flex justify-end gap-2">
-                <ModalBtn onClick={() => { setShowRecountDialog(false); setPendingRecount(null) }}>Cancel</ModalBtn>
-                <ModalBtn variant="primary" onClick={() => { setShowRecountDialog(false); performSaveEntry() }}>Overwrite</ModalBtn>
-              </div>
-            </div>
-          </DialogContent>
+            </RpxDialogBody>
+            <RpxDialogFooter>
+              <Btn onClick={() => { setShowRecountDialog(false); setPendingRecount(null) }}>Cancel</Btn>
+              <Btn variant="primary" onClick={() => { setShowRecountDialog(false); performSaveEntry() }}>Overwrite</Btn>
+            </RpxDialogFooter>
+          </RpxDialogContent>
         </Dialog>
       )}
 
       {/* Void stocktake confirmation dialog */}
       {showVoidDialog && (
         <Dialog open onOpenChange={(o) => { if (!o) { setShowVoidDialog(false); setVoidReason('') } }}>
-          <DialogContent className="sm:max-w-md" showCloseButton={false}>
-            <ModalTitleBar title="Void Stocktake?" onClose={() => { setShowVoidDialog(false); setVoidReason('') }} />
-            <div className="space-y-3 mt-2">
+          <RpxDialogContent maxWidth={480}>
+            <RpxDialogHeader title="Void Stocktake?" onClose={() => { setShowVoidDialog(false); setVoidReason('') }} />
+            <RpxDialogBody>
+            <div className="space-y-3">
               <div style={{ background: colors.warningBg, border: `1px solid ${colors.warning}`, borderRadius: 3, padding: '10px 12px', fontSize: 12, color: '#92610A' }}>
                 This will reverse every stock adjustment this stocktake applied. This action cannot be undone.
               </div>
@@ -640,16 +637,17 @@ export default function StocktakeDetailPage() {
                   {voidReason.trim().length}/5 characters minimum
                 </p>
               </div>
-              <div className="flex justify-end gap-2 pt-2">
-                <ModalBtn onClick={() => { setShowVoidDialog(false); setVoidReason('') }} disabled={voiding}>Cancel</ModalBtn>
-                <ModalBtn variant="danger" onClick={performVoid} loading={voiding} disabled={voidReason.trim().length < 5}>
-                  Void Stocktake
-                </ModalBtn>
-              </div>
             </div>
-          </DialogContent>
+            </RpxDialogBody>
+            <RpxDialogFooter>
+              <Btn onClick={() => { setShowVoidDialog(false); setVoidReason('') }} disabled={voiding}>Cancel</Btn>
+              <Btn variant="danger" loading={voiding} disabled={voidReason.trim().length < 5} onClick={performVoid}>
+                Void Stocktake
+              </Btn>
+            </RpxDialogFooter>
+          </RpxDialogContent>
         </Dialog>
       )}
-    </div>
+    </>
   )
 }
