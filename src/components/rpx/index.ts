@@ -4,6 +4,7 @@ export {
   btnPrimary, btnSecondary, btnDanger,
 } from './styles'
 export { Btn, type BtnProps, type BtnVariant } from './Btn'
+export { BtnMenu, type BtnMenuItem } from './BtnMenu'
 export {
   FormLabel, Field,
   TabStrip, type RpxTab,

@@ -8,10 +8,9 @@ import useSWR from 'swr'
 import Decimal from 'decimal.js'
 import {
   RefreshCw, Plus,
-  BarChart2, ClipboardCheck,
-  Download, LogOut, Settings,
+  ClipboardCheck, AlertCircle,
+  Download, LogOut, Settings, Settings2, TrendingUp,
   Users, UserPlus, ChevronRight,
-  Archive, Landmark,
   Wifi, WifiOff,
   Scale, ClipboardList,
   Boxes, ArrowLeftRight, Grid3X3, SlidersHorizontal,
@@ -22,9 +21,12 @@ import { useOfflineStore } from '@/stores/offlineStore'
 import { getModuleName } from '@/lib/module-names'
 import { WindowTaskbar } from '@/components/ui/WindowTaskbar'
 import { useRecordTitle } from '@/hooks/useRecordTitle'
-import { Btn, type BtnVariant } from '@/components/rpx'
+import { Btn, BtnMenu, type BtnVariant, type BtnMenuItem } from '@/components/rpx'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+
+/** Fixed Zone-1 logo block width so Zone 2 buttons can align under "Portal". */
+const LOGO_BLOCK_W = 140
 
 interface ToolbarButton {
   label:    string
@@ -33,6 +35,8 @@ interface ToolbarButton {
   onClick?: () => void
   variant:  'primary' | 'secondary' | 'danger' | 'ghost'
   iconOnly?: boolean
+  /** When present, renders as a dropdown menu of these items. */
+  items?:   BtnMenuItem[]
 }
 
 // ─── Toolbar configs ──────────────────────────────────────────────────────────
@@ -48,24 +52,24 @@ function useToolbarButtons(pathname: string, role: string): ToolbarButton[] {
 
   if (pathname === '/app/casual' || pathname.startsWith('/app/casual/'))
     return [
-      { label: 'Add Casual', icon: Plus, href: '/app/casual', variant: 'primary' },
+      {
+        label: 'Export', icon: Download, variant: 'secondary',
+        items: [
+          { label: 'Export Excel', href: '/app/casual?export=xlsx' },
+          { label: 'Export PDF',   href: '/app/casual?export=pdf'  },
+        ],
+      },
     ]
-
-  if (pathname.startsWith('/app/purchases/unpaid'))
-    return []
 
   if (pathname === '/app/purchases' || pathname.startsWith('/app/purchases/'))
-    return [
-      { label: 'New Purchase', icon: Plus, href: '/app/purchases/new', variant: 'primary' },
-    ]
+    return []
 
   if (pathname.startsWith('/app/sales/unpaid'))
     return []
 
   if (pathname === '/app/sales' || pathname.startsWith('/app/sales/'))
     return [
-      { label: 'New Sale',     icon: Plus, href: '/app/sales/new',    variant: 'primary' },
-      { label: 'Unpaid Sales', icon: Plus, href: '/app/sales/unpaid', variant: 'secondary' },
+      { label: 'Unpaid Sales', icon: AlertCircle, href: '/app/sales/unpaid', variant: 'secondary' },
     ]
 
   if (pathname === '/app/payments' || pathname.startsWith('/app/payments/'))
@@ -79,18 +83,14 @@ function useToolbarButtons(pathname: string, role: string): ToolbarButton[] {
     ]
 
   if (pathname === '/app/cashup' || pathname.startsWith('/app/cashup/'))
-    return [
-      { label: 'Open Cash-Up', icon: Archive, href: '/app/cashup', variant: 'primary' },
-    ]
+    return []
 
   if (pathname === '/app/float' || pathname.startsWith('/app/float/'))
-    return [
-      { label: 'Open Float', icon: Landmark, href: '/app/float', variant: 'primary' },
-    ]
+    return []
 
   if (pathname === '/app/stocktake' || pathname.startsWith('/app/stocktake/'))
     return isMgr ? [
-      { label: 'Start Stocktake', icon: ClipboardCheck, href: '/app/stocktake', variant: 'primary' },
+      { label: 'Start Stocktake', icon: ClipboardCheck, href: '/app/stocktake?create=1', variant: 'primary' },
     ] : []
 
   if (pathname === '/app/stock' || pathname.startsWith('/app/stock/')) {
@@ -107,14 +107,17 @@ function useToolbarButtons(pathname: string, role: string): ToolbarButton[] {
     ]
   }
 
-  if (pathname === '/app/price-groups' || pathname.startsWith('/app/price-groups/'))
-    return []
+  if (pathname === '/app/products' || pathname.startsWith('/app/products/'))
+    return isMgr ? [
+      { label: 'Add Product', icon: Plus,       href: '/app/products?add=1',        variant: 'primary' },
+      { label: 'Categories',  icon: Settings2,  href: '/app/products?categories=1', variant: 'secondary' },
+      { label: 'Bulk Price',  icon: TrendingUp, href: '/app/products?bulk=1',       variant: 'secondary' },
+    ] : []
 
-  if (pathname === '/app/loans' || pathname.startsWith('/app/loans/'))
-    return [
-      { label: 'New Loan',  icon: Plus,      href: '/app/loans', variant: 'primary' },
-      { label: 'Repayment', icon: BarChart2, variant: 'secondary', iconOnly: true },
-    ]
+  if (pathname === '/app/price-groups' || pathname.startsWith('/app/price-groups/'))
+    return isMgr ? [
+      { label: 'Add Price Group', icon: Plus, href: '/app/price-groups?create=1', variant: 'primary' },
+    ] : []
 
   // Reports has its own in-page Run/Download controls — no toolbar actions
   if (pathname === '/app/reports' || pathname.startsWith('/app/reports/'))
@@ -122,7 +125,7 @@ function useToolbarButtons(pathname: string, role: string): ToolbarButton[] {
 
   if (pathname === '/app/audit-log' || pathname.startsWith('/app/audit-log/'))
     return isAdmin ? [
-      { label: 'Export', icon: Download, variant: 'ghost', iconOnly: true },
+      { label: 'Export', icon: Download, href: '/app/audit-log?export=1', variant: 'secondary' },
     ] : []
 
   if (pathname === '/app/settings' || pathname.startsWith('/app/settings/'))
@@ -144,6 +147,17 @@ const TOOLBAR_VARIANT: Record<ToolbarButton['variant'], BtnVariant> = {
 }
 
 function ToolbarBtn({ btn }: { btn: ToolbarButton }) {
+  if (btn.items) {
+    return (
+      <BtnMenu
+        size="sm"
+        variant={TOOLBAR_VARIANT[btn.variant]}
+        icon={btn.icon}
+        label={btn.label}
+        items={btn.items}
+      />
+    )
+  }
   return (
     <Btn
       size="sm"
@@ -503,7 +517,7 @@ export function AppShell({
         style={{ height: 40, background: 'var(--rpx-navy, #1B3A6B)' }}
       >
         {/* Logo mark */}
-        <div className="flex items-center gap-2 pr-3 border-r border-white/15 shrink-0">
+        <div className="flex items-center gap-2 pr-3 border-r border-white/15 shrink-0" style={{ width: LOGO_BLOCK_W }}>
           <div className="w-6 h-6 rounded bg-white/10 flex items-center justify-center">
             <RefreshCw className="w-3.5 h-3.5 text-[#F2AB1A]" />
           </div>
@@ -557,11 +571,15 @@ export function AppShell({
         if (!showToolbar) return null
         return (
           <div
-            className="flex items-center gap-1 px-3 shrink-0 border-b"
+            className="flex items-center gap-1 shrink-0 border-b"
             style={{
-              height:      'var(--rpx-toolbar-h, 32px)',
-              background:  'rgba(27,58,107,0.09)',
-              borderColor: 'var(--rpx-border, #E0E0E0)',
+              height:       'var(--rpx-toolbar-h, 32px)',
+              background:   'rgba(27,58,107,0.09)',
+              borderColor:  'var(--rpx-border, #E0E0E0)',
+              // Align the first button directly below the "Portal" breadcrumb:
+              // 12px header px-3 + fixed logo block + 12px breadcrumb nav px-3.
+              paddingLeft:  LOGO_BLOCK_W + 24,
+              paddingRight: 12,
             }}
           >
             {toolbarBtns.map((btn, i) => <ToolbarBtn key={i} btn={btn} />)}

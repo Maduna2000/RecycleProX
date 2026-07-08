@@ -54,11 +54,11 @@ export const btnPrimary: React.CSSProperties = {
   borderRadius: 3, cursor: 'pointer',
 }
 
-/** Gray secondary button. */
+/** Light-blue secondary button — pairs with the navy primary. */
 export const btnSecondary: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 5,
   fontSize: 11, fontWeight: 600, padding: '5px 12px',
-  background: '#E0E0E0', color: '#212529', border: '1px solid #999',
+  background: '#EBF3FC', color: '#185ABD', border: '1px solid #9DBFE8',
   borderRadius: 2, cursor: 'pointer',
 }
 

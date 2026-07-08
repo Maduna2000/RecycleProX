@@ -15,13 +15,13 @@ const VARIANT_STYLE: Record<BtnVariant, React.CSSProperties> = {
 
 const HOVER_BG: Record<BtnVariant, string> = {
   primary:   '#16305A',
-  secondary: '#D0D0D0',
+  secondary: '#D8E8FA',
   danger:    '#C82333',
 }
 
 const BASE_BG: Record<BtnVariant, string> = {
   primary:   '#1B3A6B',
-  secondary: '#E0E0E0',
+  secondary: '#EBF3FC',
   danger:    '#DC3545',
 }
 
@@ -48,7 +48,7 @@ export interface BtnProps {
 }
 
 /**
- * The standard Renovo Pro button: navy primary, gray secondary, red danger.
+ * The standard Renovo Pro button: navy primary, light-blue secondary, red danger.
  * Renders a Link when `href` is given (PDF downloads, navigation actions).
  */
 export function Btn({
