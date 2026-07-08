@@ -22,6 +22,7 @@ import { useOfflineStore } from '@/stores/offlineStore'
 import { getModuleName } from '@/lib/module-names'
 import { WindowTaskbar } from '@/components/ui/WindowTaskbar'
 import { useRecordTitle } from '@/hooks/useRecordTitle'
+import { Btn, type BtnVariant } from '@/components/rpx'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -135,67 +136,25 @@ function useToolbarButtons(pathname: string, role: string): ToolbarButton[] {
 
 // ─── ToolbarBtn ───────────────────────────────────────────────────────────────
 
+const TOOLBAR_VARIANT: Record<ToolbarButton['variant'], BtnVariant> = {
+  primary:   'primary',
+  secondary: 'secondary',
+  danger:    'danger',
+  ghost:     'secondary',
+}
+
 function ToolbarBtn({ btn }: { btn: ToolbarButton }) {
-  const baseStyle: React.CSSProperties = {
-    fontSize: 10,
-    padding: '1px 6px',
-    background: btn.variant === 'danger' ? '#DC3545' : '#E0E0E0',
-    border: btn.variant === 'danger' ? '1px solid #C82333' : '1px solid #999',
-    borderRadius: 2,
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    gap: 3,
-    color: btn.variant === 'danger' ? '#fff' : '#212529',
-    textDecoration: 'none',
-    whiteSpace: 'nowrap',
-  }
-
-  const handleMouseEnter = (e: React.MouseEvent<HTMLElement>) => {
-    if (btn.variant === 'danger') {
-      e.currentTarget.style.background = '#A93226'
-    } else {
-      e.currentTarget.style.background = '#D0D0D0'
-    }
-  }
-
-  const handleMouseLeave = (e: React.MouseEvent<HTMLElement>) => {
-    if (btn.variant === 'danger') {
-      e.currentTarget.style.background = '#DC3545'
-    } else {
-      e.currentTarget.style.background = '#E0E0E0'
-    }
-  }
-
-  const inner = (
-    <>
-      <btn.icon style={{ width: 9, height: 9, flexShrink: 0 }} />
-      {!btn.iconOnly && <span>{btn.label}</span>}
-    </>
-  )
-  if (btn.href) {
-    return (
-      <Link
-        href={btn.href}
-        style={baseStyle}
-        title={btn.iconOnly ? btn.label : undefined}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-      >
-        {inner}
-      </Link>
-    )
-  }
   return (
-    <button
-      style={baseStyle}
+    <Btn
+      size="sm"
+      variant={TOOLBAR_VARIANT[btn.variant]}
+      icon={btn.icon}
+      href={btn.href}
+      onClick={btn.onClick}
       title={btn.iconOnly ? btn.label : undefined}
-      onClick={btn.onClick ?? (() => {})}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
     >
-      {inner}
-    </button>
+      {!btn.iconOnly && btn.label}
+    </Btn>
   )
 }
 

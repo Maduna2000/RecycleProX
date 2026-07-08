@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import useSWR, { mutate } from 'swr'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -82,12 +82,6 @@ const lblStyle: React.CSSProperties = {
   display: 'block', fontSize: 10, fontWeight: 700,
   textTransform: 'uppercase', letterSpacing: '0.04em',
   color: '#6C757D', marginBottom: 2,
-}
-const titleBtn: React.CSSProperties = {
-  fontSize: 10, padding: '1px 6px', cursor: 'pointer', borderRadius: 2,
-  background: '#E0E0E0',
-  border: '1px solid #999', color: '#212529',
-  display: 'flex', alignItems: 'center', gap: 3, whiteSpace: 'nowrap' as const,
 }
 
 function Pill({ text, bg, color }: { text: string; bg: string; color: string }) {
@@ -416,6 +410,7 @@ function DocumentsTab({ customer, onPhotoSaved }: { customer: Customer; onPhotoS
   const [justUploaded, setJustUploaded] = useState(false)
   const [docType, setDocType] = useState<string>('trading_licence')
   const [uploading, setUploading] = useState(false)
+  const docFileRef = useRef<HTMLInputElement>(null)
   const { data: docs, mutate: mutateDocs } = useSWR<CustomerDoc[]>(
     `/api/customers/${customer.id}/documents`, fetcher,
   )
@@ -496,10 +491,17 @@ function DocumentsTab({ customer, onPhotoSaved }: { customer: Customer; onPhotoS
                 <option key={v} value={v}>{l}</option>
               ))}
             </select>
-            <label style={{ cursor: uploading ? 'not-allowed' : 'pointer', opacity: uploading ? 0.5 : 1, ...titleBtn, fontSize: 10, padding: '2px 8px' }}>
-              {uploading ? 'Uploading…' : '+ Upload'}
-              <input type="file" style={{ display: 'none' }} accept=".pdf,.jpg,.jpeg,.png" onChange={handleDocUpload} disabled={uploading} />
-            </label>
+            <input
+              ref={docFileRef}
+              type="file"
+              style={{ display: 'none' }}
+              accept=".pdf,.jpg,.jpeg,.png"
+              onChange={handleDocUpload}
+              disabled={uploading}
+            />
+            <Btn size="sm" loading={uploading} onClick={() => docFileRef.current?.click()}>
+              + Upload
+            </Btn>
           </div>
           {!docs?.length ? (
             <p style={{ fontSize: 10, color: '#9CA3AF', margin: 0 }}>No documents uploaded.</p>

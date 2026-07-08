@@ -5,11 +5,11 @@ import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { ChangePasswordSchema, type ChangePasswordInput } from '@/lib/schemas/auth'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Recycle, Loader2, CheckCircle2, XCircle } from 'lucide-react'
+import { Recycle, CheckCircle2, XCircle } from 'lucide-react'
 import { colors } from '@/lib/design-tokens'
+import { Btn, NAVY } from '@/components/rpx'
 
 function getStrength(pw: string): { label: string; color: string; score: number } {
   let score = 0
@@ -65,7 +65,7 @@ export default function ChangePasswordPage() {
       <div className="w-full max-w-md">
         <div className="bg-white p-8" style={{ border: `1px solid ${colors.border}`, borderRadius: 2 }}>
           <div className="flex flex-col items-center mb-6">
-            <div className="w-12 h-12 flex items-center justify-center mb-3" style={{ background: colors.warning, borderRadius: 2 }}>
+            <div className="w-12 h-12 flex items-center justify-center mb-3" style={{ background: NAVY, borderRadius: 2 }}>
               <Recycle className="w-6 h-6 text-white" />
             </div>
             <h1 className="text-xl font-bold" style={{ color: colors.textPrimary }}>Change Your Password</h1>
@@ -122,9 +122,9 @@ export default function ChangePasswordPage() {
               {errors.confirmPassword && <p className="text-xs text-red-600 mt-1">{errors.confirmPassword.message}</p>}
             </div>
 
-            <Button type="submit" className="w-full hover:opacity-90" style={{ background: colors.action }} disabled={loading}>
-              {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Updating...</> : 'Update Password'}
-            </Button>
+            <Btn type="submit" variant="primary" loading={loading} style={{ width: '100%', justifyContent: 'center' }}>
+              Update Password
+            </Btn>
           </form>
         </div>
       </div>

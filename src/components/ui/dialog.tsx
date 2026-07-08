@@ -5,7 +5,7 @@ import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { XIcon, Minus, X, Loader2 } from "lucide-react"
+import { XIcon } from "lucide-react"
 
 function Dialog({ ...props }: DialogPrimitive.Root.Props) {
   return <DialogPrimitive.Root data-slot="dialog" {...props} />
@@ -146,86 +146,6 @@ function DialogDescription({
   )
 }
 
-function ModalTitleBar({ title, onClose }: { title: React.ReactNode; onClose: () => void }) {
-  return (
-    <div
-      className="flex items-center justify-between px-3 select-none"
-      style={{
-        height: 28,
-        background: 'linear-gradient(180deg,#EAEAEA 0%,#D4D4D4 100%)',
-        borderBottom: '1px solid #BEBEBE',
-        borderRadius: '2px 2px 0 0',
-      }}
-    >
-      <span className="text-[12px] font-semibold text-[#374151]">{title}</span>
-      <div className="flex items-center gap-0.5">
-        <button
-          onClick={onClose}
-          title="Dismiss"
-          aria-label="Dismiss"
-          className="w-6 h-5 flex items-center justify-center rounded-sm text-[#6B7280] hover:text-[#374151] hover:bg-black/10 transition-colors"
-        >
-          <Minus className="w-3 h-3" />
-        </button>
-        <button
-          onClick={onClose}
-          title="Close"
-          aria-label="Close"
-          className="w-6 h-5 flex items-center justify-center rounded-sm text-[#6B7280] hover:text-white hover:bg-red-500 transition-colors"
-        >
-          <X className="w-3 h-3" />
-        </button>
-      </div>
-    </div>
-  )
-}
-
-type ModalBtnVariant = 'primary' | 'outline' | 'danger'
-
-function ModalBtn({
-  variant = 'outline', onClick, type = 'button', disabled, loading, icon, children,
-}: {
-  variant?:  ModalBtnVariant
-  onClick?:  () => void
-  type?:     'button' | 'submit'
-  disabled?: boolean
-  loading?:  boolean
-  icon?:     React.ReactNode
-  children:  React.ReactNode
-}) {
-  // Windows aesthetic base style
-  const base: React.CSSProperties = {
-    display: 'inline-flex', alignItems: 'center', gap: 3,
-    padding: '1px 6px', fontSize: 10,
-    borderRadius: 2, cursor: disabled || loading ? 'not-allowed' : 'pointer',
-    opacity: disabled || loading ? 0.6 : 1, transition: 'background 0.1s',
-  }
-  const variants: Record<ModalBtnVariant, React.CSSProperties> = {
-    primary: { background: '#E0E0E0', color: '#212529', border: '1px solid #999' },
-    outline: { background: '#E0E0E0', color: '#212529', border: '1px solid #999' },
-    danger:  { background: '#DC3545', color: '#fff',     border: '1px solid #C82333' },
-  }
-  const hovers: Record<ModalBtnVariant, string> = {
-    primary: '#D0D0D0',
-    outline: '#D0D0D0',
-    danger:  '#C82333',
-  }
-  const isDisabled = disabled || loading
-  return (
-    <button
-      type={type}
-      onClick={onClick}
-      disabled={isDisabled}
-      style={{ ...base, ...variants[variant] }}
-      onMouseEnter={isDisabled ? undefined : (e) => { (e.currentTarget as HTMLButtonElement).style.background = hovers[variant] }}
-      onMouseLeave={isDisabled ? undefined : (e) => { (e.currentTarget as HTMLButtonElement).style.background = (variants[variant].background as string) }}
-    >
-      {loading ? <Loader2 style={{ width: 9, height: 9, animation: 'spin 1s linear infinite' }} /> : icon}
-      {children}
-    </button>
-  )
-}
-
 export {
   Dialog,
   DialogClose,
@@ -237,6 +157,4 @@ export {
   DialogPortal,
   DialogTitle,
   DialogTrigger,
-  ModalBtn,
-  ModalTitleBar,
 }
