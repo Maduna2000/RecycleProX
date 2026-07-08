@@ -1,10 +1,10 @@
 'use client'
 
-import React, { useState } from 'react'
-import { FileText, Loader2 } from 'lucide-react'
+import { useState } from 'react'
+import { FileText } from 'lucide-react'
 import { toast } from 'sonner'
-import { colors } from '@/lib/design-tokens'
 import type { CashupReportType } from '@/lib/schemas/cashup'
+import { Btn } from '@/components/rpx'
 
 interface ReportButtonProps {
   type: CashupReportType
@@ -62,48 +62,17 @@ export function ReportButton({
     }
   }
 
-  const buttonStyle: React.CSSProperties = {
-    fontSize: 10,
-    padding: fullWidth ? '6px 12px' : '1px 6px',
-    background: disabled ? '#F0F0F0' : '#E0E0E0',
-    border: `1px solid ${disabled ? '#CCC' : '#999'}`,
-    borderRadius: 2,
-    cursor: disabled ? 'not-allowed' : loading ? 'wait' : 'pointer',
-    opacity: disabled ? 0.5 : 1,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: fullWidth ? 'center' : 'flex-start',
-    gap: 4,
-    whiteSpace: 'nowrap',
-    flexShrink: 0,
-    width: fullWidth ? '100%' : 'auto',
-    color: disabled ? colors.textMuted : colors.textPrimary,
-  }
-
   return (
-    <button
+    <Btn
+      size="sm"
+      icon={FileText}
+      loading={loading}
+      disabled={disabled}
       onClick={handleClick}
-      disabled={disabled || loading}
-      style={buttonStyle}
-      onMouseEnter={(e) => {
-        if (!disabled && !loading) e.currentTarget.style.background = '#D0D0D0'
-      }}
-      onMouseLeave={(e) => {
-        if (!disabled && !loading) e.currentTarget.style.background = '#E0E0E0'
-      }}
       title={disabled ? 'Submit session to enable reports' : `Download ${label ?? 'Report'}`}
+      style={{ justifyContent: fullWidth ? 'center' : 'flex-start', width: fullWidth ? '100%' : 'auto' }}
     >
-      {loading ? (
-        <>
-          <Loader2 style={{ width: 9, height: 9, animation: 'spin 1s linear infinite' }} />
-          <span>Loading...</span>
-        </>
-      ) : (
-        <>
-          <FileText style={{ width: 9, height: 9 }} />
-          <span>{label ?? 'Report'}</span>
-        </>
-      )}
-    </button>
+      {label ?? 'Report'}
+    </Btn>
   )
 }

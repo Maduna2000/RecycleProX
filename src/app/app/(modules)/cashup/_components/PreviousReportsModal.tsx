@@ -4,10 +4,11 @@ import React, { useState } from 'react'
 import useSWR from 'swr'
 import { FileText, Loader2, CheckCircle2, Calendar } from 'lucide-react'
 import { toast } from 'sonner'
-import { Dialog, DialogContent, ModalTitleBar, ModalBtn } from '@/components/ui/dialog'
+import { Dialog } from '@/components/ui/dialog'
 import { colors } from '@/lib/design-tokens'
 import Decimal from 'decimal.js'
 import { CASHUP_REPORT_LABELS, type CashupReportType, CURRENCY_SYMBOLS } from '@/lib/schemas/cashup'
+import { Btn, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -119,19 +120,10 @@ export function PreviousReportsModal({ onClose }: PreviousReportsModalProps) {
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent
-        className="sm:max-w-2xl p-0 gap-0"
-        showCloseButton={false}
-        style={{
-          borderRadius: 2,
-          border: `1px solid ${colors.border}`,
-          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-          background: colors.surface,
-        }}
-      >
-        <ModalTitleBar title="Previous Session Reports" onClose={onClose} />
-
-        <div style={{ padding: '12px 16px 16px' }} className="space-y-4">
+      <RpxDialogContent maxWidth={720}>
+        <RpxDialogHeader title="Previous Session Reports" onClose={onClose} />
+        <RpxDialogBody>
+        <div className="space-y-4">
           {isLoading && (
             <div className="flex items-center justify-center py-8 text-sm" style={{ color: colors.textSecondary }}>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -305,38 +297,29 @@ export function PreviousReportsModal({ onClose }: PreviousReportsModalProps) {
               </div>
             </div>
           )}
-
-          {/* Footer */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              paddingTop: 12,
-              borderTop: `1px solid ${colors.border}`,
-            }}
-          >
-            <span style={{ fontSize: 11, color: colors.textSecondary }}>
-              {selectedSession
-                ? `${selectedReports.size} report${selectedReports.size !== 1 ? 's' : ''} selected`
-                : 'Select a session to view reports'}
-            </span>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <ModalBtn onClick={onClose} disabled={downloading}>
-                Cancel
-              </ModalBtn>
-              <ModalBtn
-                variant="primary"
-                onClick={handleDownload}
-                disabled={!selectedSession || selectedReports.size === 0 || downloading}
-                loading={downloading}
-              >
-                Download {selectedReports.size > 0 ? `(${selectedReports.size})` : ''}
-              </ModalBtn>
-            </div>
-          </div>
         </div>
-      </DialogContent>
+        </RpxDialogBody>
+        <RpxDialogFooter style={{ justifyContent: 'space-between' }}>
+          <span style={{ fontSize: 11, color: colors.textSecondary }}>
+            {selectedSession
+              ? `${selectedReports.size} report${selectedReports.size !== 1 ? 's' : ''} selected`
+              : 'Select a session to view reports'}
+          </span>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Btn onClick={onClose} disabled={downloading}>
+              Cancel
+            </Btn>
+            <Btn
+              variant="primary"
+              onClick={handleDownload}
+              disabled={!selectedSession || selectedReports.size === 0 || downloading}
+              loading={downloading}
+            >
+              Download {selectedReports.size > 0 ? `(${selectedReports.size})` : ''}
+            </Btn>
+          </div>
+        </RpxDialogFooter>
+      </RpxDialogContent>
     </Dialog>
   )
 }

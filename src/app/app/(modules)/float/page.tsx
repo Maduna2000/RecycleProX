@@ -11,9 +11,9 @@ import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
 import { Loader2, Calendar, PlusCircle, Undo2, ChevronLeft, ChevronRight } from 'lucide-react'
 import Decimal from 'decimal.js'
-import { PageShell } from '@/components/layout/PageShell'
 import { colors } from '@/lib/design-tokens'
 import { z } from 'zod'
+import { Btn, PortalPage, TH, TD, HEADER_GRAD } from '@/components/rpx'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -182,8 +182,8 @@ export default function FloatPage() {
   }
 
   return (
-    <PageShell>
-      <div className="max-w-3xl mx-auto w-full space-y-5 pb-6">
+    <PortalPage title="Cash Float">
+      <div className="max-w-3xl mx-auto w-full space-y-5 pb-6" style={{ padding: '10px 10px 0' }}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
 
           {/* Today's float status + action forms */}
@@ -245,29 +245,9 @@ export default function FloatPage() {
                           placeholder="e.g. Additional cash from safe"
                         />
                       </div>
-                      <button
-                        type="submit"
-                        disabled={saving}
-                        style={{
-                          width: '100%',
-                          fontSize: 10,
-                          padding: '1px 6px',
-                          background: '#E0E0E0',
-                          border: '1px solid #999',
-                          borderRadius: 2,
-                          cursor: saving ? 'not-allowed' : 'pointer',
-                          opacity: saving ? 0.6 : 1,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: 3,
-                          color: '#212529',
-                        }}
-                        onMouseEnter={(e) => { if (!saving) e.currentTarget.style.background = '#D0D0D0' }}
-                        onMouseLeave={(e) => { if (!saving) e.currentTarget.style.background = '#E0E0E0' }}
-                      >
-                        {saving ? <><Loader2 style={{ width: 9, height: 9, animation: 'spin 1s linear infinite' }} /> Adding…</> : 'Add to Float'}
-                      </button>
+                      <Btn type="submit" loading={saving} style={{ width: '100%', justifyContent: 'center' }}>
+                        Add to Float
+                      </Btn>
                     </form>
                   </div>
                 )}
@@ -295,32 +275,32 @@ export default function FloatPage() {
                 <div className="overflow-x-auto">
                   <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead>
-                      <tr style={{ background: '#F5F5F5', borderBottom: `1px solid ${colors.border}` }}>
-                        <th style={{ textAlign: 'left', padding: '6px 12px', fontSize: 10, fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Date</th>
-                        <th style={{ textAlign: 'right', padding: '6px 12px', fontSize: 10, fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Opening Float</th>
-                        <th style={{ textAlign: 'right', padding: '6px 12px', fontSize: 10, fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Current Float</th>
+                      <tr style={{ background: HEADER_GRAD, borderBottom: '1px solid #C0C0C0' }}>
+                        <th style={TH}>Date</th>
+                        <th style={{ ...TH, textAlign: 'right' }}>Opening Float</th>
+                        <th style={{ ...TH, textAlign: 'right' }}>Current Float</th>
                       </tr>
                     </thead>
                     <tbody>
                       {history.slice((historyPage - 1) * HISTORY_PAGE_SIZE, historyPage * HISTORY_PAGE_SIZE).map((f, i) => (
                         <tr key={f.id} style={{ background: i % 2 === 0 ? '#fff' : '#FAFAFA', borderBottom: `1px solid #F0F0F0` }}>
-                          <td style={{ padding: '8px 12px' }}>
-                            <p className="text-xs font-medium" style={{ color: colors.textPrimary }}>
+                          <td style={TD}>
+                            <p className="font-medium" style={{ fontSize: 12, color: colors.textPrimary }}>
                               {new Date(f.floatDate).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })}
                             </p>
-                            {f.notes && <p className="text-xs mt-0.5" style={{ color: colors.textSecondary }}>{f.notes}</p>}
+                            {f.notes && <p className="mt-0.5" style={{ fontSize: 11, color: colors.textSecondary }}>{f.notes}</p>}
                           </td>
-                          <td style={{ padding: '8px 12px', textAlign: 'right' }}>
-                            <span className="font-mono font-semibold text-xs" style={{ color: colors.textPrimary }}>
+                          <td style={{ ...TD, textAlign: 'right' }}>
+                            <span className="font-mono font-semibold" style={{ fontSize: 12, color: colors.textPrimary }}>
                               R {new Decimal(f.openingAmount).toFixed(2)}
                             </span>
                           </td>
-                          <td style={{ padding: '8px 12px', textAlign: 'right' }}>
-                            <span className="font-mono font-semibold text-xs" style={{ color: f.closingAmount ? colors.textSecondary : colors.action }}>
+                          <td style={{ ...TD, textAlign: 'right' }}>
+                            <span className="font-mono font-semibold" style={{ fontSize: 12, color: f.closingAmount ? colors.textSecondary : colors.action }}>
                               R {new Decimal(f.currentBalance).toFixed(2)}
                             </span>
                             {f.closingAmount && (
-                              <span className="text-xs ml-1" style={{ color: colors.textSecondary }}>(closed)</span>
+                              <span className="ml-1" style={{ fontSize: 11, color: colors.textSecondary }}>(closed)</span>
                             )}
                           </td>
                         </tr>
@@ -335,45 +315,16 @@ export default function FloatPage() {
                       Showing {(historyPage - 1) * HISTORY_PAGE_SIZE + 1}–{Math.min(historyPage * HISTORY_PAGE_SIZE, history.length)} of {history.length}
                     </span>
                     <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        disabled={historyPage <= 1}
-                        onClick={() => setHistoryPage(p => p - 1)}
-                        style={{
-                          padding: '2px 6px',
-                          fontSize: 10,
-                          background: '#E0E0E0',
-                          border: '1px solid #999',
-                          borderRadius: 2,
-                          cursor: historyPage <= 1 ? 'not-allowed' : 'pointer',
-                          opacity: historyPage <= 1 ? 0.5 : 1,
-                        }}
-                        onMouseEnter={(e) => { if (historyPage > 1) e.currentTarget.style.background = '#D0D0D0' }}
-                        onMouseLeave={(e) => { e.currentTarget.style.background = '#E0E0E0' }}
-                      >
-                        <ChevronLeft style={{ width: 12, height: 12 }} />
-                      </button>
+                      <Btn size="sm" icon={ChevronLeft} disabled={historyPage <= 1} onClick={() => setHistoryPage(p => p - 1)} />
                       <span className="text-xs px-2" style={{ color: colors.textPrimary }}>
                         Page {historyPage} of {Math.ceil(history.length / HISTORY_PAGE_SIZE)}
                       </span>
-                      <button
-                        type="button"
+                      <Btn
+                        size="sm"
+                        icon={ChevronRight}
                         disabled={historyPage >= Math.ceil(history.length / HISTORY_PAGE_SIZE)}
                         onClick={() => setHistoryPage(p => p + 1)}
-                        style={{
-                          padding: '2px 6px',
-                          fontSize: 10,
-                          background: '#E0E0E0',
-                          border: '1px solid #999',
-                          borderRadius: 2,
-                          cursor: historyPage >= Math.ceil(history.length / HISTORY_PAGE_SIZE) ? 'not-allowed' : 'pointer',
-                          opacity: historyPage >= Math.ceil(history.length / HISTORY_PAGE_SIZE) ? 0.5 : 1,
-                        }}
-                        onMouseEnter={(e) => { if (historyPage < Math.ceil(history.length / HISTORY_PAGE_SIZE)) e.currentTarget.style.background = '#D0D0D0' }}
-                        onMouseLeave={(e) => { e.currentTarget.style.background = '#E0E0E0' }}
-                      >
-                        <ChevronRight style={{ width: 12, height: 12 }} />
-                      </button>
+                      />
                     </div>
                   </div>
                 )}
@@ -396,9 +347,9 @@ export default function FloatPage() {
             <div className="overflow-x-auto">
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
-                  <tr style={{ background: '#F5F5F5', borderBottom: `1px solid ${colors.border}` }}>
+                  <tr style={{ background: HEADER_GRAD, borderBottom: '1px solid #C0C0C0' }}>
                     {['Time', 'Type', 'Amount', 'Expected in Drawer', 'Note', ...(isManager ? [''] : [])].map((h, idx) => (
-                      <th key={idx} style={{ textAlign: 'left', padding: '6px 12px', fontSize: 10, fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
+                      <th key={idx} style={TH}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -447,29 +398,9 @@ export default function FloatPage() {
                         {isManager && (
                           <td style={{ padding: '6px 12px', textAlign: 'right' }}>
                             {isLastMovement && (
-                              <button
-                                type="button"
-                                onClick={() => handleReverseMovement(m.id)}
-                                disabled={reversingMovement}
-                                style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: 3,
-                                  padding: '1px 6px',
-                                  fontSize: 10,
-                                  background: '#E0E0E0',
-                                  border: '1px solid #999',
-                                  borderRadius: 2,
-                                  color: '#212529',
-                                  cursor: reversingMovement ? 'not-allowed' : 'pointer',
-                                  opacity: reversingMovement ? 0.6 : 1,
-                                }}
-                                onMouseEnter={(e) => { if (!reversingMovement) e.currentTarget.style.background = '#D0D0D0' }}
-                                onMouseLeave={(e) => { if (!reversingMovement) e.currentTarget.style.background = '#E0E0E0' }}
-                              >
-                                <Undo2 style={{ width: 9, height: 9 }} />
-                                {reversingMovement ? 'Reversing…' : 'Reverse'}
-                              </button>
+                              <Btn size="sm" icon={Undo2} loading={reversingMovement} onClick={() => handleReverseMovement(m.id)}>
+                                Reverse
+                              </Btn>
                             )}
                           </td>
                         )}
@@ -482,6 +413,6 @@ export default function FloatPage() {
           )}
         </div>
       </div>
-    </PageShell>
+    </PortalPage>
   )
 }

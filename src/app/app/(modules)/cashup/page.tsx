@@ -8,14 +8,14 @@ import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { CheckCircle2, Calculator, Clock, Loader2, Lock, RefreshCw, FolderOpen } from 'lucide-react'
-import { Dialog, DialogContent, ModalTitleBar, ModalBtn } from '@/components/ui/dialog'
+import { CheckCircle2, Calculator, Clock, Lock, RefreshCw, FolderOpen } from 'lucide-react'
+import { Dialog } from '@/components/ui/dialog'
 import { DENOMINATIONS, DENOMINATION_LABELS, type Denomination, CURRENCY_SYMBOLS, CURRENCY_LABELS, type Currency } from '@/lib/schemas/cashup'
-import { PageShell } from '@/components/layout/PageShell'
 import { colors } from '@/lib/design-tokens'
 import { useOfflineMutation } from '@/hooks/useOfflineFetch'
 import { ReportButton } from './_components/ReportButton'
 import { PreviousReportsModal } from './_components/PreviousReportsModal'
+import { Btn, PortalPage, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -202,21 +202,12 @@ function CountCashModal({ counts, setCounts, notes, setNotes, submitting, handle
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent
-        className="sm:max-w-xl p-0 gap-0"
-        showCloseButton={false}
-        style={{
-          borderRadius: 2,
-          border: `1px solid ${colors.border}`,
-          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-          background: colors.surface,
-          ...dialogStyle,
-        }}
-      >
+      <RpxDialogContent maxWidth={576} style={dialogStyle}>
         <div onMouseDown={handleMouseDown} style={{ cursor: dragging ? 'grabbing' : 'grab' }}>
-          <ModalTitleBar title="Count Cash" onClose={onClose} />
+          <RpxDialogHeader title="Count Cash" onClose={onClose} />
         </div>
-        <div style={{ padding: '12px 16px 16px' }} className="space-y-3">
+        <RpxDialogBody>
+        <div className="space-y-3">
 
           {/* Two-column layout: Denominations left/right, Summary below */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -303,21 +294,20 @@ function CountCashModal({ counts, setCounts, notes, setNotes, submitting, handle
               rows={2} disabled={submitting}
             />
           </div>
-
-          {/* Footer buttons */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, paddingTop: 8, borderTop: `1px solid ${colors.border}` }}>
-            <ModalBtn onClick={onClose} disabled={submitting}>Cancel</ModalBtn>
-            <ModalBtn
-              variant="primary"
-              onClick={() => { void handleSubmit(); onClose() }}
-              disabled={submitting || !hasCounted}
-              loading={submitting}
-            >
-              Submit Cash-Up
-            </ModalBtn>
-          </div>
         </div>
-      </DialogContent>
+        </RpxDialogBody>
+        <RpxDialogFooter>
+          <Btn onClick={onClose} disabled={submitting}>Cancel</Btn>
+          <Btn
+            variant="primary"
+            onClick={() => { void handleSubmit(); onClose() }}
+            disabled={submitting || !hasCounted}
+            loading={submitting}
+          >
+            Submit Cash-Up
+          </Btn>
+        </RpxDialogFooter>
+      </RpxDialogContent>
     </Dialog>
   )
 }
@@ -392,10 +382,10 @@ function ManageSessionsModal({ sessions, onClose, onVoided, currencySymbol = 'R'
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-lg p-0 gap-0" showCloseButton={false} style={{ borderRadius: 2, border: `1px solid ${colors.border}`, boxShadow: '0 4px 12px rgba(0,0,0,0.15)', background: colors.surface }}>
-        <ModalTitleBar title={`Manage Open Sessions (${sessions.length})`} onClose={onClose} />
-
-        <div style={{ padding: '12px 16px 16px' }} className="space-y-3">
+      <RpxDialogContent maxWidth={520}>
+        <RpxDialogHeader title={`Manage Open Sessions (${sessions.length})`} onClose={onClose} />
+        <RpxDialogBody>
+        <div className="space-y-3">
           {/* Select All checkbox */}
           <label className="flex items-center gap-2 cursor-pointer">
             <input
@@ -453,26 +443,25 @@ function ManageSessionsModal({ sessions, onClose, onVoided, currencySymbol = 'R'
               rows={2} disabled={voiding}
             />
           </div>
-
-          {/* Footer */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 8, borderTop: `1px solid ${colors.border}` }}>
-            <span style={{ fontSize: 11, color: colors.textSecondary }}>
-              {selected.size} session{selected.size !== 1 ? 's' : ''} selected
-            </span>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <ModalBtn onClick={onClose} disabled={voiding}>Cancel</ModalBtn>
-              <ModalBtn
-                variant="danger"
-                onClick={handleBulkVoid}
-                disabled={voiding || selected.size === 0 || !voidReason.trim()}
-                loading={voiding}
-              >
-                Void {selected.size} Session{selected.size !== 1 ? 's' : ''}
-              </ModalBtn>
-            </div>
-          </div>
         </div>
-      </DialogContent>
+        </RpxDialogBody>
+        <RpxDialogFooter style={{ justifyContent: 'space-between' }}>
+          <span style={{ fontSize: 11, color: colors.textSecondary }}>
+            {selected.size} session{selected.size !== 1 ? 's' : ''} selected
+          </span>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Btn onClick={onClose} disabled={voiding}>Cancel</Btn>
+            <Btn
+              variant="danger"
+              onClick={handleBulkVoid}
+              disabled={voiding || selected.size === 0 || !voidReason.trim()}
+              loading={voiding}
+            >
+              Void {selected.size} Session{selected.size !== 1 ? 's' : ''}
+            </Btn>
+          </div>
+        </RpxDialogFooter>
+      </RpxDialogContent>
     </Dialog>
   )
 }
@@ -683,11 +672,11 @@ export default function CashUpPage() {
 
   if (isLoading) {
     return (
-      <PageShell>
+      <PortalPage title="Cash-Up">
         <div className="flex items-center justify-center h-40 text-sm" style={{ color: colors.textSecondary }}>
           Loading…
         </div>
-      </PageShell>
+      </PortalPage>
     )
   }
 
@@ -695,8 +684,8 @@ export default function CashUpPage() {
   const isPreviousDay = cashUp && cashUp.status === 'open' && sessionDate !== todayISO
 
   return (
-    <PageShell>
-      <div className="max-w-6xl mx-auto w-full space-y-4 pb-6">
+    <PortalPage title="Cash-Up">
+      <div className="max-w-6xl mx-auto w-full space-y-4 pb-6" style={{ padding: '10px 10px 0' }}>
 
         {/* No session */}
         {!cashUp && (
@@ -708,27 +697,9 @@ export default function CashUpPage() {
             <Clock className="w-10 h-10 mx-auto mb-3" style={{ color: colors.border }} />
             <p className="font-medium mb-1" style={{ color: colors.textPrimary }}>No session open for today</p>
             <p className="text-sm mb-5" style={{ color: colors.textSecondary }}>Open a session to begin tracking today&apos;s cash.</p>
-            <button
-              onClick={handleOpen}
-              disabled={opening}
-              style={{
-                fontSize: 10,
-                padding: '1px 6px',
-                background: '#E0E0E0',
-                border: '1px solid #999',
-                borderRadius: 2,
-                cursor: opening ? 'not-allowed' : 'pointer',
-                opacity: opening ? 0.6 : 1,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 3,
-                margin: '0 auto',
-              }}
-              onMouseEnter={(e) => { if (!opening) e.currentTarget.style.background = '#D0D0D0' }}
-              onMouseLeave={(e) => { if (!opening) e.currentTarget.style.background = '#E0E0E0' }}
-            >
-              {opening ? <><Loader2 style={{ width: 9, height: 9, animation: 'spin 1s linear infinite' }} /> Opening…</> : 'Open Session'}
-            </button>
+            <Btn loading={opening} onClick={handleOpen} style={{ margin: '0 auto' }}>
+              Open Session
+            </Btn>
             </div>
           </div>
         )}
@@ -754,37 +725,13 @@ export default function CashUpPage() {
                       : ' Count your cash and submit below, or void this session if you cannot reconcile.'}
                   </p>
                   <div className="flex gap-2 flex-wrap">
-                    <button
-                      onClick={handleVoidSession}
-                      disabled={voiding}
-                      style={{
-                        fontSize: 11,
-                        padding: '4px 12px',
-                        background: colors.danger,
-                        color: '#fff',
-                        border: 'none',
-                        borderRadius: 2,
-                        cursor: voiding ? 'not-allowed' : 'pointer',
-                        opacity: voiding ? 0.6 : 1,
-                      }}
-                    >
-                      {voiding ? 'Voiding...' : 'Void This Session'}
-                    </button>
+                    <Btn size="sm" variant="danger" loading={voiding} onClick={handleVoidSession}>
+                      Void This Session
+                    </Btn>
                     {openSessionsCount > 1 && (
-                      <button
-                        onClick={() => setManageSessionsOpen(true)}
-                        style={{
-                          fontSize: 11,
-                          padding: '4px 12px',
-                          background: '#333',
-                          color: '#fff',
-                          border: 'none',
-                          borderRadius: 2,
-                          cursor: 'pointer',
-                        }}
-                      >
+                      <Btn size="sm" onClick={() => setManageSessionsOpen(true)}>
                         Manage All {openSessionsCount} Sessions
-                      </button>
+                      </Btn>
                     )}
                     <span className="text-xs self-center" style={{ color: colors.textSecondary }}>
                       (Cannot reconcile? Void to skip this session)
@@ -980,12 +927,9 @@ export default function CashUpPage() {
                           <ReconRow label="Cash On Hand (Counted)" value={declared.toFixed(2)} highlight currencySymbol={currSym} />
                         </div>
                         {isOpen && (
-                          <button
-                            onClick={() => setCountCashOpen(true)}
-                            style={{ fontSize: 10, padding: '1px 6px', background: '#E0E0E0', border: '1px solid #999', borderRadius: 2, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3, whiteSpace: 'nowrap', flexShrink: 0 }}
-                          >
-                            <Calculator style={{ width: 9, height: 9 }} /> Count Cash
-                          </button>
+                          <Btn size="sm" icon={Calculator} onClick={() => setCountCashOpen(true)} style={{ whiteSpace: 'nowrap', flexShrink: 0 }}>
+                            Count Cash
+                          </Btn>
                         )}
                       </div>
                       {isOpen ? (
@@ -1043,59 +987,20 @@ export default function CashUpPage() {
                       <div className="pt-2 border-t flex justify-end gap-2" style={{ borderColor: colors.border }}>
                         {isManager ? (
                           <>
-                            <button
-                              onClick={handleVoidSession}
-                              disabled={voiding}
-                              style={{
-                                fontSize: 10,
-                                padding: '1px 6px',
-                                background: '#E0E0E0',
-                                border: '1px solid #999',
-                                borderRadius: 2,
-                                cursor: voiding ? 'not-allowed' : 'pointer',
-                                opacity: voiding ? 0.6 : 1,
-                              }}
-                              onMouseEnter={(e) => { if (!voiding) e.currentTarget.style.background = '#D0D0D0' }}
-                              onMouseLeave={(e) => { if (!voiding) e.currentTarget.style.background = '#E0E0E0' }}
-                            >
-                              {voiding ? 'Voiding...' : 'Void'}
-                            </button>
-                            <button
+                            <Btn size="sm" loading={voiding} onClick={handleVoidSession}>
+                              Void
+                            </Btn>
+                            <Btn
+                              size="sm"
+                              variant="danger"
+                              loading={rejecting}
                               onClick={handleReject}
-                              disabled={rejecting}
-                              style={{
-                                fontSize: 10,
-                                padding: '1px 6px',
-                                background: colors.dangerBg,
-                                color: colors.danger,
-                                border: `1px solid ${colors.danger}`,
-                                borderRadius: 2,
-                                cursor: rejecting ? 'not-allowed' : 'pointer',
-                                opacity: rejecting ? 0.6 : 1,
-                              }}
                             >
-                              {rejecting ? 'Rejecting...' : 'Reject — Send Back to Cashier'}
-                            </button>
-                            <button
-                              onClick={handleApprove}
-                              disabled={approving}
-                              style={{
-                                fontSize: 10,
-                                padding: '1px 6px',
-                                background: '#E0E0E0',
-                                border: '1px solid #999',
-                                borderRadius: 2,
-                                cursor: approving ? 'not-allowed' : 'pointer',
-                                opacity: approving ? 0.6 : 1,
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 3,
-                              }}
-                              onMouseEnter={(e) => { if (!approving) e.currentTarget.style.background = '#D0D0D0' }}
-                              onMouseLeave={(e) => { if (!approving) e.currentTarget.style.background = '#E0E0E0' }}
-                            >
-                              {approving ? <><Loader2 style={{ width: 9, height: 9, animation: 'spin 1s linear infinite' }} />Approving...</> : <><Lock style={{ width: 9, height: 9 }} />Approve Cash-Up</>}
-                            </button>
+                              Reject — Send Back to Cashier
+                            </Btn>
+                            <Btn size="sm" icon={Lock} loading={approving} onClick={handleApprove}>
+                              Approve Cash-Up
+                            </Btn>
                           </>
                         ) : (
                           <p className="text-sm" style={{ color: colors.textSecondary }}>Awaiting manager approval</p>
@@ -1147,27 +1052,9 @@ export default function CashUpPage() {
                           disabled={isOpen}
                           fullWidth
                         />
-                        <button
-                          onClick={() => setPreviousReportsOpen(true)}
-                          style={{
-                            width: '100%',
-                            fontSize: 10,
-                            padding: '6px 12px',
-                            background: '#E0E0E0',
-                            border: '1px solid #999',
-                            borderRadius: 2,
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: 4,
-                          }}
-                          onMouseEnter={(e) => e.currentTarget.style.background = '#D0D0D0'}
-                          onMouseLeave={(e) => e.currentTarget.style.background = '#E0E0E0'}
-                        >
-                          <FolderOpen style={{ width: 9, height: 9 }} />
-                          <span>Previous Reports</span>
-                        </button>
+                        <Btn icon={FolderOpen} onClick={() => setPreviousReportsOpen(true)} style={{ width: '100%', justifyContent: 'center' }}>
+                          Previous Reports
+                        </Btn>
                       </div>
                     </div>
 
@@ -1286,6 +1173,6 @@ export default function CashUpPage() {
       {previousReportsOpen && (
         <PreviousReportsModal onClose={() => setPreviousReportsOpen(false)} />
       )}
-    </PageShell>
+    </PortalPage>
   )
 }

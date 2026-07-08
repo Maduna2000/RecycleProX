@@ -4,8 +4,8 @@ import useSWR from 'swr'
 import { AlertCircle } from 'lucide-react'
 import Decimal from 'decimal.js'
 import { DataTable, Avatar, type Column } from '@/components/ui/DataTable'
-import { PageShell } from '@/components/layout/PageShell'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
+import { PortalPage } from '@/components/rpx'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -87,13 +87,13 @@ export default function AccountBalancesPage() {
   ]
 
   return (
-    <PageShell>
+    <PortalPage title="Account Balances">
       {outstandingCount > 0 && (
-        <p className="shrink-0 text-xs" style={{ color: '#6C757D' }}>
+        <p className="shrink-0" style={{ fontSize: 11, color: '#6C757D', padding: '8px 10px 0' }}>
           {outstandingCount} with outstanding balance · R {totalOutstanding.toFixed(2)} total
         </p>
       )}
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0" style={{ padding: 10 }}>
         <DataTable
           columns={balanceColumns}
           rows={balances}
@@ -102,6 +102,6 @@ export default function AccountBalancesPage() {
           emptyMessage="No customer balances found"
         />
       </div>
-    </PageShell>
+    </PortalPage>
   )
 }

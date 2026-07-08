@@ -3,16 +3,18 @@
 import { useState } from 'react'
 import useSWR, { mutate } from 'swr'
 import { useSession } from 'next-auth/react'
-import { Search, Ban, Loader2, X } from 'lucide-react'
+import { Search, Ban, X } from 'lucide-react'
 import Decimal from 'decimal.js'
 import { toast } from 'sonner'
 import { DataTable, Avatar, StatusBadge, type Column, type RowAction } from '@/components/ui/DataTable'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { format } from '@/lib/utils/format'
-import { PageShell } from '@/components/layout/PageShell'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
+import {
+  inp, Btn, Field, PortalPage, FilterBar,
+  RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter,
+} from '@/components/rpx'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -132,50 +134,36 @@ export default function PaymentsPage() {
   ]
 
   return (
-    <PageShell>
-      <div className="flex gap-2 flex-wrap items-center shrink-0 mb-3">
-        <div className="relative">
-          <Search
-            className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3"
-            style={{ color: colors.textSecondary }}
-          />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search ref or customer..."
-            className="pl-7 pr-3 h-7 text-xs rounded border bg-white focus:outline-none w-52 border-[#E0E0E0] focus:border-[#185ABD]"
-          />
-        </div>
-        <select
-          className="h-7 border rounded px-2 text-xs bg-white focus:outline-none border-[#E0E0E0] focus:border-[#185ABD]"
-          style={{ color: colors.textPrimary }}
-          value={paymentMethod}
-          onChange={(e) => setPaymentMethod(e.target.value)}
-        >
-          <option value="">All Methods</option>
-          <option value="cash">Cash</option>
-          <option value="eft">EFT</option>
-          <option value="cheque">Cheque</option>
-        </select>
-        <input
-          type="date"
-          value={from}
-          onChange={(e) => setFrom(e.target.value)}
-          className="h-7 border rounded px-2 text-xs bg-white focus:outline-none border-[#E0E0E0] focus:border-[#185ABD]"
-          style={{ color: from ? colors.textPrimary : colors.textSecondary }}
-          title="From date"
-        />
-        <input
-          type="date"
-          value={to}
-          onChange={(e) => setTo(e.target.value)}
-          className="h-7 border rounded px-2 text-xs bg-white focus:outline-none border-[#E0E0E0] focus:border-[#185ABD]"
-          style={{ color: to ? colors.textPrimary : colors.textSecondary }}
-          title="To date"
-        />
+    <PortalPage title="Payments">
+      <FilterBar>
+        <Field label="Search" width={200}>
+          <div style={{ position: 'relative' }}>
+            <Search style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', width: 12, height: 12, color: colors.textSecondary }} />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search ref or customer..."
+              style={{ ...inp, paddingLeft: 24 }}
+            />
+          </div>
+        </Field>
+        <Field label="Method" width={130}>
+          <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} style={inp}>
+            <option value="">All Methods</option>
+            <option value="cash">Cash</option>
+            <option value="eft">EFT</option>
+            <option value="cheque">Cheque</option>
+          </select>
+        </Field>
+        <Field label="From" width={145}>
+          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} style={inp} title="From date" />
+        </Field>
+        <Field label="To" width={145}>
+          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} style={inp} title="To date" />
+        </Field>
         <label
-          className="flex items-center gap-1.5 text-xs cursor-pointer"
-          style={{ color: colors.textSecondary }}
+          className="flex items-center gap-1.5 cursor-pointer"
+          style={{ fontSize: 11, color: colors.textSecondary, paddingBottom: 8 }}
         >
           <input
             type="checkbox"
@@ -186,27 +174,10 @@ export default function PaymentsPage() {
           Include voided
         </label>
         {hasFilters && (
-          <button
-            onClick={clearFilters}
-            style={{
-              fontSize: 10,
-              padding: '1px 6px',
-              background: '#E0E0E0',
-              border: '1px solid #999',
-              borderRadius: 2,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 3,
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = '#D0D0D0' }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = '#E0E0E0' }}
-          >
-            <X style={{ width: 9, height: 9 }} /> Clear
-          </button>
+          <Btn size="sm" icon={X} onClick={clearFilters}>Clear</Btn>
         )}
-      </div>
-      <div className="flex-1 min-h-0">
+      </FilterBar>
+      <div className="flex-1 min-h-0" style={{ padding: 10 }}>
         <DataTable
           columns={paymentColumns}
           rows={payments}
@@ -226,7 +197,7 @@ export default function PaymentsPage() {
           onSuccess={() => { revalidate(); setVoidTarget(null) }}
         />
       )}
-    </PageShell>
+    </PortalPage>
   )
 }
 
@@ -250,12 +221,10 @@ function VoidPaymentModal({ payment, onClose, onSuccess }: { payment: Payment; o
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle style={{ color: colors.danger }}>Void Payment</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4 mt-2">
-          <p className="text-sm" style={{ color: colors.textSecondary }}>
+      <RpxDialogContent maxWidth={420}>
+        <RpxDialogHeader title="Void Payment" onClose={onClose} />
+        <RpxDialogBody>
+          <p style={{ fontSize: 12, color: colors.textSecondary, marginBottom: 12 }}>
             Void{' '}
             <span className="font-semibold" style={{ color: colors.textPrimary }}>{payment.refNumber}</span>
             {' '}(R {new Decimal(payment.amount).toFixed(2)}) to{' '}
@@ -263,61 +232,27 @@ function VoidPaymentModal({ payment, onClose, onSuccess }: { payment: Payment; o
               {payment.customer ? `${payment.customer.firstName} ${payment.customer.lastName}` : 'Unknown'}
             </span>? This cannot be undone.
           </p>
-          <div>
-            <Label>Reason</Label>
+          <Field label="Reason">
             <Input
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder="Min 5 characters"
-              className="mt-1"
               disabled={loading}
             />
-          </div>
-          <div className="flex justify-end gap-2">
-            <button
-              onClick={onClose}
-              disabled={loading}
-              style={{
-                fontSize: 10,
-                padding: '1px 6px',
-                background: '#E0E0E0',
-                border: '1px solid #999',
-                borderRadius: 2,
-                cursor: loading ? 'not-allowed' : 'pointer',
-                opacity: loading ? 0.6 : 1,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 3,
-              }}
-              onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = '#D0D0D0' }}
-              onMouseLeave={(e) => { if (!loading) e.currentTarget.style.background = '#E0E0E0' }}
-            >
-              Cancel
-            </button>
-            <button
-              onClick={onConfirm}
-              disabled={loading || reason.trim().length < 5}
-              style={{
-                fontSize: 10,
-                padding: '1px 6px',
-                background: colors.danger,
-                border: '1px solid #C82333',
-                borderRadius: 2,
-                color: '#fff',
-                cursor: (loading || reason.trim().length < 5) ? 'not-allowed' : 'pointer',
-                opacity: (loading || reason.trim().length < 5) ? 0.6 : 1,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 3,
-              }}
-              onMouseEnter={(e) => { if (!loading && reason.trim().length >= 5) e.currentTarget.style.background = '#A93226' }}
-              onMouseLeave={(e) => { if (!loading && reason.trim().length >= 5) e.currentTarget.style.background = colors.danger }}
-            >
-              {loading ? <><Loader2 style={{ width: 9, height: 9, animation: 'spin 1s linear infinite' }} /> Voiding…</> : 'Confirm Void'}
-            </button>
-          </div>
-        </div>
-      </DialogContent>
+          </Field>
+        </RpxDialogBody>
+        <RpxDialogFooter>
+          <Btn onClick={onClose} disabled={loading}>Cancel</Btn>
+          <Btn
+            variant="danger"
+            onClick={onConfirm}
+            disabled={loading || reason.trim().length < 5}
+            loading={loading}
+          >
+            Confirm Void
+          </Btn>
+        </RpxDialogFooter>
+      </RpxDialogContent>
     </Dialog>
   )
 }

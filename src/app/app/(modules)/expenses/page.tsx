@@ -6,19 +6,22 @@ import { useSearchParams } from 'next/navigation'
 import Decimal from 'decimal.js'
 import useSWR, { mutate } from 'swr'
 import { useSession } from 'next-auth/react'
-import { CheckCircle, Trash2, Receipt, Search, X, Paperclip, Upload, Eye, Pencil } from 'lucide-react'
+import { CheckCircle, Trash2, Receipt, Search, X, Paperclip, Upload, Eye, Pencil, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { CreateExpenseSchema, type CreateExpenseFormInput, type CreateExpenseInput } from '@/lib/schemas/expense'
 import { DataTable, StatusBadge, type Column, type RowAction } from '@/components/ui/DataTable'
-import { Dialog, DialogContent, ModalBtn } from '@/components/ui/dialog'
+import { Dialog } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { PageShell } from '@/components/layout/PageShell'
 import { colors, fontSize } from '@/lib/design-tokens'
+import {
+  inp, Btn, Field, PortalPage, FilterBar,
+  RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter,
+} from '@/components/rpx'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -248,86 +251,43 @@ export default function ExpensesPage() {
   const pageTabs = PAGE_TABS.map((t) => ({ value: t, label: t }))
 
   return (
-    <PageShell
+    <PortalPage
       tabs={pageTabs}
-      activeTab={tab}
-      onTabChange={(v) => setTab(v as PageTab)}
+      active={tab}
+      onChange={(v) => setTab(v as PageTab)}
+      actions={<Btn variant="primary" size="sm" icon={Plus} onClick={() => setAddOpen(true)}>Add Expense</Btn>}
     >
-      {/* Filters */}
-      <div className="flex gap-2 flex-wrap items-center shrink-0 mb-3">
-        <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3" style={{ color: colors.textSecondary }} />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search ref, category or description..."
-            className="pl-7 pr-3 bg-white focus:outline-none w-60"
-            style={{
-              height: 28,
-              border: `1px solid ${colors.border}`,
-              borderRadius: 2,
-              fontSize: fontSize.base,
-            }}
-          />
-        </div>
-        <input
-          type="date"
-          value={from}
-          onChange={(e) => setFrom(e.target.value)}
-          className="px-2 bg-white focus:outline-none"
-          style={{
-            height: 28,
-            border: `1px solid ${colors.border}`,
-            borderRadius: 2,
-            fontSize: fontSize.base,
-            color: from ? colors.textPrimary : colors.textSecondary,
-          }}
-          title="From date"
-        />
-        <input
-          type="date"
-          value={to}
-          onChange={(e) => setTo(e.target.value)}
-          className="px-2 bg-white focus:outline-none"
-          style={{
-            height: 28,
-            border: `1px solid ${colors.border}`,
-            borderRadius: 2,
-            fontSize: fontSize.base,
-            color: to ? colors.textPrimary : colors.textSecondary,
-          }}
-          title="To date"
-        />
+      <FilterBar>
+        <Field label="Search" width={220}>
+          <div style={{ position: 'relative' }}>
+            <Search style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', width: 12, height: 12, color: colors.textSecondary }} />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search ref, category or description..."
+              style={{ ...inp, paddingLeft: 24 }}
+            />
+          </div>
+        </Field>
+        <Field label="From" width={145}>
+          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} style={inp} title="From date" />
+        </Field>
+        <Field label="To" width={145}>
+          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} style={inp} title="To date" />
+        </Field>
         {hasFilters && (
-          <button
-            onClick={clearFilters}
-            style={{
-              fontSize: 10,
-              padding: '1px 6px',
-              background: '#E0E0E0',
-              border: '1px solid #999',
-              borderRadius: 2,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 3,
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = '#D0D0D0' }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = '#E0E0E0' }}
-          >
-            <X style={{ width: 9, height: 9 }} /> Clear
-          </button>
+          <Btn size="sm" icon={X} onClick={clearFilters}>Clear</Btn>
         )}
-        <span className="ml-auto" style={{ fontSize: 11, color: '#6C757D' }}>
+        <span style={{ marginLeft: 'auto', fontSize: 11, color: '#6C757D', paddingBottom: 8 }}>
           {data?.total ?? expenses.length} expenses
         </span>
-      </div>
+      </FilterBar>
 
       {/* Approved total banner */}
       {tab === 'Approved' && data && (
         <div
-          className="flex items-center gap-3 px-4 py-2.5 shrink-0 mb-3"
-          style={{ background: colors.actionBg, border: `1px solid ${colors.action}30`, borderRadius: 2 }}
+          className="flex items-center gap-3 px-4 py-2.5 shrink-0"
+          style={{ margin: '10px 10px 0', background: colors.actionBg, border: `1px solid ${colors.action}30`, borderRadius: 2 }}
         >
           <Receipt className="w-4 h-4 shrink-0" style={{ color: colors.action }} />
           <div>
@@ -342,7 +302,7 @@ export default function ExpensesPage() {
       )}
 
       {/* Table */}
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0" style={{ padding: 10 }}>
         <DataTable
           columns={columns}
           rows={expenses}
@@ -382,7 +342,7 @@ export default function ExpensesPage() {
           onSuccess={() => { mutate('/api/expense-types'); setAddTypeOpen(false) }}
         />
       )}
-    </PageShell>
+    </PortalPage>
   )
 }
 
@@ -503,50 +463,11 @@ function AddExpenseModal({ mode, expense, onClose, onSuccess }: AddExpenseModalP
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent
-        className="sm:max-w-lg p-0"
-        showCloseButton={false}
-        style={{
-          borderRadius: 2,
-          border: `1px solid ${colors.border}`,
-          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-          background: colors.surface,
-        }}
-      >
-        {/* Windows-style title bar with gradient */}
-        <div
-          style={{
-            background: 'linear-gradient(180deg, #EAEAEA 0%, #D4D4D4 100%)',
-            borderBottom: `1px solid ${colors.border}`,
-            padding: '6px 8px 6px 12px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}
-        >
-          <span style={{ fontSize: fontSize.sm, fontWeight: 600, color: colors.textPrimary }}>{isEdit ? 'Edit Expense' : 'Add Expense'}</span>
-          <button
-            onClick={onClose}
-            style={{
-              width: 20,
-              height: 20,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              borderRadius: 2,
-              color: colors.textSecondary,
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = '#C0392B'; e.currentTarget.style.color = '#fff' }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = colors.textSecondary }}
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
-        </div>
-        <form onSubmit={handleSubmit(onSubmit)}>
-          <div style={{ padding: '12px 16px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <RpxDialogContent maxWidth={520}>
+        <RpxDialogHeader title={isEdit ? 'Edit Expense' : 'Add Expense'} onClose={onClose} />
+        <form id="expense-form" onSubmit={handleSubmit(onSubmit)}>
+          <RpxDialogBody>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
 
             <div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
@@ -736,24 +657,14 @@ function AddExpenseModal({ mode, expense, onClose, onSuccess }: AddExpenseModalP
                 </button>
               )}
             </div>
-
-            {/* Footer with gradient */}
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'flex-end',
-                gap: 8,
-                marginTop: 8,
-                paddingTop: 12,
-                borderTop: `1px solid ${colors.border}`,
-              }}
-            >
-              <ModalBtn onClick={onClose} disabled={loading}>Cancel</ModalBtn>
-              <ModalBtn type="submit" variant="primary" loading={loading}>{isEdit ? 'Update Expense' : 'Record Expense'}</ModalBtn>
-            </div>
           </div>
+          </RpxDialogBody>
         </form>
-      </DialogContent>
+        <RpxDialogFooter>
+          <Btn onClick={onClose} disabled={loading}>Cancel</Btn>
+          <Btn type="submit" form="expense-form" variant="primary" loading={loading}>{isEdit ? 'Update Expense' : 'Record Expense'}</Btn>
+        </RpxDialogFooter>
+      </RpxDialogContent>
 
       {addTypeOpen && (
         <AddTypeModal
@@ -844,45 +755,11 @@ function UpdatePendingExpenseModal({ expense, onClose, onSuccess }: UpdatePendin
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent
-        className="sm:max-w-md p-0"
-        showCloseButton={false}
-        style={{
-          borderRadius: 2,
-          border: `1px solid ${colors.border}`,
-          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-          background: colors.surface,
-        }}
-      >
-        {/* Windows-style title bar */}
-        <div
-          style={{
-            background: 'linear-gradient(180deg, #EAEAEA 0%, #D4D4D4 100%)',
-            borderBottom: `1px solid ${colors.border}`,
-            padding: '6px 8px 6px 12px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}
-        >
-          <span style={{ fontSize: fontSize.sm, fontWeight: 600, color: colors.textPrimary }}>
-            Update Pending Expense
-          </span>
-          <button
-            onClick={onClose}
-            style={{
-              width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'none', border: 'none', cursor: 'pointer', borderRadius: 2, color: colors.textSecondary,
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = '#C0392B'; e.currentTarget.style.color = '#fff' }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = colors.textSecondary }}
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit}>
-          <div style={{ padding: '12px 16px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <RpxDialogContent maxWidth={480}>
+        <RpxDialogHeader title="Update Pending Expense" onClose={onClose} />
+        <form id="settle-expense-form" onSubmit={handleSubmit}>
+          <RpxDialogBody>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
 
             {/* Read-only expense info */}
             <div style={{ background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 2, padding: 10 }}>
@@ -987,31 +864,22 @@ function UpdatePendingExpenseModal({ expense, onClose, onSuccess }: UpdatePendin
                 </button>
               )}
             </div>
-
-            {/* Footer */}
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'flex-end',
-                gap: 8,
-                marginTop: 8,
-                paddingTop: 12,
-                borderTop: `1px solid ${colors.border}`,
-              }}
-            >
-              <ModalBtn onClick={onClose} disabled={loading}>Cancel</ModalBtn>
-              <ModalBtn
-                type="submit"
-                variant="primary"
-                loading={loading}
-                disabled={!isValidChange || loading}
-              >
-                Update & Approve
-              </ModalBtn>
-            </div>
           </div>
+          </RpxDialogBody>
         </form>
-      </DialogContent>
+        <RpxDialogFooter>
+          <Btn onClick={onClose} disabled={loading}>Cancel</Btn>
+          <Btn
+            type="submit"
+            form="settle-expense-form"
+            variant="primary"
+            loading={loading}
+            disabled={!isValidChange || loading}
+          >
+            Update & Approve
+          </Btn>
+        </RpxDialogFooter>
+      </RpxDialogContent>
     </Dialog>
   )
 }
@@ -1037,52 +905,11 @@ function AddTypeModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent
-        className="sm:max-w-sm p-0"
-        showCloseButton={false}
-        style={{
-          borderRadius: 2,
-          border: `1px solid ${colors.border}`,
-          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-          background: colors.surface,
-        }}
-      >
-        {/* Windows-style title bar with gradient */}
-        <div
-          style={{
-            background: 'linear-gradient(180deg, #EAEAEA 0%, #D4D4D4 100%)',
-            borderBottom: `1px solid ${colors.border}`,
-            padding: '6px 8px 6px 12px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}
-        >
-          <span style={{ fontSize: fontSize.sm, fontWeight: 600, color: colors.textPrimary }}>New Expense Category</span>
-          <button
-            onClick={onClose}
-            style={{
-              width: 20,
-              height: 20,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              borderRadius: 2,
-              color: colors.textSecondary,
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = '#C0392B'; e.currentTarget.style.color = '#fff' }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = colors.textSecondary }}
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
-        </div>
-        <form onSubmit={handleSubmit}>
-          <div style={{ padding: '12px 16px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div>
-              <Label style={{ display: 'block', marginBottom: 4, fontSize: fontSize.sm, fontWeight: 600, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Category Name</Label>
+      <RpxDialogContent maxWidth={380}>
+        <RpxDialogHeader title="New Expense Category" onClose={onClose} />
+        <form id="add-type-form" onSubmit={handleSubmit}>
+          <RpxDialogBody>
+            <Field label="Category Name">
               <Input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -1097,23 +924,14 @@ function AddTypeModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
                   fontSize: fontSize.base,
                 }}
               />
-            </div>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'flex-end',
-                gap: 8,
-                marginTop: 4,
-                paddingTop: 12,
-                borderTop: `1px solid ${colors.border}`,
-              }}
-            >
-              <ModalBtn onClick={onClose} disabled={loading}>Cancel</ModalBtn>
-              <ModalBtn type="submit" variant="primary" loading={loading} disabled={loading || !name.trim()}>Create</ModalBtn>
-            </div>
-          </div>
+            </Field>
+          </RpxDialogBody>
         </form>
-      </DialogContent>
+        <RpxDialogFooter>
+          <Btn onClick={onClose} disabled={loading}>Cancel</Btn>
+          <Btn type="submit" form="add-type-form" variant="primary" loading={loading} disabled={loading || !name.trim()}>Create</Btn>
+        </RpxDialogFooter>
+      </RpxDialogContent>
     </Dialog>
   )
 }
