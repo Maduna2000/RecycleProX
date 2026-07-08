@@ -1,11 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Loader2, Coins, CreditCard, FileText, Wallet, AlertCircle, Lock } from 'lucide-react'
+import { Coins, CreditCard, FileText, Wallet, AlertCircle, Lock, Split } from 'lucide-react'
 import { toast } from 'sonner'
 import Decimal from 'decimal.js'
-import { Dialog, DialogContent, ModalTitleBar } from '@/components/ui/dialog'
+import { Dialog } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { Btn, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
 
 export type SplitPayTarget = {
   id: string
@@ -164,10 +165,10 @@ export function SplitPaymentModal({
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-md" showCloseButton={false}>
-        <ModalTitleBar title="Split Payment" onClose={onClose} />
-
-        <div className="space-y-4 mt-2">
+      <RpxDialogContent maxWidth={480}>
+        <RpxDialogHeader title="Split Payment" icon={Split} onClose={onClose} />
+        <RpxDialogBody>
+        <div className="space-y-4">
           {/* Pending amount banner */}
           <div className="px-3 py-2.5 rounded-lg" style={{ background: '#FFF8E1', border: '1px solid #FFE082' }}>
             <div className="flex justify-between items-center">
@@ -244,41 +245,20 @@ export function SplitPaymentModal({
           {error && (
             <p className="text-xs" style={{ color: '#DC3545' }}>{error}</p>
           )}
-
-          {/* Actions */}
-          <div className="flex justify-end gap-2 pt-2">
-            <button
-              onClick={onClose}
-              disabled={loading}
-              style={{
-                fontSize: 10, padding: '1px 6px',
-                background: '#E0E0E0', border: '1px solid #999',
-                borderRadius: 2, cursor: loading ? 'not-allowed' : 'pointer',
-                opacity: loading ? 0.6 : 1,
-              }}
-              onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = '#D0D0D0' }}
-              onMouseLeave={(e) => { if (!loading) e.currentTarget.style.background = '#E0E0E0' }}
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSubmit}
-              disabled={loading || paymentTotal.isZero() || !remaining.isZero()}
-              style={{
-                fontSize: 10, padding: '1px 6px',
-                background: '#217346', color: '#fff',
-                border: '1px solid #1A5A38', borderRadius: 2,
-                cursor: (loading || paymentTotal.isZero() || !remaining.isZero()) ? 'not-allowed' : 'pointer',
-                opacity: (loading || paymentTotal.isZero() || !remaining.isZero()) ? 0.6 : 1,
-                display: 'flex', alignItems: 'center', gap: 3,
-              }}
-            >
-              {loading && <Loader2 style={{ width: 9, height: 9, animation: 'spin 1s linear infinite' }} />}
-              Process Full Payment
-            </button>
-          </div>
         </div>
-      </DialogContent>
+        </RpxDialogBody>
+        <RpxDialogFooter>
+          <Btn onClick={onClose} disabled={loading}>Cancel</Btn>
+          <Btn
+            variant="primary"
+            loading={loading}
+            disabled={paymentTotal.isZero() || !remaining.isZero()}
+            onClick={handleSubmit}
+          >
+            Process Full Payment
+          </Btn>
+        </RpxDialogFooter>
+      </RpxDialogContent>
     </Dialog>
   )
 }

@@ -1,12 +1,13 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Loader2, CreditCard, AlertCircle, Split } from 'lucide-react'
+import { CreditCard, AlertCircle, Split } from 'lucide-react'
 import { toast } from 'sonner'
 import Decimal from 'decimal.js'
-import { Dialog, DialogContent, ModalTitleBar } from '@/components/ui/dialog'
+import { Dialog } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { SplitPaymentModal, type SplitPayTarget } from './SplitPaymentModal'
+import { Btn, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
 
 export type PayTarget = {
   id: string
@@ -77,9 +78,10 @@ export function ProcessPaymentModal({
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-sm" showCloseButton={false}>
-        <ModalTitleBar title="Process Payment" onClose={onClose} />
-        <div className="space-y-4 mt-2">
+      <RpxDialogContent maxWidth={420}>
+        <RpxDialogHeader title="Process Payment" icon={CreditCard} onClose={onClose} />
+        <RpxDialogBody>
+        <div className="space-y-4">
           {/* Balance summary */}
           <div className="px-3 py-2.5 rounded-lg space-y-1" style={{ background: '#F8F9FA', border: '1px solid #E0E0E0' }}>
             <p className="font-mono font-medium" style={{ fontSize: 12, color: '#212529' }}>{purchase.ref}</p>
@@ -164,54 +166,15 @@ export function ProcessPaymentModal({
             <Split className="w-3.5 h-3.5" />
             Split Payment (Multiple Methods)
           </button>
-
-          <div className="flex justify-end gap-2 pt-1">
-            <button
-              onClick={onClose}
-              disabled={loading}
-              style={{
-                fontSize: 10,
-                padding: '1px 6px',
-                background: '#E0E0E0',
-                border: '1px solid #999',
-                borderRadius: 2,
-                cursor: loading ? 'not-allowed' : 'pointer',
-                opacity: loading ? 0.6 : 1,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 3,
-                color: '#212529',
-              }}
-              onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = '#D0D0D0' }}
-              onMouseLeave={(e) => { if (!loading) e.currentTarget.style.background = '#E0E0E0' }}
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handlePay}
-              disabled={loading}
-              style={{
-                fontSize: 10,
-                padding: '1px 6px',
-                background: '#217346',
-                color: '#fff',
-                border: '1px solid #1A5A38',
-                borderRadius: 2,
-                cursor: loading ? 'not-allowed' : 'pointer',
-                opacity: loading ? 0.6 : 1,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 3,
-              }}
-              onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = '#1A5A38' }}
-              onMouseLeave={(e) => { if (!loading) e.currentTarget.style.background = '#217346' }}
-            >
-              {loading ? <Loader2 style={{ width: 9, height: 9, animation: 'spin 1s linear infinite' }} /> : <CreditCard style={{ width: 9, height: 9 }} />}
-              Process Full Payment
-            </button>
-          </div>
         </div>
-      </DialogContent>
+        </RpxDialogBody>
+        <RpxDialogFooter>
+          <Btn onClick={onClose} disabled={loading}>Cancel</Btn>
+          <Btn variant="primary" icon={CreditCard} loading={loading} onClick={handlePay}>
+            Process Full Payment
+          </Btn>
+        </RpxDialogFooter>
+      </RpxDialogContent>
 
       {/* Split Payment Modal */}
       {showSplit && (

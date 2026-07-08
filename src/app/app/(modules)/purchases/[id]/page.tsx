@@ -3,47 +3,20 @@
 import { useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import useSWR, { mutate } from 'swr'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Dialog, DialogContent, ModalTitleBar, ModalBtn } from '@/components/ui/dialog'
+import { Dialog } from '@/components/ui/dialog'
 import { ArrowLeft, Ban, Plus, Printer, Camera, FileText, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useSession } from 'next-auth/react'
 import { format } from '@/lib/utils/format'
 import { PhotoUploader, PhotoViewer } from '@/components/PhotoUploader'
 import { colors } from '@/lib/design-tokens'
+import {
+  inp, lbl, TH, TD, HEADER_GRAD, NAVY,
+  Btn, PortalPage,
+  RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter,
+} from '@/components/rpx'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
-
-// Windows aesthetic styles
-const TH: React.CSSProperties = {
-  textAlign: 'left', padding: '0 8px', height: 28,
-  fontSize: 10, fontWeight: 700, color: colors.textSecondary,
-  textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap',
-  background: 'linear-gradient(180deg,#F5F5F5 0%,#ECECEC 100%)',
-}
-const TD: React.CSSProperties = { padding: '8px', fontSize: 12, color: colors.textPrimary }
-
-const secBtn: React.CSSProperties = {
-  display: 'inline-flex', alignItems: 'center', gap: 4, height: 24,
-  padding: '0 8px', fontSize: 11, fontWeight: 600, borderRadius: 2,
-  background: colors.surface, border: `1px solid ${colors.border}`, color: colors.textPrimary, cursor: 'pointer',
-}
-const priBtn: React.CSSProperties = {
-  display: 'inline-flex', alignItems: 'center', gap: 4, height: 24,
-  padding: '0 8px', fontSize: 11, fontWeight: 600, borderRadius: 2,
-  background: colors.action, border: `1px solid ${colors.actionHover}`, color: colors.textOnDark, cursor: 'pointer',
-}
-const processBtn: React.CSSProperties = {
-  display: 'inline-flex', alignItems: 'center', gap: 4, height: 24,
-  padding: '0 8px', fontSize: 11, fontWeight: 600, borderRadius: 2,
-  background: colors.surface, border: `1px solid ${colors.process}`, color: colors.process, cursor: 'pointer',
-}
-const dangerBtn: React.CSSProperties = {
-  display: 'inline-flex', alignItems: 'center', gap: 4, height: 24,
-  padding: '0 8px', fontSize: 11, fontWeight: 600, borderRadius: 2,
-  background: colors.surface, border: `1px solid ${colors.danger}`, color: colors.danger, cursor: 'pointer',
-}
 
 type PurchaseLine = {
   id: string
@@ -123,24 +96,22 @@ export default function PurchaseDetailPage() {
     : Number(purchase.totalAmount)
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, padding: 8 }}>
-      {/* Main container with Windows border */}
-      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, background: '#fff', border: '1px solid #B0B0B0', borderRadius: 2, overflow: 'hidden' }}>
-
-        {/* Title bar with gradient */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 10px', borderBottom: '2px solid #B0B0B0', background: 'linear-gradient(180deg,#EAEAEA 0%,#D4D4D4 100%)', flexShrink: 0 }}>
-          <button onClick={() => router.push('/app/purchases')} style={{ ...secBtn, padding: '0 6px' }}>
-            <ArrowLeft style={{ width: 12, height: 12 }} />
-          </button>
-          <span style={{ fontSize: 13, fontWeight: 700, color: colors.primary, fontFamily: 'monospace' }}>{purchase.refNumber}</span>
+    <>
+    <PortalPage
+      title={purchase.refNumber}
+      actions={
+        <>
+          <Btn size="sm" icon={ArrowLeft} onClick={() => router.push('/app/purchases')}>Back</Btn>
+          <Btn variant="primary" size="sm" icon={Plus} onClick={() => router.push('/app/purchases/new')}>New Purchase</Btn>
+        </>
+      }
+    >
+        {/* Sub-header: status + payment method */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderBottom: '1px solid #E0E0E0', flexShrink: 0 }}>
           <StatusBadge status={purchase.status} />
           <span style={{ fontSize: 10, color: colors.textSecondary, padding: '2px 6px', background: colors.neutralBg, border: `1px solid ${colors.border}`, borderRadius: 2, textTransform: 'capitalize' }}>
             {purchase.paymentMethod}
           </span>
-          <div style={{ flex: 1 }} />
-          <button onClick={() => router.push('/app/purchases/new')} style={priBtn}>
-            <Plus style={{ width: 11, height: 11 }} /> New Purchase
-          </button>
         </div>
 
         {/* Voided banner */}
@@ -190,8 +161,8 @@ export default function PurchaseDetailPage() {
 
           {/* Products table */}
           <div style={{ background: '#fff', border: `1px solid ${colors.border}`, borderRadius: 2, overflow: 'hidden', marginBottom: 16 }}>
-            <div style={{ padding: '6px 10px', borderBottom: `1px solid ${colors.border}`, background: 'linear-gradient(180deg,#EAEAEA 0%,#D4D4D4 100%)' }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: colors.primary }}>Products Purchased</span>
+            <div style={{ padding: '6px 10px', borderBottom: `1px solid ${colors.border}`, background: HEADER_GRAD }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: NAVY }}>Products Purchased</span>
               <span style={{ fontSize: 10, color: colors.textSecondary, marginLeft: 8 }}>{purchase.lines.length} items</span>
             </div>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -269,9 +240,9 @@ export default function PurchaseDetailPage() {
           {/* Photos */}
           {purchase.status !== 'voided' && (
             <div style={{ background: '#fff', border: `1px solid ${colors.border}`, borderRadius: 2, overflow: 'hidden', marginBottom: 16 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', borderBottom: `1px solid ${colors.border}`, background: 'linear-gradient(180deg,#EAEAEA 0%,#D4D4D4 100%)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', borderBottom: `1px solid ${colors.border}`, background: HEADER_GRAD }}>
                 <Camera style={{ width: 12, height: 12, color: colors.action }} />
-                <span style={{ fontSize: 11, fontWeight: 700, color: colors.primary }}>Product Photos</span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: NAVY }}>Product Photos</span>
               </div>
               <div style={{ padding: 12 }}>
                 <PurchasePhotos purchaseId={purchase.id} initialKeys={purchase.photoR2Keys ?? []} />
@@ -281,28 +252,22 @@ export default function PurchaseDetailPage() {
         </div>
 
         {/* Actions footer */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderTop: '1px solid #B0B0B0', background: 'linear-gradient(180deg,#F5F5F5 0%,#ECECEC 100%)', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderTop: '1px solid #E0E0E0', background: '#F8F9FA', flexShrink: 0 }}>
           <div style={{ display: 'flex', gap: 6 }}>
-            <button
-              onClick={() => window.open(`/api/purchases/${purchase.id}/receipt?format=pdf`, '_blank')}
-              style={secBtn}
-            >
-              <Printer style={{ width: 11, height: 11 }} /> Print Receipt
-            </button>
-            <button
-              onClick={() => window.open(`/api/purchases/${purchase.id}/vat264`, '_blank')}
-              style={processBtn}
-            >
-              <FileText style={{ width: 11, height: 11 }} /> Download VAT264
-            </button>
+            <Btn size="sm" icon={Printer} onClick={() => window.open(`/api/purchases/${purchase.id}/receipt?format=pdf`, '_blank')}>
+              Print Receipt
+            </Btn>
+            <Btn size="sm" icon={FileText} onClick={() => window.open(`/api/purchases/${purchase.id}/vat264`, '_blank')}>
+              Download VAT264
+            </Btn>
           </div>
           {isManager && purchase.status !== 'voided' && (
-            <button onClick={() => setVoidOpen(true)} style={dangerBtn}>
-              <Ban style={{ width: 11, height: 11 }} /> Void Purchase
-            </button>
+            <Btn variant="danger" size="sm" icon={Ban} onClick={() => setVoidOpen(true)}>
+              Void Purchase
+            </Btn>
           )}
         </div>
-      </div>
+    </PortalPage>
 
       {voidOpen && (
         <VoidModal
@@ -314,7 +279,7 @@ export default function PurchaseDetailPage() {
           }}
         />
       )}
-    </div>
+    </>
   )
 }
 
@@ -385,31 +350,29 @@ function VoidModal({ purchase, onClose, onSuccess }: { purchase: Purchase; onClo
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-md" showCloseButton={false}>
-        <ModalTitleBar title="Void Purchase" onClose={onClose} />
-        <div style={{ padding: 12 }}>
-          <p style={{ fontSize: 12, color: colors.textSecondary, marginBottom: 12 }}>
+      <RpxDialogContent maxWidth={440}>
+        <RpxDialogHeader title="Void Purchase" onClose={onClose} />
+        <RpxDialogBody>
+          <p style={{ fontSize: 12.5, color: colors.textSecondary, margin: '0 0 12px' }}>
             You are about to void <span style={{ fontWeight: 600, color: colors.textPrimary }}>{purchase.refNumber}</span> (R {Number(purchase.totalAmount).toFixed(2)}).
             This action cannot be undone.
           </p>
-          <div style={{ marginBottom: 12 }}>
-            <Label style={{ fontSize: 11, fontWeight: 600, color: colors.textPrimary }}>Reason for void</Label>
-            <Input
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder="Enter reason (min 5 characters)"
-              style={{ marginTop: 4, height: 28, fontSize: 12, borderColor: colors.border }}
-              disabled={loading}
-            />
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
-            <ModalBtn variant="outline" onClick={onClose} disabled={loading}>Cancel</ModalBtn>
-            <ModalBtn variant="danger" onClick={onConfirm} disabled={loading || reason.trim().length < 5} loading={loading}>
-              Confirm Void
-            </ModalBtn>
-          </div>
-        </div>
-      </DialogContent>
+          <span style={lbl}>Reason for void</span>
+          <input
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="Enter reason (min 5 characters)"
+            style={inp}
+            disabled={loading}
+          />
+        </RpxDialogBody>
+        <RpxDialogFooter>
+          <Btn onClick={onClose} disabled={loading}>Cancel</Btn>
+          <Btn variant="danger" onClick={onConfirm} disabled={reason.trim().length < 5} loading={loading}>
+            Confirm Void
+          </Btn>
+        </RpxDialogFooter>
+      </RpxDialogContent>
     </Dialog>
   )
 }

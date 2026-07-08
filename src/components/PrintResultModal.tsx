@@ -1,9 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { Dialog, DialogContent, ModalTitleBar, ModalBtn } from '@/components/ui/dialog'
-import { Printer, FileText, CheckCircle2, Plus, ExternalLink, Download, Loader2 } from 'lucide-react'
+import { Dialog } from '@/components/ui/dialog'
+import { Printer, FileText, CheckCircle2, Plus, ExternalLink, Download } from 'lucide-react'
 import { toast } from 'sonner'
+import { Btn, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
 
 interface PrintResultModalProps {
   type:            'purchase' | 'sale'
@@ -52,10 +53,10 @@ export function PrintResultModal({ type, id, refNumber, onClose, onViewPurchase,
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-sm" showCloseButton={false}>
-        <ModalTitleBar title={`${label} Complete`} onClose={onClose} />
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4 }}>
+      <RpxDialogContent maxWidth={400}>
+        <RpxDialogHeader title={`${label} Complete`} onClose={onClose} />
+        <RpxDialogBody>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
 
           {/* Reference panel */}
           <div style={{ background: '#F8F9FA', border: '1px solid #E0E0E0', borderRadius: 3, padding: '8px 12px' }}>
@@ -75,70 +76,36 @@ export function PrintResultModal({ type, id, refNumber, onClose, onViewPurchase,
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
             {/* Direct print button - shown only in Electron desktop app */}
             {isElectron && (
-              <button
-                onClick={printDirect}
-                disabled={printing}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, width: '100%', padding: '1px 6px', background: '#E0E0E0', color: '#212529', border: '1px solid #999', borderRadius: 2, fontSize: 10, cursor: printing ? 'not-allowed' : 'pointer', opacity: printing ? 0.6 : 1 }}
-                onMouseEnter={(e) => { if (!printing) (e.currentTarget as HTMLButtonElement).style.background = '#D0D0D0' }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#E0E0E0' }}
-              >
-                {printing ? (
-                  <><Loader2 style={{ width: 9, height: 9, animation: 'spin 1s linear infinite' }} /> Printing...</>
-                ) : (
-                  <><Printer style={{ width: 9, height: 9 }} /> Print Receipt</>
-                )}
-              </button>
+              <Btn icon={Printer} loading={printing} onClick={printDirect} style={{ width: '100%', justifyContent: 'center' }}>
+                {printing ? 'Printing...' : 'Print Receipt'}
+              </Btn>
             )}
-            <button
-              onClick={() => openPdf(receiptUrl)}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, width: '100%', padding: '1px 6px', background: '#E0E0E0', color: '#212529', border: '1px solid #999', borderRadius: 2, fontSize: 10, cursor: 'pointer' }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#D0D0D0' }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#E0E0E0' }}
-            >
-              <Printer style={{ width: 9, height: 9 }} /> Print PDF Slip
-            </button>
-            <button
-              onClick={printThermal}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, width: '100%', padding: '1px 6px', background: '#E0E0E0', color: '#212529', border: '1px solid #999', borderRadius: 2, fontSize: 10, cursor: 'pointer' }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#D0D0D0' }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#E0E0E0' }}
-            >
-              <Download style={{ width: 9, height: 9 }} /> Download Thermal Receipt
-            </button>
+            <Btn icon={Printer} onClick={() => openPdf(receiptUrl)} style={{ width: '100%', justifyContent: 'center' }}>
+              Print PDF Slip
+            </Btn>
+            <Btn icon={Download} onClick={printThermal} style={{ width: '100%', justifyContent: 'center' }}>
+              Download Thermal Receipt
+            </Btn>
             {type === 'purchase' && (
-              <button
-                onClick={() => openPdf(vat264Url)}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, width: '100%', padding: '1px 6px', background: '#E0E0E0', color: '#212529', border: '1px solid #999', borderRadius: 2, fontSize: 10, cursor: 'pointer' }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#D0D0D0' }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#E0E0E0' }}
-              >
-                <FileText style={{ width: 9, height: 9 }} /> Download VAT264
-              </button>
+              <Btn icon={FileText} onClick={() => openPdf(vat264Url)} style={{ width: '100%', justifyContent: 'center' }}>
+                Download VAT264
+              </Btn>
             )}
           </div>
-
-          {/* Footer */}
-          <div style={{ borderTop: '1px solid #E0E0E0', paddingTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
-            {onViewPurchase ? (
-              <button
-                onClick={onViewPurchase}
-                style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 10, padding: '1px 6px', background: '#E0E0E0', border: '1px solid #999', borderRadius: 2, cursor: 'pointer', color: '#212529' }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#D0D0D0' }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#E0E0E0' }}
-              >
-                <ExternalLink style={{ width: 9, height: 9 }} /> View Transaction
-              </button>
-            ) : <span />}
-            <div style={{ display: 'flex', gap: 6 }}>
-              {onDone && <ModalBtn variant="outline" onClick={onDone}>Done</ModalBtn>}
-              <ModalBtn variant="primary" icon={<Plus style={{ width: 9, height: 9 }} />} onClick={onClose}>
-                New {label}
-              </ModalBtn>
-            </div>
-          </div>
-
         </div>
-      </DialogContent>
+        </RpxDialogBody>
+        <RpxDialogFooter>
+          {onViewPurchase ? (
+            <Btn icon={ExternalLink} onClick={onViewPurchase} style={{ marginRight: 'auto' }}>
+              View Transaction
+            </Btn>
+          ) : <span />}
+          {onDone && <Btn onClick={onDone}>Done</Btn>}
+          <Btn variant="primary" icon={Plus} onClick={onClose}>
+            New {label}
+          </Btn>
+        </RpxDialogFooter>
+      </RpxDialogContent>
     </Dialog>
   )
 }
