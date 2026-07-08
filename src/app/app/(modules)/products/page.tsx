@@ -7,8 +7,7 @@ import useSWR, { mutate } from 'swr'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Dialog, DialogContent, ModalTitleBar, ModalBtn } from '@/components/ui/dialog'
-import { WinButton } from '@/components/ui/WinButton'
+import { Dialog } from '@/components/ui/dialog'
 import { Search, Pencil, TrendingUp, Plus, Eye, EyeOff, Trash2, X, Settings2, Package, Loader2, MoreVertical } from 'lucide-react'
 import * as LucideIcons from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -19,6 +18,11 @@ import { CreateProductSchema, UpdateProductSchema, BulkPriceUpdateSchema, type C
 import { useSession } from 'next-auth/react'
 import Decimal from 'decimal.js'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
+import {
+  inp, TH, TD, HEADER_GRAD,
+  Btn, Field, PortalPage, FilterBar,
+  RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter,
+} from '@/components/rpx'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -47,13 +51,6 @@ type Product = {
   id: string; code: string; name: string; category: string; unit: string
   defaultBuyPrice: string; defaultSellPrice: string; isActive: boolean; sortOrder: number
 }
-
-const TH: React.CSSProperties = {
-  textAlign: 'left', padding: '0 8px', height: 28,
-  fontSize: 10, fontWeight: 700, color: colors.textSecondary,
-  textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap',
-}
-const TD: React.CSSProperties = { padding: '0 8px', fontSize: 12 }
 
 export default function ProductsPage() {
   const router       = useRouter()
@@ -147,78 +144,58 @@ export default function ProductsPage() {
   const allSelected = products.length > 0 && selectedKeys.size === products.length
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, background: '#fff', border: '1px solid #B0B0B0', borderRadius: 2, overflow: 'hidden' }}>
-
-        {/* Title bar */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 10px', borderBottom: '2px solid #B0B0B0', background: 'linear-gradient(180deg,#EAEAEA 0%,#D4D4D4 100%)', flexShrink: 0 }}>
-          <span style={{ fontSize: 13, fontWeight: 700, color: '#1B3A6B' }}>Products</span>
-          <span style={{ fontSize: 11, color: '#6C757D' }}>{products.length} products</span>
-          <div style={{ flex: 1 }} />
-          {isManager && (
-            <>
-              <WinButton onClick={() => setCatManageOpen(true)}>
-                <Settings2 style={{ width: 9, height: 9 }} /> Categories
-              </WinButton>
-              <WinButton onClick={() => setBulkOpen(true)}>
-                <TrendingUp style={{ width: 9, height: 9 }} /> Bulk Price
-              </WinButton>
-              <WinButton onClick={() => setCreateOpen(true)}>
-                <Plus style={{ width: 9, height: 9 }} /> Add Product
-              </WinButton>
-            </>
-          )}
-        </div>
-
+    <PortalPage
+      title={`Products (${products.length})`}
+      actions={isManager ? (
+        <>
+          <Btn size="sm" icon={Settings2} onClick={() => setCatManageOpen(true)}>Categories</Btn>
+          <Btn size="sm" icon={TrendingUp} onClick={() => setBulkOpen(true)}>Bulk Price</Btn>
+          <Btn variant="primary" size="sm" icon={Plus} onClick={() => setCreateOpen(true)}>Add Product</Btn>
+        </>
+      ) : undefined}
+    >
         {/* Filter toolbar */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 8px', background: 'linear-gradient(180deg,#F5F5F5 0%,#ECECEC 100%)', borderBottom: '1px solid #C0C0C0', flexShrink: 0 }}>
-          <div style={{ position: 'relative' }}>
-            <Search style={{ position: 'absolute', left: 6, top: '50%', transform: 'translateY(-50%)', width: 11, height: 11, color: '#6C757D', pointerEvents: 'none' }} />
-            <input
-              placeholder="Search code or name…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              style={{ height: 24, paddingLeft: 22, paddingRight: 8, fontSize: 11, border: '1px solid #ABABAB', borderRadius: 2, outline: 'none', background: '#fff', width: 190, color: '#212529' }}
-            />
-          </div>
-          <select
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            style={{ height: 24, padding: '0 6px', fontSize: 11, border: '1px solid #ABABAB', borderRadius: 2, background: '#fff', color: '#212529', outline: 'none' }}
-          >
-            <option value="">All Categories</option>
-            {categories.map((c) => (
-              <React.Fragment key={c.id}>
-                <option value={c.name}>{c.name}</option>
-                {c.children.map(s => <option key={s.id} value={s.name}>&nbsp;&nbsp;↳ {s.name}</option>)}
-              </React.Fragment>
-            ))}
-          </select>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatus(e.target.value)}
-            style={{ height: 24, padding: '0 6px', fontSize: 11, border: '1px solid #ABABAB', borderRadius: 2, background: '#fff', color: '#212529', outline: 'none' }}
-          >
-            <option value="active">Active only</option>
-            <option value="inactive">Inactive only</option>
-            <option value="all">All statuses</option>
-          </select>
-        </div>
+        <FilterBar>
+          <Field label="Search" width={200}>
+            <div style={{ position: 'relative' }}>
+              <Search style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', width: 12, height: 12, color: '#6C757D' }} />
+              <input
+                placeholder="Search code or name…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                style={{ ...inp, paddingLeft: 26 }}
+              />
+            </div>
+          </Field>
+          <Field label="Category" width={160}>
+            <select value={category} onChange={(e) => setCategory(e.target.value)} style={inp}>
+              <option value="">All Categories</option>
+              {categories.map((c) => (
+                <React.Fragment key={c.id}>
+                  <option value={c.name}>{c.name}</option>
+                  {c.children.map(s => <option key={s.id} value={s.name}>&nbsp;&nbsp;↳ {s.name}</option>)}
+                </React.Fragment>
+              ))}
+            </select>
+          </Field>
+          <Field label="Status" width={140}>
+            <select value={statusFilter} onChange={(e) => setStatus(e.target.value)} style={inp}>
+              <option value="active">Active only</option>
+              <option value="inactive">Inactive only</option>
+              <option value="all">All statuses</option>
+            </select>
+          </Field>
+        </FilterBar>
 
         {/* Bulk action bar */}
         {isManager && selectedKeys.size > 0 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 10px', background: '#EBF3FC', borderBottom: '1px solid #185ABD', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 14px', background: '#EBF3FC', borderBottom: '1px solid #185ABD', flexShrink: 0 }}>
             <span style={{ fontSize: 11, fontWeight: 600, color: '#185ABD' }}>{selectedKeys.size} selected</span>
-            <button
-              onClick={() => setSelectedKeys(new Set())}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, color: '#6C757D', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px' }}
-            >
-              <X style={{ width: 11, height: 11 }} /> Clear
-            </button>
+            <Btn size="sm" icon={X} onClick={() => setSelectedKeys(new Set())}>Clear</Btn>
             <div style={{ flex: 1 }} />
-            <ModalBtn onClick={handleBulkReactivate} loading={bulkLoading === 'reactivate'} disabled={bulkLoading !== null}>Reactivate</ModalBtn>
-            <ModalBtn onClick={handleBulkDeactivate} loading={bulkLoading === 'deactivate'} disabled={bulkLoading !== null}>Deactivate</ModalBtn>
-            <ModalBtn variant="danger" onClick={() => setBulkDelOpen(true)} disabled={bulkLoading !== null}>Delete</ModalBtn>
+            <Btn size="sm" loading={bulkLoading === 'reactivate'} disabled={bulkLoading !== null} onClick={handleBulkReactivate}>Reactivate</Btn>
+            <Btn size="sm" loading={bulkLoading === 'deactivate'} disabled={bulkLoading !== null} onClick={handleBulkDeactivate}>Deactivate</Btn>
+            <Btn size="sm" variant="danger" disabled={bulkLoading !== null} onClick={() => setBulkDelOpen(true)}>Delete</Btn>
           </div>
         )}
 
@@ -232,15 +209,13 @@ export default function ProductsPage() {
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 120, color: '#6C757D', fontSize: 12, gap: 8 }}>
               <span>No products found</span>
               {isManager && (
-                <WinButton onClick={() => setCreateOpen(true)}>
-                  <Plus style={{ width: 9, height: 9 }} /> Add Product
-                </WinButton>
+                <Btn size="sm" icon={Plus} onClick={() => setCreateOpen(true)}>Add Product</Btn>
               )}
             </div>
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
-                <tr style={{ background: 'linear-gradient(180deg,#FFFFFF 0%,#E8E8E8 100%)', borderBottom: '1px solid #C0C0C0' }}>
+                <tr style={{ background: HEADER_GRAD, borderBottom: '1px solid #C0C0C0' }}>
                   {isManager && (
                     <th style={{ ...TH, width: 32, textAlign: 'center' }}>
                       <input
@@ -346,7 +321,6 @@ export default function ProductsPage() {
             </table>
           )}
         </div>
-      </div>
 
       {createOpen && (
         <CreateProductModal
@@ -392,7 +366,7 @@ export default function ProductsPage() {
           onSuccess={() => { revalidate(); setSelectedKeys(new Set()); setBulkDelOpen(false) }}
         />
       )}
-    </div>
+    </PortalPage>
   )
 }
 
@@ -415,9 +389,11 @@ function CreateProductModal({ categories, onClose, onSuccess }: { categories: Ca
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-lg" showCloseButton={false}>
-        <ModalTitleBar title="Add Product" onClose={onClose} />
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-2">
+      <RpxDialogContent maxWidth={560}>
+        <RpxDialogHeader title="Add Product" onClose={onClose} />
+        <form id="create-product-form" onSubmit={handleSubmit(onSubmit)}>
+        <RpxDialogBody>
+        <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label>Product Code</Label>
@@ -472,12 +448,14 @@ function CreateProductModal({ categories, onClose, onSuccess }: { categories: Ca
               {errors.defaultSellPrice && <p className="text-xs text-red-600 mt-1">{errors.defaultSellPrice.message}</p>}
             </div>
           </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <ModalBtn onClick={onClose} disabled={loading}>Cancel</ModalBtn>
-            <ModalBtn type="submit" variant="primary" loading={loading}>Create Product</ModalBtn>
-          </div>
+        </div>
+        </RpxDialogBody>
+        <RpxDialogFooter>
+          <Btn onClick={onClose} disabled={loading}>Cancel</Btn>
+          <Btn variant="primary" type="submit" form="create-product-form" loading={loading}>Create Product</Btn>
+        </RpxDialogFooter>
         </form>
-      </DialogContent>
+      </RpxDialogContent>
     </Dialog>
   )
 }
@@ -508,9 +486,11 @@ function EditProductModal({ product, categories, onClose, onSuccess }: { product
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-lg" showCloseButton={false}>
-        <ModalTitleBar title={`Edit Product — ${product.code}`} onClose={onClose} />
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-2">
+      <RpxDialogContent maxWidth={560}>
+        <RpxDialogHeader title={`Edit Product — ${product.code}`} onClose={onClose} />
+        <form id="edit-product-form" onSubmit={handleSubmit(onSubmit)}>
+        <RpxDialogBody>
+        <div className="space-y-4">
           <div>
             <Label>Product Name</Label>
             <Input {...register('name')} className="mt-1" disabled={loading} />
@@ -563,12 +543,14 @@ function EditProductModal({ product, categories, onClose, onSuccess }: { product
             <input type="checkbox" defaultChecked={product.isActive} onChange={(e) => setValue('isActive', e.target.checked)} className="rounded" />
             Active
           </label>
-          <div className="flex justify-end gap-2 pt-2">
-            <ModalBtn onClick={onClose} disabled={loading}>Cancel</ModalBtn>
-            <ModalBtn type="submit" variant="primary" loading={loading}>Save Changes</ModalBtn>
-          </div>
+        </div>
+        </RpxDialogBody>
+        <RpxDialogFooter>
+          <Btn onClick={onClose} disabled={loading}>Cancel</Btn>
+          <Btn variant="primary" type="submit" form="edit-product-form" loading={loading}>Save Changes</Btn>
+        </RpxDialogFooter>
         </form>
-      </DialogContent>
+      </RpxDialogContent>
     </Dialog>
   )
 }
@@ -589,33 +571,31 @@ function ConfirmDeleteModal({ product, onClose, onSuccess }: { product: Product;
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-sm" showCloseButton={false}>
-        <ModalTitleBar title="Delete Product" onClose={onClose} />
-        <div className="space-y-4 mt-2">
+      <RpxDialogContent maxWidth={440}>
+        <RpxDialogHeader title="Delete Product" onClose={onClose} />
+        <RpxDialogBody>
           {inUse ? (
             <div style={{ background: colors.processBg, border: `1px solid ${colors.process}`, borderRadius: 3, padding: '10px 12px', fontSize: 12, color: colors.process }}>
               Cannot delete <strong>{product.name}</strong> — it is referenced by existing purchases, sales, or stock movements. Use <strong>Deactivate</strong> instead.
             </div>
           ) : (
             <>
-              <div style={{ background: colors.warningBg, border: `1px solid ${colors.warning}`, borderRadius: 3, padding: '10px 12px', fontSize: 12, color: '#92610A' }}>
+              <div style={{ background: colors.warningBg, border: `1px solid ${colors.warning}`, borderRadius: 3, padding: '10px 12px', fontSize: 12, color: '#92610A', marginBottom: 10 }}>
                 This will permanently remove <strong>{product.name}</strong> ({product.code}) and its full price history. This cannot be undone.
               </div>
-              <p style={{ fontSize: 12, color: colors.textSecondary }}>
+              <p style={{ fontSize: 12, color: colors.textSecondary, margin: 0 }}>
                 To hide it from active use without deleting, use <strong>Deactivate</strong> instead.
               </p>
             </>
           )}
-          <div className="flex justify-end gap-2">
-            <ModalBtn onClick={onClose} disabled={loading}>Cancel</ModalBtn>
-            {!inUse && (
-              <ModalBtn variant="danger" onClick={onConfirm} disabled={loading} loading={loading}>
-                Delete Product
-              </ModalBtn>
-            )}
-          </div>
-        </div>
-      </DialogContent>
+        </RpxDialogBody>
+        <RpxDialogFooter>
+          <Btn onClick={onClose} disabled={loading}>Cancel</Btn>
+          {!inUse && (
+            <Btn variant="danger" onClick={onConfirm} loading={loading}>Delete Product</Btn>
+          )}
+        </RpxDialogFooter>
+      </RpxDialogContent>
     </Dialog>
   )
 }
@@ -658,11 +638,12 @@ function BulkPriceModal({ products, onClose, onSuccess }: { products: Product[];
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-3xl max-h-[80vh] overflow-y-auto" showCloseButton={false}>
-        <ModalTitleBar title={preview ? 'Confirm Price Changes' : 'Bulk Price Update'} onClose={onClose} />
+      <RpxDialogContent maxWidth={860} style={{ maxHeight: '85vh' }}>
+        <RpxDialogHeader title={preview ? 'Confirm Price Changes' : 'Bulk Price Update'} onClose={onClose} />
+        <RpxDialogBody>
 
         {!preview ? (
-          <div className="space-y-3 mt-2">
+          <div className="space-y-3">
             <p style={{ fontSize: 12, color: colors.textSecondary }}>Edit buy/sell prices below. Only changed prices will be updated.</p>
             <table className="w-full" style={{ fontSize: fontSize.sm }}>
               <thead>
@@ -707,15 +688,15 @@ function BulkPriceModal({ products, onClose, onSuccess }: { products: Product[];
             <div className="flex justify-between items-center pt-2">
               <p style={{ fontSize: 12, color: colors.textSecondary }}>{changed.length} product{changed.length !== 1 ? 's' : ''} changed</p>
               <div className="flex gap-2">
-                <ModalBtn onClick={onClose}>Cancel</ModalBtn>
-                <ModalBtn variant="primary" disabled={changed.length === 0} onClick={() => setPreview(true)}>
+                <Btn onClick={onClose}>Cancel</Btn>
+                <Btn variant="primary" disabled={changed.length === 0} onClick={() => setPreview(true)}>
                   Preview Changes
-                </ModalBtn>
+                </Btn>
               </div>
             </div>
           </div>
         ) : (
-          <div className="space-y-4 mt-2">
+          <div className="space-y-4">
             <p style={{ fontSize: 12, color: colors.textSecondary }}>The following {changed.length} price{changed.length !== 1 ? 's' : ''} will be updated:</p>
             <table className="w-full" style={{ fontSize: fontSize.sm, border: `1px solid ${colors.border}`, borderRadius: 3 }}>
               <thead style={{ background: colors.neutralBg, borderBottom: `1px solid ${colors.border}` }}>
@@ -743,13 +724,18 @@ function BulkPriceModal({ products, onClose, onSuccess }: { products: Product[];
               </tbody>
             </table>
             {reason && <p style={{ fontSize: 12, color: colors.textSecondary }}>Reason: <strong>{reason}</strong></p>}
-            <div className="flex justify-end gap-2 pt-2">
-              <ModalBtn onClick={() => setPreview(false)} disabled={loading}>Back</ModalBtn>
-              <ModalBtn variant="primary" onClick={onConfirm} loading={loading}>Confirm Update</ModalBtn>
-            </div>
           </div>
         )}
-      </DialogContent>
+        </RpxDialogBody>
+        <RpxDialogFooter>
+          {!preview ? null : (
+            <>
+              <Btn onClick={() => setPreview(false)} disabled={loading}>Back</Btn>
+              <Btn variant="primary" onClick={onConfirm} loading={loading}>Confirm Update</Btn>
+            </>
+          )}
+        </RpxDialogFooter>
+      </RpxDialogContent>
     </Dialog>
   )
 }
@@ -781,9 +767,9 @@ function BulkDeleteModal({ ids, products, onClose, onSuccess }: {
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-sm" showCloseButton={false}>
-        <ModalTitleBar title="Delete Products" onClose={onClose} />
-        <div className="space-y-4 mt-2">
+      <RpxDialogContent maxWidth={440}>
+        <RpxDialogHeader title="Delete Products" onClose={onClose} />
+        <RpxDialogBody>
           {results ? (
             <>
               <p style={{ fontSize: 12, color: colors.textSecondary }}>Some products could not be deleted (they are in use):</p>
@@ -796,13 +782,10 @@ function BulkDeleteModal({ ids, products, onClose, onSuccess }: {
                   </div>
                 ))}
               </div>
-              <div className="flex justify-end">
-                <ModalBtn variant="primary" onClick={onSuccess}>Done</ModalBtn>
-              </div>
             </>
           ) : (
             <>
-              <div style={{ background: colors.warningBg, border: `1px solid ${colors.warning}`, borderRadius: 3, padding: '10px 12px', fontSize: 12, color: '#92610A' }}>
+              <div style={{ background: colors.warningBg, border: `1px solid ${colors.warning}`, borderRadius: 3, padding: '10px 12px', fontSize: 12, color: '#92610A', marginBottom: 10 }}>
                 Permanently delete <strong>{targets.length} product{targets.length !== 1 ? 's' : ''}</strong> and their price history? Products in use by existing transactions will be skipped.
               </div>
               <div style={{ maxHeight: 140, overflowY: 'auto', fontSize: 12, color: colors.textSecondary }}>
@@ -810,14 +793,20 @@ function BulkDeleteModal({ ids, products, onClose, onSuccess }: {
                   <div key={p.id} style={{ padding: '2px 0' }}>• {p.name} <span style={{ fontFamily: 'monospace', fontSize: 11 }}>({p.code})</span></div>
                 ))}
               </div>
-              <div className="flex justify-end gap-2">
-                <ModalBtn onClick={onClose} disabled={loading}>Cancel</ModalBtn>
-                <ModalBtn variant="danger" onClick={onConfirm} loading={loading}>Delete {targets.length} Product{targets.length !== 1 ? 's' : ''}</ModalBtn>
-              </div>
             </>
           )}
-        </div>
-      </DialogContent>
+        </RpxDialogBody>
+        <RpxDialogFooter>
+          {results ? (
+            <Btn variant="primary" onClick={onSuccess}>Done</Btn>
+          ) : (
+            <>
+              <Btn onClick={onClose} disabled={loading}>Cancel</Btn>
+              <Btn variant="danger" onClick={onConfirm} loading={loading}>Delete {targets.length} Product{targets.length !== 1 ? 's' : ''}</Btn>
+            </>
+          )}
+        </RpxDialogFooter>
+      </RpxDialogContent>
     </Dialog>
   )
 }
@@ -960,11 +949,11 @@ function ManageCategoriesModal({ categories, onClose, onSuccess }: {
                   This will update <strong>{renameConfirm.count} product{renameConfirm.count !== 1 ? 's' : ''}</strong> to use the new name.
                 </p>
                 <div style={{ display: 'flex', gap: 6, marginTop: 8, justifyContent: 'flex-end' }}>
-                  <ModalBtn onClick={() => setRenameConfirm(null)} disabled={saving}>Cancel</ModalBtn>
-                  <ModalBtn variant="primary" loading={saving}
+                  <Btn size="sm" onClick={() => setRenameConfirm(null)} disabled={saving}>Cancel</Btn>
+                  <Btn size="sm" variant="primary" loading={saving}
                     onClick={() => doSaveEdit(renameConfirm.id, renameConfirm.newName, renameConfirm.color, renameConfirm.icon)}>
                     Confirm Rename
-                  </ModalBtn>
+                  </Btn>
                 </div>
               </div>
             ) : (
@@ -979,8 +968,8 @@ function ManageCategoriesModal({ categories, onClose, onSuccess }: {
                 </div>
                 <IconPicker value={editIcon} onChange={setEditIcon} />
                 <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', marginTop: 2 }}>
-                  <ModalBtn variant="primary" onClick={() => void handleSaveEdit(cat.id)} loading={saving} disabled={!editName.trim()}>Save</ModalBtn>
-                  <ModalBtn onClick={() => { setEditId(null); setRenameConfirm(null) }} disabled={saving}>Cancel</ModalBtn>
+                  <Btn size="sm" variant="primary" onClick={() => void handleSaveEdit(cat.id)} loading={saving} disabled={!editName.trim()}>Save</Btn>
+                  <Btn size="sm" onClick={() => { setEditId(null); setRenameConfirm(null) }} disabled={saving}>Cancel</Btn>
                 </div>
               </>
             )}
@@ -1015,9 +1004,10 @@ function ManageCategoriesModal({ categories, onClose, onSuccess }: {
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-md" showCloseButton={false}>
-        <ModalTitleBar title="Manage Categories" onClose={onClose} />
-        <div className="space-y-3 mt-2">
+      <RpxDialogContent maxWidth={480} style={{ maxHeight: '85vh' }}>
+        <RpxDialogHeader title="Manage Categories" onClose={onClose} />
+        <RpxDialogBody>
+        <div className="space-y-3">
           <div style={{ maxHeight: 320, overflowY: 'auto', border: `1px solid ${colors.border}`, borderRadius: 3 }}>
             {categories.length === 0 ? (
               <p style={{ padding: '16px', textAlign: 'center', fontSize: 12, color: colors.textSecondary }}>No categories yet</p>
@@ -1050,16 +1040,16 @@ function ManageCategoriesModal({ categories, onClose, onSuccess }: {
               <input placeholder="Category name…" value={newName} onChange={(e) => setNewName(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') void handleAdd() }}
                 style={{ flex: 1, height: 28, border: `1px solid ${colors.border}`, borderRadius: 3, padding: '0 8px', fontSize: 12, outline: 'none', background: '#fff' }} />
-              <ModalBtn variant="primary" onClick={() => void handleAdd()} loading={adding} disabled={!newName.trim()}>Add</ModalBtn>
+              <Btn size="sm" variant="primary" onClick={() => void handleAdd()} loading={adding} disabled={!newName.trim()}>Add</Btn>
             </div>
             <IconPicker value={newIcon} onChange={setNewIcon} />
           </div>
-
-          <div className="flex justify-end">
-            <ModalBtn onClick={onClose}>Close</ModalBtn>
-          </div>
         </div>
-      </DialogContent>
+        </RpxDialogBody>
+        <RpxDialogFooter>
+          <Btn onClick={onClose}>Close</Btn>
+        </RpxDialogFooter>
+      </RpxDialogContent>
     </Dialog>
   )
 }

@@ -5,10 +5,8 @@ import { useRouter } from 'next/navigation'
 import useSWR, { mutate } from 'swr'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
-import { WinButton } from '@/components/ui/WinButton'
-import { Plus, Star, Loader2, MoreVertical, ExternalLink, Pencil, Trash2 } from 'lucide-react'
+import { Dialog } from '@/components/ui/dialog'
+import { Plus, Star, MoreVertical, ExternalLink, Pencil, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -16,6 +14,11 @@ import { CreatePriceGroupSchema, type CreatePriceGroupInput, type CreatePriceGro
 import { useSession } from 'next-auth/react'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { colors } from '@/lib/design-tokens'
+import {
+  TH, TD, HEADER_GRAD,
+  Btn, PortalPage, EmptyHint,
+  RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter,
+} from '@/components/rpx'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -24,13 +27,6 @@ type PriceGroup = {
   isDefault: boolean; isActive: boolean
   _count: { customers: number; overrides: number }
 }
-
-const TH: React.CSSProperties = {
-  textAlign: 'left', padding: '0 10px', height: 28,
-  fontSize: 10, fontWeight: 700, color: '#6C757D',
-  textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap',
-}
-const TD: React.CSSProperties = { padding: '0 10px', fontSize: 12, color: '#212529' }
 
 export default function PriceGroupsPage() {
   const router = useRouter()
@@ -72,31 +68,18 @@ export default function PriceGroupsPage() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, background: '#fff', border: '1px solid #B0B0B0', borderRadius: 2, overflow: 'hidden' }}>
-
-        {/* Title bar */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 10px', borderBottom: '2px solid #B0B0B0', background: 'linear-gradient(180deg,#EAEAEA 0%,#D4D4D4 100%)', flexShrink: 0 }}>
-          <span style={{ fontSize: 13, fontWeight: 700, color: '#1B3A6B' }}>Price Groups</span>
-          <span style={{ fontSize: 11, color: '#6C757D' }}>{groups.length} group{groups.length !== 1 ? 's' : ''}</span>
-          <div style={{ flex: 1 }} />
-          {isManager && (
-            <WinButton onClick={() => setCreateOpen(true)}>
-              <Plus style={{ width: 9, height: 9 }} /> Add Price Group
-            </WinButton>
-          )}
-        </div>
-
+    <PortalPage
+      title={`Price Groups (${groups.length})`}
+      actions={isManager ? <Btn variant="primary" size="sm" icon={Plus} onClick={() => setCreateOpen(true)}>Add Price Group</Btn> : undefined}
+    >
         {/* Table */}
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
           {groups.length === 0 ? (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 120, color: '#6C757D', fontSize: 12 }}>
-              No price groups created yet
-            </div>
+            <EmptyHint text="No price groups created yet" />
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
-                <tr style={{ background: 'linear-gradient(180deg,#FFFFFF 0%,#E8E8E8 100%)', borderBottom: '1px solid #C0C0C0' }}>
+                <tr style={{ background: HEADER_GRAD, borderBottom: '1px solid #C0C0C0' }}>
                   {['Name', 'Description', 'Customers', 'Price Overrides', 'Default', 'Status', ''].map((h) => (
                     <th key={h} style={TH}>{h}</th>
                   ))}
@@ -146,7 +129,6 @@ export default function PriceGroupsPage() {
             </table>
           )}
         </div>
-      </div>
 
       {/* Fixed dropdown — escapes overflow:hidden clipping */}
       {menuOpenId && menuPos && (() => {
@@ -212,7 +194,7 @@ export default function PriceGroupsPage() {
           onSuccess={() => { mutate('/api/price-groups'); setEditGroup(null) }}
         />
       )}
-    </div>
+    </PortalPage>
   )
 }
 
@@ -234,9 +216,11 @@ function CreatePriceGroupModal({ onClose, onSuccess }: { onClose: () => void; on
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader><DialogTitle>New Price Group</DialogTitle></DialogHeader>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-2">
+      <RpxDialogContent maxWidth={440}>
+        <RpxDialogHeader title="New Price Group" onClose={onClose} />
+        <form id="create-price-group-form" onSubmit={handleSubmit(onSubmit)}>
+        <RpxDialogBody>
+          <div className="space-y-4">
           <div>
             <Label style={{ color: colors.textPrimary }}>Group Name</Label>
             <Input {...register('name')} className="mt-1 border-rpx-border" placeholder="e.g. Platinum Dealer" disabled={loading} />
@@ -250,32 +234,14 @@ function CreatePriceGroupModal({ onClose, onSuccess }: { onClose: () => void; on
             <input type="checkbox" onChange={(e) => setValue('isDefault', e.target.checked)} className="rounded" />
             Set as default price group
           </label>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
-            <button
-              type="submit"
-              disabled={loading}
-              style={{
-                fontSize: 10,
-                padding: '1px 6px',
-                background: '#E0E0E0',
-                border: '1px solid #999',
-                borderRadius: 2,
-                cursor: loading ? 'not-allowed' : 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 3,
-                color: '#212529',
-                opacity: loading ? 0.6 : 1,
-              }}
-              onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = '#D0D0D0' }}
-              onMouseLeave={(e) => { if (!loading) e.currentTarget.style.background = '#E0E0E0' }}
-            >
-              {loading ? <><Loader2 style={{ width: 9, height: 9 }} className="animate-spin" />Creating…</> : 'Create Group'}
-            </button>
           </div>
+        </RpxDialogBody>
+        <RpxDialogFooter>
+          <Btn onClick={onClose} disabled={loading}>Cancel</Btn>
+          <Btn variant="primary" type="submit" form="create-price-group-form" loading={loading}>Create Group</Btn>
+        </RpxDialogFooter>
         </form>
-      </DialogContent>
+      </RpxDialogContent>
     </Dialog>
   )
 }
@@ -298,9 +264,11 @@ function EditPriceGroupModal({ group, onClose, onSuccess }: { group: PriceGroup;
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader><DialogTitle>Edit Price Group</DialogTitle></DialogHeader>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-2">
+      <RpxDialogContent maxWidth={440}>
+        <RpxDialogHeader title="Edit Price Group" onClose={onClose} />
+        <form id="edit-price-group-form" onSubmit={handleSubmit(onSubmit)}>
+        <RpxDialogBody>
+          <div className="space-y-4">
           <div>
             <Label style={{ color: colors.textPrimary }}>Group Name</Label>
             <Input {...register('name')} className="mt-1 border-rpx-border" placeholder="e.g. Platinum Dealer" disabled={loading} />
@@ -314,32 +282,14 @@ function EditPriceGroupModal({ group, onClose, onSuccess }: { group: PriceGroup;
             <input type="checkbox" defaultChecked={group.isDefault} onChange={(e) => setValue('isDefault', e.target.checked)} className="rounded" />
             Set as default price group
           </label>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
-            <button
-              type="submit"
-              disabled={loading}
-              style={{
-                fontSize: 10,
-                padding: '1px 6px',
-                background: '#E0E0E0',
-                border: '1px solid #999',
-                borderRadius: 2,
-                cursor: loading ? 'not-allowed' : 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 3,
-                color: '#212529',
-                opacity: loading ? 0.6 : 1,
-              }}
-              onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = '#D0D0D0' }}
-              onMouseLeave={(e) => { if (!loading) e.currentTarget.style.background = '#E0E0E0' }}
-            >
-              {loading ? <><Loader2 style={{ width: 9, height: 9 }} className="animate-spin" />Saving…</> : 'Save Changes'}
-            </button>
           </div>
+        </RpxDialogBody>
+        <RpxDialogFooter>
+          <Btn onClick={onClose} disabled={loading}>Cancel</Btn>
+          <Btn variant="primary" type="submit" form="edit-price-group-form" loading={loading}>Save Changes</Btn>
+        </RpxDialogFooter>
         </form>
-      </DialogContent>
+      </RpxDialogContent>
     </Dialog>
   )
 }
