@@ -1,12 +1,13 @@
 'use client'
 
 import { useState } from 'react'
-import { Loader2, HandCoins } from 'lucide-react'
+import { HandCoins } from 'lucide-react'
 import { toast } from 'sonner'
 import Decimal from 'decimal.js'
-import { Dialog, DialogContent, ModalTitleBar } from '@/components/ui/dialog'
+import { Dialog } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
+import { Btn, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
 
 export type PayTarget = {
   id: string
@@ -64,9 +65,10 @@ export function RecordPaymentModal({
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-sm" showCloseButton={false}>
-        <ModalTitleBar title="Record Payment" onClose={onClose} />
-        <div className="space-y-4 mt-2">
+      <RpxDialogContent maxWidth={400}>
+        <RpxDialogHeader title="Record Payment" icon={HandCoins} onClose={onClose} />
+        <RpxDialogBody>
+        <div className="space-y-4">
           {/* Balance summary */}
           <div className="px-3 py-2.5 rounded-lg space-y-1" style={{ background: '#F8F9FA', border: '1px solid #E0E0E0' }}>
             <p className="font-mono font-medium" style={{ fontSize: 12, color: '#212529' }}>{sale.ref}</p>
@@ -127,27 +129,15 @@ export function RecordPaymentModal({
             </Select>
           </div>
 
-          <div className="flex justify-end gap-2 pt-1">
-            <button
-              onClick={onClose}
-              disabled={loading}
-              className="px-3 py-1.5 rounded text-xs font-medium border border-[#E0E0E0] bg-white disabled:opacity-50"
-              style={{ color: '#212529' }}
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handlePay}
-              disabled={loading}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-white disabled:opacity-50"
-              style={{ background: '#217346' }}
-            >
-              {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <HandCoins className="w-3.5 h-3.5" />}
-              Record Payment
-            </button>
-          </div>
         </div>
-      </DialogContent>
+        </RpxDialogBody>
+        <RpxDialogFooter>
+          <Btn onClick={onClose} disabled={loading}>Cancel</Btn>
+          <Btn variant="primary" icon={HandCoins} loading={loading} onClick={handlePay}>
+            Record Payment
+          </Btn>
+        </RpxDialogFooter>
+      </RpxDialogContent>
     </Dialog>
   )
 }

@@ -7,15 +7,16 @@ import { Search, Printer, Ban, HandCoins, Loader2, X } from 'lucide-react'
 import Decimal from 'decimal.js'
 import { DataTable, Avatar, type Column, type RowAction } from '@/components/ui/DataTable'
 import { InlineDetailPanel } from '@/components/ui/InlineDetailPanel'
-import { Dialog, DialogContent, ModalTitleBar, ModalBtn } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { PageShell } from '@/components/layout/PageShell'
+import { Dialog } from '@/components/ui/dialog'
 import { RecordPaymentModal, type PayTarget } from '@/components/sales/RecordPaymentModal'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
 import { format } from '@/lib/utils/format'
 import { toast } from 'sonner'
 import { useSession } from 'next-auth/react'
+import {
+  inp, lbl, Btn, Field, PortalPage, FilterBar,
+  RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter,
+} from '@/components/rpx'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -187,13 +188,13 @@ export default function UnpaidSalesPage() {
   ]
 
   return (
-    <PageShell>
+    <PortalPage title="Unpaid Sales">
 
       {/* Grand total banner */}
       {!isLoading && sales.length > 0 && (
         <div
           className="flex items-center gap-4 px-4 py-3 shrink-0"
-          style={{ background: colors.alertBg, border: `1px solid ${colors.alertBorder}` }}
+          style={{ background: colors.alertBg, borderBottom: `1px solid ${colors.alertBorder}` }}
         >
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: colors.alertIcon }}>
@@ -210,45 +211,31 @@ export default function UnpaidSalesPage() {
       )}
 
       {/* Filter bar */}
-      <div className="flex gap-2 flex-wrap shrink-0 items-center">
-        <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3" style={{ color: colors.textSecondary }} />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search ref, buyer or ID..."
-            className="pl-7 pr-3 h-7 text-xs rounded border bg-white focus:outline-none w-56 border-[#E0E0E0] focus:border-[#185ABD]"
-          />
-        </div>
-        <input
-          type="date"
-          value={from}
-          onChange={(e) => setFrom(e.target.value)}
-          className="h-7 border rounded px-2 text-xs bg-white focus:outline-none border-[#E0E0E0] focus:border-[#185ABD]"
-          style={{ color: from ? colors.textPrimary : colors.textSecondary }}
-          title="From date"
-        />
-        <input
-          type="date"
-          value={to}
-          onChange={(e) => setTo(e.target.value)}
-          className="h-7 border rounded px-2 text-xs bg-white focus:outline-none border-[#E0E0E0] focus:border-[#185ABD]"
-          style={{ color: to ? colors.textPrimary : colors.textSecondary }}
-          title="To date"
-        />
+      <FilterBar>
+        <Field label="Search" width={230}>
+          <div style={{ position: 'relative' }}>
+            <Search style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', width: 12, height: 12, color: '#6C757D' }} />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search ref, buyer or ID..."
+              style={{ ...inp, paddingLeft: 26 }}
+            />
+          </div>
+        </Field>
+        <Field label="From" width={145}>
+          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} style={inp} />
+        </Field>
+        <Field label="To" width={145}>
+          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} style={inp} />
+        </Field>
         {hasFilters && (
-          <button
-            onClick={clearFilters}
-            className="h-7 px-2.5 text-xs flex items-center gap-1 border rounded hover:bg-[#F1F3F4] transition-colors"
-            style={{ borderColor: colors.border, color: colors.textSecondary }}
-          >
-            <X className="w-3 h-3" /> Clear
-          </button>
+          <Btn size="sm" icon={X} onClick={clearFilters}>Clear</Btn>
         )}
-      </div>
+      </FilterBar>
 
       {/* Table */}
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0" style={{ padding: 10 }}>
         <DataTable
           columns={columns}
           rows={sales}
@@ -366,7 +353,7 @@ export default function UnpaidSalesPage() {
         />
       )}
 
-    </PageShell>
+    </PortalPage>
   )
 }
 
@@ -399,32 +386,30 @@ function VoidDialog({
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-md" showCloseButton={false}>
-        <ModalTitleBar title="Reverse Sale" onClose={onClose} />
-        <div className="space-y-4 mt-2">
-          <p className="text-sm" style={{ color: colors.textSecondary }}>
+      <RpxDialogContent maxWidth={440}>
+        <RpxDialogHeader title="Reverse Sale" onClose={onClose} />
+        <RpxDialogBody>
+          <p style={{ fontSize: 12.5, color: colors.textSecondary, margin: '0 0 12px' }}>
             You are about to reverse{' '}
-            <span className="font-semibold" style={{ color: colors.textPrimary }}>{sale.refNumber}</span>
+            <span style={{ fontWeight: 600, color: colors.textPrimary }}>{sale.refNumber}</span>
             {' '}(R {new Decimal(sale.totalAmount).toFixed(2)}). This cannot be undone.
           </p>
-          <div>
-            <Label>Reason for reversal</Label>
-            <Input
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder="Enter reason (min 5 characters)"
-              className="mt-1"
-              disabled={loading}
-            />
-          </div>
-          <div className="flex justify-end gap-2">
-            <ModalBtn onClick={onClose} disabled={loading}>Cancel</ModalBtn>
-            <ModalBtn variant="danger" onClick={onConfirm} disabled={loading || reason.trim().length < 5} loading={loading}>
-              Confirm Reversal
-            </ModalBtn>
-          </div>
-        </div>
-      </DialogContent>
+          <span style={lbl}>Reason for reversal</span>
+          <input
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="Enter reason (min 5 characters)"
+            style={inp}
+            disabled={loading}
+          />
+        </RpxDialogBody>
+        <RpxDialogFooter>
+          <Btn onClick={onClose} disabled={loading}>Cancel</Btn>
+          <Btn variant="danger" loading={loading} disabled={reason.trim().length < 5} onClick={onConfirm}>
+            Confirm Reversal
+          </Btn>
+        </RpxDialogFooter>
+      </RpxDialogContent>
     </Dialog>
   )
 }

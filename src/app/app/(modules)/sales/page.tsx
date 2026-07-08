@@ -9,12 +9,13 @@ import { toast } from 'sonner'
 import Decimal from 'decimal.js'
 import { DataTable, StatusBadge, type Column, type RowAction, type SortDir } from '@/components/ui/DataTable'
 import { InlineDetailPanel } from '@/components/ui/InlineDetailPanel'
-import { Dialog, DialogContent, ModalTitleBar, ModalBtn } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { Dialog } from '@/components/ui/dialog'
 import { format } from '@/lib/utils/format'
-import { PageShell } from '@/components/layout/PageShell'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
+import {
+  inp, lbl, Btn, Field, PortalPage, FilterBar,
+  RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter,
+} from '@/components/rpx'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -200,80 +201,57 @@ export default function SalesPage() {
   ]
 
   return (
-    <PageShell>
+    <PortalPage title="All Sales">
       {/* Filters */}
-      <div className="flex gap-2 flex-wrap shrink-0 mb-3 items-center">
-        <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3" style={{ color: colors.textSecondary }} />
-          <input
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1) }}
-            placeholder="Search ref or buyer..."
-            className="pl-7 pr-3 h-7 text-xs rounded border bg-white focus:outline-none w-52 border-[#E0E0E0] focus:border-[#185ABD]"
-          />
-        </div>
-        <select
-          className="h-7 border rounded px-2 text-xs bg-white focus:outline-none border-[#E0E0E0] focus:border-[#185ABD]"
-          style={{ color: colors.textPrimary }}
-          value={status}
-          onChange={(e) => { setStatus(e.target.value); setPage(1) }}
-        >
-          <option value="">All Statuses</option>
-          <option value="pending">Pending</option>
-          <option value="completed">Completed</option>
-          <option value="voided">Voided</option>
-        </select>
-        <select
-          className="h-7 border rounded px-2 text-xs bg-white focus:outline-none border-[#E0E0E0] focus:border-[#185ABD]"
-          style={{ color: colors.textPrimary }}
-          value={paymentMethod}
-          onChange={(e) => { setPaymentMethod(e.target.value); setPage(1) }}
-        >
-          <option value="">All Methods</option>
-          <option value="cash">Cash</option>
-          <option value="eft">EFT</option>
-          <option value="cheque">Cheque</option>
-        </select>
-        <input
-          type="date"
-          value={from}
-          onChange={(e) => { setFrom(e.target.value); setPage(1) }}
-          className="h-7 border rounded px-2 text-xs bg-white focus:outline-none border-[#E0E0E0] focus:border-[#185ABD]"
-          style={{ color: from ? colors.textPrimary : colors.textSecondary }}
-          title="From date"
-        />
-        <input
-          type="date"
-          value={to}
-          onChange={(e) => { setTo(e.target.value); setPage(1) }}
-          className="h-7 border rounded px-2 text-xs bg-white focus:outline-none border-[#E0E0E0] focus:border-[#185ABD]"
-          style={{ color: to ? colors.textPrimary : colors.textSecondary }}
-          title="To date"
-        />
-        {hasFilters && (
-          <button
-            onClick={clearFilters}
-            style={{
-              fontSize: 10,
-              padding: '1px 6px',
-              background: '#E0E0E0',
-              border: '1px solid #999',
-              borderRadius: 2,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 3,
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = '#D0D0D0' }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = '#E0E0E0' }}
+      <FilterBar>
+        <Field label="Search" width={210}>
+          <div style={{ position: 'relative' }}>
+            <Search style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', width: 12, height: 12, color: '#6C757D' }} />
+            <input
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setPage(1) }}
+              placeholder="Search ref or buyer..."
+              style={{ ...inp, paddingLeft: 26 }}
+            />
+          </div>
+        </Field>
+        <Field label="Status" width={130}>
+          <select
+            style={inp}
+            value={status}
+            onChange={(e) => { setStatus(e.target.value); setPage(1) }}
           >
-            <X style={{ width: 9, height: 9 }} /> Clear
-          </button>
+            <option value="">All Statuses</option>
+            <option value="pending">Pending</option>
+            <option value="completed">Completed</option>
+            <option value="voided">Voided</option>
+          </select>
+        </Field>
+        <Field label="Method" width={120}>
+          <select
+            style={inp}
+            value={paymentMethod}
+            onChange={(e) => { setPaymentMethod(e.target.value); setPage(1) }}
+          >
+            <option value="">All Methods</option>
+            <option value="cash">Cash</option>
+            <option value="eft">EFT</option>
+            <option value="cheque">Cheque</option>
+          </select>
+        </Field>
+        <Field label="From" width={145}>
+          <input type="date" value={from} onChange={(e) => { setFrom(e.target.value); setPage(1) }} style={inp} />
+        </Field>
+        <Field label="To" width={145}>
+          <input type="date" value={to} onChange={(e) => { setTo(e.target.value); setPage(1) }} style={inp} />
+        </Field>
+        {hasFilters && (
+          <Btn size="sm" icon={X} onClick={clearFilters}>Clear</Btn>
         )}
-      </div>
+      </FilterBar>
 
       {/* Table */}
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0" style={{ padding: 10 }}>
         <DataTable
           columns={columns}
           rows={sales}
@@ -396,7 +374,7 @@ export default function SalesPage() {
           }}
         />
       )}
-    </PageShell>
+    </PortalPage>
   )
 }
 
@@ -434,38 +412,30 @@ function VoidDialog({
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-md p-4" showCloseButton={false}>
-        <ModalTitleBar title="Void Sale" onClose={onClose} />
-        <div className="space-y-4 mt-3">
-          <p className="text-sm" style={{ color: colors.textSecondary }}>
+      <RpxDialogContent maxWidth={440}>
+        <RpxDialogHeader title="Void Sale" onClose={onClose} />
+        <RpxDialogBody>
+          <p style={{ fontSize: 12.5, color: colors.textSecondary, margin: '0 0 12px' }}>
             You are about to void{' '}
-            <span className="font-semibold" style={{ color: colors.textPrimary }}>{sale.refNumber}</span>
+            <span style={{ fontWeight: 600, color: colors.textPrimary }}>{sale.refNumber}</span>
             {' '}(R {new Decimal(sale.totalAmount).toFixed(2)}). This cannot be undone.
           </p>
-          <div>
-            <Label>Reason for void</Label>
-            <Input
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder="Enter reason (min 5 characters)"
-              className="mt-1"
-              disabled={loading}
-            />
-          </div>
-          <div className="flex justify-end gap-2">
-            <ModalBtn variant="outline" onClick={onClose} disabled={loading}>Cancel</ModalBtn>
-            <ModalBtn
-              variant="danger"
-              onClick={onConfirm}
-              disabled={loading || reason.trim().length < 5}
-            >
-              {loading
-                ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Voiding…</>
-                : 'Confirm Void'}
-            </ModalBtn>
-          </div>
-        </div>
-      </DialogContent>
+          <span style={lbl}>Reason for void</span>
+          <input
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="Enter reason (min 5 characters)"
+            style={inp}
+            disabled={loading}
+          />
+        </RpxDialogBody>
+        <RpxDialogFooter>
+          <Btn onClick={onClose} disabled={loading}>Cancel</Btn>
+          <Btn variant="danger" loading={loading} disabled={reason.trim().length < 5} onClick={onConfirm}>
+            Confirm Void
+          </Btn>
+        </RpxDialogFooter>
+      </RpxDialogContent>
     </Dialog>
   )
 }
