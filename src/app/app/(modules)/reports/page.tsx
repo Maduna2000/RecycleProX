@@ -11,8 +11,8 @@
 import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import { PageShell } from '@/components/layout/PageShell'
 import { colors } from '@/lib/design-tokens'
+import { PortalPage } from '@/components/rpx'
 import { REPORT_CATALOG } from '@/lib/reports/catalog'
 import { OverviewTab } from './_components/OverviewTab'
 import { ReportCatalog } from './_components/ReportCatalog'
@@ -37,11 +37,11 @@ export default function ReportsPage() {
 
   if (!isManager) {
     return (
-      <PageShell>
+      <PortalPage title="Reports">
         <div className="flex items-center justify-center h-40 text-sm" style={{ color: colors.textSecondary }}>
           Access restricted to managers and administrators.
         </div>
-      </PageShell>
+      </PortalPage>
     )
   }
 
@@ -50,17 +50,17 @@ export default function ReportsPage() {
   }
 
   return (
-    <PageShell
-      tabs={TABS}
-      activeTab={tab}
-      onTabChange={setTab}
+    <PortalPage
+      tabs={[...TABS]}
+      active={tab}
+      onChange={setTab}
     >
       {tab === 'overview' ? (
-        <div className="pt-2 overflow-auto">
+        <div className="overflow-auto" style={{ padding: 10 }}>
           <OverviewTab />
         </div>
       ) : (
-        <div className="flex gap-4 pt-2 flex-1 min-h-0">
+        <div className="flex gap-4 flex-1 min-h-0" style={{ padding: 10 }}>
           {/* Catalog rail */}
           <div className="w-80 shrink-0 overflow-auto pb-6">
             <ReportCatalog selectedId={selectedId} onSelect={handleSelect} />
@@ -81,6 +81,6 @@ export default function ReportsPage() {
           </div>
         </div>
       )}
-    </PageShell>
+    </PortalPage>
   )
 }

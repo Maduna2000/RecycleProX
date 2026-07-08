@@ -2,14 +2,14 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import useSWR from 'swr'
-import { Dialog, DialogContent } from '@/components/ui/dialog'
+import { Dialog } from '@/components/ui/dialog'
 import {
   Search, Download, Images, X, ChevronLeft, ChevronRight,
   Loader2, FileText, IdCard, Scale, ShoppingCart, Receipt, FileDown,
 } from 'lucide-react'
-import { PageShell } from '@/components/layout/PageShell'
 import { colors, fontSize } from '@/lib/design-tokens'
 import type { PhotoRecord } from '@/app/api/photos/search/route'
+import { inp, Btn, Field, PortalPage, FilterBar, RpxDialogContent, RpxDialogFooter } from '@/components/rpx'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -181,7 +181,7 @@ function ViewerDialog({
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl p-0 overflow-hidden" style={{ maxHeight: '90vh' }}>
+      <RpxDialogContent maxWidth={768} style={{ maxHeight: '90vh' }}>
         <div className="flex flex-col" style={{ maxHeight: '90vh' }}>
 
           {/* Header */}
@@ -237,124 +237,28 @@ function ViewerDialog({
           </div>
 
           {/* Action bar */}
-          <div className="flex items-center gap-2 flex-wrap px-4 py-3 border-t shrink-0" style={{ borderColor: colors.border, background: '#fff' }}>
+          <RpxDialogFooter style={{ justifyContent: 'flex-start', flexWrap: 'wrap' }}>
             {/* Prev / Next navigation */}
             <div className="flex items-center gap-1 mr-2">
-              <button
-                onClick={onPrev ?? undefined}
-                disabled={!onPrev}
-                style={{
-                  fontSize: 10,
-                  padding: '1px 6px',
-                  background: '#E0E0E0',
-                  border: '1px solid #999',
-                  borderRadius: 2,
-                  cursor: !onPrev ? 'not-allowed' : 'pointer',
-                  opacity: !onPrev ? 0.3 : 1,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 3,
-                  color: '#212529',
-                }}
-                onMouseEnter={(e) => { if (onPrev) e.currentTarget.style.background = '#D0D0D0' }}
-                onMouseLeave={(e) => { if (onPrev) e.currentTarget.style.background = '#E0E0E0' }}
-                title="Previous (←)"
-              >
-                <ChevronLeft style={{ width: 9, height: 9 }} />
-              </button>
+              <Btn size="sm" icon={ChevronLeft} disabled={!onPrev} onClick={onPrev ?? undefined} title="Previous (←)" />
               <span className="text-xs tabular-nums" style={{ color: colors.textSecondary }}>
                 {idx + 1} / {photos.length}
               </span>
-              <button
-                onClick={onNext ?? undefined}
-                disabled={!onNext}
-                style={{
-                  fontSize: 10,
-                  padding: '1px 6px',
-                  background: '#E0E0E0',
-                  border: '1px solid #999',
-                  borderRadius: 2,
-                  cursor: !onNext ? 'not-allowed' : 'pointer',
-                  opacity: !onNext ? 0.3 : 1,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 3,
-                  color: '#212529',
-                }}
-                onMouseEnter={(e) => { if (onNext) e.currentTarget.style.background = '#D0D0D0' }}
-                onMouseLeave={(e) => { if (onNext) e.currentTarget.style.background = '#E0E0E0' }}
-                title="Next (→)"
-              >
-                <ChevronRight style={{ width: 9, height: 9 }} />
-              </button>
+              <Btn size="sm" icon={ChevronRight} disabled={!onNext} onClick={onNext ?? undefined} title="Next (→)" />
             </div>
 
-            <button
-              onClick={download}
-              style={{
-                fontSize: 10,
-                padding: '1px 6px',
-                background: '#E0E0E0',
-                border: '1px solid #999',
-                borderRadius: 2,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 3,
-                color: '#212529',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = '#D0D0D0' }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = '#E0E0E0' }}
-            >
-              <Download style={{ width: 9, height: 9 }} /> Download
-            </button>
+            <Btn size="sm" icon={Download} onClick={download}>Download</Btn>
 
             {(viewer.type === 'purchase_signature' || viewer.type === 'purchase_vat264' || viewer.type === 'sale_photo') && (
-              <button
-                onClick={openReceiptPdf}
-                style={{
-                  fontSize: 10,
-                  padding: '1px 6px',
-                  background: '#E0E0E0',
-                  border: '1px solid #999',
-                  borderRadius: 2,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 3,
-                  color: '#212529',
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = '#D0D0D0' }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = '#E0E0E0' }}
-              >
-                <Receipt style={{ width: 9, height: 9 }} /> Reprint Receipt
-              </button>
+              <Btn size="sm" icon={Receipt} onClick={openReceiptPdf}>Reprint Receipt</Btn>
             )}
 
             {(viewer.type === 'purchase_signature' || viewer.type === 'purchase_vat264') && (
-              <button
-                onClick={openVat264}
-                style={{
-                  fontSize: 10,
-                  padding: '1px 6px',
-                  background: '#E0E0E0',
-                  border: '1px solid #999',
-                  borderRadius: 2,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 3,
-                  color: '#212529',
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = '#D0D0D0' }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = '#E0E0E0' }}
-              >
-                <FileText style={{ width: 9, height: 9 }} /> VAT264 / SHG Act
-              </button>
+              <Btn size="sm" icon={FileText} onClick={openVat264}>VAT264 / SHG Act</Btn>
             )}
-          </div>
+          </RpxDialogFooter>
         </div>
-      </DialogContent>
+      </RpxDialogContent>
     </Dialog>
   )
 }
@@ -427,64 +331,33 @@ function PhotoGrid({
   return (
     <div className="flex flex-col gap-3">
 
-      {/* Filter bar */}
-      <div className="flex gap-2 flex-wrap items-center shrink-0">
-        <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none" style={{ color: colors.textSecondary }} />
-          <input
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1) }}
-            placeholder="Name, ID no, ref, product…"
-            className="pl-7 pr-3 py-1 text-xs rounded border bg-white focus:outline-none w-56 border-rpx-border focus:border-rpx-blue"
-          />
-        </div>
-
-        <span className="text-xs shrink-0" style={{ color: colors.textSecondary }}>From</span>
-        <input
-          type="date"
-          value={from}
-          onChange={(e) => { setFrom(e.target.value); setPage(1) }}
-          className="border rounded px-2 py-1 text-xs bg-white focus:outline-none border-rpx-border focus:border-rpx-blue"
-          style={{ color: from ? colors.textPrimary : colors.textSecondary }}
-        />
-
-        <span className="text-xs shrink-0" style={{ color: colors.textSecondary }}>To</span>
-        <input
-          type="date"
-          value={to}
-          onChange={(e) => { setTo(e.target.value); setPage(1) }}
-          className="border rounded px-2 py-1 text-xs bg-white focus:outline-none border-rpx-border focus:border-rpx-blue"
-          style={{ color: to ? colors.textPrimary : colors.textSecondary }}
-        />
-
+      <FilterBar>
+        <Field label="Search" width={220}>
+          <div style={{ position: 'relative' }}>
+            <Search style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', width: 12, height: 12, color: colors.textSecondary }} />
+            <input
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setPage(1) }}
+              placeholder="Name, ID no, ref, product…"
+              style={{ ...inp, paddingLeft: 24 }}
+            />
+          </div>
+        </Field>
+        <Field label="From" width={145}>
+          <input type="date" value={from} onChange={(e) => { setFrom(e.target.value); setPage(1) }} style={inp} />
+        </Field>
+        <Field label="To" width={145}>
+          <input type="date" value={to} onChange={(e) => { setTo(e.target.value); setPage(1) }} style={inp} />
+        </Field>
         {hasFilters && (
-          <button
-            onClick={clearFilters}
-            style={{
-              fontSize: 10,
-              padding: '1px 6px',
-              background: '#E0E0E0',
-              border: '1px solid #999',
-              borderRadius: 2,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 3,
-              color: '#212529',
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = '#D0D0D0' }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = '#E0E0E0' }}
-          >
-            <X style={{ width: 9, height: 9 }} /> Clear
-          </button>
+          <Btn size="sm" icon={X} onClick={clearFilters}>Clear</Btn>
         )}
-
         {total > 0 && (
-          <span className="ml-auto text-xs" style={{ color: colors.textSecondary }}>
+          <span style={{ marginLeft: 'auto', fontSize: 11, color: colors.textSecondary, paddingBottom: 8 }}>
             {total} file{total !== 1 ? 's' : ''}
           </span>
         )}
-      </div>
+      </FilterBar>
 
       {/* Loading */}
       {isLoading && (
@@ -500,25 +373,7 @@ function PhotoGrid({
           <Images className="w-12 h-12 opacity-20" />
           <p className="text-sm">{emptyMsg}</p>
           {hasFilters && (
-            <button
-              onClick={clearFilters}
-              style={{
-                fontSize: 10,
-                padding: '1px 6px',
-                background: '#E0E0E0',
-                border: '1px solid #999',
-                borderRadius: 2,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 3,
-                color: '#212529',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = '#D0D0D0' }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = '#E0E0E0' }}
-            >
-              Clear filters
-            </button>
+            <Btn size="sm" onClick={clearFilters}>Clear filters</Btn>
           )}
         </div>
       )}
@@ -539,51 +394,11 @@ function PhotoGrid({
       {/* Pagination */}
       {pageCount > 1 && (
         <div className="flex items-center justify-center gap-3 pt-1">
-          <button
-            disabled={page <= 1}
-            onClick={() => setPage((p) => p - 1)}
-            style={{
-              fontSize: 10,
-              padding: '1px 6px',
-              background: '#E0E0E0',
-              border: '1px solid #999',
-              borderRadius: 2,
-              cursor: page <= 1 ? 'not-allowed' : 'pointer',
-              opacity: page <= 1 ? 0.4 : 1,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 3,
-              color: '#212529',
-            }}
-            onMouseEnter={(e) => { if (page > 1) e.currentTarget.style.background = '#D0D0D0' }}
-            onMouseLeave={(e) => { if (page > 1) e.currentTarget.style.background = '#E0E0E0' }}
-          >
-            <ChevronLeft style={{ width: 9, height: 9 }} />
-          </button>
+          <Btn size="sm" icon={ChevronLeft} disabled={page <= 1} onClick={() => setPage((p) => p - 1)} />
           <span className="text-xs" style={{ color: colors.textSecondary }}>
             Page {page} of {pageCount}
           </span>
-          <button
-            disabled={page >= pageCount}
-            onClick={() => setPage((p) => p + 1)}
-            style={{
-              fontSize: 10,
-              padding: '1px 6px',
-              background: '#E0E0E0',
-              border: '1px solid #999',
-              borderRadius: 2,
-              cursor: page >= pageCount ? 'not-allowed' : 'pointer',
-              opacity: page >= pageCount ? 0.4 : 1,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 3,
-              color: '#212529',
-            }}
-            onMouseEnter={(e) => { if (page < pageCount) e.currentTarget.style.background = '#D0D0D0' }}
-            onMouseLeave={(e) => { if (page < pageCount) e.currentTarget.style.background = '#E0E0E0' }}
-          >
-            <ChevronRight style={{ width: 9, height: 9 }} />
-          </button>
+          <Btn size="sm" icon={ChevronRight} disabled={page >= pageCount} onClick={() => setPage((p) => p + 1)} />
         </div>
       )}
 
@@ -608,38 +423,22 @@ export default function PhotosPage() {
   const [exportPhotos,  setExportPhotos]  = useState<PhotoRecord[]>([])
 
   return (
-    <PageShell
-      tabs={TABS}
-      activeTab={activeTab}
-      onTabChange={setActiveTab}
-      action={
+    <PortalPage
+      tabs={[...TABS]}
+      active={activeTab}
+      onChange={setActiveTab}
+      actions={
         exportPhotos.length > 0 ? (
-          <button
-            onClick={() => exportCsv(exportPhotos)}
-            style={{
-              fontSize: 10,
-              padding: '1px 6px',
-              background: '#E0E0E0',
-              border: '1px solid #999',
-              borderRadius: 2,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 3,
-              color: '#212529',
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = '#D0D0D0' }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = '#E0E0E0' }}
-          >
-            <FileDown style={{ width: 9, height: 9 }} /> Export CSV
-          </button>
+          <Btn size="sm" icon={FileDown} onClick={() => exportCsv(exportPhotos)}>Export CSV</Btn>
         ) : undefined
       }
     >
-      <PhotoGrid
-        queryType={activeTab === 'all' ? undefined : activeTab}
-        onPhotosChange={setExportPhotos}
-      />
-    </PageShell>
+      <div style={{ padding: 10 }}>
+        <PhotoGrid
+          queryType={activeTab === 'all' ? undefined : activeTab}
+          onPhotosChange={setExportPhotos}
+        />
+      </div>
+    </PortalPage>
   )
 }
