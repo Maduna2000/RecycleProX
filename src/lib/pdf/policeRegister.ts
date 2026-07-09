@@ -205,7 +205,7 @@ export async function generatePoliceRegister(data: PoliceRegisterData): Promise<
       y -= ROW_H
     }
 
-    // Empty rows (SA regulation — fill to ROWS_PER_PAGE rows)
+    // Empty rows (fill to ROWS_PER_PAGE rows)
     const emptyRows = ROWS_PER_PAGE - rows.length
     const ROW_H = 16
     for (let e = 0; e < emptyRows; e++) {

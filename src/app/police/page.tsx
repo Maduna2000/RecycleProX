@@ -18,6 +18,7 @@ import {
   ArrowLeft, Clock, AlertTriangle, X, User as UserIcon, Package, CalendarDays,
 } from 'lucide-react'
 import { POLICE_VISIT_REASONS, VISIT_REASON_LABELS } from '@/lib/schemas/police'
+import { DEFAULT_POLICE_SERVICE_NAME, DEFAULT_POLICE_LEGAL_NOTE } from '@/lib/police-defaults'
 import {
   NAVY, inp, lbl, TH, TD, btnPrimary, btnSecondary, btnDanger,
   TabStrip, EmptyHint, SectionLabel, DL, Drawer,
@@ -132,9 +133,8 @@ type Phase = 'loading' | 'begin' | 'active' | 'done' | 'expired'
 
 export default function PolicePortalPage() {
   const { data: settings } = useSWR<SettingsMap>('/api/settings', fetcher)
-  const serviceName = settings?.police_service_name ?? 'South African Police Service (SAPS)'
-  const legalNote   = settings?.police_legal_note ??
-    'This register is kept in terms of the Second-Hand Goods Act 6 of 2009. It must be retained for at least 5 years and produced to the police service on request.'
+  const serviceName = settings?.police_service_name ?? DEFAULT_POLICE_SERVICE_NAME
+  const legalNote   = settings?.police_legal_note ?? DEFAULT_POLICE_LEGAL_NOTE
   const yardName = settings?.yardName ?? 'Renovo Pro'
 
   const [phase, setPhase] = useState<Phase>('loading')
