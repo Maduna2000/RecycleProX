@@ -38,6 +38,9 @@ export interface ScaleOrderFilters {
   productId?:    string
   categoryName?: string
   customerType?: 'casual' | 'account'
+  customerId?:   string
+  /** Only orders with no linked Purchase yet — used by the "Load from Scale Order" picker. */
+  unlinkedOnly?: boolean
   search?:       string
   page?:         number
   pageSize?:     number
@@ -213,6 +216,8 @@ export async function listScaleOrders(filters: ScaleOrderFilters) {
   if (filters.status)     where.status     = filters.status
   if (filters.operatorId) where.operatorId = filters.operatorId
   if (filters.productId)  where.productId  = filters.productId
+  if (filters.customerId) where.customerId = filters.customerId
+  if (filters.unlinkedOnly) where.purchase = null
 
   // Category must match ANY line of the order (orders can carry multiple
   // products); a parent category also matches its sub-categories. Legacy

@@ -17,7 +17,7 @@ prisma.$use(async (params, next) => {
     'User', 'Purchase', 'PurchaseLine', 'Sale', 'SaleLine',
     'Customer', 'Payment', 'Expense', 'CashUp', 'CashFloat',
     'StockMovement', 'Product', 'PriceGroup', 'PriceGroupProductOverride',
-    'Stocktake', 'StocktakeEntry',
+    'Stocktake', 'StocktakeEntry', 'ScaleOrder',
   ]
   const writeActions = ['create', 'update', 'delete']
 

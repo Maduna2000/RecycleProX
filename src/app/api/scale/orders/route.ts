@@ -24,6 +24,8 @@ export async function GET(req: NextRequest) {
       productId:    p.get('productId')    ?? undefined,
       categoryName: p.get('categoryName')  ?? undefined,
       customerType: (p.get('customerType') ?? undefined) as 'casual' | 'account' | undefined,
+      customerId:   p.get('customerId')   ?? undefined,
+      unlinkedOnly: p.get('unlinkedOnly') === 'true' ? true : undefined,
       search:       p.get('search')       ?? undefined,
       page:         p.get('page')         ? Number(p.get('page'))     : undefined,
       pageSize:     p.get('pageSize')     ? Number(p.get('pageSize')) : undefined,

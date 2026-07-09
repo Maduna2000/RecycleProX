@@ -14,6 +14,7 @@ import type {
   PurchasesDailyParams,
   PurchasesSupplierStatementParams,
   PurchasesPerProductDayParams,
+  PurchasesByIdSearchParams,
 } from '@/lib/schemas/report'
 
 type MetaBase = Omit<ReportMeta, 'rowCount'>
@@ -488,4 +489,140 @@ export async function buildPurchasesPerProductDay(
     grandTotal,
     meta: { ...meta, rowCount: countDataRows(groups) },
   }
+}
+
+/**
+ * Purchases by Casual ID / Purchases by Account ID: search a seller by
+ * partial ID number and/or a transaction by partial reference number, scoped
+ * to one customerType — same shape as the Daily Purchases Report.
+ */
+async function buildPurchasesByIdSearchCore(
+  params: PurchasesByIdSearchParams,
+  meta: MetaBase,
+  customerType: 'casual' | 'account',
+  reportId: string,
+  title: string
+): Promise<ReportDocument> {
+  const { start, end } = getRangeBoundsSAST(params.from, params.to)
+
+  const lines = await prisma.purchaseLine.findMany({
+    where: {
+      purchase: {
+        status: { in: ['completed', 'pending'] },
+        createdAt: { gte: start, lte: end },
+        ...(params.customerId ? { customerId: params.customerId } : {}),
+        ...(params.refNumber ? { refNumber: { contains: params.refNumber, mode: 'insensitive' } } : {}),
+        customer: {
+          customerType,
+          ...(params.idNumber ? { idNumber: { contains: params.idNumber, mode: 'insensitive' } } : {}),
+        },
+      },
+    },
+    select: {
+      id: true,
+      quantity: true,
+      unitPrice: true,
+      lineTotal: true,
+      vatAmount: true,
+      product: { select: { code: true, name: true } },
+      purchase: {
+        select: {
+          refNumber: true,
+          createdAt: true,
+          status: true,
+          amountPaid: true,
+          paymentMethod: true,
+          splitPayments: true,
+          customer: {
+            select: { firstName: true, lastName: true, companyName: true, zeroRated: true },
+          },
+        },
+      },
+    },
+  })
+
+  type Line = (typeof lines)[number]
+  const amountsOf = (l: Line) => purchaseLineAmounts(l, l.purchase.customer.zeroRated)
+
+  const { groups, grandTotal } = groupRows(lines, {
+    groups: [
+      { label: (l) => customerBandName(l.purchase.customer) },
+      {
+        label: (l) => `Ticket ${l.purchase.refNumber}`,
+        meta: (l) =>
+          `${formatDateSAST(l.purchase.createdAt.toISOString())} ${formatTimeSAST(l.purchase.createdAt.toISOString())}  ·  ${purchaseStatusLabel(l.purchase)}  ·  ${paymentMethodLabel(l.purchase)}`,
+      },
+    ],
+    row: {
+      key: (l) => l.id,
+      build: (items) => {
+        const l = items[0]!
+        const a = amountsOf(l)
+        return {
+          code: l.product.code,
+          name: l.product.name,
+          price: new Decimal(l.unitPrice.toString()).toFixed(2),
+          qty: new Decimal(l.quantity.toString()).toFixed(3),
+          subTotal: a.subTotal.toFixed(2),
+          vat: a.vat.toFixed(2),
+          grandTotal: a.grandTotal.toFixed(2),
+        }
+      },
+      sortBy: (items) => items[0]!.product.name,
+    },
+    measures: {
+      qty: (l) => new Decimal(l.quantity.toString()),
+      subTotal: (l) => amountsOf(l).subTotal,
+      vat: (l) => amountsOf(l).vat,
+      grandTotal: (l) => amountsOf(l).grandTotal,
+    },
+    formatTotals: (t) => ({
+      qty: t.qty!.toFixed(3),
+      subTotal: t.subTotal!.toFixed(2),
+      vat: t.vat!.toFixed(2),
+      grandTotal: t.grandTotal!.toFixed(2),
+    }),
+  })
+
+  const filters: Record<string, string> = {}
+  if (params.idNumber) filters.idNumber = params.idNumber
+  if (params.refNumber) filters.refNumber = params.refNumber
+  if (params.customerId) filters.customerId = params.customerId
+
+  return {
+    reportId,
+    title,
+    pdfStyle: 'ledger',
+    params: {
+      from: params.from,
+      to: params.to,
+      ...(Object.keys(filters).length > 0 ? { filters } : {}),
+    },
+    columns: [
+      { key: 'code', label: 'Code', width: 0.1, format: 'text', excelWidth: 12 },
+      { key: 'name', label: 'Product', width: 0.26, format: 'text', excelWidth: 28 },
+      { key: 'price', label: 'Price', width: 0.12, align: 'right', format: 'money', excelWidth: 12 },
+      { key: 'qty', label: 'Qty', width: 0.12, align: 'right', format: 'mass', excelWidth: 12 },
+      { key: 'subTotal', label: 'Sub Total', width: 0.14, align: 'right', format: 'money', excelWidth: 14 },
+      { key: 'vat', label: 'VAT', width: 0.11, align: 'right', format: 'money', excelWidth: 12 },
+      { key: 'grandTotal', label: 'Grand Total', width: 0.15, align: 'right', format: 'money', excelWidth: 14 },
+    ],
+    groups,
+    grandTotal,
+    meta: { ...meta, rowCount: countDataRows(groups) },
+  }
+}
+
+export function buildPurchasesByCasualId(
+  params: PurchasesByIdSearchParams,
+  meta: MetaBase
+): Promise<ReportDocument> {
+  return buildPurchasesByIdSearchCore(params, meta, 'casual', 'purchases-by-casual-id', 'Purchases by Casual ID')
+}
+
+export function buildPurchasesByAccountId(
+  params: PurchasesByIdSearchParams,
+  meta: MetaBase
+): Promise<ReportDocument> {
+  return buildPurchasesByIdSearchCore(params, meta, 'account', 'purchases-by-account-id', 'Purchases by Account ID')
 }

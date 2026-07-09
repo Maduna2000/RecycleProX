@@ -3,7 +3,7 @@
 import { useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Plus, Trash2, Loader2, AlertTriangle, Scale, RefreshCw, Camera, ClipboardList } from 'lucide-react'
+import { Plus, Trash2, Loader2, AlertTriangle, Scale, RefreshCw, Camera, ClipboardList, X } from 'lucide-react'
 import { toast } from 'sonner'
 import useSWR from 'swr'
 import { CasualSelectorPanel, type CasualSelectorPanelRef } from '@/components/customers/CasualSelectorPanel'
@@ -135,6 +135,12 @@ export default function NewPurchasePage() {
   const [photoFile,    setPhotoFile]    = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const photoInputRef = useRef<HTMLInputElement>(null)
+
+  // ── Scale order link (carries the scale-kiosk weigh-in photo through to
+  //    police copper reporting) ────────────────────────────────────────────
+  const [scaleOrderLink,   setScaleOrderLink]   = useState<{ id: string; orderNumber: string } | null>(null)
+  const [scaleOrderSearch, setScaleOrderSearch] = useState('')
+  const [loadingScaleOrder, setLoadingScaleOrder] = useState(false)
 
   // ── Scale display state ──────────────────────────────────────────────────
   const [scale1,        setScale1]        = useState<string | null>(null)
@@ -302,6 +308,71 @@ export default function NewPurchasePage() {
     setShowAllProducts(false)
   }
 
+  // ── Load from Scale Order ────────────────────────────────────────────────
+  type ScaleOrderHit = {
+    id: string
+    orderNumber: string
+    status: string
+    weight: string | null
+    customerId: string | null
+    product: { id: string; name: string; unit?: string; category: string }
+    lines?: { weight: string | null; product: { id?: string; name: string; unit: string; category: string } }[]
+  }
+
+  async function handleLoadScaleOrder() {
+    const term = scaleOrderSearch.trim()
+    if (!term) return
+    setLoadingScaleOrder(true)
+    try {
+      const res = await fetch(`/api/scale/orders?search=${encodeURIComponent(term)}&unlinkedOnly=true&pageSize=5`)
+      if (!res.ok) { toast.error('Failed to look up scale order'); return }
+      const data = await res.json() as { orders: ScaleOrderHit[] }
+      const exact = data.orders.find((o) => o.orderNumber.toLowerCase() === term.toLowerCase())
+      const match = exact ?? (data.orders.length === 1 ? data.orders[0] : null)
+      if (!match) {
+        toast.error(data.orders.length === 0 ? 'No matching unlinked scale order found' : 'Multiple matches — enter the full order number')
+        return
+      }
+      if (match.status === 'voided') { toast.error('That scale order has been voided'); return }
+      if (!match.customerId) { toast.error('That scale order has no linked customer yet'); return }
+
+      const custRes = await fetch(`/api/customers/${match.customerId}`)
+      if (!custRes.ok) { toast.error("Failed to load the scale order's customer"); return }
+      const fullCustomer = await custRes.json() as SelectedCustomer & { customerType?: 'casual' | 'account'; priceGroupId?: string | null }
+
+      setCustomerType(fullCustomer.customerType === 'account' ? 'account' : 'casual')
+      handleCustomerSelect(fullCustomer)
+      setScaleOrderLink({ id: match.id, orderNumber: match.orderNumber })
+      setScaleOrderSearch('')
+
+      // Prefill the first product line from the scale order's first line
+      const firstLine = match.lines?.[0]
+      const productId = firstLine?.product?.id ?? match.product.id
+      const weight = firstLine?.weight ?? match.weight
+      const product = products.find((p) => p.id === productId) ?? null
+      let unitPrice = product ? new Decimal(product.defaultBuyPrice).toFixed(2) : ''
+      if (product && fullCustomer.priceGroupId) {
+        try {
+          const priceRes = await fetch(`/api/products/${productId}?priceGroupId=${fullCustomer.priceGroupId}`)
+          if (priceRes.ok) {
+            const d = await priceRes.json() as { defaultBuyPrice: string }
+            unitPrice = new Decimal(d.defaultBuyPrice).toFixed(2)
+          }
+        } catch { /* use default */ }
+      }
+      patchLine(lines[0]!.key, {
+        productId, product, unitPrice,
+        quantity: weight ? new Decimal(weight).toFixed(3) : lines[0]!.quantity,
+      })
+
+      toast.success(`Loaded scale order ${match.orderNumber}`)
+    } catch {
+      toast.error('Failed to load scale order')
+    } finally {
+      setLoadingScaleOrder(false)
+    }
+  }
+
   // ── Submit ───────────────────────────────────────────────────────────────
   async function submitPurchase(isPending: boolean) {
     // For casual mode, if no customer is confirmed yet, auto-confirm via ref
@@ -342,6 +413,7 @@ export default function NewPurchasePage() {
       customerId: resolvedCustomer.id, paymentMethod, status,
       notes: combinedNotes,
       ...(deduction ? { loanDeductionAmount: deduction } : {}),
+      ...(scaleOrderLink ? { scaleOrderId: scaleOrderLink.id } : {}),
       lines: validLines.map((l) => ({
         productId: l.productId, quantity: l.quantity, unitPrice: l.unitPrice,
         vatApplied: l.vatApplied,
@@ -411,6 +483,8 @@ export default function NewPurchasePage() {
           setDeductionAmount('')
           setPhotoFile(null)
           setPhotoPreview(null)
+          setScaleOrderLink(null)
+          setScaleOrderSearch('')
           mutatePending()
           toast.success(`Purchase ${purchase.refNumber} saved as unpaid`)
         } else {
@@ -498,6 +572,40 @@ export default function NewPurchasePage() {
             >
               Account
             </button>
+
+            {/* Load from Scale Order */}
+            {scaleOrderLink ? (
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, padding: '2px 8px', borderRadius: 2, background: '#DBEAFE', color: '#1D4ED8' }}>
+                Scale Order: {scaleOrderLink.orderNumber}
+                <button
+                  type="button"
+                  onClick={() => setScaleOrderLink(null)}
+                  title="Unlink scale order"
+                  style={{ display: 'flex', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', color: '#1D4ED8', padding: 0 }}
+                >
+                  <X style={{ width: 11, height: 11 }} />
+                </button>
+              </span>
+            ) : (
+              <>
+                <input
+                  value={scaleOrderSearch}
+                  onChange={(e) => setScaleOrderSearch(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleLoadScaleOrder() }}
+                  placeholder="Scale Order #"
+                  style={{ width: 110, fontSize: 11, padding: '2px 6px', border: '1px solid #ABABAB', borderRadius: 2, outline: 'none' }}
+                />
+                <button
+                  type="button"
+                  onClick={handleLoadScaleOrder}
+                  disabled={loadingScaleOrder || !scaleOrderSearch.trim()}
+                  style={{ fontSize: 11, padding: '2px 8px', background: '#E0E0E0', border: '1px solid #999', borderRadius: 2, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3, opacity: loadingScaleOrder || !scaleOrderSearch.trim() ? 0.5 : 1 }}
+                >
+                  {loadingScaleOrder ? <Loader2 style={{ width: 10, height: 10, animation: 'spin 1s linear infinite' }} /> : <Scale style={{ width: 10, height: 10 }} />}
+                  Load
+                </button>
+              </>
+            )}
 
             {/* GRV No + Invoice No pushed to right */}
             <div style={{ flex: 1 }} />

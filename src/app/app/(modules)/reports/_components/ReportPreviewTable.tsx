@@ -123,6 +123,24 @@ export function ReportPreviewTable({ doc }: ReportPreviewTableProps) {
                   }
                   if (isTotal && firstMeasureIdx > 0 && cIdx < firstMeasureIdx) return null
 
+                  if (col.isImage) {
+                    return (
+                      <td
+                        key={col.key}
+                        className="px-2 py-1 border"
+                        style={{ borderColor: '#DDD', textAlign: 'center', whiteSpace: 'nowrap' }}
+                      >
+                        {row.imageUrl ? (
+                          <a href={row.imageUrl} target="_blank" rel="noopener noreferrer" style={{ color: colors.process }}>
+                            View
+                          </a>
+                        ) : (
+                          <span style={{ color: colors.textSecondary }}>No image</span>
+                        )}
+                      </td>
+                    )
+                  }
+
                   const has = Object.prototype.hasOwnProperty.call(cells, col.key)
                   return (
                     <td

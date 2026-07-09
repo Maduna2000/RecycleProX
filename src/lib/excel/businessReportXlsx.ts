@@ -21,7 +21,8 @@ const NUMBER_FORMATS: Record<string, string> = {
 
 export function generateBusinessReportXlsx(report: ReportDocument): ArrayBuffer {
   const flat = flattenReportDocument(report)
-  const cols = report.columns
+  // Photo columns have no meaningful spreadsheet representation — omit them.
+  const cols = report.columns.filter((c) => !c.isImage)
 
   const aoa: (string | number | null)[][] = []
 

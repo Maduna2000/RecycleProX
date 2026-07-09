@@ -7,7 +7,7 @@
  * client-safe: no Prisma, no Node-only imports.
  */
 
-export type ReportArea = 'purchases' | 'sales' | 'cash' | 'stock'
+export type ReportArea = 'purchases' | 'sales' | 'cash' | 'stock' | 'accounts' | 'compliance'
 
 /** How a column's raw cell string should be rendered. */
 export type ColumnFormat =
@@ -29,6 +29,12 @@ export interface ReportColumn {
   format?: ColumnFormat
   /** Excel column width in characters. */
   excelWidth?: number
+  /**
+   * Renders as a photo thumbnail in the PDF instead of a text cell (the row's
+   * imageR2Key/imageUrl supply the image, not cells[key]). Excel drops the
+   * column; the on-screen preview shows a "View" link or "No image".
+   */
+  isImage?: boolean
 }
 
 /**
@@ -38,6 +44,10 @@ export interface ReportColumn {
  */
 export interface ReportRow {
   cells: Record<string, string | null>
+  /** R2 key for an isImage column — PDF engine embeds via fetchR2Bytes (server-side only). */
+  imageR2Key?: string | null
+  /** Presigned GET URL for an isImage column — used by the on-screen preview's "View" link. */
+  imageUrl?: string | null
 }
 
 export interface ReportGroup {
@@ -108,4 +118,6 @@ export interface FlatRow {
   label?: string
   meta?: string
   cells?: Record<string, string | null>
+  imageR2Key?: string | null
+  imageUrl?: string | null
 }

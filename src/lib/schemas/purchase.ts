@@ -42,6 +42,7 @@ export const CreatePurchaseSchema = z.object({
   notes:               z.string().max(500).optional(),
   loanDeductionAmount: z.string().regex(/^\d+(\.\d{1,2})?$/, 'Invalid amount').optional(),
   lines:               z.array(PurchaseLineSchema).min(1, 'At least one product line is required'),
+  scaleOrderId:        z.string().uuid('Invalid scale order').optional(),
 })
 
 export const VoidPurchaseSchema = z.object({

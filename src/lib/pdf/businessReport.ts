@@ -14,10 +14,11 @@
  * Modeled on cashupReport.ts, which stays untouched — the cash-up pack keeps
  * its own engine. Server-side only. Returns PDF bytes.
  */
-import { PDFDocument, rgb, StandardFonts, PDFPage, PDFFont } from 'pdf-lib'
+import { PDFDocument, rgb, StandardFonts, PDFPage, PDFFont, PDFImage } from 'pdf-lib'
 import type { FlatRow, ReportDocument } from '@/lib/reports/types'
 import { flattenReportDocument } from '@/lib/reports/flatten'
 import { formatCell, formatDateSAST, formatDateTimeSAST } from '@/lib/reports/format'
+import { fetchR2Bytes } from '@/lib/r2'
 
 // ─── Layout constants ─────────────────────────────────────────────────────────
 const PAGE_W = 595 // A4 portrait
@@ -35,6 +36,7 @@ const VERY_LIGHT_GRAY = rgb(0.95, 0.95, 0.95)
 const GROUP_SHADES = [rgb(0.8, 0.8, 0.8), rgb(0.88, 0.88, 0.88), rgb(0.94, 0.94, 0.94)]
 
 const ROW_H = 15
+const IMAGE_ROW_H = 46
 const GROUP_H = 16
 const SUBTOTAL_H = 16
 const GRAND_H = 20
@@ -72,6 +74,10 @@ interface Ctx {
    * columns row at the top of every page including the first.
    */
   ledgerTopColumns: boolean
+  /** Row height for 'data' rows in the grid layout — taller when an isImage column is present. */
+  dataRowH: number
+  /** R2 key -> embedded image, pre-fetched once for every distinct key used by an isImage column. */
+  imageCache: Map<string, PDFImage>
 }
 
 export async function generateBusinessReportPdf(report: ReportDocument): Promise<Uint8Array> {
@@ -81,11 +87,33 @@ export async function generateBusinessReportPdf(report: ReportDocument): Promise
 
   const flat = flattenReportDocument(report)
 
+  const hasImageCol = report.columns.some((c) => c.isImage)
+  const imageCache = new Map<string, PDFImage>()
+  if (hasImageCol) {
+    const keys = Array.from(new Set(flat.filter((r) => r.imageR2Key).map((r) => r.imageR2Key as string)))
+    await Promise.all(
+      keys.map(async (key) => {
+        const bytes = await fetchR2Bytes(key)
+        if (!bytes || bytes.length === 0) return
+        try {
+          let img: PDFImage
+          try { img = await doc.embedPng(bytes) }
+          catch { img = await doc.embedJpg(bytes) }
+          imageCache.set(key, img)
+        } catch {
+          // Unembeddable image — falls back to "No image" at render time
+        }
+      })
+    )
+  }
+
   const hasPlainClassBands = flat.some((r) => r.type === 'groupHeader' && r.level === 1 && !r.meta)
   const ctx: Ctx = {
     doc, report, bold, reg, pages: [],
     page: undefined as unknown as PDFPage, y: 0,
     ledgerTopColumns: !hasPlainClassBands,
+    dataRowH: hasImageCol ? IMAGE_ROW_H : ROW_H,
+    imageCache,
   }
   newPage(ctx, true)
 
@@ -404,7 +432,7 @@ function drawFlatRow(ctx: Ctx, row: FlatRow, next: FlatRow | undefined): void {
       break
     }
     case 'data':
-      ensureSpace(ctx, ROW_H)
+      ensureSpace(ctx, ctx.dataRowH)
       drawDataRow(ctx, row)
       break
     case 'subtotal':
@@ -452,7 +480,8 @@ function drawCellsInColumns(
   rowH: number,
   font: PDFFont,
   size: number,
-  withBorders: boolean
+  withBorders: boolean,
+  rowImageKey?: string | null
 ): void {
   const { page, report } = ctx
   let x = MARGIN
@@ -465,7 +494,29 @@ function drawCellsInColumns(
         thickness: BORDER_WIDTH, color: BLACK,
       })
     }
-    if (Object.prototype.hasOwnProperty.call(cells, col.key)) {
+    if (col.isImage) {
+      // rowImageKey === undefined means this call site (header/subtotal/grand
+      // total/ledger rows) doesn't track a per-row image — leave the cell
+      // blank rather than claim "No image" for a row that was never a photo row.
+      const img = rowImageKey ? ctx.imageCache.get(rowImageKey) : undefined
+      if (img) {
+        const availW = colW - CELL_PADDING * 2
+        const availH = rowH - 4
+        const scale = Math.min(availW / img.width, availH / img.height, 1)
+        const imgW = img.width * scale
+        const imgH = img.height * scale
+        page.drawImage(img, {
+          x: x + (colW - imgW) / 2,
+          y: rowY + (rowH - imgH) / 2,
+          width: imgW,
+          height: imgH,
+        })
+      } else if (rowImageKey !== undefined) {
+        page.drawText('No image', {
+          x: x + CELL_PADDING, y: rowY + (rowH - size) / 2, size, font: ctx.reg, color: MEDIUM_GRAY,
+        })
+      }
+    } else if (Object.prototype.hasOwnProperty.call(cells, col.key)) {
       const raw = cells[col.key]
       const value = truncate(sanitize(formatCell(raw, col.format, ctx.report.meta.currencySymbol)), colW)
       const textX = col.align === 'right'
@@ -479,16 +530,16 @@ function drawCellsInColumns(
 
 function drawDataRow(ctx: Ctx, row: FlatRow): void {
   const { page, reg } = ctx
-  const rowY = ctx.y - ROW_H
+  const rowY = ctx.y - ctx.dataRowH
 
   // Bordered cell row with left/right edges (zebra shading skipped — group
   // bands already delineate; legacy reports use plain white data rows)
   page.drawRectangle({
-    x: MARGIN, y: rowY, width: CONTENT_W, height: ROW_H,
+    x: MARGIN, y: rowY, width: CONTENT_W, height: ctx.dataRowH,
     borderColor: BLACK, borderWidth: BORDER_WIDTH,
   })
 
-  drawCellsInColumns(ctx, row.cells ?? {}, rowY, ROW_H, reg, DATA_FONT_SIZE, true)
+  drawCellsInColumns(ctx, row.cells ?? {}, rowY, ctx.dataRowH, reg, DATA_FONT_SIZE, true, row.imageR2Key ?? null)
   ctx.y = rowY
 }
 

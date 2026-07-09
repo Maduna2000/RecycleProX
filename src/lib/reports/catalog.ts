@@ -11,6 +11,7 @@ export type FilterType =
   | 'product'
   | 'cashup'
   | 'select'
+  | 'text'
 
 export interface FilterSpec {
   key: string
@@ -34,6 +35,8 @@ export const REPORT_AREA_LABELS: Record<ReportArea, string> = {
   sales: 'Sales',
   cash: 'Cash & Financial',
   stock: 'Stock',
+  accounts: 'Accounts & Pricing',
+  compliance: 'Police & Compliance',
 }
 
 export const REPORT_CATALOG: ReportCatalogEntry[] = [
@@ -224,6 +227,98 @@ export const REPORT_CATALOG: ReportCatalogEntry[] = [
       },
       { key: 'productId', label: 'Product', type: 'product' },
     ],
+  },
+  {
+    id: 'stocktake-report',
+    label: 'Stock Take Report',
+    description:
+      'Every stocktake session in the period with per-product system quantity, counted quantity, and variance.',
+    area: 'stock',
+    filters: [
+      {
+        key: 'status', label: 'Status', type: 'select',
+        options: [
+          { value: 'open', label: 'Open' },
+          { value: 'completed', label: 'Completed' },
+          { value: 'all', label: 'All (not voided)' },
+        ],
+      },
+    ],
+  },
+  // ── Accounts & Pricing ─────────────────────────────────────────────────────
+  {
+    id: 'dealers-price-list',
+    label: 'Dealers Price List',
+    description:
+      'Current buy price for every product, grouped by category, for Casual and each Dealer tier (1–3).',
+    area: 'accounts',
+    filters: [],
+  },
+  {
+    id: 'account-list',
+    label: 'Account List',
+    description:
+      'Every account (dealer) customer as at the selected date: company, registration/VAT numbers, price group, and contact details.',
+    area: 'accounts',
+    filters: [],
+  },
+  {
+    id: 'casual-list',
+    label: 'Casual List',
+    description:
+      'Every casual (walk-in) seller as at the selected date: name, ID number, phone, and police register number.',
+    area: 'accounts',
+    filters: [],
+  },
+  // ── Purchases: seller lookups ──────────────────────────────────────────────
+  {
+    id: 'purchases-by-casual-id',
+    label: 'Purchases by Casual ID',
+    description:
+      'Search a casual seller by ID number or a transaction by reference number and list their matching purchases with line detail and totals.',
+    area: 'purchases',
+    filters: [
+      { key: 'idNumber', label: 'ID Number (partial)', type: 'text' },
+      { key: 'refNumber', label: 'Transaction No. (partial)', type: 'text' },
+      { key: 'customerId', label: 'Casual Seller', type: 'customer' },
+    ],
+  },
+  {
+    id: 'purchases-by-account-id',
+    label: 'Purchases by Account ID',
+    description:
+      'Search an account (dealer) by ID number or a transaction by reference number and list their matching purchases with line detail and totals.',
+    area: 'purchases',
+    filters: [
+      { key: 'idNumber', label: 'ID Number (partial)', type: 'text' },
+      { key: 'refNumber', label: 'Transaction No. (partial)', type: 'text' },
+      { key: 'customerId', label: 'Account', type: 'customer' },
+    ],
+  },
+  // ── Police & Compliance ────────────────────────────────────────────────────
+  {
+    id: 'police-register',
+    label: 'Police Register',
+    description:
+      'Every purchase in the period in police register format: reference, supplier name, ID number, address, items, and amount paid.',
+    area: 'compliance',
+    filters: [],
+  },
+  {
+    id: 'police-copper-report',
+    label: 'Police Copper Report',
+    description:
+      'Every purchase containing Copper-family products in the period: reference, seller name, company, casual name, ID number, and net kg.',
+    area: 'compliance',
+    filters: [],
+  },
+  {
+    id: 'police-copper-report-images',
+    label: 'Police Copper Report with Images',
+    description:
+      'The Police Copper Report plus the scale-station photo for each transaction, where the purchase was linked to a scale order.',
+    area: 'compliance',
+    filters: [],
   },
 ]
 

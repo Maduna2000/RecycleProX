@@ -635,13 +635,10 @@ export async function getVisitForCertificate(id: string) {
 
 // ─── Daily register PDF data (existing staff flow) ────────────────────────────
 
-export async function getPurchasesForRegister(date: Date): Promise<{
+export async function getPurchasesForRegisterRange(start: Date, end: Date): Promise<{
   entries: RegisterEntry[]
   settings: Record<string, string>
 }> {
-  const start = new Date(date); start.setHours(0, 0, 0, 0)
-  const end   = new Date(date); end.setHours(23, 59, 59, 999)
-
   const [purchases, settingsRows] = await Promise.all([
     prisma.purchase.findMany({
       where:   { status: 'completed', createdAt: { gte: start, lte: end } },
@@ -678,4 +675,13 @@ export async function getPurchasesForRegister(date: Date): Promise<{
   }))
 
   return { entries, settings }
+}
+
+export async function getPurchasesForRegister(date: Date): Promise<{
+  entries: RegisterEntry[]
+  settings: Record<string, string>
+}> {
+  const start = new Date(date); start.setHours(0, 0, 0, 0)
+  const end   = new Date(date); end.setHours(23, 59, 59, 999)
+  return getPurchasesForRegisterRange(start, end)
 }

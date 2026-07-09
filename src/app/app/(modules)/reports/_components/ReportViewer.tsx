@@ -203,6 +203,39 @@ function ProductSelect({
   )
 }
 
+/** Plain free-text filter — e.g. a partial ID number or transaction number search. */
+function TextFilter({
+  label,
+  value,
+  onChange,
+}: {
+  label: string
+  value: string
+  onChange: (v: string) => void
+}) {
+  const active = !!value
+  return (
+    <div>
+      <Label className="text-xs mb-1 block" style={{ color: colors.textSecondary }}>
+        {label}
+      </Label>
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="Type to filter…"
+        className="h-9 rounded-md px-2 text-sm outline-none"
+        style={{
+          border: `1px solid ${active ? colors.process : colors.border}`,
+          background: active ? colors.processBg : colors.surface,
+          color: active ? colors.textPrimary : colors.textSecondary,
+          fontWeight: active ? fontWeight.medium : fontWeight.regular,
+          minWidth: 170,
+        }}
+      />
+    </div>
+  )
+}
+
 function FilterControl({
   spec,
   value,
@@ -217,6 +250,9 @@ function FilterControl({
   }
   if (spec.type === 'product') {
     return <ProductSelect label={spec.label} value={value} onChange={onChange} required={spec.required} />
+  }
+  if (spec.type === 'text') {
+    return <TextFilter label={spec.label} value={value} onChange={onChange} />
   }
 
   const options =

@@ -5,7 +5,9 @@ import { CreatePurchaseSchema } from '@/lib/schemas/purchase'
 import {
   createPurchase, listPurchases,
   CustomerBlacklistedError, CustomerInactiveError, ProductInactiveError,
+  ScaleOrderAlreadyLinkedError,
 } from '@/lib/services/purchaseService'
+import { ScaleOrderNotFoundError, ScaleOrderAlreadyVoidedError } from '@/lib/services/scaleService'
 
 export async function GET(req: NextRequest) {
   const session = await auth()
@@ -45,6 +47,9 @@ export async function POST(req: NextRequest) {
     if (err instanceof CustomerBlacklistedError) return NextResponse.json({ error: err.message }, { status: 422 })
     if (err instanceof CustomerInactiveError) return NextResponse.json({ error: err.message }, { status: 422 })
     if (err instanceof ProductInactiveError) return NextResponse.json({ error: err.message }, { status: 422 })
+    if (err instanceof ScaleOrderNotFoundError) return NextResponse.json({ error: err.message }, { status: 404 })
+    if (err instanceof ScaleOrderAlreadyVoidedError) return NextResponse.json({ error: err.message }, { status: 422 })
+    if (err instanceof ScaleOrderAlreadyLinkedError) return NextResponse.json({ error: err.message }, { status: 409 })
     logger.error({ err }, 'POST /api/purchases failed')
     return NextResponse.json({ error: 'Failed to create purchase' }, { status: 500 })
   }

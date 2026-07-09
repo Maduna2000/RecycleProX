@@ -10,7 +10,7 @@ import { REPORT_CATALOG, REPORT_AREA_LABELS } from '@/lib/reports/catalog'
 import type { ReportArea } from '@/lib/reports/types'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
 
-const AREA_ORDER: ReportArea[] = ['purchases', 'sales', 'cash', 'stock']
+const AREA_ORDER: ReportArea[] = ['purchases', 'sales', 'cash', 'stock', 'accounts', 'compliance']
 
 interface ReportCatalogProps {
   selectedId: string | null

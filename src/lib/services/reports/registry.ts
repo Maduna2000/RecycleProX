@@ -13,6 +13,7 @@ import {
   PurchasesDailyParamsSchema,
   PurchasesSupplierStatementParamsSchema,
   PurchasesPerProductDayParamsSchema,
+  PurchasesByIdSearchParamsSchema,
   SalesDailyParamsSchema,
   SalesByProductParamsSchema,
   SalesByCustomerParamsSchema,
@@ -20,12 +21,15 @@ import {
   LoanBookParamsSchema,
   StockOnHandParamsSchema,
   StockMovementParamsSchema,
+  StocktakeReportParamsSchema,
 } from '@/lib/schemas/report'
 import {
   buildPurchasesByProductCategory,
   buildPurchasesDaily,
   buildPurchasesSupplierStatement,
   buildPurchasesPerProductDay,
+  buildPurchasesByCasualId,
+  buildPurchasesByAccountId,
 } from './builders/purchases'
 import {
   buildSalesDaily,
@@ -43,6 +47,13 @@ import {
   buildCancelledTransactions,
 } from './builders/cash'
 import { buildStockOnHand, buildStockMovement } from './builders/stock'
+import { buildStocktakeReport } from './builders/stocktake'
+import { buildDealersPriceList, buildAccountList, buildCasualList } from './builders/accounts'
+import {
+  buildPoliceRegisterReport,
+  buildPoliceCopperReport,
+  buildPoliceCopperReportImages,
+} from './builders/police'
 
 type MetaBase = Omit<ReportMeta, 'rowCount'>
 
@@ -121,6 +132,42 @@ export const REPORT_REGISTRY: Record<string, ReportDefinition> = {
   'stock-movement': {
     paramsSchema: StockMovementParamsSchema,
     build: buildStockMovement,
+  },
+  'stocktake-report': {
+    paramsSchema: StocktakeReportParamsSchema,
+    build: buildStocktakeReport,
+  },
+  'dealers-price-list': {
+    paramsSchema: BaseReportParamsSchema,
+    build: buildDealersPriceList,
+  },
+  'account-list': {
+    paramsSchema: BaseReportParamsSchema,
+    build: buildAccountList,
+  },
+  'casual-list': {
+    paramsSchema: BaseReportParamsSchema,
+    build: buildCasualList,
+  },
+  'purchases-by-casual-id': {
+    paramsSchema: PurchasesByIdSearchParamsSchema,
+    build: buildPurchasesByCasualId,
+  },
+  'purchases-by-account-id': {
+    paramsSchema: PurchasesByIdSearchParamsSchema,
+    build: buildPurchasesByAccountId,
+  },
+  'police-register': {
+    paramsSchema: BaseReportParamsSchema,
+    build: buildPoliceRegisterReport,
+  },
+  'police-copper-report': {
+    paramsSchema: BaseReportParamsSchema,
+    build: buildPoliceCopperReport,
+  },
+  'police-copper-report-images': {
+    paramsSchema: BaseReportParamsSchema,
+    build: buildPoliceCopperReportImages,
   },
 }
 

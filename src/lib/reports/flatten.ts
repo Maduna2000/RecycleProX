@@ -13,7 +13,13 @@ function walkGroup(group: ReportGroup, out: FlatRow[]): void {
   }
   if (group.rows) {
     for (const row of group.rows) {
-      out.push({ type: 'data', level: group.level + 1, cells: row.cells })
+      out.push({
+        type: 'data',
+        level: group.level + 1,
+        cells: row.cells,
+        imageR2Key: row.imageR2Key,
+        imageUrl: row.imageUrl,
+      })
     }
   }
   if (group.subtotal) {

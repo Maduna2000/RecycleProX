@@ -11,6 +11,7 @@ import { generateTransactionSlip } from '@/lib/pdf/slip'
 import { uploadBytes, purchaseVat264Key, purchaseNoteKey } from '@/lib/r2'
 import { CURRENCY_SYMBOLS } from '@/lib/schemas/cashup'
 import { VAT_RATE, purchaseHeaderVat } from '@/lib/utils/vat'
+import { ScaleOrderNotFoundError, ScaleOrderAlreadyVoidedError } from '@/lib/services/scaleService'
 import type { CreatePurchaseInput, VoidPurchaseInput } from '@/lib/schemas/purchase'
 import type { ProcessSplitPaymentInput } from '@/lib/schemas/splitPayment'
 
@@ -34,6 +35,10 @@ export class CustomerInactiveError extends Error {
 
 export class ProductInactiveError extends Error {
   constructor(code: string) { super(`Product "${code}" is inactive`); this.name = 'ProductInactiveError' }
+}
+
+export class ScaleOrderAlreadyLinkedError extends Error {
+  constructor(ref: string) { super(`ScaleOrder "${ref}" is already linked to a purchase`); this.name = 'ScaleOrderAlreadyLinkedError' }
 }
 
 
@@ -237,6 +242,18 @@ export async function createPurchase(data: CreatePurchaseInput, createdByUserId?
     prisma.$transaction(async (tx) => {
       const refNumber = await generateRefNumber(tx)
 
+      // Optional link to the scale-kiosk order this purchase was weighed
+      // from — carries its scale-station photo into police copper reporting.
+      if (data.scaleOrderId) {
+        const scaleOrder = await tx.scaleOrder.findUnique({
+          where: { id: data.scaleOrderId },
+          select: { orderNumber: true, status: true, purchase: { select: { id: true } } },
+        })
+        if (!scaleOrder) throw new ScaleOrderNotFoundError(data.scaleOrderId)
+        if (scaleOrder.status === 'voided') throw new ScaleOrderAlreadyVoidedError(scaleOrder.orderNumber)
+        if (scaleOrder.purchase) throw new ScaleOrderAlreadyLinkedError(scaleOrder.orderNumber)
+      }
+
     const p = await tx.purchase.create({
       data: {
         refNumber,
@@ -248,6 +265,7 @@ export async function createPurchase(data: CreatePurchaseInput, createdByUserId?
         paymentMethod: data.paymentMethod ?? 'cash',
         notes: data.notes,
         createdByUserId,
+        scaleOrderId: data.scaleOrderId,
         lines: {
           create: resolvedLines.map((l) => ({
             productId:       l.productId,
@@ -267,6 +285,10 @@ export async function createPurchase(data: CreatePurchaseInput, createdByUserId?
       },
       include: { lines: { include: { product: true } }, customer: true },
     })
+
+    if (data.scaleOrderId) {
+      await tx.scaleOrder.update({ where: { id: data.scaleOrderId }, data: { status: 'processed' } })
+    }
 
     // Stock IN: yard received material from customer
     for (const line of resolvedLines) {

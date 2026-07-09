@@ -43,6 +43,18 @@ export const PurchasesPerProductDayParamsSchema = rangeParams({
   productId: z.string().uuid().optional(),
 })
 
+/** Search a casual/account seller by partial ID number and/or a transaction by partial ref number. */
+export const PurchasesByIdSearchParamsSchema = rangeParams({
+  idNumber: z.string().trim().max(20).optional(),
+  refNumber: z.string().trim().max(40).optional(),
+  customerId: z.string().uuid().optional(),
+}).superRefine((raw: unknown, ctx) => {
+  const p = raw as { idNumber?: string; refNumber?: string; customerId?: string }
+  if (!p.idNumber && !p.refNumber && !p.customerId) {
+    ctx.addIssue({ code: 'custom', message: 'Provide an ID number, transaction number, or customer', path: ['idNumber'] })
+  }
+})
+
 // ── Sales ─────────────────────────────────────────────────────────────────────
 export const SalesDailyParamsSchema = rangeParams({
   customerId: z.string().uuid().optional(),
@@ -74,12 +86,17 @@ export const StockMovementParamsSchema = rangeParams({
   productId: z.string().uuid().optional(),
 })
 
+export const StocktakeReportParamsSchema = rangeParams({
+  status: z.enum(['open', 'completed', 'all']).optional(),
+})
+
 export type BaseReportParams = z.infer<typeof BaseReportParamsSchema>
 export type ReportFormat = z.infer<typeof ReportFormatSchema>
 export type PurchasesByProductCategoryParams = z.infer<typeof PurchasesByProductCategoryParamsSchema>
 export type PurchasesDailyParams = z.infer<typeof PurchasesDailyParamsSchema>
 export type PurchasesSupplierStatementParams = z.infer<typeof PurchasesSupplierStatementParamsSchema>
 export type PurchasesPerProductDayParams = z.infer<typeof PurchasesPerProductDayParamsSchema>
+export type PurchasesByIdSearchParams = z.infer<typeof PurchasesByIdSearchParamsSchema>
 export type SalesDailyParams = z.infer<typeof SalesDailyParamsSchema>
 export type SalesByProductParams = z.infer<typeof SalesByProductParamsSchema>
 export type SalesByCustomerParams = z.infer<typeof SalesByCustomerParamsSchema>
@@ -87,3 +104,4 @@ export type ExpensesReportParams = z.infer<typeof ExpensesReportParamsSchema>
 export type LoanBookParams = z.infer<typeof LoanBookParamsSchema>
 export type StockOnHandParams = z.infer<typeof StockOnHandParamsSchema>
 export type StockMovementParams = z.infer<typeof StockMovementParamsSchema>
+export type StocktakeReportParams = z.infer<typeof StocktakeReportParamsSchema>

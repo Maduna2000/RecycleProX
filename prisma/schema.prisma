@@ -280,8 +280,10 @@ model Purchase {
   vehicleReg              String?
   wbTicketNumber          String?
   splitPayments           Json?
+  scaleOrderId            String?                  @unique
   loanRepayments          LoanRepayment[]
   customer                Customer                 @relation(fields: [customerId], references: [id])
+  scaleOrder              ScaleOrder?              @relation(fields: [scaleOrderId], references: [id])
   lines                   PurchaseLine[]
   transactionPaymentLinks TransactionPaymentLink[]
 
@@ -721,6 +723,7 @@ model ScaleOrder {
   product         Product          @relation("ScaleOrderProduct", fields: [productId], references: [id])
   voidedBy        User?            @relation("ScaleOrderVoidedBy", fields: [voidedById], references: [id])
   lines           ScaleOrderLine[]
+  purchase        Purchase?
 
   @@index([customerId])
   @@index([productId])
