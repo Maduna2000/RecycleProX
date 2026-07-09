@@ -25,9 +25,6 @@ import { Btn, BtnMenu, type BtnVariant, type BtnMenuItem } from '@/components/rp
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-/** Fixed Zone-1 logo block width so Zone 2 buttons can align under "Portal". */
-const LOGO_BLOCK_W = 140
-
 interface ToolbarButton {
   label:    string
   icon:     React.ElementType
@@ -517,7 +514,7 @@ export function AppShell({
         style={{ height: 40, background: 'var(--rpx-navy, #1B3A6B)' }}
       >
         {/* Logo mark */}
-        <div className="flex items-center gap-2 pr-3 border-r border-white/15 shrink-0" style={{ width: LOGO_BLOCK_W }}>
+        <div className="flex items-center gap-2 pr-3 border-r border-white/15 shrink-0">
           <div className="w-6 h-6 rounded bg-white/10 flex items-center justify-center">
             <RefreshCw className="w-3.5 h-3.5 text-[#F2AB1A]" />
           </div>
@@ -571,15 +568,11 @@ export function AppShell({
         if (!showToolbar) return null
         return (
           <div
-            className="flex items-center gap-1 shrink-0 border-b"
+            className="flex items-center gap-1 px-3 shrink-0 border-b"
             style={{
-              height:       'var(--rpx-toolbar-h, 32px)',
-              background:   'rgba(27,58,107,0.09)',
-              borderColor:  'var(--rpx-border, #E0E0E0)',
-              // Align the first button directly below the "Portal" breadcrumb:
-              // 12px header px-3 + fixed logo block + 12px breadcrumb nav px-3.
-              paddingLeft:  LOGO_BLOCK_W + 24,
-              paddingRight: 12,
+              height:      'var(--rpx-toolbar-h, 32px)',
+              background:  'rgba(27,58,107,0.09)',
+              borderColor: 'var(--rpx-border, #E0E0E0)',
             }}
           >
             {toolbarBtns.map((btn, i) => <ToolbarBtn key={i} btn={btn} />)}
