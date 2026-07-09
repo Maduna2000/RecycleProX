@@ -21,10 +21,11 @@ import { formatCell, formatDateSAST, formatDateTimeSAST } from '@/lib/reports/fo
 import { fetchR2Bytes } from '@/lib/r2'
 
 // ─── Layout constants ─────────────────────────────────────────────────────────
-const PAGE_W = 595 // A4 portrait
-const PAGE_H = 842
+const PAGE_SIZES: Record<'portrait' | 'landscape', { w: number; h: number }> = {
+  portrait: { w: 595, h: 842 }, // A4 portrait
+  landscape: { w: 842, h: 595 }, // A4 landscape
+}
 const MARGIN = 40
-const CONTENT_W = PAGE_W - MARGIN * 2
 const FOOTER_SPACE = 26
 
 const BLACK = rgb(0, 0, 0)
@@ -68,6 +69,10 @@ interface Ctx {
   pages: PDFPage[]
   page: PDFPage
   y: number
+  /** Page dimensions for this report's orientation (portrait by default). */
+  pageW: number
+  pageH: number
+  contentW: number
   /**
    * Ledger mode: when no level-1 band exists to carry the column labels
    * (flat reports, or ticket bands that carry meta instead), draw a bare
@@ -84,6 +89,9 @@ export async function generateBusinessReportPdf(report: ReportDocument): Promise
   const doc = await PDFDocument.create()
   const bold = await doc.embedFont(StandardFonts.HelveticaBold)
   const reg = await doc.embedFont(StandardFonts.Helvetica)
+
+  const { w: pageW, h: pageH } = PAGE_SIZES[report.orientation ?? 'portrait']
+  const contentW = pageW - MARGIN * 2
 
   const flat = flattenReportDocument(report)
 
@@ -111,6 +119,7 @@ export async function generateBusinessReportPdf(report: ReportDocument): Promise
   const ctx: Ctx = {
     doc, report, bold, reg, pages: [],
     page: undefined as unknown as PDFPage, y: 0,
+    pageW, pageH, contentW,
     ledgerTopColumns: !hasPlainClassBands,
     dataRowH: hasImageCol ? IMAGE_ROW_H : ROW_H,
     imageCache,
@@ -143,9 +152,9 @@ export async function generateBusinessReportPdf(report: ReportDocument): Promise
 // ─── Page management ──────────────────────────────────────────────────────────
 
 function newPage(ctx: Ctx, first: boolean): void {
-  ctx.page = ctx.doc.addPage([PAGE_W, PAGE_H])
+  ctx.page = ctx.doc.addPage([ctx.pageW, ctx.pageH])
   ctx.pages.push(ctx.page)
-  ctx.y = PAGE_H - MARGIN
+  ctx.y = ctx.pageH - MARGIN
   drawPageHeader(ctx, first)
   if (ctx.report.pdfStyle === 'ledger') {
     // Class bands carry the column labels when they exist; otherwise (and on
@@ -170,19 +179,19 @@ function drawPageHeader(ctx: Ctx, first: boolean): void {
 
   // Title (left) + PRINT DATE box (right)
   const title = sanitize(report.title.toUpperCase())
-  page.drawText(truncate(title, CONTENT_W - 150), {
+  page.drawText(truncate(title, ctx.contentW - 150), {
     x: MARGIN, y: y - 4, size: 12, font: bold, color: BLACK,
   })
 
   const printDate = `PRINT DATE: ${formatDateTimeSAST(report.meta.generatedAt)}`
   page.drawText(printDate, {
-    x: PAGE_W - MARGIN - bold.widthOfTextAtSize(printDate, 8),
+    x: ctx.pageW - MARGIN - bold.widthOfTextAtSize(printDate, 8),
     y: y - 3, size: 8, font: bold, color: BLACK,
   })
 
   y -= 12
   page.drawLine({
-    start: { x: MARGIN, y }, end: { x: PAGE_W - MARGIN, y },
+    start: { x: MARGIN, y }, end: { x: ctx.pageW - MARGIN, y },
     thickness: 1.2, color: BLACK,
   })
   y -= 12
@@ -220,14 +229,14 @@ function drawTableHeader(ctx: Ctx): void {
   const headerY = ctx.y - HEADER_ROW_H
 
   page.drawRectangle({
-    x: MARGIN, y: headerY, width: CONTENT_W, height: HEADER_ROW_H,
+    x: MARGIN, y: headerY, width: ctx.contentW, height: HEADER_ROW_H,
     color: LIGHT_GRAY, borderColor: BLACK, borderWidth: BORDER_WIDTH,
   })
 
   let x = MARGIN
   for (let i = 0; i < report.columns.length; i++) {
     const col = report.columns[i]!
-    const colW = col.width * CONTENT_W
+    const colW = col.width * ctx.contentW
     if (i > 0) {
       page.drawLine({
         start: { x, y: headerY }, end: { x, y: headerY + HEADER_ROW_H },
@@ -257,9 +266,9 @@ function ledgerLabelSpan(ctx: Ctx): number {
   let span = 0
   for (const col of ctx.report.columns) {
     if (col.align === 'right') break
-    span += col.width * CONTENT_W
+    span += col.width * ctx.contentW
   }
-  return Math.max(span, CONTENT_W * 0.25)
+  return Math.max(span, ctx.contentW * 0.25)
 }
 
 /** Column labels row; when a material-class band label is given it shares the row (legacy style). */
@@ -268,7 +277,7 @@ function drawLedgerColumnsRow(ctx: Ctx, bandLabel: string | undefined): void {
   const rowY = ctx.y - LEDGER_BAND_H
 
   page.drawLine({
-    start: { x: MARGIN, y: ctx.y }, end: { x: PAGE_W - MARGIN, y: ctx.y },
+    start: { x: MARGIN, y: ctx.y }, end: { x: ctx.pageW - MARGIN, y: ctx.y },
     thickness: 0.9, color: BLACK,
   })
 
@@ -280,7 +289,7 @@ function drawLedgerColumnsRow(ctx: Ctx, bandLabel: string | undefined): void {
 
   let x = MARGIN
   for (const col of report.columns) {
-    const colW = col.width * CONTENT_W
+    const colW = col.width * ctx.contentW
     // Legacy leaves the leading text columns unlabeled — the band name owns that space
     if (col.align === 'right') {
       // Measure precisely — header labels are short and often just fit
@@ -297,7 +306,7 @@ function drawLedgerColumnsRow(ctx: Ctx, bandLabel: string | undefined): void {
   }
 
   page.drawLine({
-    start: { x: MARGIN, y: rowY }, end: { x: PAGE_W - MARGIN, y: rowY },
+    start: { x: MARGIN, y: rowY }, end: { x: ctx.pageW - MARGIN, y: rowY },
     thickness: 0.5, color: BLACK,
   })
   ctx.y = rowY
@@ -309,7 +318,7 @@ function drawLedgerGroupHeader(ctx: Ctx, row: FlatRow): void {
     // Account category: plain bold heading, breathing room above
     ctx.y -= 6
     const rowY = ctx.y - 14
-    page.drawText(truncate(sanitize(row.label ?? ''), CONTENT_W), {
+    page.drawText(truncate(sanitize(row.label ?? ''), ctx.contentW), {
       x: MARGIN, y: rowY + 2, size: 10, font: bold, color: BLACK,
     })
     ctx.y = rowY
@@ -325,15 +334,15 @@ function drawLedgerGroupHeader(ctx: Ctx, row: FlatRow): void {
     // under a thin rule — column labels live at the top of the page instead
     const rowY = ctx.y - LEDGER_BAND_H
     page.drawLine({
-      start: { x: MARGIN, y: ctx.y - 2 }, end: { x: PAGE_W - MARGIN, y: ctx.y - 2 },
+      start: { x: MARGIN, y: ctx.y - 2 }, end: { x: ctx.pageW - MARGIN, y: ctx.y - 2 },
       thickness: 0.5, color: BLACK,
     })
-    page.drawText(truncate(sanitize(row.label ?? ''), CONTENT_W * 0.45), {
+    page.drawText(truncate(sanitize(row.label ?? ''), ctx.contentW * 0.45), {
       x: MARGIN, y: rowY + 3.5, size: 8.5, font: bold, color: BLACK,
     })
-    const meta = truncate(sanitize(row.meta ?? ''), CONTENT_W * 0.5)
+    const meta = truncate(sanitize(row.meta ?? ''), ctx.contentW * 0.5)
     page.drawText(meta, {
-      x: PAGE_W - MARGIN - ctx.reg.widthOfTextAtSize(meta, 7.5),
+      x: ctx.pageW - MARGIN - ctx.reg.widthOfTextAtSize(meta, 7.5),
       y: rowY + 4, size: 7.5, font: ctx.reg, color: DARK_GRAY,
     })
     ctx.y = rowY
@@ -341,7 +350,7 @@ function drawLedgerGroupHeader(ctx: Ctx, row: FlatRow): void {
   }
   // Subcategory: small bold label on its own line
   const rowY = ctx.y - LEDGER_ROW_H
-  page.drawText(truncate(sanitize(row.label ?? ''), CONTENT_W * 0.4), {
+  page.drawText(truncate(sanitize(row.label ?? ''), ctx.contentW * 0.4), {
     x: MARGIN + 2, y: rowY + 3, size: 7.5, font: bold, color: BLACK,
   })
   ctx.y = rowY
@@ -362,12 +371,12 @@ function drawLedgerTotalRow(ctx: Ctx, row: FlatRow, grand: boolean): void {
   // Rule above the totals row — heavier for higher levels
   const thickness = grand ? 1.2 : level === 0 ? 1 : level === 1 ? 0.8 : 0.5
   page.drawLine({
-    start: { x: MARGIN, y: ctx.y - 1.5 }, end: { x: PAGE_W - MARGIN, y: ctx.y - 1.5 },
+    start: { x: MARGIN, y: ctx.y - 1.5 }, end: { x: ctx.pageW - MARGIN, y: ctx.y - 1.5 },
     thickness, color: BLACK,
   })
   if (grand) {
     page.drawLine({
-      start: { x: MARGIN, y: ctx.y - 3.5 }, end: { x: PAGE_W - MARGIN, y: ctx.y - 3.5 },
+      start: { x: MARGIN, y: ctx.y - 3.5 }, end: { x: ctx.pageW - MARGIN, y: ctx.y - 3.5 },
       thickness: 0.5, color: BLACK,
     })
   }
@@ -379,7 +388,7 @@ function drawLedgerTotalRow(ctx: Ctx, row: FlatRow, grand: boolean): void {
   )
   const labelSpanW = report.columns
     .slice(0, firstMeasureIdx === -1 ? report.columns.length : firstMeasureIdx)
-    .reduce((w, c) => w + c.width * CONTENT_W, 0)
+    .reduce((w, c) => w + c.width * ctx.contentW, 0)
   const size = grand || level === 0 ? 9 : 8
   const label = truncate(
     sanitize(grand ? (row.label ?? 'GRAND TOTAL:') : (row.label ?? '').replace(/\s+TOTAL:$/, '')),
@@ -452,12 +461,12 @@ function drawGroupHeader(ctx: Ctx, row: FlatRow): void {
   const shade = GROUP_SHADES[Math.min(row.level, GROUP_SHADES.length - 1)]!
 
   page.drawRectangle({
-    x: MARGIN, y: bandY, width: CONTENT_W, height: GROUP_H,
+    x: MARGIN, y: bandY, width: ctx.contentW, height: GROUP_H,
     color: shade, borderColor: BLACK, borderWidth: BORDER_WIDTH,
   })
 
   const indent = MARGIN + CELL_PADDING + row.level * 10
-  const label = truncate(sanitize(row.label ?? ''), CONTENT_W - row.level * 10 - (row.meta ? 180 : 0))
+  const label = truncate(sanitize(row.label ?? ''), ctx.contentW - row.level * 10 - (row.meta ? 180 : 0))
   page.drawText(label, {
     x: indent, y: bandY + (GROUP_H - 8) / 2, size: 8, font: bold, color: BLACK,
   })
@@ -465,7 +474,7 @@ function drawGroupHeader(ctx: Ctx, row: FlatRow): void {
   if (row.meta) {
     const meta = truncate(sanitize(row.meta), 176)
     page.drawText(meta, {
-      x: PAGE_W - MARGIN - reg.widthOfTextAtSize(meta, 7) - CELL_PADDING,
+      x: ctx.pageW - MARGIN - reg.widthOfTextAtSize(meta, 7) - CELL_PADDING,
       y: bandY + (GROUP_H - 7) / 2, size: 7, font: reg, color: DARK_GRAY,
     })
   }
@@ -487,7 +496,7 @@ function drawCellsInColumns(
   let x = MARGIN
   for (let i = 0; i < report.columns.length; i++) {
     const col = report.columns[i]!
-    const colW = col.width * CONTENT_W
+    const colW = col.width * ctx.contentW
     if (withBorders && i > 0) {
       page.drawLine({
         start: { x, y: rowY }, end: { x, y: rowY + rowH },
@@ -535,7 +544,7 @@ function drawDataRow(ctx: Ctx, row: FlatRow): void {
   // Bordered cell row with left/right edges (zebra shading skipped — group
   // bands already delineate; legacy reports use plain white data rows)
   page.drawRectangle({
-    x: MARGIN, y: rowY, width: CONTENT_W, height: ctx.dataRowH,
+    x: MARGIN, y: rowY, width: ctx.contentW, height: ctx.dataRowH,
     borderColor: BLACK, borderWidth: BORDER_WIDTH,
   })
 
@@ -548,13 +557,13 @@ function drawSubtotalRow(ctx: Ctx, row: FlatRow): void {
   const rowY = ctx.y - SUBTOTAL_H
 
   page.drawRectangle({
-    x: MARGIN, y: rowY, width: CONTENT_W, height: SUBTOTAL_H,
+    x: MARGIN, y: rowY, width: ctx.contentW, height: SUBTOTAL_H,
     color: VERY_LIGHT_GRAY, borderColor: BLACK, borderWidth: BORDER_WIDTH,
   })
   // Double top border — classic "totals" ruling
   page.drawLine({
     start: { x: MARGIN, y: rowY + SUBTOTAL_H - 1.5 },
-    end: { x: PAGE_W - MARGIN, y: rowY + SUBTOTAL_H - 1.5 },
+    end: { x: ctx.pageW - MARGIN, y: rowY + SUBTOTAL_H - 1.5 },
     thickness: BORDER_WIDTH, color: BLACK,
   })
 
@@ -565,7 +574,7 @@ function drawSubtotalRow(ctx: Ctx, row: FlatRow): void {
   )
   const labelSpanW = report.columns
     .slice(0, firstMeasureIdx === -1 ? report.columns.length : firstMeasureIdx)
-    .reduce((w, c) => w + c.width * CONTENT_W, 0)
+    .reduce((w, c) => w + c.width * ctx.contentW, 0)
   const label = truncate(sanitize(row.label ?? 'TOTAL:'), Math.max(labelSpanW, 120))
   const labelX = Math.max(
     MARGIN + CELL_PADDING,
@@ -585,7 +594,7 @@ function drawGrandTotalRow(ctx: Ctx, row: FlatRow): void {
   const rowY = ctx.y - GRAND_H
 
   page.drawRectangle({
-    x: MARGIN, y: rowY, width: CONTENT_W, height: GRAND_H,
+    x: MARGIN, y: rowY, width: ctx.contentW, height: GRAND_H,
     color: LIGHT_GRAY, borderColor: BLACK, borderWidth: 1,
   })
 
@@ -595,7 +604,7 @@ function drawGrandTotalRow(ctx: Ctx, row: FlatRow): void {
   )
   const labelSpanW = report.columns
     .slice(0, firstMeasureIdx === -1 ? report.columns.length : firstMeasureIdx)
-    .reduce((w, c) => w + c.width * CONTENT_W, 0)
+    .reduce((w, c) => w + c.width * ctx.contentW, 0)
   const label = sanitize(row.label ?? 'GRAND TOTAL:')
   const labelX = Math.max(
     MARGIN + CELL_PADDING,
@@ -622,10 +631,10 @@ function drawSummaryBlock(ctx: Ctx): void {
     const value = sanitize(line.value)
     const valueW = font.widthOfTextAtSize(value, size)
     ctx.page.drawText(label, {
-      x: PAGE_W - MARGIN - 220, y: ctx.y - 10, size, font, color: BLACK,
+      x: ctx.pageW - MARGIN - 220, y: ctx.y - 10, size, font, color: BLACK,
     })
     ctx.page.drawText(value, {
-      x: PAGE_W - MARGIN - valueW, y: ctx.y - 10, size, font, color: BLACK,
+      x: ctx.pageW - MARGIN - valueW, y: ctx.y - 10, size, font, color: BLACK,
     })
     ctx.y -= 14
   }
@@ -644,7 +653,7 @@ function stampFooters(ctx: Ctx): void {
     })
     const pageText = `Page ${i + 1} of ${total}`
     page.drawText(pageText, {
-      x: PAGE_W - MARGIN - reg.widthOfTextAtSize(pageText, 7), y: MARGIN - 14,
+      x: ctx.pageW - MARGIN - reg.widthOfTextAtSize(pageText, 7), y: MARGIN - 14,
       size: 7, font: reg, color: DARK_GRAY,
     })
   }

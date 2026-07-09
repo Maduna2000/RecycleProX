@@ -96,6 +96,8 @@ export interface ReportDocument {
    * band between thin rules, borderless rows, bold subtotal lines.
    */
   pdfStyle?: 'grid' | 'ledger'
+  /** PDF page orientation — 'portrait' (default) or 'landscape' (for wide/many-column reports). */
+  orientation?: 'portrait' | 'landscape'
   params: {
     from: string
     to: string

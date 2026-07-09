@@ -138,7 +138,9 @@ async function queryCopperPurchases(from: string, to: string): Promise<CopperPur
       casualName: p.customer.customerType === 'casual' ? `${p.customer.firstName} ${p.customer.lastName}` : null,
       idNumber: p.customer.idNumber ?? null,
       netKg: qty,
-      scaleOrderPhotoKey: p.scaleOrder?.photoR2Keys?.[0] ?? null,
+      // Index 1 = the "Product / Load" photo slot from the scale kiosk (Step4Photos);
+      // index 0 is the scale-reading display, not the goods themselves.
+      scaleOrderPhotoKey: p.scaleOrder?.photoR2Keys?.[1] ?? null,
     })
   }
 
@@ -217,6 +219,7 @@ export async function buildPoliceCopperReportImages(
   return {
     reportId: 'police-copper-report-images',
     title: 'Police Copper Report with Images',
+    orientation: 'landscape',
     params: { from: params.from, to: params.to },
     columns: [
       { key: 'refNumber', label: 'Trans No.', width: 0.12, format: 'text', excelWidth: 16 },
