@@ -13,7 +13,7 @@ const SettleSchema = z.object({
     .refine((v) => new Decimal(v).gte(new Decimal('0.01')), {
       message: 'Minimum payment amount is E0.01',
     }),
-  paymentMethod: z.enum(['cash', 'eft', 'cheque']).default('cash'),
+  paymentMethod: z.enum(['cash', 'eft']).default('cash'),
 })
 
 export async function PATCH(

@@ -143,7 +143,7 @@ export async function listPayments(opts?: {
   const where = {
     ...(opts?.customerId && { customerId: opts.customerId }),
     ...(!opts?.includeVoided && { voidedAt: null }),
-    ...(opts?.paymentMethod && { paymentMethod: opts.paymentMethod as 'cash' | 'eft' | 'cheque' }),
+    ...(opts?.paymentMethod && { paymentMethod: opts.paymentMethod as 'cash' | 'eft' }),
     ...(opts?.from || opts?.to ? {
       createdAt: {
         ...(opts?.from && { gte: opts.from }),

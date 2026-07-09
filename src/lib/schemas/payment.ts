@@ -7,7 +7,7 @@ export const CreatePaymentSchema = z.object({
     .min(1, 'Amount is required')
     .regex(/^\d+(\.\d{1,2})?$/, 'Must be a valid amount (e.g. 150.00)')
     .refine((v) => parseFloat(v) > 0, 'Amount must be greater than 0'),
-  paymentMethod: z.enum(['cash', 'eft', 'cheque']).default('cash'),
+  paymentMethod: z.enum(['cash', 'eft']).default('cash'),
   notes: z.string().max(500).optional(),
 })
 

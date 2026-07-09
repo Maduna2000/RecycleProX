@@ -279,7 +279,7 @@ export async function markSalePaid(
           refNumber,
           ...(sale.customerId ? { customerId: sale.customerId } : {}),
           amount:          settleAmount,
-          paymentMethod:   data.paymentMethod as 'cash' | 'eft' | 'cheque',
+          paymentMethod:   data.paymentMethod as 'cash' | 'eft',
           notes:           `Settlement of sale ${sale.refNumber}`,
           createdByUserId: userId,
         } as Prisma.PaymentUncheckedCreateInput,
@@ -339,7 +339,7 @@ export async function listSales(opts?: {
 
   const where = {
     ...(opts?.status        && { status:        opts.status        as 'completed' | 'voided' | 'pending' }),
-    ...(opts?.paymentMethod && { paymentMethod: opts.paymentMethod as 'cash' | 'eft' | 'cheque' }),
+    ...(opts?.paymentMethod && { paymentMethod: opts.paymentMethod as 'cash' | 'eft' }),
     ...(opts?.from || opts?.to ? {
       createdAt: {
         ...(opts?.from && { gte: opts.from }),

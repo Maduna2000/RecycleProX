@@ -417,7 +417,7 @@ export async function markPurchasePaid(
           refNumber,
           customerId:      purchase.customerId,
           amount:          settleAmount,
-          paymentMethod:   data.paymentMethod as 'cash' | 'eft' | 'cheque',
+          paymentMethod:   data.paymentMethod as 'cash' | 'eft',
           notes:           `Settlement of purchase ${purchase.refNumber}`,
           createdByUserId: userId,
         },
@@ -460,12 +460,11 @@ export async function processSplitPayment(
         ? new Decimal(purchase.loanDeductionAmount.toString())
         : new Decimal(0)
 
-      const cashAmt   = new Decimal(data.payments.cash   || '0')
-      const eftAmt    = new Decimal(data.payments.eft    || '0')
-      const chequeAmt = new Decimal(data.payments.cheque || '0')
-      const loanAmt   = new Decimal(data.payments.loan   || '0')
+      const cashAmt   = new Decimal(data.payments.cash || '0')
+      const eftAmt    = new Decimal(data.payments.eft  || '0')
+      const loanAmt   = new Decimal(data.payments.loan || '0')
 
-      const paymentTotal = cashAmt.plus(eftAmt).plus(chequeAmt).plus(loanAmt)
+      const paymentTotal = cashAmt.plus(eftAmt).plus(loanAmt)
       const outstanding  = totalAmount.minus(existingLoan).minus(currentPaid)
 
       if (paymentTotal.greaterThan(outstanding)) {
@@ -483,16 +482,11 @@ export async function processSplitPayment(
       }
 
       const newLoanDeduction = existingLoan.plus(loanAmt)
-      const newPaid = currentPaid.plus(cashAmt).plus(eftAmt).plus(chequeAmt)
+      const newPaid = currentPaid.plus(cashAmt).plus(eftAmt)
       const isFullySettled = newPaid.plus(newLoanDeduction).gte(totalAmount)
 
       // Determine primary payment method (largest non-loan amount)
-      let primaryMethod: 'cash' | 'eft' | 'cheque' = 'cash'
-      if (eftAmt.greaterThan(cashAmt) && eftAmt.greaterThan(chequeAmt)) {
-        primaryMethod = 'eft'
-      } else if (chequeAmt.greaterThan(cashAmt) && chequeAmt.greaterThan(eftAmt)) {
-        primaryMethod = 'cheque'
-      }
+      const primaryMethod: 'cash' | 'eft' = eftAmt.greaterThan(cashAmt) ? 'eft' : 'cash'
 
       const updated = await tx.purchase.update({
         where: { id },
@@ -501,10 +495,9 @@ export async function processSplitPayment(
           loanDeductionAmount: newLoanDeduction,
           paymentMethod:       primaryMethod,
           splitPayments: {
-            cash:   cashAmt.toFixed(2),
-            eft:    eftAmt.toFixed(2),
-            cheque: chequeAmt.toFixed(2),
-            loan:   loanAmt.toFixed(2),
+            cash: cashAmt.toFixed(2),
+            eft:  eftAmt.toFixed(2),
+            loan: loanAmt.toFixed(2),
           },
           ...(isFullySettled ? { status: 'completed' } : {}),
         },
@@ -515,10 +508,9 @@ export async function processSplitPayment(
       const prefix = `PAY-${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`
       const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate())
 
-      const payments: Array<{ method: 'cash' | 'eft' | 'cheque'; amount: Decimal }> = []
-      if (cashAmt.greaterThan(0))   payments.push({ method: 'cash',   amount: cashAmt })
-      if (eftAmt.greaterThan(0))    payments.push({ method: 'eft',    amount: eftAmt })
-      if (chequeAmt.greaterThan(0)) payments.push({ method: 'cheque', amount: chequeAmt })
+      const payments: Array<{ method: 'cash' | 'eft'; amount: Decimal }> = []
+      if (cashAmt.greaterThan(0)) payments.push({ method: 'cash', amount: cashAmt })
+      if (eftAmt.greaterThan(0))  payments.push({ method: 'eft',  amount: eftAmt })
 
       for (const p of payments) {
         const payCount = await tx.payment.count({ where: { createdAt: { gte: startOfDay } } })
@@ -605,7 +597,7 @@ export async function listPurchases(opts?: {
   const where = {
     ...(opts?.customerId && { customerId: opts.customerId }),
     ...(opts?.status && { status: opts.status as 'completed' | 'voided' | 'pending' }),
-    ...(opts?.paymentMethod && { paymentMethod: opts.paymentMethod as 'cash' | 'eft' | 'cheque' }),
+    ...(opts?.paymentMethod && { paymentMethod: opts.paymentMethod as 'cash' | 'eft' }),
     ...(opts?.from || opts?.to ? {
       createdAt: {
         ...(opts.from && { gte: opts.from }),

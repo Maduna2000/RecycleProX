@@ -316,7 +316,7 @@ export async function getLoanTotalsForDate(date: Date) {
   // Only cash-method loans/repayments affect the drawer. Repayments are always
   // cash in practice (applyRepaymentTx hardcodes it — it's a deduction from a
   // purchase payout, never handed over by the customer), but advances are
-  // genuinely reachable as EFT/cheque via the Create Loan dialog, so filtering
+  // genuinely reachable as EFT via the Create Loan dialog, so filtering
   // matters there: an EFT advance never touches the physical drawer and must
   // not reduce the day's expected cash.
   const [advancedAgg, nonCashAdvancedAgg, repaidAgg] = await Promise.all([

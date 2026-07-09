@@ -65,7 +65,6 @@ export async function createExpense(data: CreateExpenseInput, userId: string) {
       vatAmount:       vatAmount,
       includesVat:     data.includesVat ?? false,
       paymentMethod:   data.paymentMethod ?? 'cash',
-      chequeNo:        data.chequeNo,
       cashUpId:        openSession?.id ?? null,
       createdByUserId: userId,
       ...(!isPending && { status: 'approved', approvedById: userId, approvedAt: new Date() }),

@@ -55,7 +55,6 @@ interface LoansTabProps {
 const PAYMENT_METHODS = [
   { value: 'cash', label: 'Cash' },
   { value: 'eft', label: 'EFT' },
-  { value: 'cheque', label: 'Cheque' },
 ]
 
 function SHdr({ title }: { title: string }) {

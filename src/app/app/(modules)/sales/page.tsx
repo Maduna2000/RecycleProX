@@ -236,7 +236,6 @@ export default function SalesPage() {
             <option value="">All Methods</option>
             <option value="cash">Cash</option>
             <option value="eft">EFT</option>
-            <option value="cheque">Cheque</option>
           </select>
         </Field>
         <Field label="From" width={145}>

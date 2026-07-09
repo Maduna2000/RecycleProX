@@ -113,7 +113,7 @@ export default function NewPurchasePage() {
   const [customer,        setCustomer]        = useState<SelectedCustomer | null>(null)
   const [customerType,    setCustomerType]    = useState<'casual' | 'account'>('casual')
   const [lines,           setLines]           = useState<LineItem[]>([emptyLine(1)])
-  const [paymentType,     setPaymentType]     = useState<'unpaid' | 'cash' | 'eft' | 'cheque'>('unpaid')
+  const [paymentType,     setPaymentType]     = useState<'unpaid' | 'cash' | 'eft'>('unpaid')
   const [notes,           setNotes]           = useState('')
   const [grvNumber,       setGrvNumber]       = useState('')
   const [invoiceNo,       setInvoiceNo]       = useState('')
@@ -335,7 +335,7 @@ export default function NewPurchasePage() {
     if (notes)      noteParts.push(notes)
     const combinedNotes = noteParts.join(' | ') || undefined
 
-    const paymentMethod = isPending ? 'cash' : paymentType as 'cash' | 'eft' | 'cheque'
+    const paymentMethod = isPending ? 'cash' : paymentType as 'cash' | 'eft'
     const status        = isPending ? 'pending' : 'completed'
 
     const body = {
@@ -628,7 +628,7 @@ export default function NewPurchasePage() {
           {/* Payment Type */}
           <div style={{ flexShrink: 0, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '3px 10px', padding: '3px 10px' }}>
             <label style={{ fontSize: 11, fontWeight: 600, color: '#374151', whiteSpace: 'nowrap', width: '100%' }}>Payment Type:</label>
-            {(['unpaid', 'cash', 'cheque', 'eft'] as const).map((type) => (
+            {(['unpaid', 'cash', 'eft'] as const).map((type) => (
               <label key={type} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#374151', cursor: 'pointer' }}>
                 <input
                   type="radio"

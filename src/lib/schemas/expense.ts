@@ -14,8 +14,7 @@ export const CreateExpenseSchema = z.object({
     z.number().positive('Amount must be positive'),
   ),
   includesVat:   z.boolean().default(false),
-  paymentMethod: z.enum(['cash', 'eft', 'cheque']).default('cash'),
-  chequeNo:      z.string().optional(),
+  paymentMethod: z.enum(['cash', 'eft']).default('cash'),
   isPending:     z.boolean().default(false),
 })
 
@@ -27,8 +26,7 @@ export const UpdateExpenseSchema = z.object({
     z.number().positive().optional(),
   ),
   includesVat:   z.boolean().optional(),
-  paymentMethod: z.enum(['cash', 'eft', 'cheque']).optional(),
-  chequeNo:      z.string().optional().nullable(),
+  paymentMethod: z.enum(['cash', 'eft']).optional(),
   updatedAt:     z.string().datetime(), // For optimistic locking
 })
 

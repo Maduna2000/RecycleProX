@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Coins, CreditCard, FileText, Wallet, AlertCircle, Lock, Split } from 'lucide-react'
+import { Coins, CreditCard, Wallet, AlertCircle, Lock, Split } from 'lucide-react'
 import { toast } from 'sonner'
 import Decimal from 'decimal.js'
 import { Dialog } from '@/components/ui/dialog'
@@ -74,7 +74,6 @@ export function SplitPaymentModal({
 }) {
   const [cash,    setCash]    = useState('')
   const [eft,     setEft]     = useState('')
-  const [cheque,  setCheque]  = useState('')
   const [loan,    setLoan]    = useState('')
   const [loading, setLoading] = useState(false)
   const [error,   setError]   = useState<string | null>(null)
@@ -96,11 +95,10 @@ export function SplitPaymentModal({
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Calculate totals
-  const cashAmt   = new Decimal(cash   || '0')
-  const eftAmt    = new Decimal(eft    || '0')
-  const chequeAmt = new Decimal(cheque || '0')
-  const loanAmt   = new Decimal(loan   || '0')
-  const paymentTotal = cashAmt.plus(eftAmt).plus(chequeAmt).plus(loanAmt)
+  const cashAmt   = new Decimal(cash || '0')
+  const eftAmt    = new Decimal(eft  || '0')
+  const loanAmt   = new Decimal(loan || '0')
+  const paymentTotal = cashAmt.plus(eftAmt).plus(loanAmt)
   const remaining = pendingAmount.minus(paymentTotal)
 
   // Validation - FULL PAYMENT REQUIRED
@@ -127,10 +125,9 @@ export function SplitPaymentModal({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         payments: {
-          cash:   cash   || '0',
-          eft:    eft    || '0',
-          cheque: cheque || '0',
-          loan:   loan   || '0',
+          cash: cash || '0',
+          eft:  eft  || '0',
+          loan: loan || '0',
         },
       }),
     })
@@ -208,13 +205,6 @@ export function SplitPaymentModal({
               label="EFT"
               value={eft}
               onChange={setEft}
-              disabled={loading}
-            />
-            <PaymentInput
-              icon={<FileText className="w-4 h-4" />}
-              label="Cheque"
-              value={cheque}
-              onChange={setCheque}
               disabled={loading}
             />
             <PaymentInput

@@ -38,7 +38,7 @@ export const CreateSaleSchema = z.object({
     .or(z.literal(''))
     .transform((v) => v || undefined),
   buyerPhone:    z.string().optional().or(z.literal('')).transform((v) => v || undefined),
-  paymentMethod: z.enum(['cash', 'eft', 'cheque']).default('cash'),
+  paymentMethod: z.enum(['cash', 'eft']).default('cash'),
   status:        z.enum(['pending', 'completed']).default('completed'),
   notes:         z.string().max(500).optional(),
   lines:         z.array(SaleLineSchema).min(1, 'At least one product line is required'),

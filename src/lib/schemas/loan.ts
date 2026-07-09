@@ -9,14 +9,14 @@ const positiveDecimalString = z
 export const CreateLoanSchema = z.object({
   customerId:      z.string().uuid('Invalid customer'),
   principalAmount: positiveDecimalString,
-  paymentMethod:   z.enum(['cash', 'eft', 'cheque']).default('cash'),
+  paymentMethod:   z.enum(['cash', 'eft']).default('cash'),
   notes:           z.string().max(500).optional(),
 })
 
 export const CreateRepaymentSchema = z.object({
   loanId:        z.string().uuid('Invalid loan'),
   amount:        positiveDecimalString,
-  paymentMethod: z.enum(['cash', 'eft', 'cheque']).default('cash'),
+  paymentMethod: z.enum(['cash', 'eft']).default('cash'),
   notes:         z.string().max(500).optional(),
 })
 

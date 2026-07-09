@@ -370,14 +370,12 @@ function AddExpenseModal({ mode, expense, onClose, onSuccess }: AddExpenseModalP
           description:   expense.description,
           amount:        parseFloat(expense.amount),
           includesVat:   expense.includesVat,
-          paymentMethod: expense.paymentMethod as 'cash' | 'eft' | 'cheque',
-          chequeNo:      expense.chequeNo ?? undefined,
+          paymentMethod: expense.paymentMethod as 'cash' | 'eft',
           isPending:     true, // Already pending in edit mode
         }
       : { paymentMethod: 'cash', includesVat: false, isPending: false },
   })
 
-  const paymentMethod  = watch('paymentMethod')
   const includesVat    = watch('includesVat')
   const isPending      = watch('isPending')
   const expenseTypeId  = watch('expenseTypeId') as string | undefined
@@ -397,7 +395,6 @@ function AddExpenseModal({ mode, expense, onClose, onSuccess }: AddExpenseModalP
           amount:        data.amount,
           includesVat:   data.includesVat,
           paymentMethod: data.paymentMethod,
-          chequeNo:      data.chequeNo ?? null,
           updatedAt:     expense.updatedAt,
         }),
       })
@@ -552,7 +549,7 @@ function AddExpenseModal({ mode, expense, onClose, onSuccess }: AddExpenseModalP
               </div>
               <div>
                 <Label style={{ display: 'block', marginBottom: 4, fontSize: fontSize.sm, fontWeight: 600, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Payment Method</Label>
-                <Select onValueChange={(v) => setValue('paymentMethod', v as 'cash' | 'eft' | 'cheque')} defaultValue="cash">
+                <Select onValueChange={(v) => setValue('paymentMethod', v as 'cash' | 'eft')} defaultValue="cash">
                   <SelectTrigger
                     style={{
                       width: '100%',
@@ -570,28 +567,10 @@ function AddExpenseModal({ mode, expense, onClose, onSuccess }: AddExpenseModalP
                   <SelectContent>
                     <SelectItem value="cash">Cash</SelectItem>
                     <SelectItem value="eft">EFT</SelectItem>
-                    <SelectItem value="cheque">Cheque</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
-
-            {paymentMethod === 'cheque' && (
-              <div>
-                <Label style={{ display: 'block', marginBottom: 4, fontSize: fontSize.sm, fontWeight: 600, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Cheque Number</Label>
-                <Input
-                  {...register('chequeNo')}
-                  disabled={loading}
-                  style={{
-                    height: 28,
-                    border: `1px solid ${colors.border}`,
-                    borderRadius: 2,
-                    padding: '2px 8px',
-                    fontSize: fontSize.base,
-                  }}
-                />
-              </div>
-            )}
 
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: fontSize.base, cursor: 'pointer', color: colors.textPrimary }}>
               <input

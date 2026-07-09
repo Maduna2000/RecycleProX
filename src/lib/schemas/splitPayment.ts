@@ -8,14 +8,12 @@ const optionalDecimalString = z
   .default('0')
 
 export const SplitPaymentSchema = z.object({
-  cash:   optionalDecimalString,
-  eft:    optionalDecimalString,
-  cheque: optionalDecimalString,
-  loan:   optionalDecimalString,
+  cash: optionalDecimalString,
+  eft:  optionalDecimalString,
+  loan: optionalDecimalString,
 }).refine((data) => {
   const total = new Decimal(data.cash || '0')
     .plus(data.eft || '0')
-    .plus(data.cheque || '0')
     .plus(data.loan || '0')
   return total.greaterThan(0)
 }, { message: 'At least one payment amount is required' })
@@ -25,7 +23,6 @@ export const ProcessSplitPaymentSchema = z.object({
 }).refine((data) => {
   const total = new Decimal(data.payments.cash || '0')
     .plus(data.payments.eft || '0')
-    .plus(data.payments.cheque || '0')
     .plus(data.payments.loan || '0')
   return total.greaterThan(0)
 }, { message: 'At least one payment amount is required' })

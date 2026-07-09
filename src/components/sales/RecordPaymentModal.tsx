@@ -25,7 +25,7 @@ export function RecordPaymentModal({
   onClose: () => void
   onSuccess: () => void
 }) {
-  const [method,      setMethod]      = useState<'cash' | 'eft' | 'cheque'>('cash')
+  const [method,      setMethod]      = useState<'cash' | 'eft'>('cash')
   const [amount,      setAmount]      = useState('')
   const [amountError, setAmountError] = useState<string | null>(null)
   const [loading,     setLoading]     = useState(false)
@@ -124,7 +124,6 @@ export function RecordPaymentModal({
               <SelectContent>
                 <SelectItem value="cash">Cash</SelectItem>
                 <SelectItem value="eft">EFT</SelectItem>
-                <SelectItem value="cheque">Cheque</SelectItem>
               </SelectContent>
             </Select>
           </div>
