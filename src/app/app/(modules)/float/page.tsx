@@ -183,6 +183,7 @@ export default function FloatPage() {
 
   return (
     <PortalPage title="Cash Float">
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
       <div className="max-w-3xl mx-auto w-full space-y-5 pb-6" style={{ padding: '10px 10px 0' }}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
 
@@ -412,6 +413,7 @@ export default function FloatPage() {
             </div>
           )}
         </div>
+      </div>
       </div>
     </PortalPage>
   )

@@ -433,7 +433,7 @@ export default function PhotosPage() {
         ) : undefined
       }
     >
-      <div style={{ padding: 10 }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 10 }}>
         <PhotoGrid
           queryType={activeTab === 'all' ? undefined : activeTab}
           onPhotosChange={setExportPhotos}

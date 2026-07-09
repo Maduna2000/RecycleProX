@@ -239,7 +239,7 @@ export default function CustomerDetailPage() {
       />
 
       {/* ── Two-column layout: main content + sidebar ─────────────────────────── */}
-      <div style={{ display: 'flex', alignItems: 'flex-start' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', flex: 1, minHeight: 0, overflowY: 'auto' }}>
 
         {/* Main content */}
         <div style={{ flex: 1, borderRight: '1px solid #D0D0D0', background: '#fff' }}>

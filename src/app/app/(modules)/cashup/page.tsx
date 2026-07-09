@@ -685,6 +685,7 @@ export default function CashUpPage() {
 
   return (
     <PortalPage title="Cash-Up">
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
       <div className="max-w-6xl mx-auto w-full space-y-4 pb-6" style={{ padding: '10px 10px 0' }}>
 
         {/* No session */}
@@ -1130,6 +1131,7 @@ export default function CashUpPage() {
             })()}
           </>
         )}
+      </div>
       </div>
 
       {countCashOpen && (() => {
