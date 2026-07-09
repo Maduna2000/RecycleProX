@@ -295,6 +295,22 @@ export const REPORT_CATALOG: ReportCatalogEntry[] = [
       { key: 'customerId', label: 'Account', type: 'customer' },
     ],
   },
+  {
+    id: 'top-sellers-by-category',
+    label: 'Top 10 Sellers by Category',
+    description:
+      'Top 10 Casual or Account sellers ranked by total weight brought in, shown as two sections in one report: Ferrous and Non-Ferrous.',
+    area: 'purchases',
+    filters: [
+      {
+        key: 'customerType', label: 'Seller Type', type: 'select', required: true,
+        options: [
+          { value: 'casual', label: 'Casual' },
+          { value: 'account', label: 'Account' },
+        ],
+      },
+    ],
+  },
   // ── Police & Compliance ────────────────────────────────────────────────────
   {
     id: 'police-register',

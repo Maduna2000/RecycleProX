@@ -14,6 +14,7 @@ import {
   PurchasesSupplierStatementParamsSchema,
   PurchasesPerProductDayParamsSchema,
   PurchasesByIdSearchParamsSchema,
+  TopSellersParamsSchema,
   SalesDailyParamsSchema,
   SalesByProductParamsSchema,
   SalesByCustomerParamsSchema,
@@ -31,6 +32,7 @@ import {
   buildPurchasesPerProductDay,
   buildPurchasesByCasualId,
   buildPurchasesByAccountId,
+  buildTopSellersByCategory,
 } from './builders/purchases'
 import {
   buildSalesDaily,
@@ -157,6 +159,10 @@ export const REPORT_REGISTRY: Record<string, ReportDefinition> = {
   'purchases-by-account-id': {
     paramsSchema: PurchasesByIdSearchParamsSchema,
     build: buildPurchasesByAccountId,
+  },
+  'top-sellers-by-category': {
+    paramsSchema: TopSellersParamsSchema,
+    build: buildTopSellersByCategory,
   },
   'police-register': {
     paramsSchema: BaseReportParamsSchema,

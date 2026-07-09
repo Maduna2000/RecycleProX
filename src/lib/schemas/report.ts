@@ -55,6 +55,11 @@ export const PurchasesByIdSearchParamsSchema = rangeParams({
   }
 })
 
+/** Top 10 sellers by category (Ferrous / Non-Ferrous), scoped to casual or account sellers. */
+export const TopSellersParamsSchema = rangeParams({
+  customerType: z.enum(['casual', 'account']),
+})
+
 // ── Sales ─────────────────────────────────────────────────────────────────────
 export const SalesDailyParamsSchema = rangeParams({
   customerId: z.string().uuid().optional(),
@@ -112,3 +117,4 @@ export type StockOnHandParams = z.infer<typeof StockOnHandParamsSchema>
 export type StockMovementParams = z.infer<typeof StockMovementParamsSchema>
 export type StocktakeReportParams = z.infer<typeof StocktakeReportParamsSchema>
 export type PoliceCopperReportParams = z.infer<typeof PoliceCopperReportParamsSchema>
+export type TopSellersParams = z.infer<typeof TopSellersParamsSchema>

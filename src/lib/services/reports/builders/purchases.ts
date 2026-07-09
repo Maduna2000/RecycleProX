@@ -8,13 +8,14 @@ import { getRangeBoundsSAST } from '@/lib/utils/dayBounds'
 import { groupRows } from '@/lib/services/reports/grouping'
 import { countDataRows } from '@/lib/reports/flatten'
 import { formatDateSAST, formatTimeSAST } from '@/lib/reports/format'
-import type { ReportDocument, ReportMeta } from '@/lib/reports/types'
+import type { ReportDocument, ReportGroup, ReportMeta, ReportRow } from '@/lib/reports/types'
 import type {
   PurchasesByProductCategoryParams,
   PurchasesDailyParams,
   PurchasesSupplierStatementParams,
   PurchasesPerProductDayParams,
   PurchasesByIdSearchParams,
+  TopSellersParams,
 } from '@/lib/schemas/report'
 
 type MetaBase = Omit<ReportMeta, 'rowCount'>
@@ -625,4 +626,137 @@ export function buildPurchasesByAccountId(
   meta: MetaBase
 ): Promise<ReportDocument> {
   return buildPurchasesByIdSearchCore(params, meta, 'account', 'purchases-by-account-id', 'Purchases by Account ID')
+}
+
+interface TopSellerAgg {
+  name: string
+  idNumber: string | null
+  weight: Decimal
+  cost: Decimal
+  purchaseIds: Set<string>
+}
+
+/**
+ * Top 10 Sellers by Category (Ferrous / Non-Ferrous): two independently
+ * ranked lists (by total weight brought in) in one report, scoped to either
+ * casual or account sellers. A seller can appear in both lists if they sold
+ * both categories in the period.
+ */
+export async function buildTopSellersByCategory(
+  params: TopSellersParams,
+  meta: MetaBase
+): Promise<ReportDocument> {
+  const { start, end } = getRangeBoundsSAST(params.from, params.to)
+
+  const lines = await prisma.purchaseLine.findMany({
+    where: {
+      purchase: {
+        status: 'completed',
+        createdAt: { gte: start, lte: end },
+        customer: { customerType: params.customerType },
+      },
+    },
+    select: {
+      quantity: true,
+      lineTotal: true,
+      vatAmount: true,
+      product: {
+        select: {
+          category: true,
+          categoryRef: { select: { name: true, parent: { select: { name: true } } } },
+        },
+      },
+      purchase: {
+        select: {
+          id: true,
+          customer: {
+            select: { id: true, firstName: true, lastName: true, companyName: true, idNumber: true, zeroRated: true },
+          },
+        },
+      },
+    },
+  })
+
+  type Line = (typeof lines)[number]
+  const amountsOf = (l: Line) => purchaseLineAmounts(l, l.purchase.customer.zeroRated)
+  const topCategoryOf = (l: Line) =>
+    (l.product.categoryRef?.parent?.name ?? l.product.categoryRef?.name ?? l.product.category).toUpperCase()
+
+  function topTenFor(category: 'FERROUS' | 'NON-FERROUS'): TopSellerAgg[] {
+    const byCustomer = new Map<string, TopSellerAgg>()
+    for (const l of lines) {
+      if (topCategoryOf(l) !== category) continue
+      const c = l.purchase.customer
+      let agg = byCustomer.get(c.id)
+      if (!agg) {
+        agg = {
+          name: c.companyName?.trim() || `${c.firstName} ${c.lastName}`,
+          idNumber: c.idNumber,
+          weight: new Decimal(0),
+          cost: new Decimal(0),
+          purchaseIds: new Set(),
+        }
+        byCustomer.set(c.id, agg)
+      }
+      agg.weight = agg.weight.plus(new Decimal(l.quantity.toString()))
+      agg.cost = agg.cost.plus(amountsOf(l).grandTotal)
+      agg.purchaseIds.add(l.purchase.id)
+    }
+    return Array.from(byCustomer.values())
+      .sort((a, b) => b.weight.comparedTo(a.weight))
+      .slice(0, 10)
+  }
+
+  function toRows(list: TopSellerAgg[]): ReportRow[] {
+    return list.map((a, i) => ({
+      cells: {
+        rank: String(i + 1),
+        name: a.name,
+        idNumber: a.idNumber,
+        transactions: String(a.purchaseIds.size),
+        weight: a.weight.toFixed(3),
+        cost: a.cost.toFixed(2),
+        avgPrice: a.weight.isZero() ? null : a.cost.div(a.weight).toFixed(2),
+      },
+    }))
+  }
+
+  const sumCells = (rows: ReportRow[], key: 'weight' | 'cost') =>
+    rows.reduce((acc, r) => acc.plus(new Decimal(r.cells[key] ?? '0')), new Decimal(0))
+
+  const ferrousRows = toRows(topTenFor('FERROUS'))
+  const nonFerrousRows = toRows(topTenFor('NON-FERROUS'))
+
+  const groups: ReportGroup[] = [
+    {
+      level: 0,
+      label: 'FERROUS — TOP 10',
+      rows: ferrousRows,
+      subtotal: { weight: sumCells(ferrousRows, 'weight').toFixed(3), cost: sumCells(ferrousRows, 'cost').toFixed(2) },
+    },
+    {
+      level: 0,
+      label: 'NON-FERROUS — TOP 10',
+      rows: nonFerrousRows,
+      subtotal: { weight: sumCells(nonFerrousRows, 'weight').toFixed(3), cost: sumCells(nonFerrousRows, 'cost').toFixed(2) },
+    },
+  ]
+
+  return {
+    reportId: 'top-sellers-by-category',
+    title: 'Top 10 Sellers by Category',
+    subtitle: `Seller type: ${params.customerType === 'account' ? 'Account' : 'Casual'}  ·  Ranked by total weight`,
+    params: { from: params.from, to: params.to, filters: { customerType: params.customerType } },
+    columns: [
+      { key: 'rank', label: '#', width: 0.05, align: 'right', format: 'int', excelWidth: 5 },
+      { key: 'name', label: 'Seller Name', width: 0.24, format: 'text', excelWidth: 26 },
+      { key: 'idNumber', label: 'ID Number', width: 0.15, format: 'text', excelWidth: 16 },
+      { key: 'transactions', label: 'Transactions', width: 0.12, align: 'right', format: 'int', excelWidth: 12 },
+      { key: 'weight', label: 'Total Weight', width: 0.15, align: 'right', format: 'mass', excelWidth: 13 },
+      { key: 'cost', label: 'Total Cost', width: 0.15, align: 'right', format: 'money', excelWidth: 14 },
+      { key: 'avgPrice', label: 'Avg Price/kg', width: 0.14, align: 'right', format: 'money', excelWidth: 13 },
+    ],
+    groups,
+    meta: { ...meta, rowCount: ferrousRows.length + nonFerrousRows.length },
+  }
 }
