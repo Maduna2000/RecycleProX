@@ -1,83 +1,37 @@
 import { PrismaClient } from '@prisma/client'
-import logger from '@/lib/logger'
+import { attachAuditMiddleware } from './auditMiddleware'
+import { tenantContext } from './tenantContext'
+import { getTenantPrismaClient } from './tenantPrismaCache'
 
 const globalForPrisma = globalThis as unknown as { prisma: PrismaClient }
 
-export const prisma =
+// The original single-tenant client, unchanged — still what every request
+// gets today, since nothing populates tenantContext yet (see
+// src/lib/db/tenantContext.ts). Once tenant login resolution is wired into
+// src/auth.ts, requests carrying a tenant context transparently start
+// resolving to that tenant's own Postgres schema instead, with zero changes
+// required in any of the ~50 files that import `prisma` from here.
+const defaultClient =
   globalForPrisma.prisma ||
-  new PrismaClient({
-    log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
-  })
+  attachAuditMiddleware(
+    new PrismaClient({
+      log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
+    }),
+  )
 
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
+if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = defaultClient
 
-// Audit log middleware — intercepts writes on all business models
-prisma.$use(async (params, next) => {
-  const writeModels = [
-    'User', 'Purchase', 'PurchaseLine', 'Sale', 'SaleLine',
-    'Customer', 'Payment', 'Expense', 'CashUp', 'CashFloat',
-    'StockMovement', 'Product', 'PriceGroup', 'PriceGroupProductOverride',
-    'Stocktake', 'StocktakeEntry', 'ScaleOrder',
-  ]
-  const writeActions = ['create', 'update', 'delete']
+function resolveClient(): PrismaClient {
+  const ctx = tenantContext.getStore()
+  return ctx ? getTenantPrismaClient(ctx.schemaName) : defaultClient
+}
 
-  if (writeModels.includes(params.model ?? '') && writeActions.includes(params.action)) {
-    let oldValues: Record<string, unknown> | null = null
-
-    if (params.action === 'update' && params.args.where) {
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        oldValues = await (prisma as any)[params.model!.charAt(0).toLowerCase() + params.model!.slice(1)].findUnique({
-          where: params.args.where,
-        })
-      } catch {
-        // best-effort
-      }
-    }
-
-    const result = await next(params)
-
-    const actionMap: Record<string, string> = {
-      create: 'INSERT',
-      update: 'UPDATE',
-      delete: 'DELETE',
-    }
-
-    // Extract changedById from the data args — covers createdByUserId, voidedById,
-    // voidedByUserId (Stocktake's naming), approvedById, closedByUserId patterns
-    // used across all service functions.
-    const dataArgs = (params.args?.data ?? {}) as Record<string, unknown>
-    const changedById =
-      (dataArgs.createdByUserId as string | undefined) ??
-      (dataArgs.voidedById as string | undefined) ??
-      (dataArgs.voidedByUserId as string | undefined) ??
-      (dataArgs.approvedById as string | undefined) ??
-      (dataArgs.closedByUserId as string | undefined) ??
-      (dataArgs.openedByUserId as string | undefined) ??
-      null
-
-    setImmediate(async () => {
-      try {
-        await prisma.auditLog.create({
-          data: {
-            tableName: params.model ?? 'unknown',
-            recordId: result?.id ? String(result.id) : 'unknown',
-            action: actionMap[params.action] as import('@prisma/client').AuditAction,
-            oldValues: oldValues ? (oldValues as object) : undefined,
-            newValues: result ? (result as object) : undefined,
-            changedById,
-            rowHash: '',
-          },
-        })
-      } catch (err) {
-        logger.error({ err }, 'Audit log write failed')
-      }
-    })
-
-    return result
-  }
-
-  return next(params)
+export const prisma = new Proxy({} as PrismaClient, {
+  get(_target, prop, receiver) {
+    const client = resolveClient()
+    const value = Reflect.get(client as object, prop, receiver)
+    return typeof value === 'function' ? value.bind(client) : value
+  },
 })
 
 export default prisma

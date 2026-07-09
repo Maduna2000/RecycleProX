@@ -8,6 +8,28 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Cross-tenant registry — lives only in the `public` schema, never inside a
+// per-tenant schema. Resolves a login subdomain/slug to the Postgres schema
+// that holds that company's business data (see src/lib/db/registryPrisma.ts).
+model Tenant {
+  id            String       @id @default(uuid())
+  companySlug   String       @unique
+  schemaName    String       @unique
+  companyName   String
+  status        TenantStatus @default(active)
+  planCode      String?
+  featureFlags  Json?
+  graceEndsAt   DateTime?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+}
+
+enum TenantStatus {
+  active
+  suspended
+  provisioning
+}
+
 model User {
   id                  String             @id @default(uuid())
   fullName            String
