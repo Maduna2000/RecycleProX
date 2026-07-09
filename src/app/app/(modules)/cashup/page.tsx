@@ -312,6 +312,52 @@ function CountCashModal({ counts, setCounts, notes, setNotes, submitting, handle
   )
 }
 
+// ─── Reason Modal — replaces window.prompt for void/reject flows ─────────────
+function ReasonModal({ title, message, confirmLabel, loading, onConfirm, onClose }: {
+  title:        string
+  message:      string
+  confirmLabel: string
+  loading:      boolean
+  onConfirm:    (reason: string) => void
+  onClose:      () => void
+}) {
+  const [reason, setReason] = useState('')
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
+      <RpxDialogContent maxWidth={440}>
+        <RpxDialogHeader title={title} onClose={onClose} />
+        <RpxDialogBody>
+          <p style={{ fontSize: 12.5, color: colors.textSecondary, margin: '0 0 10px' }}>{message}</p>
+          <Label style={{ display: 'block', marginBottom: 4, fontSize: 10, fontWeight: 600, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            Reason <span style={{ color: colors.danger }}>(required)</span>
+          </Label>
+          <Textarea
+            value={reason}
+            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setReason(e.target.value)}
+            placeholder="e.g., Unable to reconcile - data lost"
+            style={{ fontSize: 12, border: `1px solid ${colors.border}`, borderRadius: 2, resize: 'vertical' }}
+            rows={2}
+            disabled={loading}
+            autoFocus
+          />
+        </RpxDialogBody>
+        <RpxDialogFooter>
+          <Btn onClick={onClose} disabled={loading}>Cancel</Btn>
+          <Btn
+            variant="danger"
+            loading={loading}
+            disabled={!reason.trim()}
+            onClick={() => onConfirm(reason)}
+          >
+            {confirmLabel}
+          </Btn>
+        </RpxDialogFooter>
+      </RpxDialogContent>
+    </Dialog>
+  )
+}
+
 // ─── Manage Open Sessions Modal ───────────────────────────────────────────────
 function ManageSessionsModal({ sessions, onClose, onVoided, currencySymbol = 'R' }: {
   sessions: CashUp[]
@@ -539,6 +585,7 @@ export default function CashUpPage() {
   const [submitting, setSubmitting] = useState(false)
   const [approving,  setApproving]  = useState(false)
   const [rejecting,  setRejecting]  = useState(false)
+  const [rejectReasonOpen, setRejectReasonOpen] = useState(false)
   const [notes,      setNotes]      = useState('')
   const [counts, setCounts] = useState<Record<number, number>>(() =>
     Object.fromEntries(DENOMINATIONS.map((d) => [d, 0]))
@@ -546,6 +593,7 @@ export default function CashUpPage() {
 
   const [countCashOpen, setCountCashOpen] = useState(false)
   const [voiding, setVoiding] = useState(false)
+  const [voidReasonOpen, setVoidReasonOpen] = useState(false)
   const [manageSessionsOpen, setManageSessionsOpen] = useState(false)
   const [previousReportsOpen, setPreviousReportsOpen] = useState(false)
 
@@ -554,10 +602,8 @@ export default function CashUpPage() {
   const openSessions = openSessionsData?.sessions ?? []
   const openSessionsCount = openSessions.length
 
-  async function handleVoidSession() {
+  async function handleVoidSession(reason: string) {
     if (!cashUp || !isManager) return
-    const reason = window.prompt('Enter reason for voiding this session (e.g., "Unable to reconcile - data lost"):')
-    if (!reason) return
 
     setVoiding(true)
     try {
@@ -570,6 +616,7 @@ export default function CashUpPage() {
         toast.success('Session voided')
         swrMutate(CASHUP_KEY)
         swrMutate('/api/cashup/open-sessions')
+        setVoidReasonOpen(false)
       } else {
         const j = await res.json()
         toast.error(j.error ?? 'Failed to void session')
@@ -655,10 +702,8 @@ export default function CashUpPage() {
     else { const j = await res.json(); toast.error(j.error ?? 'Failed to approve cash-up') }
   }
 
-  async function handleReject() {
+  async function handleReject(reason: string) {
     if (!cashUp) return
-    const reason = window.prompt('Enter reason for rejecting this cash-up (sent back to the cashier for correction):')
-    if (!reason) return
     setRejecting(true)
     const res = await fetch(`/api/cashup/${cashUp.id}/reject`, {
       method: 'POST',
@@ -666,8 +711,15 @@ export default function CashUpPage() {
       body: JSON.stringify({ reason }),
     })
     setRejecting(false)
-    if (res.ok) { toast.success('Cash-up rejected — sent back to cashier'); swrMutate(CASHUP_KEY); refreshStats() }
-    else { const j = await res.json(); toast.error(j.error ?? 'Failed to reject cash-up') }
+    if (res.ok) {
+      toast.success('Cash-up rejected — sent back to cashier')
+      swrMutate(CASHUP_KEY)
+      refreshStats()
+      setRejectReasonOpen(false)
+    } else {
+      const j = await res.json()
+      toast.error(j.error ?? 'Failed to reject cash-up')
+    }
   }
 
   if (isLoading) {
@@ -726,7 +778,7 @@ export default function CashUpPage() {
                       : ' Count your cash and submit below, or void this session if you cannot reconcile.'}
                   </p>
                   <div className="flex gap-2 flex-wrap">
-                    <Btn size="sm" variant="danger" loading={voiding} onClick={handleVoidSession}>
+                    <Btn size="sm" variant="danger" loading={voiding} onClick={() => setVoidReasonOpen(true)}>
                       Void This Session
                     </Btn>
                     {openSessionsCount > 1 && (
@@ -988,14 +1040,14 @@ export default function CashUpPage() {
                       <div className="pt-2 border-t flex justify-end gap-2" style={{ borderColor: colors.border }}>
                         {isManager ? (
                           <>
-                            <Btn size="sm" loading={voiding} onClick={handleVoidSession}>
+                            <Btn size="sm" loading={voiding} onClick={() => setVoidReasonOpen(true)}>
                               Void
                             </Btn>
                             <Btn
                               size="sm"
                               variant="danger"
                               loading={rejecting}
-                              onClick={handleReject}
+                              onClick={() => setRejectReasonOpen(true)}
                             >
                               Reject — Send Back to Cashier
                             </Btn>
@@ -1174,6 +1226,28 @@ export default function CashUpPage() {
 
       {previousReportsOpen && (
         <PreviousReportsModal onClose={() => setPreviousReportsOpen(false)} />
+      )}
+
+      {voidReasonOpen && (
+        <ReasonModal
+          title="Void Cash-Up Session"
+          message="Voiding this session cannot be undone. Please provide a reason."
+          confirmLabel="Void Session"
+          loading={voiding}
+          onConfirm={handleVoidSession}
+          onClose={() => setVoidReasonOpen(false)}
+        />
+      )}
+
+      {rejectReasonOpen && (
+        <ReasonModal
+          title="Reject Cash-Up"
+          message="This will send the session back to the cashier for correction. Please provide a reason."
+          confirmLabel="Reject — Send Back"
+          loading={rejecting}
+          onConfirm={handleReject}
+          onClose={() => setRejectReasonOpen(false)}
+        />
       )}
     </PortalPage>
   )
