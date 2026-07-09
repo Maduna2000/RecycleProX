@@ -261,7 +261,6 @@ export default function SalesPage() {
           rowActions={rowActions}
           loading={isLoading}
           emptyMessage="No sales found"
-          emptyAction={{ label: '+ New Sale', onClick: () => router.push('/app/sales/new') }}
           total={data?.total}
           page={page}
           pageSize={50}

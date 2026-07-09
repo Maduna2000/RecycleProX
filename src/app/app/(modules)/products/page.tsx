@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog } from '@/components/ui/dialog'
-import { Search, Pencil, TrendingUp, Plus, Eye, EyeOff, Trash2, X, Settings2, Package, Loader2, MoreVertical } from 'lucide-react'
+import { Search, Pencil, Plus, Eye, EyeOff, Trash2, X, Package, Loader2, MoreVertical } from 'lucide-react'
 import * as LucideIcons from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { toast } from 'sonner'
@@ -74,6 +74,14 @@ export default function ProductsPage() {
   useEffect(() => {
     if (searchParams.get('add') === '1') {
       setCreateOpen(true)
+      router.replace('/app/products')
+    }
+    if (searchParams.get('categories') === '1') {
+      setCatManageOpen(true)
+      router.replace('/app/products')
+    }
+    if (searchParams.get('bulk') === '1') {
+      setBulkOpen(true)
       router.replace('/app/products')
     }
   }, [searchParams, router])
@@ -144,16 +152,7 @@ export default function ProductsPage() {
   const allSelected = products.length > 0 && selectedKeys.size === products.length
 
   return (
-    <PortalPage
-      title={`Products (${products.length})`}
-      actions={isManager ? (
-        <>
-          <Btn size="sm" icon={Settings2} onClick={() => setCatManageOpen(true)}>Categories</Btn>
-          <Btn size="sm" icon={TrendingUp} onClick={() => setBulkOpen(true)}>Bulk Price</Btn>
-          <Btn variant="primary" size="sm" icon={Plus} onClick={() => setCreateOpen(true)}>Add Product</Btn>
-        </>
-      ) : undefined}
-    >
+    <PortalPage title={`Products (${products.length})`}>
         {/* Filter toolbar */}
         <FilterBar>
           <Field label="Search" width={200}>

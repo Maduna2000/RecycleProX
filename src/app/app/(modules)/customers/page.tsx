@@ -102,7 +102,7 @@ function DealerCategoryBadge({ cat }: { cat?: string | null }) {
 }
 
 // ─── Accounts list ─────────────────────────────────────────────────────────────
-function AccountsList({ onAddCustomer }: { onAddCustomer: () => void }) {
+function AccountsList() {
   const router = useRouter()
   const { data: session } = useSession()
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
@@ -398,7 +398,6 @@ function AccountsList({ onAddCustomer }: { onAddCustomer: () => void }) {
           loading={isLoading}
           error={error}
           emptyMessage="No account customers found"
-          emptyAction={{ label: '+ Add Account Customer', onClick: onAddCustomer }}
         />
       </div>
 
@@ -459,14 +458,9 @@ function AccountsList({ onAddCustomer }: { onAddCustomer: () => void }) {
 
 // ─── Page ──────────────────────────────────────────────────────────────────────
 export default function AccountsPage() {
-  const router = useRouter()
-
   return (
-    <PortalPage
-      title="Accounts"
-      actions={<Btn variant="primary" size="sm" onClick={() => router.push('/app/customers/new')}>+ Add Account</Btn>}
-    >
-      <AccountsList onAddCustomer={() => router.push('/app/customers/new')} />
+    <PortalPage title="Accounts">
+      <AccountsList />
     </PortalPage>
   )
 }

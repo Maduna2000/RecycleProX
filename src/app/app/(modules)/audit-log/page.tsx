@@ -1,8 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import useSWR from 'swr'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
+import { toast } from 'sonner'
 import { ChevronLeft, ChevronRight, Loader2, X } from 'lucide-react'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
 import { inp, Btn, Field, PortalPage, FilterBar, TH, HEADER_GRAD } from '@/components/rpx'
@@ -41,8 +43,11 @@ const ACTION_STYLES: Record<AuditEntry['action'], { background: string; color: s
 const PAGE_SIZE = 50
 
 export default function AuditLogPage() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const { data: session } = useSession()
   const isAdmin = session?.user?.role === 'admin'
+  const exportFired = useRef(false)
 
   const today = (() => {
     const n = new Date()
@@ -69,6 +74,42 @@ export default function AuditLogPage() {
     isAdmin ? `/api/audit-log?${qs}` : null,
     fetcher
   )
+
+  async function handleToolbarExport() {
+    const toastId = toast.loading('Exporting audit log…')
+    try {
+      const exportQs = new URLSearchParams({
+        ...(table  && { table }),
+        ...(action && { action }),
+        ...(from   && { from }),
+        ...(to     && { to }),
+      })
+      const res = await fetch(`/api/audit-log/export?${exportQs}`)
+      if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(j.error ?? 'Export failed') }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `audit-log-${today}.xlsx`
+      a.click()
+      URL.revokeObjectURL(url)
+      toast.success('Export downloaded', { id: toastId })
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to export', { id: toastId })
+    } finally {
+      exportFired.current = false
+    }
+  }
+
+  // Toolbar Export deep-link (?export=1)
+  useEffect(() => {
+    if (searchParams.get('export') === '1' && isAdmin && !exportFired.current) {
+      exportFired.current = true
+      router.replace('/app/audit-log', { scroll: false })
+      void handleToolbarExport()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, isAdmin, router])
 
   if (!isAdmin) {
     return (

@@ -1,12 +1,12 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import useSWR, { mutate } from 'swr'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog } from '@/components/ui/dialog'
-import { Plus, Star, MoreVertical, ExternalLink, Pencil, Trash2 } from 'lucide-react'
+import { Star, MoreVertical, ExternalLink, Pencil, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -30,6 +30,7 @@ type PriceGroup = {
 
 export default function PriceGroupsPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { data: session } = useSession()
   const { confirm } = useConfirm()
   const [createOpen, setCreateOpen] = useState(false)
@@ -37,6 +38,14 @@ export default function PriceGroupsPage() {
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
+
+  // Toolbar "Add Price Group" deep-link (?create=1)
+  useEffect(() => {
+    if (searchParams.get('create') === '1' && isManager) {
+      setCreateOpen(true)
+      router.replace('/app/price-groups')
+    }
+  }, [searchParams, isManager, router])
 
   const { data } = useSWR<{ groups: PriceGroup[] }>('/api/price-groups', fetcher)
   const groups = data?.groups ?? []
@@ -68,10 +77,7 @@ export default function PriceGroupsPage() {
   }
 
   return (
-    <PortalPage
-      title={`Price Groups (${groups.length})`}
-      actions={isManager ? <Btn variant="primary" size="sm" icon={Plus} onClick={() => setCreateOpen(true)}>Add Price Group</Btn> : undefined}
-    >
+    <PortalPage title={`Price Groups (${groups.length})`}>
         {/* Table */}
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
           {groups.length === 0 ? (

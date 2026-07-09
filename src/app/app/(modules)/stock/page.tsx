@@ -200,10 +200,7 @@ export default function StockPage() {
   ].filter(Boolean).join(' · ')
 
   return (
-    <PortalPage
-      title="Stock On Hand"
-      actions={isManager ? <Btn variant="primary" size="sm" onClick={() => setAdjustOpen(true)}>Manual Adjustment</Btn> : undefined}
-    >
+    <PortalPage title="Stock On Hand">
       <FilterBar>
         <Field label="Search" width={180}>
           <div style={{ position: 'relative' }}>
@@ -362,7 +359,7 @@ function AdjustmentModal({
             <div>
               <Label>Direction</Label>
               <Select value={direction} onValueChange={(v) => setDirection(v as 'in' | 'out')}>
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="mt-1 w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="in">Stock IN (add)</SelectItem>
                   <SelectItem value="out">Stock OUT (remove)</SelectItem>

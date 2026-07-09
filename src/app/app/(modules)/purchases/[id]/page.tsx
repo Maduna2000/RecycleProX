@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import useSWR, { mutate } from 'swr'
 import { Dialog } from '@/components/ui/dialog'
-import { ArrowLeft, Ban, Plus, Printer, Camera, FileText, Loader2 } from 'lucide-react'
+import { ArrowLeft, Ban, Printer, Camera, FileText, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useSession } from 'next-auth/react'
 import { format } from '@/lib/utils/format'
@@ -99,12 +99,7 @@ export default function PurchaseDetailPage() {
     <>
     <PortalPage
       title={purchase.refNumber}
-      actions={
-        <>
-          <Btn size="sm" icon={ArrowLeft} onClick={() => router.push('/app/purchases')}>Back</Btn>
-          <Btn variant="primary" size="sm" icon={Plus} onClick={() => router.push('/app/purchases/new')}>New Purchase</Btn>
-        </>
-      }
+      actions={<Btn size="sm" icon={ArrowLeft} onClick={() => router.push('/app/purchases')}>Back</Btn>}
     >
         {/* Sub-header: status + payment method */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderBottom: '1px solid #E0E0E0', flexShrink: 0 }}>

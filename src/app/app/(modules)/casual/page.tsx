@@ -1,11 +1,11 @@
 'use client'
 
-import { useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useRef, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import useSWR, { mutate } from 'swr'
 import { Input } from '@/components/ui/input'
 import { Dialog } from '@/components/ui/dialog'
-import { Search, Upload, Download, CheckCircle2, AlertCircle, ShieldBan, ShieldCheck, UserX, Trash2, UserCheck, Eye } from 'lucide-react'
+import { Search, ShieldBan, ShieldCheck, UserX, Trash2, UserCheck, Eye } from 'lucide-react'
 import { toast } from 'sonner'
 import { useSession } from 'next-auth/react'
 import { DataTable, StatusBadge, Column, RowAction } from '@/components/ui/DataTable'
@@ -33,6 +33,7 @@ function customerStatus(c: Customer): string {
 
 export default function CasualsPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { data: session } = useSession()
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
 
@@ -41,11 +42,11 @@ export default function CasualsPage() {
   const [showBlacklisted, setShowBlacklisted] = useState('')
   const [dealerCategory, setDealerCategory]   = useState('')
   const [primaryFunction, setPrimaryFunction] = useState('')
-  const [importOpen, setImportOpen]       = useState(false)
   const [blacklistId, setBlacklistId]     = useState<string | null>(null)
   const [deleteId, setDeleteId]           = useState<string | null>(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [promoteId, setPromoteId]         = useState<string | null>(null)
+  const exportFired = useRef(false)
 
   const params = new URLSearchParams({ type: 'casual', limit: '200' })
   if (search) params.set('search', search)
@@ -56,6 +57,42 @@ export default function CasualsPage() {
     `/api/customers?${params}`,
     fetcher,
   )
+
+  async function handleToolbarExport(format: 'xlsx' | 'pdf') {
+    const toastId = toast.loading(`Exporting ${format === 'pdf' ? 'PDF' : 'Excel'}…`)
+    try {
+      const qs = new URLSearchParams({ format })
+      if (search) qs.set('search', search)
+      if (showBlacklisted) qs.set('blacklisted', showBlacklisted)
+      if (dealerCategory) qs.set('dealerCategory', dealerCategory)
+      if (primaryFunction) qs.set('primaryFunction', primaryFunction)
+      const res = await fetch(`/api/casual/export?${qs}`)
+      if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(j.error ?? 'Export failed') }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `casual-sellers-${new Date().toISOString().slice(0, 10)}.${format}`
+      a.click()
+      URL.revokeObjectURL(url)
+      toast.success('Export downloaded', { id: toastId })
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to export', { id: toastId })
+    } finally {
+      exportFired.current = false
+    }
+  }
+
+  // Toolbar Export deep-link (?export=xlsx|pdf)
+  useEffect(() => {
+    const fmt = searchParams.get('export')
+    if ((fmt === 'xlsx' || fmt === 'pdf') && !exportFired.current) {
+      exportFired.current = true
+      router.replace('/app/casual', { scroll: false })
+      void handleToolbarExport(fmt)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, router])
 
   const customers = (data?.customers ?? []).filter((c) =>
     letter ? c.lastName.toUpperCase().startsWith(letter) : true,
@@ -197,10 +234,7 @@ export default function CasualsPage() {
   ]
 
   return (
-    <PortalPage
-      title="Casual Sellers"
-      actions={isManager ? <Btn variant="primary" size="sm" icon={Upload} onClick={() => setImportOpen(true)}>Import CSV</Btn> : undefined}
-    >
+    <PortalPage title="Casual Sellers">
       <div className="flex flex-col flex-1 min-h-0">
 
         {/* Filter bar */}
@@ -268,13 +302,6 @@ export default function CasualsPage() {
               : 'No casual customers found'}
           />
         </div>
-
-        {importOpen && (
-          <ImportCsvModal
-            onClose={() => setImportOpen(false)}
-            onSuccess={() => { refreshList(); setImportOpen(false) }}
-          />
-        )}
 
         {promoteId && (
           <PromoteToAccountModal
@@ -462,119 +489,3 @@ function PromoteToAccountModal({ customerId, customerName, onClose, onSuccess }:
   )
 }
 
-// ─── Import CSV Modal ──────────────────────────────────────────────────────────
-
-type ImportResult = { imported: number; skipped: number; errors: { row: number; reason: string }[] }
-
-function ImportCsvModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
-  const fileRef = useRef<HTMLInputElement>(null)
-  const [loading, setLoading]   = useState(false)
-  const [result, setResult]     = useState<ImportResult | null>(null)
-  const [fileName, setFileName] = useState('')
-
-  function downloadTemplate() {
-    const headers = 'idNumber,firstName,lastName,phone,dateOfBirth,gender,nationality,physicalAddress'
-    const example = 'EZ12345678,John,Dlamini,76123456,1980-01-01,male,Swazi,123 Main St Mbabane'
-    const blob = new Blob([headers + '\n' + example], { type: 'text/csv' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'casual-import-template.csv'
-    a.click()
-    URL.revokeObjectURL(url)
-  }
-
-  async function handleImport() {
-    const file = fileRef.current?.files?.[0]
-    if (!file) { toast.error('Please select a CSV file'); return }
-    setLoading(true)
-    setResult(null)
-    const form = new FormData()
-    form.append('csv', file)
-    const res = await fetch('/api/casual/import', { method: 'POST', body: form })
-    setLoading(false)
-    const j = await res.json() as ImportResult & { error?: string }
-    if (res.ok || res.status === 422) {
-      setResult(j)
-      if (j.imported > 0) {
-        toast.success(`Imported ${j.imported} new customer${j.imported !== 1 ? 's' : ''}`)
-        onSuccess()
-      }
-    } else {
-      toast.error(j.error ?? 'Import failed')
-    }
-  }
-
-  return (
-    <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <RpxDialogContent maxWidth={560}>
-        <RpxDialogHeader title="Import Casual Customers from CSV" onClose={onClose} />
-        <RpxDialogBody>
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <p className="text-sm" style={{ color: colors.textSecondary }}>
-              Upload a CSV file with customer details. Existing customers (matched by ID number) will be updated.
-            </p>
-            <button
-              type="button"
-              onClick={downloadTemplate}
-              className="flex items-center gap-1 text-xs shrink-0 ml-3 hover:underline"
-              style={{ color: colors.process }}
-            >
-              <Download className="w-3.5 h-3.5" /> Template
-            </button>
-          </div>
-
-          <div
-            className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors"
-            style={{ borderColor: colors.border }}
-            onClick={() => fileRef.current?.click()}
-            onMouseEnter={(e) => (e.currentTarget.style.background = colors.toolbar)}
-            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-          >
-            <Upload className="w-6 h-6 mx-auto mb-2" style={{ color: colors.textSecondary }} />
-            <p className="text-sm" style={{ color: colors.textSecondary }}>{fileName || 'Click to select a .csv file'}</p>
-            <p className="text-xs mt-1" style={{ color: colors.textSecondary }}>Max 5 MB</p>
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".csv,text/csv"
-              className="hidden"
-              onChange={(e) => setFileName(e.target.files?.[0]?.name ?? '')}
-            />
-          </div>
-
-          {result && (
-            <div className="rounded-lg p-4 space-y-2" style={{ border: `1px solid ${colors.border}` }}>
-              <div className="flex items-center gap-2 text-sm font-medium" style={{ color: colors.action }}>
-                <CheckCircle2 className="w-4 h-4" />
-                <span>{result.imported} new customers imported · {result.skipped} updated</span>
-              </div>
-              {result.errors.length > 0 && (
-                <div>
-                  <div className="flex items-center gap-1.5 text-sm mb-1" style={{ color: colors.danger }}>
-                    <AlertCircle className="w-4 h-4" />
-                    <span>{result.errors.length} row error{result.errors.length !== 1 ? 's' : ''}</span>
-                  </div>
-                  <div className="max-h-32 overflow-y-auto space-y-0.5">
-                    {result.errors.map((e) => (
-                      <p key={e.row} className="text-xs font-mono" style={{ color: colors.danger }}>Row {e.row}: {e.reason}</p>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-        </div>
-        </RpxDialogBody>
-        <RpxDialogFooter>
-          <Btn onClick={onClose} disabled={loading}>Close</Btn>
-          <Btn variant="primary" loading={loading} disabled={!fileName} onClick={handleImport}>
-            Import
-          </Btn>
-        </RpxDialogFooter>
-      </RpxDialogContent>
-    </Dialog>
-  )
-}

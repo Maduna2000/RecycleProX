@@ -1,14 +1,14 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import useSWR, { mutate } from 'swr'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import { Plus, Loader2 } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from '@/lib/utils/format'
 import { colors } from '@/lib/design-tokens'
-import { TH, TD, HEADER_GRAD, Btn, PortalPage, EmptyHint } from '@/components/rpx'
+import { TH, TD, HEADER_GRAD, PortalPage, EmptyHint } from '@/components/rpx'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -34,13 +34,25 @@ function StatusBadge({ status }: { status: 'open' | 'completed' | 'voided' }) {
 export default function StocktakePage() {
   const { data: session } = useSession()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [creating, setCreating] = useState(false)
+  const createFired = useRef(false)
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
 
   const { data, isLoading } = useSWR<{ items: StocktakeItem[]; total: number }>(
     isManager ? '/api/stocktake' : null,
     fetcher
   )
+
+  // Toolbar "Start Stocktake" deep-link (?create=1)
+  useEffect(() => {
+    if (searchParams.get('create') === '1' && isManager && !createFired.current) {
+      createFired.current = true
+      router.replace('/app/stocktake', { scroll: false })
+      void handleCreate()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, isManager, router])
 
   if (!isManager) {
     return (
@@ -51,16 +63,20 @@ export default function StocktakePage() {
   }
 
   async function handleCreate() {
+    if (creating) return
     setCreating(true)
+    const toastId = toast.loading('Starting stocktake…')
     try {
       const res = await fetch('/api/stocktake', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) })
       if (!res.ok) { const j = await res.json(); throw new Error(j.error ?? 'Failed') }
       const stocktake = await res.json()
       mutate('/api/stocktake')
+      toast.dismiss(toastId)
       router.push(`/app/stocktake/${stocktake.id}`)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to create stocktake')
+      toast.error(err instanceof Error ? err.message : 'Failed to create stocktake', { id: toastId })
       setCreating(false)
+      createFired.current = false
     }
   }
 
@@ -68,10 +84,7 @@ export default function StocktakePage() {
   const count = data?.total ?? 0
 
   return (
-    <PortalPage
-      title={`Stocktake (${count} on record)`}
-      actions={<Btn variant="primary" size="sm" icon={Plus} loading={creating} onClick={handleCreate}>New Stocktake</Btn>}
-    >
+    <PortalPage title={`Stocktake (${count} on record)`}>
         {/* Table */}
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
           {isLoading ? (

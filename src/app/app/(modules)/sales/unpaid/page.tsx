@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import useSWR, { mutate } from 'swr'
-import { useRouter } from 'next/navigation'
 import { Search, Printer, Ban, HandCoins, Loader2, X } from 'lucide-react'
 import Decimal from 'decimal.js'
 import { DataTable, Avatar, type Column, type RowAction } from '@/components/ui/DataTable'
@@ -57,7 +56,6 @@ function outstanding(s: { totalAmount: string; amountPaid?: string }): Decimal {
 }
 
 export default function UnpaidSalesPage() {
-  const router = useRouter()
   const { data: session } = useSession()
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
 
@@ -245,7 +243,6 @@ export default function UnpaidSalesPage() {
           rowActions={rowActions}
           loading={isLoading}
           emptyMessage="No unpaid sales — all sales are settled."
-          emptyAction={{ label: '+ New Sale', onClick: () => router.push('/app/sales/new') }}
         />
       </div>
 

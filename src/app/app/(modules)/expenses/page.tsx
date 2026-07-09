@@ -6,7 +6,7 @@ import { useSearchParams } from 'next/navigation'
 import Decimal from 'decimal.js'
 import useSWR, { mutate } from 'swr'
 import { useSession } from 'next-auth/react'
-import { CheckCircle, Trash2, Receipt, Search, X, Paperclip, Upload, Eye, Pencil, Plus } from 'lucide-react'
+import { CheckCircle, Trash2, Receipt, Search, X, Paperclip, Upload, Eye, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { useForm } from 'react-hook-form'
@@ -255,7 +255,6 @@ export default function ExpensesPage() {
       tabs={pageTabs}
       active={tab}
       onChange={(v) => setTab(v as PageTab)}
-      actions={<Btn variant="primary" size="sm" icon={Plus} onClick={() => setAddOpen(true)}>Add Expense</Btn>}
     >
       <FilterBar>
         <Field label="Search" width={220}>

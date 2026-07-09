@@ -7,7 +7,7 @@ import useSWR, { mutate } from 'swr'
 import { CreateUserModal } from '@/components/users/CreateUserModal'
 import { EditUserModal } from '@/components/users/EditUserModal'
 import { ResetPasswordModal } from '@/components/users/ResetPasswordModal'
-import { MoreVertical, Search, Unlock, UserCheck, UserX, KeyRound, Plus, ArrowLeft } from 'lucide-react'
+import { MoreVertical, Search, Unlock, UserCheck, UserX, KeyRound, ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import { colors } from '@/lib/design-tokens'
 import { inp, TH, TD, HEADER_GRAD, Btn, Field, PortalPage, FilterBar, EmptyHint } from '@/components/rpx'
@@ -124,12 +124,7 @@ export default function UsersPage() {
     <>
     <PortalPage
       title={`Users (${users.length})`}
-      actions={
-        <>
-          <Btn size="sm" icon={ArrowLeft} href="/app/settings">Settings</Btn>
-          <Btn variant="primary" size="sm" icon={Plus} onClick={() => setCreateOpen(true)}>Add User</Btn>
-        </>
-      }
+      actions={<Btn size="sm" icon={ArrowLeft} href="/app/settings">Settings</Btn>}
     >
         {/* Filters */}
         <FilterBar>
