@@ -7,10 +7,15 @@ import { prisma } from '@/lib/db/prisma'
 import { Prisma } from '@prisma/client'
 import Decimal from 'decimal.js'
 import { expandCategoryNames } from '@/lib/services/productService'
+import { buildReportMeta } from '@/lib/services/reports/meta'
+import { generateBusinessReportPdf } from '@/lib/pdf/businessReport'
+import type { ReportDocument, ReportGroup } from '@/lib/reports/types'
+
+const PERIOD_LABELS = { daily: 'Daily', weekly: 'Weekly', mtd: 'Month to Date' } as const
 
 /**
- * GET /api/stock/grid/export?period=daily|weekly|mtd&date=YYYY-MM-DD&category=
- * Downloads a stock grid as an .xlsx file.
+ * GET /api/stock/grid/export?period=daily|weekly|mtd&date=YYYY-MM-DD&category=&format=xlsx|pdf
+ * Downloads a stock grid as an .xlsx (default) or .pdf file.
  */
 export async function GET(req: NextRequest) {
   const session = await auth()
@@ -20,6 +25,7 @@ export async function GET(req: NextRequest) {
   const period    = (params.get('period') ?? 'daily') as 'daily' | 'weekly' | 'mtd'
   const dateParam = params.get('date') ?? new Date().toISOString().slice(0, 10)
   const category  = params.get('category') ?? undefined
+  const format    = params.get('format') === 'pdf' ? 'pdf' : 'xlsx'
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
     return NextResponse.json({ error: 'Invalid date format' }, { status: 400 })
@@ -68,22 +74,102 @@ export async function GET(req: NextRequest) {
       const closingValue = closingQty.times(new Decimal(p.defaultBuyPrice.toString()))
 
       return {
-        Code:           p.code,
-        Product:        p.name,
-        Category:       p.category,
-        Unit:           p.unit,
-        'Opening Qty':  openingQty.toFixed(2),
-        'Purchased':    purchasedQty.toFixed(2),
-        'Sold':         soldQty.toFixed(2),
-        'Adjusted':     adjustedQty.toFixed(2),
-        'Closing Qty':  closingQty.toFixed(2),
-        'Buy Price':    Number(p.defaultBuyPrice),
-        'Closing Value (R)': Number(closingValue.toFixed(2)),
+        code:      p.code,
+        name:      p.name,
+        category:  p.category,
+        unit:      p.unit,
+        opening:   openingQty.toFixed(2),
+        purchased: purchasedQty.toFixed(2),
+        sold:      soldQty.toFixed(2),
+        adjusted:  adjustedQty.toFixed(2),
+        closing:   closingQty.toFixed(2),
+        buyPrice:  new Decimal(p.defaultBuyPrice.toString()),
+        value:     closingValue,
       }
     })
 
+    logger.info({ userId: session.user.id, period, date: dateParam, format }, 'stock.grid.export')
+
+    if (format === 'pdf') {
+      const meta = await buildReportMeta(session.user.name ?? session.user.username ?? 'Unknown')
+      if (meta.company.name === 'Renovo Pro') {
+        meta.company = { ...meta.company, name: 'Golden Key Investments (Pty) Ltd' }
+      }
+
+      // One group per category (rows are already category-sorted)
+      const groups: ReportGroup[] = []
+      for (const row of rows) {
+        let group = groups[groups.length - 1]
+        if (!group || group.label !== row.category.toUpperCase()) {
+          group = { level: 0, label: row.category.toUpperCase(), rows: [], subtotal: { value: '0.00' } }
+          groups.push(group)
+        }
+        group.rows!.push({
+          cells: {
+            code:      row.code,
+            name:      row.name,
+            unit:      row.unit,
+            opening:   row.opening,
+            purchased: row.purchased,
+            sold:      row.sold,
+            adjusted:  row.adjusted,
+            closing:   row.closing,
+            value:     row.value.toFixed(2),
+          },
+        })
+        group.subtotal = { value: new Decimal(group.subtotal?.value ?? '0').plus(row.value).toFixed(2) }
+      }
+      const totalValue = rows.reduce((a, r) => a.plus(r.value), new Decimal(0))
+
+      const doc: ReportDocument = {
+        reportId: 'stock-grid',
+        title: `Stock Grid — ${PERIOD_LABELS[period]}`,
+        subtitle: category ? `Category: ${category}` : undefined,
+        params: { from: periodStart.toISOString(), to: periodEnd.toISOString() },
+        columns: [
+          { key: 'code',      label: 'Code',      width: 0.09 },
+          { key: 'name',      label: 'Product',   width: 0.25 },
+          { key: 'unit',      label: 'Unit',      width: 0.06 },
+          { key: 'opening',   label: 'Opening',   width: 0.10, align: 'right', format: 'qty' },
+          { key: 'purchased', label: 'Purchased', width: 0.10, align: 'right', format: 'qty' },
+          { key: 'sold',      label: 'Sold',      width: 0.09, align: 'right', format: 'qty' },
+          { key: 'adjusted',  label: 'Adjusted',  width: 0.09, align: 'right', format: 'qty' },
+          { key: 'closing',   label: 'Closing',   width: 0.10, align: 'right', format: 'qty' },
+          { key: 'value',     label: 'Value',     width: 0.12, align: 'right', format: 'money' },
+        ],
+        groups,
+        grandTotal: { value: totalValue.toFixed(2) },
+        meta: { ...meta, rowCount: rows.length },
+      }
+
+      const pdfBytes = await generateBusinessReportPdf(doc)
+      const body = pdfBytes.buffer.slice(pdfBytes.byteOffset, pdfBytes.byteOffset + pdfBytes.byteLength) as ArrayBuffer
+
+      return new NextResponse(body, {
+        headers: {
+          'Content-Type':        'application/pdf',
+          'Content-Disposition': `attachment; filename="stock-grid-${period}-${dateParam}.pdf"`,
+          'Content-Length':      String(body.byteLength),
+        },
+      })
+    }
+
+    const xlsxRows = rows.map((r) => ({
+      Code:           r.code,
+      Product:        r.name,
+      Category:       r.category,
+      Unit:           r.unit,
+      'Opening Qty':  r.opening,
+      'Purchased':    r.purchased,
+      'Sold':         r.sold,
+      'Adjusted':     r.adjusted,
+      'Closing Qty':  r.closing,
+      'Buy Price':    r.buyPrice.toNumber(),
+      'Closing Value (R)': Number(r.value.toFixed(2)),
+    }))
+
     const wb = XLSX.utils.book_new()
-    const ws = XLSX.utils.json_to_sheet(rows)
+    const ws = XLSX.utils.json_to_sheet(xlsxRows)
 
     // Column widths
     ws['!cols'] = [
@@ -96,8 +182,6 @@ export async function GET(req: NextRequest) {
 
     const rawBuf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer
     const filename = `stock-grid-${period}-${dateParam}.xlsx`
-
-    logger.info({ userId: session.user.id, period, date: dateParam }, 'stock.grid.export')
 
     return new NextResponse(rawBuf, {
       headers: {

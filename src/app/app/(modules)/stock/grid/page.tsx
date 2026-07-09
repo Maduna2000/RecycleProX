@@ -8,7 +8,7 @@ import Decimal from 'decimal.js'
 import { DataTable, type Column } from '@/components/ui/DataTable'
 import { CategoryFilterSelect } from '@/components/products/CategoryFilterSelect'
 import { colors, fontSize } from '@/lib/design-tokens'
-import { inp, Btn, Field, PortalPage, FilterBar } from '@/components/rpx'
+import { inp, BtnMenu, Field, PortalPage, FilterBar } from '@/components/rpx'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -37,9 +37,9 @@ export default function StockGridPage() {
   const gridKey = `/api/stock/grid?period=${gridPeriod}&date=${gridDate}${gridCategory ? `&category=${gridCategory}` : ''}`
   const { data: gridData, isLoading: gridLoading } = useSWR<{ grid: GridRow[] }>(gridKey, fetcher)
 
-  async function handleExport() {
+  async function handleExport(format: 'xlsx' | 'pdf') {
     setExporting(true)
-    const exportUrl = `/api/stock/grid/export?period=${gridPeriod}&date=${gridDate}${gridCategory ? `&category=${gridCategory}` : ''}`
+    const exportUrl = `/api/stock/grid/export?period=${gridPeriod}&date=${gridDate}&format=${format}${gridCategory ? `&category=${gridCategory}` : ''}`
     const res = await fetch(exportUrl)
     setExporting(false)
     if (!res.ok) { toast.error('Export failed'); return }
@@ -47,7 +47,7 @@ export default function StockGridPage() {
     const url  = URL.createObjectURL(blob)
     const a    = document.createElement('a')
     a.href     = url
-    a.download = `stock-grid-${gridPeriod}-${gridDate}.xlsx`
+    a.download = `stock-grid-${gridPeriod}-${gridDate}.${format}`
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -153,12 +153,19 @@ export default function StockGridPage() {
         <Field label="Category" width={160}>
           <CategoryFilterSelect style={inp} value={gridCategory} onChange={setGridCategory} />
         </Field>
+        <BtnMenu
+          size="sm"
+          icon={Download}
+          label="Export"
+          loading={exporting}
+          items={[
+            { label: 'Export Excel', onClick: () => handleExport('xlsx') },
+            { label: 'Export PDF',   onClick: () => handleExport('pdf')  },
+          ]}
+        />
         <span style={{ marginLeft: 'auto', fontSize: 11, color: '#6C757D', paddingBottom: 8 }}>
           {gridData?.grid?.length ?? 0} products
         </span>
-        <Btn size="sm" icon={Download} loading={exporting} onClick={handleExport}>
-          Export Excel
-        </Btn>
       </FilterBar>
 
       <div className="flex-1 min-h-0" style={{ padding: 10 }}>
