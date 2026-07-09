@@ -8,7 +8,7 @@ import { getViewUrl } from '@/lib/r2'
 import { getRangeBoundsSAST } from '@/lib/utils/dayBounds'
 import { getPurchasesForRegisterRange } from '@/lib/services/policeVisitService'
 import type { ReportDocument, ReportMeta, ReportRow } from '@/lib/reports/types'
-import type { BaseReportParams } from '@/lib/schemas/report'
+import type { BaseReportParams, PoliceCopperReportParams } from '@/lib/schemas/report'
 
 type MetaBase = Omit<ReportMeta, 'rowCount'>
 
@@ -87,12 +87,16 @@ interface CopperPurchase {
  * Tanks), with only the copper lines' quantity summed into netKg — a purchase
  * with mixed copper/non-copper lines only counts its copper portion.
  */
-async function queryCopperPurchases(from: string, to: string): Promise<CopperPurchase[]> {
+async function queryCopperPurchases(from: string, to: string, idNumber?: string): Promise<CopperPurchase[]> {
   const { start, end } = getRangeBoundsSAST(from, to)
 
   const lines = await prisma.purchaseLine.findMany({
     where: {
-      purchase: { status: 'completed', createdAt: { gte: start, lte: end } },
+      purchase: {
+        status: 'completed',
+        createdAt: { gte: start, lte: end },
+        ...(idNumber ? { customer: { idNumber: { contains: idNumber, mode: 'insensitive' } } } : {}),
+      },
     },
     select: {
       quantity: true,
@@ -148,10 +152,10 @@ async function queryCopperPurchases(from: string, to: string): Promise<CopperPur
 }
 
 export async function buildPoliceCopperReport(
-  params: BaseReportParams,
+  params: PoliceCopperReportParams,
   meta: MetaBase
 ): Promise<ReportDocument> {
-  const purchases = await queryCopperPurchases(params.from, params.to)
+  const purchases = await queryCopperPurchases(params.from, params.to, params.idNumber)
 
   const rows: ReportRow[] = purchases.map((p) => ({
     cells: {
@@ -170,7 +174,11 @@ export async function buildPoliceCopperReport(
   return {
     reportId: 'police-copper-report',
     title: 'Police Copper Report',
-    params: { from: params.from, to: params.to },
+    params: {
+      from: params.from,
+      to: params.to,
+      ...(params.idNumber ? { filters: { idNumber: params.idNumber } } : {}),
+    },
     columns: [
       { key: 'refNumber', label: 'Trans No.', width: 0.14, format: 'text', excelWidth: 16 },
       { key: 'date', label: 'Date/Time', width: 0.16, format: 'datetime', excelWidth: 16 },
@@ -193,10 +201,10 @@ export async function buildPoliceCopperReport(
  * purchase not backed by a scale order, render "No image" rather than fail.
  */
 export async function buildPoliceCopperReportImages(
-  params: BaseReportParams,
+  params: PoliceCopperReportParams,
   meta: MetaBase
 ): Promise<ReportDocument> {
-  const purchases = await queryCopperPurchases(params.from, params.to)
+  const purchases = await queryCopperPurchases(params.from, params.to, params.idNumber)
 
   const rows: ReportRow[] = await Promise.all(
     purchases.map(async (p) => ({
@@ -220,7 +228,11 @@ export async function buildPoliceCopperReportImages(
     reportId: 'police-copper-report-images',
     title: 'Police Copper Report with Images',
     orientation: 'landscape',
-    params: { from: params.from, to: params.to },
+    params: {
+      from: params.from,
+      to: params.to,
+      ...(params.idNumber ? { filters: { idNumber: params.idNumber } } : {}),
+    },
     columns: [
       { key: 'refNumber', label: 'Trans No.', width: 0.12, format: 'text', excelWidth: 16 },
       { key: 'date', label: 'Date/Time', width: 0.14, format: 'datetime', excelWidth: 16 },

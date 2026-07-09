@@ -90,6 +90,12 @@ export const StocktakeReportParamsSchema = rangeParams({
   status: z.enum(['open', 'completed', 'all']).optional(),
 })
 
+// ── Police & Compliance ────────────────────────────────────────────────────────
+/** Copper purchases, optionally narrowed to a seller by partial ID number. */
+export const PoliceCopperReportParamsSchema = rangeParams({
+  idNumber: z.string().trim().max(20).optional(),
+})
+
 export type BaseReportParams = z.infer<typeof BaseReportParamsSchema>
 export type ReportFormat = z.infer<typeof ReportFormatSchema>
 export type PurchasesByProductCategoryParams = z.infer<typeof PurchasesByProductCategoryParamsSchema>
@@ -105,3 +111,4 @@ export type LoanBookParams = z.infer<typeof LoanBookParamsSchema>
 export type StockOnHandParams = z.infer<typeof StockOnHandParamsSchema>
 export type StockMovementParams = z.infer<typeof StockMovementParamsSchema>
 export type StocktakeReportParams = z.infer<typeof StocktakeReportParamsSchema>
+export type PoliceCopperReportParams = z.infer<typeof PoliceCopperReportParamsSchema>

@@ -22,6 +22,7 @@ import {
   StockOnHandParamsSchema,
   StockMovementParamsSchema,
   StocktakeReportParamsSchema,
+  PoliceCopperReportParamsSchema,
 } from '@/lib/schemas/report'
 import {
   buildPurchasesByProductCategory,
@@ -162,11 +163,11 @@ export const REPORT_REGISTRY: Record<string, ReportDefinition> = {
     build: buildPoliceRegisterReport,
   },
   'police-copper-report': {
-    paramsSchema: BaseReportParamsSchema,
+    paramsSchema: PoliceCopperReportParamsSchema,
     build: buildPoliceCopperReport,
   },
   'police-copper-report-images': {
-    paramsSchema: BaseReportParamsSchema,
+    paramsSchema: PoliceCopperReportParamsSchema,
     build: buildPoliceCopperReportImages,
   },
 }

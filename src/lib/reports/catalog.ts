@@ -310,7 +310,9 @@ export const REPORT_CATALOG: ReportCatalogEntry[] = [
     description:
       'Every purchase containing Copper-family products in the period: reference, seller name, company, casual name, ID number, and net kg.',
     area: 'compliance',
-    filters: [],
+    filters: [
+      { key: 'idNumber', label: 'Customer ID Number (partial)', type: 'text' },
+    ],
   },
   {
     id: 'police-copper-report-images',
@@ -318,7 +320,9 @@ export const REPORT_CATALOG: ReportCatalogEntry[] = [
     description:
       'The Police Copper Report plus the scale-station photo for each transaction, where the purchase was linked to a scale order.',
     area: 'compliance',
-    filters: [],
+    filters: [
+      { key: 'idNumber', label: 'Customer ID Number (partial)', type: 'text' },
+    ],
   },
 ]
 
