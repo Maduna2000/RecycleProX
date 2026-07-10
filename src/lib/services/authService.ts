@@ -1,5 +1,7 @@
 import bcrypt from 'bcryptjs'
 import { prisma } from '@/lib/db/prisma'
+import { registryPrisma } from '@/lib/db/registryPrisma'
+import { tenantContext } from '@/lib/db/tenantContext'
 import logger from '@/lib/logger'
 import type { CreateUserInput } from '@/lib/schemas/auth'
 
@@ -31,7 +33,36 @@ export class ForbiddenError extends Error {
 
 // ─── Service ──────────────────────────────────────────────────────────────────
 
-export async function login(username: string, password: string) {
+// tenantSlug is resolved from the login subdomain once tenant routing goes
+// live (see src/auth.ts). Omitted today, so every login runs against the
+// default client (public schema) exactly as before — this parameter is
+// dormant until a Tenant registry row and subdomain routing actually exist.
+export async function login(username: string, password: string, tenantSlug?: string) {
+  if (!tenantSlug) {
+    return loginInCurrentSchema(username, password)
+  }
+
+  const tenant = await registryPrisma.tenant.findUnique({ where: { companySlug: tenantSlug } })
+  if (!tenant) {
+    logger.warn({ username, tenantSlug }, 'Login failed: unknown tenant')
+    throw new InvalidCredentialsError()
+  }
+  if (tenant.status !== 'active') {
+    logger.warn({ username, tenantSlug, status: tenant.status }, 'Login failed: tenant not active')
+    throw new AccountInactiveError()
+  }
+
+  return tenantContext.run(
+    { schemaName: tenant.schemaName, companySlug: tenant.companySlug },
+    async () => ({
+      ...(await loginInCurrentSchema(username, password)),
+      schemaName: tenant.schemaName,
+      tenantSlug: tenant.companySlug,
+    }),
+  )
+}
+
+async function loginInCurrentSchema(username: string, password: string) {
   const user = await prisma.user.findUnique({
     where: { username },
     include: { moduleAccess: { select: { moduleKey: true } } },

@@ -3,20 +3,25 @@ import { auth } from '@/auth'
 import { PutObjectCommand } from '@aws-sdk/client-s3'
 import { getR2Client, R2_BUCKET } from '@/lib/r2/client'
 import { mimeToExt, ALLOWED_PHOTO_TYPES, MAX_PHOTO_BYTES } from '@/lib/r2'
+import { tenantContext } from '@/lib/db/tenantContext'
 import { randomUUID } from 'crypto'
 import logger from '@/lib/logger'
 
 const CONTEXTS = ['customer_id', 'purchase_photo', 'purchase_signature', 'police_signature', 'stocktake_entry', 'scale_order'] as const
 type UploadContext = typeof CONTEXTS[number]
 
+// Mirrors the tenantKeyPrefix() convention in src/lib/r2/index.ts — no-op
+// (empty prefix) today since nothing populates tenantContext yet.
 function buildKey(context: UploadContext, referenceId: string, ext: string, photoIndex?: number): string {
+  const schemaName = tenantContext.getStore()?.schemaName
+  const prefix = schemaName ? `${schemaName}/` : ''
   switch (context) {
-    case 'customer_id':        return `customers/${referenceId}/id-photo-${randomUUID()}.${ext}`
-    case 'purchase_photo':     return `purchases/${referenceId}/photo-${randomUUID()}.${ext}`
-    case 'purchase_signature': return `purchases/${referenceId}/signature-${randomUUID()}.${ext}`
-    case 'police_signature':   return `police-visits/${referenceId}/signature-${randomUUID()}.${ext}`
-    case 'stocktake_entry':    return `stocktakes/${referenceId}/photo-${randomUUID()}.${ext}`
-    case 'scale_order':        return `scale-orders/${referenceId}/photo-${photoIndex ?? 0}-${randomUUID()}.${ext}`
+    case 'customer_id':        return `${prefix}customers/${referenceId}/id-photo-${randomUUID()}.${ext}`
+    case 'purchase_photo':     return `${prefix}purchases/${referenceId}/photo-${randomUUID()}.${ext}`
+    case 'purchase_signature': return `${prefix}purchases/${referenceId}/signature-${randomUUID()}.${ext}`
+    case 'police_signature':   return `${prefix}police-visits/${referenceId}/signature-${randomUUID()}.${ext}`
+    case 'stocktake_entry':    return `${prefix}stocktakes/${referenceId}/photo-${randomUUID()}.${ext}`
+    case 'scale_order':        return `${prefix}scale-orders/${referenceId}/photo-${photoIndex ?? 0}-${randomUUID()}.${ext}`
   }
 }
 

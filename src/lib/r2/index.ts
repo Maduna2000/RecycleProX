@@ -1,6 +1,7 @@
 import { PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { getR2Client, R2_BUCKET } from '@/lib/r2/client'
+import { tenantContext } from '@/lib/db/tenantContext'
 import { randomUUID } from 'crypto'
 
 // ─── Direct server-side upload ────────────────────────────────────────────────
@@ -17,37 +18,46 @@ export async function uploadBytes(key: string, bytes: Uint8Array, contentType: s
 
 // ─── Key generators ───────────────────────────────────────────────────────────
 // All paths use R2 keys (never local filesystem). Stored in DB as-is.
+//
+// New keys are prefixed with the current tenant's schema name so one shared
+// bucket safely serves every tenant without collisions once multi-tenancy
+// goes live. No-op today (empty prefix) since nothing populates tenantContext
+// yet — Golden Key's existing keys stay unprefixed, grandfathered as-is.
+function tenantKeyPrefix(): string {
+  const schemaName = tenantContext.getStore()?.schemaName
+  return schemaName ? `${schemaName}/` : ''
+}
 
 export function customerIdPhotoKey(customerId: string, ext: string): string {
-  return `customers/${customerId}/id-photo-${randomUUID()}.${ext}`
+  return `${tenantKeyPrefix()}customers/${customerId}/id-photo-${randomUUID()}.${ext}`
 }
 
 export function purchasePhotoKey(purchaseId: string, ext: string): string {
-  return `purchases/${purchaseId}/photo-${randomUUID()}.${ext}`
+  return `${tenantKeyPrefix()}purchases/${purchaseId}/photo-${randomUUID()}.${ext}`
 }
 
 export function customerDocumentKey(customerId: string, ext: string): string {
-  return `customers/${customerId}/documents/${randomUUID()}.${ext}`
+  return `${tenantKeyPrefix()}customers/${customerId}/documents/${randomUUID()}.${ext}`
 }
 
 export function expenseAttachmentKey(expenseId: string, ext: string): string {
-  return `expenses/${expenseId}/attachments/${randomUUID()}.${ext}`
+  return `${tenantKeyPrefix()}expenses/${expenseId}/attachments/${randomUUID()}.${ext}`
 }
 
 export function purchaseVat264Key(purchaseId: string): string {
-  return `purchases/${purchaseId}/vat264.pdf`
+  return `${tenantKeyPrefix()}purchases/${purchaseId}/vat264.pdf`
 }
 
 export function purchaseNoteKey(purchaseId: string): string {
-  return `purchases/${purchaseId}/purchase-note.pdf`
+  return `${tenantKeyPrefix()}purchases/${purchaseId}/purchase-note.pdf`
 }
 
 export function scaleOrderPhotoKey(orderId: string, index: number, ext: string): string {
-  return `scale-orders/${orderId}/photo-${index}-${randomUUID()}.${ext}`
+  return `${tenantKeyPrefix()}scale-orders/${orderId}/photo-${index}-${randomUUID()}.${ext}`
 }
 
 export function scaleOrderSlipKey(orderId: string): string {
-  return `scale-orders/${orderId}/slip.pdf`
+  return `${tenantKeyPrefix()}scale-orders/${orderId}/slip.pdf`
 }
 
 // ─── Presigned upload URL (PUT) ───────────────────────────────────────────────

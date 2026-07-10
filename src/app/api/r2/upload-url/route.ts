@@ -6,6 +6,7 @@ import {
   getUploadUrl, customerIdPhotoKey, customerDocumentKey, expenseAttachmentKey, purchasePhotoKey,
   scaleOrderPhotoKey, mimeToExt, ALLOWED_PHOTO_TYPES, MAX_PHOTO_BYTES,
 } from '@/lib/r2'
+import { tenantContext } from '@/lib/db/tenantContext'
 import { randomUUID } from 'crypto'
 
 const ALLOWED_DOCUMENT_TYPES = [...ALLOWED_PHOTO_TYPES, 'application/pdf']
@@ -42,6 +43,10 @@ export async function POST(req: NextRequest) {
   try {
     const ext = mimeToExt(contentType)
     const photoIndex = typeof body.photoIndex === 'number' ? body.photoIndex : 0
+    // Mirrors the tenantKeyPrefix() convention in src/lib/r2/index.ts — no-op
+    // (empty prefix) today since nothing populates tenantContext yet.
+    const schemaName = tenantContext.getStore()?.schemaName
+    const prefix = schemaName ? `${schemaName}/` : ''
     const key = context === 'customer_id'
       ? customerIdPhotoKey(referenceId, ext)
       : context === 'customer_document'
@@ -49,9 +54,9 @@ export async function POST(req: NextRequest) {
         : context === 'expense_attachment'
           ? expenseAttachmentKey(referenceId, ext)
           : context === 'police_signature'
-            ? `police-visits/${referenceId}/signature-${randomUUID()}.${ext}`
+            ? `${prefix}police-visits/${referenceId}/signature-${randomUUID()}.${ext}`
             : context === 'stocktake_entry'
-              ? `stocktakes/${referenceId}/photo-${randomUUID()}.${ext}`
+              ? `${prefix}stocktakes/${referenceId}/photo-${randomUUID()}.${ext}`
               : context === 'scale_order'
                 ? scaleOrderPhotoKey(referenceId, photoIndex, ext)
                 : purchasePhotoKey(referenceId, ext)

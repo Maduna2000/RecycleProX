@@ -19,6 +19,9 @@ export const authConfig: NextAuthConfig = {
         token.fullName            = (user as { fullName: string }).fullName
         token.username            = (user as { username: string }).username
         token.allowedModules      = (user as { allowedModules?: string[] }).allowedModules ?? []
+        // Absent until subdomain-based tenant login exists (see src/auth.ts)
+        token.schemaName          = (user as { schemaName?: string }).schemaName
+        token.tenantSlug          = (user as { tenantSlug?: string }).tenantSlug
       }
       return token
     },
@@ -29,6 +32,8 @@ export const authConfig: NextAuthConfig = {
       session.user.fullName            = token.fullName as string
       session.user.username            = token.username as string
       session.user.allowedModules      = token.allowedModules as string[]
+      session.user.schemaName          = token.schemaName as string | undefined
+      session.user.tenantSlug          = token.tenantSlug as string | undefined
       return session
     },
     authorized({ auth }) {

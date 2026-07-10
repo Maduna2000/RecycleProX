@@ -45,6 +45,8 @@ type SessionUser = {
   role?: string
   forcePasswordChange?: boolean
   allowedModules?: string[]
+  schemaName?: string
+  tenantSlug?: string
 }
 
 export default auth((req: NextRequest & { auth: { user?: SessionUser } | null }) => {
@@ -56,6 +58,17 @@ export default auth((req: NextRequest & { auth: { user?: SessionUser } | null })
       pathname === '/api/r2/test' || pathname === '/scale/login' ||
       pathname.startsWith('/api/mobile/')) {
     return NextResponse.next()
+  }
+
+  // Tenant-consistency guardrail — inert until subdomain-based tenant login
+  // exists (session.user.tenantSlug is only ever set once that ships). Once
+  // live, this stops a session for one company's subdomain being reused on
+  // another company's subdomain tab.
+  if (session?.user?.tenantSlug) {
+    const hostSlug = req.nextUrl.hostname.split('.')[0]
+    if (hostSlug !== session.user.tenantSlug) {
+      return NextResponse.redirect(new URL('/login', req.url))
+    }
   }
 
   // Police officer portal — staff-launched; any staff role except scale operators

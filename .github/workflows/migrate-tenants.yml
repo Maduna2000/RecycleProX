@@ -1,0 +1,39 @@
+name: Migrate Tenant Schemas
+
+# Fans out the current Prisma migration history to every tenant schema in
+# the Tenant registry. `prisma migrate deploy` (run automatically by the
+# Vercel/Netlify build) only ever touches the `public` schema — this is the
+# separate step that keeps every tenant's own schema in sync with it, and
+# deliberately does not run inside the app's own request/build path since
+# tenant count × migration time is unbounded.
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - master
+    paths:
+      - prisma/migrations/**
+      - .github/workflows/migrate-tenants.yml
+
+jobs:
+  migrate-tenants:
+    name: Apply migrations to all tenant schemas
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Fan out migrations to tenant schemas
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: npm run migrate:tenants
