@@ -53,10 +53,13 @@ export default auth((req: NextRequest & { auth: { user?: SessionUser } | null })
   const { pathname } = req.nextUrl
   const session = req.auth
 
-  // Public routes — always allow
+  // Public routes — always allow. /api/internal/ is shared-secret
+  // authenticated in its own route handlers (server-to-server calls from
+  // the SaaS Portal never carry a session cookie) — see
+  // src/app/api/internal/tenants/route.ts.
   if (pathname.startsWith('/login') ||
       pathname === '/api/r2/test' || pathname === '/scale/login' ||
-      pathname.startsWith('/api/mobile/')) {
+      pathname.startsWith('/api/mobile/') || pathname.startsWith('/api/internal/')) {
     return NextResponse.next()
   }
 
