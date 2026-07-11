@@ -1,5 +1,5 @@
 /**
- * Mechanically derives prisma/schema.sqlite.prisma from prisma/schema.prisma
+ * Mechanically derives prisma/sqlite/schema.prisma from prisma/schema.prisma
  * for the Renovo Pro Desktop build. Not symlinks (fragile for multi-file
  * Prisma setups on Windows dev machines) — a plain codegen script, run via
  * `npm run generate:sqlite` before any Electron build/dev.
@@ -7,9 +7,13 @@
  * schema.prisma (Postgres) stays the single source of truth and the default
  * Prisma reads everywhere else in this repo (Vercel build, `prisma generate`,
  * `prisma migrate`, CI) — nothing here changes that file or how it's
- * invoked. This script only ever writes schema.sqlite.prisma, which is
- * loaded explicitly via `--schema=prisma/schema.sqlite.prisma` by
- * Electron-specific scripts.
+ * invoked. This script only ever writes prisma/sqlite/schema.prisma, which
+ * is loaded explicitly via `--schema=prisma/sqlite/schema.prisma` by
+ * Electron-specific scripts. It lives in its own directory (not
+ * prisma/schema.sqlite.prisma, a flat sibling) because Prisma always looks
+ * for a `migrations/` folder as a sibling of whichever schema file
+ * `--schema` points at — prisma/sqlite/migrations/ is that schema's own
+ * migration history, committed separately from prisma/migrations/.
  *
  * Transformations applied (see SaaS plan section C.2 for the reasoning):
  *  - datasource swapped to sqlite
@@ -51,7 +55,12 @@ import path from 'node:path'
 const ROOT = process.cwd()
 const SOURCE_PATH = path.join(ROOT, 'prisma', 'schema.prisma')
 const EXTRA_PATH = path.join(ROOT, 'prisma', 'schema.sqlite-extra.prisma')
-const OUTPUT_PATH = path.join(ROOT, 'prisma', 'schema.sqlite.prisma')
+// Lives in its own directory, not alongside schema.prisma — Prisma always
+// looks for a `migrations/` folder as a sibling of whichever schema file
+// `--schema` points at, so schema.sqlite.prisma needs its own directory to
+// get its own migration history (prisma/sqlite/migrations/) rather than
+// colliding with schema.prisma's prisma/migrations/.
+const OUTPUT_PATH = path.join(ROOT, 'prisma', 'sqlite', 'schema.prisma')
 
 // Every String[] field known to exist today (see SaaS plan section C.2).
 // Deliberately an explicit list, not a blanket "any String[] field" rule —
@@ -118,7 +127,7 @@ function swapDatasource(schema: string): string {
 function setDistinctClientOutput(schema: string): string {
   return schema.replace(
     /generator client \{/,
-    'generator client {\n  output        = "../node_modules/.prisma/sqlite-client"',
+    'generator client {\n  output        = "../../node_modules/.prisma/sqlite-client"',
   )
 }
 

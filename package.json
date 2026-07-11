@@ -11,7 +11,8 @@
     "seed": "npx ts-node --compiler-options '{\"module\":\"CommonJS\"}' prisma/seed.ts",
     "migrate:permissions": "npx ts-node --compiler-options '{\"module\":\"CommonJS\"}' scripts/migrate-user-permissions.ts",
     "migrate:tenants": "npx ts-node --compiler-options '{\"module\":\"CommonJS\"}' scripts/migrate-tenants.ts",
-    "generate:sqlite": "npx ts-node scripts/generate-sqlite-schema.ts && prisma generate --schema=prisma/schema.sqlite.prisma",
+    "generate:sqlite": "npx ts-node scripts/generate-sqlite-schema.ts && prisma generate --schema=prisma/sqlite/schema.prisma",
+    "migrate:sqlite:deploy": "prisma migrate deploy --schema=prisma/sqlite/schema.prisma",
     "electron": "electron .",
     "electron:dev": "concurrently \"next dev\" \"wait-on http://localhost:3000 && electron .\"",
     "electron:build": "npm run generate:sqlite && next build && electron-builder"
