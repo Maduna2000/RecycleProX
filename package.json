@@ -15,7 +15,8 @@
     "migrate:sqlite:deploy": "prisma migrate deploy --schema=prisma/sqlite/schema.prisma",
     "electron": "electron .",
     "electron:dev": "concurrently \"next dev\" \"wait-on http://localhost:3000 && electron .\"",
-    "electron:build": "npm run generate:sqlite && next build && electron-builder"
+    "build:desktop": "npx ts-node scripts/build-desktop.ts",
+    "electron:build": "npm run build:desktop && electron-builder"
   },
   "ts-node": {
     "compilerOptions": {
@@ -25,11 +26,16 @@
   "build": {
     "appId": "za.co.goldenkey.renovopro",
     "productName": "Renovo Pro",
+    "asar": false,
     "files": [
       "electron/**/*",
-      ".next/**/*",
+      ".next/standalone/**/*",
+      ".next/static/**/*",
       "public/**/*",
-      "node_modules/**/*",
+      "prisma/sqlite/**/*",
+      "node_modules/prisma/**/*",
+      "node_modules/.prisma/sqlite-client/**/*",
+      "node_modules/@prisma/engines/**/*",
       "package.json"
     ],
     "extraResources": [
@@ -117,6 +123,7 @@
   },
   "optionalDependencies": {
     "electron": "^41.2.0",
-    "electron-builder": "^26.8.1"
+    "electron-builder": "^26.8.1",
+    "electron-store": "^10.1.0"
   }
 }

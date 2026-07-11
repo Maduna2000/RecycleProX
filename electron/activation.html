@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Activate Renovo Pro</title>
+<style>
+  body {
+    margin: 0;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #1B3A6B;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    -webkit-app-region: drag;
+  }
+  .card {
+    width: 360px;
+    background: white;
+    border-radius: 12px;
+    padding: 28px;
+    -webkit-app-region: no-drag;
+  }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  p { font-size: 13px; color: #666; margin: 0 0 20px; }
+  input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 10px 12px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 14px;
+    margin-bottom: 12px;
+  }
+  button {
+    width: 100%;
+    padding: 10px 12px;
+    border: none;
+    border-radius: 8px;
+    background: #1B3A6B;
+    color: white;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  button:disabled { opacity: 0.5; cursor: default; }
+  .error { color: #c0392b; font-size: 13px; margin-top: 12px; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>Activate Renovo Pro</h1>
+    <p>Enter the activation code your platform administrator gave you.</p>
+    <input id="code" type="text" placeholder="rpt_..." autofocus />
+    <button id="activateBtn">Activate</button>
+    <div id="error" class="error"></div>
+  </div>
+
+  <script>
+    const btn = document.getElementById('activateBtn')
+    const input = document.getElementById('code')
+    const errorEl = document.getElementById('error')
+
+    btn.addEventListener('click', async () => {
+      errorEl.textContent = ''
+      btn.disabled = true
+      btn.textContent = 'Activating…'
+      try {
+        await window.electronAPI.activateDevice(input.value.trim())
+      } catch (err) {
+        errorEl.textContent = err.message || 'Activation failed'
+        btn.disabled = false
+        btn.textContent = 'Activate'
+      }
+    })
+  </script>
+</body>
+</html>

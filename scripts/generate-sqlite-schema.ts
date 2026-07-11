@@ -124,7 +124,26 @@ function swapDatasource(schema: string): string {
 // with no warning. Giving the SQLite client its own output path is what keeps
 // `npm run generate:sqlite` safe to run at any time without also having to
 // remember to re-run a plain `prisma generate` afterward.
-function setDistinctClientOutput(schema: string): string {
+// Prisma's query engine is provider-locked at `generate` time — a client
+// generated against `datasource db { provider = "postgresql" }` cannot be
+// pointed at a SQLite file just by changing DATABASE_URL at runtime, the
+// dialect and binary are baked in. That means the standalone Next.js server
+// electron/main.js spawns must itself have been *built* against the SQLite
+// client, which only happens if that client sits at the default
+// node_modules/@prisma/client path (where every `import { PrismaClient }
+// from '@prisma/client'` in the app resolves) at the moment `next build`
+// runs for the Electron target.
+//
+// Day-to-day (`npm run generate:sqlite`) the client still goes to its own
+// distinct path — see the comment above the datasource swap — because two
+// clients need to coexist during normal dev (confirmed by hand: generating
+// one to the default path silently clobbers the other, no warning). Only
+// the dedicated Electron build step (see package.json's `build:desktop`)
+// sets DESKTOP_CLIENT_TARGET=default to temporarily target the default
+// path for that one `next build` invocation, then restores the distinct
+// path immediately after so normal Web dev isn't left broken.
+function setClientOutput(schema: string): string {
+  if (process.env.DESKTOP_CLIENT_TARGET === 'default') return schema
   return schema.replace(
     /generator client \{/,
     'generator client {\n  output        = "../../node_modules/.prisma/sqlite-client"',
@@ -192,7 +211,7 @@ function main() {
   let output = source
   output = stripExcludedModels(output)
   output = swapDatasource(output)
-  output = setDistinctClientOutput(output)
+  output = setClientOutput(output)
   output = stripDecimalAttribute(output)
   output = stripDateAttribute(output)
   output = convertEnumFields(output, enums)

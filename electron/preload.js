@@ -18,6 +18,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   printSlip:     (data)     => ipcRenderer.invoke('print-slip', data),
   openCashDrawer:()         => ipcRenderer.invoke('open-cash-drawer'),
 
+  // Licensing (electron/licenseManager.js)
+  activateDevice: (activationCode) => ipcRenderer.invoke('license-activate', activationCode),
+  getLicenseStatus: ()             => ipcRenderer.invoke('license-status'),
+
   // Detect if running inside Electron
   isElectron: true,
 })
