@@ -61,3 +61,11 @@ mobile/android/build/
 mobile/android/.gradle/
 mobile/ios/build/
 mobile/ios/Pods/
+
+# Desktop (Electron/SQLite) build artifacts — schema.sqlite.prisma is
+# mechanically derived by scripts/generate-sqlite-schema.ts from
+# schema.prisma; regenerate with `npm run generate:sqlite` rather than
+# editing or committing it.
+prisma/schema.sqlite.prisma
+*.db
+*.db-journal

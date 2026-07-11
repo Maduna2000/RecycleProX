@@ -50,6 +50,12 @@ const pwaConfig = withPWA({
 })
 
 /** @type {import('next').NextConfig} */
-const nextConfig = {}
+const nextConfig = {
+  // Lets Electron bundle a self-contained server (.next/standalone) instead
+  // of shipping the full dev tree + node_modules — see electron/main.js and
+  // the SaaS plan section C.1. Vercel tolerates this setting fine; it uses
+  // its own build output API regardless of `output`.
+  output: 'standalone',
+}
 
 export default pwaConfig(nextConfig)

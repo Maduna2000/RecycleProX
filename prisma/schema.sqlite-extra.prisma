@@ -1,0 +1,36 @@
+// Appended to the generated prisma/schema.sqlite.prisma by
+// scripts/generate-sqlite-schema.ts. SQLite-only tables that exist purely to
+// support the Desktop sync engine — never deployed to the Postgres schema,
+// so they live here rather than in prisma/schema.prisma.
+//
+// Fields below are plain String rather than enum on purpose, not oversight:
+// SQLite's Prisma connector doesn't support enums at all (same reason every
+// enum field elsewhere in the generated schema gets converted to String —
+// see generate-sqlite-schema.ts). Validated at the app layer with Zod
+// (CLAUDE.md rule #3), same as everywhere else.
+
+// One row per local write that needs to reach the cloud. A Prisma middleware
+// (parallel to the existing audit-log middleware) inserts a row here after
+// every create/update/delete on a syncable model — see the Desktop sync
+// engine design in the SaaS plan, section C.4.
+model SyncOutbox {
+  id          String    @id @default(uuid())
+  tableName   String
+  recordId    String
+  operation   String    // 'create' | 'update' | 'delete'
+  payload     String
+  status      String    @default("pending") // 'pending' | 'synced' | 'failed'
+  attempts    Int       @default(0)
+  lastError   String?
+  createdAt   DateTime  @default(now())
+  syncedAt    DateTime?
+
+  @@index([status])
+}
+
+// Tracks how far this device has pulled from the cloud (GET
+// /api/sync/pull?since=<cursor>), one row per remote table synced.
+model SyncCursor {
+  tableName    String   @id
+  lastPulledAt DateTime @default(now())
+}

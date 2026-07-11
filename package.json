@@ -11,9 +11,15 @@
     "seed": "npx ts-node --compiler-options '{\"module\":\"CommonJS\"}' prisma/seed.ts",
     "migrate:permissions": "npx ts-node --compiler-options '{\"module\":\"CommonJS\"}' scripts/migrate-user-permissions.ts",
     "migrate:tenants": "npx ts-node --compiler-options '{\"module\":\"CommonJS\"}' scripts/migrate-tenants.ts",
+    "generate:sqlite": "npx ts-node scripts/generate-sqlite-schema.ts && prisma generate --schema=prisma/schema.sqlite.prisma",
     "electron": "electron .",
     "electron:dev": "concurrently \"next dev\" \"wait-on http://localhost:3000 && electron .\"",
-    "electron:build": "next build && electron-builder"
+    "electron:build": "npm run generate:sqlite && next build && electron-builder"
+  },
+  "ts-node": {
+    "compilerOptions": {
+      "module": "CommonJS"
+    }
   },
   "build": {
     "appId": "za.co.goldenkey.renovopro",
