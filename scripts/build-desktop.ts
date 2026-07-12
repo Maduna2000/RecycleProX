@@ -13,9 +13,13 @@
  * history (see prisma/seed.ts's npm script and its `ts-node` config block).
  */
 import { execFileSync } from 'node:child_process'
-import path from 'node:path'
 
-const ROOT = path.join(__dirname, '..')
+// process.cwd() rather than __dirname — this file runs under Node's native
+// TS type-stripping in some environments (Node 22+), which executes it as
+// an ES module where __dirname doesn't exist (see the identical note in
+// scripts/generate-sqlite-schema.ts). Always invoked from the repo root
+// (npm script / npx ts-node from RecycleProX/), so cwd is reliable.
+const ROOT = process.cwd()
 
 function run(command: string, args: string[], extraEnv: Record<string, string> = {}) {
   console.log(`$ ${command} ${args.join(' ')}`)
