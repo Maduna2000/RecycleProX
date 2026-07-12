@@ -146,9 +146,9 @@ export async function openCashUp(openedByUserId: string, sessionDateStr?: string
 
 // Non-persisted warning shown when the new session's currency differs from the
 // previous day's — surfaced to the UI so a manager can double-check, but never blocks.
-function attachCurrencyWarning<T extends { currency: Currency }>(
+function attachCurrencyWarning<T extends { currency: string }>(
   cashUp: T,
-  prevCashUp: { currency: Currency } | null
+  prevCashUp: { currency: string } | null
 ): T & { currencyWarning: string | null } {
   const currencyWarning =
     prevCashUp && prevCashUp.currency !== cashUp.currency

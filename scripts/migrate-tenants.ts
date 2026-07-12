@@ -27,7 +27,12 @@ function buildTenantDatabaseUrl(schemaName: string): string {
 }
 
 async function main() {
-  const tenants = await registryPrisma.tenant.findMany({
+  // Web-only ops script (never bundled into Desktop) — the Tenant model is
+  // deliberately excluded from the Desktop SQLite schema, so this cast is
+  // safe because the SQLite-generated client type is never what actually
+  // runs this script, not because the type is right.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const tenants = await (registryPrisma as any).tenant.findMany({
     where: { status: { in: ['active', 'provisioning'] } },
     select: { schemaName: true, companySlug: true },
   })

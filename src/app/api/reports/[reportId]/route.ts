@@ -7,6 +7,7 @@ import { buildReportMeta } from '@/lib/services/reports/meta'
 import { ReportFormatSchema } from '@/lib/schemas/report'
 import { generateBusinessReportPdf } from '@/lib/pdf/businessReport'
 import { generateBusinessReportXlsx } from '@/lib/excel/businessReportXlsx'
+import { encodeJsonField } from '@/lib/db/queryHelpers'
 
 /**
  * GET /api/reports/[reportId]?from=YYYY-MM-DD&to=YYYY-MM-DD&format=json|pdf|xlsx&<filters>
@@ -74,7 +75,7 @@ export async function GET(
           tableName: 'report',
           recordId: reportId,
           action: 'EXPORT',
-          newValues: { format, params: doc.params, rowCount: doc.meta.rowCount },
+          newValues: encodeJsonField({ format, params: doc.params, rowCount: doc.meta.rowCount }),
           changedById: session.user.id ?? null,
           rowHash: '',
         },

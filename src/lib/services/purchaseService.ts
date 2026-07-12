@@ -14,6 +14,8 @@ import { VAT_RATE, purchaseHeaderVat } from '@/lib/utils/vat'
 import { ScaleOrderNotFoundError, ScaleOrderAlreadyVoidedError } from '@/lib/services/scaleService'
 import type { CreatePurchaseInput, VoidPurchaseInput } from '@/lib/schemas/purchase'
 import type { ProcessSplitPaymentInput } from '@/lib/schemas/splitPayment'
+import { encodeJsonField } from '@/lib/db/queryHelpers'
+import { encodePhotoKeys, decodePhotoKeys } from '@/lib/offline/photoKeysCodec'
 
 // ─── Typed Errors ─────────────────────────────────────────────────────────────
 
@@ -516,11 +518,11 @@ export async function processSplitPayment(
           amountPaid:          newPaid,
           loanDeductionAmount: newLoanDeduction,
           paymentMethod:       primaryMethod,
-          splitPayments: {
+          splitPayments: encodeJsonField({
             cash: cashAmt.toFixed(2),
             eft:  eftAmt.toFixed(2),
             loan: loanAmt.toFixed(2),
-          },
+          }),
           ...(isFullySettled ? { status: 'completed' } : {}),
         },
       })
@@ -576,13 +578,14 @@ export async function updatePurchasePhotos(
 
   if (!action.add && !action.remove) throw new Error('Provide add or remove')
 
+  const existingKeys = decodePhotoKeys(purchase.photoR2Keys)
   const keys = action.add
-    ? [...(purchase.photoR2Keys ?? []), action.add]
-    : (purchase.photoR2Keys ?? []).filter((k) => k !== action.remove)
+    ? [...existingKeys, action.add]
+    : existingKeys.filter((k) => k !== action.remove)
 
   const updated = await prisma.purchase.update({
     where:  { id },
-    data:   { photoR2Keys: keys },
+    data:   { photoR2Keys: encodePhotoKeys(keys) },
     select: { photoR2Keys: true },
   })
 

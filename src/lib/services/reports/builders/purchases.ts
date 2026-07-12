@@ -3,7 +3,9 @@
  */
 import Decimal from 'decimal.js'
 import { prisma } from '@/lib/db/prisma'
+import type { Prisma } from '@prisma/client'
 import { purchaseLineAmounts } from '@/lib/utils/vat'
+import { ciContains } from '@/lib/db/queryHelpers'
 import { getRangeBoundsSAST } from '@/lib/utils/dayBounds'
 import { groupRows } from '@/lib/services/reports/grouping'
 import { countDataRows } from '@/lib/reports/flatten'
@@ -68,7 +70,7 @@ export async function buildPurchasesByProductCategory(
 ): Promise<ReportDocument> {
   const { start, end } = getRangeBoundsSAST(params.from, params.to)
 
-  const lines = await prisma.purchaseLine.findMany({
+  const byProductCategoryArgs = {
     where: {
       purchase: {
         status: 'completed',
@@ -98,9 +100,13 @@ export async function buildPurchasesByProductCategory(
         },
       },
     },
-  })
+  } satisfies Prisma.PurchaseLineFindManyArgs
 
-  type Line = (typeof lines)[number]
+  const lines = await prisma.purchaseLine.findMany(byProductCategoryArgs)
+
+  // See police.ts's queryCopperPurchases for why this goes through
+  // GetPayload explicitly rather than `(typeof lines)[number]`.
+  type Line = Prisma.PurchaseLineGetPayload<{ select: typeof byProductCategoryArgs.select }>
 
   // Era-aware sub/VAT/grand split — legacy rows carry VAT inside lineTotal,
   // new rows carry it on top (see purchaseLineAmounts)
@@ -186,7 +192,7 @@ export async function buildPurchasesDaily(
 ): Promise<ReportDocument> {
   const { start, end } = getRangeBoundsSAST(params.from, params.to)
 
-  const lines = await prisma.purchaseLine.findMany({
+  const supplierStatementArgs = {
     where: {
       purchase: {
         status: { in: ['completed', 'pending'] },
@@ -215,9 +221,11 @@ export async function buildPurchasesDaily(
         },
       },
     },
-  })
+  } satisfies Prisma.PurchaseLineFindManyArgs
 
-  type Line = (typeof lines)[number]
+  const lines = await prisma.purchaseLine.findMany(supplierStatementArgs)
+
+  type Line = Prisma.PurchaseLineGetPayload<{ select: typeof supplierStatementArgs.select }>
   const amountsOf = (l: Line) => purchaseLineAmounts(l, l.purchase.customer.zeroRated)
 
   const { groups, grandTotal } = groupRows(lines, {
@@ -301,7 +309,7 @@ export async function buildPurchasesSupplierStatement(
   })
   if (!customer) throw new Error('Supplier not found')
 
-  const lines = await prisma.purchaseLine.findMany({
+  const perProductDayArgs = {
     where: {
       purchase: {
         status: 'completed',
@@ -320,9 +328,11 @@ export async function buildPurchasesSupplierStatement(
       product: { select: { name: true } },
       purchase: { select: { refNumber: true, createdAt: true } },
     },
-  })
+  } satisfies Prisma.PurchaseLineFindManyArgs
 
-  type Line = (typeof lines)[number]
+  const lines = await prisma.purchaseLine.findMany(perProductDayArgs)
+
+  type Line = Prisma.PurchaseLineGetPayload<{ select: typeof perProductDayArgs.select }>
   const amountsOf = (l: Line) => purchaseLineAmounts(l, customer.zeroRated)
 
   const { groups, grandTotal } = groupRows(lines, {
@@ -394,7 +404,7 @@ export async function buildPurchasesPerProductDay(
 ): Promise<ReportDocument> {
   const { start, end } = getRangeBoundsSAST(params.from, params.to)
 
-  const lines = await prisma.purchaseLine.findMany({
+  const dailyArgs = {
     where: {
       purchase: { status: 'completed', createdAt: { gte: start, lte: end } },
       ...(params.productId ? { productId: params.productId } : {}),
@@ -423,9 +433,11 @@ export async function buildPurchasesPerProductDay(
         },
       },
     },
-  })
+  } satisfies Prisma.PurchaseLineFindManyArgs
 
-  type Line = (typeof lines)[number]
+  const lines = await prisma.purchaseLine.findMany(dailyArgs)
+
+  type Line = Prisma.PurchaseLineGetPayload<{ select: typeof dailyArgs.select }>
   const amountsOf = (l: Line) => purchaseLineAmounts(l, l.purchase.customer.zeroRated)
   const topCategoryOf = (l: Line) =>
     (l.product.categoryRef?.parent?.name ?? l.product.categoryRef?.name ?? l.product.category).toUpperCase()
@@ -506,16 +518,16 @@ async function buildPurchasesByIdSearchCore(
 ): Promise<ReportDocument> {
   const { start, end } = getRangeBoundsSAST(params.from, params.to)
 
-  const lines = await prisma.purchaseLine.findMany({
+  const byIdSearchArgs = {
     where: {
       purchase: {
         status: { in: ['completed', 'pending'] },
         createdAt: { gte: start, lte: end },
         ...(params.customerId ? { customerId: params.customerId } : {}),
-        ...(params.refNumber ? { refNumber: { contains: params.refNumber, mode: 'insensitive' } } : {}),
+        ...(params.refNumber ? { refNumber: ciContains(params.refNumber) } : {}),
         customer: {
           customerType,
-          ...(params.idNumber ? { idNumber: { contains: params.idNumber, mode: 'insensitive' } } : {}),
+          ...(params.idNumber ? { idNumber: ciContains(params.idNumber) } : {}),
         },
       },
     },
@@ -540,9 +552,11 @@ async function buildPurchasesByIdSearchCore(
         },
       },
     },
-  })
+  } satisfies Prisma.PurchaseLineFindManyArgs
 
-  type Line = (typeof lines)[number]
+  const lines = await prisma.purchaseLine.findMany(byIdSearchArgs)
+
+  type Line = Prisma.PurchaseLineGetPayload<{ select: typeof byIdSearchArgs.select }>
   const amountsOf = (l: Line) => purchaseLineAmounts(l, l.purchase.customer.zeroRated)
 
   const { groups, grandTotal } = groupRows(lines, {
@@ -648,7 +662,7 @@ export async function buildTopSellersByCategory(
 ): Promise<ReportDocument> {
   const { start, end } = getRangeBoundsSAST(params.from, params.to)
 
-  const lines = await prisma.purchaseLine.findMany({
+  const topSellersArgs = {
     where: {
       purchase: {
         status: 'completed',
@@ -675,9 +689,11 @@ export async function buildTopSellersByCategory(
         },
       },
     },
-  })
+  } satisfies Prisma.PurchaseLineFindManyArgs
 
-  type Line = (typeof lines)[number]
+  const lines = await prisma.purchaseLine.findMany(topSellersArgs)
+
+  type Line = Prisma.PurchaseLineGetPayload<{ select: typeof topSellersArgs.select }>
   const amountsOf = (l: Line) => purchaseLineAmounts(l, l.purchase.customer.zeroRated)
   const topCategoryOf = (l: Line) =>
     (l.product.categoryRef?.parent?.name ?? l.product.categoryRef?.name ?? l.product.category).toUpperCase()

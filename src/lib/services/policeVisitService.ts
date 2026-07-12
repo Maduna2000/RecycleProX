@@ -7,6 +7,8 @@ import type {
   BeginInspectionInput,
   EndInspectionInput,
 } from '@/lib/schemas/police'
+import { ciContains } from '@/lib/db/queryHelpers'
+import { decodePhotoKeys } from '@/lib/offline/photoKeysCodec'
 
 /** Idle window after which an active inspection session expires (15 minutes). */
 export const INSPECTION_IDLE_TIMEOUT_MS = 15 * 60_000
@@ -281,7 +283,7 @@ export async function searchRegisterByDate(
       })),
       totalAmount: p.totalAmount.toString(),
       idPhotoUrl:  await safeViewUrl(p.customer.idPhotoR2Key),
-      photoUrls:   await photoUrls(p.photoR2Keys),
+      photoUrls:   await photoUrls(decodePhotoKeys(p.photoR2Keys)),
     }))
   )
   return { rows }
@@ -306,10 +308,10 @@ export async function searchPersons(visitId: string, q: string): Promise<{ rows:
 
   const where: Prisma.CustomerWhereInput = {
     OR: [
-      { firstName: { contains: q, mode: 'insensitive' } },
-      { lastName:  { contains: q, mode: 'insensitive' } },
-      { idNumber:  { contains: q, mode: 'insensitive' } },
-      { companyName: { contains: q, mode: 'insensitive' } },
+      { firstName: ciContains(q) },
+      { lastName:  ciContains(q) },
+      { idNumber:  ciContains(q) },
+      { companyName: ciContains(q) },
     ],
   }
 
@@ -430,7 +432,7 @@ export async function getPersonDetail(visitId: string, customerId: string): Prom
           quantity:    l.quantity.toString(),
           unit:        l.product.unit,
         })),
-        photoUrls: await photoUrls(p.photoR2Keys),
+        photoUrls: await photoUrls(decodePhotoKeys(p.photoR2Keys)),
       }))
     ),
   }
@@ -499,7 +501,7 @@ export async function searchGoods(
       quantity:     l.quantity.toString(),
       unit:         l.product.unit,
       lineTotal:    l.lineTotal.toString(),
-      photoUrls:    await photoUrls(l.purchase.photoR2Keys),
+      photoUrls:    await photoUrls(decodePhotoKeys(l.purchase.photoR2Keys)),
     }))
   )
   return { rows, productName: product?.name ?? null }

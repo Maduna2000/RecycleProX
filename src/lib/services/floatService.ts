@@ -3,8 +3,14 @@ import { Prisma } from '@prisma/client'
 import Decimal from 'decimal.js'
 import logger from '@/lib/logger'
 import type { SetFloatInput } from '@/lib/schemas/float'
-import type { FloatMovementType } from '@prisma/client'
 import { withSerializableRetry } from '@/lib/db/withSerializableRetry'
+
+// Mirrors the FloatMovementType enum in prisma/schema.prisma. Defined locally
+// rather than imported from @prisma/client because that enum becomes a
+// plain `string` on the SQLite-generated client (SQLite's Prisma connector
+// has no enum support — see scripts/generate-sqlite-schema.ts), so the type
+// itself isn't stable across the two clients this codebase compiles against.
+type FloatMovementType = 'opening' | 'top_up' | 'withdrawal' | 'adjustment'
 import { sastDateLabelToUTCDate, normalizeToDateLabel, getDayBoundsSAST, todaySASTDate } from '@/lib/utils/dayBounds'
 
 export class FloatMovementLockedError extends Error {

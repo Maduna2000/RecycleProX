@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { getScaleOrderById, ScaleOrderNotFoundError } from '@/lib/services/scaleService'
 import { getViewUrl } from '@/lib/r2'
+import { decodePhotoKeys } from '@/lib/offline/photoKeysCodec'
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await auth()
@@ -13,7 +14,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
     // Attach presigned URLs for photos
     const photoUrls = await Promise.all(
-      order.photoR2Keys.map(key => getViewUrl(key, 3600))
+      decodePhotoKeys(order.photoR2Keys).map(key => getViewUrl(key, 3600))
     )
     const slipUrl = order.slipR2Key ? await getViewUrl(order.slipR2Key, 3600) : null
 

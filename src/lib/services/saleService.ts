@@ -4,6 +4,7 @@ import logger from '@/lib/logger'
 import Decimal from 'decimal.js'
 import { recordMovement, recordVoidReversal } from '@/lib/services/stockService'
 import type { CreateSaleInput, VoidSaleInput } from '@/lib/schemas/sale'
+import { encodePhotoKeys, decodePhotoKeys } from '@/lib/offline/photoKeysCodec'
 
 // ─── Typed Errors ─────────────────────────────────────────────────────────────
 
@@ -308,13 +309,14 @@ export async function updateSalePhotos(
 
   if (!action.add && !action.remove) throw new Error('Provide add or remove')
 
+  const existingKeys = decodePhotoKeys(sale.photoR2Keys)
   const keys = action.add
-    ? [...(sale.photoR2Keys ?? []), action.add]
-    : (sale.photoR2Keys ?? []).filter((k) => k !== action.remove)
+    ? [...existingKeys, action.add]
+    : existingKeys.filter((k) => k !== action.remove)
 
   const updated = await prisma.sale.update({
     where:  { id },
-    data:   { photoR2Keys: keys },
+    data:   { photoR2Keys: encodePhotoKeys(keys) },
     select: { photoR2Keys: true },
   })
 

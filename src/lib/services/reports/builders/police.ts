@@ -4,9 +4,11 @@
  */
 import Decimal from 'decimal.js'
 import { prisma } from '@/lib/db/prisma'
+import type { Prisma } from '@prisma/client'
 import { getViewUrl } from '@/lib/r2'
 import { getRangeBoundsSAST } from '@/lib/utils/dayBounds'
 import { getPurchasesForRegisterRange } from '@/lib/services/policeVisitService'
+import { ciContains } from '@/lib/db/queryHelpers'
 import type { ReportDocument, ReportMeta, ReportRow } from '@/lib/reports/types'
 import type { BaseReportParams, PoliceCopperReportParams } from '@/lib/schemas/report'
 
@@ -90,12 +92,12 @@ interface CopperPurchase {
 async function queryCopperPurchases(from: string, to: string, idNumber?: string): Promise<CopperPurchase[]> {
   const { start, end } = getRangeBoundsSAST(from, to)
 
-  const lines = await prisma.purchaseLine.findMany({
+  const copperPurchasesArgs = {
     where: {
       purchase: {
         status: 'completed',
         createdAt: { gte: start, lte: end },
-        ...(idNumber ? { customer: { idNumber: { contains: idNumber, mode: 'insensitive' } } } : {}),
+        ...(idNumber ? { customer: { idNumber: ciContains(idNumber) } } : {}),
       },
     },
     select: {
@@ -118,9 +120,17 @@ async function queryCopperPurchases(from: string, to: string, idNumber?: string)
         },
       },
     },
-  })
+  } satisfies Prisma.PurchaseLineFindManyArgs
 
-  type Line = (typeof lines)[number]
+  const lines = await prisma.purchaseLine.findMany(copperPurchasesArgs)
+
+  // The inferred `(typeof lines)[number]` collapses to PurchaseLine's bare
+  // scalar columns rather than the selected shape above under the
+  // SQLite-generated client — a type-inference quirk in how Prisma computes
+  // GetFindResult payloads there, not a runtime difference (the query
+  // itself, and what it actually returns, are unaffected). Deriving `Line`
+  // from GetPayload against the same args explicitly sidesteps it.
+  type Line = Prisma.PurchaseLineGetPayload<{ select: typeof copperPurchasesArgs.select }>
   const topCategoryOf = (l: Line) =>
     (l.product.categoryRef?.parent?.name ?? l.product.categoryRef?.name ?? l.product.category).toUpperCase()
 

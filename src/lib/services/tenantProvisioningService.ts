@@ -76,7 +76,13 @@ function tenantDatabaseUrl(schemaName: string): string {
 export async function provisionTenantSchema(schemaName: string): Promise<void> {
   if (!isValidSchemaName(schemaName)) throw new InvalidSchemaNameError(schemaName)
 
-  const registered = await registryPrisma.tenant.findUnique({ where: { schemaName } })
+  // registryPrisma is a Web-only, Postgres-only construct — the Tenant model
+  // is deliberately excluded from the Desktop SQLite schema (Desktop is
+  // single-tenant and never provisions schemas), so this whole module is
+  // dead code on Desktop and the cast below is safe because it's
+  // unreachable there, not because the type is right.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const registered = await (registryPrisma as any).tenant.findUnique({ where: { schemaName } })
   if (registered) {
     throw new Error(`Refusing to drop schema ${schemaName}: already registered as an active tenant`)
   }
@@ -200,7 +206,8 @@ export interface ProvisionCompanyResult {
 // it in the Tenant registry — in that order, so a failure partway through
 // never leaves a Tenant row pointing at a schema that isn't actually ready.
 export async function provisionCompany(input: ProvisionCompanyInput): Promise<ProvisionCompanyResult> {
-  const existing = await registryPrisma.tenant.findUnique({ where: { schemaName: input.schemaName } })
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const existing = await (registryPrisma as any).tenant.findUnique({ where: { schemaName: input.schemaName } })
   if (existing) throw new Error(`Tenant schema already provisioned: ${input.schemaName}`)
 
   await provisionTenantSchema(input.schemaName)
@@ -219,7 +226,8 @@ export async function provisionCompany(input: ProvisionCompanyInput): Promise<Pr
     await tenantClient.$disconnect()
   }
 
-  await registryPrisma.tenant.create({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await (registryPrisma as any).tenant.create({
     data: {
       companySlug: input.companySlug,
       schemaName: input.schemaName,

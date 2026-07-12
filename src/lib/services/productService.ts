@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/db/prisma'
 import logger from '@/lib/logger'
 import Decimal from 'decimal.js'
+import { ciContains } from '@/lib/db/queryHelpers'
 import type {
   CreateProductInput,
   UpdateProductInput,
@@ -168,8 +169,8 @@ export async function listProducts(opts?: { category?: string; isActive?: boolea
       ...(opts?.isActive !== undefined && { isActive: opts.isActive }),
       ...(opts?.search && {
         OR: [
-          { name: { contains: opts.search, mode: 'insensitive' } },
-          { code: { contains: opts.search, mode: 'insensitive' } },
+          { name: ciContains(opts.search) },
+          { code: ciContains(opts.search) },
         ],
       }),
     },

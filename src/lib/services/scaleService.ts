@@ -3,6 +3,8 @@ import { Prisma } from '@prisma/client'
 import logger from '@/lib/logger'
 import Decimal from 'decimal.js'
 import type { CreateScaleOrderInput, VoidScaleOrderInput } from '@/lib/schemas/scale'
+import { ciContains } from '@/lib/db/queryHelpers'
+import { encodePhotoKeys } from '@/lib/offline/photoKeysCodec'
 
 // ─── Typed Errors ─────────────────────────────────────────────────────────────
 
@@ -131,7 +133,7 @@ export async function createScaleOrder(data: CreateScaleOrderInput, operatorId: 
         casualIdNumber:  data.customerId ? null : (data.casualIdNumber  ?? null),
         productId:       firstLine.productId,
         weight:          firstWeight,
-        photoR2Keys:     firstLine.photoR2Keys ?? [],
+        photoR2Keys:     encodePhotoKeys(firstLine.photoR2Keys ?? []),
         lineCount:       data.lines.length,
         status:          'pending',
         operatorId,
@@ -144,7 +146,7 @@ export async function createScaleOrder(data: CreateScaleOrderInput, operatorId: 
         orderId:     created.id,
         productId:   line.productId,
         weight:      line.weight ? new Decimal(line.weight).toDecimalPlaces(3) : null,
-        photoR2Keys: line.photoR2Keys ?? [],
+        photoR2Keys: encodePhotoKeys(line.photoR2Keys ?? []),
       })),
     })
 
@@ -260,11 +262,11 @@ export async function listScaleOrders(filters: ScaleOrderFilters) {
     const s = filters.search.trim()
     andConditions.push({
       OR: [
-        { orderNumber:      { contains: s, mode: 'insensitive' } },
-        { casualFirstName:  { contains: s, mode: 'insensitive' } },
-        { casualLastName:   { contains: s, mode: 'insensitive' } },
-        { customer: { firstName: { contains: s, mode: 'insensitive' } } },
-        { customer: { lastName:  { contains: s, mode: 'insensitive' } } },
+        { orderNumber:      ciContains(s) },
+        { casualFirstName:  ciContains(s) },
+        { casualLastName:   ciContains(s) },
+        { customer: { firstName: ciContains(s) } },
+        { customer: { lastName:  ciContains(s) } },
       ],
     })
   }

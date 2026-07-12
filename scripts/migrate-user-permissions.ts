@@ -67,7 +67,10 @@ async function main() {
       continue
     }
 
-    // Grant full access to all modules
+    // Grant full access to all modules. `skipDuplicates` is a Postgres-only
+    // createMany option (SQLite's connector has no equivalent) — this is a
+    // one-off Web/Postgres ops script, never run against Desktop's SQLite
+    // database, so the cast is safe because the option is unreachable there.
     await prisma.userModuleAccess.createMany({
       data: ALL_MODULES.map((moduleKey) => ({
         userId: user.id,
@@ -75,7 +78,8 @@ async function main() {
         grantedById: null, // System migration
       })),
       skipDuplicates: true,
-    })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any)
 
     console.log(`  OK: ${user.username} (${user.role}) - granted ${ALL_MODULES.length} modules`)
     migratedCount++

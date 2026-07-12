@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { prisma } from '@/lib/db/prisma'
 import { getViewUrl } from '@/lib/r2'
+import { decodePhotoKeys } from '@/lib/offline/photoKeysCodec'
 
 // GET /api/photo-viewer?model=purchase&id=xxx
 // Returns presigned view URLs for all photos attached to a record.
@@ -24,7 +25,7 @@ export async function GET(req: NextRequest) {
     if (model === 'purchase') {
       const record = await prisma.purchase.findUnique({ where: { id }, select: { photoR2Keys: true } })
       if (!record) return NextResponse.json({ error: 'Purchase not found' }, { status: 404 })
-      keys = record.photoR2Keys
+      keys = decodePhotoKeys(record.photoR2Keys)
     } else if (model === 'customer') {
       const record = await prisma.customer.findUnique({ where: { id }, select: { idPhotoR2Key: true } })
       if (!record) return NextResponse.json({ error: 'Customer not found' }, { status: 404 })

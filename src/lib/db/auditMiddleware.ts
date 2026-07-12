@@ -1,5 +1,6 @@
 import type { PrismaClient } from '@prisma/client'
 import logger from '@/lib/logger'
+import { encodeJsonField } from '@/lib/db/queryHelpers'
 
 const WRITE_MODELS = [
   'User', 'Purchase', 'PurchaseLine', 'Sale', 'SaleLine',
@@ -56,9 +57,9 @@ export function attachAuditMiddleware<T extends PrismaClient>(client: T): T {
             data: {
               tableName: params.model ?? 'unknown',
               recordId: result?.id ? String(result.id) : 'unknown',
-              action: actionMap[params.action] as import('@prisma/client').AuditAction,
-              oldValues: oldValues ? (oldValues as object) : undefined,
-              newValues: result ? (result as object) : undefined,
+              action: actionMap[params.action] as never,
+              oldValues: oldValues ? encodeJsonField(oldValues) : undefined,
+              newValues: result ? encodeJsonField(result) : undefined,
               changedById,
               rowHash: '',
             },

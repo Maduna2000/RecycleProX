@@ -110,6 +110,11 @@ function startStandaloneServer(databaseUrl) {
       ...process.env,
       ...RUN_AS_NODE_ENV,
       DATABASE_URL: databaseUrl,
+      // Tells the service layer's query helpers (src/lib/db/queryHelpers.ts,
+      // provider.ts) it's running against SQLite, not Postgres — several
+      // query shapes (case-insensitive search, Json/array encoding) differ
+      // by provider at the value level, not just the type level.
+      DATABASE_PROVIDER: 'sqlite',
       PORT: String(PORT),
       HOSTNAME: '127.0.0.1',
       NODE_ENV: 'production',

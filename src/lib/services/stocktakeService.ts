@@ -4,6 +4,7 @@ import logger from '@/lib/logger'
 import { getStockOnHand, recordMovement } from './stockService'
 import { Prisma } from '@prisma/client'
 import { withSerializableRetry } from '@/lib/db/withSerializableRetry'
+import { encodeJsonField } from '@/lib/db/queryHelpers'
 
 // ─── Ref number ───────────────────────────────────────────────────────────────
 
@@ -46,7 +47,7 @@ export async function createStocktake(userId: string, notes?: string) {
           refNumber,
           notes,
           createdByUserId: userId,
-          stockSnapshot: stockSnapshot as Prisma.InputJsonValue,
+          stockSnapshot: encodeJsonField(stockSnapshot),
         },
         include: { entries: { include: { product: true } } },
       })

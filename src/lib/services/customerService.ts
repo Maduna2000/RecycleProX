@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/db/prisma'
 import { validateSaId } from '@/lib/utils/saId'
 import logger from '@/lib/logger'
+import type { Prisma } from '@prisma/client'
 import type { CreateCustomerInput, QuickCreateInput, UpdateCustomerInput } from '@/lib/schemas/customer'
 
 // ─── Typed errors ─────────────────────────────────────────────────────────────
@@ -71,7 +72,12 @@ export async function createCustomer(data: CreateCustomerInput, userId: string) 
     : undefined
 
   const customer = await prisma.customer.create({
-    data: { ...data, priceGroupId: resolvedPriceGroupId, createdByUserId: userId, accountCode },
+    // Prisma's checked/unchecked CreateInput union collapses `priceGroupId`
+    // to `undefined`-only on the SQLite-generated client (a type-inference
+    // quirk, same family as the GetPayload one documented in
+    // reports/builders/police.ts) — asserting the raw-FK ("unchecked")
+    // shape we actually pass sidesteps it without changing runtime behavior.
+    data: { ...data, priceGroupId: resolvedPriceGroupId, createdByUserId: userId, accountCode } as Prisma.CustomerUncheckedCreateInput,
   })
   logger.info({ customerId: customer.id, userId }, 'Customer created')
   return customer
@@ -114,7 +120,7 @@ export async function updateCustomer(id: string, data: UpdateCustomerInput, user
 
   const customer = await prisma.customer.update({
     where: { id },
-    data: { ...updateData, ...(newAccountCode && { accountCode: newAccountCode }) },
+    data: { ...updateData, ...(newAccountCode && { accountCode: newAccountCode }) } as Prisma.CustomerUncheckedUpdateInput,
   })
   logger.info({ customerId: id, userId }, 'Customer updated')
   return customer
@@ -293,10 +299,16 @@ export async function listCustomerDocuments(customerId: string) {
   })
 }
 
+// Mirrors the CustomerDocumentType enum in prisma/schema.prisma — defined
+// locally rather than imported from @prisma/client because SQLite's Prisma
+// connector has no enum support (see scripts/generate-sqlite-schema.ts), so
+// the enum becomes a plain `string` on the Desktop client.
+type CustomerDocumentType = 'trading_licence' | 'sars_certificate' | 'company_registration' | 'id_copy' | 'other'
+
 export async function addCustomerDocument(
   customerId: string,
   data: {
-    documentType: import('@prisma/client').CustomerDocumentType
+    documentType: CustomerDocumentType
     r2Key:        string
     fileName:     string
     notes?:       string

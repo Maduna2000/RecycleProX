@@ -42,7 +42,15 @@ export async function login(username: string, password: string, tenantSlug?: str
     return loginInCurrentSchema(username, password)
   }
 
-  const tenant = await registryPrisma.tenant.findUnique({ where: { companySlug: tenantSlug } })
+  // registryPrisma is a Web-only, Postgres-only construct (see
+  // src/lib/db/registryPrisma.ts) — the Tenant model is deliberately
+  // excluded from the Desktop SQLite schema (scripts/generate-sqlite-
+  // schema.ts), since Desktop is single-tenant and never has DNS-based
+  // tenant routing. This whole branch only runs when a caller passes
+  // tenantSlug, which Desktop's login flow never does — the cast is safe
+  // because the branch is unreachable there, not because the type is right.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const tenant = await (registryPrisma as any).tenant.findUnique({ where: { companySlug: tenantSlug } })
   if (!tenant) {
     logger.warn({ username, tenantSlug }, 'Login failed: unknown tenant')
     throw new InvalidCredentialsError()
@@ -290,7 +298,7 @@ export async function listUsers(opts: {
 }) {
   const { page = 1, limit = 20 } = opts
   const where = {
-    ...(opts.role     && { role:     opts.role as import('@prisma/client').UserRole }),
+    ...(opts.role     && { role:     opts.role as never }),
     ...(opts.isActive !== undefined && { isActive: opts.isActive }),
     ...(opts.search   && {
       OR: [
