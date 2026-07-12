@@ -33,10 +33,16 @@ function loadMigrationStatements(): string[] {
     const sqlPath = path.join(migrationsDir, dir, 'migration.sql')
     if (!fs.existsSync(sqlPath)) continue
     const sql = fs.readFileSync(sqlPath, 'utf-8')
+    // Prisma prefixes every statement with its own `-- CreateTable`-style
+    // comment line, so a naive "drop chunks starting with --" filter drops
+    // every single statement, not just genuinely comment-only fragments —
+    // confirmed by hand: this produced statementCount: 0 against the real
+    // migration file, silently creating an empty schema. Strip only the
+    // leading comment *lines* within each chunk instead, keeping the SQL.
     const parts = sql
       .split(/;\s*\n/)
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0 && !s.startsWith('--'))
+      .map((s) => s.split('\n').filter((line) => !line.trim().startsWith('--')).join('\n').trim())
+      .filter((s) => s.length > 0)
     statements.push(...parts)
   }
   return statements
@@ -54,13 +60,47 @@ function tenantDatabaseUrl(schemaName: string): string {
 // caller is responsible for registering the schema in the Tenant table only
 // after this — and the seed step below — succeed, so a failed provision
 // never leaves a half-registered tenant.
+//
+// Drops the schema first if it already exists, rather than `CREATE SCHEMA
+// IF NOT EXISTS` + hoping the retry picks up where it left off. Confirmed
+// by hand: raw-SQL migration replay isn't idempotent (no `IF NOT EXISTS`
+// guards in Prisma's generated DDL), so a retry after a partial failure
+// (e.g. a dropped connection mid-replay) hit `type "UserRole" already
+// exists` on the very type its own earlier attempt had already created.
+// Only safe because this function refuses to run at all once a Tenant row
+// references this schemaName — i.e. only before a company has ever
+// successfully finished provisioning. Enforced here, not just by the
+// caller's own pre-check in provisionCompany(), so this function stays safe
+// even if some future caller (an admin "re-provision" action, say) forgets
+// that precondition.
 export async function provisionTenantSchema(schemaName: string): Promise<void> {
   if (!isValidSchemaName(schemaName)) throw new InvalidSchemaNameError(schemaName)
 
-  await registryPrisma.$executeRawUnsafe(`CREATE SCHEMA IF NOT EXISTS "${schemaName}"`)
+  const registered = await registryPrisma.tenant.findUnique({ where: { schemaName } })
+  if (registered) {
+    throw new Error(`Refusing to drop schema ${schemaName}: already registered as an active tenant`)
+  }
+
+  await registryPrisma.$executeRawUnsafe(`DROP SCHEMA IF EXISTS "${schemaName}" CASCADE`)
+  await registryPrisma.$executeRawUnsafe(`CREATE SCHEMA "${schemaName}"`)
 
   const tenantClient = new PrismaClient({ datasourceUrl: tenantDatabaseUrl(schemaName) })
   try {
+    // The connection URL's ?schema= param scopes Prisma's own generated
+    // queries (confirmed: prisma.user.findMany() correctly resolves to
+    // "tenant_x"."User") but does NOT set the Postgres session's actual
+    // search_path — raw SQL via $executeRawUnsafe bypasses Prisma's
+    // schema-qualification entirely and runs against whatever search_path
+    // the session already has, which defaults to `public`. Confirmed by
+    // hand: without this, every unqualified CREATE TABLE/TYPE statement in
+    // the migration replay was silently targeting `public` (Golden Key's
+    // real production schema) — harmlessly, since it collided with an
+    // already-existing object there and errored out immediately on
+    // statement #1, but silently is the operative word. This SET is what
+    // actually fixes it, verified to persist correctly across the
+    // sequential (non-concurrent) loop below.
+    await tenantClient.$executeRawUnsafe(`SET search_path TO "${schemaName}"`)
+
     const statements = loadMigrationStatements()
     for (const statement of statements) {
       await tenantClient.$executeRawUnsafe(statement)
