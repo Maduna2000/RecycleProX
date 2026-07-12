@@ -1,5 +1,5 @@
 /**
- * RecycleProX Basic — Electron Preload
+ * Renovo Pro Desktop — Electron Preload
  * Exposes safe IPC APIs to the renderer (Next.js) via contextBridge.
  */
 

@@ -7,20 +7,6 @@
  * (first install and upgrades both go through the same path), spawns the
  * standalone server as a child process pointed at that database, and only
  * then loads the window — gated on device activation first.
- *
- * KNOWN BLOCKER (as of this file's last edit): `npm run build:desktop`
- * currently fails at its `next build` step. Confirmed by hand: typechecking
- * the app against the SQLite-flavored client (which is what that build step
- * temporarily swaps to the default `@prisma/client` path) surfaces ~10+
- * files' worth of real errors — `mode: 'insensitive'` string filters
- * (SQLite has no equivalent flag), direct enum type imports (UserRole,
- * FloatMovementType, CustomerDocumentType, AuditAction — all converted to
- * plain `string` on the SQLite schema), Json-typed fields, and the
- * photoR2Keys scalar-list codec not being used everywhere it's read. The
- * plan's "same business logic runs on both backends unchanged" assumption
- * does not hold as of today — closing that gap is real, careful,
- * multi-file service-layer work, tracked as a follow-up rather than rushed
- * here. This file is correct target-state code for once that's fixed.
  */
 const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage } = require('electron')
 const path = require('node:path')
