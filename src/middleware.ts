@@ -49,9 +49,35 @@ type SessionUser = {
   tenantSlug?: string
 }
 
+const RESERVED_SUBDOMAINS = new Set(['www', 'app', 'api'])
+
+// Derives a candidate tenant slug from the request hostname, e.g.
+// "acme.renovopro.app" -> "acme" against TENANT_BASE_DOMAIN="renovopro.app".
+// Returns null for the apex domain, reserved subdomains, and any host that
+// doesn't end in the configured base domain (covers localhost/127.0.0.1 in
+// dev, where there's no real subdomain to parse) — those all fall through
+// to the single default/public-schema tenant, unchanged from today.
+function deriveTenantSlugFromHost(hostname: string): string | null {
+  const baseDomain = process.env.TENANT_BASE_DOMAIN
+  if (!baseDomain) return null
+  const host = hostname.split(':')[0] // strip port, if any
+  if (!host || host === baseDomain || !host.endsWith(`.${baseDomain}`)) return null
+  const slug = host.slice(0, -(`.${baseDomain}`.length))
+  if (!slug || slug.includes('.') || RESERVED_SUBDOMAINS.has(slug)) return null
+  return slug
+}
+
 export default auth((req: NextRequest & { auth: { user?: SessionUser } | null }) => {
   const { pathname } = req.nextUrl
   const session = req.auth
+
+  // Dev-only override so subdomain-based tenant login is testable on
+  // localhost without wildcard DNS: ?tenant=<slug> on the /login page.
+  // Never honored in production — real tenant resolution there is always
+  // derived from the actual hostname below.
+  const devTenantOverride =
+    process.env.NODE_ENV !== 'production' ? req.nextUrl.searchParams.get('tenant') : null
+  const tenantSlug = devTenantOverride ?? deriveTenantSlugFromHost(req.nextUrl.hostname)
 
   // Public routes — always allow. /api/internal/ is shared-secret
   // authenticated in its own route handlers (server-to-server calls from
@@ -63,6 +89,11 @@ export default auth((req: NextRequest & { auth: { user?: SessionUser } | null })
       pathname === '/api/r2/test' || pathname === '/scale/login' ||
       pathname.startsWith('/api/mobile/') || pathname.startsWith('/api/internal/') ||
       pathname.startsWith('/api/sync/')) {
+    if (pathname.startsWith('/login') && tenantSlug) {
+      const headers = new Headers(req.headers)
+      headers.set('x-tenant-slug', tenantSlug)
+      return NextResponse.next({ request: { headers } })
+    }
     return NextResponse.next()
   }
 
@@ -165,5 +196,5 @@ export default auth((req: NextRequest & { auth: { user?: SessionUser } | null })
 })
 
 export const config = {
-  matcher: ['/app/:path*', '/scale/:path*', '/police/:path*', '/police', '/api/:path*'],
+  matcher: ['/login', '/app/:path*', '/scale/:path*', '/police/:path*', '/police', '/api/:path*'],
 }

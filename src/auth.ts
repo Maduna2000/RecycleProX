@@ -18,8 +18,11 @@ const {
       credentials: {
         username: { label: 'Username', type: 'text' },
         password: { label: 'Password', type: 'password' },
-        // Resolved from the login subdomain once tenant routing goes live —
-        // absent today, so every sign-in stays on the single default tenant.
+        // Resolved from the login subdomain by middleware.ts and threaded
+        // through by src/app/login/page.tsx + LoginForm.tsx. Absent (undefined)
+        // for the default/legacy tenant's own domain — that keeps login on
+        // the single public-schema tenant exactly as before subdomain
+        // routing existed.
         tenantSlug: { label: 'Tenant', type: 'text' },
       },
       async authorize(credentials) {

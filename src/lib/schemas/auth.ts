@@ -6,8 +6,9 @@ export const LoginSchema = z.object({
     .min(3, 'Username must be at least 3 characters')
     .regex(/^[a-zA-Z0-9_]+$/, 'Username may only contain letters, numbers, and underscores'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
-  // Resolved from the login subdomain once tenant routing goes live — absent
-  // today, which keeps login on the single default (public-schema) tenant.
+  // Resolved from the login subdomain (see middleware.ts). Undefined for the
+  // default/legacy tenant's own domain, which keeps login on the single
+  // public-schema tenant unchanged.
   tenantSlug: z.string().optional(),
 })
 

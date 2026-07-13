@@ -33,6 +33,8 @@ export async function GET(req: NextRequest) {
         username: (decoded.username as string) ?? '',
         role: (decoded.role as string) ?? '',
         forcePasswordChange: (decoded.forcePasswordChange as boolean) ?? false,
+        schemaName: (decoded.schemaName as string | undefined) ?? undefined,
+        tenantSlug: (decoded.tenantSlug as string | undefined) ?? undefined,
       },
     })
   } catch {

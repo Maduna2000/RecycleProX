@@ -33,10 +33,10 @@ export class ForbiddenError extends Error {
 
 // ─── Service ──────────────────────────────────────────────────────────────────
 
-// tenantSlug is resolved from the login subdomain once tenant routing goes
-// live (see src/auth.ts). Omitted today, so every login runs against the
-// default client (public schema) exactly as before — this parameter is
-// dormant until a Tenant registry row and subdomain routing actually exist.
+// tenantSlug is resolved from the login subdomain by middleware.ts (see
+// src/auth.ts / src/app/login/page.tsx). Omitted for the default/legacy
+// tenant's own domain, so login there runs against the default client
+// (public schema) exactly as before subdomain routing existed.
 export async function login(username: string, password: string, tenantSlug?: string) {
   if (!tenantSlug) {
     return loginInCurrentSchema(username, password)

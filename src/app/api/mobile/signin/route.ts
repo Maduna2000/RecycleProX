@@ -12,6 +12,10 @@ import logger from '@/lib/logger'
 const schema = z.object({
   username: z.string().min(1),
   password: z.string().min(1),
+  // Resolved client-side from wherever the mobile app determined the
+  // tenant (e.g. a saved company slug) — undefined keeps sign-in on the
+  // default/legacy tenant, same as the web login when no subdomain resolves.
+  tenantSlug: z.string().optional(),
 })
 
 // Must match the salt NextAuth uses when decoding session cookies:
@@ -36,10 +40,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'username and password are required' }, { status: 400 })
   }
 
-  const { username, password } = parsed.data
+  const { username, password, tenantSlug } = parsed.data
 
   try {
-    const { user, forcePasswordChange } = await login(username, password)
+    const result = await login(username, password, tenantSlug)
+    const { user, forcePasswordChange } = result
+    const schemaName = 'schemaName' in result ? result.schemaName : undefined
+    const resolvedTenantSlug = 'tenantSlug' in result ? result.tenantSlug : undefined
 
     const token = await encode({
       token: {
@@ -51,6 +58,8 @@ export async function POST(req: NextRequest) {
         fullName: user.fullName,
         username: user.username,
         forcePasswordChange,
+        schemaName,
+        tenantSlug: resolvedTenantSlug,
       },
       secret: process.env.AUTH_SECRET!,
       // 30-day expiry — mobile devices hold sessions much longer than browsers
@@ -58,7 +67,7 @@ export async function POST(req: NextRequest) {
       salt: sessionSalt(),
     })
 
-    logger.info({ userId: user.id, username }, 'Mobile sign-in successful')
+    logger.info({ userId: user.id, username, tenantSlug: resolvedTenantSlug }, 'Mobile sign-in successful')
 
     return NextResponse.json({
       token,
@@ -68,6 +77,8 @@ export async function POST(req: NextRequest) {
         username: user.username,
         role: user.role,
         forcePasswordChange,
+        schemaName,
+        tenantSlug: resolvedTenantSlug,
       },
     })
   } catch (err) {

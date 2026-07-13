@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
       schemaName: result.schemaName,
       tempUsername: result.tempUsername,
       tempPassword: result.tempPassword,
-      loginUrl: `https://${parsed.data.companySlug}.renovopro.app/login`,
+      loginUrl: `https://${parsed.data.companySlug}.${process.env.TENANT_BASE_DOMAIN ?? 'renovopro.app'}/login`,
     }, { status: 201 })
   } catch (err) {
     logger.error({ err, companySlug: parsed.data.companySlug }, 'Tenant provisioning failed')
