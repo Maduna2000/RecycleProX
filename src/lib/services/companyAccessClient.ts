@@ -9,6 +9,7 @@ export interface CompanyAccessResult {
   effectiveStatus: string
   reason: string | null
   schemaName: string | null
+  featureFlags: Record<string, boolean>
 }
 
 // Calls the Portal's internal, shared-secret-authenticated access-check

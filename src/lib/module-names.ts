@@ -35,6 +35,7 @@ export const MODULE_NAMES: Record<string, string> = {
   '/app/audit-log':        'Audit Log',
   '/app/change-password':  'Change Password',
   '/app/scale':            'Scale Station',
+  '/app/support':          'Support',
 }
 
 export function getModuleName(pathname: string): string {

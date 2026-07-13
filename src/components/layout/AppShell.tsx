@@ -14,13 +14,14 @@ import {
   Wifi, WifiOff,
   Scale, ClipboardList,
   Boxes, ArrowLeftRight, Grid3X3, SlidersHorizontal,
-  ShieldCheck, History,
+  ShieldCheck, History, LifeBuoy,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useOfflineStore } from '@/stores/offlineStore'
 import { getModuleName } from '@/lib/module-names'
 import { WindowTaskbar } from '@/components/ui/WindowTaskbar'
 import { useRecordTitle } from '@/hooks/useRecordTitle'
+import { useFeatureFlag } from '@/hooks/useFeatureFlags'
 import { Btn, BtnMenu, type BtnVariant, type BtnMenuItem } from '@/components/rpx'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -203,6 +204,15 @@ function UserMenu({ role, fullName }: { role: string; fullName: string }) {
             >
               <Settings className="w-3.5 h-3.5" /> Settings
             </Link>
+            {role === 'admin' && (
+              <Link
+                href="/app/support"
+                className="flex items-center gap-2 px-4 py-2 text-xs text-[#212529] hover:bg-[#F1F3F4] transition-colors"
+                onClick={() => setOpen(false)}
+              >
+                <LifeBuoy className="w-3.5 h-3.5" /> Support
+              </Link>
+            )}
             <button
               className="w-full flex items-center gap-2 px-4 py-2 text-xs text-[#C0392B] hover:bg-red-50 transition-colors"
               onClick={() => signOut({ callbackUrl: '/login' })}
@@ -279,10 +289,13 @@ function ScalePopup() {
 function PolicePopup({ role }: { role: string }) {
   const [open, setOpen] = useState(false)
   const isManager = role === 'admin' || role === 'manager'
+  // Company-level plan entitlement (proof-of-wiring flag for Phase 6 of the
+  // SaaS rollout) — distinct from the isManager per-user check above.
+  const policeRegisterEnabled = useFeatureFlag('policeRegister')
 
   const tiles = [
     { label: 'Officer Portal', icon: ShieldCheck, href: '/police', desc: 'Officer registers & searches the register' },
-    ...(isManager ? [
+    ...(isManager && policeRegisterEnabled ? [
       { label: 'Register Admin', icon: History, href: '/app/police-register', desc: 'Daily register PDF & visit history' },
     ] : []),
   ]

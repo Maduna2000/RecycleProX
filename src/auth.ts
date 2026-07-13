@@ -47,6 +47,7 @@ const {
             allowedModules,
             schemaName: 'schemaName' in result ? result.schemaName : undefined,
             tenantSlug: 'tenantSlug' in result ? result.tenantSlug : undefined,
+            featureFlags: 'featureFlags' in result ? result.featureFlags : undefined,
           }
         } catch (err) {
           // Log the real error so it shows in Vercel function logs
@@ -99,6 +100,7 @@ declare module 'next-auth' {
       allowedModules: string[]
       schemaName?: string
       tenantSlug?: string
+      featureFlags?: Record<string, boolean>
     }
   }
 }

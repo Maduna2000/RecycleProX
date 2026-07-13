@@ -22,6 +22,10 @@ export const authConfig: NextAuthConfig = {
         // Absent until subdomain-based tenant login exists (see src/auth.ts)
         token.schemaName          = (user as { schemaName?: string }).schemaName
         token.tenantSlug          = (user as { tenantSlug?: string }).tenantSlug
+        // Company-level plan entitlements (distinct from allowedModules,
+        // which is per-user). Absent for the default/legacy tenant, which
+        // has no Portal-managed subscription to read flags from.
+        token.featureFlags        = (user as { featureFlags?: Record<string, boolean> }).featureFlags
       }
       return token
     },
@@ -34,6 +38,7 @@ export const authConfig: NextAuthConfig = {
       session.user.allowedModules      = token.allowedModules as string[]
       session.user.schemaName          = token.schemaName as string | undefined
       session.user.tenantSlug          = token.tenantSlug as string | undefined
+      session.user.featureFlags        = token.featureFlags as Record<string, boolean> | undefined
       return session
     },
     authorized({ auth }) {

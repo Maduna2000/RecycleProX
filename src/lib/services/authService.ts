@@ -78,6 +78,7 @@ export async function login(username: string, password: string, tenantSlug?: str
       ...(await loginInCurrentSchema(username, password)),
       schemaName: tenant.schemaName,
       tenantSlug: tenant.companySlug,
+      featureFlags: access.featureFlags,
     }),
   )
 }
@@ -101,7 +102,11 @@ async function resolveCompanyAccess(tenant: TenantAccessCacheFields): Promise<Co
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (registryPrisma as any).tenant.update({
       where: { companySlug: tenant.companySlug },
-      data: { lastAccessCheckAt: new Date(), lastAccessCheckResult: result },
+      data: {
+        lastAccessCheckAt: new Date(),
+        lastAccessCheckResult: result,
+        featureFlags: result.featureFlags,
+      },
     })
     return result
   } catch (err) {
@@ -122,7 +127,13 @@ async function resolveCompanyAccess(tenant: TenantAccessCacheFields): Promise<Co
       { tenantSlug: tenant.companySlug, err },
       'Company access check unreachable and no valid cache — failing closed',
     )
-    return { allowed: false, effectiveStatus: 'unknown', reason: 'Unable to verify company access', schemaName: null }
+    return {
+      allowed: false,
+      effectiveStatus: 'unknown',
+      reason: 'Unable to verify company access',
+      schemaName: null,
+      featureFlags: {},
+    }
   }
 }
 

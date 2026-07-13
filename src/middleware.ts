@@ -47,6 +47,7 @@ type SessionUser = {
   allowedModules?: string[]
   schemaName?: string
   tenantSlug?: string
+  featureFlags?: Record<string, boolean>
 }
 
 const RESERVED_SUBDOMAINS = new Set(['www', 'app', 'api'])
@@ -149,6 +150,18 @@ export default auth((req: NextRequest & { auth: { user?: SessionUser } | null })
   if (pathname.startsWith('/app')) {
     if (!session) {
       return NextResponse.redirect(new URL('/login', req.url))
+    }
+
+    // Company-level plan entitlement (featureFlags, from the Portal's
+    // subscription plan) checked before the admin bypass below — this gates
+    // by what the company's plan includes, not by staff permission, so even
+    // an admin shouldn't reach a feature their plan doesn't include. One
+    // real flag as proof of end-to-end wiring; extend this list only when a
+    // second flag actually needs the same treatment.
+    if (pathname.startsWith('/app/police-register') && session.user?.featureFlags?.policeRegister === false) {
+      const dashboardUrl = new URL('/app/dashboard', req.url)
+      dashboardUrl.searchParams.set('denied', '1')
+      return NextResponse.redirect(dashboardUrl)
     }
 
     // Admins bypass all permission checks
