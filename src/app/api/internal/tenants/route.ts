@@ -1,23 +1,15 @@
-import { timingSafeEqual } from 'node:crypto'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import logger from '@/lib/logger'
 import { ProvisionTenantSchema } from '@/lib/schemas/internal'
 import { provisionCompany } from '@/lib/services/tenantProvisioningService'
+import { authorizeInternalRequest } from '@/lib/internal/authorizeInternalRequest'
 
 // Server-to-server only — called by the Renovo Pro SaaS Portal right after
 // it creates a Company + trial Subscription, never reachable from a browser
-// (no session cookie exists that could authorize this). Shared-secret
-// authenticated instead of session-based for that reason.
-function isAuthorized(req: NextRequest): boolean {
-  const provided = req.headers.get('x-internal-secret') ?? ''
-  const expected = process.env.INTERNAL_API_SHARED_SECRET ?? ''
-  if (!expected || provided.length !== expected.length) return false
-  return timingSafeEqual(Buffer.from(provided), Buffer.from(expected))
-}
-
+// (no session cookie exists that could authorize this).
 export async function POST(req: NextRequest) {
-  if (!isAuthorized(req)) {
+  if (!authorizeInternalRequest(req)) {
     return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   }
 
