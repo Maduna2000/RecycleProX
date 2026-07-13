@@ -4,6 +4,7 @@ import { registryPrisma } from '@/lib/db/registryPrisma'
 import { tenantContext } from '@/lib/db/tenantContext'
 import logger from '@/lib/logger'
 import type { CreateUserInput } from '@/lib/schemas/auth'
+import { checkCompanyAccess, type CompanyAccessResult } from '@/lib/services/companyAccessClient'
 
 // ─── Typed errors ─────────────────────────────────────────────────────────────
 
@@ -61,8 +62,13 @@ export async function login(username: string, password: string, tenantSlug?: str
     logger.warn({ username, tenantSlug }, 'Login failed: unknown tenant')
     throw new InvalidCredentialsError()
   }
-  if (tenant.status !== 'active') {
-    logger.warn({ username, tenantSlug, status: tenant.status }, 'Login failed: tenant not active')
+
+  const access = await resolveCompanyAccess(tenant)
+  if (!access.allowed) {
+    logger.warn(
+      { username, tenantSlug, effectiveStatus: access.effectiveStatus, reason: access.reason },
+      'Login failed: company access denied',
+    )
     throw new AccountInactiveError()
   }
 
@@ -74,6 +80,50 @@ export async function login(username: string, password: string, tenantSlug?: str
       tenantSlug: tenant.companySlug,
     }),
   )
+}
+
+// How long a cached Portal access result stays trusted once the Portal
+// itself becomes unreachable. Bounded so availability of the actual product
+// doesn't hinge on the Portal's uptime for routine shift logins, while still
+// failing closed if the outage drags on rather than trusting a cache
+// forever.
+const ACCESS_CACHE_FAIL_OPEN_WINDOW_MS = 24 * 60 * 60 * 1000
+
+interface TenantAccessCacheFields {
+  companySlug: string
+  lastAccessCheckAt: Date | null
+  lastAccessCheckResult: unknown
+}
+
+async function resolveCompanyAccess(tenant: TenantAccessCacheFields): Promise<CompanyAccessResult> {
+  try {
+    const result = await checkCompanyAccess(tenant.companySlug)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (registryPrisma as any).tenant.update({
+      where: { companySlug: tenant.companySlug },
+      data: { lastAccessCheckAt: new Date(), lastAccessCheckResult: result },
+    })
+    return result
+  } catch (err) {
+    const cached = tenant.lastAccessCheckResult as CompanyAccessResult | null
+    const withinFailOpenWindow =
+      !!tenant.lastAccessCheckAt &&
+      Date.now() - tenant.lastAccessCheckAt.getTime() < ACCESS_CACHE_FAIL_OPEN_WINDOW_MS
+
+    if (cached && withinFailOpenWindow) {
+      logger.warn(
+        { tenantSlug: tenant.companySlug, err },
+        'Company access check unreachable — using cached result within fail-open window',
+      )
+      return cached
+    }
+
+    logger.error(
+      { tenantSlug: tenant.companySlug, err },
+      'Company access check unreachable and no valid cache — failing closed',
+    )
+    return { allowed: false, effectiveStatus: 'unknown', reason: 'Unable to verify company access', schemaName: null }
+  }
 }
 
 async function loginInCurrentSchema(username: string, password: string) {

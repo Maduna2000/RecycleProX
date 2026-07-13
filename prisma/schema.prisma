@@ -22,6 +22,13 @@ model Tenant {
   graceEndsAt   DateTime?
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
+
+  // Cache of the last successful Portal access check (companyAccessClient.ts)
+  // — backs login()'s bounded fail-open window when the Portal is
+  // unreachable, so routine shift logins don't hinge on cross-service
+  // uptime, while still failing closed once the cache goes stale.
+  lastAccessCheckAt     DateTime?
+  lastAccessCheckResult Json?
 }
 
 enum TenantStatus {
