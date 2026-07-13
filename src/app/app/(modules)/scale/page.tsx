@@ -21,6 +21,7 @@ import { Btn, PortalPage } from '@/components/rpx'
 type ScaleOrderLine = {
   weight:  string | null
   product: { name: string; unit: string; category: string }
+  photoUrls?: string[]
 }
 
 type ScaleOrder = {
@@ -39,9 +40,13 @@ type ScaleOrder = {
 }
 
 /** All product lines of an order; legacy orders without line rows fall back to the header product. */
-function orderLines(o: ScaleOrder): ScaleOrderLine[] {
+function orderLines(o: ScaleOrder & { photoUrls?: string[] }): ScaleOrderLine[] {
   if (o.lines && o.lines.length > 0) return o.lines
-  return [{ weight: o.weight, product: { name: o.product.name, unit: o.product.unit ?? 'kg', category: o.product.category } }]
+  return [{
+    weight: o.weight,
+    product: { name: o.product.name, unit: o.product.unit ?? 'kg', category: o.product.category },
+    photoUrls: o.photoUrls,
+  }]
 }
 
 function orderTotalWeight(o: ScaleOrder): number {
@@ -143,7 +148,16 @@ function FullscreenPhotoViewer({ order, onClose }: { order: OrderDetail | null; 
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null)
 
   const urls = order?.photoUrls ?? []
-  const labels = ['Scale Reading', 'Product / Load']
+  // Each product line always contributes photos in the same fixed order it
+  // was captured in (see Step4Photos.tsx): scale reading, then product/load.
+  // Building labels per-line (rather than one hardcoded pair) is what makes
+  // orders with more than one product show correctly here — previously this
+  // was hardcoded to exactly 2 labels, which silently worked only for
+  // single-product orders and mislabeled everything from product 2 onward.
+  const lines = order ? orderLines(order) : []
+  const labels = lines.flatMap((l) =>
+    (l.photoUrls ?? []).map((_, i) => `${l.product.name} — ${i === 0 ? 'Scale Reading' : i === 1 ? 'Product / Load' : `Photo ${i + 1}`}`)
+  )
 
   // Wait for client-side mount
   useEffect(() => {

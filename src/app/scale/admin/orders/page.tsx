@@ -10,6 +10,7 @@ import { colors, fontSize, fontWeight, layout } from '@/lib/design-tokens'
 interface OrderLine {
   product: { name: string; unit: string; category?: string }
   weight: string
+  photoUrls?: string[]
 }
 
 interface Order {
@@ -311,21 +312,61 @@ export default function ScaleOrdersPage() {
                     View All
                   </button>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  {detail.photoUrls.map((url, i) => (
-                    <button
-                      key={i}
-                      onClick={() => setPhotoViewer({ urls: detail.photoUrls!, index: i })}
-                      className="relative group"
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={url} alt={`Photo ${i + 1}`} className="w-full h-36 object-cover rounded-xl border border-slate-200 group-hover:opacity-90 transition-opacity" />
-                      <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/20 rounded-xl transition-colors">
-                        <Eye className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                      </div>
-                    </button>
-                  ))}
-                </div>
+
+                {/* Grouped per product when this is a multi-line order, so
+                    it's clear which pair of photos belongs to which
+                    weighed item — the fullscreen viewer still opens onto
+                    the same flat, order-wide list (correct global index per
+                    thumbnail), so prev/next keeps working across products. */}
+                {detail.lines && detail.lines.length > 1 && detail.lines.some(l => l.photoUrls?.length) ? (
+                  <div className="space-y-4">
+                    {(() => {
+                      let offset = 0
+                      return detail.lines.map((line, li) => {
+                        const urls = line.photoUrls ?? []
+                        const startIndex = offset
+                        offset += urls.length
+                        if (urls.length === 0) return null
+                        return (
+                          <div key={li}>
+                            <p className="text-xs font-medium text-slate-600 mb-1.5">{line.product.name}</p>
+                            <div className="grid grid-cols-2 gap-3">
+                              {urls.map((url, i) => (
+                                <button
+                                  key={i}
+                                  onClick={() => setPhotoViewer({ urls: detail.photoUrls!, index: startIndex + i })}
+                                  className="relative group"
+                                >
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img src={url} alt={`${line.product.name} photo ${i + 1}`} className="w-full h-36 object-cover rounded-xl border border-slate-200 group-hover:opacity-90 transition-opacity" />
+                                  <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/20 rounded-xl transition-colors">
+                                    <Eye className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )
+                      })
+                    })()}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3">
+                    {detail.photoUrls.map((url, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setPhotoViewer({ urls: detail.photoUrls!, index: i })}
+                        className="relative group"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={url} alt={`Photo ${i + 1}`} className="w-full h-36 object-cover rounded-xl border border-slate-200 group-hover:opacity-90 transition-opacity" />
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/20 rounded-xl transition-colors">
+                          <Eye className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
