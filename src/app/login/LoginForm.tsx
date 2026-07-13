@@ -24,10 +24,14 @@ export function LoginForm({ tenantSlug }: { tenantSlug?: string }) {
     setLoading(true)
     setError(null)
 
+    // signIn() form-encodes this object — an `undefined` value gets
+    // coerced to the literal string "undefined" by URLSearchParams, which
+    // is truthy and would incorrectly steer login() into the tenant-lookup
+    // branch. Only include the key at all when there's a real slug.
     const result = await signIn('credentials', {
       username: data.username,
       password: data.password,
-      tenantSlug,
+      ...(tenantSlug ? { tenantSlug } : {}),
       redirect: false,
     })
 

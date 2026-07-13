@@ -38,7 +38,13 @@ export class ForbiddenError extends Error {
 // tenant's own domain, so login there runs against the default client
 // (public schema) exactly as before subdomain routing existed.
 export async function login(username: string, password: string, tenantSlug?: string) {
-  if (!tenantSlug) {
+  // Defense-in-depth: a client-side bug (form-encoding an actually-undefined
+  // tenantSlug via next-auth's signIn(), which URLSearchParams coerces to
+  // the literal string "undefined" rather than omitting the field) took
+  // production login down once already — treat that string, and a blank
+  // one, the same as "no tenant slug" here regardless of what any caller
+  // sends, not just in the one client component that caused it.
+  if (!tenantSlug || tenantSlug === 'undefined' || tenantSlug.trim() === '') {
     return loginInCurrentSchema(username, password)
   }
 
