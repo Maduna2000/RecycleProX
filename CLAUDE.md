@@ -2,7 +2,7 @@
 
 ## Project
 Renovo Pro — production-grade recycling yard management system.
-Golden Key Investments (Pty) Ltd, Pretoria, South Africa.
+Golden Key Investments (Pty) Ltd, Matsapha, Eswatini.
 (Feature reference: replicates the legacy "RecycleProX" software — never use
 that name or "Lariat Technologies" in user-facing output.)
 

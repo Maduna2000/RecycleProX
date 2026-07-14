@@ -3,7 +3,7 @@
  *
  * Second-hand goods dealers are required to keep a register of every purchase
  * from the public, available for inspection by the police service configured
- * in Settings → Police Register (SAPS by default).
+ * in Settings → Police Register (Royal Eswatini Police Service by default).
  *
  * Columns: #, Time, Supplier Name, ID Number, Address, Items, Total Paid
  *

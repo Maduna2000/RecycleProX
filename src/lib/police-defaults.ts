@@ -3,7 +3,7 @@
  * Overridable per yard via SystemSettings keys `police_service_name`
  * and `police_legal_note` (Settings → Police Register).
  */
-export const DEFAULT_POLICE_SERVICE_NAME = 'South African Police Service (SAPS)'
+export const DEFAULT_POLICE_SERVICE_NAME = 'Royal Eswatini Police Service'
 
 export const DEFAULT_POLICE_LEGAL_NOTE =
   'This register is kept as a permanent record of every second-hand goods transaction. ' +
