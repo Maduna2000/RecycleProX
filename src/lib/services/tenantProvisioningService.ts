@@ -240,3 +240,49 @@ export async function provisionCompany(input: ProvisionCompanyInput): Promise<Pr
 
   return { schemaName: input.schemaName, tempUsername, tempPassword }
 }
+
+export interface RegisterExistingTenantInput {
+  companySlug: string
+  schemaName: string
+  companyName: string
+}
+
+export interface RegisterExistingTenantResult {
+  tenantId: string
+  schemaName: string
+}
+
+// Registers a schema that already holds real data as a formal Tenant —
+// deliberately does NOT call provisionTenantSchema (which drops/recreates
+// the schema) or seedTenantSchema (which would create a duplicate admin
+// user and duplicate default categories). This is a one-off path for
+// onboarding a pre-existing tenant (Golden Key, living in `public` since
+// before multi-tenancy existed), not the normal signup flow — that stays
+// provisionCompany() above, completely untouched.
+export async function registerExistingTenant(
+  input: RegisterExistingTenantInput,
+): Promise<RegisterExistingTenantResult> {
+  if (!isValidSchemaName(input.schemaName)) throw new InvalidSchemaNameError(input.schemaName)
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const existingBySlug = await (registryPrisma as any).tenant.findUnique({ where: { companySlug: input.companySlug } })
+  if (existingBySlug) throw new Error(`Company slug already registered: ${input.companySlug}`)
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const existingBySchema = await (registryPrisma as any).tenant.findUnique({ where: { schemaName: input.schemaName } })
+  if (existingBySchema) throw new Error(`Schema already registered as a tenant: ${input.schemaName}`)
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const tenant = await (registryPrisma as any).tenant.create({
+    data: {
+      companySlug: input.companySlug,
+      schemaName: input.schemaName,
+      companyName: input.companyName,
+      status: 'active',
+    },
+  })
+
+  logger.info({ companySlug: input.companySlug, schemaName: input.schemaName }, 'Existing tenant registered (no provisioning/seeding run)')
+
+  return { tenantId: tenant.id, schemaName: input.schemaName }
+}

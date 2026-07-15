@@ -8,3 +8,17 @@ export const ProvisionTenantSchema = z.object({
 })
 
 export type ProvisionTenantInput = z.infer<typeof ProvisionTenantSchema>
+
+// Registers an ALREADY-EXISTING schema (its tables, data, and admin user
+// already exist — e.g. Golden Key's own production data living in `public`
+// since before multi-tenancy existed) as a formal Tenant, without running
+// provisionTenantSchema/seedTenantSchema — those would try to create/wipe a
+// schema that already has real data in it. One-off registration, not the
+// normal signup path (see registerExistingTenant in tenantProvisioningService.ts).
+export const RegisterExistingTenantSchema = z.object({
+  companySlug: z.string().min(2).regex(/^[a-z0-9-]+$/),
+  schemaName: z.string().min(3).regex(/^[a-z][a-z0-9_]{2,50}$/),
+  companyName: z.string().min(2),
+})
+
+export type RegisterExistingTenantInput = z.infer<typeof RegisterExistingTenantSchema>
