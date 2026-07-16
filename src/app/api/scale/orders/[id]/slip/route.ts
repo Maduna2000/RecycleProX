@@ -40,11 +40,21 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       yardName,
     })
 
-    // Save to R2 (don't block response on failure)
-    const key = scaleOrderSlipKey(order.id)
-    uploadBytes(key, pdfBytes, 'application/pdf')
-      .then(() => saveSlipKey(order.id, key))
-      .catch(err => logger.error({ err, orderId: order.id }, 'Failed to save slip to R2'))
+    // Save to R2 — awaited (not fire-and-forget): a detached, un-awaited
+    // promise chain here risks running after this function has already
+    // returned its response, at which point Next.js's request-scoped
+    // headers() context (which requireTenantId() now depends on, see
+    // i-need-you-to-vectorized-pumpkin.md Section 11) is gone, and
+    // saveSlipKey's prisma call would silently fail. Failure here still
+    // shouldn't block the response the user is waiting on, so errors are
+    // caught and logged rather than thrown.
+    try {
+      const key = scaleOrderSlipKey(order.id)
+      await uploadBytes(key, pdfBytes, 'application/pdf')
+      await saveSlipKey(order.id, key)
+    } catch (err) {
+      logger.error({ err, orderId: order.id }, 'Failed to save slip to R2')
+    }
 
     logger.info({ orderId: order.id, userId: session.user.id }, 'scaleOrder.slip.generated')
 

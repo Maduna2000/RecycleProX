@@ -6,6 +6,7 @@ import Decimal from 'decimal.js'
 import type { CreateScaleOrderInput, VoidScaleOrderInput } from '@/lib/schemas/scale'
 import { ciContains } from '@/lib/db/queryHelpers'
 import { encodePhotoKeys } from '@/lib/offline/photoKeysCodec'
+import { quickCreate } from './customerService'
 
 // ─── Typed Errors ─────────────────────────────────────────────────────────────
 
@@ -89,7 +90,6 @@ export function resolveCustomerIdNumber(o: OrderWithCustomer): string {
 export async function createScaleOrder(data: CreateScaleOrderInput, operatorId: string) {
   // Auto-save casual customer to Customer table if idNumber is provided
   if (!data.customerId && data.casualIdNumber && data.casualFirstName && data.casualLastName && data.casualPhone) {
-    const { quickCreate } = await import('./customerService')
     const savedCustomer = await quickCreate({
       idNumber: data.casualIdNumber,
       firstName: data.casualFirstName,
