@@ -9,10 +9,23 @@ const globalForPrisma = globalThis as unknown as { rawPrisma: PrismaClient }
 // Isolation comes from Postgres Row-Level Security (prisma/migrations/
 // 20260716000003_enable_rls) plus the tenant-scoping wrapper below, not
 // from picking a different client/schema per tenant.
+//
+// Deliberately NOT the same role `prisma migrate deploy` uses. Neon's
+// default owner role has BYPASSRLS, which silently defeats FORCE ROW LEVEL
+// SECURITY regardless of policy correctness (see the critical finding in
+// project_saas_platform_initiative.md) — the app's actual runtime queries
+// must connect as a separate, restricted role (NOBYPASSRLS, plain CRUD
+// grants, not table owner) for RLS to mean anything. Migrations still run
+// as the owner role (DATABASE_URL, needs DDL privileges the restricted
+// role doesn't have) — only the app's own query connection switches.
+// Falls back to DATABASE_URL where APP_RUNTIME_DATABASE_URL isn't set
+// (local dev, scratch testing) rather than requiring every environment to
+// provision the restricted role.
 const rawClient =
   globalForPrisma.rawPrisma ||
   attachAuditMiddleware(
     new PrismaClient({
+      datasourceUrl: process.env.APP_RUNTIME_DATABASE_URL || process.env.DATABASE_URL,
       log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
     }),
   )
