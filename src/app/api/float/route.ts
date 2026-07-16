@@ -1,25 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 import { setFloat, listFloats, canReverseFloat } from '@/lib/services/floatService'
 import { SetFloatSchema } from '@/lib/schemas/float'
 import logger from '@/lib/logger'
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
-  const floats = await listFloats(30)
+  const floatsWithCanReverse = await runWithRequestTenant(req, async () => {
+    const floats = await listFloats(30)
 
-  // Only compute canReverse for the last entry (index 0) - others cannot be reversed
-  const floatsWithCanReverse = await Promise.all(
-    floats.map(async (f, index) => {
-      if (index === 0 && f.isLastEntry) {
-        const { canReverse } = await canReverseFloat(f.id)
-        return { ...f, canReverse }
-      }
-      return { ...f, canReverse: false }
-    })
-  )
+    // Only compute canReverse for the last entry (index 0) - others cannot be reversed
+    return Promise.all(
+      floats.map(async (f, index) => {
+        if (index === 0 && f.isLastEntry) {
+          const { canReverse } = await canReverseFloat(f.id)
+          return { ...f, canReverse }
+        }
+        return { ...f, canReverse: false }
+      })
+    )
+  })
 
   return NextResponse.json(floatsWithCanReverse)
 }
@@ -38,7 +41,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const record = await setFloat(parsed.data, session.user.id)
+    const record = await runWithRequestTenant(req, () => setFloat(parsed.data, session.user.id))
     return NextResponse.json(record)
   } catch (err) {
     logger.error({ err }, 'POST /api/float failed')

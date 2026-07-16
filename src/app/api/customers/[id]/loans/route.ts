@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 import { listLoans, getCustomerLoanSummary } from '@/lib/services/loanService'
 
 export async function GET(
@@ -16,10 +17,10 @@ export async function GET(
   const pageSize = parseInt(searchParams.get('pageSize') ?? '50')
 
   try {
-    const [list, summary] = await Promise.all([
+    const [list, summary] = await runWithRequestTenant(req, () => Promise.all([
       listLoans({ customerId: params.id, status, page, pageSize }),
       getCustomerLoanSummary(params.id),
-    ])
+    ]))
     return NextResponse.json({ ...list, summary })
   } catch (err) {
     logger.error({ err }, 'GET /api/customers/[id]/loans failed')

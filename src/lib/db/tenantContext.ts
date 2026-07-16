@@ -84,3 +84,27 @@ export async function withTenantId<T>(tenantId: string, fn: () => Promise<T>): P
     fn,
   )
 }
+
+// Wraps a route handler's business logic in a tenantContext.run() call,
+// reading tenantId directly off the request object (no ambient anything —
+// req.headers is a plain property on the exact NextRequest this invocation
+// received). Once established, EVERY nested requireTenantId() call inside
+// fn — no matter how many sequential/nested prisma calls happen — hits the
+// fast, reliable ALS store first and never needs to re-read headers().
+//
+// Added for routes doing multiple sequential prisma calls (e.g.
+// createScaleOrder: a customer lookup, a product-existence check per line,
+// then a transaction), which — per a live production incident, see
+// i-need-you-to-vectorized-pumpkin.md Section 11 — hit intermittent
+// MissingTenantContextErrors under real traffic that a single isolated
+// manual test couldn't reproduce. Route handlers with only one prisma call
+// are lower risk and don't strictly need this, but it's harmless to apply
+// broadly.
+export async function runWithRequestTenant<T>(
+  req: { headers: { get(name: string): string | null } },
+  fn: () => Promise<T>,
+): Promise<T> {
+  const tenantId = req.headers.get('x-tenant-id')
+  if (!tenantId) throw new MissingTenantContextError()
+  return tenantContext.run({ tenantId, schemaName: '', companySlug: '' }, fn)
+}

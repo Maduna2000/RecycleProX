@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 import { CreateScaleOrderSchema } from '@/lib/schemas/scale'
 import {
   listScaleOrders, createScaleOrder,
@@ -16,7 +17,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const p = req.nextUrl.searchParams
-    const result = await listScaleOrders({
+    const result = await runWithRequestTenant(req, () => listScaleOrders({
       dateFrom:     p.get('dateFrom')     ?? undefined,
       dateTo:       p.get('dateTo')       ?? undefined,
       status:       (p.get('status')      ?? undefined) as 'pending' | 'processed' | 'voided' | undefined,
@@ -29,7 +30,7 @@ export async function GET(req: NextRequest) {
       search:       p.get('search')       ?? undefined,
       page:         p.get('page')         ? Number(p.get('page'))     : undefined,
       pageSize:     p.get('pageSize')     ? Number(p.get('pageSize')) : undefined,
-    })
+    }))
     logger.info({ total: result.total, page: result.page }, 'GET /api/scale/orders success')
     return NextResponse.json(result)
   } catch (err) {
@@ -50,7 +51,7 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
 
   try {
-    const order = await createScaleOrder(parsed.data, session.user.id)
+    const order = await runWithRequestTenant(req, () => createScaleOrder(parsed.data, session.user.id))
     return NextResponse.json(order, { status: 201 })
   } catch (err) {
     if (err instanceof ScaleCustomerNotFoundError)  return NextResponse.json({ error: err.message }, { status: 404 })
