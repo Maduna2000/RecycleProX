@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { headers } from 'next/headers'
 import { registryPrisma } from './registryPrisma'
+import logger from '@/lib/logger'
 
 export interface TenantContextValue {
   tenantId: string
@@ -28,6 +29,14 @@ export const tenantContext = new AsyncLocalStorage<TenantContextValue>()
 // it was issued in, so reuse (not re-pinning) is required for correctness.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const activeTenantTx = new AsyncLocalStorage<any>()
+
+// Tracks the tenantId a currently-open tenant-scoped transaction was pinned
+// with (see withTenantScope in prisma.ts) — populated alongside
+// activeTenantTx from the one place tenantId is authoritatively known for
+// that transaction. Lets attachAuditMiddleware (auditMiddleware.ts) reuse
+// that exact value instead of independently calling requireTenantId() again
+// for every write, removing a redundant ambient read.
+export const activeTenantId = new AsyncLocalStorage<string>()
 
 export class MissingTenantContextError extends Error {
   constructor() {
@@ -68,6 +77,11 @@ export function requireTenantId(): string {
     // fall through to the error below.
   }
 
+  // Fixed, greppable signal — independent of which route's catch block
+  // logs afterward (different message strings, some swallow/rewrap errors).
+  // Lets a recurrence be found in Vercel's Log Explorer by this exact
+  // `event` field rather than by scanning for generic 500s.
+  logger.error({ event: 'tenant_context_missing' }, 'MissingTenantContextError: no tenant context resolved (requireTenantId)')
   throw new MissingTenantContextError()
 }
 
@@ -105,6 +119,9 @@ export async function runWithRequestTenant<T>(
   fn: () => Promise<T>,
 ): Promise<T> {
   const tenantId = req.headers.get('x-tenant-id')
-  if (!tenantId) throw new MissingTenantContextError()
+  if (!tenantId) {
+    logger.error({ event: 'tenant_context_missing' }, 'MissingTenantContextError: no x-tenant-id header on request (runWithRequestTenant)')
+    throw new MissingTenantContextError()
+  }
   return tenantContext.run({ tenantId, schemaName: '', companySlug: '' }, fn)
 }

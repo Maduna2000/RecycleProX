@@ -1,7 +1,7 @@
 import type { PrismaClient } from '@prisma/client'
 import logger from '@/lib/logger'
 import { encodeJsonField } from '@/lib/db/queryHelpers'
-import { activeTenantTx, requireTenantId } from '@/lib/db/tenantContext'
+import { activeTenantId, activeTenantTx, requireTenantId } from '@/lib/db/tenantContext'
 
 const WRITE_MODELS = [
   'User', 'Purchase', 'PurchaseLine', 'Sale', 'SaleLine',
@@ -63,7 +63,14 @@ export function attachAuditMiddleware<T extends PrismaClient>(client: T): T {
         const target = activeTenantTx.getStore() ?? client
         await target.auditLog.create({
           data: {
-            tenantId: requireTenantId(),
+            // Prefer the tenantId the enclosing transaction was actually
+            // pinned with (provably correct — it's the literal value used
+            // in pinTenantContext's set_config call, see prisma.ts) over an
+            // independent, redundant ambient requireTenantId() lookup. Falls
+            // back defensively for any write path that somehow bypasses
+            // withTenantScope (should not happen once all routes are
+            // wrapped — see i-need-you-to-vectorized-pumpkin.md Section 12).
+            tenantId: activeTenantId.getStore() ?? requireTenantId(),
             tableName: params.model ?? 'unknown',
             recordId: result?.id ? String(result.id) : 'unknown',
             action: actionMap[params.action] as never,

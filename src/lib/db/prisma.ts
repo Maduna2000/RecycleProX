@@ -1,6 +1,6 @@
 import { PrismaClient, Prisma } from '@prisma/client'
 import { attachAuditMiddleware } from './auditMiddleware'
-import { activeTenantTx, requireTenantId } from './tenantContext'
+import { activeTenantId, activeTenantTx, requireTenantId } from './tenantContext'
 
 const globalForPrisma = globalThis as unknown as { rawPrisma: PrismaClient }
 
@@ -150,7 +150,7 @@ export async function withTenantScope<T>(
   return rawClient.$transaction(async (tx) => {
     await pinTenantContext(tx, tenantId)
     const scopedTx = wrapAsTenantScoped(tx, tenantId) as Prisma.TransactionClient
-    return activeTenantTx.run(scopedTx, () => fn(scopedTx))
+    return activeTenantId.run(tenantId, () => activeTenantTx.run(scopedTx, () => fn(scopedTx)))
   }, options)
 }
 
