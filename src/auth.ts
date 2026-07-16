@@ -84,6 +84,16 @@ export async function auth(): Promise<Session | null> {
   if (tenantId && schemaName && tenantSlug) {
     tenantContext.enterWith({ tenantId, schemaName, companySlug: tenantSlug })
   }
+  // TEMPORARY diagnostic — live incident, see i-need-you-to-vectorized-pumpkin.md
+  // Section 11. Remove once the MissingTenantContextError root cause is found.
+  logger.warn(
+    {
+      hasSession: !!session,
+      tenantId, schemaName, tenantSlug,
+      storeAfterEnterWith: tenantContext.getStore(),
+    },
+    'auth-diagnostic',
+  )
   return session
 }
 

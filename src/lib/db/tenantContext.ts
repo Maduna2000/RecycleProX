@@ -1,5 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { registryPrisma } from './registryPrisma'
+import logger from '@/lib/logger'
 
 export interface TenantContextValue {
   tenantId: string
@@ -41,7 +42,12 @@ export class MissingTenantContextError extends Error {
 
 export function requireTenantId(): string {
   const ctx = tenantContext.getStore()
-  if (!ctx) throw new MissingTenantContextError()
+  if (!ctx) {
+    // TEMPORARY diagnostic — live incident, see
+    // i-need-you-to-vectorized-pumpkin.md Section 11. Remove once found.
+    logger.warn('requireTenantId-diagnostic: store is empty at failure point')
+    throw new MissingTenantContextError()
+  }
   return ctx.tenantId
 }
 
