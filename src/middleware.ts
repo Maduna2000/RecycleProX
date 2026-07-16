@@ -98,15 +98,18 @@ export default auth((req: NextRequest & { auth: { user?: SessionUser } | null })
     return NextResponse.next()
   }
 
-  // Tenant-consistency guardrail — inert until subdomain-based tenant login
-  // exists (session.user.tenantSlug is only ever set once that ships). Once
-  // live, this stops a session for one company's subdomain being reused on
-  // another company's subdomain tab.
-  if (session?.user?.tenantSlug) {
-    const hostSlug = req.nextUrl.hostname.split('.')[0]
-    if (hostSlug !== session.user.tenantSlug) {
-      return NextResponse.redirect(new URL('/login', req.url))
-    }
+  // Tenant-consistency guardrail — stops a session for one company's
+  // subdomain being reused on another company's subdomain tab. Only
+  // enforced when THIS request actually resolved a real subdomain-derived
+  // tenantSlug (respects TENANT_BASE_DOMAIN via deriveTenantSlugFromHost
+  // above) — not a naive hostname.split('.')[0], which treats every apex
+  // request (e.g. Golden Key's own renovopros.vercel.app, no subdomain at
+  // all) as a mismatched "host slug" and redirect-loops every request.
+  // session.user.tenantSlug is now populated for every login, including
+  // the apex-domain default-tenant path (see resolveDefaultTenant() in
+  // authService.ts) — this guardrail must stay inert for exactly that case.
+  if (session?.user?.tenantSlug && tenantSlug && tenantSlug !== session.user.tenantSlug) {
+    return NextResponse.redirect(new URL('/login', req.url))
   }
 
   // Police officer portal — staff-launched; any staff role except scale operators
