@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db/prisma'
+import { requireTenantId } from '@/lib/db/tenantContext'
 import logger from '@/lib/logger'
 import Decimal from 'decimal.js'
 
@@ -24,6 +25,7 @@ export async function recordMovement(
 ) {
   return tx.stockMovement.create({
     data: {
+      tenantId: requireTenantId(),
       productId: opts.productId,
       direction: opts.direction,
       quantity: opts.quantity,

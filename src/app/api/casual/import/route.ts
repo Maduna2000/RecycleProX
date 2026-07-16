@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { prisma } from '@/lib/db/prisma'
+import { requireTenantId } from '@/lib/db/tenantContext'
 import Papa from 'papaparse'
 import { z } from 'zod'
 
@@ -97,6 +98,7 @@ export async function POST(req: NextRequest) {
   let skipped  = 0
 
   await prisma.$transaction(async (tx) => {
+    const tenantId = requireTenantId()
     for (const row of validRows) {
       let dob: Date | undefined
       if (row.dateOfBirth) {
@@ -105,12 +107,12 @@ export async function POST(req: NextRequest) {
       }
 
       // Check if already exists
-      const existing = await tx.customer.findUnique({ where: { idNumber: row.idNumber } })
+      const existing = await tx.customer.findUnique({ where: { tenantId_idNumber: { tenantId, idNumber: row.idNumber } } })
 
       if (existing) {
         // Update existing customer
         await tx.customer.update({
-          where: { idNumber: row.idNumber },
+          where: { tenantId_idNumber: { tenantId, idNumber: row.idNumber } },
           data: {
             firstName:       row.firstName,
             lastName:        row.lastName,
@@ -126,6 +128,7 @@ export async function POST(req: NextRequest) {
         // Create new casual customer
         await tx.customer.create({
           data: {
+            tenantId,
             idNumber:        row.idNumber,
             firstName:       row.firstName,
             lastName:        row.lastName,

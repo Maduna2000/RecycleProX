@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db/prisma'
+import { requireTenantId } from '@/lib/db/tenantContext'
 import Decimal from 'decimal.js'
 import logger from '@/lib/logger'
 import type { CreateExpenseInput, CreateExpenseTypeInput, UpdateExpenseInput, SettlePendingExpenseInput } from '@/lib/schemas/expense'
@@ -15,7 +16,7 @@ async function nextRef(): Promise<string> {
 
 export async function createExpenseType(data: CreateExpenseTypeInput, userId: string) {
   const type = await prisma.expenseType.create({
-    data: { ...data, },
+    data: { ...data, tenantId: requireTenantId() },
   })
   logger.info({ expenseTypeId: type.id, userId }, 'ExpenseType created')
   return type
@@ -33,11 +34,12 @@ export async function listExpenseTypes() {
 // ─── Expenses ─────────────────────────────────────────────────────────────────
 
 export async function createExpense(data: CreateExpenseInput, userId: string) {
+  const tenantId = requireTenantId()
   const refNumber = await nextRef()
   const amount = new Decimal(data.amount)
 
   // Read VAT rate from SystemSettings; fall back to 15%
-  const vatSetting = await prisma.systemSettings.findUnique({ where: { key: 'vatRate' } })
+  const vatSetting = await prisma.systemSettings.findUnique({ where: { tenantId_key: { tenantId, key: 'vatRate' } } })
   const vatRate = vatSetting ? new Decimal(vatSetting.value).div(100) : new Decimal('0.15')
   const vatAmount = data.includesVat
     ? amount.times(vatRate.div(vatRate.plus(1))).toDecimalPlaces(2)
@@ -56,6 +58,7 @@ export async function createExpense(data: CreateExpenseInput, userId: string) {
 
   const expense = await prisma.expense.create({
     data: {
+      tenantId,
       refNumber,
       expenseTypeId:   data.expenseTypeId,
       description:     data.description,
@@ -148,7 +151,7 @@ export async function updateExpense(
     if (data.amount !== undefined || data.includesVat !== undefined) {
       const amount = new Decimal(data.amount ?? expense.amount.toString())
       const includesVat = data.includesVat ?? expense.includesVat
-      const vatSetting = await tx.systemSettings.findUnique({ where: { key: 'vatRate' } })
+      const vatSetting = await tx.systemSettings.findUnique({ where: { tenantId_key: { tenantId: requireTenantId(), key: 'vatRate' } } })
       const vatRate = vatSetting ? new Decimal(vatSetting.value).div(100) : new Decimal('0.15')
       vatAmount = includesVat
         ? amount.times(vatRate.div(vatRate.plus(1))).toDecimalPlaces(2)
@@ -219,7 +222,7 @@ export async function settlePendingExpense(
     }
 
     // Recalculate VAT based on new actual amount
-    const vatSetting = await tx.systemSettings.findUnique({ where: { key: 'vatRate' } })
+    const vatSetting = await tx.systemSettings.findUnique({ where: { tenantId_key: { tenantId: requireTenantId(), key: 'vatRate' } } })
     const vatRate = vatSetting ? new Decimal(vatSetting.value).div(100) : new Decimal('0.15')
     const vatAmount = expense.includesVat
       ? actualAmount.times(vatRate.div(vatRate.plus(1))).toDecimalPlaces(2)
@@ -316,7 +319,7 @@ export async function addExpenseAttachment(
   if (!expense) throw new Error(`Expense "${expenseId}" not found`)
 
   const attachment = await prisma.expenseAttachment.create({
-    data: { expenseId, r2Key: data.r2Key, fileName: data.fileName, notes: data.notes, uploadedByUserId },
+    data: { tenantId: requireTenantId(), expenseId, r2Key: data.r2Key, fileName: data.fileName, notes: data.notes, uploadedByUserId },
   })
   logger.info({ attachmentId: attachment.id, expenseId, uploadedByUserId }, 'expense.attachment.added')
   return attachment

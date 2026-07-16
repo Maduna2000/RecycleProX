@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
   try {
     const result = await provisionCompany(parsed.data)
     return NextResponse.json({
-      schemaName: result.schemaName,
+      tenantId: result.tenantId,
       tempUsername: result.tempUsername,
       tempPassword: result.tempPassword,
       loginUrl: `https://${parsed.data.companySlug}.${process.env.TENANT_BASE_DOMAIN ?? 'renovopro.app'}/login`,

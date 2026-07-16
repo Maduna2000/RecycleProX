@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import { z } from 'zod'
 import bcrypt from 'bcryptjs'
 import { prisma } from '@/lib/db/prisma'
+import { requireTenantId } from '@/lib/db/tenantContext'
 import logger from '@/lib/logger'
 
 const CreateOperatorSchema = z.object({
@@ -60,7 +61,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Validation failed', issues: parsed.error.issues }, { status: 400 })
   }
 
-  const existing = await prisma.user.findUnique({ where: { username: parsed.data.username } })
+  const tenantId = requireTenantId()
+  const existing = await prisma.user.findUnique({ where: { tenantId_username: { tenantId, username: parsed.data.username } } })
   if (existing) {
     return NextResponse.json({ error: 'Username already taken' }, { status: 409 })
   }
@@ -69,6 +71,7 @@ export async function POST(req: NextRequest) {
     const passwordHash = await bcrypt.hash(parsed.data.password, 12)
     const user = await prisma.user.create({
       data: {
+        tenantId,
         fullName:            parsed.data.fullName,
         username:            parsed.data.username,
         passwordHash,

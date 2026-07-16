@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { prisma } from '@/lib/db/prisma'
+import { requireTenantId } from '@/lib/db/tenantContext'
 import { UpdateStepConfigSchema } from '@/lib/schemas/scale'
 
 type RouteParams = { params: Promise<{ categoryId: string }> }
@@ -117,6 +118,7 @@ export async function PUT(req: Request, { params }: RouteParams) {
   const config = await prisma.categoryStepConfig.upsert({
     where:  { categoryId },
     create: {
+      tenantId: requireTenantId(),
       categoryId,
       requireWeight:   parsed.data.requireWeight,
       requirePhotos:   parsed.data.requirePhotos,

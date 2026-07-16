@@ -1,121 +1,8 @@
-import fs from 'node:fs'
-import path from 'node:path'
 import bcrypt from 'bcryptjs'
-import { PrismaClient } from '@prisma/client'
+import { prisma } from '@/lib/db/prisma'
 import { registryPrisma } from '@/lib/db/registryPrisma'
+import { withTenantId, requireTenantId } from '@/lib/db/tenantContext'
 import logger from '@/lib/logger'
-
-export class InvalidSchemaNameError extends Error {
-  constructor(schemaName: string) { super(`Invalid tenant schema name: ${schemaName}`); this.name = 'InvalidSchemaNameError' }
-}
-
-function isValidSchemaName(name: string): boolean {
-  return /^[a-z][a-z0-9_]{2,50}$/.test(name)
-}
-
-// Reads every prisma/migrations/*/migration.sql in directory order (the same
-// order `prisma migrate deploy` would apply them) and splits each file into
-// individual statements. `prisma migrate deploy` isn't safely shellable from
-// inside a Vercel serverless function (no guaranteed CLI/filesystem
-// semantics at runtime — see plan risk #1), so new tenant schemas are
-// migrated by replaying the same DDL through the Prisma Client instead.
-// Splitting on `;` followed by a newline is safe for this schema today:
-// no current migration embeds a semicolon inside a string/default literal.
-function loadMigrationStatements(): string[] {
-  const migrationsDir = path.join(process.cwd(), 'prisma', 'migrations')
-  const dirs = fs
-    .readdirSync(migrationsDir)
-    .filter((d) => fs.statSync(path.join(migrationsDir, d)).isDirectory())
-    .sort()
-
-  const statements: string[] = []
-  for (const dir of dirs) {
-    const sqlPath = path.join(migrationsDir, dir, 'migration.sql')
-    if (!fs.existsSync(sqlPath)) continue
-    const sql = fs.readFileSync(sqlPath, 'utf-8')
-    // Prisma prefixes every statement with its own `-- CreateTable`-style
-    // comment line, so a naive "drop chunks starting with --" filter drops
-    // every single statement, not just genuinely comment-only fragments —
-    // confirmed by hand: this produced statementCount: 0 against the real
-    // migration file, silently creating an empty schema. Strip only the
-    // leading comment *lines* within each chunk instead, keeping the SQL.
-    const parts = sql
-      .split(/;\s*\n/)
-      .map((s) => s.split('\n').filter((line) => !line.trim().startsWith('--')).join('\n').trim())
-      .filter((s) => s.length > 0)
-    statements.push(...parts)
-  }
-  return statements
-}
-
-function tenantDatabaseUrl(schemaName: string): string {
-  const base = process.env.DATABASE_URL
-  if (!base) throw new Error('DATABASE_URL is not set')
-  const url = new URL(base)
-  url.searchParams.set('schema', schemaName)
-  return url.toString()
-}
-
-// Creates the Postgres schema and replays every migration against it. The
-// caller is responsible for registering the schema in the Tenant table only
-// after this — and the seed step below — succeed, so a failed provision
-// never leaves a half-registered tenant.
-//
-// Drops the schema first if it already exists, rather than `CREATE SCHEMA
-// IF NOT EXISTS` + hoping the retry picks up where it left off. Confirmed
-// by hand: raw-SQL migration replay isn't idempotent (no `IF NOT EXISTS`
-// guards in Prisma's generated DDL), so a retry after a partial failure
-// (e.g. a dropped connection mid-replay) hit `type "UserRole" already
-// exists` on the very type its own earlier attempt had already created.
-// Only safe because this function refuses to run at all once a Tenant row
-// references this schemaName — i.e. only before a company has ever
-// successfully finished provisioning. Enforced here, not just by the
-// caller's own pre-check in provisionCompany(), so this function stays safe
-// even if some future caller (an admin "re-provision" action, say) forgets
-// that precondition.
-export async function provisionTenantSchema(schemaName: string): Promise<void> {
-  if (!isValidSchemaName(schemaName)) throw new InvalidSchemaNameError(schemaName)
-
-  // registryPrisma is a Web-only, Postgres-only construct — the Tenant model
-  // is deliberately excluded from the Desktop SQLite schema (Desktop is
-  // single-tenant and never provisions schemas), so this whole module is
-  // dead code on Desktop and the cast below is safe because it's
-  // unreachable there, not because the type is right.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const registered = await (registryPrisma as any).tenant.findUnique({ where: { schemaName } })
-  if (registered) {
-    throw new Error(`Refusing to drop schema ${schemaName}: already registered as an active tenant`)
-  }
-
-  await registryPrisma.$executeRawUnsafe(`DROP SCHEMA IF EXISTS "${schemaName}" CASCADE`)
-  await registryPrisma.$executeRawUnsafe(`CREATE SCHEMA "${schemaName}"`)
-
-  const tenantClient = new PrismaClient({ datasourceUrl: tenantDatabaseUrl(schemaName) })
-  try {
-    // The connection URL's ?schema= param scopes Prisma's own generated
-    // queries (confirmed: prisma.user.findMany() correctly resolves to
-    // "tenant_x"."User") but does NOT set the Postgres session's actual
-    // search_path — raw SQL via $executeRawUnsafe bypasses Prisma's
-    // schema-qualification entirely and runs against whatever search_path
-    // the session already has, which defaults to `public`. Confirmed by
-    // hand: without this, every unqualified CREATE TABLE/TYPE statement in
-    // the migration replay was silently targeting `public` (Golden Key's
-    // real production schema) — harmlessly, since it collided with an
-    // already-existing object there and errored out immediately on
-    // statement #1, but silently is the operative word. This SET is what
-    // actually fixes it, verified to persist correctly across the
-    // sequential (non-concurrent) loop below.
-    await tenantClient.$executeRawUnsafe(`SET search_path TO "${schemaName}"`)
-
-    const statements = loadMigrationStatements()
-    for (const statement of statements) {
-      await tenantClient.$executeRawUnsafe(statement)
-    }
-    logger.info({ schemaName, statementCount: statements.length }, 'Tenant schema migrated')
-  } finally {
-    await tenantClient.$disconnect()
-  }
-}
 
 const DEFAULT_CATEGORIES = [
   { name: 'Ferrous',     colorHex: '#607D8B', iconName: 'Layers',   sortOrder: 0 },
@@ -141,18 +28,22 @@ const DEFAULT_SUBCATEGORIES: Record<string, Array<{ name: string; colorHex: stri
   ],
 }
 
-// Seeds default categories and the tenant's first admin user into a brand
-// new (guaranteed-empty) tenant schema. Deliberately separate from
-// prisma/seed.ts, which seeds the `public` schema (Golden Key's production
-// data) and has its own idempotent "skip if admin already exists" guard —
-// that script is untouched here to avoid any risk to its existing behavior.
-export async function seedTenantSchema(
-  client: PrismaClient,
-  opts: { username: string; password: string; fullName: string },
-): Promise<void> {
+// Seeds default categories and the tenant's first admin user for a brand
+// new tenant. Deliberately separate from prisma/seed.ts, which seeds the
+// local/dev default tenant and has its own idempotent guard — that script
+// is untouched here. Must run inside withTenantId() (see provisionCompany
+// below) so every row created here gets the right tenantId stamped and
+// passes RLS's WITH CHECK.
+export async function seedTenantDefaults(opts: {
+  username: string
+  password: string
+  fullName: string
+}): Promise<void> {
+  const tenantId = requireTenantId()
   const passwordHash = await bcrypt.hash(opts.password, 12)
-  await client.user.create({
+  await prisma.user.create({
     data: {
+      tenantId,
       fullName: opts.fullName,
       username: opts.username,
       passwordHash,
@@ -163,11 +54,7 @@ export async function seedTenantSchema(
 
   const parentIds: Record<string, string> = {}
   for (const cat of DEFAULT_CATEGORIES) {
-    const created = await client.productCategory.upsert({
-      where: { name: cat.name },
-      update: { iconName: cat.iconName },
-      create: cat,
-    })
+    const created = await prisma.productCategory.create({ data: { ...cat, tenantId } })
     parentIds[cat.name] = created.id
   }
 
@@ -175,11 +62,7 @@ export async function seedTenantSchema(
     const parentId = parentIds[parentName]
     if (!parentId) continue
     for (const sub of subs) {
-      await client.productCategory.upsert({
-        where: { name: sub.name },
-        update: { parentId },
-        create: { ...sub, parentId },
-      })
+      await prisma.productCategory.create({ data: { ...sub, tenantId, parentId } })
     }
   }
 }
@@ -190,55 +73,63 @@ function generateTempPassword(): string {
 
 export interface ProvisionCompanyInput {
   companySlug: string
-  schemaName: string
   companyName: string
   ownerName: string
 }
 
 export interface ProvisionCompanyResult {
-  schemaName: string
+  tenantId: string
   tempUsername: string
   tempPassword: string
 }
 
-// Full provisioning flow called by POST /api/internal/tenants: create the
-// schema, migrate it, seed default data + a temp admin login, then register
-// it in the Tenant registry — in that order, so a failure partway through
-// never leaves a Tenant row pointing at a schema that isn't actually ready.
+// Full provisioning flow called by POST /api/internal/tenants: register the
+// tenant, then seed default data + a temp admin login — in that order, so a
+// failure partway through never leaves a Tenant row with no data at all
+// pointing at a company that thinks it's ready.
+//
+// Everyone's data lives in the same shared tables now (see
+// i-need-you-to-vectorized-pumpkin.md Section 2/5) — there is no schema to
+// create or migrate per tenant anymore. This function deletes, not just
+// simplifies, the old CREATE SCHEMA/raw-migration-replay/SET search_path
+// machinery — three separate bugs were found and fixed in that path over
+// its lifetime (see git history on provisionTenantSchema), and none of that
+// complexity has a category in this design.
 export async function provisionCompany(input: ProvisionCompanyInput): Promise<ProvisionCompanyResult> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const existing = await (registryPrisma as any).tenant.findUnique({ where: { schemaName: input.schemaName } })
-  if (existing) throw new Error(`Tenant schema already provisioned: ${input.schemaName}`)
-
-  await provisionTenantSchema(input.schemaName)
+  const existing = await (registryPrisma as any).tenant.findUnique({ where: { companySlug: input.companySlug } })
+  if (existing) throw new Error(`Company slug already provisioned: ${input.companySlug}`)
 
   const tempUsername = 'admin'
   const tempPassword = generateTempPassword()
 
-  const tenantClient = new PrismaClient({ datasourceUrl: tenantDatabaseUrl(input.schemaName) })
-  try {
-    await seedTenantSchema(tenantClient, {
-      username: tempUsername,
-      password: tempPassword,
-      fullName: input.ownerName,
-    })
-  } finally {
-    await tenantClient.$disconnect()
-  }
-
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await (registryPrisma as any).tenant.create({
+  const tenant = await (registryPrisma as any).tenant.create({
     data: {
       companySlug: input.companySlug,
-      schemaName: input.schemaName,
+      // schemaName no longer selects a physical Postgres schema — every
+      // tenant shares the same tables (Row-Level Security provides
+      // isolation instead, see prisma/migrations/20260716000003_enable_rls).
+      // Kept populated only to satisfy this column's pre-existing @unique
+      // constraint through the rollback window (Section 9 of the tenancy
+      // plan); companySlug is already unique, so it's a safe placeholder.
+      schemaName: input.companySlug,
       companyName: input.companyName,
       status: 'active',
     },
   })
 
-  logger.info({ companySlug: input.companySlug, schemaName: input.schemaName }, 'Tenant company provisioned')
+  await withTenantId(tenant.id, () =>
+    seedTenantDefaults({
+      username: tempUsername,
+      password: tempPassword,
+      fullName: input.ownerName,
+    }),
+  )
 
-  return { schemaName: input.schemaName, tempUsername, tempPassword }
+  logger.info({ companySlug: input.companySlug, tenantId: tenant.id }, 'Tenant company provisioned')
+
+  return { tenantId: tenant.id, tempUsername, tempPassword }
 }
 
 export interface RegisterExistingTenantInput {
@@ -252,9 +143,8 @@ export interface RegisterExistingTenantResult {
   schemaName: string
 }
 
-// Registers a schema that already holds real data as a formal Tenant —
-// deliberately does NOT call provisionTenantSchema (which drops/recreates
-// the schema) or seedTenantSchema (which would create a duplicate admin
+// Registers a pre-existing schema/dataset as a formal Tenant — deliberately
+// does NOT call seedTenantDefaults (which would create a duplicate admin
 // user and duplicate default categories). This is a one-off path for
 // onboarding a pre-existing tenant (Golden Key, living in `public` since
 // before multi-tenancy existed), not the normal signup flow — that stays
@@ -262,8 +152,6 @@ export interface RegisterExistingTenantResult {
 export async function registerExistingTenant(
   input: RegisterExistingTenantInput,
 ): Promise<RegisterExistingTenantResult> {
-  if (!isValidSchemaName(input.schemaName)) throw new InvalidSchemaNameError(input.schemaName)
-
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const existingBySlug = await (registryPrisma as any).tenant.findUnique({ where: { companySlug: input.companySlug } })
   if (existingBySlug) throw new Error(`Company slug already registered: ${input.companySlug}`)

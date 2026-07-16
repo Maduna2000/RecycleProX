@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db/prisma'
+import { requireTenantId } from '@/lib/db/tenantContext'
 import { Prisma } from '@prisma/client'
 import logger from '@/lib/logger'
 import Decimal from 'decimal.js'
@@ -122,9 +123,11 @@ export async function createScaleOrder(data: CreateScaleOrderInput, operatorId: 
   const firstWeight = firstLine.weight ? new Decimal(firstLine.weight).toDecimalPlaces(3) : null
 
   const order = await prisma.$transaction(async (tx) => {
+    const tenantId = requireTenantId()
     const orderNumber = await generateOrderNumber(tx, new Date())
     const created = await tx.scaleOrder.create({
       data: {
+        tenantId,
         orderNumber,
         customerId:      data.customerId ?? null,
         casualFirstName: data.customerId ? null : (data.casualFirstName ?? null),
@@ -143,6 +146,7 @@ export async function createScaleOrder(data: CreateScaleOrderInput, operatorId: 
 
     await tx.scaleOrderLine.createMany({
       data: data.lines.map(line => ({
+        tenantId,
         orderId:     created.id,
         productId:   line.productId,
         weight:      line.weight ? new Decimal(line.weight).toDecimalPlaces(3) : null,
@@ -273,8 +277,8 @@ export async function listScaleOrders(filters: ScaleOrderFilters) {
 
   if (andConditions.length > 0) where.AND = andConditions
 
-  const [orders, total] = await prisma.$transaction([
-    prisma.scaleOrder.findMany({
+  const [orders, total] = await prisma.$transaction(async (tx) => [
+    await tx.scaleOrder.findMany({
       where,
       include: {
         customer: { select: { id: true, firstName: true, lastName: true, phone: true, customerType: true } },
@@ -286,7 +290,7 @@ export async function listScaleOrders(filters: ScaleOrderFilters) {
       skip,
       take: pageSize,
     }),
-    prisma.scaleOrder.count({ where }),
+    await tx.scaleOrder.count({ where }),
   ])
 
   return { orders, total, page, pageSize, totalPages: Math.ceil(total / pageSize) }
@@ -315,18 +319,18 @@ export async function getScaleStats() {
   const today = new Date()
   const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate())
 
-  const [todayTotal, todayPending, todayProcessed, todayVoided, lineWeightSum, legacyWeightSum] = await prisma.$transaction([
-    prisma.scaleOrder.count({ where: { createdAt: { gte: startOfDay } } }),
-    prisma.scaleOrder.count({ where: { createdAt: { gte: startOfDay }, status: 'pending' } }),
-    prisma.scaleOrder.count({ where: { createdAt: { gte: startOfDay }, status: 'processed' } }),
-    prisma.scaleOrder.count({ where: { createdAt: { gte: startOfDay }, status: 'voided' } }),
+  const [todayTotal, todayPending, todayProcessed, todayVoided, lineWeightSum, legacyWeightSum] = await prisma.$transaction(async (tx) => [
+    await tx.scaleOrder.count({ where: { createdAt: { gte: startOfDay } } }),
+    await tx.scaleOrder.count({ where: { createdAt: { gte: startOfDay }, status: 'pending' } }),
+    await tx.scaleOrder.count({ where: { createdAt: { gte: startOfDay }, status: 'processed' } }),
+    await tx.scaleOrder.count({ where: { createdAt: { gte: startOfDay }, status: 'voided' } }),
     // Sum EVERY line's weight — the order header only carries the first line
-    prisma.scaleOrderLine.aggregate({
+    await tx.scaleOrderLine.aggregate({
       where: { order: { createdAt: { gte: startOfDay }, status: { not: 'voided' } } },
       _sum: { weight: true },
     }),
     // Legacy orders created before per-line rows existed
-    prisma.scaleOrder.aggregate({
+    await tx.scaleOrder.aggregate({
       where: { createdAt: { gte: startOfDay }, status: { not: 'voided' }, lines: { none: {} } },
       _sum: { weight: true },
     }),

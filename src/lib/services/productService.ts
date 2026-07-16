@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db/prisma'
+import { requireTenantId } from '@/lib/db/tenantContext'
 import logger from '@/lib/logger'
 import Decimal from 'decimal.js'
 import { ciContains } from '@/lib/db/queryHelpers'
@@ -67,14 +68,16 @@ export class ProductInUseError extends Error {
 // ─── Product CRUD ─────────────────────────────────────────────────────────────
 
 export async function createProduct(data: CreateProductInput, createdById?: string) {
-  const existing = await prisma.product.findUnique({ where: { code: data.code } })
+  const tenantId = requireTenantId()
+  const existing = await prisma.product.findUnique({ where: { tenantId_code: { tenantId, code: data.code } } })
   if (existing) throw new DuplicateProductCodeError(data.code)
 
-  const cat = await prisma.productCategory.findUnique({ where: { name: data.category } })
+  const cat = await prisma.productCategory.findUnique({ where: { tenantId_name: { tenantId, name: data.category } } })
   if (!cat) throw new Error(`Category "${data.category}" does not exist`)
 
   const product = await prisma.product.create({
     data: {
+      tenantId,
       code: data.code,
       name: data.name,
       category: data.category,
@@ -92,12 +95,13 @@ export async function createProduct(data: CreateProductInput, createdById?: stri
 }
 
 export async function updateProduct(id: string, data: UpdateProductInput, updatedById?: string) {
+  const tenantId = requireTenantId()
   const existing = await prisma.product.findUnique({ where: { id } })
   if (!existing) throw new ProductNotFoundError(id)
 
   let categoryId: string | undefined
   if (data.category !== undefined) {
-    const cat = await prisma.productCategory.findUnique({ where: { name: data.category } })
+    const cat = await prisma.productCategory.findUnique({ where: { tenantId_name: { tenantId, name: data.category } } })
     if (!cat) throw new Error(`Category "${data.category}" does not exist`)
     categoryId = cat.id
   }
@@ -124,6 +128,7 @@ export async function updateProduct(id: string, data: UpdateProductInput, update
   if (buyChanged || sellChanged) {
     await prisma.priceHistory.create({
       data: {
+        tenantId,
         productId: id,
         buyPrice: updated.defaultBuyPrice,
         sellPrice: updated.defaultSellPrice,
@@ -154,11 +159,11 @@ export async function deleteProduct(id: string) {
     throw new ProductInUseError(counts)
   }
 
-  await prisma.$transaction([
-    prisma.priceHistory.deleteMany({ where: { productId: id } }),
-    prisma.priceGroupProductOverride.deleteMany({ where: { productId: id } }),
-    prisma.product.delete({ where: { id } }),
-  ])
+  await prisma.$transaction(async (tx) => {
+    await tx.priceHistory.deleteMany({ where: { productId: id } })
+    await tx.priceGroupProductOverride.deleteMany({ where: { productId: id } })
+    await tx.product.delete({ where: { id } })
+  })
   logger.info({ productId: id }, 'product.deleted')
 }
 
@@ -190,6 +195,7 @@ export async function getProduct(id: string) {
 // ─── Bulk Price Update ────────────────────────────────────────────────────────
 
 export async function bulkUpdatePrices(data: BulkPriceUpdateInput, updatedById?: string) {
+  const tenantId = requireTenantId()
   const results = await prisma.$transaction(async (tx) => {
     const updated = []
     for (const item of data.updates) {
@@ -206,6 +212,7 @@ export async function bulkUpdatePrices(data: BulkPriceUpdateInput, updatedById?:
 
       await tx.priceHistory.create({
         data: {
+          tenantId,
           productId: item.productId,
           buyPrice: new Decimal(item.defaultBuyPrice),
           sellPrice: new Decimal(item.defaultSellPrice),
@@ -238,7 +245,7 @@ export async function resolvePrice(productId: string, priceGroupId?: string | nu
   }
 
   const override = await prisma.priceGroupProductOverride.findUnique({
-    where: { priceGroupId_productId: { priceGroupId, productId } },
+    where: { tenantId_priceGroupId_productId: { tenantId: requireTenantId(), priceGroupId, productId } },
   })
 
   if (override) {
@@ -259,7 +266,8 @@ export async function resolvePrice(productId: string, priceGroupId?: string | nu
 // ─── Price Groups ─────────────────────────────────────────────────────────────
 
 export async function createPriceGroup(data: CreatePriceGroupInput, createdById?: string) {
-  const existing = await prisma.priceGroup.findUnique({ where: { name: data.name } })
+  const tenantId = requireTenantId()
+  const existing = await prisma.priceGroup.findUnique({ where: { tenantId_name: { tenantId, name: data.name } } })
   if (existing) throw new DuplicatePriceGroupNameError(data.name)
 
   // If isDefault, clear other defaults first
@@ -269,6 +277,7 @@ export async function createPriceGroup(data: CreatePriceGroupInput, createdById?
 
   const group = await prisma.priceGroup.create({
     data: {
+      tenantId,
       name: data.name,
       description: data.description,
       isDefault: data.isDefault ?? false,
@@ -284,7 +293,7 @@ export async function updatePriceGroup(id: string, data: UpdatePriceGroupInput, 
   if (!existing) throw new PriceGroupNotFoundError(id)
 
   if (data.name && data.name !== existing.name) {
-    const nameConflict = await prisma.priceGroup.findUnique({ where: { name: data.name } })
+    const nameConflict = await prisma.priceGroup.findUnique({ where: { tenantId_name: { tenantId: requireTenantId(), name: data.name } } })
     if (nameConflict) throw new DuplicatePriceGroupNameError(data.name)
   }
 
@@ -314,10 +323,10 @@ export async function deletePriceGroup(id: string, deletedById?: string) {
   if (group.isDefault) throw new DefaultPriceGroupDeleteError()
   if (group._count.customers > 0) throw new PriceGroupInUseError(group._count.customers)
 
-  await prisma.$transaction([
-    prisma.priceGroupProductOverride.deleteMany({ where: { priceGroupId: id } }),
-    prisma.priceGroup.delete({ where: { id } }),
-  ])
+  await prisma.$transaction(async (tx) => {
+    await tx.priceGroupProductOverride.deleteMany({ where: { priceGroupId: id } })
+    await tx.priceGroup.delete({ where: { id } })
+  })
 
   logger.info({ priceGroupId: id, deletedById }, 'priceGroup.deleted')
 }
@@ -350,6 +359,7 @@ export async function setGroupOverrides(groupId: string, data: SetGroupOverrides
   const group = await prisma.priceGroup.findUnique({ where: { id: groupId } })
   if (!group) throw new PriceGroupNotFoundError(groupId)
 
+  const tenantId = requireTenantId()
   await prisma.$transaction(async (tx) => {
     // Remove overrides not in the new set
     const incomingProductIds = data.overrides.map((o) => o.productId)
@@ -359,8 +369,9 @@ export async function setGroupOverrides(groupId: string, data: SetGroupOverrides
 
     for (const override of data.overrides) {
       await tx.priceGroupProductOverride.upsert({
-        where: { priceGroupId_productId: { priceGroupId: groupId, productId: override.productId } },
+        where: { tenantId_priceGroupId_productId: { tenantId, priceGroupId: groupId, productId: override.productId } },
         create: {
+          tenantId,
           priceGroupId: groupId,
           productId: override.productId,
           buyPrice: new Decimal(override.buyPrice),
@@ -394,12 +405,13 @@ export async function copyDefaultsToPriceGroup(
     select: { id: true, defaultBuyPrice: true, defaultSellPrice: true },
   })
 
+  const tenantId = requireTenantId()
   const upserted = await prisma.$transaction(async (tx) => {
     let count = 0
     for (const product of products) {
       await tx.priceGroupProductOverride.upsert({
-        where:  { priceGroupId_productId: { priceGroupId, productId: product.id } },
-        create: { priceGroupId, productId: product.id, buyPrice: product.defaultBuyPrice, sellPrice: product.defaultSellPrice },
+        where:  { tenantId_priceGroupId_productId: { tenantId, priceGroupId, productId: product.id } },
+        create: { tenantId, priceGroupId, productId: product.id, buyPrice: product.defaultBuyPrice, sellPrice: product.defaultSellPrice },
         update: { buyPrice: product.defaultBuyPrice, sellPrice: product.defaultSellPrice },
       })
       count++
@@ -414,7 +426,8 @@ export async function copyDefaultsToPriceGroup(
 // ─── Category CRUD ────────────────────────────────────────────────────────────
 
 export async function createCategory(data: CreateCategoryInput) {
-  const existing = await prisma.productCategory.findUnique({ where: { name: data.name } })
+  const tenantId = requireTenantId()
+  const existing = await prisma.productCategory.findUnique({ where: { tenantId_name: { tenantId, name: data.name } } })
   if (existing) throw new Error(`Category "${data.name}" already exists`)
 
   if (data.parentId) {
@@ -425,6 +438,7 @@ export async function createCategory(data: CreateCategoryInput) {
 
   const category = await prisma.productCategory.create({
     data: {
+      tenantId,
       name:      data.name,
       colorHex:  data.colorHex  || null,
       iconName:  data.iconName  || null,
@@ -444,7 +458,7 @@ export async function updateCategory(id: string, data: UpdateCategoryInput, upda
   if (!existing) throw new Error('Category not found')
 
   if (data.name && data.name !== existing.name) {
-    const conflict = await prisma.productCategory.findUnique({ where: { name: data.name } })
+    const conflict = await prisma.productCategory.findUnique({ where: { tenantId_name: { tenantId: requireTenantId(), name: data.name } } })
     if (conflict) throw new Error(`Category "${data.name}" already exists`)
   }
 
@@ -512,7 +526,7 @@ export async function countProductsForCategory(name: string): Promise<number> {
  */
 export async function expandCategoryNames(name: string): Promise<string[]> {
   const cat = await prisma.productCategory.findUnique({
-    where: { name },
+    where: { tenantId_name: { tenantId: requireTenantId(), name } },
     include: { children: { where: { isActive: true }, select: { name: true } } },
   })
   if (!cat) return [name]

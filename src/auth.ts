@@ -45,6 +45,7 @@ const {
             fullName: user.fullName,
             username: user.username,
             allowedModules,
+            tenantId: 'tenantId' in result ? result.tenantId : undefined,
             schemaName: 'schemaName' in result ? result.schemaName : undefined,
             tenantSlug: 'tenantSlug' in result ? result.tenantSlug : undefined,
             featureFlags: 'featureFlags' in result ? result.featureFlags : undefined,
@@ -77,10 +78,11 @@ export { handlers, signIn, signOut }
 // exposed here.
 export async function auth(): Promise<Session | null> {
   const session = await nextAuthCore()
+  const tenantId = session?.user?.tenantId
   const schemaName = session?.user?.schemaName
   const tenantSlug = session?.user?.tenantSlug
-  if (schemaName && tenantSlug) {
-    tenantContext.enterWith({ schemaName, companySlug: tenantSlug })
+  if (tenantId && schemaName && tenantSlug) {
+    tenantContext.enterWith({ tenantId, schemaName, companySlug: tenantSlug })
   }
   return session
 }
@@ -98,6 +100,7 @@ declare module 'next-auth' {
       fullName: string
       username: string
       allowedModules: string[]
+      tenantId?: string
       schemaName?: string
       tenantSlug?: string
       featureFlags?: Record<string, boolean>

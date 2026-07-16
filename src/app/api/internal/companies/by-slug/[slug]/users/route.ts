@@ -22,7 +22,7 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
 
   try {
     const users = await tenantContext.run(
-      { schemaName: tenant.schemaName, companySlug: tenant.companySlug },
+      { tenantId: tenant.id, schemaName: tenant.schemaName, companySlug: tenant.companySlug },
       () =>
         prisma.user.findMany({
           select: {

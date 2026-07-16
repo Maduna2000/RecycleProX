@@ -2,7 +2,11 @@ import { z } from 'zod'
 
 export const ProvisionTenantSchema = z.object({
   companySlug: z.string().min(2).regex(/^[a-z0-9-]+$/),
-  schemaName: z.string().min(3).regex(/^[a-z][a-z0-9_]{2,50}$/),
+  // Accepted-but-ignored for backward compatibility with the Portal's
+  // existing request body — tenants no longer get their own Postgres
+  // schema (see i-need-you-to-vectorized-pumpkin.md Section 5), so this
+  // field carries no meaning on the Web side anymore.
+  schemaName: z.string().optional(),
   companyName: z.string().min(2),
   ownerName: z.string().min(2),
 })

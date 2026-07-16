@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db/prisma'
+import { requireTenantId } from '@/lib/db/tenantContext'
 import { Prisma } from '@prisma/client'
 import logger from '@/lib/logger'
 import Decimal from 'decimal.js'
@@ -258,6 +259,7 @@ export async function createPurchase(data: CreatePurchaseInput, createdByUserId?
 
     const p = await tx.purchase.create({
       data: {
+        tenantId: requireTenantId(),
         refNumber,
         customerId: data.customerId,
         status: data.status ?? 'completed',
@@ -270,6 +272,7 @@ export async function createPurchase(data: CreatePurchaseInput, createdByUserId?
         scaleOrderId: data.scaleOrderId,
         lines: {
           create: resolvedLines.map((l) => ({
+            tenantId:        requireTenantId(),
             productId:       l.productId,
             quantity:        l.quantity,
             grossQty:        l.grossQty,
@@ -438,6 +441,7 @@ export async function markPurchasePaid(
 
       await tx.payment.create({
         data: {
+          tenantId:        requireTenantId(),
           refNumber,
           customerId:      purchase.customerId,
           amount:          settleAmount,
@@ -540,6 +544,7 @@ export async function processSplitPayment(
         const payCount = await tx.payment.count({ where: { createdAt: { gte: startOfDay } } })
         await tx.payment.create({
           data: {
+            tenantId:        requireTenantId(),
             refNumber:       `${prefix}-${String(payCount + 1).padStart(4, '0')}`,
             customerId:      purchase.customerId,
             amount:          p.amount,

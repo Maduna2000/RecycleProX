@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db/prisma'
+import { requireTenantId } from '@/lib/db/tenantContext'
 import logger from '@/lib/logger'
 import type {
   CreateTradeCommodityCategoryInput,
@@ -41,8 +42,9 @@ export async function createTradeCommodityCategory(
   data: CreateTradeCommodityCategoryInput,
   userId: string,
 ) {
+  const tenantId = requireTenantId()
   const existing = await prisma.tradeCommodityCategory.findUnique({
-    where: { name: data.name },
+    where: { tenantId_name: { tenantId, name: data.name } },
   })
   if (existing) throw new DuplicateCategoryError(data.name)
 
@@ -56,7 +58,7 @@ export async function createTradeCommodityCategory(
   }
 
   const category = await prisma.tradeCommodityCategory.create({
-    data: { ...data, sortOrder },
+    data: { ...data, tenantId, sortOrder },
   })
 
   logger.info({ categoryId: category.id, userId }, 'Trade commodity category created')
@@ -74,7 +76,7 @@ export async function updateTradeCommodityCategory(
   // Check for duplicate name if name is being changed
   if (data.name && data.name !== existing.name) {
     const duplicate = await prisma.tradeCommodityCategory.findUnique({
-      where: { name: data.name },
+      where: { tenantId_name: { tenantId: requireTenantId(), name: data.name } },
     })
     if (duplicate) throw new DuplicateCategoryError(data.name)
   }

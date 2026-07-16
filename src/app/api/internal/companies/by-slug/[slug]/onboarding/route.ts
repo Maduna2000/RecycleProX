@@ -19,7 +19,7 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
   }
 
   try {
-    const counts = await tenantContext.run({ schemaName: tenant.schemaName, companySlug: tenant.companySlug }, () =>
+    const counts = await tenantContext.run({ tenantId: tenant.id, schemaName: tenant.schemaName, companySlug: tenant.companySlug }, () =>
       Promise.all([
         prisma.user.count(),
         prisma.customer.count(),

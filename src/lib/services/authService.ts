@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs'
 import { prisma } from '@/lib/db/prisma'
 import { registryPrisma } from '@/lib/db/registryPrisma'
-import { tenantContext } from '@/lib/db/tenantContext'
+import { tenantContext, requireTenantId } from '@/lib/db/tenantContext'
 import logger from '@/lib/logger'
 import type { CreateUserInput } from '@/lib/schemas/auth'
 import { checkCompanyAccess, type CompanyAccessResult } from '@/lib/services/companyAccessClient'
@@ -36,8 +36,12 @@ export class ForbiddenError extends Error {
 
 // tenantSlug is resolved from the login subdomain by middleware.ts (see
 // src/auth.ts / src/app/login/page.tsx). Omitted for the default/legacy
-// tenant's own domain, so login there runs against the default client
-// (public schema) exactly as before subdomain routing existed.
+// tenant's own domain — that resolves to Golden Key (the tenant registered
+// against schemaName "public", see resolveDefaultTenant() below) rather
+// than skipping tenant resolution, since every business-model query now
+// requires a real tenantId to pass RLS (prisma/migrations/
+// 20260716000003_enable_rls) — there is no unscoped "default client"
+// anymore (see src/lib/db/prisma.ts).
 export async function login(username: string, password: string, tenantSlug?: string) {
   // Defense-in-depth: a client-side bug (form-encoding an actually-undefined
   // tenantSlug via next-auth's signIn(), which URLSearchParams coerces to
@@ -45,19 +49,22 @@ export async function login(username: string, password: string, tenantSlug?: str
   // production login down once already — treat that string, and a blank
   // one, the same as "no tenant slug" here regardless of what any caller
   // sends, not just in the one client component that caused it.
-  if (!tenantSlug || tenantSlug === 'undefined' || tenantSlug.trim() === '') {
-    return loginInCurrentSchema(username, password)
-  }
+  const noSlugGiven = !tenantSlug || tenantSlug === 'undefined' || tenantSlug.trim() === ''
 
   // registryPrisma is a Web-only, Postgres-only construct (see
   // src/lib/db/registryPrisma.ts) — the Tenant model is deliberately
   // excluded from the Desktop SQLite schema (scripts/generate-sqlite-
   // schema.ts), since Desktop is single-tenant and never has DNS-based
-  // tenant routing. This whole branch only runs when a caller passes
-  // tenantSlug, which Desktop's login flow never does — the cast is safe
-  // because the branch is unreachable there, not because the type is right.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const tenant = await (registryPrisma as any).tenant.findUnique({ where: { companySlug: tenantSlug } })
+  // tenant routing. Desktop's login flow never resolves a Tenant row at
+  // all — see loginInCurrentSchema()'s direct, tenant-context-free call
+  // pattern used by src/lib/services/syncService.ts instead. The cast below
+  // is safe because this whole function only runs from Web's own login
+  // route, not because the type is right for every build target.
+  const tenant = noSlugGiven
+    ? await resolveDefaultTenant()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    : await (registryPrisma as any).tenant.findUnique({ where: { companySlug: tenantSlug } })
+
   if (!tenant) {
     logger.warn({ username, tenantSlug }, 'Login failed: unknown tenant')
     throw new InvalidCredentialsError()
@@ -73,14 +80,26 @@ export async function login(username: string, password: string, tenantSlug?: str
   }
 
   return tenantContext.run(
-    { schemaName: tenant.schemaName, companySlug: tenant.companySlug },
+    { tenantId: tenant.id, schemaName: tenant.schemaName, companySlug: tenant.companySlug },
     async () => ({
       ...(await loginInCurrentSchema(username, password)),
+      tenantId: tenant.id as string,
       schemaName: tenant.schemaName,
       tenantSlug: tenant.companySlug,
       featureFlags: access.featureFlags,
     }),
   )
+}
+
+// The tenant reached via Web's own primary/apex domain (no subdomain, no
+// tenantSlug) — historically "the" tenant back when this app was
+// single-tenant-only. Resolved by schemaName rather than a hardcoded slug
+// so nothing here special-cases Golden Key by name (see Section 6 of the
+// tenancy plan) — it happens to be Golden Key today only because it's the
+// one Tenant row registered against the pre-existing "public" schema.
+async function resolveDefaultTenant() {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (registryPrisma as any).tenant.findUnique({ where: { schemaName: 'public' } })
 }
 
 // How long a cached Portal access result stays trusted once the Portal
@@ -139,7 +158,7 @@ async function resolveCompanyAccess(tenant: TenantAccessCacheFields): Promise<Co
 
 async function loginInCurrentSchema(username: string, password: string) {
   const user = await prisma.user.findUnique({
-    where: { username },
+    where: { tenantId_username: { tenantId: requireTenantId(), username } },
     include: { moduleAccess: { select: { moduleKey: true } } },
   })
 
@@ -190,11 +209,13 @@ export async function createUser(
   data: CreateUserInput & { allowedModules?: string[] },
   createdByUserId: string,
 ) {
+  const tenantId = requireTenantId()
   const passwordHash = await bcrypt.hash(data.password, 12)
 
   const user = await prisma.$transaction(async (tx) => {
     const newUser = await tx.user.create({
       data: {
+        tenantId,
         fullName: data.fullName,
         username: data.username,
         passwordHash,
@@ -209,6 +230,7 @@ export async function createUser(
     if (data.allowedModules?.length && data.role !== 'admin' && data.role !== 'scale_operator') {
       await tx.userModuleAccess.createMany({
         data: data.allowedModules.map((moduleKey) => ({
+          tenantId,
           userId: newUser.id,
           moduleKey,
           grantedById: createdByUserId,
@@ -297,6 +319,7 @@ export async function updateUserModuleAccess(
     if (moduleKeys.length > 0) {
       await tx.userModuleAccess.createMany({
         data: moduleKeys.map((moduleKey) => ({
+          tenantId: requireTenantId(),
           userId,
           moduleKey,
           grantedById,
@@ -329,7 +352,7 @@ const SYSTEM_DEFAULT_PIN = '1234'
 export async function verifyPin(userId: string, pin: string): Promise<boolean> {
   const [user, defaultPinRow] = await Promise.all([
     prisma.user.findUniqueOrThrow({ where: { id: userId } }),
-    prisma.systemSettings.findUnique({ where: { key: 'defaultPin' } }),
+    prisma.systemSettings.findUnique({ where: { tenantId_key: { tenantId: requireTenantId(), key: 'defaultPin' } } }),
   ])
 
   if (user.pinHash) {

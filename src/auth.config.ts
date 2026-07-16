@@ -19,7 +19,11 @@ export const authConfig: NextAuthConfig = {
         token.fullName            = (user as { fullName: string }).fullName
         token.username            = (user as { username: string }).username
         token.allowedModules      = (user as { allowedModules?: string[] }).allowedModules ?? []
-        // Absent until subdomain-based tenant login exists (see src/auth.ts)
+        // tenantId drives RLS scoping (src/lib/db/prisma.ts) — present for
+        // every login post-migration, including the default/apex-domain
+        // path (see resolveDefaultTenant() in authService.ts). schemaName/
+        // tenantSlug are kept for the rollback window and R2 key prefixing.
+        token.tenantId            = (user as { tenantId?: string }).tenantId
         token.schemaName          = (user as { schemaName?: string }).schemaName
         token.tenantSlug          = (user as { tenantSlug?: string }).tenantSlug
         // Company-level plan entitlements (distinct from allowedModules,
@@ -36,6 +40,7 @@ export const authConfig: NextAuthConfig = {
       session.user.fullName            = token.fullName as string
       session.user.username            = token.username as string
       session.user.allowedModules      = token.allowedModules as string[]
+      session.user.tenantId            = token.tenantId as string | undefined
       session.user.schemaName          = token.schemaName as string | undefined
       session.user.tenantSlug          = token.tenantSlug as string | undefined
       session.user.featureFlags        = token.featureFlags as Record<string, boolean> | undefined

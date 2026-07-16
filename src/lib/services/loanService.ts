@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db/prisma'
+import { requireTenantId } from '@/lib/db/tenantContext'
 import logger from '@/lib/logger'
 import Decimal from 'decimal.js'
 import type { Prisma } from '@prisma/client'
@@ -90,6 +91,7 @@ export async function applyRepaymentTx(
 
     await tx.loanRepayment.create({
       data: {
+        tenantId:        requireTenantId(),
         refNumber,
         loanId:          loan.id,
         customerId,
@@ -127,6 +129,7 @@ export async function createLoan(data: CreateLoanInput, createdByUserId?: string
   const loan = await prisma.$transaction(async (tx) => {
     return tx.loan.create({
       data: {
+        tenantId:        requireTenantId(),
         refNumber,
         customerId:      data.customerId,
         principalAmount: principal,
@@ -171,6 +174,7 @@ export async function createRepayment(data: CreateRepaymentInput, createdByUserI
   const result = await prisma.$transaction(async (tx) => {
     const repayment = await tx.loanRepayment.create({
       data: {
+        tenantId:        requireTenantId(),
         refNumber,
         loanId:          data.loanId,
         customerId:      loan.customerId,

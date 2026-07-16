@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db/prisma'
+import { requireTenantId } from '@/lib/db/tenantContext'
 import Decimal from 'decimal.js'
 import logger from '@/lib/logger'
 import { getStockOnHand, recordMovement } from './stockService'
@@ -44,6 +45,7 @@ export async function createStocktake(userId: string, notes?: string) {
       const refNumber = await nextRef(tx)
       return tx.stocktake.create({
         data: {
+          tenantId: requireTenantId(),
           refNumber,
           notes,
           createdByUserId: userId,
@@ -126,8 +128,9 @@ export async function upsertEntry(
   }
 
   const entry = await prisma.stocktakeEntry.upsert({
-    where: { stocktakeId_productId: { stocktakeId, productId } },
+    where: { tenantId_stocktakeId_productId: { tenantId: requireTenantId(), stocktakeId, productId } },
     create: {
+      tenantId: requireTenantId(),
       stocktakeId,
       productId,
       systemQty:  systemQty,
@@ -160,7 +163,7 @@ export async function updateEntryPhoto(
   if (stocktake.status !== 'open') throw new Error('Stocktake is not open')
 
   const entry = await prisma.stocktakeEntry.update({
-    where: { stocktakeId_productId: { stocktakeId, productId } },
+    where: { tenantId_stocktakeId_productId: { tenantId: requireTenantId(), stocktakeId, productId } },
     data: { photoR2Key },
     include: { product: true },
   })

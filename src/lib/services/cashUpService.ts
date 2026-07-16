@@ -1,5 +1,6 @@
 import Decimal from 'decimal.js'
 import { prisma } from '@/lib/db/prisma'
+import { requireTenantId } from '@/lib/db/tenantContext'
 import logger from '@/lib/logger'
 import { SubmitCashUpInput, ApproveCashUpInput, type Currency } from '@/lib/schemas/cashup'
 import { getMostRecentFloatBefore, updateClosingAmount, getDrawingsReceivedForDate } from './floatService'
@@ -119,6 +120,7 @@ export async function openCashUp(openedByUserId: string, sessionDateStr?: string
   try {
     cashUp = await prisma.cashUp.create({
       data: {
+        tenantId: requireTenantId(),
         sessionDate,
         currency,
         openedByUserId,
@@ -131,7 +133,7 @@ export async function openCashUp(openedByUserId: string, sessionDateStr?: string
     // commits; the DB's unique constraint on sessionDate is the real guard. If we lose
     // the race, just return whatever the winner created instead of erroring.
     if ((err as { code?: string })?.code === 'P2002') {
-      const winner = await prisma.cashUp.findUnique({ where: { sessionDate } })
+      const winner = await prisma.cashUp.findUnique({ where: { tenantId_sessionDate: { tenantId: requireTenantId(), sessionDate } } })
       if (winner) {
         logger.warn({ sessionDate: dateStr }, 'CashUp: lost create race — returning existing session')
         return attachCurrencyWarning(winner, prevCashUp)

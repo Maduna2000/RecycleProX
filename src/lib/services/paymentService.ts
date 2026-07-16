@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db/prisma'
+import { requireTenantId } from '@/lib/db/tenantContext'
 import logger from '@/lib/logger'
 import Decimal from 'decimal.js'
 import type { CreatePaymentInput, VoidPaymentInput } from '@/lib/schemas/payment'
@@ -76,6 +77,7 @@ export async function createPayment(data: CreatePaymentInput, createdByUserId?: 
 
   const payment = await prisma.payment.create({
     data: {
+      tenantId: requireTenantId(),
       refNumber,
       customerId: data.customerId,
       amount: new Decimal(data.amount),

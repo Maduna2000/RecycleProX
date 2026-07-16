@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import logger from '@/lib/logger'
 import { prisma } from '@/lib/db/prisma'
+import { requireTenantId } from '@/lib/db/tenantContext'
 import { requireRole } from '@/lib/auth-helpers'
 import { REPORT_REGISTRY } from '@/lib/services/reports/registry'
 import { buildReportMeta } from '@/lib/services/reports/meta'
@@ -72,6 +73,7 @@ export async function GET(
     prisma.auditLog
       .create({
         data: {
+          tenantId: requireTenantId(),
           tableName: 'report',
           recordId: reportId,
           action: 'EXPORT',

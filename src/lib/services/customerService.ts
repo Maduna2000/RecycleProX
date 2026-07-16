@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db/prisma'
+import { requireTenantId } from '@/lib/db/tenantContext'
 import { validateSaId } from '@/lib/utils/saId'
 import logger from '@/lib/logger'
 import type { Prisma } from '@prisma/client'
@@ -59,10 +60,11 @@ async function resolvePriceGroupId(
 }
 
 export async function createCustomer(data: CreateCustomerInput, userId: string) {
+  const tenantId = requireTenantId()
   const idCheck = validateSaId(data.idNumber)
   if (!idCheck.valid) throw new Error(idCheck.error)
 
-  const existing = await prisma.customer.findUnique({ where: { idNumber: data.idNumber } })
+  const existing = await prisma.customer.findUnique({ where: { tenantId_idNumber: { tenantId, idNumber: data.idNumber } } })
   if (existing) throw new DuplicateCustomerError(existing.id)
 
   const resolvedPriceGroupId = await resolvePriceGroupId(data.dealerCategory, data.priceGroupId)
@@ -77,21 +79,22 @@ export async function createCustomer(data: CreateCustomerInput, userId: string) 
     // quirk, same family as the GetPayload one documented in
     // reports/builders/police.ts) — asserting the raw-FK ("unchecked")
     // shape we actually pass sidesteps it without changing runtime behavior.
-    data: { ...data, priceGroupId: resolvedPriceGroupId, createdByUserId: userId, accountCode } as Prisma.CustomerUncheckedCreateInput,
+    data: { ...data, tenantId, priceGroupId: resolvedPriceGroupId, createdByUserId: userId, accountCode } as Prisma.CustomerUncheckedCreateInput,
   })
   logger.info({ customerId: customer.id, userId }, 'Customer created')
   return customer
 }
 
 export async function quickCreate(data: QuickCreateInput, userId: string) {
+  const tenantId = requireTenantId()
   // Return existing customer if duplicate (only when ID number is provided)
   if (data.idNumber) {
-    const existing = await prisma.customer.findUnique({ where: { idNumber: data.idNumber } })
+    const existing = await prisma.customer.findUnique({ where: { tenantId_idNumber: { tenantId, idNumber: data.idNumber } } })
     if (existing) return existing
   }
 
   const customer = await prisma.customer.create({
-    data: { ...data, idNumber: data.idNumber ?? null, customerType: 'casual', createdByUserId: userId },
+    data: { ...data, tenantId, idNumber: data.idNumber ?? null, customerType: 'casual', createdByUserId: userId },
   })
   logger.info({ customerId: customer.id, userId }, 'Customer quick-created')
   return customer
@@ -181,7 +184,7 @@ export async function searchCustomers(
 }
 
 export async function lookupByIdNumber(idNumber: string) {
-  return prisma.customer.findUnique({ where: { idNumber } })
+  return prisma.customer.findUnique({ where: { tenantId_idNumber: { tenantId: requireTenantId(), idNumber } } })
 }
 
 export async function blacklistCustomer(id: string, reason: string, userId: string, userRole: string) {
@@ -319,7 +322,7 @@ export async function addCustomerDocument(
   if (!customer) throw new Error(`Customer "${customerId}" not found`)
 
   const doc = await prisma.customerDocument.create({
-    data: { customerId, documentType: data.documentType, r2Key: data.r2Key, fileName: data.fileName, notes: data.notes, uploadedByUserId },
+    data: { tenantId: requireTenantId(), customerId, documentType: data.documentType, r2Key: data.r2Key, fileName: data.fileName, notes: data.notes, uploadedByUserId },
   })
   logger.info({ docId: doc.id, customerId, uploadedByUserId }, 'customer.document.added')
   return doc

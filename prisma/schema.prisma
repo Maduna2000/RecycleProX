@@ -11,17 +11,21 @@ datasource db {
 // Cross-tenant registry — lives only in the `public` schema, never inside a
 // per-tenant schema. Resolves a login subdomain/slug to the Postgres schema
 // that holds that company's business data (see src/lib/db/registryPrisma.ts).
+//
+// schemaName is vestigial post shared-table migration (kept through the
+// rollback window, see i-need-you-to-vectorized-pumpkin.md Section 9) — the
+// live isolation mechanism is now tenantId + RLS, not a Postgres schema.
 model Tenant {
-  id            String       @id @default(uuid())
-  companySlug   String       @unique
-  schemaName    String       @unique
-  companyName   String
-  status        TenantStatus @default(active)
-  planCode      String?
-  featureFlags  Json?
-  graceEndsAt   DateTime?
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  id           String       @id @default(uuid())
+  companySlug  String       @unique
+  schemaName   String       @unique
+  companyName  String
+  status       TenantStatus @default(active)
+  planCode     String?
+  featureFlags Json?
+  graceEndsAt  DateTime?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
 
   // Cache of the last successful Portal access check (companyAccessClient.ts)
   // — backs login()'s bounded fail-open window when the Portal is
@@ -39,8 +43,9 @@ enum TenantStatus {
 
 model User {
   id                  String             @id @default(uuid())
+  tenantId            String
   fullName            String
-  username            String             @unique
+  username            String
   passwordHash        String
   pinHash             String?
   role                UserRole
@@ -57,23 +62,29 @@ model User {
   stocktakes          Stocktake[]        @relation("StocktakeCreatedBy")
   voidedStocktakes    Stocktake[]        @relation("StocktakeVoidedBy")
   moduleAccess        UserModuleAccess[]
+
+  @@unique([tenantId, username])
+  @@index([tenantId])
 }
 
 model UserModuleAccess {
   id          String   @id @default(uuid())
+  tenantId    String
   userId      String
   moduleKey   String
   grantedById String?
   grantedAt   DateTime @default(now())
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, moduleKey])
+  @@unique([tenantId, userId, moduleKey])
+  @@index([tenantId])
   @@index([userId])
   @@index([moduleKey])
 }
 
 model AuditLog {
   id          BigInt      @id @default(autoincrement())
+  tenantId    String
   tableName   String
   recordId    String
   action      AuditAction
@@ -85,23 +96,29 @@ model AuditLog {
   rowHash     String
   createdAt   DateTime    @default(now())
 
-  @@index([tableName, recordId])
-  @@index([changedById])
-  @@index([createdAt])
+  @@index([tenantId])
+  @@index([tenantId, tableName, recordId])
+  @@index([tenantId, changedById])
+  @@index([tenantId, createdAt])
 }
 
 model SystemSettings {
   id        String   @id @default(uuid())
-  key       String   @unique
+  tenantId  String
+  key       String
   value     String
   updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, key])
+  @@index([tenantId])
 }
 
 model Customer {
   id                  String               @id @default(uuid())
+  tenantId            String
   customerType        CustomerType         @default(casual)
   primaryFunction     PrimaryFunction      @default(supplier)
-  idNumber            String?              @unique
+  idNumber            String?
   firstName           String
   lastName            String
   dateOfBirth         DateTime?
@@ -136,7 +153,7 @@ model Customer {
   dealerCategory      DealerCategory?
   marketSector        MarketSector?
   zeroRated           Boolean              @default(false)
-  accountCode         String?              @unique
+  accountCode         String?
   companyRegNumber    String?
   landline            String?
   priceGroup          PriceGroup?          @relation(fields: [priceGroupId], references: [id])
@@ -149,16 +166,20 @@ model Customer {
   scaleOrders         ScaleOrder[]
   transactionPayments TransactionPayment[]
 
-  @@index([idNumber])
-  @@index([phone])
-  @@index([lastName])
-  @@index([customerType])
-  @@index([companyName])
-  @@index([contactPerson])
+  @@unique([tenantId, idNumber])
+  @@unique([tenantId, accountCode])
+  @@index([tenantId])
+  @@index([tenantId, idNumber])
+  @@index([tenantId, phone])
+  @@index([tenantId, lastName])
+  @@index([tenantId, customerType])
+  @@index([tenantId, companyName])
+  @@index([tenantId, contactPerson])
 }
 
 model CustomerDocument {
   id               String               @id @default(uuid())
+  tenantId         String
   customerId       String
   documentType     CustomerDocumentType
   r2Key            String
@@ -168,12 +189,14 @@ model CustomerDocument {
   uploadedByUserId String?
   customer         Customer             @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
-  @@index([customerId])
+  @@index([tenantId])
+  @@index([tenantId, customerId])
 }
 
 model Product {
   id               String                      @id @default(uuid())
-  code             String                      @unique
+  tenantId         String
+  code             String
   name             String
   category         String
   categoryId       String?
@@ -196,14 +219,17 @@ model Product {
   stockMovements   StockMovement[]
   stocktakeEntries StocktakeEntry[]
 
-  @@index([category])
-  @@index([categoryId])
-  @@index([isActive])
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, category])
+  @@index([tenantId, categoryId])
+  @@index([tenantId, isActive])
 }
 
 model PriceGroup {
   id          String                      @id @default(uuid())
-  name        String                      @unique
+  tenantId    String
+  name        String
   description String?
   isDefault   Boolean                     @default(false)
   isActive    Boolean                     @default(true)
@@ -211,10 +237,14 @@ model PriceGroup {
   updatedAt   DateTime                    @updatedAt
   customers   Customer[]
   overrides   PriceGroupProductOverride[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
 }
 
 model PriceGroupProductOverride {
   id           String     @id @default(uuid())
+  tenantId     String
   priceGroupId String
   productId    String
   buyPrice     Decimal    @db.Decimal(18, 2)
@@ -224,12 +254,14 @@ model PriceGroupProductOverride {
   priceGroup   PriceGroup @relation(fields: [priceGroupId], references: [id], onDelete: Cascade)
   product      Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
 
-  @@unique([priceGroupId, productId])
-  @@index([productId])
+  @@unique([tenantId, priceGroupId, productId])
+  @@index([tenantId])
+  @@index([tenantId, productId])
 }
 
 model PriceHistory {
   id          String   @id @default(uuid())
+  tenantId    String
   productId   String
   buyPrice    Decimal  @db.Decimal(18, 2)
   sellPrice   Decimal  @db.Decimal(18, 2)
@@ -238,13 +270,15 @@ model PriceHistory {
   createdAt   DateTime @default(now())
   product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
-  @@index([productId])
-  @@index([createdAt])
+  @@index([tenantId])
+  @@index([tenantId, productId])
+  @@index([tenantId, createdAt])
 }
 
 model ProductCategory {
   id         String              @id @default(uuid())
-  name       String              @unique
+  tenantId   String
+  name       String
   colorHex   String?
   sortOrder  Int                 @default(0)
   isActive   Boolean             @default(true)
@@ -256,22 +290,29 @@ model ProductCategory {
   parent     ProductCategory?    @relation("SubCategories", fields: [parentId], references: [id])
   children   ProductCategory[]   @relation("SubCategories")
   products   Product[]           @relation("ProductCategoryProducts")
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
 }
 
 model TradeCommodityCategory {
   id        String   @id @default(uuid())
-  name      String   @unique
+  tenantId  String
+  name      String
   sortOrder Int      @default(0)
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([sortOrder])
-  @@index([isActive])
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@index([tenantId, sortOrder])
+  @@index([tenantId, isActive])
 }
 
 model CategoryStepConfig {
   id              String          @id @default(uuid())
+  tenantId        String
   categoryId      String          @unique
   requireWeight   Boolean         @default(true)
   requirePhotos   Boolean         @default(true)
@@ -280,12 +321,14 @@ model CategoryStepConfig {
   createdByUserId String?
   category        ProductCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
 
-  @@index([categoryId])
+  @@index([tenantId])
+  @@index([tenantId, categoryId])
 }
 
 model Purchase {
   id                      String                   @id @default(uuid())
-  refNumber               String                   @unique
+  tenantId                String
+  refNumber               String
   customerId              String
   status                  TxStatus                 @default(completed)
   totalAmount             Decimal                  @db.Decimal(18, 2)
@@ -316,15 +359,17 @@ model Purchase {
   lines                   PurchaseLine[]
   transactionPaymentLinks TransactionPaymentLink[]
 
-  @@index([customerId])
-  @@index([status])
-  @@index([createdAt])
-  @@index([refNumber])
-  @@index([customerId, status, createdAt])
+  @@unique([tenantId, refNumber])
+  @@index([tenantId])
+  @@index([tenantId, customerId])
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, customerId, status, createdAt])
 }
 
 model PurchaseLine {
   id              String   @id @default(uuid())
+  tenantId        String
   purchaseId      String
   productId       String
   quantity        Decimal  @db.Decimal(18, 3)
@@ -342,13 +387,15 @@ model PurchaseLine {
   product         Product  @relation(fields: [productId], references: [id])
   purchase        Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
 
-  @@index([purchaseId])
-  @@index([productId])
+  @@index([tenantId])
+  @@index([tenantId, purchaseId])
+  @@index([tenantId, productId])
 }
 
 model Sale {
   id                    String        @id @default(uuid())
-  refNumber             String        @unique
+  tenantId              String
+  refNumber             String
   buyerId               String?
   buyerName             String?
   buyerIdNumber         String?
@@ -372,15 +419,17 @@ model Sale {
   customer              Customer?     @relation("SaleCustomer", fields: [customerId], references: [id])
   lines                 SaleLine[]
 
-  @@index([buyerId])
-  @@index([customerId])
-  @@index([status])
-  @@index([createdAt])
-  @@index([refNumber])
+  @@unique([tenantId, refNumber])
+  @@index([tenantId])
+  @@index([tenantId, buyerId])
+  @@index([tenantId, customerId])
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
 }
 
 model SaleLine {
   id              String   @id @default(uuid())
+  tenantId        String
   saleId          String
   productId       String
   quantity        Decimal  @db.Decimal(18, 3)
@@ -395,12 +444,14 @@ model SaleLine {
   product         Product  @relation(fields: [productId], references: [id])
   sale            Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
 
-  @@index([saleId])
-  @@index([productId])
+  @@index([tenantId])
+  @@index([tenantId, saleId])
+  @@index([tenantId, productId])
 }
 
 model StockMovement {
   id              String         @id @default(uuid())
+  tenantId        String
   productId       String
   direction       StockDirection
   quantity        Decimal        @db.Decimal(18, 3)
@@ -411,16 +462,18 @@ model StockMovement {
   createdAt       DateTime       @default(now())
   product         Product        @relation(fields: [productId], references: [id])
 
-  @@index([productId])
-  @@index([direction])
-  @@index([source])
-  @@index([createdAt])
-  @@index([productId, createdAt])
+  @@index([tenantId])
+  @@index([tenantId, productId])
+  @@index([tenantId, direction])
+  @@index([tenantId, source])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, productId, createdAt])
 }
 
 model Payment {
   id              String        @id @default(uuid())
-  refNumber       String        @unique
+  tenantId        String
+  refNumber       String
   customerId      String?
   amount          Decimal       @db.Decimal(18, 2)
   paymentMethod   PaymentMethod @default(cash)
@@ -433,14 +486,16 @@ model Payment {
   updatedAt       DateTime      @updatedAt
   customer        Customer?     @relation(fields: [customerId], references: [id])
 
-  @@index([customerId])
-  @@index([createdAt])
-  @@index([refNumber])
+  @@unique([tenantId, refNumber])
+  @@index([tenantId])
+  @@index([tenantId, customerId])
+  @@index([tenantId, createdAt])
 }
 
 model ExpenseType {
   id        String        @id @default(uuid())
-  name      String        @unique
+  tenantId  String
+  name      String
   parentId  String?
   isActive  Boolean       @default(true)
   sortOrder Int           @default(0)
@@ -449,12 +504,15 @@ model ExpenseType {
   parent    ExpenseType?  @relation("children", fields: [parentId], references: [id])
   children  ExpenseType[] @relation("children")
 
-  @@index([parentId])
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@index([tenantId, parentId])
 }
 
 model Expense {
   id              String              @id @default(uuid())
-  refNumber       String              @unique
+  tenantId        String
+  refNumber       String
   expenseTypeId   String
   description     String
   amount          Decimal             @db.Decimal(18, 2)
@@ -474,13 +532,16 @@ model Expense {
   expenseType     ExpenseType         @relation(fields: [expenseTypeId], references: [id])
   attachments     ExpenseAttachment[]
 
-  @@index([expenseTypeId])
-  @@index([status])
-  @@index([createdAt])
+  @@unique([tenantId, refNumber])
+  @@index([tenantId])
+  @@index([tenantId, expenseTypeId])
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
 }
 
 model ExpenseAttachment {
   id               String   @id @default(uuid())
+  tenantId         String
   expenseId        String
   r2Key            String
   fileName         String
@@ -489,12 +550,14 @@ model ExpenseAttachment {
   uploadedByUserId String?
   expense          Expense  @relation(fields: [expenseId], references: [id], onDelete: Cascade)
 
-  @@index([expenseId])
+  @@index([tenantId])
+  @@index([tenantId, expenseId])
 }
 
 model CashFloat {
   id              String          @id @default(uuid())
-  floatDate       DateTime        @unique @db.Date
+  tenantId        String
+  floatDate       DateTime        @db.Date
   openingAmount   Decimal         @db.Decimal(18, 2)
   closingAmount   Decimal?        @db.Decimal(18, 2)
   notes           String?
@@ -503,12 +566,15 @@ model CashFloat {
   updatedAt       DateTime        @updatedAt
   movements       FloatMovement[]
 
-  @@index([floatDate])
+  @@unique([tenantId, floatDate])
+  @@index([tenantId])
+  @@index([tenantId, floatDate])
 }
 
 model Stocktake {
   id              String           @id @default(uuid())
-  refNumber       String           @unique
+  tenantId        String
+  refNumber       String
   status          StocktakeStatus  @default(open)
   notes           String?
   createdByUserId String
@@ -523,12 +589,15 @@ model Stocktake {
   voidedBy        User?            @relation("StocktakeVoidedBy", fields: [voidedByUserId], references: [id])
   entries         StocktakeEntry[]
 
-  @@index([status])
-  @@index([createdAt])
+  @@unique([tenantId, refNumber])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
 }
 
 model StocktakeEntry {
   id          String    @id @default(uuid())
+  tenantId    String
   stocktakeId String
   productId   String
   systemQty   Decimal   @db.Decimal(18, 4)
@@ -542,14 +611,16 @@ model StocktakeEntry {
   product     Product   @relation(fields: [productId], references: [id])
   stocktake   Stocktake @relation(fields: [stocktakeId], references: [id], onDelete: Cascade)
 
-  @@unique([stocktakeId, productId])
-  @@index([stocktakeId])
-  @@index([productId])
+  @@unique([tenantId, stocktakeId, productId])
+  @@index([tenantId])
+  @@index([tenantId, stocktakeId])
+  @@index([tenantId, productId])
 }
 
 model CashUp {
   id                  String       @id @default(uuid())
-  sessionDate         DateTime     @unique @db.Date
+  tenantId            String
+  sessionDate         DateTime     @db.Date
   currency            Currency     @default(ZAR)
   openedByUserId      String
   openedAt            DateTime     @default(now())
@@ -578,13 +649,16 @@ model CashUp {
   createdAt           DateTime     @default(now())
   updatedAt           DateTime     @updatedAt
 
-  @@index([status])
-  @@index([openedByUserId])
+  @@unique([tenantId, sessionDate])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, openedByUserId])
 }
 
 model Loan {
   id              String          @id @default(uuid())
-  refNumber       String          @unique
+  tenantId        String
+  refNumber       String
   customerId      String
   principalAmount Decimal         @db.Decimal(18, 2)
   balanceAmount   Decimal         @db.Decimal(18, 2)
@@ -600,14 +674,17 @@ model Loan {
   customer        Customer        @relation(fields: [customerId], references: [id])
   repayments      LoanRepayment[]
 
-  @@index([customerId])
-  @@index([status])
-  @@index([createdAt])
+  @@unique([tenantId, refNumber])
+  @@index([tenantId])
+  @@index([tenantId, customerId])
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
 }
 
 model LoanRepayment {
   id              String        @id @default(uuid())
-  refNumber       String        @unique
+  tenantId        String
+  refNumber       String
   loanId          String
   customerId      String
   amount          Decimal       @db.Decimal(18, 2)
@@ -620,14 +697,17 @@ model LoanRepayment {
   loan            Loan          @relation(fields: [loanId], references: [id], onDelete: Cascade)
   purchase        Purchase?     @relation(fields: [purchaseId], references: [id])
 
-  @@index([loanId])
-  @@index([customerId])
-  @@index([purchaseId])
-  @@index([createdAt])
+  @@unique([tenantId, refNumber])
+  @@index([tenantId])
+  @@index([tenantId, loanId])
+  @@index([tenantId, customerId])
+  @@index([tenantId, purchaseId])
+  @@index([tenantId, createdAt])
 }
 
 model PoliceVisit {
   id               String             @id @default(uuid())
+  tenantId         String
   visitDate        DateTime           @db.Date
   officerName      String
   badgeNumber      String?
@@ -647,13 +727,15 @@ model PoliceVisit {
   createdAt        DateTime           @default(now())
   searchLogs       PoliceSearchLog[]
 
-  @@index([visitDate])
-  @@index([createdAt])
-  @@index([status])
+  @@index([tenantId])
+  @@index([tenantId, visitDate])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, status])
 }
 
 model PoliceSearchLog {
   id          String           @id @default(uuid())
+  tenantId    String
   visitId     String
   searchType  PoliceSearchType
   queryText   String
@@ -661,12 +743,14 @@ model PoliceSearchLog {
   createdAt   DateTime         @default(now())
   visit       PoliceVisit      @relation(fields: [visitId], references: [id], onDelete: Cascade)
 
-  @@index([visitId])
-  @@index([createdAt])
+  @@index([tenantId])
+  @@index([tenantId, visitId])
+  @@index([tenantId, createdAt])
 }
 
 model MediaFile {
   id               String   @id @default(uuid())
+  tenantId         String
   r2Key            String   @unique
   fileName         String
   mimeType         String
@@ -677,12 +761,14 @@ model MediaFile {
   uploadedByUserId String?
   uploadedAt       DateTime @default(now())
 
-  @@index([linkedModel, linkedId])
-  @@index([uploadedAt])
+  @@index([tenantId])
+  @@index([tenantId, linkedModel, linkedId])
+  @@index([tenantId, uploadedAt])
 }
 
 model FloatMovement {
   id              String            @id @default(uuid())
+  tenantId        String
   cashFloatId     String
   movementType    FloatMovementType
   amount          Decimal           @db.Decimal(18, 2)
@@ -692,13 +778,15 @@ model FloatMovement {
   createdAt       DateTime          @default(now())
   cashFloat       CashFloat         @relation(fields: [cashFloatId], references: [id], onDelete: Cascade)
 
-  @@index([cashFloatId])
-  @@index([createdAt])
+  @@index([tenantId])
+  @@index([tenantId, cashFloatId])
+  @@index([tenantId, createdAt])
 }
 
 model TransactionPayment {
   id              String                   @id @default(uuid())
-  refNumber       String                   @unique
+  tenantId        String
+  refNumber       String
   customerId      String
   totalAmount     Decimal                  @db.Decimal(18, 2)
   paymentMethod   PaymentMethod            @default(cash)
@@ -709,12 +797,15 @@ model TransactionPayment {
   customer        Customer                 @relation(fields: [customerId], references: [id])
   purchaseLinks   TransactionPaymentLink[]
 
-  @@index([customerId])
-  @@index([createdAt])
+  @@unique([tenantId, refNumber])
+  @@index([tenantId])
+  @@index([tenantId, customerId])
+  @@index([tenantId, createdAt])
 }
 
 model TransactionPaymentLink {
   id                   String             @id @default(uuid())
+  tenantId             String
   transactionPaymentId String
   purchaseId           String
   amountAllocated      Decimal            @db.Decimal(18, 2)
@@ -722,13 +813,15 @@ model TransactionPaymentLink {
   purchase             Purchase           @relation(fields: [purchaseId], references: [id])
   transactionPayment   TransactionPayment @relation(fields: [transactionPaymentId], references: [id], onDelete: Cascade)
 
-  @@unique([transactionPaymentId, purchaseId])
-  @@index([purchaseId])
+  @@unique([tenantId, transactionPaymentId, purchaseId])
+  @@index([tenantId])
+  @@index([tenantId, purchaseId])
 }
 
 model ScaleOrder {
   id              String           @id @default(uuid())
-  orderNumber     String           @unique
+  tenantId        String
+  orderNumber     String
   customerId      String?
   productId       String
   weight          Decimal?         @db.Decimal(18, 3)
@@ -754,15 +847,18 @@ model ScaleOrder {
   lines           ScaleOrderLine[]
   purchase        Purchase?
 
-  @@index([customerId])
-  @@index([productId])
-  @@index([operatorId])
-  @@index([status])
-  @@index([createdAt])
+  @@unique([tenantId, orderNumber])
+  @@index([tenantId])
+  @@index([tenantId, customerId])
+  @@index([tenantId, productId])
+  @@index([tenantId, operatorId])
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
 }
 
 model ScaleOrderLine {
   id          String     @id @default(uuid())
+  tenantId    String
   orderId     String
   productId   String
   weight      Decimal?   @db.Decimal(18, 3)
@@ -771,8 +867,9 @@ model ScaleOrderLine {
   order       ScaleOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product     Product    @relation("ScaleOrderLineProduct", fields: [productId], references: [id])
 
-  @@index([orderId])
-  @@index([productId])
+  @@index([tenantId])
+  @@index([tenantId, orderId])
+  @@index([tenantId, productId])
 }
 
 enum UserRole {
@@ -883,8 +980,8 @@ enum CashUpStatus {
 }
 
 enum Currency {
-  ZAR  // South African Rand (R)
-  SZL  // Eswatini Lilangeni (E)
+  ZAR // South African Rand (R)
+  SZL // Eswatini Lilangeni (E)
 }
 
 enum StocktakeStatus {

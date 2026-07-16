@@ -14,20 +14,59 @@ const DEFAULT_CATEGORIES = [
   { name: 'Other',       colorHex: '#757575', iconName: 'Box',      sortOrder: 7 },
 ]
 
+// This script uses a bare PrismaClient (not the app's tenant-scoping proxy
+// in src/lib/db/prisma.ts — ts-node doesn't resolve the @/ path alias used
+// there without extra config), so every write against a tenant-scoped,
+// RLS-protected table must open its own transaction and pin
+// set_config('app.current_tenant_id', ...) as the first statement itself —
+// otherwise FORCE ROW LEVEL SECURITY (prisma/migrations/
+// 20260716000003_enable_rls) silently rejects the write (WITH CHECK never
+// matches an unpinned NULL session setting).
+function asTenant<T>(tenantId: string, fn: (tx: Parameters<Parameters<PrismaClient['$transaction']>[0]>[0]) => Promise<T>): Promise<T> {
+  return prisma.$transaction(async (tx) => {
+    await tx.$queryRawUnsafe(`SELECT set_config('app.current_tenant_id', $1, true)`, tenantId)
+    return fn(tx)
+  })
+}
+
 async function main() {
-  // Seed default admin if not exists
-  const adminExists = await prisma.user.findFirst({ where: { role: 'admin' } })
-  if (!adminExists) {
-    const passwordHash = await bcrypt.hash('Admin@1234', 12)
-    await prisma.user.create({
+  // schemaName "public" is the same designation production's Golden Key
+  // tenant was registered against, so a fresh local/CI database gets a
+  // matching default tenant to log into via the apex-domain path (see
+  // resolveDefaultTenant() in src/lib/services/authService.ts) without any
+  // per-developer setup step. Tenant itself carries no tenantId/RLS.
+  let tenant = await prisma.tenant.findUnique({ where: { schemaName: 'public' } })
+  if (!tenant) {
+    tenant = await prisma.tenant.create({
       data: {
-        fullName: 'System Administrator',
-        username: 'admin',
-        passwordHash,
-        role: 'admin',
-        forcePasswordChange: true,
+        companySlug: 'default',
+        schemaName: 'public',
+        companyName: 'Default Tenant (local/dev)',
+        status: 'active',
       },
     })
+    console.log(`Seeded default Tenant: ${tenant.id}`)
+  } else {
+    console.log(`Default tenant already exists: ${tenant.id}`)
+  }
+  const tenantId = tenant.id
+
+  // Seed default admin if not exists
+  const adminExists = await asTenant(tenantId, (tx) => tx.user.findFirst({ where: { role: 'admin' } }))
+  if (!adminExists) {
+    const passwordHash = await bcrypt.hash('Admin@1234', 12)
+    await asTenant(tenantId, (tx) =>
+      tx.user.create({
+        data: {
+          tenantId,
+          fullName: 'System Administrator',
+          username: 'admin',
+          passwordHash,
+          role: 'admin',
+          forcePasswordChange: true,
+        },
+      }),
+    )
     console.log('Seeded default admin (username: admin, password: Admin@1234)')
   } else {
     console.log('Admin already exists — skipping')
@@ -35,16 +74,22 @@ async function main() {
 
   // Seed default product categories (top-level, parentId = null)
   for (const cat of DEFAULT_CATEGORIES) {
-    await prisma.productCategory.upsert({
-      where:  { name: cat.name },
-      update: { iconName: cat.iconName },
-      create: cat,
-    })
+    await asTenant(tenantId, (tx) =>
+      tx.productCategory.upsert({
+        where:  { tenantId_name: { tenantId, name: cat.name } },
+        update: { iconName: cat.iconName },
+        create: { ...cat, tenantId },
+      }),
+    )
   }
 
   // Seed demo sub-categories (only on first run — skip if already exists)
-  const ferrousParent  = await prisma.productCategory.findUnique({ where: { name: 'Ferrous' } })
-  const copperParent   = await prisma.productCategory.findUnique({ where: { name: 'Copper' } })
+  const ferrousParent = await asTenant(tenantId, (tx) =>
+    tx.productCategory.findUnique({ where: { tenantId_name: { tenantId, name: 'Ferrous' } } }),
+  )
+  const copperParent = await asTenant(tenantId, (tx) =>
+    tx.productCategory.findUnique({ where: { tenantId_name: { tenantId, name: 'Copper' } } }),
+  )
 
   if (ferrousParent) {
     for (const sub of [
@@ -52,11 +97,13 @@ async function main() {
       { name: 'Light Iron',               colorHex: '#607D8B', iconName: 'Layers',  sortOrder: 1, parentId: ferrousParent.id },
       { name: 'Sheet Iron',               colorHex: '#78909C', iconName: 'Layers',  sortOrder: 2, parentId: ferrousParent.id },
     ]) {
-      await prisma.productCategory.upsert({
-        where:  { name: sub.name },
-        update: { parentId: ferrousParent.id },
-        create: sub,
-      })
+      await asTenant(tenantId, (tx) =>
+        tx.productCategory.upsert({
+          where:  { tenantId_name: { tenantId, name: sub.name } },
+          update: { parentId: ferrousParent.id },
+          create: { ...sub, tenantId },
+        }),
+      )
     }
   }
 
@@ -66,11 +113,13 @@ async function main() {
       { name: 'Burnt Copper',   colorHex: '#CC5500', iconName: 'Cpu', sortOrder: 1, parentId: copperParent.id },
       { name: 'Copper Tanks',   colorHex: '#FF6D00', iconName: 'Box', sortOrder: 2, parentId: copperParent.id },
     ]) {
-      await prisma.productCategory.upsert({
-        where:  { name: sub.name },
-        update: { parentId: copperParent.id },
-        create: sub,
-      })
+      await asTenant(tenantId, (tx) =>
+        tx.productCategory.upsert({
+          where:  { tenantId_name: { tenantId, name: sub.name } },
+          update: { parentId: copperParent.id },
+          create: { ...sub, tenantId },
+        }),
+      )
     }
   }
 

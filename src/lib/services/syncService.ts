@@ -1,6 +1,18 @@
 import { prisma } from '@/lib/db/prisma'
+import { registryPrisma } from '@/lib/db/registryPrisma'
 import { tenantContext } from '@/lib/db/tenantContext'
 import logger from '@/lib/logger'
+
+// Desktop's sync routes authenticate via device token (see
+// deviceAuthClient.ts), not a Web session, so they only ever have
+// schemaName/companySlug on hand (from the Portal's device-license check),
+// never a tenantId directly. Resolved here rather than changing every
+// caller's signature.
+async function resolveTenantId(schemaName: string): Promise<string> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const tenant = await (registryPrisma as any).tenant.findUniqueOrThrow({ where: { schemaName } })
+  return tenant.id
+}
 
 // Models a Desktop install may push/pull. Deliberately an explicit
 // allowlist, not "any model" — a table with a foreign-key shape sync
@@ -42,7 +54,8 @@ export async function applySyncPush(
   companySlug: string,
   records: SyncPushRecord[],
 ): Promise<Array<{ recordId: string; status: SyncPushResultStatus; reason?: string }>> {
-  return tenantContext.run({ schemaName, companySlug }, async () => {
+  const tenantId = await resolveTenantId(schemaName)
+  return tenantContext.run({ tenantId, schemaName, companySlug }, async () => {
     const results: Array<{ recordId: string; status: SyncPushResultStatus; reason?: string }> = []
 
     for (const record of records) {
@@ -96,7 +109,8 @@ export async function pullChanges(
     throw new Error(`Table not syncable: ${tableName}`)
   }
 
-  return tenantContext.run({ schemaName, companySlug }, async () => {
+  const tenantId = await resolveTenantId(schemaName)
+  return tenantContext.run({ tenantId, schemaName, companySlug }, async () => {
     const delegate = modelDelegate(tableName)
     return delegate.findMany({
       where: { updatedAt: { gt: since } },

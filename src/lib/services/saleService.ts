@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db/prisma'
+import { requireTenantId } from '@/lib/db/tenantContext'
 import { Prisma } from '@prisma/client'
 import logger from '@/lib/logger'
 import Decimal from 'decimal.js'
@@ -128,6 +129,7 @@ export async function createSale(data: CreateSaleInput, createdByUserId?: string
 
       const s = await tx.sale.create({
         data: {
+          tenantId:             requireTenantId(),
           refNumber,
           customerId:           data.customerId,
           buyerId:              data.buyerId,
@@ -144,6 +146,7 @@ export async function createSale(data: CreateSaleInput, createdByUserId?: string
           createdByUserId,
           lines: {
             create: resolvedLines.map((l) => ({
+              tenantId:        requireTenantId(),
               productId:       l.productId,
               quantity:        l.quantity,
               unitPrice:       l.unitPrice,

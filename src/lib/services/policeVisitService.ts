@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db/prisma'
+import { requireTenantId } from '@/lib/db/tenantContext'
 import type { Prisma, PoliceVisit } from '@prisma/client'
 import logger from '@/lib/logger'
 import { getViewUrl, fetchR2Bytes } from '@/lib/r2'
@@ -84,7 +85,7 @@ export async function createPoliceVisit(
   createdByUserId: string
 ) {
   const visit = await prisma.policeVisit.create({
-    data: { ...data, createdByUserId },
+    data: { ...data, tenantId: requireTenantId(), createdByUserId },
   })
   logger.info({ visitId: visit.id, createdByUserId }, 'police-visit.created')
   return visit
@@ -125,6 +126,7 @@ export async function beginInspection(data: BeginInspectionInput, launchedByUser
 
   const visit = await prisma.policeVisit.create({
     data: {
+      tenantId:      requireTenantId(),
       visitDate,
       officerName:   data.officerName,
       rank:          data.rank,
@@ -257,6 +259,7 @@ export async function searchRegisterByDate(
     })
     await tx.policeSearchLog.create({
       data: {
+        tenantId: requireTenantId(),
         visitId,
         searchType:  'register_by_date',
         queryText:   from === to ? from : `${from} to ${to}`,
@@ -326,7 +329,7 @@ export async function searchPersons(visitId: string, q: string): Promise<{ rows:
       },
     })
     await tx.policeSearchLog.create({
-      data: { visitId, searchType: 'person', queryText: q, resultCount: found.length },
+      data: { tenantId: requireTenantId(), visitId, searchType: 'person', queryText: q, resultCount: found.length },
     })
     return found
   })
@@ -392,6 +395,7 @@ export async function getPersonDetail(visitId: string, customerId: string): Prom
     })
     await tx.policeSearchLog.create({
       data: {
+        tenantId: requireTenantId(),
         visitId,
         searchType:  'person',
         queryText:   found
@@ -481,6 +485,7 @@ export async function searchGoods(
     const rangeText = [opts.from, opts.to].filter(Boolean).join(' to ') || 'all dates'
     await tx.policeSearchLog.create({
       data: {
+        tenantId: requireTenantId(),
         visitId,
         searchType:  'goods',
         queryText:   `${foundProduct?.name ?? opts.productId} · ${rangeText}${opts.minQuantity ? ` · min ${opts.minQuantity}` : ''}`,
@@ -530,6 +535,7 @@ export async function getPersonRecordReport(visitId: string, customerId: string)
     })
     await tx.policeSearchLog.create({
       data: {
+        tenantId: requireTenantId(),
         visitId,
         searchType:  'person',
         queryText:   found
@@ -594,6 +600,7 @@ export async function getGoodsTraceReport(
     const rangeText = [opts.from, opts.to].filter(Boolean).join(' to ') || 'all dates'
     await tx.policeSearchLog.create({
       data: {
+        tenantId: requireTenantId(),
         visitId,
         searchType:  'goods',
         queryText:   `report: ${foundProduct?.name ?? opts.productId} · ${rangeText}${opts.minQuantity ? ` · min ${opts.minQuantity}` : ''}`,
