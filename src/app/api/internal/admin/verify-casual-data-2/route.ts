@@ -75,7 +75,7 @@ export async function GET(req: Request) {
           s.schema_name,
         )
         schemaCustomerTables.push({ schema_name: s.schema_name, table_exists: rows.length > 0 })
-      } catch (e) {
+      } catch {
         schemaCustomerTables.push({ schema_name: s.schema_name, table_exists: false })
       }
     }
