@@ -45,6 +45,7 @@ type SessionUser = {
   role?: string
   forcePasswordChange?: boolean
   allowedModules?: string[]
+  tenantId?: string
   schemaName?: string
   tenantSlug?: string
   featureFlags?: Record<string, boolean>
@@ -80,6 +81,26 @@ export default auth((req: NextRequest & { auth: { user?: SessionUser } | null })
     process.env.NODE_ENV !== 'production' ? req.nextUrl.searchParams.get('tenant') : null
   const tenantSlug = devTenantOverride ?? deriveTenantSlugFromHost(req.nextUrl.hostname)
 
+  // Forwards the session's resolved tenantId to the Node.js runtime via a
+  // request header, read back out by requireTenantId() (src/lib/db/
+  // tenantContext.ts) using next/headers — NOT via tenantContext's
+  // AsyncLocalStorage.enterWith() in src/auth.ts, which was found (live
+  // incident, see i-need-you-to-vectorized-pumpkin.md Section 11) to never
+  // propagate into the calling route handler's own continuation: an
+  // async function's enterWith() call only affects code running inside
+  // that same function — code that awaited it resumes in the context that
+  // was active before the call, not whatever the callee mutated. Next.js's
+  // own request-header propagation (this mechanism) doesn't have that
+  // problem — it's Next.js's own request-scoped storage, not ours.
+  const forwardedHeaders = new Headers(req.headers)
+  if (session?.user?.tenantId) {
+    forwardedHeaders.set('x-tenant-id', session.user.tenantId)
+  }
+  if (tenantSlug) {
+    forwardedHeaders.set('x-tenant-slug', tenantSlug)
+  }
+  const next = () => NextResponse.next({ request: { headers: forwardedHeaders } })
+
   // Public routes — always allow. /api/internal/ is shared-secret
   // authenticated in its own route handlers (server-to-server calls from
   // the SaaS Portal never carry a session cookie) — see
@@ -90,12 +111,7 @@ export default auth((req: NextRequest & { auth: { user?: SessionUser } | null })
       pathname === '/api/r2/test' || pathname === '/scale/login' ||
       pathname.startsWith('/api/mobile/') || pathname.startsWith('/api/internal/') ||
       pathname.startsWith('/api/sync/')) {
-    if (pathname.startsWith('/login') && tenantSlug) {
-      const headers = new Headers(req.headers)
-      headers.set('x-tenant-slug', tenantSlug)
-      return NextResponse.next({ request: { headers } })
-    }
-    return NextResponse.next()
+    return next()
   }
 
   // Tenant-consistency guardrail — stops a session for one company's
@@ -118,7 +134,7 @@ export default auth((req: NextRequest & { auth: { user?: SessionUser } | null })
     if (session.user?.role === 'scale_operator') {
       return NextResponse.redirect(new URL('/scale', req.url))
     }
-    return NextResponse.next()
+    return next()
   }
 
   // API routes — 401 if no session (individual routes do full role checks)
@@ -126,7 +142,7 @@ export default auth((req: NextRequest & { auth: { user?: SessionUser } | null })
     if (!session) {
       return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
     }
-    return NextResponse.next()
+    return next()
   }
 
   // Scale station operator routes — restricted to scale_operator + admin + manager
@@ -136,7 +152,7 @@ export default auth((req: NextRequest & { auth: { user?: SessionUser } | null })
     if (!['scale_operator', 'admin', 'manager'].includes(role ?? '')) {
       return NextResponse.redirect(new URL('/app/dashboard', req.url))
     }
-    return NextResponse.next()
+    return next()
   }
 
   // Scale admin routes — admin + manager only
@@ -146,7 +162,7 @@ export default auth((req: NextRequest & { auth: { user?: SessionUser } | null })
     if (!['admin', 'manager'].includes(role ?? '')) {
       return NextResponse.redirect(new URL('/app/dashboard', req.url))
     }
-    return NextResponse.next()
+    return next()
   }
 
   // App routes — redirect to login if no session
@@ -173,7 +189,7 @@ export default auth((req: NextRequest & { auth: { user?: SessionUser } | null })
       if (session.user?.forcePasswordChange && pathname !== '/app/change-password') {
         return NextResponse.redirect(new URL('/app/change-password', req.url))
       }
-      return NextResponse.next()
+      return next()
     }
 
     // Scale operators belong on the scale station, not the main app
@@ -205,10 +221,10 @@ export default auth((req: NextRequest & { auth: { user?: SessionUser } | null })
       }
     }
 
-    return NextResponse.next()
+    return next()
   }
 
-  return NextResponse.next()
+  return next()
 })
 
 export const config = {

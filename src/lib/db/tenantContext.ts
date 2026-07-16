@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
+import { headers } from 'next/headers'
 import { registryPrisma } from './registryPrisma'
-import logger from '@/lib/logger'
 
 export interface TenantContextValue {
   tenantId: string
@@ -40,15 +40,35 @@ export class MissingTenantContextError extends Error {
   }
 }
 
+// Reads tenantId in this priority order:
+// 1. tenantContext's AsyncLocalStorage store — populated via withTenantId()
+//    (scripts: seed.ts, backfill jobs) using .run(), which reliably
+//    propagates through everything it wraps.
+// 2. The x-tenant-id request header — set by middleware.ts from the
+//    session, for every real HTTP request. Read via next/headers, which is
+//    Next.js's OWN request-scoped storage, not ours.
+//
+// NOT src/auth.ts's tenantContext.enterWith() call, despite that being the
+// original design — found (live incident, see
+// i-need-you-to-vectorized-pumpkin.md Section 11) to never actually reach
+// the calling route handler: an async function's enterWith() only affects
+// code running inside that same function's own continuation. Code that
+// awaited it (e.g. `const session = await auth()`) resumes in the context
+// that was active before the call, not whatever auth() mutated internally
+// — so it reliably failed on every single request, 100% of the time.
 export function requireTenantId(): string {
   const ctx = tenantContext.getStore()
-  if (!ctx) {
-    // TEMPORARY diagnostic — live incident, see
-    // i-need-you-to-vectorized-pumpkin.md Section 11. Remove once found.
-    logger.warn('requireTenantId-diagnostic: store is empty at failure point')
-    throw new MissingTenantContextError()
+  if (ctx) return ctx.tenantId
+
+  try {
+    const tenantId = headers().get('x-tenant-id')
+    if (tenantId) return tenantId
+  } catch {
+    // headers() throws outside an active request scope (e.g. a script) —
+    // fall through to the error below.
   }
-  return ctx.tenantId
+
+  throw new MissingTenantContextError()
 }
 
 // Escape hatch for non-request contexts (backfill/admin scripts, seed.ts)

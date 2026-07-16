@@ -3,7 +3,6 @@ import Credentials from 'next-auth/providers/credentials'
 import { login } from '@/lib/services/authService'
 import { LoginSchema } from '@/lib/schemas/auth'
 import { authConfig } from '@/auth.config'
-import { tenantContext } from '@/lib/db/tenantContext'
 import logger from '@/lib/logger'
 
 const {
@@ -62,39 +61,25 @@ const {
 
 export { handlers, signIn, signOut }
 
-// Wraps NextAuth's session resolution to populate tenantContext for the rest
-// of the current request as a side effect — every API route/service already
-// starts with `const session = await auth()` (the only call pattern used
-// anywhere in this codebase), so this is the one place that needs to change
-// for the ~50 files calling `prisma` downstream to resolve the right tenant
-// schema. No-ops (same as before) when the session carries no schemaName
-// claim, which is always true until subdomain login exists.
-//
 // Deliberately typed as the plain no-arg overload rather than
 // `typeof nextAuthCore` — NextAuth's `auth` export is overloaded (bare call,
 // route-handler wrapper, middleware wrapper) and `Parameters<>`/generic
 // forwarding collapses that union to the wrong branch. This codebase only
 // ever calls `auth()` with zero arguments, so that's the only signature
 // exposed here.
+//
+// tenantId reaches downstream prisma.ts calls via the x-tenant-id request
+// header (set by middleware.ts from this same session, read back out by
+// requireTenantId() in src/lib/db/tenantContext.ts via next/headers) — NOT
+// via tenantContext.enterWith() here. That was the original design and
+// does NOT work: an async function's enterWith() call only affects code
+// running inside that same function's own continuation — code that
+// awaited auth() (every caller, everywhere) resumes in the context that
+// was active before the call, not whatever this function mutated
+// internally. Confirmed via a live production incident — see
+// i-need-you-to-vectorized-pumpkin.md Section 11.
 export async function auth(): Promise<Session | null> {
-  const session = await nextAuthCore()
-  const tenantId = session?.user?.tenantId
-  const schemaName = session?.user?.schemaName
-  const tenantSlug = session?.user?.tenantSlug
-  if (tenantId && schemaName && tenantSlug) {
-    tenantContext.enterWith({ tenantId, schemaName, companySlug: tenantSlug })
-  }
-  // TEMPORARY diagnostic — live incident, see i-need-you-to-vectorized-pumpkin.md
-  // Section 11. Remove once the MissingTenantContextError root cause is found.
-  logger.warn(
-    {
-      hasSession: !!session,
-      tenantId, schemaName, tenantSlug,
-      storeAfterEnterWith: tenantContext.getStore(),
-    },
-    'auth-diagnostic',
-  )
-  return session
+  return nextAuthCore()
 }
 
 // Extend next-auth types
