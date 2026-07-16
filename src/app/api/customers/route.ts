@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { headers } from 'next/headers'
 import { auth } from '@/auth'
 import { createCustomer, searchCustomers, DuplicateCustomerError } from '@/lib/services/customerService'
 import { CreateCustomerSchema } from '@/lib/schemas/customer'
@@ -7,6 +8,16 @@ import logger from '@/lib/logger'
 export async function GET(req: NextRequest) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+
+  // TEMPORARY diagnostic — live incident, see
+  // i-need-you-to-vectorized-pumpkin.md Section 11. Remove once found.
+  logger.warn(
+    {
+      rawReqHeader: req.headers.get('x-tenant-id'),
+      ambientHeader: headers().get('x-tenant-id'),
+    },
+    'customers-route-diagnostic',
+  )
 
   const { searchParams } = req.nextUrl
   const query           = searchParams.get('search')          ?? ''
