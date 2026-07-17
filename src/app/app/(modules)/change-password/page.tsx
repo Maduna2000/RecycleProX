@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { ChangePasswordSchema, type ChangePasswordInput } from '@/lib/schemas/auth'
@@ -32,6 +33,7 @@ const rules = [
 
 export default function ChangePasswordPage() {
   const router = useRouter()
+  const { update } = useSession()
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -56,6 +58,12 @@ export default function ChangePasswordPage() {
       setError(json.error ?? 'Failed to change password')
       return
     }
+    // The session JWT still carries forcePasswordChange from login time —
+    // without refreshing it here, middleware bounces /app/dashboard right
+    // back to this page until the user logs out and in again (the DB flag
+    // is already false; only the cookie is stale). The jwt callback in
+    // auth.config.ts honors exactly this one update.
+    await update({ forcePasswordChange: false })
     router.push('/app/dashboard')
     router.refresh()
   }

@@ -11,7 +11,19 @@ export const authConfig: NextAuthConfig = {
   providers: [],   // Credentials provider is added in auth.ts (Node runtime only)
 
   callbacks: {
-    jwt({ token, user }) {
+    jwt({ token, user, trigger, session }) {
+      // Client-initiated session update (useSession().update(...) from the
+      // change-password page). The JWT carries forcePasswordChange from
+      // login time, so without this the middleware keeps bouncing the user
+      // back to /app/change-password until they log out and in again —
+      // the DB flag is already false, only the cookie is stale. Only this
+      // one specific transition is honored from the client payload: it's a
+      // UX gate, not a security boundary (the user changing it early only
+      // skips their own reminder — the DB remains the source of truth),
+      // and role/tenantId/etc. must never be client-writable.
+      if (trigger === 'update' && (session as { forcePasswordChange?: boolean } | null)?.forcePasswordChange === false) {
+        token.forcePasswordChange = false
+      }
       if (user) {
         token.id                  = user.id as string
         token.role                = (user as { role: string }).role
