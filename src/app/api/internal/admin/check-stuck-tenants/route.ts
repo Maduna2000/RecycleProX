@@ -18,6 +18,14 @@ export async function GET() {
     select: { id: true, companySlug: true, companyName: true, schemaName: true, status: true, createdAt: true },
   })
 
+  // The exact query login()'s resolveDefaultTenant() runs when no tenantSlug
+  // is provided (i.e. logging in on the app's own primary domain, no
+  // subdomain) — surfaced directly here rather than inferred, since a
+  // mismatch here would make every login attempt fail with a generic
+  // InvalidCredentialsError before password comparison even runs.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const defaultTenant = await (registryPrisma as any).tenant.findUnique({ where: { schemaName: 'public' } })
+
   const results = []
   for (const t of tenants) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -45,6 +53,7 @@ export async function GET() {
       tenantId: t.id,
       companySlug: t.companySlug,
       companyName: t.companyName,
+      schemaName: t.schemaName,
       status: t.status,
       createdAt: t.createdAt,
       userCount,
@@ -57,5 +66,10 @@ export async function GET() {
     })
   }
 
-  return NextResponse.json({ tenants: results })
+  return NextResponse.json({
+    defaultTenantResolvedBySchemaNamePublic: defaultTenant
+      ? { id: defaultTenant.id, companySlug: defaultTenant.companySlug, companyName: defaultTenant.companyName }
+      : null,
+    tenants: results,
+  })
 }
