@@ -24,6 +24,16 @@ export function LoginForm({ tenantSlug }: { tenantSlug?: string }) {
     setLoading(true)
     setError(null)
 
+    // tenantSlug normally comes from the subdomain (the `tenantSlug` prop,
+    // derived by middleware.ts from the request hostname) — but this
+    // deployment has no custom domain attached (zero-cost hosting on
+    // *.vercel.app, see CLAUDE.md), so that never resolves in production.
+    // The manual field below is the fallback that actually makes
+    // non-default tenants reachable at all today; the prop still wins if a
+    // real subdomain is ever wired up later, so this field naturally stops
+    // being shown/needed at that point (see the conditional render below).
+    const effectiveTenantSlug = tenantSlug || data.tenantSlug?.trim() || undefined
+
     // signIn() form-encodes this object — an `undefined` value gets
     // coerced to the literal string "undefined" by URLSearchParams, which
     // is truthy and would incorrectly steer login() into the tenant-lookup
@@ -31,7 +41,7 @@ export function LoginForm({ tenantSlug }: { tenantSlug?: string }) {
     const result = await signIn('credentials', {
       username: data.username,
       password: data.password,
-      ...(tenantSlug ? { tenantSlug } : {}),
+      ...(effectiveTenantSlug ? { tenantSlug: effectiveTenantSlug } : {}),
       redirect: false,
     })
 
@@ -88,6 +98,21 @@ export function LoginForm({ tenantSlug }: { tenantSlug?: string }) {
 
           {/* Form */}
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            {!tenantSlug && (
+              <div>
+                <Label htmlFor="tenantSlug" style={{ color: colors.textPrimary }}>Company (leave blank for Golden Key)</Label>
+                <Input
+                  id="tenantSlug"
+                  autoComplete="off"
+                  {...register('tenantSlug')}
+                  placeholder="e.g. md-tech-solutions"
+                  className="mt-1"
+                  style={{ borderColor: colors.border }}
+                  disabled={loading}
+                />
+              </div>
+            )}
+
             <div>
               <Label htmlFor="username" style={{ color: colors.textPrimary }}>Username</Label>
               <Input
