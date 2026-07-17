@@ -34,6 +34,19 @@ const DEFAULT_SUBCATEGORIES: Record<string, Array<{ name: string; colorHex: stri
 // is untouched here. Must run inside withTenantId() (see provisionCompany
 // below) so every row created here gets the right tenantId stamped and
 // passes RLS's WITH CHECK.
+//
+// Single transaction (CLAUDE.md rule 2: multi-table writes = single
+// transaction) — this is ~15 separate inserts (1 user + 8 parent
+// categories + 6 subcategories); without this, a transient failure
+// partway through (a Neon connection blip, observed to genuinely happen
+// against this database — see the P1002 advisory-lock incidents during
+// this same deployment cycle) left a Tenant with an admin user but no
+// categories, or worse, a user whose bcrypt hash was stored but whose
+// plaintext temp password was never returned to the caller and so was
+// permanently lost — a real production incident this was written to
+// close off. provisionCompany()'s retry path below depends on this being
+// truly all-or-nothing to safely tell "never seeded" apart from "fully
+// seeded", since there is no longer a partial state to be ambiguous about.
 export async function seedTenantDefaults(opts: {
   username: string
   password: string
@@ -41,30 +54,33 @@ export async function seedTenantDefaults(opts: {
 }): Promise<void> {
   const tenantId = requireTenantId()
   const passwordHash = await bcrypt.hash(opts.password, 12)
-  await prisma.user.create({
-    data: {
-      tenantId,
-      fullName: opts.fullName,
-      username: opts.username,
-      passwordHash,
-      role: 'admin',
-      forcePasswordChange: true,
-    },
-  })
 
-  const parentIds: Record<string, string> = {}
-  for (const cat of DEFAULT_CATEGORIES) {
-    const created = await prisma.productCategory.create({ data: { ...cat, tenantId } })
-    parentIds[cat.name] = created.id
-  }
+  await prisma.$transaction(async (tx) => {
+    await tx.user.create({
+      data: {
+        tenantId,
+        fullName: opts.fullName,
+        username: opts.username,
+        passwordHash,
+        role: 'admin',
+        forcePasswordChange: true,
+      },
+    })
 
-  for (const [parentName, subs] of Object.entries(DEFAULT_SUBCATEGORIES)) {
-    const parentId = parentIds[parentName]
-    if (!parentId) continue
-    for (const sub of subs) {
-      await prisma.productCategory.create({ data: { ...sub, tenantId, parentId } })
+    const parentIds: Record<string, string> = {}
+    for (const cat of DEFAULT_CATEGORIES) {
+      const created = await tx.productCategory.create({ data: { ...cat, tenantId } })
+      parentIds[cat.name] = created.id
     }
-  }
+
+    for (const [parentName, subs] of Object.entries(DEFAULT_SUBCATEGORIES)) {
+      const parentId = parentIds[parentName]
+      if (!parentId) continue
+      for (const sub of subs) {
+        await tx.productCategory.create({ data: { ...sub, tenantId, parentId } })
+      }
+    }
+  })
 }
 
 function generateTempPassword(): string {
@@ -98,10 +114,34 @@ export interface ProvisionCompanyResult {
 export async function provisionCompany(input: ProvisionCompanyInput): Promise<ProvisionCompanyResult> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const existing = await (registryPrisma as any).tenant.findUnique({ where: { companySlug: input.companySlug } })
-  if (existing) throw new Error(`Company slug already provisioned: ${input.companySlug}`)
 
   const tempUsername = 'admin'
   const tempPassword = generateTempPassword()
+
+  if (existing) {
+    // A prior attempt registered the Tenant row but seedTenantDefaults()
+    // never completed (e.g. Portal's HTTP call to this route itself timed
+    // out or dropped, or — before seedTenantDefaults became a single
+    // transaction, see above — a step partway through the old multi-call
+    // sequence failed). Distinguish a genuinely-stuck tenant from a real
+    // duplicate signup attempt by checking whether anything was ever
+    // actually seeded: seedTenantDefaults is now all-or-nothing, so "zero
+    // users" can only mean "never finished," never "partially finished."
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const seededUserCount = await withTenantId<number>(existing.id, () => (prisma as any).user.count())
+    if (seededUserCount > 0) {
+      throw new Error(`Company slug already provisioned: ${input.companySlug}`)
+    }
+
+    logger.warn(
+      { companySlug: input.companySlug, tenantId: existing.id },
+      'Resuming incomplete tenant provisioning — Tenant row existed with zero seeded users',
+    )
+    await withTenantId(existing.id, () =>
+      seedTenantDefaults({ username: tempUsername, password: tempPassword, fullName: input.ownerName }),
+    )
+    return { tenantId: existing.id, tempUsername, tempPassword }
+  }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const tenant = await (registryPrisma as any).tenant.create({
