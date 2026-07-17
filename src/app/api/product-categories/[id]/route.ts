@@ -4,6 +4,7 @@ import logger from '@/lib/logger'
 import { UpdateCategorySchema } from '@/lib/schemas/product'
 import { prisma } from '@/lib/db/prisma'
 import { updateCategory, deleteCategory, countProductsForCategory } from '@/lib/services/productService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await auth()
@@ -17,11 +18,15 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     const body = await req.json().catch(() => ({}))
     const newName = typeof body === 'object' && body !== null ? (body as Record<string, unknown>).name as string | undefined : undefined
     if (!newName) return NextResponse.json({ affectedProducts: 0 })
-    const existing = await prisma.productCategory.findUnique({ where: { id: params.id } })
-    if (!existing) return NextResponse.json({ error: 'Category not found' }, { status: 404 })
-    if (newName === existing.name) return NextResponse.json({ affectedProducts: 0, oldName: existing.name })
-    const affectedProducts = await countProductsForCategory(existing.name)
-    return NextResponse.json({ affectedProducts, oldName: existing.name })
+    const preview = await runWithRequestTenant(req, async () => {
+      const existing = await prisma.productCategory.findUnique({ where: { id: params.id } })
+      if (!existing) return null
+      if (newName === existing.name) return { affectedProducts: 0, oldName: existing.name }
+      const affectedProducts = await countProductsForCategory(existing.name)
+      return { affectedProducts, oldName: existing.name }
+    })
+    if (!preview) return NextResponse.json({ error: 'Category not found' }, { status: 404 })
+    return NextResponse.json(preview)
   }
 
   const body = await req.json()
@@ -29,7 +34,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Validation failed' }, { status: 422 })
 
   try {
-    const updated = await updateCategory(params.id, parsed.data, session.user.id)
+    const updated = await runWithRequestTenant(req, () => updateCategory(params.id, parsed.data, session.user.id))
     return NextResponse.json(updated)
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Failed to update category'
@@ -39,7 +44,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   }
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!['admin', 'manager'].includes(session.user.role)) {
@@ -47,7 +52,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
   }
 
   try {
-    await deleteCategory(params.id)
+    await runWithRequestTenant(req, () => deleteCategory(params.id))
     return NextResponse.json({ ok: true })
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Failed to delete category'

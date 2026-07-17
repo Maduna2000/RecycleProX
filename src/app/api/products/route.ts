@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { CreateProductSchema } from '@/lib/schemas/product'
 import { createProduct, listProducts, DuplicateProductCodeError } from '@/lib/services/productService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 export async function GET(req: NextRequest) {
   const session = await auth()
@@ -14,7 +15,7 @@ export async function GET(req: NextRequest) {
   const activeOnly = searchParams.get('active') !== 'false'
 
   try {
-    const products = await listProducts({ category, search, isActive: activeOnly ? true : undefined })
+    const products = await runWithRequestTenant(req, () => listProducts({ category, search, isActive: activeOnly ? true : undefined }))
     return NextResponse.json({ products })
   } catch (err) {
     logger.error({ err }, 'GET /api/products failed')
@@ -34,7 +35,7 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
 
   try {
-    const product = await createProduct(parsed.data, session.user.id)
+    const product = await runWithRequestTenant(req, () => createProduct(parsed.data, session.user.id))
     return NextResponse.json(product, { status: 201 })
   } catch (err) {
     if (err instanceof DuplicateProductCodeError) {

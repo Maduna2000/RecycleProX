@@ -3,8 +3,9 @@ import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { createStocktake, listStocktakes } from '@/lib/services/stocktakeService'
 import { CreateStocktakeSchema } from '@/lib/schemas/stocktake'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!['admin', 'manager'].includes(session.user.role)) {
@@ -12,7 +13,7 @@ export async function GET() {
   }
 
   try {
-    const result = await listStocktakes()
+    const result = await runWithRequestTenant(req, () => listStocktakes())
     return NextResponse.json(result)
   } catch (err) {
     logger.error({ err }, 'GET /api/stocktake failed')
@@ -33,7 +34,7 @@ export async function POST(req: NextRequest) {
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid input' }, { status: 400 })
     }
-    const stocktake = await createStocktake(session.user.id, parsed.data.notes)
+    const stocktake = await runWithRequestTenant(req, () => createStocktake(session.user.id, parsed.data.notes))
     return NextResponse.json(stocktake, { status: 201 })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Failed to create stocktake'

@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { SetGroupOverridesSchema } from '@/lib/schemas/product'
 import { setGroupOverrides, PriceGroupNotFoundError } from '@/lib/services/productService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await auth()
@@ -16,7 +17,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
 
   try {
-    await setGroupOverrides(params.id, parsed.data, session.user.id)
+    await runWithRequestTenant(req, () => setGroupOverrides(params.id, parsed.data, session.user.id))
     return NextResponse.json({ ok: true })
   } catch (err) {
     if (err instanceof PriceGroupNotFoundError) return NextResponse.json({ error: err.message }, { status: 404 })

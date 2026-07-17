@@ -3,8 +3,9 @@ import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { getStocktake, upsertEntry, completeStocktake, updateEntryPhoto } from '@/lib/services/stocktakeService'
 import { UpsertEntrySchema, UpdateEntryPhotoSchema } from '@/lib/schemas/stocktake'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!['admin', 'manager'].includes(session.user.role)) {
@@ -12,7 +13,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   }
 
   try {
-    const stocktake = await getStocktake(params.id)
+    const stocktake = await runWithRequestTenant(req, () => getStocktake(params.id))
     return NextResponse.json(stocktake)
   } catch (err) {
     logger.error({ err, id: params.id }, 'GET /api/stocktake/[id] failed')
@@ -34,12 +35,12 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid input' }, { status: 400 })
     }
-    const entry = await upsertEntry(
+    const entry = await runWithRequestTenant(req, () => upsertEntry(
       params.id,
       parsed.data.productId,
       parsed.data.countedQty,
       { grossQty: parsed.data.grossQty, tareQty: parsed.data.tareQty, photoR2Key: parsed.data.photoR2Key }
-    )
+    ))
     return NextResponse.json(entry)
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Failed to add entry'
@@ -62,7 +63,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid input' }, { status: 400 })
     }
-    const entry = await updateEntryPhoto(params.id, parsed.data.productId, parsed.data.photoR2Key)
+    const entry = await runWithRequestTenant(req, () => updateEntryPhoto(params.id, parsed.data.productId, parsed.data.photoR2Key))
     return NextResponse.json(entry)
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Failed to update photo'
@@ -72,7 +73,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 }
 
 // POST — complete the stocktake
-export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!['admin', 'manager'].includes(session.user.role)) {
@@ -80,7 +81,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
   }
 
   try {
-    const stocktake = await completeStocktake(params.id, session.user.id)
+    const stocktake = await runWithRequestTenant(req, () => completeStocktake(params.id, session.user.id))
     return NextResponse.json(stocktake)
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Failed to complete stocktake'

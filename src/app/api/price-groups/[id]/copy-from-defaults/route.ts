@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { copyDefaultsToPriceGroup, PriceGroupNotFoundError } from '@/lib/services/productService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 export async function POST(
   req: NextRequest,
@@ -16,7 +17,7 @@ export async function POST(
   const body = await req.json().catch(() => ({})) as { productIds?: string[] }
 
   try {
-    const upserted = await copyDefaultsToPriceGroup(params.id, body.productIds)
+    const upserted = await runWithRequestTenant(req, () => copyDefaultsToPriceGroup(params.id, body.productIds))
     logger.info({ priceGroupId: params.id, upserted, userId: session.user.id }, 'price-group.copy-from-defaults')
     return NextResponse.json({ upserted })
   } catch (err) {

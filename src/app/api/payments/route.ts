@@ -6,6 +6,7 @@ import {
   createPayment, listPayments,
   CustomerNotFoundError,
 } from '@/lib/services/paymentService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 export async function GET(req: NextRequest) {
   const session = await auth()
@@ -22,7 +23,7 @@ export async function GET(req: NextRequest) {
   const to = searchParams.get('to') ? new Date(searchParams.get('to')!) : undefined
 
   try {
-    const result = await listPayments({ customerId, search, paymentMethod, includeVoided, page, pageSize, from, to })
+    const result = await runWithRequestTenant(req, () => listPayments({ customerId, search, paymentMethod, includeVoided, page, pageSize, from, to }))
     return NextResponse.json(result)
   } catch (err) {
     logger.error({ err }, 'GET /api/payments failed')
@@ -39,7 +40,7 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
 
   try {
-    const payment = await createPayment(parsed.data, session.user.id)
+    const payment = await runWithRequestTenant(req, () => createPayment(parsed.data, session.user.id))
     return NextResponse.json(payment, { status: 201 })
   } catch (err) {
     if (err instanceof CustomerNotFoundError) return NextResponse.json({ error: err.message }, { status: 404 })

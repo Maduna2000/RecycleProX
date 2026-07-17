@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { reverseFloatMovement, FloatMovementReversalError } from '@/lib/services/floatService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 import logger from '@/lib/logger'
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -16,7 +17,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   const { id: movementId } = await params
 
   try {
-    const result = await reverseFloatMovement(movementId, session.user.id)
+    const result = await runWithRequestTenant(req, () => reverseFloatMovement(movementId, session.user.id))
     return NextResponse.json({
       success: true,
       reversedMovementId: result.reversedMovementId,

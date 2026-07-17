@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { BulkPriceUpdateSchema } from '@/lib/schemas/product'
 import { bulkUpdatePrices, ProductNotFoundError } from '@/lib/services/productService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 export async function POST(req: NextRequest) {
   const session = await auth()
@@ -16,7 +17,7 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
 
   try {
-    const updated = await bulkUpdatePrices(parsed.data, session.user.id)
+    const updated = await runWithRequestTenant(req, () => bulkUpdatePrices(parsed.data, session.user.id))
     return NextResponse.json({ updated: updated.length })
   } catch (err) {
     if (err instanceof ProductNotFoundError) return NextResponse.json({ error: err.message }, { status: 404 })

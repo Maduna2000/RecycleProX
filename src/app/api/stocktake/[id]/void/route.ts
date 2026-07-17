@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { VoidStocktakeSchema } from '@/lib/schemas/stocktake'
 import { voidStocktake } from '@/lib/services/stocktakeService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await auth()
@@ -18,7 +19,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   }
 
   try {
-    const stocktake = await voidStocktake(params.id, session.user.id, parsed.data.reason)
+    const stocktake = await runWithRequestTenant(req, () => voidStocktake(params.id, session.user.id, parsed.data.reason))
     return NextResponse.json(stocktake)
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Failed to void stocktake'

@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { prisma } from '@/lib/db/prisma'
 import { getViewUrl } from '@/lib/r2'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 // Photo record shape returned to the client
 export type PhotoRecord = {
@@ -31,6 +32,7 @@ export async function GET(req: NextRequest) {
   const pageSize   = Math.min(parseInt(searchParams.get('pageSize') ?? '24'), 48)
 
   try {
+    const records: PhotoRecord[] = await runWithRequestTenant(req, async () => {
     const records: PhotoRecord[] = []
 
     const dateFilter = (from || to) ? {
@@ -240,6 +242,9 @@ export async function GET(req: NextRequest) {
         }
       }
     }
+
+    return records
+    })
 
     // Sort all combined records by date descending, then paginate
     records.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())

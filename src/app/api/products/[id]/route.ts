@@ -3,13 +3,14 @@ import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { UpdateProductSchema } from '@/lib/schemas/product'
 import { getProduct, updateProduct, deleteProduct, ProductNotFoundError, ProductInUseError } from '@/lib/services/productService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   try {
-    const product = await getProduct(params.id)
+    const product = await runWithRequestTenant(req, () => getProduct(params.id))
     return NextResponse.json(product)
   } catch (err) {
     if (err instanceof ProductNotFoundError) return NextResponse.json({ error: err.message }, { status: 404 })
@@ -30,7 +31,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
 
   try {
-    const product = await updateProduct(params.id, parsed.data, session.user.id)
+    const product = await runWithRequestTenant(req, () => updateProduct(params.id, parsed.data, session.user.id))
     return NextResponse.json(product)
   } catch (err) {
     if (err instanceof ProductNotFoundError) return NextResponse.json({ error: err.message }, { status: 404 })
@@ -39,7 +40,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   }
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!['admin', 'manager'].includes(session.user.role)) {
@@ -47,7 +48,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
   }
 
   try {
-    await deleteProduct(params.id)
+    await runWithRequestTenant(req, () => deleteProduct(params.id))
     return NextResponse.json({ ok: true })
   } catch (err) {
     if (err instanceof ProductNotFoundError) return NextResponse.json({ error: err.message }, { status: 404 })

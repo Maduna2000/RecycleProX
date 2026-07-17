@@ -4,6 +4,7 @@ import logger from '@/lib/logger'
 import { z } from 'zod'
 import Decimal from 'decimal.js'
 import { addFloatMovement, FloatMovementLockedError } from '@/lib/services/floatService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 const TopUpSchema = z.object({
   amount: z
@@ -30,7 +31,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const result = await addFloatMovement('top_up', parsed.data.amount, parsed.data.note, session.user.id)
+    const result = await runWithRequestTenant(req, () => addFloatMovement('top_up', parsed.data.amount, parsed.data.note, session.user.id))
     return NextResponse.json(result, { status: 201 })
   } catch (err) {
     if (err instanceof FloatMovementLockedError) {

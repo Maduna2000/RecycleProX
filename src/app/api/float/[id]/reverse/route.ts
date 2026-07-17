@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { reverseFloat, FloatReversalError } from '@/lib/services/floatService'
 import { ReverseFloatSchema } from '@/lib/schemas/float'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 import logger from '@/lib/logger'
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -29,7 +30,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   }
 
   try {
-    const result = await reverseFloat(floatId, session.user.id, reason)
+    const result = await runWithRequestTenant(req, () => reverseFloat(floatId, session.user.id, reason))
     return NextResponse.json({
       success: true,
       reversedFloatId: result.reversedFloatId,

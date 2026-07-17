@@ -5,6 +5,7 @@ import { listAuditLogs } from '@/lib/services/auditLogService'
 import { buildReportMeta } from '@/lib/services/reports/meta'
 import { generateBusinessReportXlsx } from '@/lib/excel/businessReportXlsx'
 import type { ReportDocument } from '@/lib/reports/types'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 /**
  * GET /api/audit-log/export?table=&action=&from=YYYY-MM-DD&to=YYYY-MM-DD
@@ -28,16 +29,18 @@ export async function GET(req: NextRequest) {
   const to   = toStr   ? (() => { const d = new Date(toStr);   d.setHours(23, 59, 59, 999); return d })() : undefined
 
   try {
-    const { items } = await listAuditLogs({
-      table,
-      action: action as 'INSERT' | 'UPDATE' | 'DELETE' | 'VOID' | 'LOGIN' | 'LOGOUT' | undefined,
-      from,
-      to,
-      page: 1,
-      pageSize: 10000,
+    const { items, meta } = await runWithRequestTenant(req, async () => {
+      const { items } = await listAuditLogs({
+        table,
+        action: action as 'INSERT' | 'UPDATE' | 'DELETE' | 'VOID' | 'LOGIN' | 'LOGOUT' | undefined,
+        from,
+        to,
+        page: 1,
+        pageSize: 10000,
+      })
+      const meta = await buildReportMeta(session.user.name ?? session.user.username ?? 'Unknown')
+      return { items, meta }
     })
-
-    const meta = await buildReportMeta(session.user.name ?? session.user.username ?? 'Unknown')
     if (meta.company.name === 'Renovo Pro') {
       meta.company = { ...meta.company, name: 'Golden Key Investments (Pty) Ltd' }
     }

@@ -4,6 +4,7 @@ import logger from '@/lib/logger'
 import { generatePoliceRegister } from '@/lib/pdf/policeRegister'
 import { getPurchasesForRegister } from '@/lib/services/policeVisitService'
 import { DEFAULT_POLICE_SERVICE_NAME } from '@/lib/police-defaults'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 /**
  * GET /api/police-register?date=YYYY-MM-DD
@@ -26,7 +27,7 @@ export async function GET(req: NextRequest) {
   const date = new Date(y!, m! - 1, d!)
 
   try {
-    const { entries, settings } = await getPurchasesForRegister(date)
+    const { entries, settings } = await runWithRequestTenant(req, () => getPurchasesForRegister(date))
 
     const pdfBytes = await generatePoliceRegister({
       date,

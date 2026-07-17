@@ -3,13 +3,14 @@ import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { CreatePriceGroupSchema } from '@/lib/schemas/product'
 import { createPriceGroup, listPriceGroups, DuplicatePriceGroupNameError } from '@/lib/services/productService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   try {
-    const groups = await listPriceGroups()
+    const groups = await runWithRequestTenant(req, () => listPriceGroups())
     return NextResponse.json({ groups })
   } catch (err) {
     logger.error({ err }, 'GET /api/price-groups failed')
@@ -29,7 +30,7 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
 
   try {
-    const group = await createPriceGroup(parsed.data, session.user.id)
+    const group = await runWithRequestTenant(req, () => createPriceGroup(parsed.data, session.user.id))
     return NextResponse.json(group, { status: 201 })
   } catch (err) {
     if (err instanceof DuplicatePriceGroupNameError) {

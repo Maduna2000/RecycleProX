@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { listAuditLogs } from '@/lib/services/auditLogService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 /**
  * GET /api/audit-log
@@ -29,7 +30,7 @@ export async function GET(req: NextRequest) {
   const to   = toStr   ? (() => { const d = new Date(toStr);   d.setHours(23,59,59,999); return d })() : undefined
 
   try {
-    const result = await listAuditLogs({
+    const result = await runWithRequestTenant(req, () => listAuditLogs({
       table,
       action: action as 'INSERT' | 'UPDATE' | 'DELETE' | 'VOID' | 'LOGIN' | 'LOGOUT' | undefined,
       recordId,
@@ -38,7 +39,7 @@ export async function GET(req: NextRequest) {
       to,
       page,
       pageSize,
-    })
+    }))
     return NextResponse.json(result)
   } catch (err) {
     logger.error({ err }, 'GET /api/audit-log failed')

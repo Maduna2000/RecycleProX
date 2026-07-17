@@ -36,6 +36,11 @@ const ALLOWLIST_PREFIXES = [
   'src/app/api/auth',
   'src/app/api/ping',
   'src/app/api/r2/test',
+  // supportTicketClient.ts is a pure HTTP client calling the Portal's
+  // internal API (fetch, no Prisma) — matched the DB-touching grep only
+  // because it imports from @/lib/services/, not because it needs tenant
+  // context. A grep-pipeline false positive, not a gap.
+  'src/app/api/support-tickets',
 ]
 
 function findRouteFiles(dir: string): string[] {

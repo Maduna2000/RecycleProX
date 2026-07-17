@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { prisma } from '@/lib/db/prisma'
-import { requireTenantId } from '@/lib/db/tenantContext'
+import { requireTenantId, runWithRequestTenant } from '@/lib/db/tenantContext'
 import Papa from 'papaparse'
 import { z } from 'zod'
 
@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
   let imported = 0
   let skipped  = 0
 
-  await prisma.$transaction(async (tx) => {
+  await runWithRequestTenant(req, () => prisma.$transaction(async (tx) => {
     const tenantId = requireTenantId()
     for (const row of validRows) {
       let dob: Date | undefined
@@ -145,7 +145,7 @@ export async function POST(req: NextRequest) {
         imported++
       }
     }
-  })
+  }))
 
   logger.info({ userId: session.user.id, imported, skipped, errors: errors.length }, 'casual.import')
   return NextResponse.json({ imported, skipped, errors })

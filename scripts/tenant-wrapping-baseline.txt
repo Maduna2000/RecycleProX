@@ -8,35 +8,9 @@
 # route on this list should be wrapped and REMOVED from this file in a
 # follow-up batch — do not add new entries here for new routes; a new,
 # never-before-seen unwrapped route fails the build (that's the point).
-src/app/api/audit-log/export/route.ts
-src/app/api/audit-log/route.ts
-src/app/api/casual/export/route.ts
-src/app/api/casual/import/route.ts
-src/app/api/float/[id]/reverse/route.ts
-src/app/api/float/current/route.ts
-src/app/api/float/history/route.ts
-src/app/api/float/movement/[id]/reverse/route.ts
-src/app/api/float/top-up/route.ts
-src/app/api/payments/[id]/route.ts
-src/app/api/payments/[id]/void/route.ts
-src/app/api/payments/balances/route.ts
-src/app/api/payments/route.ts
-src/app/api/photo-viewer/route.ts
-src/app/api/photos/search/route.ts
-src/app/api/police-register/route.ts
-src/app/api/price-groups/[id]/copy-from-defaults/route.ts
-src/app/api/price-groups/[id]/overrides/route.ts
-src/app/api/price-groups/[id]/route.ts
-src/app/api/price-groups/route.ts
-src/app/api/print/cash-drawer/route.ts
-src/app/api/print/slip/route.ts
-src/app/api/product-categories/[id]/route.ts
-src/app/api/products/[id]/route.ts
-src/app/api/products/bulk-price/route.ts
-src/app/api/products/route.ts
-src/app/api/reports/[reportId]/route.ts
-src/app/api/reports/route.ts
-src/app/api/stocktake/[id]/route.ts
-src/app/api/stocktake/[id]/void/route.ts
-src/app/api/stocktake/route.ts
-src/app/api/support-tickets/route.ts
+#
+# Empty as of the final remediation batch — every route touching
+# Prisma/services is now either wrapped in runWithRequestTenant or
+# explicitly allowlisted (ALLOWLIST_PREFIXES in check-tenant-wrapping.ts)
+# as a genuine non-tenant-context route. Do not add entries here going
+# forward — a newly unwrapped route should fail the build.

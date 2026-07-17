@@ -1,6 +1,7 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getAllSettings } from '@/lib/services/settingsService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 import logger from '@/lib/logger'
 
 /**
@@ -8,13 +9,13 @@ import logger from '@/lib/logger'
  * Opens the cash drawer connected to the thermal printer.
  * Uses ESC/POS drawer kick command.
  */
-export async function POST() {
+export async function POST(req: NextRequest) {
   const session = await auth()
   if (!session) {
     return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   }
 
-  const cfg = await getAllSettings()
+  const cfg = await runWithRequestTenant(req, () => getAllSettings())
   if (!cfg.printerType || cfg.printerType === 'none') {
     return NextResponse.json({ error: 'No printer configured' }, { status: 400 })
   }

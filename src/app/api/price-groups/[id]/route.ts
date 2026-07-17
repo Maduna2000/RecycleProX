@@ -7,13 +7,14 @@ import {
   PriceGroupNotFoundError, DuplicatePriceGroupNameError,
   PriceGroupInUseError, DefaultPriceGroupDeleteError,
 } from '@/lib/services/productService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   try {
-    const group = await getPriceGroupWithOverrides(params.id)
+    const group = await runWithRequestTenant(req, () => getPriceGroupWithOverrides(params.id))
     return NextResponse.json(group)
   } catch (err) {
     if (err instanceof PriceGroupNotFoundError) return NextResponse.json({ error: err.message }, { status: 404 })
@@ -34,7 +35,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
 
   try {
-    const group = await updatePriceGroup(params.id, parsed.data, session.user.id)
+    const group = await runWithRequestTenant(req, () => updatePriceGroup(params.id, parsed.data, session.user.id))
     return NextResponse.json(group)
   } catch (err) {
     if (err instanceof PriceGroupNotFoundError) return NextResponse.json({ error: err.message }, { status: 404 })
@@ -44,7 +45,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   }
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!['admin', 'manager'].includes(session.user.role)) {
@@ -52,7 +53,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
   }
 
   try {
-    await deletePriceGroup(params.id, session.user.id)
+    await runWithRequestTenant(req, () => deletePriceGroup(params.id, session.user.id))
     return NextResponse.json({ success: true })
   } catch (err) {
     if (err instanceof PriceGroupNotFoundError) return NextResponse.json({ error: err.message }, { status: 404 })

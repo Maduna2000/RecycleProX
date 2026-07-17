@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { getDateRangeReport } from '@/lib/services/reportService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 /**
  * GET /api/reports?from=YYYY-MM-DD&to=YYYY-MM-DD
@@ -29,7 +30,7 @@ export async function GET(req: NextRequest) {
   const to   = new Date(ty!, tm! - 1, td!); to.setHours(23, 59, 59, 999)
 
   try {
-    const report = await getDateRangeReport(from, to)
+    const report = await runWithRequestTenant(req, () => getDateRangeReport(from, to))
     return NextResponse.json({ range: { from: fromParam, to: toParam }, ...report })
   } catch (err) {
     logger.error({ err }, 'GET /api/reports failed')

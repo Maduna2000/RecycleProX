@@ -3,8 +3,11 @@ import { auth } from '@/auth'
 import { prisma } from '@/lib/db/prisma'
 import { getAllSettings } from '@/lib/services/settingsService'
 import { buildPurchaseReceipt, buildSaleReceipt } from '@/lib/print/thermal'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 import logger from '@/lib/logger'
 import Decimal from 'decimal.js'
+
+class SlipRecordNotFoundError extends Error {}
 
 /**
  * POST /api/print/slip
@@ -28,7 +31,7 @@ export async function POST(req: Request) {
   }
 
   // Get printer config
-  const cfg = await getAllSettings()
+  const cfg = await runWithRequestTenant(req, () => getAllSettings())
   if (!cfg.printerType || cfg.printerType === 'none') {
     return NextResponse.json({ error: 'No printer configured' }, { status: 400 })
   }
@@ -38,17 +41,17 @@ export async function POST(req: Request) {
 
     if (type === 'purchase') {
       // Fetch purchase with related data
-      const purchase = await prisma.purchase.findUnique({
-        where: { id },
-        include: {
-          customer: true,
-          lines: { include: { product: true } },
-        },
+      const purchase = await runWithRequestTenant(req, async () => {
+        const purchase = await prisma.purchase.findUnique({
+          where: { id },
+          include: {
+            customer: true,
+            lines: { include: { product: true } },
+          },
+        })
+        if (!purchase) throw new SlipRecordNotFoundError('Purchase not found')
+        return purchase
       })
-
-      if (!purchase) {
-        return NextResponse.json({ error: 'Purchase not found' }, { status: 404 })
-      }
 
       // Build receipt data
       const lines = purchase.lines.map(line => ({
@@ -70,17 +73,17 @@ export async function POST(req: Request) {
       })
     } else {
       // Fetch sale with related data
-      const sale = await prisma.sale.findUnique({
-        where: { id },
-        include: {
-          customer: true,
-          lines: { include: { product: true } },
-        },
+      const sale = await runWithRequestTenant(req, async () => {
+        const sale = await prisma.sale.findUnique({
+          where: { id },
+          include: {
+            customer: true,
+            lines: { include: { product: true } },
+          },
+        })
+        if (!sale) throw new SlipRecordNotFoundError('Sale not found')
+        return sale
       })
-
-      if (!sale) {
-        return NextResponse.json({ error: 'Sale not found' }, { status: 404 })
-      }
 
       // Build receipt data
       const lines = sale.lines.map(line => ({
@@ -129,6 +132,7 @@ export async function POST(req: Request) {
     logger.info({ type, id, iface }, 'receipt.printed')
     return NextResponse.json({ success: true })
   } catch (err) {
+    if (err instanceof SlipRecordNotFoundError) return NextResponse.json({ error: err.message }, { status: 404 })
     logger.error({ err, type, id }, 'print-slip.failed')
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'Print failed' },

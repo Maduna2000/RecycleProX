@@ -6,6 +6,7 @@ import { buildReportMeta } from '@/lib/services/reports/meta'
 import { generateBusinessReportPdf } from '@/lib/pdf/businessReport'
 import { generateBusinessReportXlsx } from '@/lib/excel/businessReportXlsx'
 import type { ReportDocument } from '@/lib/reports/types'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 /**
  * GET /api/casual/export?format=xlsx|pdf&search=&blacklisted=&dealerCategory=&primaryFunction=
@@ -24,14 +25,16 @@ export async function GET(req: NextRequest) {
   const primaryFunction = sp.get('primaryFunction') ?? undefined
 
   try {
-    const { customers } = await searchCustomers(
-      query,
-      { type: 'casual', blacklisted, dealerCategory, primaryFunction },
-      1,
-      10000,
-    )
-
-    const meta = await buildReportMeta(session.user.name ?? session.user.username ?? 'Unknown')
+    const { customers, meta } = await runWithRequestTenant(req, async () => {
+      const { customers } = await searchCustomers(
+        query,
+        { type: 'casual', blacklisted, dealerCategory, primaryFunction },
+        1,
+        10000,
+      )
+      const meta = await buildReportMeta(session.user.name ?? session.user.username ?? 'Unknown')
+      return { customers, meta }
+    })
     if (meta.company.name === 'Renovo Pro') {
       meta.company = { ...meta.company, name: 'Golden Key Investments (Pty) Ltd' }
     }

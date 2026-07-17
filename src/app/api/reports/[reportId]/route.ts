@@ -9,6 +9,7 @@ import { ReportFormatSchema } from '@/lib/schemas/report'
 import { generateBusinessReportPdf } from '@/lib/pdf/businessReport'
 import { generateBusinessReportXlsx } from '@/lib/excel/businessReportXlsx'
 import { encodeJsonField } from '@/lib/db/queryHelpers'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 /**
  * GET /api/reports/[reportId]?from=YYYY-MM-DD&to=YYYY-MM-DD&format=json|pdf|xlsx&<filters>
@@ -52,8 +53,10 @@ export async function GET(
   }
 
   try {
-    const metaBase = await buildReportMeta(session.user.name ?? session.user.username ?? 'Unknown')
-    const doc = await definition.build(paramsParse.data, metaBase)
+    const doc = await runWithRequestTenant(req, async () => {
+      const metaBase = await buildReportMeta(session.user.name ?? session.user.username ?? 'Unknown')
+      return definition.build(paramsParse.data, metaBase)
+    })
 
     if (format === 'json') {
       return NextResponse.json(doc)
@@ -69,20 +72,25 @@ export async function GET(
     }
 
     // Explicit EXPORT audit entry — the Prisma middleware only covers
-    // business-model writes, not report downloads.
-    prisma.auditLog
-      .create({
-        data: {
-          tenantId: requireTenantId(),
-          tableName: 'report',
-          recordId: reportId,
-          action: 'EXPORT',
-          newValues: encodeJsonField({ format, params: doc.params, rowCount: doc.meta.rowCount }),
-          changedById: session.user.id ?? null,
-          rowHash: '',
-        },
-      })
-      .catch((err) => logger.error({ err, reportId }, 'report.export.audit.failed'))
+    // business-model writes, not report downloads. Awaited (not
+    // fire-and-forget): an unawaited call here would race the response
+    // being returned, risking the same async-boundary context loss that
+    // caused the original MissingTenantContextError incident (see
+    // i-need-you-to-vectorized-pumpkin.md Section 12) — requireTenantId()
+    // would have nothing to resolve against by the time it actually runs.
+    // Still error-tolerant: a failed audit write shouldn't break the
+    // export response the user is waiting on.
+    await runWithRequestTenant(req, () => prisma.auditLog.create({
+      data: {
+        tenantId: requireTenantId(),
+        tableName: 'report',
+        recordId: reportId,
+        action: 'EXPORT',
+        newValues: encodeJsonField({ format, params: doc.params, rowCount: doc.meta.rowCount }),
+        changedById: session.user.id ?? null,
+        rowHash: '',
+      },
+    })).catch((err) => logger.error({ err, reportId }, 'report.export.audit.failed'))
 
     return new NextResponse(body, {
       headers: {
