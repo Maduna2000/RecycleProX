@@ -43,7 +43,7 @@ export async function GET() {
           WHERE c.relname = 'User' AND n.nspname = 'public'
         ) as user_table_rls_enabled,
         (
-          SELECT count(*) FROM pg_policies
+          SELECT count(*)::int FROM pg_policies
           WHERE tablename = 'User' AND schemaname = 'public'
         ) as user_table_policy_count,
         (
