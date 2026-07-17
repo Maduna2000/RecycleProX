@@ -15,6 +15,7 @@ export function LoginForm({ tenantSlug }: { tenantSlug?: string }) {
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [showCompanyCode, setShowCompanyCode] = useState(false)
 
   const { register, handleSubmit, formState: { errors } } = useForm<LoginInput>({
     resolver: zodResolver(LoginSchema),
@@ -28,11 +29,13 @@ export function LoginForm({ tenantSlug }: { tenantSlug?: string }) {
     // derived by middleware.ts from the request hostname) — but this
     // deployment has no custom domain attached (zero-cost hosting on
     // *.vercel.app, see CLAUDE.md), so that never resolves in production.
-    // The manual field below is the fallback that actually makes
+    // The company-code disclosure below is the fallback that actually makes
     // non-default tenants reachable at all today; the prop still wins if a
-    // real subdomain is ever wired up later, so this field naturally stops
-    // being shown/needed at that point (see the conditional render below).
-    const effectiveTenantSlug = tenantSlug || data.tenantSlug?.trim() || undefined
+    // real subdomain is ever wired up later, so the disclosure naturally
+    // stops being shown at that point. The typed value only counts while
+    // its field is visible — a code typed and then collapsed is ignored.
+    const effectiveTenantSlug =
+      tenantSlug || (showCompanyCode ? data.tenantSlug?.trim() : undefined) || undefined
 
     // signIn() form-encodes this object — an `undefined` value gets
     // coerced to the literal string "undefined" by URLSearchParams, which
@@ -85,7 +88,7 @@ export function LoginForm({ tenantSlug }: { tenantSlug?: string }) {
             </div>
             <h1 className="text-2xl font-bold" style={{ color: colors.textPrimary }}>Renovo Pro</h1>
             <p className="text-sm mt-1" style={{ color: colors.textSecondary }}>
-              {tenantSlug ? tenantSlug : 'Golden Keys Investments'}
+              {tenantSlug ? tenantSlug : 'Recycling Yard Management'}
             </p>
           </div>
 
@@ -98,21 +101,6 @@ export function LoginForm({ tenantSlug }: { tenantSlug?: string }) {
 
           {/* Form */}
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            {!tenantSlug && (
-              <div>
-                <Label htmlFor="tenantSlug" style={{ color: colors.textPrimary }}>Company (leave blank for Golden Key)</Label>
-                <Input
-                  id="tenantSlug"
-                  autoComplete="off"
-                  {...register('tenantSlug')}
-                  placeholder="e.g. md-tech-solutions"
-                  className="mt-1"
-                  style={{ borderColor: colors.border }}
-                  disabled={loading}
-                />
-              </div>
-            )}
-
             <div>
               <Label htmlFor="username" style={{ color: colors.textPrimary }}>Username</Label>
               <Input
@@ -153,6 +141,36 @@ export function LoginForm({ tenantSlug }: { tenantSlug?: string }) {
                 <p className="text-xs mt-1" style={{ color: colors.danger }}>{errors.password.message}</p>
               )}
             </div>
+
+            {!tenantSlug && (
+              showCompanyCode ? (
+                <div>
+                  <Label htmlFor="tenantSlug" style={{ color: colors.textPrimary }}>Company code</Label>
+                  <Input
+                    id="tenantSlug"
+                    autoComplete="off"
+                    autoFocus
+                    {...register('tenantSlug')}
+                    className="mt-1"
+                    style={{ borderColor: colors.border }}
+                    disabled={loading}
+                  />
+                  <p className="text-xs mt-1" style={{ color: colors.textSecondary }}>
+                    Provided by your administrator
+                  </p>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowCompanyCode(true)}
+                  className="text-xs underline-offset-2 hover:underline"
+                  style={{ color: colors.textSecondary }}
+                  disabled={loading}
+                >
+                  Sign in with a company code
+                </button>
+              )
+            )}
 
             <button
               type="submit"
