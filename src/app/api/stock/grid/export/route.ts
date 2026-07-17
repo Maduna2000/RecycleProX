@@ -10,6 +10,7 @@ import { expandCategoryNames } from '@/lib/services/productService'
 import { buildReportMeta } from '@/lib/services/reports/meta'
 import { generateBusinessReportPdf } from '@/lib/pdf/businessReport'
 import type { ReportDocument, ReportGroup } from '@/lib/reports/types'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 const PERIOD_LABELS = { daily: 'Daily', weekly: 'Weekly', mtd: 'Month to Date' } as const
 
@@ -34,25 +35,27 @@ export async function GET(req: NextRequest) {
   try {
     const { periodStart, periodEnd, openingCutoff } = getPeriodBounds(period, dateParam)
 
-    // A parent category selection covers its sub-categories too
-    const productWhere: Prisma.ProductWhereInput = {
-      isActive: true,
-      ...(category ? { category: { in: await expandCategoryNames(category) } } : undefined),
-    }
+    const [products, movements] = await runWithRequestTenant(req, async () => {
+      // A parent category selection covers its sub-categories too
+      const productWhere: Prisma.ProductWhereInput = {
+        isActive: true,
+        ...(category ? { category: { in: await expandCategoryNames(category) } } : undefined),
+      }
 
-    const [products, movements] = await Promise.all([
-      prisma.product.findMany({
-        where: productWhere,
-        orderBy: [{ category: 'asc' }, { name: 'asc' }],
-      }),
-      prisma.stockMovement.findMany({
-        where: {
-          product: productWhere,
-          createdAt: { gte: openingCutoff, lte: periodEnd },
-        },
-        select: { productId: true, direction: true, quantity: true, source: true, createdAt: true },
-      }),
-    ])
+      return Promise.all([
+        prisma.product.findMany({
+          where: productWhere,
+          orderBy: [{ category: 'asc' }, { name: 'asc' }],
+        }),
+        prisma.stockMovement.findMany({
+          where: {
+            product: productWhere,
+            createdAt: { gte: openingCutoff, lte: periodEnd },
+          },
+          select: { productId: true, direction: true, quantity: true, source: true, createdAt: true },
+        }),
+      ])
+    })
 
     // Build rows
     const rows = products.map((p) => {

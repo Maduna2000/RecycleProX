@@ -6,6 +6,7 @@ import { getPurchase } from '@/lib/services/purchaseService'
 import { getAllSettings } from '@/lib/services/settingsService'
 import { getCustomerLoanSummary } from '@/lib/services/loanService'
 import { generateTransactionSlip } from '@/lib/pdf/slip'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 /**
  * GET /api/purchases/[id]/receipt?format=pdf|thermal
@@ -25,15 +26,29 @@ export async function GET(
   const format = req.nextUrl.searchParams.get('format') ?? 'pdf'
 
   try {
-    const [purchase, settings] = await Promise.all([
-      getPurchase(id),
-      getAllSettings(),
-    ])
+    const { purchase, settings, remainingLoanBalance } = await runWithRequestTenant(req, async () => {
+      const [purchase, settings] = await Promise.all([
+        getPurchase(id),
+        getAllSettings(),
+      ])
+
+      const loanDec = purchase.loanDeductionAmount
+        ? new Decimal(purchase.loanDeductionAmount.toString())
+        : new Decimal(0)
+
+      // Remaining loan balance (current outstanding after applied deduction)
+      let remainingLoanBalance: string | undefined
+      if (loanDec.greaterThan(0)) {
+        const loanSummary = await getCustomerLoanSummary(purchase.customerId)
+        if (new Decimal(loanSummary.outstanding).greaterThan(0)) {
+          remainingLoanBalance = loanSummary.outstanding
+        }
+      }
+
+      return { purchase, settings, remainingLoanBalance }
+    })
 
     const amountPaidDec = new Decimal(purchase.amountPaid.toString())
-    const loanDec       = purchase.loanDeductionAmount
-      ? new Decimal(purchase.loanDeductionAmount.toString())
-      : new Decimal(0)
 
     const slipStatus: 'completed' | 'pending' | 'partial' =
       purchase.status === 'completed'            ? 'completed'
@@ -41,15 +56,6 @@ export async function GET(
       : 'pending'
 
     const slipAmountPaid = amountPaidDec.greaterThan(0) ? amountPaidDec.toFixed(2) : undefined
-
-    // Remaining loan balance (current outstanding after applied deduction)
-    let remainingLoanBalance: string | undefined
-    if (loanDec.greaterThan(0)) {
-      const loanSummary = await getCustomerLoanSummary(purchase.customerId)
-      if (new Decimal(loanSummary.outstanding).greaterThan(0)) {
-        remainingLoanBalance = loanSummary.outstanding
-      }
-    }
 
     const lines = purchase.lines.map((l) => ({
       productName: l.product.name,

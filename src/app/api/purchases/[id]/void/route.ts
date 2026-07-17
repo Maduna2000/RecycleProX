@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { VoidPurchaseSchema } from '@/lib/schemas/purchase'
 import { voidPurchase, PurchaseNotFoundError, PurchaseAlreadyVoidedError } from '@/lib/services/purchaseService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 export async function POST(
   req: NextRequest,
@@ -28,7 +29,7 @@ export async function POST(
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
 
   try {
-    const purchase = await voidPurchase(id, parsed.data, session.user.id)
+    const purchase = await runWithRequestTenant(req, () => voidPurchase(id, parsed.data, session.user.id))
     return NextResponse.json(purchase)
   } catch (err) {
     if (err instanceof PurchaseNotFoundError) return NextResponse.json({ error: err.message }, { status: 404 })

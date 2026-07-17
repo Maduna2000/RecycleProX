@@ -8,6 +8,7 @@ import {
   PaymentExceedsBalanceError,
   PartialPaymentNotAllowedError,
 } from '@/lib/services/purchaseService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 export async function POST(
   req: NextRequest,
@@ -32,11 +33,11 @@ export async function POST(
   }
 
   try {
-    const { updated, isFullySettled } = await processSplitPayment(
+    const { updated, isFullySettled } = await runWithRequestTenant(req, () => processSplitPayment(
       id,
       parsed.data,
       session.user.id
-    )
+    ))
     return NextResponse.json({ purchase: updated, isFullySettled })
   } catch (err) {
     if (err instanceof PurchaseNotPendingError) {

@@ -4,6 +4,7 @@ import logger from '@/lib/logger'
 import { z } from 'zod'
 import Decimal from 'decimal.js'
 import { stockTransfer, ProductNotFoundError } from '@/lib/services/stockService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 const TransferSchema = z.object({
   sourceProductId: z.string().uuid(),
@@ -31,7 +32,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const result = await stockTransfer({ ...parsed.data, createdByUserId: session.user.id })
+    const result = await runWithRequestTenant(req, () => stockTransfer({ ...parsed.data, createdByUserId: session.user.id }))
     return NextResponse.json(result, { status: 201 })
   } catch (err) {
     if (err instanceof ProductNotFoundError) {

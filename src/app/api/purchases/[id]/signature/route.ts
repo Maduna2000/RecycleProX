@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { savePurchaseSignature, PurchaseNotFoundError } from '@/lib/services/purchaseService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 /**
  * PATCH /api/purchases/[id]/signature
@@ -23,7 +24,7 @@ export async function PATCH(
     if (!body.signatureR2Key) {
       return NextResponse.json({ error: 'signatureR2Key is required' }, { status: 400 })
     }
-    await savePurchaseSignature(id, body.signatureR2Key, session.user.id)
+    await runWithRequestTenant(req, () => savePurchaseSignature(id, body.signatureR2Key!, session.user.id))
     return NextResponse.json({ ok: true })
   } catch (err) {
     if (err instanceof PurchaseNotFoundError) {

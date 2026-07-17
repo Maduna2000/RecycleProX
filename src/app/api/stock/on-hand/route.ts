@@ -4,6 +4,7 @@ import logger from '@/lib/logger'
 import { getStockOnHand, getStockOnHandForPeriod } from '@/lib/services/stockService'
 import { getDayBoundsSAST, sastDateLabelToUTCDate } from '@/lib/utils/dayBounds'
 import { getPeriodBounds, STOCK_PERIODS, type StockPeriod } from '@/lib/utils/stock-periods'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 /**
  * GET /api/stock/on-hand?productId=
@@ -34,11 +35,11 @@ export async function GET(req: NextRequest) {
   try {
     if (periodParam) {
       const { periodStart, periodEnd } = getPeriodBounds(periodParam as StockPeriod, dateParam)
-      const stock = await getStockOnHandForPeriod(periodStart, periodEnd, productId)
+      const stock = await runWithRequestTenant(req, () => getStockOnHandForPeriod(periodStart, periodEnd, productId))
       return NextResponse.json({ stock })
     }
     const asAt = asAtParam ? getDayBoundsSAST(sastDateLabelToUTCDate(asAtParam)).end : undefined
-    const stock = await getStockOnHand(productId, asAt)
+    const stock = await runWithRequestTenant(req, () => getStockOnHand(productId, asAt))
     return NextResponse.json({ stock })
   } catch (err) {
     logger.error({ err }, 'GET /api/stock/on-hand failed')

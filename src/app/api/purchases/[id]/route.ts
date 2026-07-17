@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { getPurchase, PurchaseNotFoundError } from '@/lib/services/purchaseService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
   const session = await auth()
@@ -14,7 +15,7 @@ export async function GET(
   const { id } = await context.params
 
   try {
-    const purchase = await getPurchase(id)
+    const purchase = await runWithRequestTenant(req, () => getPurchase(id))
     return NextResponse.json(purchase)
   } catch (err) {
     if (err instanceof PurchaseNotFoundError) return NextResponse.json({ error: err.message }, { status: 404 })

@@ -8,6 +8,7 @@ import {
   ScaleOrderAlreadyLinkedError,
 } from '@/lib/services/purchaseService'
 import { ScaleOrderNotFoundError, ScaleOrderAlreadyVoidedError } from '@/lib/services/scaleService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 export async function GET(req: NextRequest) {
   const session = await auth()
@@ -24,7 +25,7 @@ export async function GET(req: NextRequest) {
   const to = searchParams.get('to') ? new Date(searchParams.get('to')!) : undefined
 
   try {
-    const result = await listPurchases({ customerId, status, search, paymentMethod, page, pageSize, from, to })
+    const result = await runWithRequestTenant(req, () => listPurchases({ customerId, status, search, paymentMethod, page, pageSize, from, to }))
     return NextResponse.json(result)
   } catch (err) {
     logger.error({ err }, 'GET /api/purchases failed')
@@ -41,7 +42,7 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
 
   try {
-    const purchase = await createPurchase(parsed.data, session.user.id)
+    const purchase = await runWithRequestTenant(req, () => createPurchase(parsed.data, session.user.id))
     return NextResponse.json(purchase, { status: 201 })
   } catch (err) {
     if (err instanceof CustomerBlacklistedError) return NextResponse.json({ error: err.message }, { status: 422 })

@@ -5,6 +5,7 @@ import Decimal from 'decimal.js'
 import { getSale } from '@/lib/services/saleService'
 import { getAllSettings } from '@/lib/services/settingsService'
 import { generateTransactionSlip } from '@/lib/pdf/slip'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 /**
  * GET /api/sales/[id]/receipt?format=pdf|thermal
@@ -21,10 +22,10 @@ export async function GET(
   const format = req.nextUrl.searchParams.get('format') ?? 'pdf'
 
   try {
-    const [sale, settings] = await Promise.all([
+    const [sale, settings] = await runWithRequestTenant(req, () => Promise.all([
       getSale(params.id),
       getAllSettings(),
-    ])
+    ]))
 
     const lines = sale.lines.map((l) => ({
       productName: l.product.name,

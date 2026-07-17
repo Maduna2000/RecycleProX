@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { updateSalePhotos, SaleNotFoundError } from '@/lib/services/saleService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 // PATCH /api/sales/[id]/photos
 // Body: { add: string } | { remove: string }
@@ -11,7 +12,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   try {
     const body   = await req.json() as { add?: string; remove?: string }
-    const result = await updateSalePhotos(params.id, body, session.user?.id ?? '')
+    const result = await runWithRequestTenant(req, () => updateSalePhotos(params.id, body, session.user?.id ?? ''))
     return NextResponse.json(result)
   } catch (err) {
     if (err instanceof SaleNotFoundError) {

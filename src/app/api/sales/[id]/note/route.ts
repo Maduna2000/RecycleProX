@@ -8,6 +8,9 @@ import { fetchR2Bytes } from '@/lib/r2'
 import { saleLineVat } from '@/lib/utils/vat'
 import { CURRENCY_SYMBOLS } from '@/lib/schemas/cashup'
 import { generateTransactionNote, type NoteLine } from '@/lib/pdf/transactionNote'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
+
+class SaleNotFoundForNoteError extends Error {}
 
 /**
  * GET /api/sales/[id]/note?download=1
@@ -24,22 +27,25 @@ export async function GET(
   const download = req.nextUrl.searchParams.get('download') === '1'
 
   try {
-    const sale = await prisma.sale.findUnique({
-      where: { id },
-      include: {
-        customer: true,
-        lines: { include: { product: true } },
-      },
-    })
-    if (!sale) return NextResponse.json({ error: 'Sale not found' }, { status: 404 })
+    const { sale, settings, doneByUser, latestCashUp } = await runWithRequestTenant(req, async () => {
+      const sale = await prisma.sale.findUnique({
+        where: { id },
+        include: {
+          customer: true,
+          lines: { include: { product: true } },
+        },
+      })
+      if (!sale) throw new SaleNotFoundForNoteError()
 
-    const [settings, doneByUser, latestCashUp] = await Promise.all([
-      getAllSettings(),
-      sale.createdByUserId
-        ? prisma.user.findUnique({ where: { id: sale.createdByUserId }, select: { fullName: true } })
-        : null,
-      prisma.cashUp.findFirst({ orderBy: { sessionDate: 'desc' }, select: { currency: true } }),
-    ])
+      const [settings, doneByUser, latestCashUp] = await Promise.all([
+        getAllSettings(),
+        sale.createdByUserId
+          ? prisma.user.findUnique({ where: { id: sale.createdByUserId }, select: { fullName: true } })
+          : null,
+        prisma.cashUp.findFirst({ orderBy: { sessionDate: 'desc' }, select: { currency: true } }),
+      ])
+      return { sale, settings, doneByUser, latestCashUp }
+    })
     const logoKey = settings[LOGO_SETTING_KEY]
     const logoPng = logoKey ? await fetchR2Bytes(logoKey) : null
     const currencySymbol =
@@ -124,6 +130,7 @@ export async function GET(
       },
     })
   } catch (err) {
+    if (err instanceof SaleNotFoundForNoteError) return NextResponse.json({ error: 'Sale not found' }, { status: 404 })
     logger.error({ err, saleId: id }, 'GET /api/sales/[id]/note failed')
     return NextResponse.json({ error: 'Failed to generate sale note' }, { status: 500 })
   }

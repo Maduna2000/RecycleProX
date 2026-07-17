@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { CreateSaleSchema } from '@/lib/schemas/sale'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 import { createSale, listSales, ProductInactiveError, InsufficientStockError } from '@/lib/services/saleService'
 
 export async function GET(req: NextRequest) {
@@ -18,7 +19,7 @@ export async function GET(req: NextRequest) {
   const to = searchParams.get('to') ? new Date(searchParams.get('to')!) : undefined
 
   try {
-    const result = await listSales({ status, search, paymentMethod, page, pageSize, from, to })
+    const result = await runWithRequestTenant(req, () => listSales({ status, search, paymentMethod, page, pageSize, from, to }))
     return NextResponse.json(result)
   } catch (err) {
     logger.error({ err }, 'GET /api/sales failed')
@@ -35,7 +36,7 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
 
   try {
-    const sale = await createSale(parsed.data, session.user.id)
+    const sale = await runWithRequestTenant(req, () => createSale(parsed.data, session.user.id))
     return NextResponse.json(sale, { status: 201 })
   } catch (err) {
     if (err instanceof ProductInactiveError)  return NextResponse.json({ error: err.message }, { status: 422 })

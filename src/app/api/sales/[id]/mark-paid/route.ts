@@ -4,6 +4,7 @@ import logger from '@/lib/logger'
 import { z } from 'zod'
 import Decimal from 'decimal.js'
 import { markSalePaid, SaleNotPendingError, SalePaymentExceedsBalanceError } from '@/lib/services/saleService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 const SettleSchema = z.object({
   amount: z
@@ -30,7 +31,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 
   try {
-    const { updated } = await markSalePaid(params.id, parsed.data, session.user.id)
+    const { updated } = await runWithRequestTenant(req, () => markSalePaid(params.id, parsed.data, session.user.id))
     return NextResponse.json(updated)
   } catch (err) {
     if (err instanceof SaleNotPendingError) {

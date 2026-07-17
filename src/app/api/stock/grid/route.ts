@@ -6,6 +6,7 @@ import { Prisma } from '@prisma/client'
 import Decimal from 'decimal.js'
 import { getPeriodBounds } from '@/lib/utils/stock-periods'
 import { expandCategoryNames } from '@/lib/services/productService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 /**
  * GET /api/stock/grid?period=daily|weekly|mtd&date=YYYY-MM-DD&categoryId=
@@ -27,25 +28,27 @@ export async function GET(req: NextRequest) {
   try {
     const { periodStart, periodEnd, openingCutoff } = getPeriodBounds(period, dateParam)
 
-    // A parent category selection covers its sub-categories too
-    const productWhere: Prisma.ProductWhereInput = {
-      isActive: true,
-      ...(category ? { category: { in: await expandCategoryNames(category) } } : undefined),
-    }
+    const [products, movements] = await runWithRequestTenant(req, async () => {
+      // A parent category selection covers its sub-categories too
+      const productWhere: Prisma.ProductWhereInput = {
+        isActive: true,
+        ...(category ? { category: { in: await expandCategoryNames(category) } } : undefined),
+      }
 
-    const [products, movements] = await Promise.all([
-      prisma.product.findMany({
-        where: productWhere,
-        orderBy: [{ category: 'asc' }, { name: 'asc' }],
-      }),
-      prisma.stockMovement.findMany({
-        where: {
-          product: productWhere,
-          createdAt: { gte: openingCutoff, lte: periodEnd },
-        },
-        select: { productId: true, direction: true, quantity: true, source: true, createdAt: true },
-      }),
-    ])
+      return Promise.all([
+        prisma.product.findMany({
+          where: productWhere,
+          orderBy: [{ category: 'asc' }, { name: 'asc' }],
+        }),
+        prisma.stockMovement.findMany({
+          where: {
+            product: productWhere,
+            createdAt: { gte: openingCutoff, lte: periodEnd },
+          },
+          select: { productId: true, direction: true, quantity: true, source: true, createdAt: true },
+        }),
+      ])
+    })
 
     // Build per-product aggregates
     const grid = products.map((p) => {

@@ -4,21 +4,22 @@ import logger from '@/lib/logger'
 import { getSale, SaleNotFoundError } from '@/lib/services/saleService'
 import { getAllSettings } from '@/lib/services/settingsService'
 import { generateTransactionSlip } from '@/lib/pdf/slip'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 // GET /api/sales/[id]/packing-list
 // Returns a PDF packing list for the sale (items + quantities).
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   try {
-    const [sale, settings] = await Promise.all([
+    const [sale, settings] = await runWithRequestTenant(req, () => Promise.all([
       getSale(params.id),
       getAllSettings(),
-    ])
+    ]))
 
     const lines = sale.lines.map((l) => ({
       productName: l.product.name,

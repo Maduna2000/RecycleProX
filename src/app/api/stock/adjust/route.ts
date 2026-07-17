@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { z } from 'zod'
 import { manualAdjustment, ProductNotFoundError } from '@/lib/services/stockService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 const AdjustSchema = z.object({
   productId: z.string().uuid(),
@@ -26,7 +27,7 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
 
   try {
-    const movement = await manualAdjustment({ ...parsed.data, createdByUserId: session.user.id })
+    const movement = await runWithRequestTenant(req, () => manualAdjustment({ ...parsed.data, createdByUserId: session.user.id }))
     return NextResponse.json(movement, { status: 201 })
   } catch (err) {
     if (err instanceof ProductNotFoundError) return NextResponse.json({ error: err.message }, { status: 404 })

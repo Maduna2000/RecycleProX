@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { VoidSaleSchema } from '@/lib/schemas/sale'
 import { voidSale, SaleNotFoundError, SaleAlreadyVoidedError } from '@/lib/services/saleService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await auth()
@@ -16,7 +17,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
 
   try {
-    const sale = await voidSale(params.id, parsed.data, session.user.id)
+    const sale = await runWithRequestTenant(req, () => voidSale(params.id, parsed.data, session.user.id))
     return NextResponse.json(sale)
   } catch (err) {
     if (err instanceof SaleNotFoundError) return NextResponse.json({ error: err.message }, { status: 404 })

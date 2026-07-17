@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { updatePurchasePhotos, PurchaseNotFoundError } from '@/lib/services/purchaseService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 // PATCH /api/purchases/[id]/photos
 // Body: { add: string } | { remove: string }
@@ -17,7 +18,7 @@ export async function PATCH(
 
   try {
     const body   = await req.json() as { add?: string; remove?: string }
-    const result = await updatePurchasePhotos(id, body, session.user.id)
+    const result = await runWithRequestTenant(req, () => updatePurchasePhotos(id, body, session.user.id))
     return NextResponse.json(result)
   } catch (err) {
     if (err instanceof PurchaseNotFoundError) {

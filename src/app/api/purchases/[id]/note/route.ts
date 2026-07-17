@@ -8,6 +8,9 @@ import { fetchR2Bytes } from '@/lib/r2'
 import { purchaseLineAmounts, purchaseHeaderAmounts } from '@/lib/utils/vat'
 import { CURRENCY_SYMBOLS } from '@/lib/schemas/cashup'
 import { generateTransactionNote, type NoteLine } from '@/lib/pdf/transactionNote'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
+
+class PurchaseNotFoundForNoteError extends Error {}
 
 /**
  * GET /api/purchases/[id]/note?download=1
@@ -24,22 +27,25 @@ export async function GET(
   const download = req.nextUrl.searchParams.get('download') === '1'
 
   try {
-    const purchase = await prisma.purchase.findUnique({
-      where: { id },
-      include: {
-        customer: true,
-        lines: { include: { product: true } },
-      },
-    })
-    if (!purchase) return NextResponse.json({ error: 'Purchase not found' }, { status: 404 })
+    const { purchase, settings, doneByUser, latestCashUp } = await runWithRequestTenant(req, async () => {
+      const purchase = await prisma.purchase.findUnique({
+        where: { id },
+        include: {
+          customer: true,
+          lines: { include: { product: true } },
+        },
+      })
+      if (!purchase) throw new PurchaseNotFoundForNoteError()
 
-    const [settings, doneByUser, latestCashUp] = await Promise.all([
-      getAllSettings(),
-      purchase.createdByUserId
-        ? prisma.user.findUnique({ where: { id: purchase.createdByUserId }, select: { fullName: true } })
-        : null,
-      prisma.cashUp.findFirst({ orderBy: { sessionDate: 'desc' }, select: { currency: true } }),
-    ])
+      const [settings, doneByUser, latestCashUp] = await Promise.all([
+        getAllSettings(),
+        purchase.createdByUserId
+          ? prisma.user.findUnique({ where: { id: purchase.createdByUserId }, select: { fullName: true } })
+          : null,
+        prisma.cashUp.findFirst({ orderBy: { sessionDate: 'desc' }, select: { currency: true } }),
+      ])
+      return { purchase, settings, doneByUser, latestCashUp }
+    })
     const logoKey = settings[LOGO_SETTING_KEY]
     const logoPng = logoKey ? await fetchR2Bytes(logoKey) : null
     const currencySymbol =
@@ -123,6 +129,7 @@ export async function GET(
       },
     })
   } catch (err) {
+    if (err instanceof PurchaseNotFoundForNoteError) return NextResponse.json({ error: 'Purchase not found' }, { status: 404 })
     logger.error({ err, purchaseId: id }, 'GET /api/purchases/[id]/note failed')
     return NextResponse.json({ error: 'Failed to generate purchase note' }, { status: 500 })
   }

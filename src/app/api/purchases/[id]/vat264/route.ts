@@ -6,9 +6,10 @@ import { getPurchase } from '@/lib/services/purchaseService'
 import { getAllSettings } from '@/lib/services/settingsService'
 import { CURRENCY_SYMBOLS } from '@/lib/schemas/cashup'
 import { generateVat264 } from '@/lib/pdf/vat264'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
   const session = await auth()
@@ -18,13 +19,16 @@ export async function GET(
   const { id } = await context.params
 
   try {
-    const purchase = await getPurchase(id)
+    const { purchase, settings, latestCashUp } = await runWithRequestTenant(req, async () => {
+      const purchase = await getPurchase(id)
 
-    // Load yard settings + operating currency (from the latest cash-up)
-    const [settings, latestCashUp] = await Promise.all([
-      getAllSettings(),
-      prisma.cashUp.findFirst({ orderBy: { sessionDate: 'desc' }, select: { currency: true } }),
-    ])
+      // Load yard settings + operating currency (from the latest cash-up)
+      const [settings, latestCashUp] = await Promise.all([
+        getAllSettings(),
+        prisma.cashUp.findFirst({ orderBy: { sessionDate: 'desc' }, select: { currency: true } }),
+      ])
+      return { purchase, settings, latestCashUp }
+    })
     const currencySymbol =
       CURRENCY_SYMBOLS[latestCashUp?.currency as keyof typeof CURRENCY_SYMBOLS] ?? 'R'
 
