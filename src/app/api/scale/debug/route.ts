@@ -1,10 +1,11 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { prisma } from '@/lib/db/prisma'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 // Debug endpoint to check scale orders in database
 // Only accessible by admin
-export async function GET() {
+export async function GET(req: NextRequest) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (session.user.role !== 'admin') {
@@ -12,28 +13,33 @@ export async function GET() {
   }
 
   try {
-    // Get counts
-    const totalOrders = await prisma.scaleOrder.count()
-    const pendingOrders = await prisma.scaleOrder.count({ where: { status: 'pending' } })
-    const processedOrders = await prisma.scaleOrder.count({ where: { status: 'processed' } })
-    const voidedOrders = await prisma.scaleOrder.count({ where: { status: 'voided' } })
+    const { totalOrders, pendingOrders, processedOrders, voidedOrders, recentOrders } =
+      await runWithRequestTenant(req, async () => {
+        // Get counts
+        const totalOrders = await prisma.scaleOrder.count()
+        const pendingOrders = await prisma.scaleOrder.count({ where: { status: 'pending' } })
+        const processedOrders = await prisma.scaleOrder.count({ where: { status: 'processed' } })
+        const voidedOrders = await prisma.scaleOrder.count({ where: { status: 'voided' } })
 
-    // Get orders by day for the last 7 days
-    const sevenDaysAgo = new Date()
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+        // Get orders by day for the last 7 days
+        const sevenDaysAgo = new Date()
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
 
-    const recentOrders = await prisma.scaleOrder.findMany({
-      where: { createdAt: { gte: sevenDaysAgo } },
-      select: {
-        id: true,
-        orderNumber: true,
-        createdAt: true,
-        status: true,
-        operator: { select: { fullName: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 50,
-    })
+        const recentOrders = await prisma.scaleOrder.findMany({
+          where: { createdAt: { gte: sevenDaysAgo } },
+          select: {
+            id: true,
+            orderNumber: true,
+            createdAt: true,
+            status: true,
+            operator: { select: { fullName: true } },
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 50,
+        })
+
+        return { totalOrders, pendingOrders, processedOrders, voidedOrders, recentOrders }
+      })
 
     // Group by date
     const ordersByDate: Record<string, number> = {}

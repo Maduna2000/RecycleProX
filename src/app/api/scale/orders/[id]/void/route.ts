@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { VoidScaleOrderSchema } from '@/lib/schemas/scale'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 import { voidScaleOrder, ScaleOrderNotFoundError, ScaleOrderAlreadyVoidedError } from '@/lib/services/scaleService'
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
@@ -16,7 +17,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
 
   try {
-    const order = await voidScaleOrder(params.id, parsed.data, session.user.id)
+    const order = await runWithRequestTenant(req, () => voidScaleOrder(params.id, parsed.data, session.user.id))
     return NextResponse.json(order)
   } catch (err) {
     if (err instanceof ScaleOrderNotFoundError)     return NextResponse.json({ error: err.message }, { status: 404 })

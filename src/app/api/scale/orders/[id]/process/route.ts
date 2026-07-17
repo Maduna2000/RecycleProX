@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 import {
   markProcessed, ScaleOrderNotFoundError,
   ScaleOrderAlreadyVoidedError, ScaleOrderAlreadyProcessedError,
@@ -14,7 +15,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   }
 
   try {
-    const order = await markProcessed(params.id, session.user.id)
+    const order = await runWithRequestTenant(req, () => markProcessed(params.id, session.user.id))
     return NextResponse.json(order)
   } catch (err) {
     if (err instanceof ScaleOrderNotFoundError)          return NextResponse.json({ error: err.message }, { status: 404 })

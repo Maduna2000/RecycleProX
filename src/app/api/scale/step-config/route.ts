@@ -1,6 +1,7 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { prisma } from '@/lib/db/prisma'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 import type { StepConfigResponse } from '@/lib/schemas/scale'
 
 /**
@@ -8,16 +9,16 @@ import type { StepConfigResponse } from '@/lib/schemas/scale'
  * List all categories with their step configurations
  * Includes inheritance logic: child categories inherit from parent if no explicit config
  */
-export async function GET() {
+export async function GET(req: NextRequest) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   // Fetch all active categories with their step configs
-  const categories = await prisma.productCategory.findMany({
+  const categories = await runWithRequestTenant(req, () => prisma.productCategory.findMany({
     where:   { isActive: true },
     orderBy: [{ parentId: 'asc' }, { sortOrder: 'asc' }, { name: 'asc' }],
     include: { stepConfig: true },
-  })
+  }))
 
   // Build a map of parent configs for inheritance lookup
   const parentConfigs = new Map<string, { requireWeight: boolean; requirePhotos: boolean }>()

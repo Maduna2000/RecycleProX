@@ -5,7 +5,8 @@
   "main": "electron/main.js",
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && prisma migrate deploy && next build",
+    "build": "npx ts-node --project tsconfig.scripts.json scripts/check-tenant-wrapping.ts && prisma generate && prisma migrate deploy && next build",
+    "check:tenant-wrapping": "npx ts-node --project tsconfig.scripts.json scripts/check-tenant-wrapping.ts",
     "start": "next start",
     "lint": "next lint",
     "seed": "npx ts-node --compiler-options '{\"module\":\"CommonJS\"}' prisma/seed.ts",

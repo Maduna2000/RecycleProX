@@ -4,13 +4,14 @@ import logger from '@/lib/logger'
 import { getScaleOrderById, ScaleOrderNotFoundError } from '@/lib/services/scaleService'
 import { getViewUrl } from '@/lib/r2'
 import { decodePhotoKeys } from '@/lib/offline/photoKeysCodec'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   try {
-    const order = await getScaleOrderById(params.id)
+    const order = await runWithRequestTenant(req, () => getScaleOrderById(params.id))
 
     // order.photoR2Keys is a legacy single-product column, seeded only from
     // the *first* line at order-creation time (see scaleService.ts's

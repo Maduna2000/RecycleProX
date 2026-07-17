@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { getAllScaleOrdersForExport, resolveCustomerName, resolveCustomerPhone } from '@/lib/services/scaleService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 import * as XLSX from 'xlsx'
 import Decimal from 'decimal.js'
 
@@ -15,7 +16,7 @@ export async function GET(req: NextRequest) {
   const p      = req.nextUrl.searchParams
   const format = p.get('format') ?? 'csv'
 
-  const orders = await getAllScaleOrdersForExport({
+  const orders = await runWithRequestTenant(req, () => getAllScaleOrdersForExport({
     dateFrom:   p.get('dateFrom')   ?? undefined,
     dateTo:     p.get('dateTo')     ?? undefined,
     status:     (p.get('status')    ?? undefined) as 'pending' | 'processed' | 'voided' | undefined,
@@ -23,7 +24,7 @@ export async function GET(req: NextRequest) {
     productId:  p.get('productId')  ?? undefined,
     categoryName: p.get('categoryName') ?? undefined,
     search:     p.get('search')     ?? undefined,
-  })
+  }))
 
   // One row per product line — the order header only carries the first line.
   // Legacy orders without line rows fall back to the header product/weight.

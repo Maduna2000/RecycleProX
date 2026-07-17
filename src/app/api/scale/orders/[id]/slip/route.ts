@@ -5,6 +5,7 @@ import { getScaleOrderById, saveSlipKey, resolveCustomerName, resolveCustomerPho
 import { getAllSettings } from '@/lib/services/settingsService'
 import { generateScaleOrderSlip } from '@/lib/pdf/scaleSlip'
 import { uploadBytes, scaleOrderSlipKey } from '@/lib/r2'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 import Decimal from 'decimal.js'
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
@@ -12,8 +13,9 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   try {
-    const order    = await getScaleOrderById(params.id)
-    const settings = await getAllSettings()
+    const [order, settings] = await runWithRequestTenant(req, () =>
+      Promise.all([getScaleOrderById(params.id), getAllSettings()]),
+    )
     const yardName = settings.yard_name ?? settings.company_name ?? 'Renovo Pro'
 
     const slipLines = order.lines.length > 0
@@ -42,16 +44,18 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
     // Save to R2 — awaited (not fire-and-forget): a detached, un-awaited
     // promise chain here risks running after this function has already
-    // returned its response, at which point Next.js's request-scoped
-    // headers() context (which requireTenantId() now depends on, see
-    // i-need-you-to-vectorized-pumpkin.md Section 11) is gone, and
-    // saveSlipKey's prisma call would silently fail. Failure here still
-    // shouldn't block the response the user is waiting on, so errors are
-    // caught and logged rather than thrown.
+    // returned its response, at which point req itself may no longer be
+    // valid to read headers off. runWithRequestTenant re-derives tenant
+    // context from `req` directly (see i-need-you-to-vectorized-pumpkin.md
+    // Section 12) rather than Next's ambient headers(), but that only
+    // works while this handler's own invocation is still alive — hence
+    // still awaited here. Failure here still shouldn't block the response
+    // the user is waiting on, so errors are caught and logged rather than
+    // thrown.
     try {
       const key = scaleOrderSlipKey(order.id)
       await uploadBytes(key, pdfBytes, 'application/pdf')
-      await saveSlipKey(order.id, key)
+      await runWithRequestTenant(req, () => saveSlipKey(order.id, key))
     } catch (err) {
       logger.error({ err, orderId: order.id }, 'Failed to save slip to R2')
     }

@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import { z } from 'zod'
 import bcrypt from 'bcryptjs'
 import { prisma } from '@/lib/db/prisma'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 import logger from '@/lib/logger'
 
 const PatchSchema = z.discriminatedUnion('action', [
@@ -18,7 +19,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const target = await prisma.user.findUnique({ where: { id: params.id } })
+  const target = await runWithRequestTenant(req, () => prisma.user.findUnique({ where: { id: params.id } }))
   if (!target || target.role !== 'scale_operator') {
     return NextResponse.json({ error: 'Operator not found' }, { status: 404 })
   }
@@ -43,11 +44,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       }
     }
 
-    const user = await prisma.user.update({
+    const user = await runWithRequestTenant(req, () => prisma.user.update({
       where:  { id: params.id },
       data:   updateData,
       select: { id: true, fullName: true, username: true, isActive: true, lastLoginAt: true, createdAt: true },
-    })
+    }))
     logger.info({ targetUserId: params.id, action: parsed.data.action, adminId: session.user.id }, 'scale_operator.patched')
     return NextResponse.json(user)
   } catch (err) {
