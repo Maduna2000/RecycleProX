@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { blacklistCustomer, ForbiddenError } from '@/lib/services/customerService'
 import { BlacklistSchema } from '@/lib/schemas/customer'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 import logger from '@/lib/logger'
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
@@ -15,7 +16,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   }
 
   try {
-    const customer = await blacklistCustomer(params.id, parsed.data.reason, session.user.id, session.user.role)
+    const customer = await runWithRequestTenant(req, () => blacklistCustomer(params.id, parsed.data.reason, session.user.id, session.user.role))
     return NextResponse.json(customer)
   } catch (err) {
     if (err instanceof ForbiddenError) return NextResponse.json({ error: err.message }, { status: 403 })

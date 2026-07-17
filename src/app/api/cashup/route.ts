@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { OpenCashUpSchema } from '@/lib/schemas/cashup'
 import { openCashUp, listCashUps, getOpenSession, getAnyOpenSession } from '@/lib/services/cashUpService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 // GET /api/cashup — list history OR ?today=1 for the open session
 export async function GET(req: NextRequest) {
@@ -18,23 +19,23 @@ export async function GET(req: NextRequest) {
       // An explicit date was requested — honor it directly rather than letting
       // an unrelated open session from another date silently override it.
       if (dateStr) {
-        const cashUp = await getOpenSession(dateStr)
+        const cashUp = await runWithRequestTenant(req, () => getOpenSession(dateStr))
         return NextResponse.json({ cashUp })
       }
 
       // No explicit date — check for any open session (could be from a previous
       // day that needs submission) before falling back to today's session.
-      const openSession = await getAnyOpenSession()
+      const openSession = await runWithRequestTenant(req, () => getAnyOpenSession())
       if (openSession) {
         return NextResponse.json({ cashUp: openSession })
       }
-      const cashUp = await getOpenSession()
+      const cashUp = await runWithRequestTenant(req, () => getOpenSession())
       return NextResponse.json({ cashUp })
     }
 
     const skip = parseInt(searchParams.get('skip') ?? '0', 10)
     const take = parseInt(searchParams.get('take') ?? '30', 10)
-    const result = await listCashUps({ skip, take })
+    const result = await runWithRequestTenant(req, () => listCashUps({ skip, take }))
     return NextResponse.json(result)
   } catch (err) {
     logger.error({ err }, 'GET /api/cashup failed')
@@ -54,7 +55,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
     }
 
-    const cashUp = await openCashUp(session.user.id, parsed.data.sessionDate, parsed.data.currency)
+    const cashUp = await runWithRequestTenant(req, () => openCashUp(session.user.id, parsed.data.sessionDate, parsed.data.currency))
     return NextResponse.json({ cashUp }, { status: 201 })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to open cash-up session'

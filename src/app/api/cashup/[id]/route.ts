@@ -3,17 +3,18 @@ import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { SubmitCashUpSchema } from '@/lib/schemas/cashup'
 import { getCashUp, submitCashUp } from '@/lib/services/cashUpService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 // GET /api/cashup/[id]
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   try {
-    const cashUp = await getCashUp(params.id)
+    const cashUp = await runWithRequestTenant(req, () => getCashUp(params.id))
     if (!cashUp) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     return NextResponse.json({ cashUp })
   } catch (err) {
@@ -37,7 +38,7 @@ export async function PUT(
       return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
     }
 
-    const cashUp = await submitCashUp(params.id, session.user.id, parsed.data)
+    const cashUp = await runWithRequestTenant(req, () => submitCashUp(params.id, session.user.id, parsed.data))
     return NextResponse.json({ cashUp })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Failed to submit cash-up'

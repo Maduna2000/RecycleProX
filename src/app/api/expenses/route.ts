@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { createExpense, listExpenses } from '@/lib/services/expenseService'
 import { CreateExpenseSchema } from '@/lib/schemas/expense'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 import logger from '@/lib/logger'
 
 export async function GET(req: NextRequest) {
@@ -15,7 +16,7 @@ export async function GET(req: NextRequest) {
   const to     = searchParams.get('to')   ? new Date(searchParams.get('to')!)   : undefined
   const page   = parseInt(searchParams.get('page') ?? '1')
 
-  const result = await listExpenses({ status, search, from, to, page })
+  const result = await runWithRequestTenant(req, () => listExpenses({ status, search, from, to, page }))
   return NextResponse.json(result)
 }
 
@@ -30,7 +31,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const expense = await createExpense(parsed.data, session.user.id)
+    const expense = await runWithRequestTenant(req, () => createExpense(parsed.data, session.user.id))
     return NextResponse.json(expense, { status: 201 })
   } catch (err) {
     logger.error({ err }, 'POST /api/expenses failed')

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { lookupByIdNumber } from '@/lib/services/customerService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 export async function GET(req: NextRequest) {
   const session = await auth()
@@ -9,6 +10,6 @@ export async function GET(req: NextRequest) {
   const idNumber = req.nextUrl.searchParams.get('idNumber')
   if (!idNumber) return NextResponse.json({ error: 'idNumber is required' }, { status: 400 })
 
-  const customer = await lookupByIdNumber(idNumber)
+  const customer = await runWithRequestTenant(req, () => lookupByIdNumber(idNumber))
   return NextResponse.json(customer ?? null)
 }

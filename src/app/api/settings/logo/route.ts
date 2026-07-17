@@ -4,6 +4,7 @@ import logger from '@/lib/logger'
 import { uploadBytes, deleteR2Object } from '@/lib/r2'
 import { readPngMeta } from '@/lib/utils/pngMeta'
 import { getAllSettings, upsertGlobalSettings, LOGO_SETTING_KEY } from '@/lib/services/settingsService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 /**
  * Company logo used on generated documents (purchase/sale notes).
@@ -69,9 +70,12 @@ export async function POST(req: NextRequest) {
     await uploadBytes(key, bytes, 'image/png')
 
     // Point the setting at the new object, then clean up the old one
-    const settings = await getAllSettings()
-    const oldKey = settings[LOGO_SETTING_KEY]
-    await upsertGlobalSettings({ [LOGO_SETTING_KEY]: key }, session.user.id)
+    const oldKey = await runWithRequestTenant(req, async () => {
+      const settings = await getAllSettings()
+      const oldKey = settings[LOGO_SETTING_KEY]
+      await upsertGlobalSettings({ [LOGO_SETTING_KEY]: key }, session.user.id)
+      return oldKey
+    })
     if (oldKey && oldKey !== key) {
       await deleteR2Object(oldKey).catch((err) => logger.warn({ err, oldKey }, 'settings.logo.cleanup.failed'))
     }
@@ -84,15 +88,18 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function DELETE() {
+export async function DELETE(req: NextRequest) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (session.user.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   try {
-    const settings = await getAllSettings()
-    const oldKey = settings[LOGO_SETTING_KEY]
-    await upsertGlobalSettings({ [LOGO_SETTING_KEY]: '' }, session.user.id)
+    const oldKey = await runWithRequestTenant(req, async () => {
+      const settings = await getAllSettings()
+      const oldKey = settings[LOGO_SETTING_KEY]
+      await upsertGlobalSettings({ [LOGO_SETTING_KEY]: '' }, session.user.id)
+      return oldKey
+    })
     if (oldKey) {
       await deleteR2Object(oldKey).catch((err) => logger.warn({ err, oldKey }, 'settings.logo.cleanup.failed'))
     }

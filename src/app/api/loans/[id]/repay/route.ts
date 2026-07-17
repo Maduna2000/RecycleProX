@@ -9,6 +9,7 @@ import {
   LoanAlreadyVoidedError,
   RepaymentExceedsBalanceError,
 } from '@/lib/services/loanService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 export async function POST(
   req: NextRequest,
@@ -22,7 +23,7 @@ export async function POST(
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
 
   try {
-    const repayment = await createRepayment(parsed.data, session.user.id)
+    const repayment = await runWithRequestTenant(req, () => createRepayment(parsed.data, session.user.id))
     return NextResponse.json(repayment, { status: 201 })
   } catch (err) {
     if (err instanceof LoanNotFoundError)          return NextResponse.json({ error: err.message }, { status: 404 })

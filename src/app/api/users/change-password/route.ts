@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { changePassword, InvalidCurrentPasswordError } from '@/lib/services/authService'
 import { ChangePasswordSchema } from '@/lib/schemas/auth'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 import logger from '@/lib/logger'
 
 export async function POST(req: NextRequest) {
@@ -15,7 +16,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    await changePassword(session.user.id, parsed.data.currentPassword, parsed.data.newPassword)
+    await runWithRequestTenant(req, () => changePassword(session.user.id, parsed.data.currentPassword, parsed.data.newPassword))
     return NextResponse.json({ success: true })
   } catch (err) {
     if (err instanceof InvalidCurrentPasswordError) {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { quickCreate } from '@/lib/services/customerService'
 import { QuickCreateSchema } from '@/lib/schemas/customer'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 import logger from '@/lib/logger'
 
 export async function POST(req: NextRequest) {
@@ -15,7 +16,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const customer = await quickCreate(parsed.data, session.user.id)
+    const customer = await runWithRequestTenant(req, () => quickCreate(parsed.data, session.user.id))
     return NextResponse.json(customer, { status: 200 })
   } catch (err) {
     logger.error({ err }, 'POST /api/customers/quick-create failed')

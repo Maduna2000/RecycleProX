@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { listUsers, createUser } from '@/lib/services/authService'
 import { CreateUserSchema } from '@/lib/schemas/auth'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 import logger from '@/lib/logger'
 
 export async function GET(req: NextRequest) {
@@ -18,13 +19,13 @@ export async function GET(req: NextRequest) {
   const page     = parseInt(searchParams.get('page')  ?? '1')
   const limit    = parseInt(searchParams.get('limit') ?? '20')
 
-  const result = await listUsers({
+  const result = await runWithRequestTenant(req, () => listUsers({
     role,
     isActive: isActive !== null ? isActive === 'true' : undefined,
     search,
     page,
     limit,
-  })
+  }))
 
   return NextResponse.json(result)
 }
@@ -46,7 +47,7 @@ export async function POST(req: NextRequest) {
   const allowedModules = Array.isArray(body.allowedModules) ? body.allowedModules : undefined
 
   try {
-    const user = await createUser({ ...parsed.data, allowedModules }, session.user.id)
+    const user = await runWithRequestTenant(req, () => createUser({ ...parsed.data, allowedModules }, session.user.id))
     return NextResponse.json(user, { status: 201 })
   } catch (err) {
     logger.error({ err }, 'POST /api/users failed')

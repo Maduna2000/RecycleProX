@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { PersonSearchSchema } from '@/lib/schemas/police'
 import { searchPersons, PoliceVisitNotActiveError } from '@/lib/services/policeVisitService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 /**
  * GET /api/police-search/person?visitId=&q=
@@ -23,7 +24,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const result = await searchPersons(parsed.data.visitId, parsed.data.q)
+    const result = await runWithRequestTenant(req, () => searchPersons(parsed.data.visitId, parsed.data.q))
     return NextResponse.json(result)
   } catch (err) {
     if (err instanceof PoliceVisitNotActiveError) {

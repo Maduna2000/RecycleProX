@@ -1,17 +1,18 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { getAllOpenSessions } from '@/lib/services/cashUpService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 // GET /api/cashup/open-sessions — list all open sessions
-export async function GET() {
+export async function GET(req: NextRequest) {
   const session = await auth()
   if (!session?.user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   try {
-    const sessions = await getAllOpenSessions()
+    const sessions = await runWithRequestTenant(req, () => getAllOpenSessions())
     return NextResponse.json({ sessions })
   } catch (err) {
     logger.error({ err }, 'GET /api/cashup/open-sessions failed')

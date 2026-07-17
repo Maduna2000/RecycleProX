@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { generateCashupReport, type ReportEntry } from '@/lib/pdf/cashupReport'
 import { getAllSettings } from '@/lib/services/settingsService'
 import { getUnpaidPurchases } from '@/lib/services/cashUpService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 const QuerySchema = z.object({
   scope: z.enum(['today', 'all']).default('all'),
@@ -53,11 +54,11 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // Get settings for company info
-    const settings = await getAllSettings()
-
-    // Fetch report data
-    const entries = await getUnpaidPurchases(scope, sessionDate) as unknown as ReportEntry[]
+    // Get settings for company info + report data
+    const [settings, entries] = await runWithRequestTenant(req, () => Promise.all([
+      getAllSettings(),
+      getUnpaidPurchases(scope, sessionDate) as unknown as Promise<ReportEntry[]>,
+    ]))
 
     const reportType = scope === 'today' ? 'unpaid-today' : 'unpaid-all'
     const reportDate = sessionDate ?? new Date()

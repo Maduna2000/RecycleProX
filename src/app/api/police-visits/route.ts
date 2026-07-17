@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { z } from 'zod'
 import { listPoliceVisits, createPoliceVisit } from '@/lib/services/policeVisitService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 const CreateVisitSchema = z.object({
   visitDate:       z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date (YYYY-MM-DD required)'),
@@ -29,7 +30,7 @@ export async function GET(req: NextRequest) {
   const offset = parseInt(req.nextUrl.searchParams.get('offset') ?? '0')
 
   try {
-    const result = await listPoliceVisits({ limit, offset })
+    const result = await runWithRequestTenant(req, () => listPoliceVisits({ limit, offset }))
     return NextResponse.json(result)
   } catch (err) {
     logger.error({ err }, 'GET /api/police-visits failed')
@@ -61,7 +62,7 @@ export async function POST(req: NextRequest) {
   const visitDate = new Date(Date.UTC(y!, m! - 1, day!))
 
   try {
-    const visit = await createPoliceVisit(
+    const visit = await runWithRequestTenant(req, () => createPoliceVisit(
       {
         visitDate,
         officerName:    d.officerName,
@@ -72,7 +73,7 @@ export async function POST(req: NextRequest) {
         notes:          d.notes,
       },
       session.user.id
-    )
+    ))
     return NextResponse.json({ visit }, { status: 201 })
   } catch (err) {
     logger.error({ err }, 'POST /api/police-visits failed')

@@ -6,6 +6,7 @@ import {
   createLoan, listLoans,
   CustomerBlacklistedError, CustomerInactiveError,
 } from '@/lib/services/loanService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 export async function GET(req: NextRequest) {
   const session = await auth()
@@ -21,7 +22,7 @@ export async function GET(req: NextRequest) {
   const to   = searchParams.get('to')   ? new Date(searchParams.get('to')!)   : undefined
 
   try {
-    const result = await listLoans({ customerId, status, search, page, pageSize, from, to })
+    const result = await runWithRequestTenant(req, () => listLoans({ customerId, status, search, page, pageSize, from, to }))
     return NextResponse.json(result)
   } catch (err) {
     logger.error({ err }, 'GET /api/loans failed')
@@ -38,7 +39,7 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
 
   try {
-    const loan = await createLoan(parsed.data, session.user.id)
+    const loan = await runWithRequestTenant(req, () => createLoan(parsed.data, session.user.id))
     return NextResponse.json(loan, { status: 201 })
   } catch (err) {
     if (err instanceof CustomerBlacklistedError) return NextResponse.json({ error: err.message }, { status: 422 })

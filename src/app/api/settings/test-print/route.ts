@@ -1,19 +1,20 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { getAllSettings } from '@/lib/services/settingsService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 // POST /api/settings/test-print
 // Sends a small test page to the configured thermal printer.
 // Only works on a local install — gracefully fails in cloud/Vercel.
-export async function POST() {
+export async function POST(req: NextRequest) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   if (session.user.role !== 'admin') {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const cfg = await getAllSettings()
+  const cfg = await runWithRequestTenant(req, () => getAllSettings())
 
   if (!cfg.printerType || cfg.printerType === 'none') {
     return NextResponse.json({ error: 'No printer configured' }, { status: 400 })

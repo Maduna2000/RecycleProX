@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { settlePendingExpense } from '@/lib/services/expenseService'
 import { SettlePendingExpenseSchema } from '@/lib/schemas/expense'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 import logger from '@/lib/logger'
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
@@ -15,7 +16,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   }
 
   try {
-    const expense = await settlePendingExpense(params.id, session.user.id, session.user.role, parsed.data)
+    const expense = await runWithRequestTenant(req, () => settlePendingExpense(params.id, session.user.id, session.user.role, parsed.data))
     return NextResponse.json(expense)
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to settle expense'

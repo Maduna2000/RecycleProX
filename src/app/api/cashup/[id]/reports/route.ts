@@ -18,6 +18,10 @@ import {
   getTransferredPurchasesForDate,
   getDrawingsReceivedForDateReport,
 } from '@/lib/services/cashUpService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
+
+class CashUpNotFoundForReportError extends Error {}
+class CashUpNotReportableError extends Error {}
 
 /**
  * GET /api/cashup/[id]/reports?type=cash-sales
@@ -48,25 +52,22 @@ export async function GET(
   const reportType = parseResult.data.type
 
   try {
-    // Fetch cashup session
-    const cashUp = await getCashUp(id)
-    if (!cashUp) {
-      return NextResponse.json({ error: 'Cash-up session not found' }, { status: 404 })
-    }
+    const { cashUp, settings, entries } = await runWithRequestTenant(req, async () => {
+      // Fetch cashup session
+      const cashUp = await getCashUp(id)
+      if (!cashUp) throw new CashUpNotFoundForReportError()
 
-    // Only allow reports for submitted or approved sessions
-    if (!['submitted', 'approved'].includes(cashUp.status)) {
-      return NextResponse.json(
-        { error: 'Reports only available for submitted or approved sessions' },
-        { status: 400 }
-      )
-    }
+      // Only allow reports for submitted or approved sessions
+      if (!['submitted', 'approved'].includes(cashUp.status)) throw new CashUpNotReportableError()
 
-    // Get settings for company info
-    const settings = await getAllSettings()
+      // Get settings for company info
+      const settings = await getAllSettings()
 
-    // Fetch report data based on type
-    const entries = await getReportData(reportType, cashUp.sessionDate)
+      // Fetch report data based on type
+      const entries = await getReportData(reportType, cashUp.sessionDate)
+
+      return { cashUp, settings, entries }
+    })
 
     const currencySymbol = CURRENCY_SYMBOLS[cashUp.currency as keyof typeof CURRENCY_SYMBOLS] ?? 'R'
 
@@ -94,6 +95,15 @@ export async function GET(
       },
     })
   } catch (err) {
+    if (err instanceof CashUpNotFoundForReportError) {
+      return NextResponse.json({ error: 'Cash-up session not found' }, { status: 404 })
+    }
+    if (err instanceof CashUpNotReportableError) {
+      return NextResponse.json(
+        { error: 'Reports only available for submitted or approved sessions' },
+        { status: 400 }
+      )
+    }
     logger.error({ err, cashUpId: id, reportType }, 'GET /api/cashup/[id]/reports failed')
     return NextResponse.json({ error: 'Failed to generate report' }, { status: 500 })
   }

@@ -9,6 +9,7 @@ import {
   endInspection,
   PoliceVisitNotActiveError,
 } from '@/lib/services/policeVisitService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 const PatchVisitSchema = z.object({
   signatureR2Key: z.string().max(500).optional(),
@@ -21,7 +22,7 @@ const PatchVisitSchema = z.object({
  * Cashiers may read too — the portal restores its session state from this.
  */
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   const session = await auth()
@@ -31,7 +32,7 @@ export async function GET(
   }
 
   try {
-    const visit = await getPoliceVisit(params.id)
+    const visit = await runWithRequestTenant(req, () => getPoliceVisit(params.id))
     if (!visit) return NextResponse.json({ error: 'Visit not found' }, { status: 404 })
     return NextResponse.json(visit)
   } catch (err) {
@@ -73,7 +74,7 @@ export async function PATCH(
     }
 
     try {
-      const visit = await endInspection(params.id, parsed.data, session.user.id)
+      const visit = await runWithRequestTenant(req, () => endInspection(params.id, parsed.data, session.user.id))
       return NextResponse.json({ visit })
     } catch (err) {
       if (err instanceof PoliceVisitNotActiveError) {
@@ -95,7 +96,7 @@ export async function PATCH(
   }
 
   try {
-    const visit = await updatePoliceVisit(params.id, parsed.data, session.user.id)
+    const visit = await runWithRequestTenant(req, () => updatePoliceVisit(params.id, parsed.data, session.user.id))
     return NextResponse.json({ visit })
   } catch (err) {
     logger.error({ err, id: params.id }, 'PATCH /api/police-visits/[id] failed')

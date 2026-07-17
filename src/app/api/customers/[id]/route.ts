@@ -2,14 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getCustomer, updateCustomer, deleteCustomer, CustomerHasRecordsError } from '@/lib/services/customerService'
 import { UpdateCustomerSchema } from '@/lib/schemas/customer'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 import logger from '@/lib/logger'
 
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
   try {
-    const customer = await getCustomer(params.id)
+    const customer = await runWithRequestTenant(req, () => getCustomer(params.id))
     return NextResponse.json(customer)
   } catch {
     return NextResponse.json({ error: 'Customer not found' }, { status: 404 })
@@ -27,7 +28,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   }
 
   try {
-    const customer = await updateCustomer(params.id, parsed.data, session.user.id)
+    const customer = await runWithRequestTenant(req, () => updateCustomer(params.id, parsed.data, session.user.id))
     return NextResponse.json(customer)
   } catch (err) {
     logger.error({ err }, 'PUT /api/customers/[id] failed')
@@ -35,7 +36,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   }
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   if (!['admin', 'manager'].includes(session.user.role ?? '')) {
@@ -43,7 +44,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
   }
 
   try {
-    await deleteCustomer(params.id, session.user.id)
+    await runWithRequestTenant(req, () => deleteCustomer(params.id, session.user.id))
     return NextResponse.json({ ok: true })
   } catch (err) {
     if (err instanceof CustomerHasRecordsError) {

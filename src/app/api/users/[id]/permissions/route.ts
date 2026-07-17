@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { updateUserModuleAccess, getUserModuleAccess } from '@/lib/services/authService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 import logger from '@/lib/logger'
 import { z } from 'zod'
 
@@ -21,7 +22,7 @@ export async function GET(
   const { id } = await params
 
   try {
-    const moduleKeys = await getUserModuleAccess(id)
+    const moduleKeys = await runWithRequestTenant(req, () => getUserModuleAccess(id))
     return NextResponse.json({ moduleKeys })
   } catch (err) {
     logger.error({ err, userId: id }, 'GET /api/users/[id]/permissions failed')
@@ -48,7 +49,7 @@ export async function PUT(
   }
 
   try {
-    await updateUserModuleAccess(id, parsed.data.moduleKeys, session.user.id)
+    await runWithRequestTenant(req, () => updateUserModuleAccess(id, parsed.data.moduleKeys, session.user.id))
     return NextResponse.json({ success: true })
   } catch (err) {
     logger.error({ err, userId: id }, 'PUT /api/users/[id]/permissions failed')

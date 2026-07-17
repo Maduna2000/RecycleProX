@@ -5,6 +5,7 @@ import { GoodsSearchSchema } from '@/lib/schemas/police'
 import { getGoodsTraceReport, PoliceVisitNotActiveError } from '@/lib/services/policeVisitService'
 import { generateGoodsTraceReport } from '@/lib/pdf/policeSearchReport'
 import { DEFAULT_POLICE_SERVICE_NAME } from '@/lib/police-defaults'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 /**
  * GET /api/police-search/goods/report?visitId=&productId=&from=&to=&minQuantity=
@@ -31,12 +32,12 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const data = await getGoodsTraceReport(parsed.data.visitId, {
+    const data = await runWithRequestTenant(req, () => getGoodsTraceReport(parsed.data.visitId, {
       productId:   parsed.data.productId,
       from:        parsed.data.from,
       to:          parsed.data.to,
       minQuantity: parsed.data.minQuantity,
-    })
+    }))
     if (!data) return NextResponse.json({ error: 'Product not found' }, { status: 404 })
     const { visit, product, lines, settings } = data
 

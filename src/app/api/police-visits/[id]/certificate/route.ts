@@ -4,6 +4,7 @@ import logger from '@/lib/logger'
 import { getVisitForCertificate } from '@/lib/services/policeVisitService'
 import { generateInspectionCertificate } from '@/lib/pdf/inspectionCertificate'
 import { DEFAULT_POLICE_SERVICE_NAME, DEFAULT_POLICE_LEGAL_NOTE } from '@/lib/police-defaults'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 /**
  * GET /api/police-visits/[id]/certificate
@@ -11,7 +12,7 @@ import { DEFAULT_POLICE_SERVICE_NAME, DEFAULT_POLICE_LEGAL_NOTE } from '@/lib/po
  * Available to staff (the officer downloads it at the end of their session).
  */
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   const session = await auth()
@@ -21,7 +22,7 @@ export async function GET(
   }
 
   try {
-    const data = await getVisitForCertificate(params.id)
+    const data = await runWithRequestTenant(req, () => getVisitForCertificate(params.id))
     if (!data) return NextResponse.json({ error: 'Visit not found' }, { status: 404 })
     const { visit, settings, signatureBytes } = data
 

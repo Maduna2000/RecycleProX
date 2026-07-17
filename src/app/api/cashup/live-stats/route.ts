@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getLiveStats } from '@/lib/services/cashUpService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 import logger from '@/lib/logger'
 
 // GET /api/cashup/live-stats?date=YYYY-MM-DD
@@ -16,7 +17,7 @@ export async function GET(req: NextRequest) {
   const sessionDate = new Date(y!, m! - 1, d!)
 
   try {
-    const stats = await getLiveStats(sessionDate)
+    const stats = await runWithRequestTenant(req, () => getLiveStats(sessionDate))
     return NextResponse.json(stats)
   } catch (err) {
     logger.error({ err, dateStr }, 'GET /api/cashup/live-stats failed')

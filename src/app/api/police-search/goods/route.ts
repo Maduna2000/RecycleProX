@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { GoodsSearchSchema } from '@/lib/schemas/police'
 import { searchGoods, PoliceVisitNotActiveError } from '@/lib/services/policeVisitService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 /**
  * GET /api/police-search/goods?visitId=&productId=&from=&to=&minQuantity=
@@ -29,12 +30,12 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const result = await searchGoods(parsed.data.visitId, {
+    const result = await runWithRequestTenant(req, () => searchGoods(parsed.data.visitId, {
       productId:   parsed.data.productId,
       from:        parsed.data.from,
       to:          parsed.data.to,
       minQuantity: parsed.data.minQuantity,
-    })
+    }))
     return NextResponse.json(result)
   } catch (err) {
     if (err instanceof PoliceVisitNotActiveError) {

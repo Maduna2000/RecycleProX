@@ -2,18 +2,19 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { getAllSettings, upsertUserSettings, upsertGlobalSettings } from '@/lib/services/settingsService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 /**
  * GET /api/settings
  * Returns all system settings as a flat key-value object.
  * Any authenticated user may read settings (needed for VAT rate, yard name, etc.).
  */
-export async function GET() {
+export async function GET(req: NextRequest) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   try {
-    const settings = await getAllSettings()
+    const settings = await runWithRequestTenant(req, () => getAllSettings())
     return NextResponse.json(settings)
   } catch (err) {
     logger.error({ err }, 'GET /api/settings failed')
@@ -35,7 +36,7 @@ export async function PATCH(req: NextRequest) {
     if (typeof body !== 'object' || Array.isArray(body)) {
       return NextResponse.json({ error: 'Body must be a key-value object' }, { status: 400 })
     }
-    await upsertUserSettings(session.user.id, body)
+    await runWithRequestTenant(req, () => upsertUserSettings(session.user.id, body))
     return NextResponse.json({ ok: true })
   } catch (err: unknown) {
     if (err instanceof Error && err.message === 'No allowed keys provided') {
@@ -61,7 +62,7 @@ export async function PUT(req: NextRequest) {
     if (typeof body !== 'object' || Array.isArray(body)) {
       return NextResponse.json({ error: 'Body must be a key-value object' }, { status: 400 })
     }
-    await upsertGlobalSettings(body, session.user.id)
+    await runWithRequestTenant(req, () => upsertGlobalSettings(body, session.user.id))
     return NextResponse.json({ ok: true })
   } catch (err) {
     logger.error({ err }, 'PUT /api/settings failed')

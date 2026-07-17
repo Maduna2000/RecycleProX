@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { z } from 'zod'
 import { getCashUpHistory } from '@/lib/services/cashUpService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 const QuerySchema = z.object({
   skip: z.coerce.number().int().min(0).default(0),
@@ -48,11 +49,11 @@ export async function GET(req: NextRequest) {
     : ['submitted', 'approved']
 
   try {
-    const { items, total } = await getCashUpHistory({
+    const { items, total } = await runWithRequestTenant(req, () => getCashUpHistory({
       skip,
       take,
       status: statusFilter,
-    })
+    }))
 
     return NextResponse.json({
       sessions: items,

@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { getPersonRecordReport, PoliceVisitNotActiveError } from '@/lib/services/policeVisitService'
 import { generatePersonRecordReport } from '@/lib/pdf/policeSearchReport'
 import { DEFAULT_POLICE_SERVICE_NAME } from '@/lib/police-defaults'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 const ParamsSchema = z.object({
   visitId:    z.string().uuid(),
@@ -35,7 +36,7 @@ export async function GET(
   }
 
   try {
-    const data = await getPersonRecordReport(parsed.data.visitId, parsed.data.customerId)
+    const data = await runWithRequestTenant(req, () => getPersonRecordReport(parsed.data.visitId, parsed.data.customerId))
     if (!data) return NextResponse.json({ error: 'Person not found' }, { status: 404 })
     const { visit, customer, settings, idPhotoBytes } = data
 

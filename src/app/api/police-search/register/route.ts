@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { RegisterSearchSchema } from '@/lib/schemas/police'
 import { searchRegisterByDate, PoliceVisitNotActiveError } from '@/lib/services/policeVisitService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 /**
  * GET /api/police-search/register?visitId=&from=YYYY-MM-DD&to=YYYY-MM-DD
@@ -27,7 +28,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const result = await searchRegisterByDate(parsed.data.visitId, parsed.data.from, parsed.data.to)
+    const result = await runWithRequestTenant(req, () => searchRegisterByDate(parsed.data.visitId, parsed.data.from, parsed.data.to))
     return NextResponse.json(result)
   } catch (err) {
     if (err instanceof PoliceVisitNotActiveError) {

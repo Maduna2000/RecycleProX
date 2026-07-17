@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { ReorderTradeCommodityCategoriesSchema } from '@/lib/schemas/tradeCommodity'
 import { reorderTradeCommodityCategories } from '@/lib/services/tradeCommodityService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 export async function PUT(req: NextRequest) {
   const session = await auth()
@@ -21,7 +22,7 @@ export async function PUT(req: NextRequest) {
   }
 
   try {
-    const categories = await reorderTradeCommodityCategories(parsed.data, session.user.id)
+    const categories = await runWithRequestTenant(req, () => reorderTradeCommodityCategories(parsed.data, session.user.id))
     return NextResponse.json({ categories })
   } catch (err) {
     logger.error({ err }, 'PUT /api/settings/trade-commodities/reorder failed')

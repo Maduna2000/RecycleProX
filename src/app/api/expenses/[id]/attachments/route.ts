@@ -3,12 +3,13 @@ import { auth } from '@/auth'
 import { UploadExpenseAttachmentSchema } from '@/lib/schemas/expense'
 import logger from '@/lib/logger'
 import { listExpenseAttachments, addExpenseAttachment } from '@/lib/services/expenseService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
-  const attachments = await listExpenseAttachments(params.id)
+  const attachments = await runWithRequestTenant(req, () => listExpenseAttachments(params.id))
   return NextResponse.json(attachments)
 }
 
@@ -23,7 +24,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   }
 
   try {
-    const attachment = await addExpenseAttachment(params.id, parsed.data, session.user.id)
+    const attachment = await runWithRequestTenant(req, () => addExpenseAttachment(params.id, parsed.data, session.user.id))
     return NextResponse.json(attachment, { status: 201 })
   } catch (err: unknown) {
     if (err instanceof Error && err.message.includes('not found')) {

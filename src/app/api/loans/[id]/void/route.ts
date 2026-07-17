@@ -8,6 +8,7 @@ import {
   LoanAlreadyVoidedError,
   LoanHasRepaymentsError,
 } from '@/lib/services/loanService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 export async function POST(
   req: NextRequest,
@@ -24,7 +25,7 @@ export async function POST(
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
 
   try {
-    const loan = await voidLoan(params.id, parsed.data, session.user.id)
+    const loan = await runWithRequestTenant(req, () => voidLoan(params.id, parsed.data, session.user.id))
     return NextResponse.json(loan)
   } catch (err) {
     if (err instanceof LoanNotFoundError)      return NextResponse.json({ error: err.message }, { status: 404 })

@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { toggleActive } from '@/lib/services/authService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 import logger from '@/lib/logger'
 
-export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   if (session.user.role !== 'admin') {
@@ -14,7 +15,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
   }
 
   try {
-    const user = await toggleActive(params.id, session.user.id)
+    const user = await runWithRequestTenant(req, () => toggleActive(params.id, session.user.id))
     return NextResponse.json(user)
   } catch (err) {
     logger.error({ err }, 'POST toggle-active failed')

@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { ApproveCashUpSchema } from '@/lib/schemas/cashup'
 import { approveCashUp } from '@/lib/services/cashUpService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 // POST /api/cashup/[id]/approve — manager/admin only
 export async function POST(
@@ -24,7 +25,7 @@ export async function POST(
       return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
     }
 
-    const cashUp = await approveCashUp(params.id, session.user.id, parsed.data)
+    const cashUp = await runWithRequestTenant(req, () => approveCashUp(params.id, session.user.id, parsed.data))
     return NextResponse.json({ cashUp })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Failed to approve cash-up'

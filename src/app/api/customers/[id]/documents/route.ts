@@ -3,12 +3,13 @@ import { auth } from '@/auth'
 import { UploadCustomerDocumentSchema } from '@/lib/schemas/customer'
 import logger from '@/lib/logger'
 import { listCustomerDocuments, addCustomerDocument } from '@/lib/services/customerService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
-  const docs = await listCustomerDocuments(params.id)
+  const docs = await runWithRequestTenant(req, () => listCustomerDocuments(params.id))
   return NextResponse.json(docs)
 }
 
@@ -23,7 +24,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   }
 
   try {
-    const doc = await addCustomerDocument(params.id, parsed.data, session.user.id)
+    const doc = await runWithRequestTenant(req, () => addCustomerDocument(params.id, parsed.data, session.user.id))
     return NextResponse.json(doc, { status: 201 })
   } catch (err: unknown) {
     if (err instanceof Error && err.message.includes('not found')) {

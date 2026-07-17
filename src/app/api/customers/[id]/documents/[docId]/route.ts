@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { deleteCustomerDocument } from '@/lib/services/customerService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: { id: string; docId: string } },
 ) {
   const session = await auth()
@@ -14,7 +15,7 @@ export async function DELETE(
   }
 
   try {
-    await deleteCustomerDocument(params.id, params.docId, session.user.id)
+    await runWithRequestTenant(req, () => deleteCustomerDocument(params.id, params.docId, session.user.id))
     return new Response(null, { status: 204 })
   } catch (err: unknown) {
     if (err instanceof Error && err.message === 'Document not found') {

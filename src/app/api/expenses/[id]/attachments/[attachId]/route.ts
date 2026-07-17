@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { deleteExpenseAttachment } from '@/lib/services/expenseService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: { id: string; attachId: string } },
 ) {
   const session = await auth()
@@ -14,7 +15,7 @@ export async function DELETE(
   }
 
   try {
-    await deleteExpenseAttachment(params.id, params.attachId, session.user.id)
+    await runWithRequestTenant(req, () => deleteExpenseAttachment(params.id, params.attachId, session.user.id))
     return new Response(null, { status: 204 })
   } catch (err: unknown) {
     if (err instanceof Error && err.message === 'Attachment not found') {

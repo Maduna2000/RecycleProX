@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { setPin } from '@/lib/services/authService'
 import { SetPinSchema } from '@/lib/schemas/auth'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 import logger from '@/lib/logger'
 
 export async function POST(req: NextRequest) {
@@ -15,7 +16,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    await setPin(session.user.id, parsed.data.pin)
+    await runWithRequestTenant(req, () => setPin(session.user.id, parsed.data.pin))
     return NextResponse.json({ success: true })
   } catch (err) {
     logger.error({ err }, 'POST set-pin failed')

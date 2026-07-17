@@ -2,13 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { getCustomerBalance, CustomerNotFoundError } from '@/lib/services/paymentService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   try {
-    const balance = await getCustomerBalance(params.id)
+    const balance = await runWithRequestTenant(req, () => getCustomerBalance(params.id))
     return NextResponse.json({
       ...balance,
       totalPurchases: balance.totalPurchases.toFixed(2),

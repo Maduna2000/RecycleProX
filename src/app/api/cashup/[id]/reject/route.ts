@@ -7,6 +7,7 @@ import {
   CashUpNotSubmittedError,
   CashUpNewerSessionOpenError,
 } from '@/lib/services/cashUpService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 const RejectCashUpSchema = z.object({
   reason: z.string().min(1, 'Reason is required'),
@@ -33,7 +34,7 @@ export async function POST(
       return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
     }
 
-    const cashUp = await rejectCashUp(params.id, session.user.id, parsed.data.reason)
+    const cashUp = await runWithRequestTenant(req, () => rejectCashUp(params.id, session.user.id, parsed.data.reason))
     return NextResponse.json({ cashUp })
   } catch (err: unknown) {
     if (err instanceof CashUpNotSubmittedError) return NextResponse.json({ error: err.message }, { status: 400 })

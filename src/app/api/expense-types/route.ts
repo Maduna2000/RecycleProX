@@ -2,13 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { listExpenseTypes, createExpenseType } from '@/lib/services/expenseService'
 import { CreateExpenseTypeSchema } from '@/lib/schemas/expense'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 import logger from '@/lib/logger'
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
-  const types = await listExpenseTypes()
+  const types = await runWithRequestTenant(req, () => listExpenseTypes())
   return NextResponse.json(types)
 }
 
@@ -26,7 +27,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const type = await createExpenseType(parsed.data, session.user.id)
+    const type = await runWithRequestTenant(req, () => createExpenseType(parsed.data, session.user.id))
     return NextResponse.json(type, { status: 201 })
   } catch (err) {
     logger.error({ err }, 'POST /api/expense-types failed')

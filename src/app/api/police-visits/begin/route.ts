@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { BeginInspectionSchema } from '@/lib/schemas/police'
 import { beginInspection } from '@/lib/services/policeVisitService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 /**
  * POST /api/police-visits/begin
@@ -23,7 +24,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const visit = await beginInspection(parsed.data, session.user.id)
+    const visit = await runWithRequestTenant(req, () => beginInspection(parsed.data, session.user.id))
     return NextResponse.json({ visit }, { status: 201 })
   } catch (err) {
     logger.error({ err }, 'POST /api/police-visits/begin failed')

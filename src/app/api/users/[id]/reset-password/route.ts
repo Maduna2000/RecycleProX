@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { resetPassword } from '@/lib/services/authService'
 import { ResetPasswordSchema } from '@/lib/schemas/auth'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 import logger from '@/lib/logger'
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
@@ -18,7 +19,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   }
 
   try {
-    await resetPassword(params.id, parsed.data.newPassword, session.user.id)
+    await runWithRequestTenant(req, () => resetPassword(params.id, parsed.data.newPassword, session.user.id))
     return NextResponse.json({ success: true })
   } catch (err) {
     logger.error({ err }, 'POST /api/users/[id]/reset-password failed')

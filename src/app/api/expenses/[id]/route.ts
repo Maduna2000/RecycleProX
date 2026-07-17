@@ -2,14 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getExpense, voidExpense, updateExpense } from '@/lib/services/expenseService'
 import { UpdateExpenseSchema } from '@/lib/schemas/expense'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 import logger from '@/lib/logger'
 
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
   try {
-    const expense = await getExpense(params.id)
+    const expense = await runWithRequestTenant(req, () => getExpense(params.id))
     return NextResponse.json(expense)
   } catch {
     return NextResponse.json({ error: 'Expense not found' }, { status: 404 })
@@ -27,7 +28,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 
   try {
-    const expense = await updateExpense(params.id, session.user.id, session.user.role, parsed.data)
+    const expense = await runWithRequestTenant(req, () => updateExpense(params.id, session.user.id, session.user.role, parsed.data))
     return NextResponse.json(expense)
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to update expense'
@@ -49,7 +50,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   if (!['admin', 'manager'].includes(session.user.role)) {
@@ -57,7 +58,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
   }
 
   try {
-    const expense = await voidExpense(params.id, session.user.id)
+    const expense = await runWithRequestTenant(req, () => voidExpense(params.id, session.user.id))
     return NextResponse.json(expense)
   } catch (err) {
     logger.error({ err }, 'DELETE /api/expenses/[id] failed')

@@ -9,6 +9,7 @@ import {
   CategoryNotFoundError,
   DuplicateCategoryError,
 } from '@/lib/services/tradeCommodityService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -19,7 +20,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
   const { id } = await context.params
 
   try {
-    const category = await getTradeCommodityCategory(id)
+    const category = await runWithRequestTenant(req, () => getTradeCommodityCategory(id))
     return NextResponse.json(category)
   } catch (err) {
     if (err instanceof CategoryNotFoundError) {
@@ -48,7 +49,7 @@ export async function PUT(req: NextRequest, context: RouteContext) {
   }
 
   try {
-    const category = await updateTradeCommodityCategory(id, parsed.data, session.user.id)
+    const category = await runWithRequestTenant(req, () => updateTradeCommodityCategory(id, parsed.data, session.user.id))
     return NextResponse.json(category)
   } catch (err) {
     if (err instanceof CategoryNotFoundError) {
@@ -72,7 +73,7 @@ export async function DELETE(req: NextRequest, context: RouteContext) {
   const { id } = await context.params
 
   try {
-    const category = await deleteTradeCommodityCategory(id, session.user.id)
+    const category = await runWithRequestTenant(req, () => deleteTradeCommodityCategory(id, session.user.id))
     return NextResponse.json(category)
   } catch (err) {
     if (err instanceof CategoryNotFoundError) {

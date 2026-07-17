@@ -7,6 +7,7 @@ import {
   createTradeCommodityCategory,
   DuplicateCategoryError,
 } from '@/lib/services/tradeCommodityService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 export async function GET(req: NextRequest) {
   const session = await auth()
@@ -15,7 +16,7 @@ export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl
   const includeInactive = searchParams.get('includeInactive') === 'true'
 
-  const categories = await listTradeCommodityCategories(includeInactive)
+  const categories = await runWithRequestTenant(req, () => listTradeCommodityCategories(includeInactive))
   return NextResponse.json({ categories })
 }
 
@@ -36,7 +37,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const category = await createTradeCommodityCategory(parsed.data, session.user.id)
+    const category = await runWithRequestTenant(req, () => createTradeCommodityCategory(parsed.data, session.user.id))
     return NextResponse.json(category, { status: 201 })
   } catch (err) {
     if (err instanceof DuplicateCategoryError) {

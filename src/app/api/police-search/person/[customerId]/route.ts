@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { z } from 'zod'
 import { getPersonDetail, PoliceVisitNotActiveError } from '@/lib/services/policeVisitService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 const ParamsSchema = z.object({
   visitId:    z.string().uuid(),
@@ -33,7 +34,7 @@ export async function GET(
   }
 
   try {
-    const detail = await getPersonDetail(parsed.data.visitId, parsed.data.customerId)
+    const detail = await runWithRequestTenant(req, () => getPersonDetail(parsed.data.visitId, parsed.data.customerId))
     if (!detail) return NextResponse.json({ error: 'Person not found' }, { status: 404 })
     return NextResponse.json(detail)
   } catch (err) {

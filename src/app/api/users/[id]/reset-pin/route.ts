@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { resetPinToDefault } from '@/lib/services/authService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 import logger from '@/lib/logger'
 
 // POST /api/users/[id]/reset-pin
@@ -13,7 +14,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   }
 
   try {
-    await resetPinToDefault(params.id)
+    await runWithRequestTenant(req, () => resetPinToDefault(params.id))
     return NextResponse.json({ success: true })
   } catch (err) {
     logger.error({ err, userId: params.id }, 'POST reset-pin failed')

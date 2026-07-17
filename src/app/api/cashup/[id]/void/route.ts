@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { voidCashUp } from '@/lib/services/cashUpService'
+import { runWithRequestTenant } from '@/lib/db/tenantContext'
 import { z } from 'zod'
 
 const VoidCashUpSchema = z.object({
@@ -30,7 +31,7 @@ export async function POST(
       return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
     }
 
-    const updated = await voidCashUp(params.id, session.user.id, parsed.data.reason)
+    const updated = await runWithRequestTenant(req, () => voidCashUp(params.id, session.user.id, parsed.data.reason))
     return NextResponse.json({ cashUp: updated })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to void cash-up'
