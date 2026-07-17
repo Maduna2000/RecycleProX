@@ -35,12 +35,21 @@ export async function POST() {
   try {
     const password = randomBytes(24).toString('base64url')
 
+    // NOSUPERUSER deliberately omitted: Postgres requires the caller to
+    // already BE a superuser to touch any role's SUPERUSER attribute at
+    // all, even to (re)set it to the same default value. Neon's
+    // neondb_owner is a powerful role but not a true superuser, so
+    // including NOSUPERUSER here fails outright with "permission denied
+    // to alter role" (confirmed live). Roles default to NOSUPERUSER on
+    // creation regardless, so omitting it changes nothing about the
+    // resulting privileges — this is a syntax-permission workaround, not
+    // a security relaxation.
     await registryPrisma.$executeRawUnsafe(`
       DO $$ BEGIN
         IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'app_runtime') THEN
-          CREATE ROLE app_runtime WITH LOGIN PASSWORD '${password}' NOBYPASSRLS NOSUPERUSER NOCREATEDB NOCREATEROLE;
+          CREATE ROLE app_runtime WITH LOGIN PASSWORD '${password}' NOBYPASSRLS NOCREATEDB NOCREATEROLE;
         ELSE
-          ALTER ROLE app_runtime WITH LOGIN PASSWORD '${password}' NOBYPASSRLS NOSUPERUSER NOCREATEDB NOCREATEROLE;
+          ALTER ROLE app_runtime WITH LOGIN PASSWORD '${password}' NOBYPASSRLS NOCREATEDB NOCREATEROLE;
         END IF;
       END $$;
     `)
