@@ -75,7 +75,7 @@ export function LoginForm({ tenantSlug }: { tenantSlug?: string }) {
     if (sess?.user?.role === 'security_guard') {
       await signOut({ redirect: false })
       setLoading(false)
-      setError('Security guards must use the Gate Security login')
+      setError('Security guards must use the Guard Station login')
       return
     }
 

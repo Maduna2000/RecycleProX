@@ -1,0 +1,20 @@
+{
+  "name": "guard-station",
+  "version": "1.0.0",
+  "description": "Guard Station — Renovo Pro Gate Security mobile wrapper",
+  "private": true,
+  "scripts": {
+    "sync": "npx cap sync android",
+    "open": "npx cap open android",
+    "build": "npx cap sync android && npx cap open android",
+    "gen-icons": "node gen-icons.mjs"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.0.0",
+    "@capacitor/core": "^6.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.0.0",
+    "jimp": "^1.6.0"
+  }
+}

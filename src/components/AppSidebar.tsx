@@ -71,12 +71,12 @@ const SCALE_ADMIN: NavGroup = {
 }
 
 const GATE_ADMIN: NavGroup = {
-  heading: 'Gate Security',
+  heading: 'Guard Station',
   items: [
     { label: 'Entries',       href: '/app/gate',               icon: ClipboardList },
     { label: 'Guards',        href: '/app/gate?tab=guards',    icon: Users },
     { label: 'Purpose Config', href: '/app/gate?tab=config',   icon: Settings2 },
-    { label: 'Gate',          href: '/gate',                   icon: DoorOpen },
+    { label: 'Guard',         href: '/gate',                   icon: DoorOpen },
   ],
 }
 

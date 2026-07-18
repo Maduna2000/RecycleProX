@@ -292,7 +292,7 @@ function GatePopup() {
   const tiles = [
     { label: 'Gate Entries',  icon: ClipboardList, href: '/app/gate',               desc: 'View & manage entries' },
     { label: 'Gate Guards',   icon: Users,         href: '/app/gate?tab=guards',    desc: 'Manage guard accounts' },
-    { label: 'Gate Security', icon: DoorOpen,      href: '/gate',                   desc: 'Open kiosk app', external: true },
+    { label: 'Guard Station', icon: DoorOpen,      href: '/gate',                   desc: 'Open kiosk app', external: true },
   ]
 
   return (
@@ -300,11 +300,11 @@ function GatePopup() {
       <button
         onClick={() => setOpen(o => !o)}
         className="flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium transition-all duration-100 focus:outline-none whitespace-nowrap border rounded-sm border-[#185ABD] text-[#185ABD] bg-transparent hover:bg-[#EBF3FC]"
-        title="Gate Security"
-        aria-label="Gate Security shortcuts"
+        title="Guard Station"
+        aria-label="Guard Station shortcuts"
       >
         <DoorOpen className="w-3.5 h-3.5 shrink-0" />
-        <span>Gate</span>
+        <span>Guard</span>
       </button>
 
       {open && (
@@ -312,7 +312,7 @@ function GatePopup() {
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div className="absolute right-0 top-full mt-1 w-56 bg-white rounded-sm shadow-2xl border border-[#E0E0E0] py-1.5 z-50">
             <p className="px-3 pb-1.5 pt-0.5 text-[10px] font-semibold text-[#6C757D] uppercase tracking-widest border-b border-[#F1F3F4]">
-              Gate Security
+              Guard Station
             </p>
             {tiles.map((t) => (
               <Link

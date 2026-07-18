@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Background color - matches the splash banner's own navy background -->
+    <item android:drawable="@color/splashBackground" />
+
+    <!-- Centered Guard Station banner — 300x200dp preserves the source's 3:2 ratio -->
+    <item
+        android:drawable="@drawable/splash_logo"
+        android:gravity="center"
+        android:width="300dp"
+        android:height="200dp" />
+</layer-list>

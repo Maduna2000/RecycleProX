@@ -211,7 +211,7 @@ export function CreateUserModal({ open, onClose, onSuccess }: { open: boolean; o
           )}
           {selectedRole === 'security_guard' && (
             <p style={{ fontSize: 10, color: '#666', fontStyle: 'italic' }}>
-              Security guards can only access the Gate Security app.
+              Security guards can only access the Guard Station app.
             </p>
           )}
 

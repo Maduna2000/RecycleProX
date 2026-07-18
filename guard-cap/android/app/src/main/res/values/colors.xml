@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="colorPrimary">#2563EB</color>
+    <color name="colorPrimaryDark">#0F203A</color>
+    <color name="colorAccent">#2563EB</color>
+
+    <!-- Splash screen colors - matches the Guard Station brand navy -->
+    <color name="splashBackground">#0F203A</color>
+    <color name="splashIconBackground">#0F203A</color>
+</resources>

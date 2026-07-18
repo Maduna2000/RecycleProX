@@ -692,7 +692,7 @@ function GateManagementInner() {
       onChange={changeTab}
       actions={
         <Btn size="sm" icon={ShieldCheck} href="/gate" target="_blank">
-          Open Gate Security
+          Open Guard Station
         </Btn>
       }
     >

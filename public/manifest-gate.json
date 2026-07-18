@@ -1,6 +1,6 @@
 {
-  "name": "Gate Security — Renovo Pro",
-  "short_name": "Gate Security",
+  "name": "Guard Station — Renovo Pro",
+  "short_name": "Guard Station",
   "description": "Yard entry & exit logging for gate security guards",
   "start_url": "/gate",
   "display": "standalone",

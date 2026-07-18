@@ -54,7 +54,7 @@ export default function GateLoginPage() {
     const sess = await getSession()
     if (!sess?.user?.role || !GATE_ROLES.includes(sess.user.role)) {
       setLoading(false)
-      setError('This account does not have Gate Security access')
+      setError('This account does not have Guard Station access')
       return
     }
 
@@ -83,7 +83,7 @@ export default function GateLoginPage() {
             >
               <ShieldCheck className="w-9 h-9 sm:w-11 sm:h-11 text-blue-300" />
             </div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-slate-800 tracking-tight">Gate Security</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-800 tracking-tight">Guard Station</h1>
             <p className="text-sm text-slate-400 mt-1">Renovo Pro</p>
           </div>
 

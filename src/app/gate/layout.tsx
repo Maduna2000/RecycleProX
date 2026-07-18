@@ -4,12 +4,12 @@ import { SessionProvider } from 'next-auth/react'
 import GateClientLayout from './GateClientLayout'
 
 export const metadata: Metadata = {
-  title: 'Gate Security',
+  title: 'Guard Station',
   manifest: '/manifest-gate.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'Gate Security',
+    title: 'Guard Station',
   },
   icons: {
     icon: '/icons/gate-icon-192.png',

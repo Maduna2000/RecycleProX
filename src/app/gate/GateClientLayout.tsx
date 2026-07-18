@@ -43,7 +43,7 @@ export default function GateClientLayout({ children }: { children: React.ReactNo
             <ShieldCheck className="text-blue-300" style={{ width: 18, height: 18 }} />
           </div>
           <div className="min-w-0">
-            <span className="font-bold text-[15px] sm:text-lg tracking-tight block leading-tight">Gate Security</span>
+            <span className="font-bold text-[15px] sm:text-lg tracking-tight block leading-tight">Guard Station</span>
             <span className="text-[10px] sm:text-xs text-slate-400 block leading-tight">Renovo Pro</span>
           </div>
         </div>
