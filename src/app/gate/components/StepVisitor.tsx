@@ -4,7 +4,7 @@ import { useState, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Loader2, AlertCircle, CheckCircle, History } from 'lucide-react'
+import { Loader2, AlertCircle, CheckCircle2, History, IdCard } from 'lucide-react'
 
 const VisitorSchema = z.object({
   idNumber:  z.string().min(1, 'Required'),
@@ -24,6 +24,8 @@ export interface VisitorInfo {
 interface Props {
   onNext: (visitor: VisitorInfo) => void
 }
+
+const inputClass = 'w-full border border-slate-300 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow'
 
 // customerId is deliberately never surfaced here — the server always
 // re-derives it from visitorIdNumber at creation time (see gateService.ts),
@@ -85,18 +87,23 @@ export default function StepVisitor({ onNext }: Props) {
   }
 
   return (
-    <div className="flex-1 flex flex-col p-5 max-w-lg mx-auto w-full">
-      <h2 className="text-2xl font-bold text-slate-800 mb-1">Who&apos;s entering?</h2>
-      <p className="text-slate-500 mb-6">Enter the visitor&apos;s National ID / Passport number</p>
+    <div className="flex-1 flex flex-col p-5 sm:p-8 max-w-lg sm:max-w-xl mx-auto w-full">
+      <div className="flex items-center gap-3 mb-1">
+        <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
+          <IdCard className="w-5 h-5 text-blue-600" />
+        </div>
+        <h2 className="text-xl sm:text-2xl font-bold text-slate-800">Who&apos;s entering?</h2>
+      </div>
+      <p className="text-slate-500 mb-6 sm:mb-7">Enter the visitor&apos;s National ID / Passport number</p>
 
       <form onSubmit={form.handleSubmit(handleSubmit)} className="flex flex-col gap-4">
         <div>
-          <label className="text-sm font-medium text-slate-700 block mb-1">National ID / Passport *</label>
+          <label className="text-sm font-medium text-slate-700 block mb-1.5">National ID / Passport *</label>
           <div className="relative">
             <input
               {...form.register('idNumber', { onBlur: (e) => handleIdLookup(e.target.value) })}
               autoComplete="off"
-              className="w-full border border-slate-300 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className={inputClass}
               placeholder="e.g. 9001015800086"
             />
             {lookingUp && (
@@ -107,22 +114,22 @@ export default function StepVisitor({ onNext }: Props) {
             <p className="text-red-500 text-xs mt-1">{form.formState.errors.idNumber.message}</p>
           )}
           {matched && (
-            <p className="text-emerald-600 text-xs mt-1 flex items-center gap-1">
-              <CheckCircle className="w-3 h-3" /> Registered customer: {matched.firstName} {matched.lastName}
+            <p className="text-emerald-700 text-xs font-medium mt-1.5 flex items-center gap-1.5 bg-emerald-50 rounded-lg px-2.5 py-1.5 w-fit">
+              <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> Registered customer: {matched.firstName} {matched.lastName}
             </p>
           )}
         </div>
 
         {blacklistError && (
-          <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2.5">
-            <p className="text-red-700 text-sm flex items-start gap-2">
+          <div className="bg-red-50 border border-red-200 rounded-xl px-3.5 py-3">
+            <p className="text-red-700 text-sm font-medium flex items-start gap-2">
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" /> {blacklistError}
             </p>
           </div>
         )}
 
         {repeatInfo && !blacklistError && (
-          <div className="bg-blue-50 border border-blue-200 rounded-xl px-3 py-2.5">
+          <div className="bg-blue-50 border border-blue-200 rounded-xl px-3.5 py-3">
             <p className="text-blue-700 text-sm flex items-center gap-2">
               <History className="w-4 h-4 shrink-0" />
               Visited {repeatInfo.count} time{repeatInfo.count !== 1 ? 's' : ''} before
@@ -133,11 +140,11 @@ export default function StepVisitor({ onNext }: Props) {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className="text-sm font-medium text-slate-700 block mb-1">First Name *</label>
+            <label className="text-sm font-medium text-slate-700 block mb-1.5">First Name *</label>
             <input
               {...form.register('firstName')}
               autoComplete="given-name"
-              className="w-full border border-slate-300 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className={inputClass}
               placeholder="John"
             />
             {form.formState.errors.firstName && (
@@ -145,11 +152,11 @@ export default function StepVisitor({ onNext }: Props) {
             )}
           </div>
           <div>
-            <label className="text-sm font-medium text-slate-700 block mb-1">Last Name *</label>
+            <label className="text-sm font-medium text-slate-700 block mb-1.5">Last Name *</label>
             <input
               {...form.register('lastName')}
               autoComplete="family-name"
-              className="w-full border border-slate-300 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className={inputClass}
               placeholder="Smith"
             />
             {form.formState.errors.lastName && (
@@ -159,13 +166,13 @@ export default function StepVisitor({ onNext }: Props) {
         </div>
 
         <div>
-          <label className="text-sm font-medium text-slate-700 block mb-1">Phone Number</label>
+          <label className="text-sm font-medium text-slate-700 block mb-1.5">Phone Number</label>
           <input
             {...form.register('phone')}
             type="tel"
             inputMode="tel"
             autoComplete="tel"
-            className="w-full border border-slate-300 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            className={inputClass}
             placeholder="76123456"
           />
         </div>
@@ -173,7 +180,7 @@ export default function StepVisitor({ onNext }: Props) {
         <button
           type="submit"
           disabled={!!blacklistError}
-          className="mt-2 bg-emerald-600 hover:bg-emerald-700 text-white text-lg font-semibold h-14 rounded-xl flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="mt-2 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-lg font-semibold h-14 rounded-xl flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-blue-600/20"
         >
           Continue →
         </button>

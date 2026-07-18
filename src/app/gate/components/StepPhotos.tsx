@@ -106,22 +106,27 @@ export default function StepPhotos({ entryTempId, config, onConfirm }: Props) {
   }
 
   return (
-    <div className="flex-1 flex flex-col p-5 max-w-2xl mx-auto w-full">
-      <h2 className="text-2xl font-bold text-slate-800 mb-1">Capture Photos</h2>
-      <p className="text-slate-500 mb-4">Required photos are marked with *</p>
+    <div className="flex-1 flex flex-col p-5 sm:p-8 max-w-2xl lg:max-w-3xl mx-auto w-full">
+      <div className="flex items-center gap-3 mb-1">
+        <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
+          <Camera className="w-5 h-5 text-blue-600" />
+        </div>
+        <h2 className="text-xl sm:text-2xl font-bold text-slate-800">Capture Photos</h2>
+      </div>
+      <p className="text-slate-500 mb-5 sm:mb-6">Required photos are marked with *</p>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {slots.map((slot, i) => (
-          <div key={slot.key} className="bg-white rounded-2xl shadow-md p-3">
+          <div key={slot.key} className="bg-white rounded-2xl shadow-sm p-3">
             <div className="flex items-center justify-between mb-2">
               <span className="font-semibold text-slate-700 text-sm">{slot.label}{slot.required && ' *'}</span>
-              {slot.r2Key && <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
+              {slot.r2Key && <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />}
             </div>
 
             {slot.preview ? (
               <div className="relative">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={slot.preview} alt={slot.label} className="w-full h-32 object-cover rounded-xl" />
+                <img src={slot.preview} alt={slot.label} className="w-full h-32 sm:h-40 object-cover rounded-xl" />
                 {slot.uploading && (
                   <div className="absolute inset-0 bg-black/40 rounded-xl flex items-center justify-center">
                     <Loader2 className="w-6 h-6 text-white animate-spin" />
@@ -130,17 +135,17 @@ export default function StepPhotos({ entryTempId, config, onConfirm }: Props) {
                 {!slot.uploading && (
                   <button
                     onClick={() => { updateSlot(i, { r2Key: null, preview: null }); inputRefs[i]?.current?.click() }}
-                    className="absolute top-1.5 right-1.5 bg-white/90 rounded-full shadow w-8 h-8 flex items-center justify-center"
+                    className="absolute top-1.5 right-1.5 bg-white/95 rounded-full shadow-md w-11 h-11 flex items-center justify-center active:scale-95 transition-transform"
                     aria-label="Retake photo"
                   >
-                    <RefreshCw className="w-3.5 h-3.5 text-slate-600" />
+                    <RefreshCw className="w-4 h-4 text-slate-600" />
                   </button>
                 )}
               </div>
             ) : (
               <button
                 onClick={() => inputRefs[i]?.current?.click()}
-                className="w-full h-32 border-2 border-dashed border-slate-300 rounded-xl flex flex-col items-center justify-center gap-2 hover:border-emerald-400 transition-colors"
+                className="w-full h-32 sm:h-40 border-2 border-dashed border-slate-300 rounded-xl flex flex-col items-center justify-center gap-2 hover:border-blue-400 hover:bg-blue-50/40 active:bg-blue-50 transition-colors"
               >
                 <Camera className="w-7 h-7 text-slate-400" />
                 <span className="text-slate-500 text-xs font-medium">Tap to capture</span>
@@ -164,7 +169,7 @@ export default function StepPhotos({ entryTempId, config, onConfirm }: Props) {
       <button
         onClick={handleConfirm}
         disabled={!canContinue}
-        className="mt-6 w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white text-xl font-semibold h-16 rounded-xl transition-colors"
+        className="mt-6 w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:opacity-40 text-white text-xl font-semibold h-16 rounded-xl transition-colors flex items-center justify-center gap-2 shadow-md shadow-blue-600/20"
       >
         Continue →
       </button>

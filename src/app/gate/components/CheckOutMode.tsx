@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Search, LogOut as LogOutIcon, Loader2 } from 'lucide-react'
+import { Search, LogOut as LogOutIcon, Loader2, ChevronLeft, AlertCircle } from 'lucide-react'
 
 interface OnSiteEntry {
   id:               string
@@ -22,6 +22,7 @@ export default function CheckOutMode({ onDone }: Props) {
   const [entries, setEntries] = useState<OnSiteEntry[]>([])
   const [loading, setLoading] = useState(false)
   const [checkingOut, setCheckingOut] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const fetchEntries = useCallback(async (search: string) => {
     setLoading(true)
@@ -44,45 +45,58 @@ export default function CheckOutMode({ onDone }: Props) {
 
   async function handleCheckout(id: string) {
     setCheckingOut(id)
+    setError(null)
     try {
       const res = await fetch(`/api/gate/entries/${id}/checkout`, { method: 'PATCH' })
       if (!res.ok) throw new Error()
       setEntries((prev) => prev.filter((e) => e.id !== id))
     } catch {
-      // Leave it in the list so the guard can retry.
+      setError('Failed to check out — please try again.')
     } finally {
       setCheckingOut(null)
     }
   }
 
   return (
-    <div className="flex-1 flex flex-col p-5 max-w-lg mx-auto w-full">
-      <h2 className="text-2xl font-bold text-slate-800 mb-1">Check Out</h2>
-      <p className="text-slate-500 mb-4">Find a vehicle or visitor currently on site</p>
+    <div className="flex-1 flex flex-col p-5 sm:p-8 max-w-lg sm:max-w-2xl mx-auto w-full">
+      <div className="flex items-center gap-3 mb-1">
+        <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
+          <LogOutIcon className="w-5 h-5 text-slate-700" />
+        </div>
+        <h2 className="text-xl sm:text-2xl font-bold text-slate-800">Check Out</h2>
+      </div>
+      <p className="text-slate-500 mb-4 sm:mb-5">Find a vehicle or visitor currently on site</p>
 
       <div className="relative mb-4">
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          className="w-full border border-slate-300 rounded-xl pl-11 pr-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          className="w-full border border-slate-300 rounded-xl pl-11 pr-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow"
           placeholder="Name, ID number or vehicle reg…"
           autoFocus
         />
         {loading && <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 animate-spin" />}
       </div>
 
-      <div className="flex flex-col gap-3 overflow-y-auto">
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-xl px-3.5 py-3 mb-4 flex items-start gap-2">
+          <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+          <p className="text-red-700 text-sm font-medium">{error}</p>
+        </div>
+      )}
+
+      <div className="flex flex-col gap-3 overflow-y-auto sm:grid sm:grid-cols-2 sm:gap-3 sm:items-start">
         {entries.map((e) => (
-          <div key={e.id} className="flex items-center justify-between bg-white rounded-xl shadow-sm p-4">
-            <div>
-              <div className="font-semibold text-slate-800">{e.visitorFirstName} {e.visitorLastName}</div>
-              <div className="text-slate-500 text-sm">{e.entryNumber}{e.vehicleReg ? ` · ${e.vehicleReg}` : ''}</div>
+          <div key={e.id} className="flex items-center justify-between bg-white rounded-xl shadow-sm p-4 gap-3">
+            <div className="min-w-0">
+              <div className="font-semibold text-slate-800 truncate">{e.visitorFirstName} {e.visitorLastName}</div>
+              <div className="text-slate-500 text-sm truncate">{e.entryNumber}{e.vehicleReg ? ` · ${e.vehicleReg}` : ''}</div>
             </div>
             <button
               onClick={() => handleCheckout(e.id)}
               disabled={checkingOut === e.id}
-              className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-900 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors shrink-0"
+              className="flex items-center gap-1.5 bg-[#0F203A] hover:bg-[#16305A] active:bg-[#0A1830] disabled:opacity-50 text-white text-sm font-medium px-4 min-h-[44px] rounded-lg transition-colors shrink-0"
             >
               {checkingOut === e.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogOutIcon className="w-4 h-4" />}
               Check Out
@@ -90,14 +104,17 @@ export default function CheckOutMode({ onDone }: Props) {
           </div>
         ))}
         {!loading && entries.length === 0 && (
-          <p className="text-center text-slate-400 py-8">
+          <p className="text-center text-slate-400 py-8 sm:col-span-2">
             {query.trim() ? 'No matching entries on site' : 'No one currently on site'}
           </p>
         )}
       </div>
 
-      <button onClick={onDone} className="mt-4 text-slate-500 text-sm self-center">
-        ← Back to New Entry
+      <button
+        onClick={onDone}
+        className="mt-4 text-slate-500 hover:text-slate-700 text-sm font-medium self-center min-h-[44px] px-4 rounded-lg hover:bg-slate-100 active:bg-slate-200 transition-colors flex items-center gap-1"
+      >
+        <ChevronLeft className="w-4 h-4" /> Back to New Entry
       </button>
     </div>
   )

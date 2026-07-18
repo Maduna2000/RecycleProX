@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Loader2, CheckCircle2 } from 'lucide-react'
+import { Loader2, CheckCircle2, ClipboardCheck } from 'lucide-react'
 import type { VisitorInfo } from './StepVisitor'
 import type { Purpose } from './StepPurpose'
 import type { PhotoKeys } from './StepPhotos'
@@ -58,14 +58,14 @@ export default function StepReview({ visitor, purpose, categoryName, vehicleReg,
   if (done) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-6 gap-4">
-        <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center">
-          <CheckCircle2 className="w-12 h-12 text-emerald-600" />
+        <div className="w-20 h-20 sm:w-24 sm:h-24 bg-emerald-100 rounded-full flex items-center justify-center">
+          <CheckCircle2 className="w-12 h-12 sm:w-14 sm:h-14 text-emerald-600" />
         </div>
-        <h2 className="text-2xl font-bold text-slate-800">Entry Registered</h2>
-        <p className="text-slate-500 font-mono">{done.entryNumber}</p>
+        <h2 className="text-2xl sm:text-3xl font-bold text-slate-800">Entry Registered</h2>
+        <p className="font-mono text-base sm:text-lg font-semibold text-blue-700 bg-blue-50 px-4 py-1.5 rounded-full">{done.entryNumber}</p>
         <button
           onClick={onSubmitted}
-          className="mt-4 bg-emerald-600 hover:bg-emerald-700 text-white text-lg font-semibold h-14 px-8 rounded-xl transition-colors"
+          className="mt-4 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-lg font-semibold h-14 px-8 rounded-xl transition-colors shadow-md shadow-blue-600/20"
         >
           New Entry
         </button>
@@ -74,29 +74,34 @@ export default function StepReview({ visitor, purpose, categoryName, vehicleReg,
   }
 
   return (
-    <div className="flex-1 flex flex-col p-5 max-w-lg mx-auto w-full">
-      <h2 className="text-2xl font-bold text-slate-800 mb-1">Review</h2>
-      <p className="text-slate-500 mb-5">Confirm the details before registering</p>
+    <div className="flex-1 flex flex-col p-5 sm:p-8 max-w-lg sm:max-w-xl mx-auto w-full">
+      <div className="flex items-center gap-3 mb-1">
+        <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
+          <ClipboardCheck className="w-5 h-5 text-blue-600" />
+        </div>
+        <h2 className="text-xl sm:text-2xl font-bold text-slate-800">Review</h2>
+      </div>
+      <p className="text-slate-500 mb-5 sm:mb-6">Confirm the details before registering</p>
 
-      <div className="bg-white rounded-2xl shadow-md p-5 flex flex-col gap-3 mb-6">
+      <div className="bg-white rounded-2xl shadow-sm p-5 flex flex-col gap-3 mb-6 divide-y divide-slate-100">
         <Row label="Visitor" value={`${visitor.firstName} ${visitor.lastName}`} />
-        <Row label="ID Number" value={visitor.idNumber} />
-        {visitor.phone && <Row label="Phone" value={visitor.phone} />}
-        <Row label="Purpose" value={PURPOSE_LABELS[purpose]} />
-        {categoryName && <Row label="Category" value={categoryName} />}
-        {vehicleReg && <Row label="Vehicle Reg" value={vehicleReg} />}
+        <Row label="ID Number" value={visitor.idNumber} pad />
+        {visitor.phone && <Row label="Phone" value={visitor.phone} pad />}
+        <Row label="Purpose" value={PURPOSE_LABELS[purpose]} pad />
+        {categoryName && <Row label="Category" value={categoryName} pad />}
+        {vehicleReg && <Row label="Vehicle Reg" value={vehicleReg} pad />}
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2.5 mb-4">
-          <p className="text-red-700 text-sm">{error}</p>
+        <div className="bg-red-50 border border-red-200 rounded-xl px-3.5 py-3 mb-4">
+          <p className="text-red-700 text-sm font-medium">{error}</p>
         </div>
       )}
 
       <button
         onClick={handleSubmit}
         disabled={submitting}
-        className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xl font-semibold h-16 rounded-xl transition-colors flex items-center justify-center gap-2"
+        className="bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:opacity-50 text-white text-xl font-semibold h-16 rounded-xl transition-colors flex items-center justify-center gap-2 shadow-md shadow-blue-600/20"
       >
         {submitting ? <><Loader2 className="w-5 h-5 animate-spin" /> Registering…</> : 'Register Entry'}
       </button>
@@ -104,11 +109,11 @@ export default function StepReview({ visitor, purpose, categoryName, vehicleReg,
   )
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+function Row({ label, value, pad }: { label: string; value: string; pad?: boolean }) {
   return (
-    <div className="flex items-center justify-between">
+    <div className={`flex items-center justify-between ${pad ? 'pt-3' : ''}`}>
       <span className="text-slate-500 text-sm">{label}</span>
-      <span className="font-semibold text-slate-800">{value}</span>
+      <span className="font-semibold text-slate-800 text-right">{value}</span>
     </div>
   )
 }

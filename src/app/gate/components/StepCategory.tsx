@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import * as LucideIcons from 'lucide-react'
-import { Package, Loader2, ArrowRight } from 'lucide-react'
+import { Package, Loader2, ArrowRight, Recycle } from 'lucide-react'
 
 type CategoryNode = {
   id: string
@@ -38,7 +38,7 @@ export default function StepCategory({ onSelect }: Props) {
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
+        <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
       </div>
     )
   }
@@ -46,11 +46,16 @@ export default function StepCategory({ onSelect }: Props) {
   const flat = categories.flatMap((parent) => [parent, ...parent.children])
 
   return (
-    <div className="flex-1 flex flex-col p-5 max-w-2xl mx-auto w-full">
-      <h2 className="text-2xl font-bold text-slate-800 mb-1">What are they selling?</h2>
-      <p className="text-slate-500 mb-5">Select the category</p>
+    <div className="flex-1 flex flex-col p-5 sm:p-8 max-w-2xl lg:max-w-4xl mx-auto w-full">
+      <div className="flex items-center gap-3 mb-1">
+        <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0">
+          <Recycle className="w-5 h-5 text-emerald-600" />
+        </div>
+        <h2 className="text-xl sm:text-2xl font-bold text-slate-800">What are they selling?</h2>
+      </div>
+      <p className="text-slate-500 mb-5 sm:mb-6">Select the category</p>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
         {flat.map((cat) => {
           const isSel = selected === cat.name
           const bg = cat.colorHex ? `${cat.colorHex}22` : '#F1F5F9'
@@ -59,13 +64,13 @@ export default function StepCategory({ onSelect }: Props) {
             <button
               key={cat.id}
               onClick={() => setSelected(cat.name)}
-              className="flex flex-col items-center gap-2 rounded-2xl shadow-md p-4 border-2 transition-all active:scale-95 bg-white"
-              style={{ borderColor: isSel ? '#10b981' : 'transparent' }}
+              className="flex flex-col items-center gap-2 rounded-2xl shadow-sm hover:shadow-md p-4 border-2 transition-all active:scale-95 bg-white min-h-[96px] justify-center"
+              style={{ borderColor: isSel ? '#10b981' : '#F1F5F9' }}
             >
               <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: bg, color: fg }}>
                 <CatIcon name={cat.iconName} />
               </div>
-              <span className="font-medium text-slate-800 text-sm text-center">{cat.name}</span>
+              <span className="font-medium text-slate-800 text-sm text-center leading-tight">{cat.name}</span>
             </button>
           )
         })}
@@ -77,7 +82,7 @@ export default function StepCategory({ onSelect }: Props) {
       <button
         onClick={() => selected && onSelect(selected)}
         disabled={!selected}
-        className="mt-6 w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white text-xl font-semibold h-16 rounded-xl transition-colors flex items-center justify-center gap-2"
+        className="mt-6 w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:opacity-40 text-white text-xl font-semibold h-16 rounded-xl transition-colors flex items-center justify-center gap-2 shadow-md shadow-blue-600/20"
       >
         Continue <ArrowRight className="w-5 h-5" />
       </button>
