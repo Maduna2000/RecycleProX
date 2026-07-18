@@ -132,7 +132,7 @@ export async function checkoutGateEntry(id: string, exitedById: string) {
     where: { id },
     data: { exitedAt: new Date(), exitedById },
     include: {
-      customer: { select: { id: true, firstName: true, lastName: true } },
+      customer: { select: { id: true, firstName: true, lastName: true, customerType: true } },
       operator: { select: { id: true, fullName: true } },
       exitedBy: { select: { id: true, fullName: true } },
     },

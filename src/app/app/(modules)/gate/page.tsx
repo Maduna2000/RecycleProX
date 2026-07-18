@@ -6,7 +6,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import {
   Search, X, RefreshCw, Images, CheckCircle2, EyeOff,
-  UserPlus, Eye, Loader2, ShieldCheck, Info,
+  UserPlus, Eye, Loader2, ShieldCheck, Info, LogOut,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { DataTable, StatusBadge, type Column, type RowAction } from '@/components/ui/DataTable'
@@ -302,6 +302,22 @@ function EntriesTab() {
     }
   }
 
+  const [checkingOutId, setCheckingOutId] = useState<string | null>(null)
+
+  async function handleCheckout(entry: GateEntry) {
+    setCheckingOutId(entry.id)
+    try {
+      const res = await fetch(`/api/gate/entries/${entry.id}/checkout`, { method: 'PATCH' })
+      if (!res.ok) { const d = await res.json(); throw new Error(d.error ?? 'Failed to check out') }
+      const updated: GateEntry = await res.json()
+      setEntries(prev => prev.map(e => e.id === updated.id ? updated : e))
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Failed to check out')
+    } finally {
+      setCheckingOutId(null)
+    }
+  }
+
   const columns: Column<GateEntry>[] = [
     {
       key: 'entryNumber', header: 'Entry #', width: '140px',
@@ -351,6 +367,12 @@ function EntriesTab() {
 
   const rowActions: RowAction<GateEntry>[] = [
     { label: 'View Photos', icon: Images, onClick: openPhotos },
+    {
+      label:  'Check Out',
+      icon:   LogOut,
+      hidden: (e) => !!e.exitedAt || checkingOutId === e.id,
+      onClick: handleCheckout,
+    },
   ]
 
   return (
