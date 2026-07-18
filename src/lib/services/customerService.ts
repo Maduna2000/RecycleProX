@@ -24,6 +24,19 @@ export class ForbiddenError extends Error {
   constructor(msg = 'Forbidden') { super(msg); this.name = 'ForbiddenError' }
 }
 
+/** A casual customer must be a regular before they can hold an account. */
+export const MIN_PURCHASES_FOR_ACCOUNT = 5
+
+export class NotEligibleForAccountError extends Error {
+  constructor(completedPurchases: number) {
+    super(
+      `Customer has ${completedPurchases} completed purchase${completedPurchases === 1 ? '' : 's'} — ` +
+      `more than ${MIN_PURCHASES_FOR_ACCOUNT} are required before they can become an account holder`
+    )
+    this.name = 'NotEligibleForAccountError'
+  }
+}
+
 // ─── Service ──────────────────────────────────────────────────────────────────
 
 async function generateAccountCode(lastName: string): Promise<string> {
@@ -100,7 +113,37 @@ export async function quickCreate(data: QuickCreateInput, userId: string) {
   return customer
 }
 
-export async function updateCustomer(id: string, data: UpdateCustomerInput, userId: string) {
+export async function updateCustomer(id: string, data: UpdateCustomerInput, userId: string, userRole?: string) {
+  const current = await prisma.customer.findUniqueOrThrow({
+    where: { id },
+    select: { customerType: true, dealerCategory: true, accountCode: true, lastName: true },
+  })
+
+  const isPromotion = data.customerType === 'account' && current.customerType === 'casual'
+
+  // Regulars only: a casual must have brought in more than
+  // MIN_PURCHASES_FOR_ACCOUNT completed purchases before they can hold an
+  // account.
+  if (isPromotion) {
+    const completedPurchases = await prisma.purchase.count({
+      where: { customerId: id, status: 'completed' },
+    })
+    if (completedPurchases <= MIN_PURCHASES_FOR_ACCOUNT) {
+      throw new NotEligibleForAccountError(completedPurchases)
+    }
+  }
+
+  // Dealer tiers are assigned by admins only — changing an existing
+  // category to dealer_1/2/3 is never part of a routine edit or promotion.
+  const assignsDealerTier =
+    data.dealerCategory !== undefined &&
+    data.dealerCategory !== null &&
+    data.dealerCategory !== 'casual' &&
+    data.dealerCategory !== current.dealerCategory
+  if (assignsDealerTier && userRole !== 'admin') {
+    throw new ForbiddenError('Only an admin can assign a dealer category')
+  }
+
   let updateData: typeof data = data
 
   if (data.dealerCategory !== undefined) {
@@ -111,14 +154,18 @@ export async function updateCustomer(id: string, data: UpdateCustomerInput, user
     updateData = { ...data, priceGroupId: resolvedPriceGroupId }
   }
 
+  // A promoted casual stays in the Casual category with casual pricing —
+  // an admin can assign a dealer tier afterwards (or explicitly in the
+  // same request).
+  if (isPromotion && !assignsDealerTier) {
+    updateData = { ...updateData, dealerCategory: 'casual', priceGroupId: null }
+  }
+
   // Auto-assign account code when converting casual → account
   let newAccountCode: string | undefined
-  if (data.customerType === 'account') {
-    const current = await prisma.customer.findUnique({ where: { id }, select: { accountCode: true, lastName: true } })
-    if (current && !current.accountCode) {
-      const lastName = data.lastName ?? current.lastName
-      newAccountCode = await generateAccountCode(lastName)
-    }
+  if (data.customerType === 'account' && !current.accountCode) {
+    const lastName = data.lastName ?? current.lastName
+    newAccountCode = await generateAccountCode(lastName)
   }
 
   const customer = await prisma.customer.update({

@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
-import { getCustomer, updateCustomer, deleteCustomer, CustomerHasRecordsError } from '@/lib/services/customerService'
+import {
+  getCustomer,
+  updateCustomer,
+  deleteCustomer,
+  CustomerHasRecordsError,
+  NotEligibleForAccountError,
+  ForbiddenError,
+} from '@/lib/services/customerService'
 import { UpdateCustomerSchema } from '@/lib/schemas/customer'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
 import logger from '@/lib/logger'
@@ -28,9 +35,17 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   }
 
   try {
-    const customer = await runWithRequestTenant(req, () => updateCustomer(params.id, parsed.data, session.user.id))
+    const customer = await runWithRequestTenant(req, () =>
+      updateCustomer(params.id, parsed.data, session.user.id, session.user.role)
+    )
     return NextResponse.json(customer)
   } catch (err) {
+    if (err instanceof NotEligibleForAccountError) {
+      return NextResponse.json({ error: err.message }, { status: 422 })
+    }
+    if (err instanceof ForbiddenError) {
+      return NextResponse.json({ error: err.message }, { status: 403 })
+    }
     logger.error({ err }, 'PUT /api/customers/[id] failed')
     return NextResponse.json({ error: 'Failed to update customer' }, { status: 500 })
   }

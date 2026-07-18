@@ -389,16 +389,10 @@ function BlacklistModal({ customer, onClose, onSuccess }: { customer: Customer; 
 }
 
 // ─── Promote to Account Modal ─────────────────────────────────────────────────
-type PriceGroup = { id: string; name: string }
 
 function PromoteToAccountModal({ customerId, customerName, onClose, onSuccess }: {
   customerId: string; customerName: string; onClose: () => void; onSuccess: () => void
 }) {
-  const { data: pgData } = useSWR<{ priceGroups: PriceGroup[] }>('/api/price-groups', fetcher)
-  const priceGroups = pgData?.priceGroups ?? []
-
-  const [dealerCategory,  setDealerCategory]  = useState('dealer_1')
-  const [priceGroupId,    setPriceGroupId]    = useState('')
   const [primaryFunction, setPrimaryFunction] = useState('supplier')
   const [loading,         setLoading]         = useState(false)
 
@@ -409,9 +403,7 @@ function PromoteToAccountModal({ customerId, customerName, onClose, onSuccess }:
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         customerType: 'account',
-        dealerCategory,
         primaryFunction,
-        ...(priceGroupId && { priceGroupId }),
       }),
     })
     setLoading(false)
@@ -433,38 +425,12 @@ function PromoteToAccountModal({ customerId, customerName, onClose, onSuccess }:
           <p style={{ fontSize: 12.5, color: colors.textSecondary, margin: '0 0 12px' }}>
             Promoting <strong style={{ color: colors.textPrimary }}>{customerName}</strong> to an account customer. An account code will be auto-assigned.
           </p>
+          <p style={{ fontSize: 12.5, color: colors.textSecondary, margin: '0 0 12px' }}>
+            Only regulars qualify — the customer must have <strong style={{ color: colors.textPrimary }}>more than 5 completed purchases</strong>.
+            They will stay in the <strong style={{ color: colors.textPrimary }}>Casual</strong> dealer category; only an admin can assign a dealer category afterwards.
+          </p>
 
           <div className="space-y-3">
-            <div>
-              <label className="text-xs font-medium block mb-1" style={{ color: colors.textSecondary }}>Dealer Category</label>
-              <select
-                className="w-full border rounded px-2 py-1.5 text-sm bg-white focus:outline-none"
-                style={{ borderColor: colors.border, color: colors.textPrimary }}
-                value={dealerCategory}
-                onChange={(e) => setDealerCategory(e.target.value)}
-              >
-                <option value="casual">Casual</option>
-                <option value="dealer_1">Dealer 1</option>
-                <option value="dealer_2">Dealer 2</option>
-                <option value="dealer_3">Dealer 3</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="text-xs font-medium block mb-1" style={{ color: colors.textSecondary }}>Price Group (optional)</label>
-              <select
-                className="w-full border rounded px-2 py-1.5 text-sm bg-white focus:outline-none"
-                style={{ borderColor: colors.border, color: colors.textPrimary }}
-                value={priceGroupId}
-                onChange={(e) => setPriceGroupId(e.target.value)}
-              >
-                <option value="">— None —</option>
-                {priceGroups.map((pg) => (
-                  <option key={pg.id} value={pg.id}>{pg.name}</option>
-                ))}
-              </select>
-            </div>
-
             <div>
               <label className="text-xs font-medium block mb-1" style={{ color: colors.textSecondary }}>Primary Function</label>
               <select

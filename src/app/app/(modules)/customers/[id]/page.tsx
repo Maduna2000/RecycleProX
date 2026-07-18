@@ -88,6 +88,7 @@ export default function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
   const { data: session } = useSession()
+  const isAdmin = session?.user?.role === 'admin'
   const [tab, setTab] = useState<string>('Overview')
   const [sectionTab, setSectionTab] = useState<typeof SECTION_TABS[number]>('Personal')
   const [isEditing, setIsEditing] = useState(false)
@@ -347,8 +348,8 @@ export default function CustomerDetailPage() {
                       </select>
                     </div>
                     <div>
-                      <span style={lbl}>Dealer Category</span>
-                      <select value={watch('dealerCategory') ?? ''} onChange={(e) => setValue('dealerCategory', e.target.value === '' ? undefined : e.target.value as 'casual' | 'dealer_1' | 'dealer_2' | 'dealer_3')} disabled={!isEditing || saving} style={isEditing ? selectStyle : selectDisabled}>
+                      <span style={lbl}>Dealer Category{!isAdmin ? ' (admin only)' : ''}</span>
+                      <select value={watch('dealerCategory') ?? ''} onChange={(e) => setValue('dealerCategory', e.target.value === '' ? undefined : e.target.value as 'casual' | 'dealer_1' | 'dealer_2' | 'dealer_3')} disabled={!isEditing || saving || !isAdmin} style={isEditing && isAdmin ? selectStyle : selectDisabled}>
                         <option value="">—</option>
                         <option value="casual">Casual</option>
                         <option value="dealer_1">Dealer 1</option>

@@ -596,6 +596,8 @@ function BlacklistTab({ customer, onAction, onUnblacklist }: {
 function EditCustomerModal({ customer, onClose, onSuccess }: {
   customer: Customer; onClose: () => void; onSuccess: () => void
 }) {
+  const { data: session } = useSession()
+  const isAdmin = session?.user?.role === 'admin'
   const [loading, setLoading] = useState(false)
   const [editTab, setEditTab] = useState<typeof EDIT_TABS[number]>('Personal')
   const { data: pgData } = useSWR<{ groups: { id: string; name: string; isActive: boolean }[] }>('/api/price-groups', fetcher)
@@ -788,7 +790,11 @@ function EditCustomerModal({ customer, onClose, onSuccess }: {
                 </div>
                 <div>
                   <Label>Dealer Category</Label>
-                  <Select onValueChange={(v) => setValue('dealerCategory', v === 'none' ? undefined : v as 'casual' | 'dealer_1' | 'dealer_2' | 'dealer_3')} defaultValue={customer.dealerCategory ?? 'none'}>
+                  <Select
+                    onValueChange={(v) => setValue('dealerCategory', v === 'none' ? undefined : v as 'casual' | 'dealer_1' | 'dealer_2' | 'dealer_3')}
+                    defaultValue={customer.dealerCategory ?? 'none'}
+                    disabled={!isAdmin}
+                  >
                     <SelectTrigger className="mt-1"><SelectValue placeholder="Select..." /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">Not set</SelectItem>
@@ -798,6 +804,9 @@ function EditCustomerModal({ customer, onClose, onSuccess }: {
                       <SelectItem value="dealer_3">Dealer 3 → Price Group C</SelectItem>
                     </SelectContent>
                   </Select>
+                  {!isAdmin && (
+                    <p className="text-xs mt-1 text-gray-500">Only an admin can change the dealer category</p>
+                  )}
                 </div>
               </div>
               <div className="flex items-center justify-between p-3 rounded-lg bg-yellow-50 border border-yellow-200">
