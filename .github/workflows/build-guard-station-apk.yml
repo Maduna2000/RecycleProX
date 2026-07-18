@@ -1,0 +1,63 @@
+name: Build Guard Station APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+    paths:
+      - guard-cap/**
+      - .github/workflows/build-guard-station-apk.yml
+
+jobs:
+  build:
+    name: Build Guard Station APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: guard-cap/package-lock.json
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install dependencies
+        working-directory: guard-cap
+        run: npm ci
+
+      - name: Sync Capacitor native project
+        working-directory: guard-cap
+        run: npx cap sync android
+
+      - name: Make Gradle wrapper executable
+        working-directory: guard-cap/android
+        run: chmod +x gradlew
+
+      # Debug build — Gradle signs it with an auto-generated debug keystore,
+      # so it installs directly via sideload with no extra signing setup.
+      # (A release build would need a signingConfig added to build.gradle
+      # first — there isn't one yet — otherwise it comes out unsigned and
+      # Android will refuse to install it.)
+      - name: Build debug APK
+        working-directory: guard-cap/android
+        run: ./gradlew assembleDebug --no-daemon
+        env:
+          GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx3072m -XX:MaxMetaspaceSize=512m"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: GuardStation-${{ github.sha }}.apk
+          path: guard-cap/android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 14
+          if-no-files-found: error
