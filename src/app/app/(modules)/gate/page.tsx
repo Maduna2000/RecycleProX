@@ -73,6 +73,20 @@ function useDebounce<T>(value: T, ms = 300): T {
   return debounced
 }
 
+function formatCompactDateTime(iso: string): string {
+  return new Date(iso).toLocaleString('en-ZA', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+}
+
+/** Elapsed time from check-in to check-out — or to now, while still on site. */
+function formatDuration(createdAt: string, exitedAt: string | null): string {
+  const start = new Date(createdAt).getTime()
+  const end = exitedAt ? new Date(exitedAt).getTime() : Date.now()
+  const totalMinutes = Math.max(0, Math.round((end - start) / 60000))
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+  return hours === 0 ? `${minutes}m` : `${hours}h ${minutes}m`
+}
+
 function miniBtn(extra?: Record<string, unknown>) {
   return {
     fontSize: 10, padding: '1px 6px', background: '#E0E0E0', border: '1px solid #999',
@@ -320,15 +334,29 @@ function EntriesTab() {
 
   const columns: Column<GateEntry>[] = [
     {
-      key: 'entryNumber', header: 'Entry #', width: '140px',
+      key: 'entryNumber', header: 'Entry #', width: '128px',
       render: (e) => <span style={{ fontFamily: 'monospace', fontSize: fontSize.xs, fontWeight: fontWeight.semibold, color: colors.process }}>{e.entryNumber}</span>,
     },
     {
-      key: 'createdAt', header: 'Date / Time', width: '140px',
-      render: (e) => <span style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>{new Date(e.createdAt).toLocaleString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>,
+      key: 'createdAt', header: 'Check In', width: '98px',
+      render: (e) => <span style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>{formatCompactDateTime(e.createdAt)}</span>,
     },
     {
-      key: 'visitor', header: 'Visitor', width: '170px',
+      key: 'exitedAt', header: 'Check Out', width: '98px',
+      render: (e) => e.exitedAt
+        ? <span style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>{formatCompactDateTime(e.exitedAt)}</span>
+        : <StatusBadge status="on site" />,
+    },
+    {
+      key: 'duration', header: 'Duration', width: '78px',
+      render: (e) => (
+        <span style={{ fontSize: fontSize.xs, color: e.exitedAt ? colors.textSecondary : colors.process, fontWeight: e.exitedAt ? fontWeight.regular : fontWeight.medium }}>
+          {formatDuration(e.createdAt, e.exitedAt)}
+        </span>
+      ),
+    },
+    {
+      key: 'visitor', header: 'Visitor', width: '148px',
       render: (e) => {
         const name = `${e.visitorFirstName} ${e.visitorLastName}`
         return (
@@ -344,23 +372,19 @@ function EntriesTab() {
       },
     },
     {
-      key: 'purpose', header: 'Purpose', width: '90px',
+      key: 'purpose', header: 'Purpose', width: '72px',
       render: (e) => <span style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>{PURPOSE_LABELS[e.purpose] ?? e.purpose}</span>,
     },
     {
-      key: 'categoryName', header: 'Category', width: '110px',
+      key: 'categoryName', header: 'Category', width: '98px',
       render: (e) => <span className="truncate block" style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>{e.categoryName ?? '—'}</span>,
     },
     {
-      key: 'vehicleReg', header: 'Vehicle Reg', width: '110px',
+      key: 'vehicleReg', header: 'Vehicle Reg', width: '88px',
       render: (e) => <span style={{ fontFamily: 'monospace', fontSize: fontSize.xs }}>{e.vehicleReg ?? '—'}</span>,
     },
     {
-      key: 'exitedAt', header: 'On Site', width: '90px',
-      render: (e) => <StatusBadge status={e.exitedAt ? 'inactive' : 'active'} />,
-    },
-    {
-      key: 'operator', header: 'Guard', width: '120px',
+      key: 'operator', header: 'Guard', width: '104px',
       render: (e) => <span className="truncate block" title={e.operator.fullName} style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>{e.operator.fullName}</span>,
     },
   ]

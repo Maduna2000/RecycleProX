@@ -54,6 +54,7 @@ export interface DataTableProps<T> {
 
 const STATUS_STYLES: Record<string, { color: string; background: string }> = {
   active:      { color: colors.action,        background: colors.actionBg },
+  'on site':   { color: colors.action,        background: colors.actionBg },
   completed:   { color: colors.action,        background: colors.actionBg },
   done:        { color: colors.action,        background: colors.actionBg },
   approved:    { color: colors.action,        background: colors.actionBg },
