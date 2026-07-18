@@ -4,7 +4,7 @@
   it crashes. Run this once per machine, then log off/on (or just run
   launcher.ps1 directly to test immediately without waiting for a logon).
 
-  No admin elevation required — this is a per-user task (-RunLevel Limited).
+  No admin elevation required - this is a per-user task (-RunLevel Limited).
 #>
 
 $ErrorActionPreference = 'Stop'
@@ -22,7 +22,7 @@ $action = New-ScheduledTaskAction -Execute 'powershell.exe' `
 
 $trigger = New-ScheduledTaskTrigger -AtLogOn
 
-# ExecutionTimeLimit defaults to 3 days in Task Scheduler — without
+# ExecutionTimeLimit defaults to 3 days in Task Scheduler - without
 # overriding it to unlimited, this long-lived server task would get
 # silently killed every 3 days. MultipleInstances IgnoreNew guards against
 # a double-launch on rapid logon/logoff cycling.
@@ -39,6 +39,6 @@ $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interac
 Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger `
     -Settings $settings -Principal $principal -Force | Out-Null
 
-Write-Output "Registered Scheduled Task '$taskName' — it will start automatically at your next logon."
+Write-Output "Registered Scheduled Task '$taskName' - it will start automatically at your next logon."
 Write-Output "To start it right now without logging off, run: .\launcher.ps1"
 Write-Output "To remove it later, run: .\uninstall-task.ps1"

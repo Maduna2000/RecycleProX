@@ -1,10 +1,10 @@
 <#
-  Renovo Pro — Local Hardware-Bridge Server launcher.
+  Renovo Pro - Local Hardware-Bridge Server launcher.
 
   Loads local-server.env (next to this script), then runs the standalone
   Next.js server as a supervised child process, restarting it if it ever
   exits. Meant to be run hidden via a Scheduled Task (see install-task.ps1),
-  so a log file is the only way anyone will ever see what happened — nothing
+  so a log file is the only way anyone will ever see what happened - nothing
   here should rely on console output being visible.
 #>
 
@@ -34,7 +34,7 @@ if (-not (Test-Path $envFile)) {
     exit 1
 }
 
-# ── Load local-server.env into the process environment ──────────────────────
+# --- Load local-server.env into the process environment ---
 foreach ($line in Get-Content $envFile) {
     $trimmed = $line.Trim()
     if ($trimmed -eq '' -or $trimmed.StartsWith('#')) { continue }
@@ -57,7 +57,7 @@ foreach ($line in Get-Content $envFile) {
     Set-Item -Path "Env:$key" -Value $value
 }
 
-# This mode always talks to the shared Postgres database — never the
+# This mode always talks to the shared Postgres database - never the
 # Electron desktop build's isolated local SQLite copy. Force this even if
 # it somehow ended up in local-server.env or the ambient environment.
 Remove-Item Env:DATABASE_PROVIDER -ErrorAction SilentlyContinue
@@ -78,11 +78,15 @@ Write-Log "Launcher starting. Node: $nodeExe  Port: $env:PORT  Hostname: $env:HO
 while ($true) {
     Write-Log 'Starting server.js'
     try {
-        $proc = Start-Process -FilePath $nodeExe -ArgumentList $serverJs -WorkingDirectory $standaloneDir `
+        # server.js's own path must be explicitly quoted here - Start-Process's
+        # -ArgumentList does not reliably quote paths containing spaces on its
+        # own, and an unquoted path breaks node.exe's argument parsing.
+        $quotedServerJs = '"' + $serverJs + '"'
+        $proc = Start-Process -FilePath $nodeExe -ArgumentList $quotedServerJs -WorkingDirectory $standaloneDir `
             -WindowStyle Hidden -PassThru -Wait
-        Write-Log "server.js exited with code $($proc.ExitCode) — restarting in 5s"
+        Write-Log "server.js exited with code $($proc.ExitCode) - restarting in 5s"
     } catch {
-        Write-Log "Failed to start server.js: $($_.Exception.Message) — retrying in 5s"
+        Write-Log "Failed to start server.js: $($_.Exception.Message) - retrying in 5s"
     }
     Start-Sleep -Seconds 5
 }

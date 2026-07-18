@@ -1,7 +1,7 @@
 <#
   Removes the "RenovoProLocalServer" Scheduled Task registered by
   install-task.ps1. Does not stop an already-running launcher.ps1/node
-  process from this session — close those manually via Task Manager if
+  process from this session - close those manually via Task Manager if
   needed (look for powershell.exe and node.exe under your user).
 #>
 
@@ -11,7 +11,7 @@ $taskName = 'RenovoProLocalServer'
 
 $existing = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
 if (-not $existing) {
-    Write-Output "No Scheduled Task named '$taskName' was found — nothing to do."
+    Write-Output "No Scheduled Task named '$taskName' was found - nothing to do."
     exit 0
 }
 
