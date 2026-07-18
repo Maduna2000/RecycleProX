@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog } from '@/components/ui/dialog'
 import { AlertTriangle, ShieldBan, ShieldCheck, Loader2, Camera, Pencil } from 'lucide-react'
 import { PhotoUploader, PhotoViewer } from '@/components/PhotoUploader'
+import { TradeCommoditiesSelect } from '@/components/customers/TradeCommoditiesSelect'
 import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
 import { useForm } from 'react-hook-form'
@@ -656,14 +657,6 @@ function EditCustomerModal({ customer, onClose, onSuccess }: {
 
   const tradeCommodities = (watch('tradeCommodities') as string[] | undefined) ?? []
 
-  function toggleCommodity(val: string) {
-    if (tradeCommodities.includes(val)) {
-      setValue('tradeCommodities', tradeCommodities.filter((c) => c !== val))
-    } else {
-      setValue('tradeCommodities', [...tradeCommodities, val])
-    }
-  }
-
   async function onSubmit(data: UpdateCustomerInput) {
     setLoading(true)
     const res = await fetch(`/api/customers/${customer.id}`, {
@@ -882,20 +875,12 @@ function EditCustomerModal({ customer, onClose, onSuccess }: {
               </div>
               <div>
                 <Label className="mb-2">Trade Commodities</Label>
-                <div className="grid grid-cols-2 gap-2 mt-1">
-                  {commodityOptions.length === 0 ? (
-                    <span className="text-sm text-gray-500 col-span-2">No categories configured</span>
-                  ) : commodityOptions.map((opt) => (
-                    <label key={opt} className="flex items-center gap-2 text-sm cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={tradeCommodities.includes(opt)}
-                        onChange={() => toggleCommodity(opt)}
-                        className="w-4 h-4 rounded border-gray-300 text-green-600"
-                      />
-                      {opt}
-                    </label>
-                  ))}
+                <div className="mt-1">
+                  <TradeCommoditiesSelect
+                    options={commodityOptions}
+                    value={tradeCommodities}
+                    onChange={(next) => setValue('tradeCommodities', next)}
+                  />
                 </div>
               </div>
               <div>

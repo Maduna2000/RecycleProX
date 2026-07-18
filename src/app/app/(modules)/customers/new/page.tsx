@@ -8,6 +8,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { Loader2, ChevronDown, ChevronRight } from 'lucide-react'
 import { toast } from 'sonner'
 import { CreateCustomerSchema, type CreateCustomerFormInput, type CreateCustomerInput } from '@/lib/schemas/customer'
+import { TradeCommoditiesSelect } from '@/components/customers/TradeCommoditiesSelect'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -81,14 +82,6 @@ export default function NewAccountPage() {
   const dealerCategory  = watch('dealerCategory')
   const marketSector    = watch('marketSector')
   const zeroRated       = watch('zeroRated') ?? false
-
-  function toggleCommodity(val: string) {
-    if (tradeCommodities.includes(val)) {
-      setValue('tradeCommodities', tradeCommodities.filter((c) => c !== val))
-    } else {
-      setValue('tradeCommodities', [...tradeCommodities, val])
-    }
-  }
 
   async function onSubmit(data: CreateCustomerInput) {
     setLoading(true)
@@ -365,40 +358,14 @@ export default function NewAccountPage() {
                 </select>
               </Field>
 
-              {/* Trade Commodities — scrollable listbox */}
+              {/* Trade Commodities — multi-select dropdown */}
               <Field label="Trade Commodities">
-                <div
-                  className="border rounded-[2px] overflow-y-auto"
-                  style={{ borderColor: '#ABABAB', height: 148, background: '#FFFFFF' }}
-                >
-                  {commodityOptions.length === 0 ? (
-                    <div className="flex items-center justify-center h-full text-[11px]" style={{ color: '#6C757D' }}>
-                      No categories configured
-                    </div>
-                  ) : commodityOptions.map((opt) => {
-                    const checked = tradeCommodities.includes(opt)
-                    return (
-                      <label
-                        key={opt}
-                        className="flex items-center gap-2 px-2 py-0.5 cursor-pointer text-[11px]"
-                        style={{
-                          background: checked ? '#D6E8FF' : 'transparent',
-                          color: '#212529',
-                          borderBottom: '1px solid #F0F0F0',
-                        }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => toggleCommodity(opt)}
-                          className="w-3 h-3"
-                          disabled={loading}
-                        />
-                        {opt}
-                      </label>
-                    )
-                  })}
-                </div>
+                <TradeCommoditiesSelect
+                  options={commodityOptions}
+                  value={tradeCommodities}
+                  onChange={(next) => setValue('tradeCommodities', next)}
+                  disabled={loading}
+                />
               </Field>
 
               {/* Physical Address */}

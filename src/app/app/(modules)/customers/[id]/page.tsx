@@ -7,6 +7,7 @@ import { Dialog } from '@/components/ui/dialog'
 import { ArrowLeft, AlertTriangle, ShieldBan, ShieldCheck, Save, Pencil } from 'lucide-react'
 import { PhotoUploader, PhotoViewer } from '@/components/PhotoUploader'
 import { LoansTab } from '@/components/customers/LoansTab'
+import { TradeCommoditiesSelect } from '@/components/customers/TradeCommoditiesSelect'
 import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
 import { useForm } from 'react-hook-form'
@@ -144,11 +145,6 @@ export default function CustomerDetailPage() {
   })
 
   const tradeCommodities = (watch('tradeCommodities') as string[] | undefined) ?? []
-
-  function toggleCommodity(val: string) {
-    if (tradeCommodities.includes(val)) setValue('tradeCommodities', tradeCommodities.filter((c) => c !== val))
-    else setValue('tradeCommodities', [...tradeCommodities, val])
-  }
 
   async function onSubmit(data: UpdateCustomerInput) {
     setSaving(true)
@@ -394,15 +390,13 @@ export default function CustomerDetailPage() {
                     </div>
                     <div style={{ gridColumn: 'span 2' }}>
                       <span style={lbl}>Trade Commodities</span>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
-                        {commodityOptions.length === 0 ? (
-                          <span style={{ fontSize: 11, color: '#6C757D' }}>No categories configured</span>
-                        ) : commodityOptions.map((opt) => (
-                          <label key={opt} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, cursor: isEditing ? 'pointer' : 'default', color: '#333' }}>
-                            <input type="checkbox" checked={tradeCommodities.includes(opt)} onChange={() => isEditing && toggleCommodity(opt)} disabled={!isEditing || saving} style={{ width: 12, height: 12 }} />
-                            {opt}
-                          </label>
-                        ))}
+                      <div style={{ marginTop: 4 }}>
+                        <TradeCommoditiesSelect
+                          options={commodityOptions}
+                          value={tradeCommodities}
+                          onChange={(next) => setValue('tradeCommodities', next)}
+                          disabled={!isEditing || saving}
+                        />
                       </div>
                     </div>
                   </div>
