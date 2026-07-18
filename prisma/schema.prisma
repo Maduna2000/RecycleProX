@@ -286,6 +286,12 @@ model ProductCategory {
   updatedAt  DateTime            @updatedAt
   iconName   String?
   parentId   String?
+  // Enables this category as a selectable "trade commodity" option on
+  // account-customer registration — see productService.ts's
+  // listTradeCommodityOptions/setTradeCommodityFlag. Superseded the standalone
+  // TradeCommodityCategory model (free-typed names, prone to drifting from
+  // real product categories) on 2026-07-18.
+  isTradeCommodity Boolean        @default(false)
   stepConfig CategoryStepConfig?
   parent     ProductCategory?    @relation("SubCategories", fields: [parentId], references: [id])
   children   ProductCategory[]   @relation("SubCategories")
@@ -293,21 +299,6 @@ model ProductCategory {
 
   @@unique([tenantId, name])
   @@index([tenantId])
-}
-
-model TradeCommodityCategory {
-  id        String   @id @default(uuid())
-  tenantId  String
-  name      String
-  sortOrder Int      @default(0)
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([tenantId, name])
-  @@index([tenantId])
-  @@index([tenantId, sortOrder])
-  @@index([tenantId, isActive])
 }
 
 model CategoryStepConfig {

@@ -1,36 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
+import { z } from 'zod'
 import logger from '@/lib/logger'
-import { UpdateTradeCommodityCategorySchema } from '@/lib/schemas/tradeCommodity'
-import {
-  getTradeCommodityCategory,
-  updateTradeCommodityCategory,
-  deleteTradeCommodityCategory,
-  CategoryNotFoundError,
-  DuplicateCategoryError,
-} from '@/lib/services/tradeCommodityService'
+import { setTradeCommodityFlag } from '@/lib/services/productService'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
-export async function GET(req: NextRequest, context: RouteContext) {
-  const session = await auth()
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+const ToggleSchema = z.object({ isActive: z.boolean() })
 
-  const { id } = await context.params
-
-  try {
-    const category = await runWithRequestTenant(req, () => getTradeCommodityCategory(id))
-    return NextResponse.json(category)
-  } catch (err) {
-    if (err instanceof CategoryNotFoundError) {
-      return NextResponse.json({ error: err.message }, { status: 404 })
-    }
-    logger.error({ err, id }, 'GET /api/settings/trade-commodities/[id] failed')
-    return NextResponse.json({ error: 'Failed to fetch category' }, { status: 500 })
-  }
-}
-
+/** Toggles whether a product category is shown as a trade-commodity option. */
 export async function PUT(req: NextRequest, context: RouteContext) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -40,46 +19,18 @@ export async function PUT(req: NextRequest, context: RouteContext) {
 
   const { id } = await context.params
   const body = await req.json()
-  const parsed = UpdateTradeCommodityCategorySchema.safeParse(body)
+  const parsed = ToggleSchema.safeParse(body)
   if (!parsed.success) {
-    return NextResponse.json(
-      { error: parsed.error.issues[0]?.message ?? 'Validation failed' },
-      { status: 422 },
-    )
+    return NextResponse.json({ error: 'Body must include { "isActive": boolean }' }, { status: 422 })
   }
 
   try {
-    const category = await runWithRequestTenant(req, () => updateTradeCommodityCategory(id, parsed.data, session.user.id))
+    const category = await runWithRequestTenant(req, () => setTradeCommodityFlag(id, parsed.data.isActive))
     return NextResponse.json(category)
   } catch (err) {
-    if (err instanceof CategoryNotFoundError) {
-      return NextResponse.json({ error: err.message }, { status: 404 })
-    }
-    if (err instanceof DuplicateCategoryError) {
-      return NextResponse.json({ error: err.message }, { status: 409 })
-    }
+    const msg = err instanceof Error ? err.message : 'Failed to update category'
+    if (msg.includes('not found')) return NextResponse.json({ error: msg }, { status: 404 })
     logger.error({ err, id }, 'PUT /api/settings/trade-commodities/[id] failed')
-    return NextResponse.json({ error: 'Failed to update category' }, { status: 500 })
-  }
-}
-
-export async function DELETE(req: NextRequest, context: RouteContext) {
-  const session = await auth()
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!['admin', 'manager'].includes(session.user.role)) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  }
-
-  const { id } = await context.params
-
-  try {
-    const category = await runWithRequestTenant(req, () => deleteTradeCommodityCategory(id, session.user.id))
-    return NextResponse.json(category)
-  } catch (err) {
-    if (err instanceof CategoryNotFoundError) {
-      return NextResponse.json({ error: err.message }, { status: 404 })
-    }
-    logger.error({ err, id }, 'DELETE /api/settings/trade-commodities/[id] failed')
-    return NextResponse.json({ error: 'Failed to delete category' }, { status: 500 })
+    return NextResponse.json({ error: msg }, { status: 500 })
   }
 }

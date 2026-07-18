@@ -28,22 +28,7 @@ type SelectedCustomer = {
   companyName?: string | null; contactPerson?: string | null
 }
 
-const COMMODITY_MAP: Record<string, string[]> = {
-  'Copper':                ['copper'],
-  'Aluminium':             ['aluminium'],
-  'Steel (Ferrous)':       ['ferrous'],
-  'Non-Ferrous Metals':    ['non_ferrous'],
-  'Stainless Steel':       ['ferrous', 'non_ferrous'],
-  'Lead':                  ['non_ferrous'],
-  'Brass':                 ['non_ferrous'],
-  'Iron':                  ['ferrous'],
-  'E-Waste (Electronics)': ['e_waste'],
-  'Plastic':               ['plastic'],
-  'Paper / Cardboard':     ['paper'],
-  'Catalytic Converters':  ['other'],
-  'Batteries':             ['other'],
-  'Other':                 ['other'],
-}
+type CategoryNode = { id: string; name: string; children: { id: string; name: string }[] }
 
 type LineItem = {
   key: number
@@ -155,6 +140,20 @@ export default function NewPurchasePage() {
   const { data: productsData } = useSWR<{ products: Product[] }>('/api/products?active=true', fetcher)
   const products = productsData?.products ?? []
 
+  // A customer's trade commodities are product category names (Settings ->
+  // Trade Commodities toggles real categories on/off). Selecting a parent
+  // category covers its sub-categories too, mirroring productService.ts's
+  // expandCategoryNames.
+  const { data: categoriesData } = useSWR<{ categories: CategoryNode[] }>('/api/product-categories', fetcher)
+  const categoryExpansion = (() => {
+    const map: Record<string, string[]> = {}
+    for (const parent of categoriesData?.categories ?? []) {
+      map[parent.name] = [parent.name, ...parent.children.map((c) => c.name)]
+      for (const child of parent.children) map[child.name] = [child.name]
+    }
+    return map
+  })()
+
   const { data: pendingData, mutate: mutatePending } = useSWR<{ purchases: PendingPurchase[] }>(
     '/api/purchases?status=pending&pageSize=20',
     fetcher,
@@ -175,7 +174,7 @@ export default function NewPurchasePage() {
   const visibleProducts = (() => {
     const commodities = customer?.tradeCommodities
     if (showAllProducts || !commodities?.length) return products
-    const allowed = new Set(commodities.flatMap((c) => COMMODITY_MAP[c] ?? []))
+    const allowed = new Set(commodities.flatMap((c) => categoryExpansion[c] ?? [c]))
     return products.filter((p) => allowed.has(p.category))
   })()
 

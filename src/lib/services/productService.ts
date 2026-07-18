@@ -532,3 +532,30 @@ export async function expandCategoryNames(name: string): Promise<string[]> {
   if (!cat) return [name]
   return [cat.name, ...cat.children.map((c) => c.name)]
 }
+
+// ─── Trade Commodities ────────────────────────────────────────────────────────
+// "Trade commodities" are just product categories flagged as selectable on
+// account-customer registration — see Settings > Trade Commodities. Every
+// active category (parent and child) is always listed; toggling on/off sets
+// isTradeCommodity, it never creates/renames/deletes the category itself
+// (that's the Products module's Manage Categories screen).
+
+export async function listTradeCommodityOptions() {
+  return prisma.productCategory.findMany({
+    where: { isActive: true },
+    select: { id: true, name: true, parentId: true, isTradeCommodity: true },
+    orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+  })
+}
+
+export async function setTradeCommodityFlag(id: string, enabled: boolean) {
+  const cat = await prisma.productCategory.findUnique({ where: { id } })
+  if (!cat) throw new Error('Category not found')
+
+  const updated = await prisma.productCategory.update({
+    where: { id },
+    data: { isTradeCommodity: enabled },
+  })
+  logger.info({ categoryId: id, enabled }, 'productCategory.tradeCommodityToggled')
+  return updated
+}
