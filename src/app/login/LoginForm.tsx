@@ -8,7 +8,8 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { LoginSchema, type LoginInput } from '@/lib/schemas/auth'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { RefreshCw, Loader2, Eye, EyeOff } from 'lucide-react'
+import Image from 'next/image'
+import { Loader2, Eye, EyeOff } from 'lucide-react'
 import { colors } from '@/lib/design-tokens'
 
 export function LoginForm({ tenantSlug }: { tenantSlug?: string }) {
@@ -91,13 +92,10 @@ export function LoginForm({ tenantSlug }: { tenantSlug?: string }) {
         <div className="bg-white rounded-lg shadow-lg p-8" style={{ border: `1px solid ${colors.border}` }}>
           {/* Logo & Title */}
           <div className="flex flex-col items-center mb-8">
-            <div className="w-16 h-16 rounded-lg flex items-center justify-center mb-4" style={{ background: colors.primary }}>
-              <RefreshCw className="w-9 h-9 text-white" />
-            </div>
-            <h1 className="text-2xl font-bold" style={{ color: colors.textPrimary }}>Renovo Pro</h1>
-            <p className="text-sm mt-1" style={{ color: colors.textSecondary }}>
-              {tenantSlug ? tenantSlug : 'Recycling Yard Management'}
-            </p>
+            <Image src="/brand/renovo-logo.png" alt="Renovo Pro" width={300} height={81} priority className="h-auto w-full max-w-[300px]" />
+            {tenantSlug && (
+              <p className="text-sm mt-3" style={{ color: colors.textSecondary }}>{tenantSlug}</p>
+            )}
           </div>
 
           {/* Error */}
