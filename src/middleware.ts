@@ -108,7 +108,7 @@ export default auth((req: NextRequest & { auth: { user?: SessionUser } | null })
   // authenticated the same way — Desktop's background sync process has no
   // interactive login — see src/lib/services/deviceAuthClient.ts.
   if (pathname.startsWith('/login') ||
-      pathname === '/api/r2/test' || pathname === '/scale/login' ||
+      pathname === '/api/r2/test' || pathname === '/scale/login' || pathname === '/gate/login' ||
       pathname.startsWith('/api/mobile/') || pathname.startsWith('/api/internal/') ||
       pathname.startsWith('/api/sync/')) {
     return next()
@@ -128,11 +128,14 @@ export default auth((req: NextRequest & { auth: { user?: SessionUser } | null })
     return NextResponse.redirect(new URL('/login', req.url))
   }
 
-  // Police officer portal — staff-launched; any staff role except scale operators
+  // Police officer portal — staff-launched; any staff role except scale operators/guards
   if (pathname.startsWith('/police')) {
     if (!session) return NextResponse.redirect(new URL('/login', req.url))
     if (session.user?.role === 'scale_operator') {
       return NextResponse.redirect(new URL('/scale', req.url))
+    }
+    if (session.user?.role === 'security_guard') {
+      return NextResponse.redirect(new URL('/gate', req.url))
     }
     return next()
   }
@@ -160,6 +163,16 @@ export default auth((req: NextRequest & { auth: { user?: SessionUser } | null })
     if (!session) return NextResponse.redirect(new URL('/login', req.url))
     const role = session.user?.role
     if (!['admin', 'manager'].includes(role ?? '')) {
+      return NextResponse.redirect(new URL('/app/dashboard', req.url))
+    }
+    return next()
+  }
+
+  // Gate Security kiosk routes — restricted to security_guard + admin + manager
+  if (pathname.startsWith('/gate')) {
+    if (!session) return NextResponse.redirect(new URL('/gate/login', req.url))
+    const role = session.user?.role
+    if (!['security_guard', 'admin', 'manager'].includes(role ?? '')) {
       return NextResponse.redirect(new URL('/app/dashboard', req.url))
     }
     return next()
@@ -197,6 +210,11 @@ export default auth((req: NextRequest & { auth: { user?: SessionUser } | null })
       return NextResponse.redirect(new URL('/scale', req.url))
     }
 
+    // Security guards belong at the gate, not the main app
+    if (session.user?.role === 'security_guard') {
+      return NextResponse.redirect(new URL('/gate', req.url))
+    }
+
     // Force password change redirect
     if (session.user?.forcePasswordChange && pathname !== '/app/change-password') {
       return NextResponse.redirect(new URL('/app/change-password', req.url))
@@ -228,5 +246,5 @@ export default auth((req: NextRequest & { auth: { user?: SessionUser } | null })
 })
 
 export const config = {
-  matcher: ['/login', '/app/:path*', '/scale/:path*', '/police/:path*', '/police', '/api/:path*'],
+  matcher: ['/login', '/app/:path*', '/scale/:path*', '/gate/:path*', '/police/:path*', '/police', '/api/:path*'],
 }

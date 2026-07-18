@@ -2,7 +2,7 @@ import {
   Users, UserRound, ShoppingCart, AlertCircle,
   Tag, CreditCard, ImageIcon, Scale,
   Package, ClipboardList, ClipboardCheck, TrendingUp, BarChart2,
-  Archive, Wallet, Landmark, Settings, LayoutGrid, Banknote,
+  Archive, Wallet, Landmark, Settings, LayoutGrid, Banknote, ShieldCheck,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -35,6 +35,7 @@ export const MODULE_NAMES: Record<string, string> = {
   '/app/audit-log':        'Audit Log',
   '/app/change-password':  'Change Password',
   '/app/scale':            'Scale Station',
+  '/app/gate':             'Gate Security',
   '/app/support':          'Support',
 }
 
@@ -65,6 +66,7 @@ export const HREF_TO_ICON: Record<string, LucideIcon> = {
   '/app/loans':            Banknote,
   '/app/settings':         Settings,
   '/app/scale':            Scale,
+  '/app/gate':             ShieldCheck,
 }
 
 export function getModuleIcon(pathname: string): LucideIcon {

@@ -14,7 +14,7 @@ import {
   Wifi, WifiOff,
   Scale, ClipboardList,
   Boxes, ArrowLeftRight, Grid3X3, SlidersHorizontal,
-  ShieldCheck, History, LifeBuoy,
+  ShieldCheck, History, LifeBuoy, DoorOpen,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useOfflineStore } from '@/stores/offlineStore'
@@ -284,6 +284,64 @@ function ScalePopup() {
   )
 }
 
+// ─── GatePopup ────────────────────────────────────────────────────────────────
+
+function GatePopup() {
+  const [open, setOpen] = useState(false)
+
+  const tiles = [
+    { label: 'Gate Entries',  icon: ClipboardList, href: '/app/gate',               desc: 'View & manage entries' },
+    { label: 'Gate Guards',   icon: Users,         href: '/app/gate?tab=guards',    desc: 'Manage guard accounts' },
+    { label: 'Gate Security', icon: DoorOpen,      href: '/gate',                   desc: 'Open kiosk app', external: true },
+  ]
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium transition-all duration-100 focus:outline-none whitespace-nowrap border rounded-sm border-[#185ABD] text-[#185ABD] bg-transparent hover:bg-[#EBF3FC]"
+        title="Gate Security"
+        aria-label="Gate Security shortcuts"
+      >
+        <DoorOpen className="w-3.5 h-3.5 shrink-0" />
+        <span>Gate</span>
+      </button>
+
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-full mt-1 w-56 bg-white rounded-sm shadow-2xl border border-[#E0E0E0] py-1.5 z-50">
+            <p className="px-3 pb-1.5 pt-0.5 text-[10px] font-semibold text-[#6C757D] uppercase tracking-widest border-b border-[#F1F3F4]">
+              Gate Security
+            </p>
+            {tiles.map((t) => (
+              <Link
+                key={t.href}
+                href={t.href}
+                target={t.external ? '_blank' : undefined}
+                rel={t.external ? 'noopener noreferrer' : undefined}
+                onClick={() => setOpen(false)}
+                className="flex items-start gap-2.5 px-3 py-2 hover:bg-[#EBF3FC] transition-colors"
+              >
+                <div
+                  className="w-7 h-7 rounded flex items-center justify-center shrink-0 mt-0.5"
+                  style={{ background: '#EBF3FC' }}
+                >
+                  <t.icon className="w-3.5 h-3.5" style={{ color: '#185ABD' }} />
+                </div>
+                <div>
+                  <p className="text-[12px] font-medium text-[#212529]">{t.label}</p>
+                  <p className="text-[10px] text-[#6C757D]">{t.desc}</p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 // ─── PolicePopup ──────────────────────────────────────────────────────────────
 
 function PolicePopup({ role }: { role: string }) {
@@ -408,6 +466,62 @@ type TodayStats = {
 
 const statsFetcher = (url: string) => fetch(url).then(r => r.json())
 
+type OnSiteData = {
+  count:   number
+  entries: { id: string; entryNumber: string; vehicleReg: string | null; visitorFirstName: string; visitorLastName: string }[]
+}
+
+function OnSiteIndicator() {
+  const [open, setOpen] = useState(false)
+  const { data } = useSWR<OnSiteData>('/api/gate/on-site', statsFetcher, { refreshInterval: 30_000 })
+  const count = data?.count ?? 0
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="flex items-center gap-2 px-3 border-r border-[#E0E0E0] shrink-0 h-full focus:outline-none"
+      >
+        <span className="text-[#6B7280] text-[11px] select-none">On Site</span>
+        <span className={cn(
+          'text-[10px] font-semibold px-2 py-0.5 rounded-full border select-none',
+          count > 0 ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-gray-100 text-gray-500 border-gray-200',
+        )}>
+          {count}
+        </span>
+      </button>
+
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute left-0 top-full mt-1 w-64 bg-white rounded-sm shadow-2xl border border-[#E0E0E0] py-1.5 z-50">
+            <p className="px-3 pb-1.5 pt-0.5 text-[10px] font-semibold text-[#6C757D] uppercase tracking-widest border-b border-[#F1F3F4]">
+              On Site Now
+            </p>
+            {(!data?.entries || data.entries.length === 0) ? (
+              <p className="px-3 py-2.5 text-[11px] text-[#9CA3AF]">No one currently on site</p>
+            ) : (
+              data.entries.map((e) => (
+                <div key={e.id} className="px-3 py-1.5 border-b border-[#F8F9FA] last:border-b-0">
+                  <p className="text-[12px] font-medium text-[#212529]">{e.visitorFirstName} {e.visitorLastName}</p>
+                  <p className="text-[10px] text-[#6C757D]">{e.entryNumber}{e.vehicleReg ? ` · ${e.vehicleReg}` : ''}</p>
+                </div>
+              ))
+            )}
+            <Link
+              href="/app/gate"
+              onClick={() => setOpen(false)}
+              className="block px-3 py-1.5 text-[11px] font-medium text-[#185ABD] hover:bg-[#EBF3FC] transition-colors border-t border-[#F1F3F4] mt-0.5"
+            >
+              View all entries →
+            </Link>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 function DashboardStatsBar({ fullName, role }: { fullName: string; role: string }) {
   const { data: stats, isLoading } = useSWR<TodayStats>('/api/reports/today', statsFetcher, {
     refreshInterval: 30_000,
@@ -460,7 +574,7 @@ function DashboardStatsBar({ fullName, role }: { fullName: string; role: string 
           </div>
 
           {/* Sales */}
-          <div className="flex items-center gap-2 px-3 shrink-0">
+          <div className="flex items-center gap-2 px-3 border-r border-[#E0E0E0] shrink-0">
             <span className="text-[#6B7280] text-[11px] select-none">Sales</span>
             {isLoading
               ? <div className="h-3 w-16 rounded bg-gray-200 animate-pulse" />
@@ -469,15 +583,19 @@ function DashboardStatsBar({ fullName, role }: { fullName: string; role: string 
                 </span>
             }
           </div>
+
+          {/* On Site (Gate Security) */}
+          <OnSiteIndicator />
         </>
       )}
 
       <div className="flex-1" />
 
-      {/* Police + Scale popups — far right */}
+      {/* Police + Scale + Gate popups — far right */}
       <div className="flex items-center gap-1.5">
         <PolicePopup role={role} />
         {isManager && <ScalePopup />}
+        {isManager && <GatePopup />}
       </div>
     </>
   )

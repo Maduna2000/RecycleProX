@@ -226,8 +226,8 @@ export async function createUser(
       },
     })
 
-    // Create module access records if provided (for non-admin, non-scale_operator users)
-    if (data.allowedModules?.length && data.role !== 'admin' && data.role !== 'scale_operator') {
+    // Create module access records if provided (for non-admin, non-scale_operator, non-security_guard users)
+    if (data.allowedModules?.length && data.role !== 'admin' && data.role !== 'scale_operator' && data.role !== 'security_guard') {
       await tx.userModuleAccess.createMany({
         data: data.allowedModules.map((moduleKey) => ({
           tenantId,

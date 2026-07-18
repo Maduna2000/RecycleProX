@@ -61,6 +61,8 @@ model User {
   voidedScaleOrders   ScaleOrder[]       @relation("ScaleOrderVoidedBy")
   stocktakes          Stocktake[]        @relation("StocktakeCreatedBy")
   voidedStocktakes    Stocktake[]        @relation("StocktakeVoidedBy")
+  operatedGateEntries GateEntry[]        @relation("GateEntryOperator")
+  exitedGateEntries   GateEntry[]        @relation("GateEntryExitedBy")
   moduleAccess        UserModuleAccess[]
 
   @@unique([tenantId, username])
@@ -164,6 +166,7 @@ model Customer {
   purchases           Purchase[]
   sales               Sale[]               @relation("SaleCustomer")
   scaleOrders         ScaleOrder[]
+  gateEntries         GateEntry[]
   transactionPayments TransactionPayment[]
 
   @@unique([tenantId, idNumber])
@@ -879,17 +882,79 @@ model ScaleOrderLine {
   @@index([tenantId, productId])
 }
 
+// Gate Security — yard entry/exit log. customerId is set only on an exact
+// ID-number match against an existing Customer; unlike ScaleOrder's
+// quickCreate-on-create behaviour, a non-matching visitor is never turned
+// into a new Customer row here — the visitor* fields carry their details
+// inline regardless. "Repeat visitor" is detected by matching
+// visitorIdNumber against this table's own history, so it works whether or
+// not the person has ever become a real Customer.
+model GateEntry {
+  id                String           @id @default(uuid())
+  tenantId          String
+  entryNumber       String
+  purpose           GateEntryPurpose
+  categoryName      String?
+  customerId        String?
+  visitorFirstName  String
+  visitorLastName   String
+  visitorIdNumber   String
+  visitorPhone      String?
+  vehicleReg        String?
+  idPhotoR2Key      String?
+  vehiclePhotoR2Key String?
+  facePhotoR2Key    String?
+  notes             String?
+  operatorId        String
+  exitedAt          DateTime?
+  exitedById        String?
+  createdAt         DateTime         @default(now())
+  customer          Customer?        @relation(fields: [customerId], references: [id])
+  operator          User             @relation("GateEntryOperator", fields: [operatorId], references: [id])
+  exitedBy          User?            @relation("GateEntryExitedBy", fields: [exitedById], references: [id])
+
+  @@unique([tenantId, entryNumber])
+  @@index([tenantId])
+  @@index([tenantId, visitorIdNumber])
+  @@index([tenantId, customerId])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, exitedAt])
+}
+
+// Per-purpose photo requirements, admin-configurable — mirrors
+// CategoryStepConfig's role for Scale Station, but keyed on purpose
+// (Gate Entry's natural branching axis) rather than product category.
+model GatePurposeConfig {
+  id                  String           @id @default(uuid())
+  tenantId            String
+  purpose             GateEntryPurpose
+  requireIdPhoto      Boolean          @default(false)
+  requireVehiclePhoto Boolean          @default(true)
+  requireFacePhoto    Boolean          @default(true)
+
+  @@unique([tenantId, purpose])
+  @@index([tenantId])
+}
+
 enum UserRole {
   admin
   manager
   cashier
   scale_operator
+  security_guard
 }
 
 enum ScaleOrderStatus {
   pending
   processed
   voided
+}
+
+enum GateEntryPurpose {
+  sell
+  buy
+  visitor
+  other
 }
 
 enum CustomerType {

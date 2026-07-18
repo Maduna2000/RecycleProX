@@ -44,9 +44,9 @@ export function CreateUserModal({ open, onClose, onSuccess }: { open: boolean; o
 
   function handleRoleChange(role: string) {
     setSelectedRole(role)
-    setValue('role', role as 'admin' | 'manager' | 'cashier' | 'scale_operator')
+    setValue('role', role as 'admin' | 'manager' | 'cashier' | 'scale_operator' | 'security_guard')
     // Clear module selection when changing roles
-    if (role === 'admin' || role === 'scale_operator') {
+    if (role === 'admin' || role === 'scale_operator' || role === 'security_guard') {
       setSelectedModules([])
     }
   }
@@ -139,6 +139,7 @@ export function CreateUserModal({ open, onClose, onSuccess }: { open: boolean; o
               <option value="manager">Manager</option>
               <option value="cashier">Cashier</option>
               <option value="scale_operator">Scale Operator</option>
+              <option value="security_guard">Security Guard</option>
             </select>
             {errors.role && <span style={{ fontSize: 10, color: '#DC2626', marginTop: 2, display: 'block' }}>{errors.role.message}</span>}
           </div>
@@ -206,6 +207,11 @@ export function CreateUserModal({ open, onClose, onSuccess }: { open: boolean; o
           {selectedRole === 'scale_operator' && (
             <p style={{ fontSize: 10, color: '#666', fontStyle: 'italic' }}>
               Scale operators can only access the Scale Station app.
+            </p>
+          )}
+          {selectedRole === 'security_guard' && (
+            <p style={{ fontSize: 10, color: '#666', fontStyle: 'italic' }}>
+              Security guards can only access the Gate Security app.
             </p>
           )}
 

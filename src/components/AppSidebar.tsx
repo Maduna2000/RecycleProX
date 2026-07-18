@@ -8,7 +8,7 @@ import {
   Package, BarChart2, Settings, Settings2, LogOut, RefreshCw,
   Warehouse, DollarSign, Tag, Banknote, ShieldCheck, ShieldAlert,
   Receipt, Coins, UserCheck, ClipboardList, Images,
-  AlertCircle, Scale,
+  AlertCircle, Scale, DoorOpen,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -70,6 +70,16 @@ const SCALE_ADMIN: NavGroup = {
   ],
 }
 
+const GATE_ADMIN: NavGroup = {
+  heading: 'Gate Security',
+  items: [
+    { label: 'Entries',       href: '/app/gate',               icon: ClipboardList },
+    { label: 'Guards',        href: '/app/gate?tab=guards',    icon: Users },
+    { label: 'Purpose Config', href: '/app/gate?tab=config',   icon: Settings2 },
+    { label: 'Gate',          href: '/gate',                   icon: DoorOpen },
+  ],
+}
+
 const ADMIN: NavGroup = {
   heading: 'Administration',
   items: [
@@ -83,7 +93,7 @@ const ADMIN: NavGroup = {
 
 function isActive(pathname: string, href: string): boolean {
   // Exact match only for paths that are a prefix of deeper routes
-  if (href === '/app/settings' || href === '/app/scale') {
+  if (href === '/app/settings' || href === '/app/scale' || href === '/app/gate') {
     return pathname === href || pathname === href + '/'
   }
   // Purchases/Sales nav points to /new but should highlight for any sub-route
@@ -105,7 +115,7 @@ export function AppSidebar({ role, fullName }: { role: string; fullName: string;
 
   const groups: NavGroup[] = [
     ALWAYS,
-    ...(isManager ? [FINANCE, INVENTORY, RECORDS, SCALE_ADMIN] : []),
+    ...(isManager ? [FINANCE, INVENTORY, RECORDS, SCALE_ADMIN, GATE_ADMIN] : []),
     ...(isAdmin   ? [ADMIN]                                     : []),
   ]
 

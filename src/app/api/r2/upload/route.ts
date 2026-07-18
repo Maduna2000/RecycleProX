@@ -7,7 +7,7 @@ import { tenantContext } from '@/lib/db/tenantContext'
 import { randomUUID } from 'crypto'
 import logger from '@/lib/logger'
 
-const CONTEXTS = ['customer_id', 'purchase_photo', 'purchase_signature', 'police_signature', 'stocktake_entry', 'scale_order'] as const
+const CONTEXTS = ['customer_id', 'purchase_photo', 'purchase_signature', 'police_signature', 'stocktake_entry', 'scale_order', 'gate_entry'] as const
 type UploadContext = typeof CONTEXTS[number]
 
 // Mirrors the tenantKeyPrefix() convention in src/lib/r2/index.ts — no-op
@@ -22,6 +22,7 @@ function buildKey(context: UploadContext, referenceId: string, ext: string, phot
     case 'police_signature':   return `${prefix}police-visits/${referenceId}/signature-${randomUUID()}.${ext}`
     case 'stocktake_entry':    return `${prefix}stocktakes/${referenceId}/photo-${randomUUID()}.${ext}`
     case 'scale_order':        return `${prefix}scale-orders/${referenceId}/photo-${photoIndex ?? 0}-${randomUUID()}.${ext}`
+    case 'gate_entry':         return `${prefix}gate-entries/${referenceId}/photo-${photoIndex ?? 0}-${randomUUID()}.${ext}`
   }
 }
 

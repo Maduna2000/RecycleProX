@@ -71,6 +71,14 @@ export function LoginForm({ tenantSlug }: { tenantSlug?: string }) {
       return
     }
 
+    // Block security guards from main login — they must use /gate/login
+    if (sess?.user?.role === 'security_guard') {
+      await signOut({ redirect: false })
+      setLoading(false)
+      setError('Security guards must use the Gate Security login')
+      return
+    }
+
     router.push('/app/dashboard')
     router.refresh()
   }

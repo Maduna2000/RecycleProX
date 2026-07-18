@@ -60,6 +60,10 @@ export function scaleOrderSlipKey(orderId: string): string {
   return `${tenantKeyPrefix()}scale-orders/${orderId}/slip.pdf`
 }
 
+export function gateEntryPhotoKey(entryId: string, index: number, ext: string): string {
+  return `${tenantKeyPrefix()}gate-entries/${entryId}/photo-${index}-${randomUUID()}.${ext}`
+}
+
 // ─── Presigned upload URL (PUT) ───────────────────────────────────────────────
 // Client uploads directly to R2 — server never handles the binary.
 
