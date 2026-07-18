@@ -275,8 +275,6 @@ export default function NewAccountPage() {
                   value={tradeCommodities}
                   onChange={(next) => setValue('tradeCommodities', next)}
                   disabled={loading}
-                  className={inputCls}
-                  style={inputStyle}
                 />
               </Field>
 

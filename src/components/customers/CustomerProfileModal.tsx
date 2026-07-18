@@ -871,12 +871,13 @@ function EditCustomerModal({ customer, onClose, onSuccess }: {
               </div>
               <div>
                 <Label>Trade Commodities</Label>
-                <TradeCommoditiesSelect
-                  options={commodityOptions}
-                  value={tradeCommodities}
-                  onChange={(next) => setValue('tradeCommodities', next)}
-                  className="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                />
+                <div className="mt-1">
+                  <TradeCommoditiesSelect
+                    options={commodityOptions}
+                    value={tradeCommodities}
+                    onChange={(next) => setValue('tradeCommodities', next)}
+                  />
+                </div>
               </div>
               <div>
                 <Label>Credit Limit (R)</Label>

@@ -384,14 +384,13 @@ export default function CustomerDetailPage() {
                       <input {...register('vatNumber')} disabled={!isEditing || saving} style={{ ...(isEditing ? inp : inpDisabled), fontFamily: 'monospace' }} />
                       {errors.vatNumber && <span style={{ fontSize: 10, color: '#DC2626' }}>{errors.vatNumber.message}</span>}
                     </div>
-                    <div style={{ gridColumn: 'span 2' }}>
+                    <div>
                       <span style={lbl}>Trade Commodities</span>
                       <TradeCommoditiesSelect
                         options={commodityOptions}
                         value={tradeCommodities}
                         onChange={(next) => setValue('tradeCommodities', next)}
                         disabled={!isEditing || saving}
-                        style={isEditing ? inp : inpDisabled}
                       />
                     </div>
                     <div>
