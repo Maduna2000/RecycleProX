@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { Search, LogOut as LogOutIcon, Loader2, ChevronLeft, AlertCircle } from 'lucide-react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { Search, LogOut as LogOutIcon, Loader2, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react'
 
 interface OnSiteEntry {
   id:               string
@@ -17,31 +17,65 @@ interface Props {
   onDone: () => void
 }
 
+const PAGE_SIZE = 10
+
+function useDebounce<T>(value: T, ms = 300): T {
+  const [debounced, setDebounced] = useState(value)
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(value), ms)
+    return () => clearTimeout(t)
+  }, [value, ms])
+  return debounced
+}
+
 export default function CheckOutMode({ onDone }: Props) {
   const [query, setQuery] = useState('')
   const [entries, setEntries] = useState<OnSiteEntry[]>([])
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(false)
   const [checkingOut, setCheckingOut] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchEntries = useCallback(async (search: string) => {
+  const debouncedQuery = useDebounce(query, 300)
+  const prevQueryRef = useRef(debouncedQuery)
+
+  const fetchEntries = useCallback(async (search: string, pg: number) => {
     setLoading(true)
     try {
-      const params = new URLSearchParams({ onSiteOnly: 'true', pageSize: '50', ...(search && { search }) })
+      const params = new URLSearchParams({ onSiteOnly: 'true', pageSize: String(PAGE_SIZE), page: String(pg), ...(search && { search }) })
       const res = await fetch(`/api/gate/entries?${params}`)
       const data = await res.json()
-      setEntries(data.entries ?? [])
+      const fetchedEntries: OnSiteEntry[] = data.entries ?? []
+      const fetchedTotal: number = data.total ?? 0
+      // This page came back empty but there are entries on an earlier page —
+      // e.g. the last entry on the last page just got checked out. Step back
+      // a page; the effect below picks up the resulting page change.
+      if (fetchedEntries.length === 0 && pg > 1 && fetchedTotal > 0) {
+        setPage(pg - 1)
+        return
+      }
+      setEntries(fetchedEntries)
+      setTotal(fetchedTotal)
     } catch {
       setEntries([])
+      setTotal(0)
     } finally {
       setLoading(false)
     }
   }, [])
 
   useEffect(() => {
-    const t = setTimeout(() => fetchEntries(query.trim()), 300)
-    return () => clearTimeout(t)
-  }, [query, fetchEntries])
+    const changed = prevQueryRef.current !== debouncedQuery
+    prevQueryRef.current = debouncedQuery
+    if (changed) {
+      setPage(1)
+      fetchEntries(debouncedQuery, 1)
+    } else {
+      fetchEntries(debouncedQuery, page)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedQuery, page, fetchEntries])
 
   async function handleCheckout(id: string) {
     setCheckingOut(id)
@@ -49,13 +83,15 @@ export default function CheckOutMode({ onDone }: Props) {
     try {
       const res = await fetch(`/api/gate/entries/${id}/checkout`, { method: 'PATCH' })
       if (!res.ok) throw new Error()
-      setEntries((prev) => prev.filter((e) => e.id !== id))
+      await fetchEntries(debouncedQuery, page)
     } catch {
       setError('Failed to check out — please try again.')
     } finally {
       setCheckingOut(null)
     }
   }
+
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
   return (
     <div className="flex-1 flex flex-col p-5 sm:p-8 max-w-lg sm:max-w-2xl mx-auto w-full">
@@ -110,9 +146,31 @@ export default function CheckOutMode({ onDone }: Props) {
         )}
       </div>
 
+      {total > PAGE_SIZE && (
+        <div className="flex items-center justify-between mt-4 shrink-0">
+          <button
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page <= 1 || loading}
+            className="flex items-center gap-1 text-slate-600 hover:text-slate-900 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-medium min-h-[44px] px-3 rounded-lg hover:bg-slate-100 active:bg-slate-200 transition-colors"
+          >
+            <ChevronLeft className="w-4 h-4" /> Prev
+          </button>
+          <span className="text-slate-500 text-sm tabular-nums">
+            Page {page} of {totalPages} · {total} on site
+          </span>
+          <button
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page >= totalPages || loading}
+            className="flex items-center gap-1 text-slate-600 hover:text-slate-900 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-medium min-h-[44px] px-3 rounded-lg hover:bg-slate-100 active:bg-slate-200 transition-colors"
+          >
+            Next <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       <button
         onClick={onDone}
-        className="mt-4 text-slate-500 hover:text-slate-700 text-sm font-medium self-center min-h-[44px] px-4 rounded-lg hover:bg-slate-100 active:bg-slate-200 transition-colors flex items-center gap-1"
+        className="mt-2 text-slate-500 hover:text-slate-700 text-sm font-medium self-center min-h-[44px] px-4 rounded-lg hover:bg-slate-100 active:bg-slate-200 transition-colors flex items-center gap-1"
       >
         <ChevronLeft className="w-4 h-4" /> Back to New Entry
       </button>
