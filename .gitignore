@@ -17,6 +17,9 @@ node_modules/
 # production
 /build
 
+# local hardware-bridge server packaging output (scripts/local-server/assemble.ts)
+/dist/
+
 # misc
 .DS_Store
 *.pem
@@ -71,3 +74,4 @@ mobile/ios/Pods/
 prisma/sqlite/schema.prisma
 *.db
 *.db-journal
+.env*
