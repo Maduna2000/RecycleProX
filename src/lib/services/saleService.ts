@@ -285,6 +285,8 @@ export async function markSalePaid(
           amount:          settleAmount,
           paymentMethod:   data.paymentMethod as 'cash' | 'eft',
           notes:           `Settlement of sale ${sale.refNumber}`,
+          source:          'sale',
+          saleId:          sale.id,
           createdByUserId: userId,
         } as Prisma.PaymentUncheckedCreateInput,
       })

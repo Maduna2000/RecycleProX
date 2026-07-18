@@ -447,6 +447,8 @@ export async function markPurchasePaid(
           amount:          settleAmount,
           paymentMethod:   data.paymentMethod as 'cash' | 'eft',
           notes:           `Settlement of purchase ${purchase.refNumber}`,
+          source:          'purchase',
+          purchaseId:      purchase.id,
           createdByUserId: userId,
         },
       })
@@ -550,6 +552,8 @@ export async function processSplitPayment(
             amount:          p.amount,
             paymentMethod:   p.method,
             notes:           `Split payment for ${purchase.refNumber} (${p.method})`,
+            source:          'purchase',
+            purchaseId:      purchase.id,
             createdByUserId: userId,
           },
         })

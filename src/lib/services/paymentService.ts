@@ -83,6 +83,9 @@ export async function createPayment(data: CreatePaymentInput, createdByUserId?: 
       amount: new Decimal(data.amount),
       paymentMethod: data.paymentMethod ?? 'cash',
       notes: data.notes,
+      // Manual "Record Payment" always settles what the yard owes a
+      // customer from purchases — see the Payment.source field comment.
+      source: 'purchase',
       createdByUserId,
     },
     include: {
@@ -135,6 +138,7 @@ export async function listPayments(opts?: {
   search?: string
   includeVoided?: boolean
   paymentMethod?: string
+  source?: 'sale' | 'purchase'
   page?: number
   pageSize?: number
 }) {
@@ -146,6 +150,7 @@ export async function listPayments(opts?: {
     ...(opts?.customerId && { customerId: opts.customerId }),
     ...(!opts?.includeVoided && { voidedAt: null }),
     ...(opts?.paymentMethod && { paymentMethod: opts.paymentMethod as 'cash' | 'eft' }),
+    ...(opts?.source && { source: opts.source }),
     ...(opts?.from || opts?.to ? {
       createdAt: {
         ...(opts?.from && { gte: opts.from }),
@@ -162,20 +167,32 @@ export async function listPayments(opts?: {
     }),
   }
 
-  const [payments, total] = await Promise.all([
+  const [payments, total, receivedAgg, paidOutAgg] = await Promise.all([
     prisma.payment.findMany({
       where,
       include: {
         customer: { select: { id: true, firstName: true, lastName: true, idNumber: true } },
+        sale: { select: { refNumber: true } },
+        purchase: { select: { refNumber: true } },
       },
       orderBy: { createdAt: 'desc' },
       skip,
       take: pageSize,
     }),
     prisma.payment.count({ where }),
+    prisma.payment.aggregate({ where: { ...where, source: 'sale' }, _sum: { amount: true } }),
+    prisma.payment.aggregate({ where: { ...where, source: 'purchase' }, _sum: { amount: true } }),
   ])
 
-  return { payments, total, page, pageSize, pageCount: Math.ceil(total / pageSize) }
+  return {
+    payments,
+    total,
+    page,
+    pageSize,
+    pageCount: Math.ceil(total / pageSize),
+    totalReceived: receivedAgg._sum.amount?.toString() ?? '0',
+    totalPaidOut: paidOutAgg._sum.amount?.toString() ?? '0',
+  }
 }
 
 // ─── List Customers with Balances ────────────────────────────────────────────

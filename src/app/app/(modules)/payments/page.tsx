@@ -26,7 +26,28 @@ type Payment = {
   notes?: string
   voidedAt?: string
   createdAt: string
+  source: 'sale' | 'purchase'
   customer: { id: string; firstName: string; lastName: string; idNumber: string | null } | null
+  sale: { refNumber: string } | null
+  purchase: { refNumber: string } | null
+}
+
+function DirectionBadge({ source }: { source: 'sale' | 'purchase' }) {
+  const isReceived = source === 'sale'
+  return (
+    <span
+      className="inline-flex items-center rounded-full"
+      style={{
+        padding: '2px 8px',
+        fontSize: fontSize.xs,
+        fontWeight: fontWeight.medium,
+        color: isReceived ? colors.action : colors.process,
+        background: isReceived ? colors.actionBg : colors.processBg,
+      }}
+    >
+      {isReceived ? 'Received' : 'Paid Out'}
+    </span>
+  )
 }
 
 export default function PaymentsPage() {
@@ -35,27 +56,31 @@ export default function PaymentsPage() {
 
   const [search,         setSearch]         = useState('')
   const [paymentMethod,  setPaymentMethod]  = useState('')
+  const [source,         setSource]         = useState('')
   const [from,           setFrom]           = useState('')
   const [to,             setTo]             = useState('')
   const [includeVoided,  setIncludeVoided]  = useState(false)
   const [voidTarget,     setVoidTarget]     = useState<Payment | null>(null)
 
-  const hasFilters = !!(search || paymentMethod || from || to)
+  const hasFilters = !!(search || paymentMethod || source || from || to)
 
   function clearFilters() {
-    setSearch(''); setPaymentMethod(''); setFrom(''); setTo('')
+    setSearch(''); setPaymentMethod(''); setSource(''); setFrom(''); setTo('')
   }
 
   const query = new URLSearchParams({
     ...(search        && { search }),
     ...(paymentMethod && { paymentMethod }),
+    ...(source        && { source }),
     ...(from          && { from }),
     ...(to            && { to }),
     ...(includeVoided && { includeVoided: 'true' }),
     pageSize: '100',
   })
 
-  const { data: paymentsData, isLoading: paymentsLoading } = useSWR<{ payments: Payment[]; total: number }>(
+  const { data: paymentsData, isLoading: paymentsLoading } = useSWR<{
+    payments: Payment[]; total: number; totalReceived: string; totalPaidOut: string
+  }>(
     `/api/payments?${query}`,
     fetcher,
   )
@@ -89,6 +114,22 @@ export default function PaymentsPage() {
             <p className="font-mono" style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>{r.customer?.idNumber ?? '-'}</p>
           </div>
         </div>
+      ),
+    },
+    {
+      key: 'source',
+      header: 'Direction',
+      width: '96px',
+      render: (r) => <DirectionBadge source={r.source} />,
+    },
+    {
+      key: 'reference',
+      header: 'Reference',
+      width: '120px',
+      render: (r) => (
+        <span className="font-mono text-xs" style={{ color: colors.textSecondary }}>
+          {r.sale?.refNumber ?? r.purchase?.refNumber ?? '—'}
+        </span>
       ),
     },
     {
@@ -154,6 +195,13 @@ export default function PaymentsPage() {
             <option value="eft">EFT</option>
           </select>
         </Field>
+        <Field label="Type" width={150}>
+          <select value={source} onChange={(e) => setSource(e.target.value)} style={inp}>
+            <option value="">All Payments</option>
+            <option value="sale">Received (Sales)</option>
+            <option value="purchase">Paid Out (Purchases)</option>
+          </select>
+        </Field>
         <Field label="From" width={145}>
           <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} style={inp} title="From date" />
         </Field>
@@ -176,6 +224,26 @@ export default function PaymentsPage() {
           <Btn size="sm" icon={X} onClick={clearFilters}>Clear</Btn>
         )}
       </FilterBar>
+      <div className="flex items-center gap-3" style={{ padding: '0 10px' }}>
+        <div
+          className="flex-1 rounded-lg px-3 py-2"
+          style={{ background: colors.actionBg, border: `1px solid ${colors.border}` }}
+        >
+          <p style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>Total Received (Sales)</p>
+          <p className="font-mono font-semibold" style={{ fontSize: fontSize.md, color: colors.action }}>
+            R {new Decimal(paymentsData?.totalReceived ?? '0').toFixed(2)}
+          </p>
+        </div>
+        <div
+          className="flex-1 rounded-lg px-3 py-2"
+          style={{ background: colors.processBg, border: `1px solid ${colors.border}` }}
+        >
+          <p style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>Total Paid Out (Purchases)</p>
+          <p className="font-mono font-semibold" style={{ fontSize: fontSize.md, color: colors.process }}>
+            R {new Decimal(paymentsData?.totalPaidOut ?? '0').toFixed(2)}
+          </p>
+        </div>
+      </div>
       <div className="flex-1 min-h-0" style={{ padding: 10 }}>
         <DataTable
           columns={paymentColumns}

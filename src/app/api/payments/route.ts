@@ -16,6 +16,8 @@ export async function GET(req: NextRequest) {
   const customerId = searchParams.get('customerId') ?? undefined
   const search = searchParams.get('search') ?? undefined
   const paymentMethod = searchParams.get('paymentMethod') ?? undefined
+  const sourceRaw = searchParams.get('source') ?? undefined
+  const source = sourceRaw === 'sale' || sourceRaw === 'purchase' ? sourceRaw : undefined
   const includeVoided = searchParams.get('includeVoided') === 'true'
   const page = parseInt(searchParams.get('page') ?? '1')
   const pageSize = parseInt(searchParams.get('pageSize') ?? '50')
@@ -23,7 +25,7 @@ export async function GET(req: NextRequest) {
   const to = searchParams.get('to') ? new Date(searchParams.get('to')!) : undefined
 
   try {
-    const result = await runWithRequestTenant(req, () => listPayments({ customerId, search, paymentMethod, includeVoided, page, pageSize, from, to }))
+    const result = await runWithRequestTenant(req, () => listPayments({ customerId, search, paymentMethod, source, includeVoided, page, pageSize, from, to }))
     return NextResponse.json(result)
   } catch (err) {
     logger.error({ err }, 'GET /api/payments failed')

@@ -354,6 +354,7 @@ model Purchase {
   splitPayments           Json?
   scaleOrderId            String?                  @unique
   loanRepayments          LoanRepayment[]
+  payments                Payment[]
   customer                Customer                 @relation(fields: [customerId], references: [id])
   scaleOrder              ScaleOrder?              @relation(fields: [scaleOrderId], references: [id])
   lines                   PurchaseLine[]
@@ -418,6 +419,7 @@ model Sale {
   photoR2Keys           String[]      @default([])
   customer              Customer?     @relation("SaleCustomer", fields: [customerId], references: [id])
   lines                 SaleLine[]
+  payments              Payment[]
 
   @@unique([tenantId, refNumber])
   @@index([tenantId])
@@ -484,12 +486,26 @@ model Payment {
   createdByUserId String?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
+  // Money direction — 'sale' = received from a buyer settling a sale;
+  // 'purchase' = paid out to a supplier/customer settling a purchase (the
+  // manual "Record Payment" action is purchase-direction too, since it
+  // settles what the yard owes from purchases). Always set explicitly by
+  // the writer (markSalePaid / markPurchasePaid / processSplitPayment /
+  // createPayment) — never inferred from `notes` at read time.
+  source          PaymentSource @default(purchase)
+  saleId          String?
+  purchaseId      String?
   customer        Customer?     @relation(fields: [customerId], references: [id])
+  sale            Sale?         @relation(fields: [saleId], references: [id])
+  purchase        Purchase?     @relation(fields: [purchaseId], references: [id])
 
   @@unique([tenantId, refNumber])
   @@index([tenantId])
   @@index([tenantId, customerId])
   @@index([tenantId, createdAt])
+  @@index([tenantId, source])
+  @@index([tenantId, saleId])
+  @@index([tenantId, purchaseId])
 }
 
 model ExpenseType {
@@ -901,6 +917,12 @@ enum PaymentMethod {
   eft
   cheque
   card
+}
+
+// Money direction on a Payment row — see the field comment on Payment.source.
+enum PaymentSource {
+  sale
+  purchase
 }
 
 enum UnitOfMeasure {
