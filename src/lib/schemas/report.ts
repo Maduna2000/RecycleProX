@@ -81,6 +81,15 @@ export const LoanBookParamsSchema = rangeParams({
   status: z.enum(['active', 'settled', 'all']).optional(),
 })
 
+/** Snapshot of loans still owing as at the "to" date ("from" is not used). */
+export const LoansOutstandingParamsSchema = rangeParams({
+  customerId: z.string().uuid().optional(),
+})
+
+export const LoanPaymentsParamsSchema = rangeParams({
+  customerId: z.string().uuid().optional(),
+})
+
 // ── Stock ─────────────────────────────────────────────────────────────────────
 export const StockOnHandParamsSchema = rangeParams({
   valuation: z.enum(['buy', 'sell']).optional(),
@@ -113,6 +122,8 @@ export type SalesByProductParams = z.infer<typeof SalesByProductParamsSchema>
 export type SalesByCustomerParams = z.infer<typeof SalesByCustomerParamsSchema>
 export type ExpensesReportParams = z.infer<typeof ExpensesReportParamsSchema>
 export type LoanBookParams = z.infer<typeof LoanBookParamsSchema>
+export type LoansOutstandingParams = z.infer<typeof LoansOutstandingParamsSchema>
+export type LoanPaymentsParams = z.infer<typeof LoanPaymentsParamsSchema>
 export type StockOnHandParams = z.infer<typeof StockOnHandParamsSchema>
 export type StockMovementParams = z.infer<typeof StockMovementParamsSchema>
 export type StocktakeReportParams = z.infer<typeof StocktakeReportParamsSchema>

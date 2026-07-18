@@ -20,6 +20,8 @@ import {
   SalesByCustomerParamsSchema,
   ExpensesReportParamsSchema,
   LoanBookParamsSchema,
+  LoansOutstandingParamsSchema,
+  LoanPaymentsParamsSchema,
   StockOnHandParamsSchema,
   StockMovementParamsSchema,
   StocktakeReportParamsSchema,
@@ -45,6 +47,8 @@ import {
   buildFloatLog,
   buildCashOnHand,
   buildLoanBook,
+  buildLoansOutstanding,
+  buildLoanPayments,
   buildProfitSummary,
   buildVatSummary,
   buildCancelledTransactions,
@@ -115,6 +119,14 @@ export const REPORT_REGISTRY: Record<string, ReportDefinition> = {
   'loan-book': {
     paramsSchema: LoanBookParamsSchema,
     build: buildLoanBook,
+  },
+  'loans-outstanding': {
+    paramsSchema: LoansOutstandingParamsSchema,
+    build: buildLoansOutstanding,
+  },
+  'loan-payments': {
+    paramsSchema: LoanPaymentsParamsSchema,
+    build: buildLoanPayments,
   },
   'profit-summary': {
     paramsSchema: BaseReportParamsSchema,

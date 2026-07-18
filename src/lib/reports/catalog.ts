@@ -171,6 +171,22 @@ export const REPORT_CATALOG: ReportCatalogEntry[] = [
     ],
   },
   {
+    id: 'loans-outstanding',
+    label: 'Outstanding Loans',
+    description:
+      'Every loan still owing as at the end date: principal, amount repaid, and outstanding balance per customer.',
+    area: 'cash',
+    filters: [{ key: 'customerId', label: 'Customer', type: 'customer' }],
+  },
+  {
+    id: 'loan-payments',
+    label: 'Loan Payments',
+    description:
+      'Per customer: opening loan balance, each repayment with the purchase note that funded it, and running balance for the period.',
+    area: 'cash',
+    filters: [{ key: 'customerId', label: 'Customer', type: 'customer' }],
+  },
+  {
     id: 'profit-summary',
     label: 'Profit Summary',
     description:

@@ -15,6 +15,8 @@ import type {
   BaseReportParams,
   ExpensesReportParams,
   LoanBookParams,
+  LoansOutstandingParams,
+  LoanPaymentsParams,
 } from '@/lib/schemas/report'
 
 type MetaBase = Omit<ReportMeta, 'rowCount'>
@@ -439,6 +441,322 @@ export async function buildLoanBook(
       advance: totalAdvanced.toFixed(2),
       repayment: totalRepaid.toFixed(2),
       balance: totalAdvanced.minus(totalRepaid).toFixed(2),
+    },
+    meta: { ...meta, rowCount },
+  }
+}
+
+// ─── Outstanding Loans ────────────────────────────────────────────────────────
+
+export async function buildLoansOutstanding(
+  params: LoansOutstandingParams,
+  meta: MetaBase
+): Promise<ReportDocument> {
+  // As-at snapshot: balance = principal minus repayments up to the end date,
+  // so historical end dates reconstruct the book as it stood then.
+  const { end } = getRangeBoundsSAST(params.from, params.to)
+
+  const loans = await prisma.loan.findMany({
+    where: {
+      createdAt: { lte: end },
+      status: { not: 'voided' },
+      ...(params.customerId ? { customerId: params.customerId } : {}),
+    },
+    select: {
+      refNumber: true,
+      principalAmount: true,
+      notes: true,
+      createdAt: true,
+      customerId: true,
+      customer: { select: { firstName: true, lastName: true, companyName: true } },
+      repayments: {
+        where: { createdAt: { lte: end } },
+        select: { amount: true },
+      },
+    },
+    orderBy: { createdAt: 'asc' },
+  })
+
+  interface OutstandingRow {
+    date: Date
+    ref: string
+    notes: string | null
+    principal: Decimal
+    repaid: Decimal
+    outstanding: Decimal
+  }
+  const byCustomer = new Map<string, { name: string; rows: OutstandingRow[] }>()
+
+  for (const loan of loans) {
+    const principal = D(loan.principalAmount)
+    const repaid = loan.repayments.reduce((a, r) => a.plus(D(r.amount)), new Decimal(0))
+    const outstanding = principal.minus(repaid)
+    if (outstanding.lessThanOrEqualTo(0)) continue
+
+    if (!byCustomer.has(loan.customerId)) {
+      byCustomer.set(loan.customerId, { name: customerName(loan.customer), rows: [] })
+    }
+    byCustomer.get(loan.customerId)!.rows.push({
+      date: loan.createdAt,
+      ref: loan.refNumber,
+      notes: loan.notes,
+      principal,
+      repaid,
+      outstanding,
+    })
+  }
+
+  const groups: ReportGroup[] = []
+  let totalPrincipal = new Decimal(0)
+  let totalRepaid = new Decimal(0)
+  let totalOutstanding = new Decimal(0)
+  let rowCount = 0
+
+  const buckets = Array.from(byCustomer.values()).sort((a, b) => a.name.localeCompare(b.name))
+  for (const bucket of buckets) {
+    let principal = new Decimal(0)
+    let repaid = new Decimal(0)
+    let outstanding = new Decimal(0)
+
+    const rows: ReportRow[] = bucket.rows.map((r) => {
+      principal = principal.plus(r.principal)
+      repaid = repaid.plus(r.repaid)
+      outstanding = outstanding.plus(r.outstanding)
+      return {
+        cells: {
+          date: r.date.toISOString(),
+          ref: r.ref,
+          notes: r.notes,
+          principal: r.principal.toFixed(2),
+          repaid: r.repaid.toFixed(2),
+          outstanding: r.outstanding.toFixed(2),
+        },
+      }
+    })
+
+    totalPrincipal = totalPrincipal.plus(principal)
+    totalRepaid = totalRepaid.plus(repaid)
+    totalOutstanding = totalOutstanding.plus(outstanding)
+    rowCount += rows.length
+
+    groups.push({
+      level: 0,
+      label: bucket.name,
+      rows,
+      subtotal: {
+        principal: principal.toFixed(2),
+        repaid: repaid.toFixed(2),
+        outstanding: outstanding.toFixed(2),
+      },
+    })
+  }
+
+  return {
+    reportId: 'loans-outstanding',
+    title: 'Outstanding Loans',
+    subtitle: `As at ${params.to}`,
+    params: {
+      from: params.from,
+      to: params.to,
+      filters: params.customerId ? { customerId: params.customerId } : {},
+    },
+    columns: [
+      { key: 'date', label: 'Date', width: 0.13, format: 'date', excelWidth: 12 },
+      { key: 'ref', label: 'Loan Ref', width: 0.15, format: 'text', excelWidth: 16 },
+      { key: 'notes', label: 'Notes', width: 0.27, format: 'text', excelWidth: 32 },
+      { key: 'principal', label: 'Principal', width: 0.15, align: 'right', format: 'money', excelWidth: 13 },
+      { key: 'repaid', label: 'Repaid', width: 0.14, align: 'right', format: 'money', excelWidth: 13 },
+      { key: 'outstanding', label: 'Outstanding', width: 0.16, align: 'right', format: 'money', excelWidth: 13 },
+    ],
+    groups,
+    grandTotal: {
+      principal: totalPrincipal.toFixed(2),
+      repaid: totalRepaid.toFixed(2),
+      outstanding: totalOutstanding.toFixed(2),
+    },
+    meta: { ...meta, rowCount },
+  }
+}
+
+// ─── Loan Payments ────────────────────────────────────────────────────────────
+
+export async function buildLoanPayments(
+  params: LoanPaymentsParams,
+  meta: MetaBase
+): Promise<ReportDocument> {
+  const { start, end } = getRangeBoundsSAST(params.from, params.to)
+  const customerWhere = params.customerId ? { customerId: params.customerId } : {}
+
+  // Opening balance per customer = advances before the period minus repayments
+  // before the period. Repayments never belong to voided loans (voiding
+  // requires zero repayments), so no loan-status filter is needed on them.
+  const [openingLoans, openingRepayments, repayments, advances] = await Promise.all([
+    prisma.loan.groupBy({
+      by: ['customerId'],
+      where: { createdAt: { lt: start }, status: { not: 'voided' }, ...customerWhere },
+      _sum: { principalAmount: true },
+    }),
+    prisma.loanRepayment.groupBy({
+      by: ['customerId'],
+      where: { createdAt: { lt: start }, ...customerWhere },
+      _sum: { amount: true },
+    }),
+    prisma.loanRepayment.findMany({
+      where: { createdAt: { gte: start, lte: end }, ...customerWhere },
+      select: {
+        refNumber: true,
+        amount: true,
+        createdAt: true,
+        customerId: true,
+        customer: { select: { firstName: true, lastName: true, companyName: true } },
+        purchase: { select: { refNumber: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+    }),
+    prisma.loan.findMany({
+      where: { createdAt: { gte: start, lte: end }, status: { not: 'voided' }, ...customerWhere },
+      select: {
+        refNumber: true,
+        principalAmount: true,
+        createdAt: true,
+        customerId: true,
+      },
+      orderBy: { createdAt: 'asc' },
+    }),
+  ])
+
+  const openingByCustomer = new Map<string, Decimal>()
+  for (const l of openingLoans) {
+    openingByCustomer.set(l.customerId, D(l._sum.principalAmount))
+  }
+  for (const r of openingRepayments) {
+    const prev = openingByCustomer.get(r.customerId) ?? new Decimal(0)
+    openingByCustomer.set(r.customerId, prev.minus(D(r._sum.amount)))
+  }
+
+  // Only customers with at least one repayment in the period appear; their
+  // in-period advances are included so the running balance stays true.
+  interface Entry {
+    date: Date
+    ref: string
+    purchaseRef: string | null
+    description: string
+    advance: Decimal | null
+    repayment: Decimal | null
+  }
+  const byCustomer = new Map<string, { name: string; entries: Entry[] }>()
+
+  for (const r of repayments) {
+    if (!byCustomer.has(r.customerId)) {
+      byCustomer.set(r.customerId, { name: customerName(r.customer), entries: [] })
+    }
+    byCustomer.get(r.customerId)!.entries.push({
+      date: r.createdAt,
+      ref: r.refNumber,
+      purchaseRef: r.purchase?.refNumber ?? 'Manual',
+      description: r.purchase ? 'Loan Repayment - Purchase Deduction' : 'Loan Repayment - Manual',
+      advance: null,
+      repayment: D(r.amount),
+    })
+  }
+  for (const loan of advances) {
+    const bucket = byCustomer.get(loan.customerId)
+    if (!bucket) continue
+    bucket.entries.push({
+      date: loan.createdAt,
+      ref: loan.refNumber,
+      purchaseRef: null,
+      description: 'Advance',
+      advance: D(loan.principalAmount),
+      repayment: null,
+    })
+  }
+
+  const groups: ReportGroup[] = []
+  let totalAdvanced = new Decimal(0)
+  let totalRepaid = new Decimal(0)
+  let totalClosing = new Decimal(0)
+  let rowCount = 0
+
+  const buckets = Array.from(byCustomer.entries())
+    .map(([customerId, bucket]) => ({ customerId, ...bucket }))
+    .sort((a, b) => a.name.localeCompare(b.name))
+  for (const bucket of buckets) {
+    bucket.entries.sort((a, b) => a.date.getTime() - b.date.getTime())
+    const opening = openingByCustomer.get(bucket.customerId) ?? new Decimal(0)
+    let balance = opening
+    let advanced = new Decimal(0)
+    let repaid = new Decimal(0)
+
+    const rows: ReportRow[] = [
+      {
+        cells: {
+          date: start.toISOString(),
+          ref: null,
+          purchaseRef: null,
+          description: 'Opening Balance',
+          advance: null,
+          repayment: null,
+          balance: opening.toFixed(2),
+        },
+      },
+      ...bucket.entries.map((e) => {
+        if (e.advance) { balance = balance.plus(e.advance); advanced = advanced.plus(e.advance) }
+        if (e.repayment) { balance = balance.minus(e.repayment); repaid = repaid.plus(e.repayment) }
+        return {
+          cells: {
+            date: e.date.toISOString(),
+            ref: e.ref,
+            purchaseRef: e.purchaseRef,
+            description: e.description,
+            advance: e.advance ? e.advance.toFixed(2) : null,
+            repayment: e.repayment ? e.repayment.toFixed(2) : null,
+            balance: balance.toFixed(2),
+          },
+        }
+      }),
+    ]
+
+    totalAdvanced = totalAdvanced.plus(advanced)
+    totalRepaid = totalRepaid.plus(repaid)
+    totalClosing = totalClosing.plus(balance)
+    rowCount += rows.length
+
+    groups.push({
+      level: 0,
+      label: bucket.name,
+      rows,
+      subtotal: {
+        advance: advanced.toFixed(2),
+        repayment: repaid.toFixed(2),
+        balance: balance.toFixed(2),
+      },
+    })
+  }
+
+  return {
+    reportId: 'loan-payments',
+    title: 'Loan Payments Report',
+    subtitle: 'Opening balance and repayments per customer — repayments reference their purchase note',
+    params: {
+      from: params.from,
+      to: params.to,
+      filters: params.customerId ? { customerId: params.customerId } : {},
+    },
+    columns: [
+      { key: 'date', label: 'Date', width: 0.11, format: 'date', excelWidth: 12 },
+      { key: 'ref', label: 'Ref', width: 0.13, format: 'text', excelWidth: 16 },
+      { key: 'purchaseRef', label: 'Purchase Ref', width: 0.14, format: 'text', excelWidth: 16 },
+      { key: 'description', label: 'Description', width: 0.18, format: 'text', excelWidth: 30 },
+      { key: 'advance', label: 'Advance', width: 0.13, align: 'right', format: 'money', excelWidth: 13 },
+      { key: 'repayment', label: 'Repayment', width: 0.14, align: 'right', format: 'money', excelWidth: 13 },
+      { key: 'balance', label: 'Balance', width: 0.17, align: 'right', format: 'money', excelWidth: 13 },
+    ],
+    groups,
+    grandTotal: {
+      advance: totalAdvanced.toFixed(2),
+      repayment: totalRepaid.toFixed(2),
+      balance: totalClosing.toFixed(2),
     },
     meta: { ...meta, rowCount },
   }
