@@ -384,20 +384,19 @@ export default function CustomerDetailPage() {
                       <input {...register('vatNumber')} disabled={!isEditing || saving} style={{ ...(isEditing ? inp : inpDisabled), fontFamily: 'monospace' }} />
                       {errors.vatNumber && <span style={{ fontSize: 10, color: '#DC2626' }}>{errors.vatNumber.message}</span>}
                     </div>
+                    <div style={{ gridColumn: 'span 2' }}>
+                      <span style={lbl}>Trade Commodities</span>
+                      <TradeCommoditiesSelect
+                        options={commodityOptions}
+                        value={tradeCommodities}
+                        onChange={(next) => setValue('tradeCommodities', next)}
+                        disabled={!isEditing || saving}
+                        style={isEditing ? inp : inpDisabled}
+                      />
+                    </div>
                     <div>
                       <span style={lbl}>Credit Limit (R)</span>
                       <input {...register('creditLimit')} type="number" step="0.01" min="0" disabled={!isEditing || saving} style={isEditing ? inp : inpDisabled} />
-                    </div>
-                    <div style={{ gridColumn: 'span 2' }}>
-                      <span style={lbl}>Trade Commodities</span>
-                      <div style={{ marginTop: 4 }}>
-                        <TradeCommoditiesSelect
-                          options={commodityOptions}
-                          value={tradeCommodities}
-                          onChange={(next) => setValue('tradeCommodities', next)}
-                          disabled={!isEditing || saving}
-                        />
-                      </div>
                     </div>
                   </div>
                 </div>

@@ -870,18 +870,17 @@ function EditCustomerModal({ customer, onClose, onSuccess }: {
                 {errors.vatNumber && <p className="text-xs text-red-600 mt-1">{errors.vatNumber.message}</p>}
               </div>
               <div>
-                <Label>Credit Limit (R)</Label>
-                <Input {...register('creditLimit')} type="number" step="0.01" min="0" className="mt-1" disabled={loading} />
+                <Label>Trade Commodities</Label>
+                <TradeCommoditiesSelect
+                  options={commodityOptions}
+                  value={tradeCommodities}
+                  onChange={(next) => setValue('tradeCommodities', next)}
+                  className="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                />
               </div>
               <div>
-                <Label className="mb-2">Trade Commodities</Label>
-                <div className="mt-1">
-                  <TradeCommoditiesSelect
-                    options={commodityOptions}
-                    value={tradeCommodities}
-                    onChange={(next) => setValue('tradeCommodities', next)}
-                  />
-                </div>
+                <Label>Credit Limit (R)</Label>
+                <Input {...register('creditLimit')} type="number" step="0.01" min="0" className="mt-1" disabled={loading} />
               </div>
               <div>
                 <Label>Notes</Label>

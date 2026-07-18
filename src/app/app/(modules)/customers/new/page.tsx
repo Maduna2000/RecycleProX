@@ -268,6 +268,18 @@ export default function NewAccountPage() {
                 )}
               </div>
 
+              {/* Trade Commodities — multi-select dropdown, right under VAT */}
+              <Field label="Trade Commodities">
+                <TradeCommoditiesSelect
+                  options={commodityOptions}
+                  value={tradeCommodities}
+                  onChange={(next) => setValue('tradeCommodities', next)}
+                  disabled={loading}
+                  className={inputCls}
+                  style={inputStyle}
+                />
+              </Field>
+
               {/* Bank Details (collapsible) */}
               <div className="border rounded-[2px] mt-1" style={{ borderColor: '#C0C0C0' }}>
                 <button
@@ -356,16 +368,6 @@ export default function NewAccountPage() {
                   <option value="dealer_2">Dealer 2</option>
                   <option value="dealer_3">Dealer 3</option>
                 </select>
-              </Field>
-
-              {/* Trade Commodities — multi-select dropdown */}
-              <Field label="Trade Commodities">
-                <TradeCommoditiesSelect
-                  options={commodityOptions}
-                  value={tradeCommodities}
-                  onChange={(next) => setValue('tradeCommodities', next)}
-                  disabled={loading}
-                />
               </Field>
 
               {/* Physical Address */}
