@@ -153,24 +153,6 @@ export const REPORT_CATALOG: ReportCatalogEntry[] = [
     filters: [],
   },
   {
-    id: 'loan-book',
-    label: 'Loan Book Report',
-    description:
-      'Advances and repayments per customer in chronological order with a running balance — repayments reference their purchase note.',
-    area: 'cash',
-    filters: [
-      { key: 'customerId', label: 'Customer', type: 'customer' },
-      {
-        key: 'status', label: 'Loan Status', type: 'select',
-        options: [
-          { value: 'active', label: 'Active' },
-          { value: 'settled', label: 'Settled' },
-          { value: 'all', label: 'All (not voided)' },
-        ],
-      },
-    ],
-  },
-  {
     id: 'loans-outstanding',
     label: 'Outstanding Loans',
     description:

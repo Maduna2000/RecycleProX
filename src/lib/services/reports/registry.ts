@@ -19,7 +19,6 @@ import {
   SalesByProductParamsSchema,
   SalesByCustomerParamsSchema,
   ExpensesReportParamsSchema,
-  LoanBookParamsSchema,
   LoansOutstandingParamsSchema,
   LoanPaymentsParamsSchema,
   StockOnHandParamsSchema,
@@ -46,7 +45,6 @@ import {
   buildExpensesReport,
   buildFloatLog,
   buildCashOnHand,
-  buildLoanBook,
   buildLoansOutstanding,
   buildLoanPayments,
   buildProfitSummary,
@@ -115,10 +113,6 @@ export const REPORT_REGISTRY: Record<string, ReportDefinition> = {
   'cash-on-hand': {
     paramsSchema: BaseReportParamsSchema,
     build: buildCashOnHand,
-  },
-  'loan-book': {
-    paramsSchema: LoanBookParamsSchema,
-    build: buildLoanBook,
   },
   'loans-outstanding': {
     paramsSchema: LoansOutstandingParamsSchema,

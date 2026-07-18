@@ -76,11 +76,6 @@ export const ExpensesReportParamsSchema = rangeParams({
   status: z.enum(['approved', 'pending', 'all']).optional(),
 })
 
-export const LoanBookParamsSchema = rangeParams({
-  customerId: z.string().uuid().optional(),
-  status: z.enum(['active', 'settled', 'all']).optional(),
-})
-
 /** Snapshot of loans still owing as at the "to" date ("from" is not used). */
 export const LoansOutstandingParamsSchema = rangeParams({
   customerId: z.string().uuid().optional(),
@@ -121,7 +116,6 @@ export type SalesDailyParams = z.infer<typeof SalesDailyParamsSchema>
 export type SalesByProductParams = z.infer<typeof SalesByProductParamsSchema>
 export type SalesByCustomerParams = z.infer<typeof SalesByCustomerParamsSchema>
 export type ExpensesReportParams = z.infer<typeof ExpensesReportParamsSchema>
-export type LoanBookParams = z.infer<typeof LoanBookParamsSchema>
 export type LoansOutstandingParams = z.infer<typeof LoansOutstandingParamsSchema>
 export type LoanPaymentsParams = z.infer<typeof LoanPaymentsParamsSchema>
 export type StockOnHandParams = z.infer<typeof StockOnHandParamsSchema>

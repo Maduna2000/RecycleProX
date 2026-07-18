@@ -1,6 +1,7 @@
 /**
  * Cash & Financial report builders: cash-up history, expenses, float log,
- * cash on hand, loan book, profit summary, VAT summary, voided transactions.
+ * cash on hand, outstanding loans, loan payments, profit summary, VAT
+ * summary, voided transactions.
  */
 import Decimal from 'decimal.js'
 import { prisma } from '@/lib/db/prisma'
@@ -14,7 +15,6 @@ import type { ReportDocument, ReportGroup, ReportMeta, ReportRow } from '@/lib/r
 import type {
   BaseReportParams,
   ExpensesReportParams,
-  LoanBookParams,
   LoansOutstandingParams,
   LoanPaymentsParams,
 } from '@/lib/schemas/report'
@@ -297,151 +297,6 @@ export async function buildCashOnHand(
     ],
     groups,
     grandTotal: { value: grand.toFixed(2) },
-    meta: { ...meta, rowCount },
-  }
-}
-
-// ─── Loan Book ────────────────────────────────────────────────────────────────
-
-export async function buildLoanBook(
-  params: LoanBookParams,
-  meta: MetaBase
-): Promise<ReportDocument> {
-  const { start, end } = getRangeBoundsSAST(params.from, params.to)
-  const statusFilter =
-    params.status === 'all' || !params.status ? { not: 'voided' as const } : params.status
-
-  const loans = await prisma.loan.findMany({
-    where: {
-      createdAt: { gte: start, lte: end },
-      status: statusFilter,
-      ...(params.customerId ? { customerId: params.customerId } : {}),
-    },
-    select: {
-      refNumber: true,
-      principalAmount: true,
-      notes: true,
-      createdAt: true,
-      customerId: true,
-      customer: { select: { firstName: true, lastName: true, companyName: true } },
-      repayments: {
-        select: {
-          refNumber: true,
-          amount: true,
-          createdAt: true,
-          purchase: { select: { refNumber: true } },
-        },
-      },
-    },
-    orderBy: { createdAt: 'asc' },
-  })
-
-  // Merge advances + their repayments per customer, chronologically, with a
-  // running balance — built manually (running balances don't fit groupRows).
-  interface Entry {
-    date: Date
-    ref: string
-    description: string
-    advance: Decimal | null
-    repayment: Decimal | null
-  }
-  const byCustomer = new Map<string, { name: string; entries: Entry[] }>()
-
-  for (const loan of loans) {
-    const key = loan.customerId
-    if (!byCustomer.has(key)) {
-      byCustomer.set(key, { name: customerName(loan.customer), entries: [] })
-    }
-    const bucket = byCustomer.get(key)!
-    bucket.entries.push({
-      date: loan.createdAt,
-      ref: loan.refNumber,
-      description: `Advance${loan.notes ? ` - ${loan.notes}` : ''}`,
-      advance: D(loan.principalAmount),
-      repayment: null,
-    })
-    for (const r of loan.repayments) {
-      bucket.entries.push({
-        date: r.createdAt,
-        ref: r.refNumber,
-        description: r.purchase
-          ? `Loan Repayment - Purchase Note ${r.purchase.refNumber}`
-          : 'Loan Repayment',
-        advance: null,
-        repayment: D(r.amount),
-      })
-    }
-  }
-
-  const groups: ReportGroup[] = []
-  let totalAdvanced = new Decimal(0)
-  let totalRepaid = new Decimal(0)
-  let rowCount = 0
-
-  const names = Array.from(byCustomer.values()).sort((a, b) => a.name.localeCompare(b.name))
-  for (const bucket of names) {
-    bucket.entries.sort((a, b) => a.date.getTime() - b.date.getTime())
-    let balance = new Decimal(0)
-    let advanced = new Decimal(0)
-    let repaid = new Decimal(0)
-
-    const rows: ReportRow[] = bucket.entries.map((e) => {
-      if (e.advance) { balance = balance.plus(e.advance); advanced = advanced.plus(e.advance) }
-      if (e.repayment) { balance = balance.minus(e.repayment); repaid = repaid.plus(e.repayment) }
-      return {
-        cells: {
-          date: e.date.toISOString(),
-          ref: e.ref,
-          description: e.description,
-          advance: e.advance ? e.advance.toFixed(2) : null,
-          repayment: e.repayment ? e.repayment.toFixed(2) : null,
-          balance: balance.toFixed(2),
-        },
-      }
-    })
-
-    totalAdvanced = totalAdvanced.plus(advanced)
-    totalRepaid = totalRepaid.plus(repaid)
-    rowCount += rows.length
-
-    groups.push({
-      level: 0,
-      label: bucket.name,
-      rows,
-      subtotal: {
-        advance: advanced.toFixed(2),
-        repayment: repaid.toFixed(2),
-        balance: balance.toFixed(2),
-      },
-    })
-  }
-
-  return {
-    reportId: 'loan-book',
-    title: 'Loan Book Report',
-    subtitle: 'Advances and repayments for loans opened in the period',
-    params: {
-      from: params.from,
-      to: params.to,
-      filters: {
-        ...(params.customerId ? { customerId: params.customerId } : {}),
-        ...(params.status ? { status: params.status } : {}),
-      },
-    },
-    columns: [
-      { key: 'date', label: 'Date', width: 0.12, format: 'date', excelWidth: 12 },
-      { key: 'ref', label: 'Ref', width: 0.12, format: 'text', excelWidth: 14 },
-      { key: 'description', label: 'Description', width: 0.34, format: 'text', excelWidth: 40 },
-      { key: 'advance', label: 'Advance', width: 0.14, align: 'right', format: 'money', excelWidth: 13 },
-      { key: 'repayment', label: 'Repayment', width: 0.14, align: 'right', format: 'money', excelWidth: 13 },
-      { key: 'balance', label: 'Balance', width: 0.14, align: 'right', format: 'money', excelWidth: 13 },
-    ],
-    groups,
-    grandTotal: {
-      advance: totalAdvanced.toFixed(2),
-      repayment: totalRepaid.toFixed(2),
-      balance: totalAdvanced.minus(totalRepaid).toFixed(2),
-    },
     meta: { ...meta, rowCount },
   }
 }
