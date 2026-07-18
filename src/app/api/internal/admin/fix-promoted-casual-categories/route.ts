@@ -13,12 +13,19 @@ import logger from '@/lib/logger'
 // dealer price group cleared. Runs against the calling admin's own tenant
 // (run it logged into Golden Key). POST {} = dry run (report only);
 // POST { "apply": true } = write the fix. Delete this route after use.
+// Visiting the URL in a logged-in browser tab = safe dry-run report.
+export async function GET(req: Request) {
+  return handle(req, false)
+}
+
 export async function POST(req: Request) {
+  const body = await req.json().catch(() => ({}))
+  return handle(req, body?.apply === true)
+}
+
+async function handle(req: Request, apply: boolean) {
   const { session, response } = await requireRole(['admin'])
   if (response) return response
-
-  const body = await req.json().catch(() => ({}))
-  const apply = body?.apply === true
 
   const result = await runWithRequestTenant(req, async () => {
     // Every audited casual→account transition, whoever performed it.
