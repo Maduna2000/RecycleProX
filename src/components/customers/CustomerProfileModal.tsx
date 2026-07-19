@@ -170,8 +170,8 @@ export function CustomerProfileModal({
                   )}
 
                   {customer.blacklisted
-                    ? <Pill text="Blacklisted" bg="#FEE2E2" color="#B91C1C" />
-                    : <Pill text="Active" bg="#DCFCE7" color="#166534" />}
+                    ? <Pill text="Blacklisted" bg={colors.dangerBg} color={colors.danger} />
+                    : <Pill text="Active" bg={colors.actionBg} color={colors.action} />}
                 </div>
                 <Btn size="sm" icon={Pencil} onClick={() => setEditOpen(true)}>Edit</Btn>
               </div>

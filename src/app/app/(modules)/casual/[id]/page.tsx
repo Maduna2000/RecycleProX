@@ -9,6 +9,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { inp, lbl, HEADER_GRAD, NAVY, Btn, TabStrip, PortalPage } from '@/components/rpx'
+import { colors } from '@/lib/design-tokens'
 
 const inpDisabled: React.CSSProperties = { ...inp, background: '#F5F5F5', color: '#6C757D', cursor: 'default' }
 
@@ -234,8 +235,8 @@ export default function CasualCustomerDetailPage() {
               <span style={lbl}>Status</span>
               <Pill
                 text={customer.blacklisted ? 'Blacklisted' : 'Active'}
-                bg={customer.blacklisted ? '#FEE2E2' : '#DCFCE7'}
-                color={customer.blacklisted ? '#991B1B' : '#166534'}
+                bg={customer.blacklisted ? colors.dangerBg : colors.actionBg}
+                color={customer.blacklisted ? colors.danger : colors.action}
               />
             </div>
             <div>

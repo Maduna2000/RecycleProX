@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import useSWR, { mutate } from 'swr'
 import { Dialog } from '@/components/ui/dialog'
+import { colors } from '@/lib/design-tokens'
 import { ArrowLeft, AlertTriangle, ShieldBan, ShieldCheck, Save, Pencil } from 'lucide-react'
 import { PhotoUploader, PhotoViewer } from '@/components/PhotoUploader'
 import { LoansTab } from '@/components/customers/LoansTab'
@@ -517,8 +518,8 @@ export default function CustomerDetailPage() {
               <span style={lbl}>Status</span>
               <Pill
                 text={customer.blacklisted ? 'Blacklisted' : 'Active'}
-                bg={customer.blacklisted ? '#FEE2E2' : '#DCFCE7'}
-                color={customer.blacklisted ? '#991B1B' : '#166534'}
+                bg={customer.blacklisted ? colors.dangerBg : colors.actionBg}
+                color={customer.blacklisted ? colors.danger : colors.action}
               />
             </div>
             <div>
