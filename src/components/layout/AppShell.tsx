@@ -2,12 +2,13 @@
 
 import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { signOut } from 'next-auth/react'
 import { useState, useEffect, useCallback } from 'react'
 import useSWR from 'swr'
 import Decimal from 'decimal.js'
 import {
-  RefreshCw, Plus,
+  Plus,
   ClipboardCheck, AlertCircle,
   Download, LogOut, Settings, Settings2, TrendingUp,
   Users, UserPlus, ChevronRight,
@@ -646,9 +647,7 @@ export function AppShell({
       >
         {/* Logo mark */}
         <div className="flex items-center gap-2 pr-3 border-r border-white/15 shrink-0">
-          <div className="w-6 h-6 rounded bg-white/10 flex items-center justify-center">
-            <RefreshCw className="w-3.5 h-3.5 text-[#F2AB1A]" />
-          </div>
+          <Image src="/brand/renovo-icon.png" alt="" width={22} height={22} className="rounded shrink-0" />
           <span className="text-white text-[13px] font-bold tracking-wide select-none whitespace-nowrap">
             Renovo Pro
           </span>
