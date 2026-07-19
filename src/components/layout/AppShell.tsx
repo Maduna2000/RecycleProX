@@ -648,9 +648,14 @@ export function AppShell({
         {/* Logo mark */}
         <div className="flex items-center gap-2 pr-3 border-r border-white/15 shrink-0">
           <Image src="/brand/renovo-icon.png" alt="" width={22} height={22} className="rounded shrink-0" />
-          <span className="text-white text-[13px] font-bold tracking-wide select-none whitespace-nowrap">
-            Renovo Pro
-          </span>
+          <div className="flex flex-col leading-none select-none whitespace-nowrap">
+            <span className="text-[13px] font-bold tracking-wide">
+              <span className="text-white">Renovo</span> <span style={{ color: '#10B981' }}>Pro</span>
+            </span>
+            <span className="text-white/45 text-[8px] font-semibold tracking-widest uppercase mt-0.5">
+              Buy. Sell. Track.
+            </span>
+          </div>
         </div>
 
         {/* Breadcrumb: Portal › Module [› Detail] */}
