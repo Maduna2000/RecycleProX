@@ -8,9 +8,10 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { ChangePasswordSchema, type ChangePasswordInput } from '@/lib/schemas/auth'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Recycle, CheckCircle2, XCircle } from 'lucide-react'
+import Image from 'next/image'
+import { CheckCircle2, XCircle } from 'lucide-react'
 import { colors } from '@/lib/design-tokens'
-import { Btn, NAVY } from '@/components/rpx'
+import { Btn } from '@/components/rpx'
 
 function getStrength(pw: string): { label: string; color: string; score: number } {
   let score = 0
@@ -74,9 +75,7 @@ export default function ChangePasswordPage() {
         <div className="bg-white" style={{ border: `1px solid ${colors.border}`, borderRadius: 2 }}>
           {/* Header — horizontal, compact */}
           <div className="flex items-center gap-3 px-6 py-4" style={{ borderBottom: `1px solid ${colors.border}` }}>
-            <div className="w-10 h-10 flex items-center justify-center shrink-0" style={{ background: NAVY, borderRadius: 2 }}>
-              <Recycle className="w-5 h-5 text-white" />
-            </div>
+            <Image src="/brand/renovo-icon.png" alt="" width={40} height={40} className="rounded shrink-0" />
             <div>
               <h1 className="text-lg font-bold leading-tight" style={{ color: colors.textPrimary }}>Change your password</h1>
               <p className="text-sm" style={{ color: colors.textSecondary }}>
