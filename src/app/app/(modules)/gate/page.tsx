@@ -12,7 +12,7 @@ import { toast } from 'sonner'
 import { DataTable, StatusBadge, type Column, type RowAction } from '@/components/ui/DataTable'
 import { InlineDetailPanel } from '@/components/ui/InlineDetailPanel'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
-import { Btn, PortalPage } from '@/components/rpx'
+import { Btn, PortalPage, BAR_GRAD } from '@/components/rpx'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -110,22 +110,28 @@ function PhotoViewerModal({ entry, onClose }: { entry: EntryDetail | null; onClo
 
   const modalContent = (
     <div
-      style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}
+      style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.1)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 2, width: '100%', maxWidth: 900, maxHeight: 'calc(100vh - 48px)', display: 'flex', flexDirection: 'column', boxShadow: '0 8px 32px rgba(0,0,0,0.15)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: `1px solid ${colors.border}`, background: colors.bg }}>
+      <div style={{ background: colors.surface, border: '1px solid #B0B0B0', borderRadius: 4, width: '100%', maxWidth: 900, maxHeight: 'calc(100vh - 48px)', display: 'flex', flexDirection: 'column', boxShadow: '0 6px 24px rgba(0,0,0,0.2)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 34, padding: '0 8px 0 14px', borderBottom: '2px solid #B0B0B0', background: BAR_GRAD }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <Images style={{ width: 18, height: 18, color: colors.process }} />
-            <span style={{ fontSize: fontSize.base, fontWeight: fontWeight.semibold, color: colors.textPrimary }}>
+            <Images style={{ width: 14, height: 14, color: colors.primary }} />
+            <span style={{ fontSize: 13, fontWeight: 700, color: colors.primary }}>
               Photos — {entry.entryNumber}
             </span>
             <span style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>
               {entry.visitorFirstName} {entry.visitorLastName}
             </span>
           </div>
-          <button onClick={onClose} style={{ width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', borderRadius: 2, cursor: 'pointer' }}>
-            <X style={{ width: 16, height: 16, color: colors.textSecondary }} />
+          <button
+            onClick={onClose}
+            style={{ width: 24, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', borderRadius: 2, cursor: 'pointer', color: colors.textSecondary }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = colors.danger; e.currentTarget.style.color = '#fff' }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = colors.textSecondary }}
+            aria-label="Close"
+          >
+            <X style={{ width: 14, height: 14 }} />
           </button>
         </div>
         <div style={{ flex: 1, overflow: 'auto', padding: 16, background: colors.bg }}>
@@ -231,11 +237,8 @@ function CreateGuardPanel({ open, onClose, onCreated }: { open: boolean; onClose
         </div>
         {error && <p style={{ fontSize: fontSize.xs, color: colors.danger }}>{error}</p>}
         <div className="flex justify-end gap-2 pt-1">
-          <button onClick={onClose} style={miniBtn()}>Cancel</button>
-          <button onClick={handleCreate} disabled={loading} style={miniBtn({ cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.6 : 1 })}>
-            {loading && <Loader2 style={{ width: 9, height: 9, animation: 'spin 1s linear infinite' }} />}
-            Create Guard
-          </button>
+          <Btn size="sm" onClick={onClose}>Cancel</Btn>
+          <Btn size="sm" variant="primary" onClick={handleCreate} loading={loading}>Create Guard</Btn>
         </div>
       </div>
     </InlineDetailPanel>

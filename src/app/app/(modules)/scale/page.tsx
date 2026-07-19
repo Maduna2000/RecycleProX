@@ -14,7 +14,7 @@ import { toast } from 'sonner'
 import { DataTable, StatusBadge, type Column, type RowAction } from '@/components/ui/DataTable'
 import { InlineDetailPanel } from '@/components/ui/InlineDetailPanel'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
-import { Btn, PortalPage } from '@/components/rpx'
+import { Btn, PortalPage, BAR_GRAD } from '@/components/rpx'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -210,7 +210,8 @@ function FullscreenPhotoViewer({ order, onClose }: { order: OrderDetail | null; 
         right: 0,
         bottom: 0,
         zIndex: 9999,
-        background: 'rgba(0, 0, 0, 0.4)',
+        background: 'rgba(0, 0, 0, 0.1)',
+        backdropFilter: 'blur(4px)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -220,18 +221,18 @@ function FullscreenPhotoViewer({ order, onClose }: { order: OrderDetail | null; 
         if (e.target === e.currentTarget) onClose()
       }}
     >
-      {/* Modal container - Windows style */}
+      {/* Modal container - matches the shared RpxDialog chrome */}
       <div
         style={{
           background: colors.surface,
-          border: `1px solid ${colors.border}`,
-          borderRadius: 2,
+          border: '1px solid #B0B0B0',
+          borderRadius: 4,
           width: '100%',
           maxWidth: 900,
           maxHeight: 'calc(100vh - 48px)',
           display: 'flex',
           flexDirection: 'column',
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.15)',
+          boxShadow: '0 6px 24px rgba(0, 0, 0, 0.2)',
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -241,15 +242,16 @@ function FullscreenPhotoViewer({ order, onClose }: { order: OrderDetail | null; 
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '12px 16px',
-            borderBottom: `1px solid ${colors.border}`,
-            background: colors.bg,
+            height: 34,
+            padding: '0 8px 0 14px',
+            borderBottom: '2px solid #B0B0B0',
+            background: BAR_GRAD,
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <Images style={{ width: 18, height: 18, color: colors.process }} />
+            <Images style={{ width: 14, height: 14, color: colors.primary }} />
             <div>
-              <span style={{ fontSize: fontSize.base, fontWeight: fontWeight.semibold, color: colors.textPrimary }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: colors.primary }}>
                 Photos — {order.orderNumber}
               </span>
               <span style={{ fontSize: fontSize.xs, color: colors.textSecondary, marginLeft: 12 }}>
@@ -260,22 +262,22 @@ function FullscreenPhotoViewer({ order, onClose }: { order: OrderDetail | null; 
           <button
             onClick={onClose}
             style={{
-              width: 28,
-              height: 28,
+              width: 24,
+              height: 22,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              background: 'transparent',
+              background: 'none',
               border: 'none',
               borderRadius: 2,
               cursor: 'pointer',
-              transition: 'background 150ms ease',
+              color: colors.textSecondary,
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = colors.dangerBg }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = colors.danger; e.currentTarget.style.color = '#fff' }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = colors.textSecondary }}
             aria-label="Close"
           >
-            <X style={{ width: 16, height: 16, color: colors.textSecondary }} />
+            <X style={{ width: 14, height: 14 }} />
           </button>
         </div>
 
@@ -423,24 +425,7 @@ function FullscreenPhotoViewer({ order, onClose }: { order: OrderDetail | null; 
           <span style={{ fontSize: fontSize.xs, color: colors.textMuted }}>
             {urls.length} photo{urls.length !== 1 ? 's' : ''} · Click to expand
           </span>
-          <button
-            onClick={onClose}
-            style={{
-              fontSize: 10,
-              padding: '1px 6px',
-              background: '#E0E0E0',
-              border: '1px solid #999',
-              borderRadius: 2,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 3,
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = '#D0D0D0' }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = '#E0E0E0' }}
-          >
-            Close
-          </button>
+          <Btn size="sm" onClick={onClose}>Close</Btn>
         </div>
       </div>
 
@@ -602,17 +587,32 @@ function VoidModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white border border-[#E0E0E0] shadow-2xl w-full max-w-sm mx-4" style={{ borderRadius: 2 }}>
-        <div className="px-5 py-4 border-b border-[#E0E0E0] flex items-center justify-between">
-          <p style={{ fontSize: fontSize.base, fontWeight: fontWeight.semibold, color: colors.danger }}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ background: 'rgba(0, 0, 0, 0.1)', backdropFilter: 'blur(4px)' }}
+    >
+      <div
+        className="bg-white w-full max-w-sm mx-4"
+        style={{ borderRadius: 4, border: '1px solid #B0B0B0', boxShadow: '0 6px 24px rgba(0, 0, 0, 0.2)' }}
+      >
+        <div
+          className="flex items-center justify-between"
+          style={{ height: 34, padding: '0 8px 0 14px', borderBottom: '2px solid #B0B0B0', background: BAR_GRAD }}
+        >
+          <p style={{ fontSize: 13, fontWeight: 700, color: colors.danger }}>
             Void Order
           </p>
-          <button onClick={onClose} className="text-[#6C757D] hover:text-[#212529]">
-            <X className="w-4 h-4" />
+          <button
+            onClick={onClose}
+            style={{ width: 24, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', borderRadius: 2, cursor: 'pointer', color: colors.textSecondary }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = colors.danger; e.currentTarget.style.color = '#fff' }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = colors.textSecondary }}
+            aria-label="Close"
+          >
+            <X style={{ width: 14, height: 14 }} />
           </button>
         </div>
-        <div className="px-5 py-4 flex flex-col gap-3">
+        <div className="px-4 py-3.5 flex flex-col gap-3">
           <p style={{ fontSize: fontSize.sm, color: colors.textPrimary }}>
             Void <strong>{order.orderNumber}</strong>? This cannot be undone.
           </p>
@@ -631,47 +631,9 @@ function VoidModal({
           </div>
           {error && <p style={{ fontSize: fontSize.xs, color: colors.danger }}>{error}</p>}
         </div>
-        <div className="px-5 py-3 border-t border-[#E0E0E0] flex justify-end gap-2">
-          <button
-            onClick={onClose}
-            style={{
-              fontSize: 10,
-              padding: '1px 6px',
-              background: '#E0E0E0',
-              border: '1px solid #999',
-              borderRadius: 2,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 3,
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = '#D0D0D0' }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = '#E0E0E0' }}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleVoid}
-            disabled={loading}
-            style={{
-              fontSize: 10,
-              padding: '1px 6px',
-              background: colors.danger,
-              border: '1px solid #C82333',
-              borderRadius: 2,
-              color: '#fff',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              opacity: loading ? 0.6 : 1,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 3,
-            }}
-            onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = '#A93226' }}
-            onMouseLeave={(e) => { if (!loading) e.currentTarget.style.background = colors.danger }}
-          >
-            {loading && <Loader2 style={{ width: 9, height: 9, animation: 'spin 1s linear infinite' }} />}
-            Void Order
-          </button>
+        <div className="flex justify-end gap-2" style={{ padding: '10px 14px', borderTop: '1px solid #E0E0E0', background: '#F8F9FA' }}>
+          <Btn size="sm" onClick={onClose}>Cancel</Btn>
+          <Btn size="sm" variant="danger" onClick={handleVoid} loading={loading}>Void Order</Btn>
         </div>
       </div>
     </div>
@@ -791,45 +753,8 @@ function CreateOperatorPanel({
         </div>
         {error && <p style={{ fontSize: fontSize.xs, color: colors.danger }}>{error}</p>}
         <div className="flex justify-end gap-2 pt-1">
-          <button
-            onClick={onClose}
-            style={{
-              fontSize: 10,
-              padding: '1px 6px',
-              background: '#E0E0E0',
-              border: '1px solid #999',
-              borderRadius: 2,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 3,
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = '#D0D0D0' }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = '#E0E0E0' }}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleCreate}
-            disabled={loading}
-            style={{
-              fontSize: 10,
-              padding: '1px 6px',
-              background: '#E0E0E0',
-              border: '1px solid #999',
-              borderRadius: 2,
-              cursor: loading ? 'not-allowed' : 'pointer',
-              opacity: loading ? 0.6 : 1,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 3,
-            }}
-            onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = '#D0D0D0' }}
-            onMouseLeave={(e) => { if (!loading) e.currentTarget.style.background = '#E0E0E0' }}
-          >
-            {loading && <Loader2 style={{ width: 9, height: 9, animation: 'spin 1s linear infinite' }} />}
-            Create Operator
-          </button>
+          <Btn size="sm" onClick={onClose}>Cancel</Btn>
+          <Btn size="sm" variant="primary" onClick={handleCreate} loading={loading}>Create Operator</Btn>
         </div>
       </div>
     </InlineDetailPanel>
