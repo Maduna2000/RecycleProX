@@ -10,7 +10,9 @@
  * use the sibling components (Btn, Field, TabStrip, …) for anything richer.
  */
 
-export const NAVY = '#1B3A6B'
+import { colors } from '@/lib/design-tokens'
+
+export const NAVY = colors.primary
 
 /** Sticky table-header row background. */
 export const HEADER_GRAD = 'linear-gradient(180deg,#FFFFFF 0%,#E8E8E8 100%)'
@@ -23,7 +25,7 @@ export const CARD_BORDER = '1px solid #B0B0B0'
 export const inp: React.CSSProperties = {
   height: 30, width: '100%', borderRadius: 2,
   border: '1px solid #ABABAB', padding: '0 8px',
-  fontSize: 13, color: '#212529', outline: 'none',
+  fontSize: 13, color: colors.textPrimary, outline: 'none',
   background: '#fff', boxSizing: 'border-box',
 }
 
@@ -31,19 +33,19 @@ export const inp: React.CSSProperties = {
 export const lbl: React.CSSProperties = {
   display: 'block', fontSize: 10, fontWeight: 700,
   textTransform: 'uppercase', letterSpacing: '0.04em',
-  color: '#6C757D', marginBottom: 3,
+  color: colors.textSecondary, marginBottom: 3,
 }
 
 /** Table header cell — pair with a `HEADER_GRAD` sticky header row. */
 export const TH: React.CSSProperties = {
   textAlign: 'left', padding: '0 10px', height: 30,
-  fontSize: 10, fontWeight: 700, color: '#6C757D',
+  fontSize: 10, fontWeight: 700, color: colors.textSecondary,
   textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap',
 }
 
 /** Table data cell. */
 export const TD: React.CSSProperties = {
-  padding: '4px 10px', fontSize: 12, color: '#212529',
+  padding: '4px 10px', fontSize: 12, color: colors.textPrimary,
 }
 
 /** Navy primary action button. */
@@ -58,7 +60,7 @@ export const btnPrimary: React.CSSProperties = {
 export const btnSecondary: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 5,
   fontSize: 11, fontWeight: 600, padding: '5px 12px',
-  background: '#EBF3FC', color: '#185ABD', border: '1px solid #9DBFE8',
+  background: colors.processBg, color: colors.process, border: '1px solid #9DBFE8',
   borderRadius: 2, cursor: 'pointer',
 }
 

@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { Loader2 } from 'lucide-react'
 import { btnPrimary, btnSecondary, btnDanger } from './styles'
+import { colors } from '@/lib/design-tokens'
 
 export type BtnVariant = 'primary' | 'secondary' | 'danger'
 export type BtnSize = 'md' | 'sm'
@@ -20,8 +21,8 @@ const HOVER_BG: Record<BtnVariant, string> = {
 }
 
 const BASE_BG: Record<BtnVariant, string> = {
-  primary:   '#1B3A6B',
-  secondary: '#EBF3FC',
+  primary:   colors.primary,
+  secondary: colors.processBg,
   danger:    '#DC3545',
 }
 
