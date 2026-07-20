@@ -414,7 +414,7 @@ function ManagePriceGroupModal({ groupId, onClose, onChanged }: {
   return (
     <>
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <RpxDialogContent maxWidth={960} style={{ height: '82vh' }}>
+      <RpxDialogContent maxWidth={960} style={{ height: '82vh', borderRadius: 10 }}>
         <RpxDialogHeader title={group?.name ?? (groupLoading ? 'Loading…' : 'Price Group')} onClose={onClose} />
 
         {groupLoading ? (
@@ -428,19 +428,19 @@ function ManagePriceGroupModal({ groupId, onClose, onChanged }: {
         ) : (
           <>
             {/* Status + actions — merged into one row, actions far right */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '5px 10px', borderBottom: '1px solid #E0E0E0', flexShrink: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-                {group.isDefault && <Star style={{ width: 13, height: 13, color: colors.warning, fill: colors.warning, flexShrink: 0 }} />}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, padding: '4px 8px', borderBottom: '1px solid #E0E0E0', flexShrink: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                {group.isDefault && <Star style={{ width: 12, height: 12, color: colors.warning, fill: colors.warning, flexShrink: 0 }} />}
                 {group.description && <span style={{ fontSize: 11, color: '#6C757D' }}>{group.description}</span>}
                 {group.isDefault && (
-                  <span style={{ display: 'inline-flex', padding: '1px 6px', borderRadius: 3, fontSize: 11, fontWeight: 600, background: colors.warningBg, color: colors.warning }}>Default</span>
+                  <span style={{ display: 'inline-flex', padding: '0px 5px', borderRadius: 3, fontSize: 10, fontWeight: 600, background: colors.warningBg, color: colors.warning }}>Default</span>
                 )}
-                <span style={{ display: 'inline-flex', padding: '1px 6px', borderRadius: 3, fontSize: 11, fontWeight: 600, ...(group.isActive ? { background: colors.actionBg, color: colors.action } : { background: colors.neutralBg, color: colors.textSecondary }) }}>
+                <span style={{ display: 'inline-flex', padding: '0px 5px', borderRadius: 3, fontSize: 10, fontWeight: 600, ...(group.isActive ? { background: colors.actionBg, color: colors.action } : { background: colors.neutralBg, color: colors.textSecondary }) }}>
                   {group.isActive ? 'Active' : 'Inactive'}
                 </span>
               </div>
               {isManager && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
                   <Btn size="sm" icon={Copy} loading={copying} onClick={() => setCopyConfirmOpen(true)}>Copy Defaults</Btn>
                   {dirty && <Btn size="sm" icon={RotateCcw} onClick={onReset}>Reset</Btn>}
                   <Btn size="sm" variant="primary" icon={Save} loading={saving} disabled={!dirty} onClick={onSave}>Save</Btn>
@@ -454,7 +454,7 @@ function ManagePriceGroupModal({ groupId, onClose, onChanged }: {
                 <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
                   <tr style={{ background: HEADER_GRAD, borderBottom: '1px solid #C0C0C0' }}>
                     {['Override', 'Product', 'Default Buy', 'Default Sell', 'Group Buy', 'Group Sell'].map((h) => (
-                      <th key={h} style={TH}>{h}</th>
+                      <th key={h} style={{ ...TH, height: 24 }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -464,7 +464,7 @@ function ManagePriceGroupModal({ groupId, onClose, onChanged }: {
                     return (
                       <>
                         <tr key={`cat-${cat}`}>
-                          <td colSpan={6} style={{ padding: '2px 10px', fontSize: 10, fontWeight: 700, color: '#6C757D', textTransform: 'uppercase', letterSpacing: '0.05em', background: '#F0F0F0', borderTop: '1px solid #E0E0E0', borderBottom: '1px solid #E0E0E0' }}>
+                          <td colSpan={6} style={{ padding: '1px 8px', fontSize: 10, fontWeight: 700, color: '#6C757D', textTransform: 'uppercase', letterSpacing: '0.05em', background: '#F0F0F0', borderTop: '1px solid #E0E0E0', borderBottom: '1px solid #E0E0E0' }}>
                             {cat}
                           </td>
                         </tr>
@@ -473,8 +473,8 @@ function ManagePriceGroupModal({ groupId, onClose, onChanged }: {
                           const isEnabled = ov?.enabled ?? false
                           const rowBg = isEnabled ? '#F0FAF4' : (i % 2 === 1 ? '#FAFAFA' : '#fff')
                           return (
-                            <tr key={p.id} style={{ background: rowBg, borderBottom: '1px solid #F0F0F0', height: 30 }}>
-                              <td style={{ ...TD, padding: '2px 10px', width: 50, textAlign: 'center' }}>
+                            <tr key={p.id} style={{ background: rowBg, borderBottom: '1px solid #F0F0F0', height: 26 }}>
+                              <td style={{ ...TD, padding: '1px 8px', width: 50, textAlign: 'center' }}>
                                 <input
                                   type="checkbox"
                                   checked={isEnabled}
@@ -486,32 +486,32 @@ function ManagePriceGroupModal({ groupId, onClose, onChanged }: {
                                   }}
                                 />
                               </td>
-                              <td style={{ ...TD, padding: '2px 10px' }}>
+                              <td style={{ ...TD, padding: '1px 8px' }}>
                                 <span style={{ fontWeight: 600 }}>{p.name}</span>
                                 <span style={{ fontSize: 10, color: '#6C757D', fontFamily: 'monospace', marginLeft: 6 }}>{p.code} · {p.unit}</span>
                               </td>
-                              <td style={{ ...TD, padding: '2px 10px', fontFamily: 'monospace', color: '#6C757D' }}>R {Number(p.defaultBuyPrice).toFixed(2)}</td>
-                              <td style={{ ...TD, padding: '2px 10px', fontFamily: 'monospace', color: '#6C757D' }}>R {Number(p.defaultSellPrice).toFixed(2)}</td>
-                              <td style={{ ...TD, padding: '2px 10px', width: 120 }}>
+                              <td style={{ ...TD, padding: '1px 8px', fontFamily: 'monospace', color: '#6C757D' }}>R {Number(p.defaultBuyPrice).toFixed(2)}</td>
+                              <td style={{ ...TD, padding: '1px 8px', fontFamily: 'monospace', color: '#6C757D' }}>R {Number(p.defaultSellPrice).toFixed(2)}</td>
+                              <td style={{ ...TD, padding: '1px 8px', width: 120 }}>
                                 {isEnabled ? (
                                   <Input
                                     value={ov?.buy ?? ''}
                                     onChange={(e) => { setOverrides((prev) => ({ ...prev, [p.id]: { ...prev[p.id]!, buy: e.target.value } })); setDirty(true) }}
                                     disabled={!isManager}
-                                    className="h-6 text-xs font-mono border-[#ABABAB]"
+                                    className="h-5 text-xs font-mono border-[#ABABAB]"
                                     style={{ width: 100 }}
                                   />
                                 ) : (
                                   <span style={{ fontSize: 11, color: '#C0C0C0', fontFamily: 'monospace' }}>—</span>
                                 )}
                               </td>
-                              <td style={{ ...TD, padding: '2px 10px', width: 120 }}>
+                              <td style={{ ...TD, padding: '1px 8px', width: 120 }}>
                                 {isEnabled ? (
                                   <Input
                                     value={ov?.sell ?? ''}
                                     onChange={(e) => { setOverrides((prev) => ({ ...prev, [p.id]: { ...prev[p.id]!, sell: e.target.value } })); setDirty(true) }}
                                     disabled={!isManager}
-                                    className="h-6 text-xs font-mono border-[#ABABAB]"
+                                    className="h-5 text-xs font-mono border-[#ABABAB]"
                                     style={{ width: 100 }}
                                   />
                                 ) : (
