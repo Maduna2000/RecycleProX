@@ -443,7 +443,7 @@ function ManagePriceGroupModal({ groupId, onClose, onChanged }: {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
                   <Btn size="sm" icon={Copy} loading={copying} onClick={() => setCopyConfirmOpen(true)}>Copy Defaults</Btn>
                   {dirty && <Btn size="sm" icon={RotateCcw} onClick={onReset}>Reset</Btn>}
-                  <Btn size="sm" variant="primary" icon={Save} loading={saving} disabled={!dirty} onClick={onSave}>Save</Btn>
+                  {dirty && <Btn size="sm" variant="primary" icon={Save} loading={saving} onClick={onSave}>Save</Btn>}
                 </div>
               )}
             </div>
