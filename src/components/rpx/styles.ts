@@ -48,24 +48,29 @@ export const TD: React.CSSProperties = {
   padding: '4px 10px', fontSize: 12, color: colors.textPrimary,
 }
 
-/** Navy primary action button. */
+/**
+ * Legacy Windows-style grey button — the house style for every Btn variant.
+ * Flat grey fill (BAR_GRAD) with a #B0B0B0 border, the way real legacy
+ * dialogs looked; severity/emphasis is signalled by label, weight, and text
+ * colour rather than a solid colour block.
+ */
 export const btnPrimary: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 6,
-  fontSize: 12, fontWeight: 600, padding: '7px 16px',
-  background: NAVY, color: '#fff', border: 'none',
+  fontSize: 12, fontWeight: 700, padding: '7px 16px',
+  background: BAR_GRAD, color: colors.textPrimary, border: CARD_BORDER,
   borderRadius: 3, cursor: 'pointer',
 }
 
-/** Light-blue secondary button — pairs with the navy primary. */
+/** Grey secondary button — pairs with the (also grey) primary. */
 export const btnSecondary: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 5,
   fontSize: 11, fontWeight: 600, padding: '5px 12px',
-  background: colors.processBg, color: colors.process, border: '1px solid #9DBFE8',
+  background: BAR_GRAD, color: colors.textPrimary, border: CARD_BORDER,
   borderRadius: 2, cursor: 'pointer',
 }
 
-/** Red destructive button. */
+/** Destructive button — same grey fill, red label instead of a solid red block. */
 export const btnDanger: React.CSSProperties = {
   ...btnSecondary,
-  background: '#DC3545', color: '#fff', border: '1px solid #C82333',
+  background: BAR_GRAD, color: colors.danger, border: CARD_BORDER,
 }

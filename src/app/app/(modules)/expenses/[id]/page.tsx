@@ -11,6 +11,7 @@ import {
 import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { colors } from '@/lib/design-tokens'
+import { BAR_GRAD, CARD_BORDER } from '@/components/rpx/styles'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -22,8 +23,8 @@ const secBtn: React.CSSProperties = {
 }
 const priBtn: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 4, height: 24,
-  padding: '0 8px', fontSize: 11, fontWeight: 600, borderRadius: 2,
-  background: colors.action, border: `1px solid ${colors.actionHover}`, color: colors.textOnDark, cursor: 'pointer',
+  padding: '0 8px', fontSize: 11, fontWeight: 700, borderRadius: 2,
+  background: BAR_GRAD, border: CARD_BORDER, color: colors.textPrimary, cursor: 'pointer',
 }
 const dangerBtn: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 4, height: 24,

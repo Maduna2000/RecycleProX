@@ -13,9 +13,8 @@ import { Loader2, Calendar, PlusCircle, Undo2, ChevronLeft, ChevronRight } from 
 import Decimal from 'decimal.js'
 import { colors } from '@/lib/design-tokens'
 import { z } from 'zod'
-import { PortalPage, TH, TD, HEADER_GRAD } from '@/components/rpx'
+import { Btn, PortalPage, TH, TD, HEADER_GRAD } from '@/components/rpx'
 import { CARD_BORDER } from '@/components/rpx/styles'
-import { LegacyBtn } from '@/components/legacy/LegacyBtn'
 import { PANEL, PANEL_HEAD } from '@/components/legacy/legacyPanel'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
@@ -252,9 +251,9 @@ export default function FloatPage() {
                           placeholder="e.g. Additional cash from safe"
                         />
                       </div>
-                      <LegacyBtn type="submit" loading={saving} style={{ width: '100%', justifyContent: 'center' }}>
+                      <Btn type="submit" loading={saving} style={{ width: '100%', justifyContent: 'center' }}>
                         Add to Float
-                      </LegacyBtn>
+                      </Btn>
                     </form>
                   </div>
                 )}
@@ -323,11 +322,11 @@ export default function FloatPage() {
                       Showing {(historyPage - 1) * HISTORY_PAGE_SIZE + 1}–{Math.min(historyPage * HISTORY_PAGE_SIZE, history.length)} of {history.length}
                     </span>
                     <div className="flex items-center gap-1">
-                      <LegacyBtn size="sm" icon={ChevronLeft} disabled={historyPage <= 1} onClick={() => setHistoryPage(p => p - 1)} />
+                      <Btn size="sm" icon={ChevronLeft} disabled={historyPage <= 1} onClick={() => setHistoryPage(p => p - 1)} />
                       <span className="text-xs px-2" style={{ color: colors.textPrimary }}>
                         Page {historyPage} of {Math.ceil(history.length / HISTORY_PAGE_SIZE)}
                       </span>
-                      <LegacyBtn
+                      <Btn
                         size="sm"
                         icon={ChevronRight}
                         disabled={historyPage >= Math.ceil(history.length / HISTORY_PAGE_SIZE)}
@@ -406,9 +405,9 @@ export default function FloatPage() {
                         {isManager && (
                           <td style={{ padding: '6px 12px', textAlign: 'right' }}>
                             {isLastMovement && (
-                              <LegacyBtn size="sm" icon={Undo2} loading={reversingMovement} onClick={() => handleReverseMovement(m.id)}>
+                              <Btn size="sm" icon={Undo2} loading={reversingMovement} onClick={() => handleReverseMovement(m.id)}>
                                 Reverse
-                              </LegacyBtn>
+                              </Btn>
                             )}
                           </td>
                         )}

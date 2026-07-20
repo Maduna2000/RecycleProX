@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { FileText } from 'lucide-react'
 import { toast } from 'sonner'
 import type { CashupReportType } from '@/lib/schemas/cashup'
-import { LegacyBtn } from '@/components/legacy/LegacyBtn'
+import { Btn } from '@/components/rpx'
 
 interface ReportButtonProps {
   type: CashupReportType
@@ -63,7 +63,7 @@ export function ReportButton({
   }
 
   return (
-    <LegacyBtn
+    <Btn
       size="sm"
       icon={FileText}
       loading={loading}
@@ -73,6 +73,6 @@ export function ReportButton({
       style={{ justifyContent: fullWidth ? 'center' : 'flex-start', width: fullWidth ? '100%' : 'auto' }}
     >
       {label ?? 'Report'}
-    </LegacyBtn>
+    </Btn>
   )
 }

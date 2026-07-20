@@ -2,8 +2,7 @@
 
 import Link from 'next/link'
 import { Loader2 } from 'lucide-react'
-import { btnPrimary, btnSecondary, btnDanger } from './styles'
-import { colors } from '@/lib/design-tokens'
+import { btnPrimary, btnSecondary, btnDanger, BAR_GRAD } from './styles'
 
 export type BtnVariant = 'primary' | 'secondary' | 'danger'
 export type BtnSize = 'md' | 'sm'
@@ -14,16 +13,18 @@ const VARIANT_STYLE: Record<BtnVariant, React.CSSProperties> = {
   danger:    btnDanger,
 }
 
+// All three variants share the same flat grey fill — hover/leave just
+// swap between the gradient (idle) and a slightly darker flat grey (hover).
 const HOVER_BG: Record<BtnVariant, string> = {
-  primary:   '#16305A',
-  secondary: '#D8E8FA',
-  danger:    '#C82333',
+  primary:   '#D2D2D2',
+  secondary: '#D2D2D2',
+  danger:    '#D2D2D2',
 }
 
 const BASE_BG: Record<BtnVariant, string> = {
-  primary:   colors.primary,
-  secondary: colors.processBg,
-  danger:    '#DC3545',
+  primary:   BAR_GRAD,
+  secondary: BAR_GRAD,
+  danger:    BAR_GRAD,
 }
 
 /** Compact scale — fits the 32px toolbar strip and dense rows. */

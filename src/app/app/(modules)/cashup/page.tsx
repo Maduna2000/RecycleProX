@@ -15,10 +15,9 @@ import { colors } from '@/lib/design-tokens'
 import { useOfflineMutation } from '@/hooks/useOfflineFetch'
 import { ReportButton } from './_components/ReportButton'
 import { PreviousReportsModal } from './_components/PreviousReportsModal'
-import { LegacyBtn } from '@/components/legacy/LegacyBtn'
 import { PANEL, PANEL_HEAD } from '@/components/legacy/legacyPanel'
 import { CARD_BORDER } from '@/components/rpx/styles'
-import { PortalPage, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
+import { Btn, PortalPage, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -312,15 +311,15 @@ function CountCashModal({ counts, setCounts, notes, setNotes, submitting, handle
         </div>
         </RpxDialogBody>
         <RpxDialogFooter>
-          <LegacyBtn onClick={onClose} disabled={submitting}>Cancel</LegacyBtn>
-          <LegacyBtn
+          <Btn onClick={onClose} disabled={submitting}>Cancel</Btn>
+          <Btn
             variant="primary"
             onClick={() => { void handleSubmit(); onClose() }}
             disabled={submitting || !hasCounted}
             loading={submitting}
           >
             Submit Cash-Up
-          </LegacyBtn>
+          </Btn>
         </RpxDialogFooter>
       </RpxDialogContent>
     </Dialog>
@@ -358,15 +357,15 @@ function ReasonModal({ title, message, confirmLabel, loading, onConfirm, onClose
           />
         </RpxDialogBody>
         <RpxDialogFooter>
-          <LegacyBtn onClick={onClose} disabled={loading}>Cancel</LegacyBtn>
-          <LegacyBtn
+          <Btn onClick={onClose} disabled={loading}>Cancel</Btn>
+          <Btn
             variant="danger"
             loading={loading}
             disabled={!reason.trim()}
             onClick={() => onConfirm(reason)}
           >
             {confirmLabel}
-          </LegacyBtn>
+          </Btn>
         </RpxDialogFooter>
       </RpxDialogContent>
     </Dialog>
@@ -511,15 +510,15 @@ function ManageSessionsModal({ sessions, onClose, onVoided, currencySymbol = 'R'
             {selected.size} session{selected.size !== 1 ? 's' : ''} selected
           </span>
           <div style={{ display: 'flex', gap: 8 }}>
-            <LegacyBtn onClick={onClose} disabled={voiding}>Cancel</LegacyBtn>
-            <LegacyBtn
+            <Btn onClick={onClose} disabled={voiding}>Cancel</Btn>
+            <Btn
               variant="danger"
               onClick={handleBulkVoid}
               disabled={voiding || selected.size === 0 || !voidReason.trim()}
               loading={voiding}
             >
               Void {selected.size} Session{selected.size !== 1 ? 's' : ''}
-            </LegacyBtn>
+            </Btn>
           </div>
         </RpxDialogFooter>
       </RpxDialogContent>
@@ -753,9 +752,9 @@ export default function CashUpPage() {
             <Clock className="w-9 h-9 mx-auto mb-2.5" style={{ color: colors.border }} />
             <p className="font-medium mb-1" style={{ color: colors.textPrimary }}>No session open for today</p>
             <p className="text-sm mb-4" style={{ color: colors.textSecondary }}>Open a session to begin tracking today&apos;s cash.</p>
-            <LegacyBtn loading={opening} onClick={handleOpen} style={{ margin: '0 auto' }}>
+            <Btn loading={opening} onClick={handleOpen} style={{ margin: '0 auto' }}>
               Open Session
-            </LegacyBtn>
+            </Btn>
             </div>
           </div>
         )}
@@ -781,13 +780,13 @@ export default function CashUpPage() {
                       : ' Count your cash and submit below, or void this session if you cannot reconcile.'}
                   </p>
                   <div className="flex gap-2 flex-wrap">
-                    <LegacyBtn size="sm" variant="danger" loading={voiding} onClick={() => setVoidReasonOpen(true)}>
+                    <Btn size="sm" variant="danger" loading={voiding} onClick={() => setVoidReasonOpen(true)}>
                       Void This Session
-                    </LegacyBtn>
+                    </Btn>
                     {openSessionsCount > 1 && (
-                      <LegacyBtn size="sm" onClick={() => setManageSessionsOpen(true)}>
+                      <Btn size="sm" onClick={() => setManageSessionsOpen(true)}>
                         Manage All {openSessionsCount} Sessions
-                      </LegacyBtn>
+                      </Btn>
                     )}
                     <span className="text-xs self-center" style={{ color: colors.textSecondary }}>
                       (Cannot reconcile? Void to skip this session)
@@ -954,9 +953,9 @@ export default function CashUpPage() {
                           divider
                           label="Cash On Hand (Counted)" value={declared.toFixed(2)} highlight currencySymbol={currSym}
                           action={isOpen && (
-                            <LegacyBtn size="sm" icon={Calculator} onClick={() => setCountCashOpen(true)} style={{ whiteSpace: 'nowrap', flexShrink: 0 }}>
+                            <Btn size="sm" icon={Calculator} onClick={() => setCountCashOpen(true)} style={{ whiteSpace: 'nowrap', flexShrink: 0 }}>
                               Count Cash
-                            </LegacyBtn>
+                            </Btn>
                           )}
                         />
                         {isOpen && !hasCounted ? (
@@ -1018,20 +1017,20 @@ export default function CashUpPage() {
                       <div className="flex justify-end gap-2" style={{ padding: '8px 10px', borderTop: CARD_BORDER, background: colors.toolbar }}>
                         {isManager ? (
                           <>
-                            <LegacyBtn size="sm" loading={voiding} onClick={() => setVoidReasonOpen(true)}>
+                            <Btn size="sm" loading={voiding} onClick={() => setVoidReasonOpen(true)}>
                               Void
-                            </LegacyBtn>
-                            <LegacyBtn
+                            </Btn>
+                            <Btn
                               size="sm"
                               variant="danger"
                               loading={rejecting}
                               onClick={() => setRejectReasonOpen(true)}
                             >
                               Reject — Send Back to Cashier
-                            </LegacyBtn>
-                            <LegacyBtn size="sm" icon={Lock} loading={approving} onClick={handleApprove}>
+                            </Btn>
+                            <Btn size="sm" icon={Lock} loading={approving} onClick={handleApprove}>
                               Approve Cash-Up
-                            </LegacyBtn>
+                            </Btn>
                           </>
                         ) : (
                           <p className="text-sm" style={{ color: colors.textSecondary }}>Awaiting manager approval</p>
@@ -1103,9 +1102,9 @@ export default function CashUpPage() {
                         ))}
                         <div className="flex items-center justify-between" style={{ padding: '5px 10px', borderTop: '1px solid #E8E8E8' }}>
                           <span style={{ fontSize: 12, color: colors.textPrimary }}>Previous Reports</span>
-                          <LegacyBtn size="sm" icon={FolderOpen} onClick={() => setPreviousReportsOpen(true)}>
+                          <Btn size="sm" icon={FolderOpen} onClick={() => setPreviousReportsOpen(true)}>
                             Browse
-                          </LegacyBtn>
+                          </Btn>
                         </div>
                       </div>
                     </div>

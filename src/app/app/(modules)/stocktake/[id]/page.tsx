@@ -14,6 +14,7 @@ import { toast } from 'sonner'
 import Decimal from 'decimal.js'
 import { format } from '@/lib/utils/format'
 import { colors } from '@/lib/design-tokens'
+import { BAR_GRAD, CARD_BORDER } from '@/components/rpx/styles'
 import {
   TH, TD,
   Btn, PortalPage,
@@ -29,13 +30,13 @@ const secBtn: React.CSSProperties = {
 }
 const priBtn: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 4, height: 24,
-  padding: '0 8px', fontSize: 11, fontWeight: 600, borderRadius: 2,
-  background: colors.action, border: `1px solid ${colors.actionHover}`, color: colors.textOnDark, cursor: 'pointer',
+  padding: '0 8px', fontSize: 11, fontWeight: 700, borderRadius: 2,
+  background: BAR_GRAD, border: CARD_BORDER, color: colors.textPrimary, cursor: 'pointer',
 }
 const scaleBtn: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 4, height: 24,
   padding: '0 8px', fontSize: 11, fontWeight: 600, borderRadius: 2,
-  background: colors.process, border: `1px solid ${colors.processHover}`, color: colors.textOnDark, cursor: 'pointer',
+  background: BAR_GRAD, border: CARD_BORDER, color: colors.textPrimary, cursor: 'pointer',
 }
 
 type Product = { id: string; code: string; name: string; unit: string; category: string }
