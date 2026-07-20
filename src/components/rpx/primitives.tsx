@@ -128,8 +128,12 @@ export function ContentCard({
 // ─── PortalPage ───────────────────────────────────────────────────────────────
 
 /**
- * The standard page silhouette: folder tabs (or a single title tab) with a
- * right-aligned action slot, above an attached white content card.
+ * The standard page silhouette. The page's title already lives once in the
+ * windowed title bar above (PageTitleBar) — folder tabs only render here
+ * when a page genuinely has more than one section to switch between. A
+ * single implicit tab built from `title` would just repeat that title, so
+ * pages with no real `tabs` get a plain content card instead (with a
+ * right-aligned action slot when `actions` is given).
  */
 export function PortalPage({
   tabs,
@@ -143,27 +147,33 @@ export function PortalPage({
   tabs?: RpxTab[]
   active?: string
   onChange?: (value: string) => void
-  /** Used as the single tab label when no `tabs` are given. */
+  /** Used for the region's accessible name; no longer rendered as a tab. */
   title?: string
   actions?: React.ReactNode
   children: React.ReactNode
   cardStyle?: React.CSSProperties
 }) {
-  const resolvedTabs: RpxTab[] = tabs ?? [{ value: '_page', label: title ?? '' }]
-  const resolvedActive = tabs ? (active ?? tabs[0]?.value ?? '') : '_page'
+  const hasTabs = !!tabs && tabs.length > 0
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, flexShrink: 0 }}>
-        <TabStrip tabs={resolvedTabs} active={resolvedActive} onChange={onChange ?? (() => {})} />
-        <div style={{ flex: 1 }} />
-        {actions && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingBottom: 5 }}>
-            {actions}
-          </div>
-        )}
-      </div>
-      <ContentCard attached style={cardStyle}>
+    <div
+      style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}
+      aria-label={hasTabs ? undefined : title}
+    >
+      {(hasTabs || actions) && (
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, flexShrink: 0 }}>
+          {hasTabs && (
+            <TabStrip tabs={tabs!} active={active ?? tabs![0]?.value ?? ''} onChange={onChange ?? (() => {})} />
+          )}
+          <div style={{ flex: 1 }} />
+          {actions && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingBottom: 5 }}>
+              {actions}
+            </div>
+          )}
+        </div>
+      )}
+      <ContentCard attached={hasTabs} style={cardStyle}>
         {children}
       </ContentCard>
     </div>
