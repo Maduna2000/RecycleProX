@@ -42,6 +42,7 @@ export default function CasualsPage() {
   const [showBlacklisted, setShowBlacklisted] = useState('')
   const [dealerCategory, setDealerCategory]   = useState('')
   const [primaryFunction, setPrimaryFunction] = useState('')
+  const [page, setPage]                   = useState(1)
   const [blacklistId, setBlacklistId]     = useState<string | null>(null)
   const [deleteId, setDeleteId]           = useState<string | null>(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
@@ -97,6 +98,11 @@ export default function CasualsPage() {
   const customers = (data?.customers ?? []).filter((c) =>
     letter ? c.lastName.toUpperCase().startsWith(letter) : true,
   )
+
+  const PAGE_SIZE  = 50
+  const totalPages = Math.max(1, Math.ceil(customers.length / PAGE_SIZE))
+  const safePage   = Math.min(page, totalPages)
+  const pagedCustomers = customers.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
 
   function refreshList() {
     mutate((key) => typeof key === 'string' && key.includes('/api/customers'), undefined, { revalidate: true })
@@ -244,21 +250,21 @@ export default function CasualsPage() {
               <Search style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', width: 12, height: 12, color: '#6C757D' }} />
               <input
                 value={search}
-                onChange={(e) => { setSearch(e.target.value); setLetter(null) }}
+                onChange={(e) => { setSearch(e.target.value); setLetter(null); setPage(1) }}
                 placeholder="Search by name or ID number…"
                 style={{ ...inp, paddingLeft: 26 }}
               />
             </div>
           </Field>
           <Field label="Status" width={130}>
-            <select style={inp} value={showBlacklisted} onChange={(e) => setShowBlacklisted(e.target.value)}>
+            <select style={inp} value={showBlacklisted} onChange={(e) => { setShowBlacklisted(e.target.value); setPage(1) }}>
               <option value="">All Status</option>
               <option value="false">Active Only</option>
               <option value="true">Blacklisted Only</option>
             </select>
           </Field>
           <Field label="Category" width={130}>
-            <select style={inp} value={dealerCategory} onChange={(e) => setDealerCategory(e.target.value)}>
+            <select style={inp} value={dealerCategory} onChange={(e) => { setDealerCategory(e.target.value); setPage(1) }}>
               <option value="">All Categories</option>
               <option value="casual">Casual</option>
               <option value="dealer_1">Dealer 1</option>
@@ -267,7 +273,7 @@ export default function CasualsPage() {
             </select>
           </Field>
           <Field label="Function" width={130}>
-            <select style={inp} value={primaryFunction} onChange={(e) => setPrimaryFunction(e.target.value)}>
+            <select style={inp} value={primaryFunction} onChange={(e) => { setPrimaryFunction(e.target.value); setPage(1) }}>
               <option value="">All Functions</option>
               <option value="supplier">Supplier</option>
               <option value="customer">Customer</option>
@@ -281,9 +287,9 @@ export default function CasualsPage() {
 
         {/* A–Z quick filter */}
         <div className="flex flex-wrap gap-1 shrink-0" style={{ padding: '8px 14px 0' }}>
-          <Btn size="sm" variant={letter === null ? 'primary' : 'secondary'} onClick={() => setLetter(null)}>All</Btn>
+          <Btn size="sm" variant={letter === null ? 'primary' : 'secondary'} onClick={() => { setLetter(null); setPage(1) }}>All</Btn>
           {ALPHA.map((l) => (
-            <Btn key={l} size="sm" variant={letter === l ? 'primary' : 'secondary'} onClick={() => { setLetter(l === letter ? null : l); setSearch('') }}>
+            <Btn key={l} size="sm" variant={letter === l ? 'primary' : 'secondary'} onClick={() => { setLetter(l === letter ? null : l); setSearch(''); setPage(1) }}>
               {l}
             </Btn>
           ))}
@@ -293,10 +299,14 @@ export default function CasualsPage() {
         <div className="flex-1 min-h-0" style={{ padding: 10 }}>
           <DataTable
             columns={columns}
-            rows={customers}
+            rows={pagedCustomers}
             rowKey={(r) => r.id}
             rowActions={rowActions}
             loading={isLoading}
+            total={customers.length}
+            page={safePage}
+            pageSize={PAGE_SIZE}
+            onPageChange={setPage}
             emptyMessage={letter
               ? `No casual customers with surname starting with "${letter}"`
               : 'No casual customers found'}

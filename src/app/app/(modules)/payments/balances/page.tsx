@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import useSWR from 'swr'
 import { AlertCircle } from 'lucide-react'
 import Decimal from 'decimal.js'
@@ -26,9 +27,16 @@ export default function AccountBalancesPage() {
     fetcher,
   )
 
+  const [page, setPage] = useState(1)
+
   const balances = balancesData?.balances ?? []
   const outstandingCount = balances.filter((b) => new Decimal(b.balance).gt(0)).length
   const totalOutstanding = balances.reduce((sum, b) => sum.plus(new Decimal(b.balance).gt(0) ? new Decimal(b.balance) : new Decimal(0)), new Decimal(0))
+
+  const PAGE_SIZE     = 50
+  const totalPages    = Math.max(1, Math.ceil(balances.length / PAGE_SIZE))
+  const safePage      = Math.min(page, totalPages)
+  const pagedBalances = balances.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
 
   // ── Account Balances columns ──────────────────────────────────────────────
   const balanceColumns: Column<AccountBalance>[] = [
@@ -96,9 +104,13 @@ export default function AccountBalancesPage() {
       <div className="flex-1 min-h-0" style={{ padding: 10 }}>
         <DataTable
           columns={balanceColumns}
-          rows={balances}
+          rows={pagedBalances}
           rowKey={(r) => r.id}
           loading={balancesLoading}
+          total={balances.length}
+          page={safePage}
+          pageSize={PAGE_SIZE}
+          onPageChange={setPage}
           emptyMessage="No customer balances found"
         />
       </div>

@@ -60,6 +60,7 @@ export default function StockPage() {
   const [period,           setPeriod]           = useState('')
   const [periodDate,       setPeriodDate]       = useState(today)
   const [belowReorderOnly, setBelowReorderOnly] = useState(false)
+  const [page,             setPage]             = useState(1)
 
   // Check for ?adjust=1 query parameter to auto-open modal
   useEffect(() => {
@@ -92,6 +93,11 @@ export default function StockPage() {
     }
     return true
   })
+
+  const PAGE_SIZE  = 50
+  const totalPages = Math.max(1, Math.ceil(stock.length / PAGE_SIZE))
+  const safePage   = Math.min(page, totalPages)
+  const pagedStock = stock.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
 
   const totalProducts = stock.filter((s) => parseFloat(s.onHand) > 0).length
   const lowStock      = stock.filter((s) => parseFloat(s.onHand) < 0).length
@@ -278,9 +284,13 @@ export default function StockPage() {
       <div className="flex-1 min-h-0" style={{ padding: 10 }}>
         <DataTable
           columns={onHandColumns}
-          rows={stock}
+          rows={pagedStock}
           rowKey={(r) => r.product.id}
           loading={!stockData}
+          total={stock.length}
+          page={safePage}
+          pageSize={PAGE_SIZE}
+          onPageChange={setPage}
           emptyMessage="No stock data — complete some purchases first"
         />
       </div>

@@ -33,9 +33,16 @@ export default function StockGridPage() {
   const [gridDate,     setGridDate]     = useState(today)
   const [gridCategory, setGridCategory] = useState('')
   const [exporting,    setExporting]    = useState(false)
+  const [page,         setPage]         = useState(1)
 
   const gridKey = `/api/stock/grid?period=${gridPeriod}&date=${gridDate}${gridCategory ? `&category=${gridCategory}` : ''}`
   const { data: gridData, isLoading: gridLoading } = useSWR<{ grid: GridRow[] }>(gridKey, fetcher)
+
+  const gridRows   = gridData?.grid ?? []
+  const PAGE_SIZE  = 50
+  const totalPages = Math.max(1, Math.ceil(gridRows.length / PAGE_SIZE))
+  const safePage   = Math.min(page, totalPages)
+  const pagedGrid  = gridRows.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
 
   async function handleExport(format: 'xlsx' | 'pdf') {
     setExporting(true)
@@ -176,8 +183,12 @@ export default function StockGridPage() {
         ) : (
           <DataTable
             columns={gridColumns}
-            rows={gridData?.grid ?? []}
+            rows={pagedGrid}
             rowKey={(r) => r.productId}
+            total={gridRows.length}
+            page={safePage}
+            pageSize={PAGE_SIZE}
+            onPageChange={setPage}
             emptyMessage="No data for selected period"
           />
         )}

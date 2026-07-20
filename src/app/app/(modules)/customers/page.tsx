@@ -111,11 +111,14 @@ function AccountsList() {
   const [showBlacklisted, setShowBlacklisted] = useState('')
   const [dealerCategory,  setDealerCategory]  = useState('')
   const [primaryFunction, setPrimaryFunction] = useState('')
+  const [page,            setPage]            = useState(1)
   const [blacklistId,     setBlacklistId]     = useState<string | null>(null)
   const [deleteId,        setDeleteId]        = useState<string | null>(null)
   const [deleteLoading,   setDeleteLoading]   = useState(false)
   const [convertId,       setConvertId]       = useState<string | null>(null)
   const [convertLoading,  setConvertLoading]  = useState(false)
+
+  const PAGE_SIZE = 50
 
   const query = new URLSearchParams({
     type: 'account',
@@ -123,9 +126,11 @@ function AccountsList() {
     ...(showBlacklisted && { blacklisted: showBlacklisted }),
     ...(dealerCategory  && { dealerCategory }),
     ...(primaryFunction && { primaryFunction }),
+    page:  String(page),
+    limit: String(PAGE_SIZE),
   })
 
-  const { data, isLoading, error } = useSWR<{ customers: Customer[] }>(
+  const { data, isLoading, error } = useSWR<{ customers: Customer[]; total: number }>(
     `/api/customers?${query}`, fetcher,
   )
   const customers = data?.customers ?? []
@@ -354,21 +359,21 @@ function AccountsList() {
             <Search style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', width: 12, height: 12, color: '#6C757D' }} />
             <input
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => { setSearch(e.target.value); setPage(1) }}
               placeholder="Search name, ID, phone…"
               style={{ ...inp, paddingLeft: 26 }}
             />
           </div>
         </Field>
         <Field label="Status" width={130}>
-          <select style={inp} value={showBlacklisted} onChange={(e) => setShowBlacklisted(e.target.value)}>
+          <select style={inp} value={showBlacklisted} onChange={(e) => { setShowBlacklisted(e.target.value); setPage(1) }}>
             <option value="">All Status</option>
             <option value="false">Active Only</option>
             <option value="true">Blacklisted Only</option>
           </select>
         </Field>
         <Field label="Category" width={130}>
-          <select style={inp} value={dealerCategory} onChange={(e) => setDealerCategory(e.target.value)}>
+          <select style={inp} value={dealerCategory} onChange={(e) => { setDealerCategory(e.target.value); setPage(1) }}>
             <option value="">All Categories</option>
             <option value="casual">Casual</option>
             <option value="dealer_1">Dealer 1</option>
@@ -377,7 +382,7 @@ function AccountsList() {
           </select>
         </Field>
         <Field label="Function" width={130}>
-          <select style={inp} value={primaryFunction} onChange={(e) => setPrimaryFunction(e.target.value)}>
+          <select style={inp} value={primaryFunction} onChange={(e) => { setPrimaryFunction(e.target.value); setPage(1) }}>
             <option value="">All Functions</option>
             <option value="supplier">Supplier</option>
             <option value="customer">Customer</option>
@@ -385,7 +390,7 @@ function AccountsList() {
           </select>
         </Field>
         <span style={{ fontSize: 11, color: '#6C757D', marginLeft: 'auto', paddingBottom: 8 }}>
-          {customers.length} account{customers.length !== 1 ? 's' : ''}
+          {data?.total ?? customers.length} account{(data?.total ?? customers.length) !== 1 ? 's' : ''}
         </span>
       </FilterBar>
 
@@ -397,6 +402,10 @@ function AccountsList() {
           rowActions={rowActions}
           loading={isLoading}
           error={error}
+          total={data?.total}
+          page={page}
+          pageSize={PAGE_SIZE}
+          onPageChange={setPage}
           emptyMessage="No account customers found"
         />
       </div>

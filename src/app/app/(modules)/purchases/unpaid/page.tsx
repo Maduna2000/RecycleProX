@@ -66,12 +66,13 @@ export default function UnpaidPurchasesPage() {
   const [search,     setSearch]     = useState('')
   const [from,       setFrom]       = useState('')
   const [to,         setTo]         = useState('')
+  const [page,       setPage]       = useState(1)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [payTarget,  setPayTarget]  = useState<PayTarget | null>(null)
   const [voidTarget, setVoidTarget] = useState<Purchase | null>(null)
 
   const hasFilters = !!(search || from || to)
-  function clearFilters() { setSearch(''); setFrom(''); setTo('') }
+  function clearFilters() { setSearch(''); setFrom(''); setTo(''); setPage(1) }
 
   const query = new URLSearchParams({ status: 'pending', pageSize: '200' })
   if (search) query.set('search', search)
@@ -81,6 +82,11 @@ export default function UnpaidPurchasesPage() {
   const KEY = `/api/purchases?${query}`
   const { data, isLoading } = useSWR<{ purchases: Purchase[] }>(KEY, fetcher)
   const purchases = data?.purchases ?? []
+
+  const PAGE_SIZE      = 50
+  const totalPages     = Math.max(1, Math.ceil(purchases.length / PAGE_SIZE))
+  const safePage       = Math.min(page, totalPages)
+  const pagedPurchases = purchases.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
 
   const { data: detail, isLoading: detailLoading } = useSWR<PurchaseDetail>(
     selectedId ? `/api/purchases/${selectedId}` : null,
@@ -240,12 +246,16 @@ export default function UnpaidPurchasesPage() {
       <div className="flex-1 min-h-0" style={{ padding: 10 }}>
         <DataTable
           columns={columns}
-          rows={purchases}
+          rows={pagedPurchases}
           rowKey={(r) => r.id}
           onRowClick={(r) => setSelectedId(r.id === selectedId ? null : r.id)}
           selectedKey={selectedId}
           rowActions={rowActions}
           loading={isLoading}
+          total={purchases.length}
+          page={safePage}
+          pageSize={PAGE_SIZE}
+          onPageChange={setPage}
           emptyMessage="No unpaid purchases — all purchases are settled."
         />
       </div>
