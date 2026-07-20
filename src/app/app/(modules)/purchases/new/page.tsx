@@ -9,6 +9,7 @@ import useSWR from 'swr'
 import { CasualSelectorPanel, type CasualSelectorPanelRef } from '@/components/customers/CasualSelectorPanel'
 import { AccountSelectorPanel } from '@/components/customers/AccountSelectorPanel'
 import { PrintResultModal } from '@/components/PrintResultModal'
+import { ProductCategoryPicker } from '@/components/products/ProductCategoryPicker'
 import Decimal from 'decimal.js'
 import { colors } from '@/lib/design-tokens'
 import { useOfflineMutation } from '@/hooks/useOfflineFetch'
@@ -177,12 +178,6 @@ export default function NewPurchasePage() {
     const allowed = new Set(commodities.flatMap((c) => categoryExpansion[c] ?? [c]))
     return products.filter((p) => allowed.has(p.category))
   })()
-
-  const productsByCategory = visibleProducts.reduce<Record<string, Product[]>>((acc, p) => {
-    acc[p.category] = acc[p.category] ?? []
-    acc[p.category]!.push(p)
-    return acc
-  }, {})
 
   const subTotal = lines.reduce((sum, l) => {
     return sum.plus(new Decimal(l.quantity || '0').times(new Decimal(l.unitPrice || '0')))
@@ -800,20 +795,11 @@ export default function NewPurchasePage() {
                       }}
                     >
                       {/* Product */}
-                      <select
-                        style={{ height: 24, width: '100%', borderRadius: 2, border: '1px solid #ABABAB', padding: '0 4px', fontSize: 11, color: '#212529', background: '#fff', outline: 'none' }}
+                      <ProductCategoryPicker
+                        products={visibleProducts}
                         value={line.productId}
-                        onChange={(e) => onProductSelect(line.key, e.target.value)}
-                      >
-                        <option value="">Select…</option>
-                        {Object.entries(productsByCategory).map(([cat, prods]) => (
-                          <optgroup key={cat} label={cat}>
-                            {prods.map((p) => (
-                              <option key={p.id} value={p.id}>{p.name} ({p.unit})</option>
-                            ))}
-                          </optgroup>
-                        ))}
-                      </select>
+                        onChange={(productId) => onProductSelect(line.key, productId)}
+                      />
 
                       {/* Qty */}
                       <input
