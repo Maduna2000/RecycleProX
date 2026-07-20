@@ -428,7 +428,7 @@ function ManagePriceGroupModal({ groupId, onClose, onChanged }: {
         ) : (
           <>
             {/* Status + actions — merged into one row, actions far right */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '8px 12px', borderBottom: '1px solid #E0E0E0', flexShrink: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '5px 10px', borderBottom: '1px solid #E0E0E0', flexShrink: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
                 {group.isDefault && <Star style={{ width: 13, height: 13, color: colors.warning, fill: colors.warning, flexShrink: 0 }} />}
                 {group.description && <span style={{ fontSize: 11, color: '#6C757D' }}>{group.description}</span>}
@@ -464,7 +464,7 @@ function ManagePriceGroupModal({ groupId, onClose, onChanged }: {
                     return (
                       <>
                         <tr key={`cat-${cat}`}>
-                          <td colSpan={6} style={{ padding: '4px 10px', fontSize: 10, fontWeight: 700, color: '#6C757D', textTransform: 'uppercase', letterSpacing: '0.05em', background: '#F0F0F0', borderTop: '1px solid #E0E0E0', borderBottom: '1px solid #E0E0E0' }}>
+                          <td colSpan={6} style={{ padding: '2px 10px', fontSize: 10, fontWeight: 700, color: '#6C757D', textTransform: 'uppercase', letterSpacing: '0.05em', background: '#F0F0F0', borderTop: '1px solid #E0E0E0', borderBottom: '1px solid #E0E0E0' }}>
                             {cat}
                           </td>
                         </tr>
@@ -473,8 +473,8 @@ function ManagePriceGroupModal({ groupId, onClose, onChanged }: {
                           const isEnabled = ov?.enabled ?? false
                           const rowBg = isEnabled ? '#F0FAF4' : (i % 2 === 1 ? '#FAFAFA' : '#fff')
                           return (
-                            <tr key={p.id} style={{ background: rowBg, borderBottom: '1px solid #F0F0F0', height: 34 }}>
-                              <td style={{ ...TD, width: 50, textAlign: 'center' }}>
+                            <tr key={p.id} style={{ background: rowBg, borderBottom: '1px solid #F0F0F0', height: 30 }}>
+                              <td style={{ ...TD, padding: '2px 10px', width: 50, textAlign: 'center' }}>
                                 <input
                                   type="checkbox"
                                   checked={isEnabled}
@@ -486,13 +486,13 @@ function ManagePriceGroupModal({ groupId, onClose, onChanged }: {
                                   }}
                                 />
                               </td>
-                              <td style={TD}>
+                              <td style={{ ...TD, padding: '2px 10px' }}>
                                 <span style={{ fontWeight: 600 }}>{p.name}</span>
                                 <span style={{ fontSize: 10, color: '#6C757D', fontFamily: 'monospace', marginLeft: 6 }}>{p.code} · {p.unit}</span>
                               </td>
-                              <td style={{ ...TD, fontFamily: 'monospace', color: '#6C757D' }}>R {Number(p.defaultBuyPrice).toFixed(2)}</td>
-                              <td style={{ ...TD, fontFamily: 'monospace', color: '#6C757D' }}>R {Number(p.defaultSellPrice).toFixed(2)}</td>
-                              <td style={{ ...TD, width: 120 }}>
+                              <td style={{ ...TD, padding: '2px 10px', fontFamily: 'monospace', color: '#6C757D' }}>R {Number(p.defaultBuyPrice).toFixed(2)}</td>
+                              <td style={{ ...TD, padding: '2px 10px', fontFamily: 'monospace', color: '#6C757D' }}>R {Number(p.defaultSellPrice).toFixed(2)}</td>
+                              <td style={{ ...TD, padding: '2px 10px', width: 120 }}>
                                 {isEnabled ? (
                                   <Input
                                     value={ov?.buy ?? ''}
@@ -505,7 +505,7 @@ function ManagePriceGroupModal({ groupId, onClose, onChanged }: {
                                   <span style={{ fontSize: 11, color: '#C0C0C0', fontFamily: 'monospace' }}>—</span>
                                 )}
                               </td>
-                              <td style={{ ...TD, width: 120 }}>
+                              <td style={{ ...TD, padding: '2px 10px', width: 120 }}>
                                 {isEnabled ? (
                                   <Input
                                     value={ov?.sell ?? ''}
