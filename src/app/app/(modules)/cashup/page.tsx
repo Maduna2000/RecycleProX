@@ -15,15 +15,10 @@ import { colors } from '@/lib/design-tokens'
 import { useOfflineMutation } from '@/hooks/useOfflineFetch'
 import { ReportButton } from './_components/ReportButton'
 import { PreviousReportsModal } from './_components/PreviousReportsModal'
-import { LegacyBtn } from './_components/LegacyBtn'
+import { LegacyBtn } from '@/components/legacy/LegacyBtn'
+import { PANEL, PANEL_HEAD } from '@/components/legacy/legacyPanel'
+import { CARD_BORDER } from '@/components/rpx/styles'
 import { PortalPage, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
-import { BAR_GRAD, CARD_BORDER } from '@/components/rpx/styles'
-
-// ─── Legacy panel chrome — matches ContentCard/Dialog exactly (#B0B0B0
-// border, BAR_GRAD title strip) instead of the softer colors.border used
-// by generic content cards elsewhere. ─────────────────────────────────────
-const PANEL: React.CSSProperties = { border: CARD_BORDER, borderRadius: 3, overflow: 'hidden', background: '#fff' }
-const PANEL_HEAD: React.CSSProperties = { padding: '5px 10px', borderBottom: CARD_BORDER, background: BAR_GRAD }
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 

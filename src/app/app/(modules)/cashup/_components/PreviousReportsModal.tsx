@@ -9,7 +9,7 @@ import { colors } from '@/lib/design-tokens'
 import Decimal from 'decimal.js'
 import { CASHUP_REPORT_LABELS, type CashupReportType, CURRENCY_SYMBOLS } from '@/lib/schemas/cashup'
 import { RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
-import { LegacyBtn } from './LegacyBtn'
+import { LegacyBtn } from '@/components/legacy/LegacyBtn'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 

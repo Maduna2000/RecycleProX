@@ -13,7 +13,10 @@ import { Loader2, Calendar, PlusCircle, Undo2, ChevronLeft, ChevronRight } from 
 import Decimal from 'decimal.js'
 import { colors } from '@/lib/design-tokens'
 import { z } from 'zod'
-import { Btn, PortalPage, TH, TD, HEADER_GRAD } from '@/components/rpx'
+import { PortalPage, TH, TD, HEADER_GRAD } from '@/components/rpx'
+import { CARD_BORDER } from '@/components/rpx/styles'
+import { LegacyBtn } from '@/components/legacy/LegacyBtn'
+import { PANEL, PANEL_HEAD } from '@/components/legacy/legacyPanel'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -184,28 +187,31 @@ export default function FloatPage() {
   return (
     <PortalPage title="Cash Float">
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-      <div className="max-w-3xl mx-auto w-full space-y-5 pb-6" style={{ padding: '10px 10px 0' }}>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+      <div className="max-w-3xl mx-auto w-full space-y-2.5 pb-4" style={{ padding: '8px 8px 0' }}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
 
           {/* Today's float status + action forms */}
-          <div className="rounded border p-5 space-y-4 bg-white" style={{ borderColor: colors.border }}>
-            <h2 className="text-sm font-semibold" style={{ color: colors.textPrimary }}>Today&apos;s Float</h2>
+          <div style={PANEL}>
+            <div style={PANEL_HEAD}>
+              <span className="font-semibold text-sm" style={{ color: colors.textPrimary }}>Today&apos;s Float</span>
+            </div>
+            <div className="p-3">
 
             {loadingToday ? (
               <div className="flex items-center gap-2 text-sm" style={{ color: colors.textSecondary }}>
                 <Loader2 className="w-4 h-4 animate-spin" /> Loading…
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-2.5">
                 {/* Balance cards */}
-                <div className="px-4 py-3 rounded" style={{ background: colors.warningBg, border: `1px solid ${colors.warning}40` }}>
+                <div className="px-3 py-2.5" style={{ background: colors.warningBg, border: `1px solid ${colors.warning}40`, borderRadius: 3 }}>
                   {/* Opening Balance from Cashup (carry-forward from previous day) */}
                   <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: colors.textSecondary }}>Opening Balance</p>
                   <p className="font-mono font-bold mt-1" style={{ fontSize: 20, color: colors.textPrimary }}>
                     R {cashUpOpeningBalance?.toFixed(2) ?? '0.00'}
                   </p>
                   {/* Current Balance (Expected in Drawer) */}
-                  <p className="text-xs font-semibold uppercase tracking-wide mt-3" style={{ color: colors.action }}>Current Balance (Expected in Drawer)</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide mt-2.5" style={{ color: colors.action }}>Current Balance (Expected in Drawer)</p>
                   <p className="font-mono font-bold" style={{ fontSize: 20, color: colors.action }}>
                     R {calFloat?.toFixed(2) ?? '0.00'}
                   </p>
@@ -216,7 +222,7 @@ export default function FloatPage() {
 
                 {/* Top-up form */}
                 {isManager && (
-                  <div className="rounded p-4 space-y-3" style={{ background: colors.actionBg, border: `1px solid ${colors.action}30` }}>
+                  <div className="p-3 space-y-2" style={{ background: colors.actionBg, border: `1px solid ${colors.action}30`, borderRadius: 3 }}>
                     <div className="flex items-center gap-1.5">
                       <PlusCircle className="w-3.5 h-3.5" style={{ color: colors.action }} />
                       <p className="text-sm font-semibold" style={{ color: colors.action }}>Add Top-Up</p>
@@ -246,19 +252,20 @@ export default function FloatPage() {
                           placeholder="e.g. Additional cash from safe"
                         />
                       </div>
-                      <Btn type="submit" loading={saving} style={{ width: '100%', justifyContent: 'center' }}>
+                      <LegacyBtn type="submit" loading={saving} style={{ width: '100%', justifyContent: 'center' }}>
                         Add to Float
-                      </Btn>
+                      </LegacyBtn>
                     </form>
                   </div>
                 )}
               </div>
             )}
+            </div>
           </div>
 
           {/* History */}
-          <div className="rounded border bg-white" style={{ borderColor: colors.border }}>
-            <div className="flex items-center justify-between px-5 py-3" style={{ borderBottom: `1px solid ${colors.border}` }}>
+          <div style={PANEL}>
+            <div className="flex items-center justify-between" style={PANEL_HEAD}>
               <div className="flex items-center gap-2">
                 <Calendar className="w-4 h-4" style={{ color: colors.textSecondary }} />
                 <h2 className="text-sm font-semibold" style={{ color: colors.textPrimary }}>Float History</h2>
@@ -266,11 +273,11 @@ export default function FloatPage() {
             </div>
 
             {loadingHistory ? (
-              <div className="flex items-center gap-2 text-sm p-5" style={{ color: colors.textSecondary }}>
+              <div className="flex items-center gap-2 text-sm p-3" style={{ color: colors.textSecondary }}>
                 <Loader2 className="w-4 h-4 animate-spin" /> Loading…
               </div>
             ) : !history?.length ? (
-              <div className="text-center py-8 text-sm" style={{ color: colors.textSecondary }}>No float history</div>
+              <div className="text-center py-5 text-sm" style={{ color: colors.textSecondary }}>No float history</div>
             ) : (
               <>
                 <div className="overflow-x-auto">
@@ -311,16 +318,16 @@ export default function FloatPage() {
                 </div>
                 {/* Pagination */}
                 {history.length > HISTORY_PAGE_SIZE && (
-                  <div className="flex items-center justify-between px-4 py-2" style={{ borderTop: `1px solid ${colors.border}` }}>
+                  <div className="flex items-center justify-between px-3 py-1.5" style={{ borderTop: CARD_BORDER, background: colors.toolbar }}>
                     <span className="text-xs" style={{ color: colors.textSecondary }}>
                       Showing {(historyPage - 1) * HISTORY_PAGE_SIZE + 1}–{Math.min(historyPage * HISTORY_PAGE_SIZE, history.length)} of {history.length}
                     </span>
                     <div className="flex items-center gap-1">
-                      <Btn size="sm" icon={ChevronLeft} disabled={historyPage <= 1} onClick={() => setHistoryPage(p => p - 1)} />
+                      <LegacyBtn size="sm" icon={ChevronLeft} disabled={historyPage <= 1} onClick={() => setHistoryPage(p => p - 1)} />
                       <span className="text-xs px-2" style={{ color: colors.textPrimary }}>
                         Page {historyPage} of {Math.ceil(history.length / HISTORY_PAGE_SIZE)}
                       </span>
-                      <Btn
+                      <LegacyBtn
                         size="sm"
                         icon={ChevronRight}
                         disabled={historyPage >= Math.ceil(history.length / HISTORY_PAGE_SIZE)}
@@ -335,13 +342,13 @@ export default function FloatPage() {
         </div>
 
         {/* Today's Movements - always show */}
-        <div className="rounded border bg-white" style={{ borderColor: colors.border }}>
-          <div className="flex items-center justify-between px-5 py-3" style={{ borderBottom: `1px solid ${colors.border}` }}>
-            <h2 className="text-sm font-semibold" style={{ color: colors.textPrimary }}>Today&apos;s Float Movements</h2>
+        <div style={PANEL}>
+          <div className="flex items-center justify-between" style={PANEL_HEAD}>
+            <span className="font-semibold text-sm" style={{ color: colors.textPrimary }}>Today&apos;s Float Movements</span>
             <span className="text-xs" style={{ color: colors.textSecondary }}>{movements.length} movement{movements.length !== 1 ? 's' : ''}</span>
           </div>
           {movements.length === 0 ? (
-            <div className="text-center py-8 text-sm" style={{ color: colors.textSecondary }}>
+            <div className="text-center py-5 text-sm" style={{ color: colors.textSecondary }}>
               No float movements yet today
             </div>
           ) : (
@@ -399,9 +406,9 @@ export default function FloatPage() {
                         {isManager && (
                           <td style={{ padding: '6px 12px', textAlign: 'right' }}>
                             {isLastMovement && (
-                              <Btn size="sm" icon={Undo2} loading={reversingMovement} onClick={() => handleReverseMovement(m.id)}>
+                              <LegacyBtn size="sm" icon={Undo2} loading={reversingMovement} onClick={() => handleReverseMovement(m.id)}>
                                 Reverse
-                              </Btn>
+                              </LegacyBtn>
                             )}
                           </td>
                         )}

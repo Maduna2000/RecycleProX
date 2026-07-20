@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { FileText } from 'lucide-react'
 import { toast } from 'sonner'
 import type { CashupReportType } from '@/lib/schemas/cashup'
-import { LegacyBtn } from './LegacyBtn'
+import { LegacyBtn } from '@/components/legacy/LegacyBtn'
 
 interface ReportButtonProps {
   type: CashupReportType
