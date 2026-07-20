@@ -57,8 +57,10 @@ export async function GET(
       const cashUp = await getCashUp(id)
       if (!cashUp) throw new CashUpNotFoundForReportError()
 
-      // Only allow reports for submitted or approved sessions
-      if (!['submitted', 'approved'].includes(cashUp.status)) throw new CashUpNotReportableError()
+      // Reports are date-scoped queries, not a read of the finalized cashup
+      // totals, so they work for the currently-running (open) session too —
+      // only a voided session has no meaningful report to generate.
+      if (cashUp.status === 'voided') throw new CashUpNotReportableError()
 
       // Get settings for company info
       const settings = await getAllSettings()
@@ -100,7 +102,7 @@ export async function GET(
     }
     if (err instanceof CashUpNotReportableError) {
       return NextResponse.json(
-        { error: 'Reports only available for submitted or approved sessions' },
+        { error: 'Reports are not available for a voided session' },
         { status: 400 }
       )
     }

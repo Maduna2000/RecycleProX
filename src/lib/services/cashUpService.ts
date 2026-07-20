@@ -394,6 +394,7 @@ export async function getLiveStats(sessionDate: Date) {
     salesCardAgg,
     salesCardOnlyAgg,
     purchasesAgg,
+    transferredPurchasesAgg,
     paymentsAgg,
     loanTotals,
     expenses,
@@ -421,6 +422,12 @@ export async function getLiveStats(sessionDate: Date) {
     prisma.purchase.aggregate({
       _sum: { totalAmount: true },
       where: { paymentMethod: 'cash', status: 'completed', createdAt: { gte: start, lte: end } },
+    }),
+    // Transferred (EFT) purchases — matches the "Transferred Purchases" report's filter,
+    // exposed here so that report button can be greyed out when there's nothing to show.
+    prisma.purchase.aggregate({
+      _sum: { totalAmount: true },
+      where: { paymentMethod: 'eft', status: 'completed', createdAt: { gte: start, lte: end } },
     }),
     prisma.payment.aggregate({
       _sum: { amount: true },
@@ -457,6 +464,7 @@ export async function getLiveStats(sessionDate: Date) {
     cardSales:     new Decimal(salesCardAgg._sum.totalAmount?.toString()  ?? '0').toFixed(2),
     cardOnlySales: new Decimal(salesCardOnlyAgg._sum.totalAmount?.toString() ?? '0').toFixed(2),
     cashPurchases: new Decimal(purchasesAgg._sum.totalAmount?.toString()  ?? '0').toFixed(2),
+    transferredPurchases: new Decimal(transferredPurchasesAgg._sum.totalAmount?.toString() ?? '0').toFixed(2),
     cashPayments:  new Decimal(paymentsAgg._sum.amount?.toString()        ?? '0').toFixed(2),
     expenses:      expenses.toFixed(2),
     loanAdvance:   loanTotals.advanced,

@@ -15,7 +15,8 @@ import { colors } from '@/lib/design-tokens'
 import { useOfflineMutation } from '@/hooks/useOfflineFetch'
 import { ReportButton } from './_components/ReportButton'
 import { PreviousReportsModal } from './_components/PreviousReportsModal'
-import { Btn, PortalPage, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
+import { LegacyBtn } from './_components/LegacyBtn'
+import { PortalPage, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
 import { BAR_GRAD, CARD_BORDER } from '@/components/rpx/styles'
 
 // ─── Legacy panel chrome — matches ContentCard/Dialog exactly (#B0B0B0
@@ -58,6 +59,7 @@ type LiveStats = {
   cardSales:     string
   cardOnlySales: string
   cashPurchases: string
+  transferredPurchases: string
   cashPayments:  string
   expenses:      string
   loanAdvance:   string
@@ -315,15 +317,15 @@ function CountCashModal({ counts, setCounts, notes, setNotes, submitting, handle
         </div>
         </RpxDialogBody>
         <RpxDialogFooter>
-          <Btn onClick={onClose} disabled={submitting}>Cancel</Btn>
-          <Btn
+          <LegacyBtn onClick={onClose} disabled={submitting}>Cancel</LegacyBtn>
+          <LegacyBtn
             variant="primary"
             onClick={() => { void handleSubmit(); onClose() }}
             disabled={submitting || !hasCounted}
             loading={submitting}
           >
             Submit Cash-Up
-          </Btn>
+          </LegacyBtn>
         </RpxDialogFooter>
       </RpxDialogContent>
     </Dialog>
@@ -361,15 +363,15 @@ function ReasonModal({ title, message, confirmLabel, loading, onConfirm, onClose
           />
         </RpxDialogBody>
         <RpxDialogFooter>
-          <Btn onClick={onClose} disabled={loading}>Cancel</Btn>
-          <Btn
+          <LegacyBtn onClick={onClose} disabled={loading}>Cancel</LegacyBtn>
+          <LegacyBtn
             variant="danger"
             loading={loading}
             disabled={!reason.trim()}
             onClick={() => onConfirm(reason)}
           >
             {confirmLabel}
-          </Btn>
+          </LegacyBtn>
         </RpxDialogFooter>
       </RpxDialogContent>
     </Dialog>
@@ -514,15 +516,15 @@ function ManageSessionsModal({ sessions, onClose, onVoided, currencySymbol = 'R'
             {selected.size} session{selected.size !== 1 ? 's' : ''} selected
           </span>
           <div style={{ display: 'flex', gap: 8 }}>
-            <Btn onClick={onClose} disabled={voiding}>Cancel</Btn>
-            <Btn
+            <LegacyBtn onClick={onClose} disabled={voiding}>Cancel</LegacyBtn>
+            <LegacyBtn
               variant="danger"
               onClick={handleBulkVoid}
               disabled={voiding || selected.size === 0 || !voidReason.trim()}
               loading={voiding}
             >
               Void {selected.size} Session{selected.size !== 1 ? 's' : ''}
-            </Btn>
+            </LegacyBtn>
           </div>
         </RpxDialogFooter>
       </RpxDialogContent>
@@ -756,9 +758,9 @@ export default function CashUpPage() {
             <Clock className="w-9 h-9 mx-auto mb-2.5" style={{ color: colors.border }} />
             <p className="font-medium mb-1" style={{ color: colors.textPrimary }}>No session open for today</p>
             <p className="text-sm mb-4" style={{ color: colors.textSecondary }}>Open a session to begin tracking today&apos;s cash.</p>
-            <Btn loading={opening} onClick={handleOpen} style={{ margin: '0 auto' }}>
+            <LegacyBtn loading={opening} onClick={handleOpen} style={{ margin: '0 auto' }}>
               Open Session
-            </Btn>
+            </LegacyBtn>
             </div>
           </div>
         )}
@@ -784,13 +786,13 @@ export default function CashUpPage() {
                       : ' Count your cash and submit below, or void this session if you cannot reconcile.'}
                   </p>
                   <div className="flex gap-2 flex-wrap">
-                    <Btn size="sm" variant="danger" loading={voiding} onClick={() => setVoidReasonOpen(true)}>
+                    <LegacyBtn size="sm" variant="danger" loading={voiding} onClick={() => setVoidReasonOpen(true)}>
                       Void This Session
-                    </Btn>
+                    </LegacyBtn>
                     {openSessionsCount > 1 && (
-                      <Btn size="sm" onClick={() => setManageSessionsOpen(true)}>
+                      <LegacyBtn size="sm" onClick={() => setManageSessionsOpen(true)}>
                         Manage All {openSessionsCount} Sessions
-                      </Btn>
+                      </LegacyBtn>
                     )}
                     <span className="text-xs self-center" style={{ color: colors.textSecondary }}>
                       (Cannot reconcile? Void to skip this session)
@@ -854,6 +856,13 @@ export default function CashUpPage() {
               const finCum    = new Decimal(stats?.finPeriodCumulative ?? '0')
               const cardSalesLive = new Decimal(stats?.cardSales ?? '0')
               const nonCashAdvancedLive = new Decimal(stats?.nonCashAdvanced ?? '0')
+              // Live, date-scoped counts for this session — used to grey out a
+              // report button when there's nothing for it to report, regardless
+              // of whether the session is still open or already submitted.
+              const cardOnlySalesLive = new Decimal(stats?.cardOnlySales ?? '0')
+              const transferredPurchasesLive = new Decimal(stats?.transferredPurchases ?? '0')
+              const unpaidTodayCount = stats?.unpaidToday?.count ?? 0
+              const unpaidAllTimeCount = stats?.unpaidAllTime?.count ?? 0
 
               return (
                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-3">
@@ -906,14 +915,14 @@ export default function CashUpPage() {
                         <ReconRow label="Opening Balance" value={opening.toFixed(2)} positive currencySymbol={currSym} />
                         <ReconRow
                           label="Drawings Received (+)" value={draw.toFixed(2)} positive currencySymbol={currSym}
-                          action={cashUp && <ReportButton type="drawings-received" sessionId={cashUp.id} disabled={isOpen} />}
+                          action={cashUp && <ReportButton type="drawings-received" sessionId={cashUp.id} disabled={draw.isZero()} />}
                         />
                         <ReconRow label="Total Cash" value={totalCash.toFixed(2)} subtotal currencySymbol={currSym} />
 
                         <ReconRow
                           divider
                           label="Cash Received / Sales (+)" value={cashSales.toFixed(2)} positive currencySymbol={currSym}
-                          action={cashUp && <ReportButton type="cash-sales" sessionId={cashUp.id} disabled={isOpen} />}
+                          action={cashUp && <ReportButton type="cash-sales" sessionId={cashUp.id} disabled={cashSales.isZero()} />}
                         />
                         {isOpen && cardSalesLive.gt(0) && (
                           <ReconRow label="Card / EFT Sales (not in drawer)" value={cardSalesLive.toFixed(2)} muted currencySymbol={currSym} />
@@ -923,23 +932,23 @@ export default function CashUpPage() {
                         )}
                         <ReconRow
                           label="Cash Purchases (−)" value={cashPurch.toFixed(2)} negative currencySymbol={currSym}
-                          action={cashUp && <ReportButton type="cash-purchases" sessionId={cashUp.id} disabled={isOpen} />}
+                          action={cashUp && <ReportButton type="cash-purchases" sessionId={cashUp.id} disabled={cashPurch.isZero()} />}
                         />
                         <ReconRow
                           label="Account Payments (−)" value={cashPay.toFixed(2)} negative currencySymbol={currSym}
-                          action={cashUp && <ReportButton type="account-payments" sessionId={cashUp.id} disabled={isOpen} />}
+                          action={cashUp && <ReportButton type="account-payments" sessionId={cashUp.id} disabled={cashPay.isZero()} />}
                         />
                         <ReconRow
                           label="Expenses (−)" value={exp.toFixed(2)} negative currencySymbol={currSym}
-                          action={cashUp && <ReportButton type="expenses" sessionId={cashUp.id} disabled={isOpen} />}
+                          action={cashUp && <ReportButton type="expenses" sessionId={cashUp.id} disabled={exp.isZero()} />}
                         />
                         <ReconRow
                           label="Loan Advance (−)" value={loanAdv.toFixed(2)} negative currencySymbol={currSym}
-                          action={cashUp && <ReportButton type="loan-advances" sessionId={cashUp.id} disabled={isOpen} />}
+                          action={cashUp && <ReportButton type="loan-advances" sessionId={cashUp.id} disabled={loanAdv.isZero()} />}
                         />
                         <ReconRow
                           label="Loans Repayment (+)" value={loanRep.toFixed(2)} positive currencySymbol={currSym}
-                          action={cashUp && <ReportButton type="loan-repayments" sessionId={cashUp.id} disabled={isOpen} />}
+                          action={cashUp && <ReportButton type="loan-repayments" sessionId={cashUp.id} disabled={loanRep.isZero()} />}
                         />
 
                         <ReconRow divider label="Money Spent (−)" value={moneySpent.toFixed(2)} subtotal negative currencySymbol={currSym} />
@@ -950,9 +959,9 @@ export default function CashUpPage() {
                           divider
                           label="Cash On Hand (Counted)" value={declared.toFixed(2)} highlight currencySymbol={currSym}
                           action={isOpen && (
-                            <Btn size="sm" icon={Calculator} onClick={() => setCountCashOpen(true)} style={{ whiteSpace: 'nowrap', flexShrink: 0 }}>
+                            <LegacyBtn size="sm" icon={Calculator} onClick={() => setCountCashOpen(true)} style={{ whiteSpace: 'nowrap', flexShrink: 0 }}>
                               Count Cash
-                            </Btn>
+                            </LegacyBtn>
                           )}
                         />
                         {isOpen && !hasCounted ? (
@@ -1014,20 +1023,20 @@ export default function CashUpPage() {
                       <div className="flex justify-end gap-2" style={{ padding: '8px 10px', borderTop: CARD_BORDER, background: colors.toolbar }}>
                         {isManager ? (
                           <>
-                            <Btn size="sm" loading={voiding} onClick={() => setVoidReasonOpen(true)}>
+                            <LegacyBtn size="sm" loading={voiding} onClick={() => setVoidReasonOpen(true)}>
                               Void
-                            </Btn>
-                            <Btn
+                            </LegacyBtn>
+                            <LegacyBtn
                               size="sm"
                               variant="danger"
                               loading={rejecting}
                               onClick={() => setRejectReasonOpen(true)}
                             >
                               Reject — Send Back to Cashier
-                            </Btn>
-                            <Btn size="sm" icon={Lock} loading={approving} onClick={handleApprove}>
+                            </LegacyBtn>
+                            <LegacyBtn size="sm" icon={Lock} loading={approving} onClick={handleApprove}>
                               Approve Cash-Up
-                            </Btn>
+                            </LegacyBtn>
                           </>
                         ) : (
                           <p className="text-sm" style={{ color: colors.textSecondary }}>Awaiting manager approval</p>
@@ -1046,14 +1055,14 @@ export default function CashUpPage() {
                         value={`${currSym} ${new Decimal(stats?.unpaidToday?.total ?? '0').toFixed(2)}`}
                         valueColor={colors.danger}
                         sub={`${stats?.unpaidToday?.count ?? 0} purchase${(stats?.unpaidToday?.count ?? 0) !== 1 ? 's' : ''}`}
-                        action={<ReportButton type="unpaid-today" sessionId={cashUp.id} disabled={isOpen} />}
+                        action={<ReportButton type="unpaid-today" sessionId={cashUp.id} disabled={unpaidTodayCount === 0} />}
                       />
                       <StatTile
                         label="Total Unpaid"
                         value={`${currSym} ${new Decimal(stats?.unpaidAllTime?.total ?? '0').toFixed(2)}`}
                         valueColor={colors.danger}
                         sub={`${stats?.unpaidAllTime?.count ?? 0} purchase${(stats?.unpaidAllTime?.count ?? 0) !== 1 ? 's' : ''}`}
-                        action={<ReportButton type="unpaid-all" sessionId="" standalone />}
+                        action={<ReportButton type="unpaid-all" sessionId="" standalone disabled={unpaidAllTimeCount === 0} />}
                       />
                       {!isOpen && new Decimal(cashUp.cardPaymentsTotal ?? '0').gt(0) && (
                         <StatTile
@@ -1085,8 +1094,8 @@ export default function CashUpPage() {
                       </div>
                       <div>
                         {[
-                          { key: 'card-sales' as const, label: 'Card Sales' },
-                          { key: 'transferred-purchases' as const, label: 'Transferred Purchases' },
+                          { key: 'card-sales' as const, label: 'Card Sales', disabled: cardOnlySalesLive.isZero() },
+                          { key: 'transferred-purchases' as const, label: 'Transferred Purchases', disabled: transferredPurchasesLive.isZero() },
                         ].map((r, i) => (
                           <div
                             key={r.key}
@@ -1094,14 +1103,14 @@ export default function CashUpPage() {
                             style={{ padding: '5px 10px', borderTop: i > 0 ? '1px solid #E8E8E8' : undefined }}
                           >
                             <span style={{ fontSize: 12, color: colors.textPrimary }}>{r.label}</span>
-                            <ReportButton type={r.key} sessionId={cashUp.id} disabled={isOpen} />
+                            <ReportButton type={r.key} sessionId={cashUp.id} disabled={r.disabled} />
                           </div>
                         ))}
                         <div className="flex items-center justify-between" style={{ padding: '5px 10px', borderTop: '1px solid #E8E8E8' }}>
                           <span style={{ fontSize: 12, color: colors.textPrimary }}>Previous Reports</span>
-                          <Btn size="sm" icon={FolderOpen} onClick={() => setPreviousReportsOpen(true)}>
+                          <LegacyBtn size="sm" icon={FolderOpen} onClick={() => setPreviousReportsOpen(true)}>
                             Browse
-                          </Btn>
+                          </LegacyBtn>
                         </div>
                       </div>
                     </div>

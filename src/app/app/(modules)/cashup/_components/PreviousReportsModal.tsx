@@ -8,7 +8,8 @@ import { Dialog } from '@/components/ui/dialog'
 import { colors } from '@/lib/design-tokens'
 import Decimal from 'decimal.js'
 import { CASHUP_REPORT_LABELS, type CashupReportType, CURRENCY_SYMBOLS } from '@/lib/schemas/cashup'
-import { Btn, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
+import { RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
+import { LegacyBtn } from './LegacyBtn'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -306,17 +307,17 @@ export function PreviousReportsModal({ onClose }: PreviousReportsModalProps) {
               : 'Select a session to view reports'}
           </span>
           <div style={{ display: 'flex', gap: 8 }}>
-            <Btn onClick={onClose} disabled={downloading}>
+            <LegacyBtn onClick={onClose} disabled={downloading}>
               Cancel
-            </Btn>
-            <Btn
+            </LegacyBtn>
+            <LegacyBtn
               variant="primary"
               onClick={handleDownload}
               disabled={!selectedSession || selectedReports.size === 0 || downloading}
               loading={downloading}
             >
               Download {selectedReports.size > 0 ? `(${selectedReports.size})` : ''}
-            </Btn>
+            </LegacyBtn>
           </div>
         </RpxDialogFooter>
       </RpxDialogContent>
