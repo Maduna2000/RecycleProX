@@ -10,7 +10,6 @@ import useSWR from 'swr'
  *   /app/purchases/abc123 → "PUR-2025-001234"
  *   /app/customers/xyz789 → "John Smith"
  *   /app/sales/def456 → "SAL-2025-000789"
- *   /app/price-groups/ghi012 → "Premium Dealers"
  */
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
@@ -65,16 +64,6 @@ const ROUTE_PATTERNS: RoutePattern[] = [
     },
     fallbackLabel: 'Expense',
     parentLabel: 'Expenses',
-  },
-  {
-    prefix: '/app/price-groups/',
-    apiPath: (id) => `/api/price-groups/${id}`,
-    extractTitle: (data) => {
-      const d = data as { name?: string } | null
-      return d?.name ?? null
-    },
-    fallbackLabel: 'Price Group',
-    parentLabel: 'Price Groups',
   },
   {
     prefix: '/app/stocktake/',
