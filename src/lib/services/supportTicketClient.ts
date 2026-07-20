@@ -72,3 +72,33 @@ export async function fileTicket(
   const data = await res.json()
   return data.ticket
 }
+
+export async function replyToTicket(
+  companySlug: string,
+  ticketId: string,
+  message: string,
+): Promise<SupportTicketMessage> {
+  const baseUrl = process.env.RENOVO_PORTAL_BASE_URL
+  const secret = process.env.INTERNAL_API_SHARED_SECRET
+  if (!baseUrl || !secret) {
+    throw new SupportTicketClientError('RENOVO_PORTAL_BASE_URL / INTERNAL_API_SHARED_SECRET not configured')
+  }
+
+  const res = await fetch(
+    `${baseUrl}/api/internal/companies/by-slug/${companySlug}/support-tickets/${ticketId}/reply`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-internal-secret': secret },
+      body: JSON.stringify({ message }),
+    },
+  )
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => '')
+    logger.warn({ status: res.status, body, companySlug, ticketId }, 'Reply to support ticket failed')
+    throw new SupportTicketClientError(`Reply failed with status ${res.status}`)
+  }
+
+  const data = await res.json()
+  return data.reply
+}

@@ -7,3 +7,9 @@ export const FileSupportTicketSchema = z.object({
 })
 
 export type FileSupportTicketInput = z.infer<typeof FileSupportTicketSchema>
+
+export const ReplySupportTicketSchema = z.object({
+  message: z.string().min(1),
+})
+
+export type ReplySupportTicketInput = z.infer<typeof ReplySupportTicketSchema>

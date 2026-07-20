@@ -325,6 +325,7 @@ type AppStatus =
   | 'completed' | 'pending' | 'voided'
   | 'settled' | 'approved' | 'submitted' | 'open'
   | 'blacklisted' | 'locked'
+  | 'in_progress' | 'waiting_for_customer' | 'resolved' | 'closed'
 
 interface StatusStyle {
   color:      string
@@ -341,12 +342,16 @@ const STATUS_MAP: Record<AppStatus, StatusStyle> = {
   pending:     { color: colors.warning,   background: colors.warningBg,  label: 'Pending' },
   submitted:   { color: colors.warning,   background: colors.warningBg,  label: 'Submitted' },
   open:        { color: colors.process,   background: colors.processBg,  label: 'Open' },
+  in_progress: { color: colors.process,   background: colors.processBg,  label: 'In Progress' },
+  waiting_for_customer: { color: colors.warning, background: colors.warningBg, label: 'Awaiting Your Reply' },
+  resolved:    { color: colors.action,    background: colors.actionBg,   label: 'Resolved' },
 
   voided:      { color: colors.danger,    background: colors.dangerBg,   label: 'Voided' },
   blacklisted: { color: colors.danger,    background: colors.dangerBg,   label: 'Blacklisted' },
   locked:      { color: colors.danger,    background: colors.dangerBg,   label: 'Locked' },
 
   inactive:    { color: colors.textSecondary, background: colors.neutralBg, label: 'Inactive' },
+  closed:      { color: colors.textSecondary, background: colors.neutralBg, label: 'Closed' },
 }
 
 /**

@@ -133,6 +133,11 @@ function useToolbarButtons(pathname: string, role: string): ToolbarButton[] {
       { label: 'Users',    icon: Users,    href: '/app/settings/users',           variant: 'secondary' },
     ]
 
+  if (pathname === '/app/support' || pathname.startsWith('/app/support/'))
+    return isAdmin ? [
+      { label: 'New Ticket', icon: Plus, href: '/app/support?new=1', variant: 'primary' },
+    ] : []
+
   return []
 }
 
