@@ -16,6 +16,13 @@ import { useOfflineMutation } from '@/hooks/useOfflineFetch'
 import { ReportButton } from './_components/ReportButton'
 import { PreviousReportsModal } from './_components/PreviousReportsModal'
 import { Btn, PortalPage, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
+import { BAR_GRAD, CARD_BORDER } from '@/components/rpx/styles'
+
+// ─── Legacy panel chrome — matches ContentCard/Dialog exactly (#B0B0B0
+// border, BAR_GRAD title strip) instead of the softer colors.border used
+// by generic content cards elsewhere. ─────────────────────────────────────
+const PANEL: React.CSSProperties = { border: CARD_BORDER, borderRadius: 3, overflow: 'hidden', background: '#fff' }
+const PANEL_HEAD: React.CSSProperties = { padding: '5px 10px', borderBottom: CARD_BORDER, background: BAR_GRAD }
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -69,26 +76,32 @@ type ExpenseItem = {
 }
 
 
-// ─── Reconciliation row ───────────────────────────────────────────────────────
+// ─── Ledger row — a dense table row in the reconciliation grid ───────────────
 // positive = green. negative = neutral text with "−" prefix (NOT red — deductions are expected).
 // Red is reserved only for the VarianceRow when cash is short.
-function ReconRow({ label, value, positive, negative, highlight, muted, subtotal, currencySymbol = 'R' }: {
+function ReconRow({ label, value, positive, negative, highlight, muted, subtotal, currencySymbol = 'R', action, divider }: {
   label: string; value: string | undefined
   positive?: boolean; negative?: boolean; highlight?: boolean; muted?: boolean; subtotal?: boolean
   currencySymbol?: string
+  /** Optional report-download button rendered in its own narrow trailing cell. */
+  action?: React.ReactNode
+  /** Draws a heavier rule above this row to mark a new section. */
+  divider?: boolean
 }) {
   const n = new Decimal(value ?? '0')
   const valueColor = positive && !n.isZero() ? colors.action
                    : muted                    ? colors.textSecondary
                    : colors.textPrimary
   return (
-    <div className={`flex justify-between text-sm ${highlight || subtotal ? 'font-semibold' : ''} ${subtotal ? 'py-1 px-2 rounded' : ''}`}
-      style={subtotal ? { background: colors.toolbar } : undefined}>
-      <span style={{ color: muted ? colors.textSecondary : colors.textSecondary }}>{label}</span>
-      <span className="font-mono" style={{ color: valueColor }}>
+    <tr style={{ background: subtotal ? colors.toolbar : undefined, borderTop: divider ? '2px solid #B0B0B0' : '1px solid #E8E8E8' }}>
+      <td style={{ height: 24, padding: '2px 8px', fontSize: 12, fontWeight: highlight || subtotal ? 600 : 400, color: colors.textSecondary }}>
+        {label}
+      </td>
+      <td className="font-mono text-right" style={{ padding: '2px 8px', fontSize: 12, fontWeight: highlight || subtotal ? 600 : 400, color: valueColor, whiteSpace: 'nowrap' }}>
         {negative && !n.isZero() ? '−' : ''}{currencySymbol} {n.abs().toFixed(2)}
-      </span>
-    </div>
+      </td>
+      <td style={{ width: 1, padding: action ? '2px 6px 2px 0' : 0 }}>{action}</td>
+    </tr>
   )
 }
 
@@ -101,10 +114,15 @@ function VarianceRow({ variance, currencySymbol = 'R' }: { variance: string; cur
     ? { background: colors.processBg, color: colors.process }
     : { background: colors.dangerBg,  color: colors.danger  }
   return (
-    <div className="flex justify-between font-semibold rounded px-2 py-1.5 text-sm" style={style}>
-      <span>Balance (Variance)</span>
-      <span className="font-mono">{v.gt(0) ? '+' : ''}{currencySymbol} {v.toFixed(2)}</span>
-    </div>
+    <tr style={{ borderTop: '2px solid #B0B0B0' }}>
+      <td colSpan={2} style={{ padding: 0 }}>
+        <div className="flex justify-between font-semibold px-2 py-1.5 text-sm" style={style}>
+          <span>Balance (Variance)</span>
+          <span className="font-mono">{v.gt(0) ? '+' : ''}{currencySymbol} {v.toFixed(2)}</span>
+        </div>
+      </td>
+      <td style={{ width: 1 }} />
+    </tr>
   )
 }
 
@@ -512,31 +530,19 @@ function ManageSessionsModal({ sessions, onClose, onVoided, currencySymbol = 'R'
   )
 }
 
-// ─── Compact unpaid card ──────────────────────────────────────────────────────
-function UnpaidCard({ label, total, count, sessionId, reportType, disabled = false, standalone = false, currencySymbol = 'R' }: {
-  label: string
-  total: string
-  count: number
-  sessionId?: string
-  reportType: 'unpaid-today' | 'unpaid-all'
-  disabled?: boolean
-  standalone?: boolean
-  currencySymbol?: string
+// ─── Stat tile — compact KPI-style panel, sits 2-up in a grid ─────────────────
+function StatTile({ label, value, sub, valueColor, action }: {
+  label: string; value: string; sub?: string; valueColor?: string; action?: React.ReactNode
 }) {
   return (
-    <div className="rounded border bg-white overflow-hidden" style={{ borderColor: colors.border }}>
-      <div className="flex items-center justify-between" style={{ padding: '6px 12px', borderBottom: `1px solid ${colors.border}`, background: 'linear-gradient(180deg, #EAEAEA 0%, #D4D4D4 100%)' }}>
-        <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: colors.textSecondary }}>{label}</span>
-        <ReportButton
-          type={reportType}
-          sessionId={sessionId ?? ''}
-          disabled={disabled}
-          standalone={standalone}
-        />
+    <div style={PANEL}>
+      <div className="flex items-center justify-between" style={{ ...PANEL_HEAD, padding: '4px 8px' }}>
+        <span className="text-[10px] font-semibold uppercase tracking-wide truncate" style={{ color: colors.textSecondary }}>{label}</span>
+        {action}
       </div>
-      <div className="p-3">
-        <p className="font-mono font-bold text-base" style={{ color: colors.danger }}>{currencySymbol} {new Decimal(total).toFixed(2)}</p>
-        <p className="text-xs mt-0.5" style={{ color: colors.textSecondary }}>{count} purchase{count !== 1 ? 's' : ''}</p>
+      <div style={{ padding: '6px 8px' }}>
+        <p className="font-mono font-bold text-sm truncate" style={{ color: valueColor ?? colors.textPrimary }}>{value}</p>
+        {sub && <p className="text-[10px] mt-0.5 truncate" style={{ color: colors.textSecondary }}>{sub}</p>}
       </div>
     </div>
   )
@@ -738,18 +744,18 @@ export default function CashUpPage() {
   return (
     <PortalPage title="Cash-Up">
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-      <div className="max-w-6xl mx-auto w-full space-y-4 pb-6" style={{ padding: '10px 10px 0' }}>
+      <div className="max-w-6xl mx-auto w-full space-y-2.5 pb-4" style={{ padding: '8px 8px 0' }}>
 
         {/* No session */}
         {!cashUp && (
-          <div className="rounded border bg-white overflow-hidden" style={{ borderColor: colors.border }}>
-            <div style={{ padding: '6px 12px', borderBottom: `1px solid ${colors.border}`, background: 'linear-gradient(180deg, #EAEAEA 0%, #D4D4D4 100%)' }}>
+          <div style={PANEL}>
+            <div style={PANEL_HEAD}>
               <span className="font-semibold text-sm" style={{ color: colors.textPrimary }}>Today&apos;s Session</span>
             </div>
-            <div className="p-8 text-center">
-            <Clock className="w-10 h-10 mx-auto mb-3" style={{ color: colors.border }} />
+            <div className="p-6 text-center">
+            <Clock className="w-9 h-9 mx-auto mb-2.5" style={{ color: colors.border }} />
             <p className="font-medium mb-1" style={{ color: colors.textPrimary }}>No session open for today</p>
-            <p className="text-sm mb-5" style={{ color: colors.textSecondary }}>Open a session to begin tracking today&apos;s cash.</p>
+            <p className="text-sm mb-4" style={{ color: colors.textSecondary }}>Open a session to begin tracking today&apos;s cash.</p>
             <Btn loading={opening} onClick={handleOpen} style={{ margin: '0 auto' }}>
               Open Session
             </Btn>
@@ -761,8 +767,8 @@ export default function CashUpPage() {
           <>
             {/* Previous day warning — must submit before starting new day */}
             {cashUp.status === 'open' && sessionDate !== todayISO && (
-              <div className="rounded border overflow-hidden" style={{ borderColor: colors.danger, background: colors.dangerBg }}>
-                <div className="px-4 py-3">
+              <div style={{ border: `1px solid ${colors.danger}`, borderRadius: 3, overflow: 'hidden', background: colors.dangerBg }}>
+                <div className="px-3 py-2.5">
                   <p className="font-semibold text-sm mb-1" style={{ color: colors.danger }}>
                     ⚠ Previous Day&apos;s Cash-Up Not Submitted
                     {openSessionsCount > 1 && (
@@ -850,166 +856,134 @@ export default function CashUpPage() {
               const nonCashAdvancedLive = new Decimal(stats?.nonCashAdvanced ?? '0')
 
               return (
-                <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+                <div className="grid grid-cols-1 lg:grid-cols-5 gap-3">
 
-                  {/* ── LEFT: reconciliation numbers (always compact) ─────────── */}
-                  <div className="lg:col-span-3 rounded border bg-white overflow-hidden" style={{ borderColor: colors.border }}>
-                    <div style={{ padding: '6px 12px', borderBottom: `1px solid ${colors.border}`, background: 'linear-gradient(180deg, #EAEAEA 0%, #D4D4D4 100%)' }}>
+                  {/* ── LEFT: reconciliation ledger (always compact) ─────────── */}
+                  <div className="lg:col-span-3" style={PANEL}>
+                    <div style={PANEL_HEAD}>
                       <span className="font-semibold text-sm" style={{ color: colors.textPrimary }}>
                         {isOpen ? 'Reconciliation (Live)' : 'Reconciliation'}
                       </span>
                     </div>
-                    <div className="p-4 space-y-1.5">
 
-                    {/* Currency selector - first field */}
-                    <div className="flex justify-between items-center text-sm pb-1.5 mb-1.5 border-b" style={{ borderColor: colors.border }}>
-                      <span style={{ color: colors.textSecondary }}>Currency</span>
-                      {isOpen ? (
-                        <select
-                          value={cashUp.currency ?? 'ZAR'}
-                          onChange={(e) => handleCurrencyChange(e.target.value as Currency)}
-                          style={{
-                            fontSize: 12,
-                            padding: '2px 6px',
-                            border: `1px solid ${colors.border}`,
-                            borderRadius: 2,
-                            background: '#fff',
-                            fontFamily: 'monospace',
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                          }}
-                        >
-                          <option value="ZAR">R - South African Rand</option>
-                          <option value="SZL">E - Eswatini Lilangeni</option>
-                        </select>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono font-semibold" style={{ color: colors.textPrimary }}>
-                            {CURRENCY_SYMBOLS[cashUp.currency ?? 'ZAR']}
-                          </span>
-                          <span className="text-xs" style={{ color: colors.textSecondary }}>
-                            ({CURRENCY_LABELS[cashUp.currency ?? 'ZAR']})
-                          </span>
-                        </div>
-                      )}
-                    </div>
+                    <table className="w-full" style={{ borderCollapse: 'collapse' }}>
+                      <tbody>
+                        {/* Currency selector — first row */}
+                        <tr style={{ borderBottom: '2px solid #B0B0B0' }}>
+                          <td style={{ height: 26, padding: '2px 8px', fontSize: 12, color: colors.textSecondary }}>Currency</td>
+                          <td colSpan={2} style={{ padding: '2px 8px', textAlign: 'right' }}>
+                            {isOpen ? (
+                              <select
+                                value={cashUp.currency ?? 'ZAR'}
+                                onChange={(e) => handleCurrencyChange(e.target.value as Currency)}
+                                style={{
+                                  fontSize: 12,
+                                  padding: '2px 6px',
+                                  border: `1px solid ${colors.border}`,
+                                  borderRadius: 2,
+                                  background: '#fff',
+                                  fontFamily: 'monospace',
+                                  fontWeight: 600,
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                <option value="ZAR">R - South African Rand</option>
+                                <option value="SZL">E - Eswatini Lilangeni</option>
+                              </select>
+                            ) : (
+                              <span className="inline-flex items-center gap-2">
+                                <span className="font-mono font-semibold" style={{ color: colors.textPrimary }}>
+                                  {CURRENCY_SYMBOLS[cashUp.currency ?? 'ZAR']}
+                                </span>
+                                <span className="text-xs" style={{ color: colors.textSecondary }}>
+                                  ({CURRENCY_LABELS[cashUp.currency ?? 'ZAR']})
+                                </span>
+                              </span>
+                            )}
+                          </td>
+                        </tr>
 
-                    {/* Opening + Drawings */}
-                    <ReconRow label="Opening Balance" value={opening.toFixed(2)} positive currencySymbol={currSym} />
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1">
-                        <ReconRow label="Drawings Received (+)" value={draw.toFixed(2)} positive currencySymbol={currSym} />
-                      </div>
-                      {cashUp && (
-                        <ReportButton type="drawings-received" sessionId={cashUp.id} disabled={isOpen} />
-                      )}
-                    </div>
-                    <ReconRow label="Total Cash" value={totalCash.toFixed(2)} subtotal currencySymbol={currSym} />
+                        <ReconRow label="Opening Balance" value={opening.toFixed(2)} positive currencySymbol={currSym} />
+                        <ReconRow
+                          label="Drawings Received (+)" value={draw.toFixed(2)} positive currencySymbol={currSym}
+                          action={cashUp && <ReportButton type="drawings-received" sessionId={cashUp.id} disabled={isOpen} />}
+                        />
+                        <ReconRow label="Total Cash" value={totalCash.toFixed(2)} subtotal currencySymbol={currSym} />
 
-                    {/* Transaction rows */}
-                    <div className="pt-1 space-y-1 border-t" style={{ borderColor: colors.border }}>
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1">
-                          <ReconRow label="Cash Received / Sales (+)" value={cashSales.toFixed(2)} positive currencySymbol={currSym} />
-                        </div>
-                        {cashUp && (
-                          <ReportButton type="cash-sales" sessionId={cashUp.id} disabled={isOpen} />
+                        <ReconRow
+                          divider
+                          label="Cash Received / Sales (+)" value={cashSales.toFixed(2)} positive currencySymbol={currSym}
+                          action={cashUp && <ReportButton type="cash-sales" sessionId={cashUp.id} disabled={isOpen} />}
+                        />
+                        {isOpen && cardSalesLive.gt(0) && (
+                          <ReconRow label="Card / EFT Sales (not in drawer)" value={cardSalesLive.toFixed(2)} muted currencySymbol={currSym} />
                         )}
-                      </div>
-                      {isOpen && cardSalesLive.gt(0) && (
-                        <ReconRow label="Card / EFT Sales (not in drawer)" value={cardSalesLive.toFixed(2)} muted currencySymbol={currSym} />
-                      )}
-                      {isOpen && nonCashAdvancedLive.gt(0) && (
-                        <ReconRow label="Non-Cash Loan Advances (excluded)" value={nonCashAdvancedLive.toFixed(2)} muted currencySymbol={currSym} />
-                      )}
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1">
-                          <ReconRow label="Cash Purchases (−)" value={cashPurch.toFixed(2)} negative currencySymbol={currSym} />
-                        </div>
-                        {cashUp && (
-                          <ReportButton type="cash-purchases" sessionId={cashUp.id} disabled={isOpen} />
+                        {isOpen && nonCashAdvancedLive.gt(0) && (
+                          <ReconRow label="Non-Cash Loan Advances (excluded)" value={nonCashAdvancedLive.toFixed(2)} muted currencySymbol={currSym} />
                         )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1">
-                          <ReconRow label="Account Payments (−)" value={cashPay.toFixed(2)} negative currencySymbol={currSym} />
-                        </div>
-                        {cashUp && (
-                          <ReportButton type="account-payments" sessionId={cashUp.id} disabled={isOpen} />
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1">
-                          <ReconRow label="Expenses (−)" value={exp.toFixed(2)} negative currencySymbol={currSym} />
-                        </div>
-                        {cashUp && (
-                          <ReportButton type="expenses" sessionId={cashUp.id} disabled={isOpen} />
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1">
-                          <ReconRow label="Loan Advance (−)" value={loanAdv.toFixed(2)} negative currencySymbol={currSym} />
-                        </div>
-                        {cashUp && (
-                          <ReportButton type="loan-advances" sessionId={cashUp.id} disabled={isOpen} />
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1">
-                          <ReconRow label="Loans Repayment (+)" value={loanRep.toFixed(2)} positive currencySymbol={currSym} />
-                        </div>
-                        {cashUp && (
-                          <ReportButton type="loan-repayments" sessionId={cashUp.id} disabled={isOpen} />
-                        )}
-                      </div>
-                    </div>
+                        <ReconRow
+                          label="Cash Purchases (−)" value={cashPurch.toFixed(2)} negative currencySymbol={currSym}
+                          action={cashUp && <ReportButton type="cash-purchases" sessionId={cashUp.id} disabled={isOpen} />}
+                        />
+                        <ReconRow
+                          label="Account Payments (−)" value={cashPay.toFixed(2)} negative currencySymbol={currSym}
+                          action={cashUp && <ReportButton type="account-payments" sessionId={cashUp.id} disabled={isOpen} />}
+                        />
+                        <ReconRow
+                          label="Expenses (−)" value={exp.toFixed(2)} negative currencySymbol={currSym}
+                          action={cashUp && <ReportButton type="expenses" sessionId={cashUp.id} disabled={isOpen} />}
+                        />
+                        <ReconRow
+                          label="Loan Advance (−)" value={loanAdv.toFixed(2)} negative currencySymbol={currSym}
+                          action={cashUp && <ReportButton type="loan-advances" sessionId={cashUp.id} disabled={isOpen} />}
+                        />
+                        <ReconRow
+                          label="Loans Repayment (+)" value={loanRep.toFixed(2)} positive currencySymbol={currSym}
+                          action={cashUp && <ReportButton type="loan-repayments" sessionId={cashUp.id} disabled={isOpen} />}
+                        />
 
-                    {/* Money Spent & Net Cash summary */}
-                    <div className="pt-1 mt-1 border-t" style={{ borderColor: colors.border }}>
-                      <ReconRow label="Money Spent (−)" value={moneySpent.toFixed(2)} subtotal negative currencySymbol={currSym} />
-                      <ReconRow label="Net Cash" value={netCash.toFixed(2)} subtotal currencySymbol={currSym} />
-                    </div>
+                        <ReconRow divider label="Money Spent (−)" value={moneySpent.toFixed(2)} subtotal negative currencySymbol={currSym} />
+                        <ReconRow label="Net Cash" value={netCash.toFixed(2)} subtotal currencySymbol={currSym} />
+                        <ReconRow divider label="Cal Float (Expected in Drawer)" value={calFloat.toFixed(2)} subtotal currencySymbol={currSym} />
 
-                    {/* Expected float */}
-                    <ReconRow label="Cal Float (Expected in Drawer)" value={calFloat.toFixed(2)} subtotal currencySymbol={currSym} />
-
-                    {/* Cash counted + variance */}
-                    <div className="pt-1.5 border-t space-y-1.5" style={{ borderColor: colors.border }}>
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1">
-                          <ReconRow label="Cash On Hand (Counted)" value={declared.toFixed(2)} highlight currencySymbol={currSym} />
-                        </div>
-                        {isOpen && (
-                          <Btn size="sm" icon={Calculator} onClick={() => setCountCashOpen(true)} style={{ whiteSpace: 'nowrap', flexShrink: 0 }}>
-                            Count Cash
-                          </Btn>
-                        )}
-                      </div>
-                      {isOpen ? (
-                        hasCounted ? (
-                          <VarianceRow variance={balance.toFixed(2)} currencySymbol={currSym} />
+                        <ReconRow
+                          divider
+                          label="Cash On Hand (Counted)" value={declared.toFixed(2)} highlight currencySymbol={currSym}
+                          action={isOpen && (
+                            <Btn size="sm" icon={Calculator} onClick={() => setCountCashOpen(true)} style={{ whiteSpace: 'nowrap', flexShrink: 0 }}>
+                              Count Cash
+                            </Btn>
+                          )}
+                        />
+                        {isOpen && !hasCounted ? (
+                          <tr>
+                            <td colSpan={2} style={{ padding: 0 }}>
+                              <div className="flex justify-between items-center px-2 py-1.5 text-sm" style={{ background: colors.toolbar }}>
+                                <span style={{ color: colors.textSecondary }}>Balance (Variance)</span>
+                                <span className="text-xs italic" style={{ color: colors.textSecondary }}>Count cash to see</span>
+                              </div>
+                            </td>
+                            <td style={{ width: 1 }} />
+                          </tr>
                         ) : (
-                          <div className="flex justify-between items-center rounded px-2 py-1.5 text-sm" style={{ background: colors.toolbar }}>
-                            <span style={{ color: colors.textSecondary }}>Balance (Variance)</span>
-                            <span className="text-xs italic" style={{ color: colors.textSecondary }}>Count cash to see</span>
-                          </div>
-                        )
-                      ) : (
-                        <VarianceRow variance={balance.toFixed(2)} currencySymbol={currSym} />
-                      )}
-                    </div>
+                          <VarianceRow variance={balance.toFixed(2)} currencySymbol={currSym} />
+                        )}
 
-                    {/* Fin Period Cumulative */}
-                    <div className="pt-1.5 border-t flex justify-between text-sm font-medium" style={{ borderColor: colors.border }}>
-                      <span style={{ color: colors.textSecondary }}>Fin Period Cumulative Balance</span>
-                      <span className="font-mono" style={{ color: finCum.isZero() ? colors.textSecondary : finCum.gte(0) ? colors.process : colors.danger }}>
-                        {finCum.gt(0) ? '+' : ''}{currSym} {finCum.toFixed(2)}
-                      </span>
-                    </div>
+                        <tr style={{ borderTop: '2px solid #B0B0B0' }}>
+                          <td style={{ height: 26, padding: '2px 8px', fontSize: 12, fontWeight: 500, color: colors.textSecondary }}>
+                            Fin Period Cumulative Balance
+                          </td>
+                          <td className="font-mono text-right" style={{ padding: '2px 8px', fontSize: 12, fontWeight: 500, color: finCum.isZero() ? colors.textSecondary : finCum.gte(0) ? colors.process : colors.danger, whiteSpace: 'nowrap' }}>
+                            {finCum.gt(0) ? '+' : ''}{currSym} {finCum.toFixed(2)}
+                          </td>
+                          <td style={{ width: 1 }} />
+                        </tr>
+                      </tbody>
+                    </table>
 
                     {/* Submitted denomination breakdown (not open) */}
                     {cashUp.status !== 'open' && cashUp.denominations && Object.keys(cashUp.denominations).length > 0 && (
-                      <div className="pt-2 border-t" style={{ borderColor: colors.border }}>
+                      <div style={{ padding: '8px 10px', borderTop: CARD_BORDER }}>
                         <p className="text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: colors.textSecondary }}>Denomination Breakdown</p>
                         <div className="grid grid-cols-3 gap-x-3 gap-y-1">
                           {DENOMINATIONS.map((d) => {
@@ -1030,14 +1004,14 @@ export default function CashUpPage() {
 
                     {/* Notes (submitted/approved) */}
                     {cashUp.status !== 'open' && cashUp.notes && (
-                      <p className="pt-1.5 border-t text-sm italic" style={{ borderColor: colors.border, color: colors.textSecondary }}>
+                      <p className="text-sm italic" style={{ padding: '8px 10px', borderTop: CARD_BORDER, color: colors.textSecondary }}>
                         &quot;{cashUp.notes}&quot;
                       </p>
                     )}
 
                     {/* Approve / Reject / Void buttons */}
                     {cashUp.status === 'submitted' && (
-                      <div className="pt-2 border-t flex justify-end gap-2" style={{ borderColor: colors.border }}>
+                      <div className="flex justify-end gap-2" style={{ padding: '8px 10px', borderTop: CARD_BORDER, background: colors.toolbar }}>
                         {isManager ? (
                           <>
                             <Btn size="sm" loading={voiding} onClick={() => setVoidReasonOpen(true)}>
@@ -1060,103 +1034,97 @@ export default function CashUpPage() {
                         )}
                       </div>
                     )}
-                    </div>
                   </div>
 
                   {/* ── RIGHT: denomination count (open) + panels ────────────── */}
-                  <div className="lg:col-span-2 flex flex-col gap-3">
+                  <div className="lg:col-span-2 flex flex-col gap-2.5">
 
-                    {/* Unpaid cards */}
-                    <UnpaidCard
-                      label="Today Unpaid Cash"
-                      total={stats?.unpaidToday?.total ?? '0'}
-                      count={stats?.unpaidToday?.count ?? 0}
-                      sessionId={cashUp.id}
-                      reportType="unpaid-today"
-                      disabled={isOpen}
-                      currencySymbol={currSym}
-                    />
-                    <UnpaidCard
-                      label="Total Unpaid Cash"
-                      total={stats?.unpaidAllTime?.total ?? '0'}
-                      count={stats?.unpaidAllTime?.count ?? 0}
-                      reportType="unpaid-all"
-                      standalone={true}
-                      currencySymbol={currSym}
-                    />
+                    {/* Stat tiles — 2-up grid instead of stacked cards */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <StatTile
+                        label="Today Unpaid"
+                        value={`${currSym} ${new Decimal(stats?.unpaidToday?.total ?? '0').toFixed(2)}`}
+                        valueColor={colors.danger}
+                        sub={`${stats?.unpaidToday?.count ?? 0} purchase${(stats?.unpaidToday?.count ?? 0) !== 1 ? 's' : ''}`}
+                        action={<ReportButton type="unpaid-today" sessionId={cashUp.id} disabled={isOpen} />}
+                      />
+                      <StatTile
+                        label="Total Unpaid"
+                        value={`${currSym} ${new Decimal(stats?.unpaidAllTime?.total ?? '0').toFixed(2)}`}
+                        valueColor={colors.danger}
+                        sub={`${stats?.unpaidAllTime?.count ?? 0} purchase${(stats?.unpaidAllTime?.count ?? 0) !== 1 ? 's' : ''}`}
+                        action={<ReportButton type="unpaid-all" sessionId="" standalone />}
+                      />
+                      {!isOpen && new Decimal(cashUp.cardPaymentsTotal ?? '0').gt(0) && (
+                        <StatTile
+                          label="Card / EFT Sales"
+                          value={`${currSym} ${new Decimal(cashUp.cardPaymentsTotal).toFixed(2)}`}
+                          valueColor={colors.process}
+                          sub="Excluded from cash reconciliation"
+                        />
+                      )}
+                      {!isOpen && stats?.nonCashAdvanced && new Decimal(stats.nonCashAdvanced).gt(0) && (
+                        <StatTile
+                          label="Non-Cash Loan Adv."
+                          value={`${currSym} ${new Decimal(stats.nonCashAdvanced).toFixed(2)}`}
+                          valueColor={colors.process}
+                          sub="EFT/cheque — excluded from cash"
+                        />
+                      )}
+                    </div>
+                    {!isOpen && stats?.cardOnlySales && new Decimal(stats.cardOnlySales).gt(0) && (
+                      <p className="text-[11px]" style={{ color: colors.textSecondary }}>
+                        Of which true card-swipe sales: {currSym} {new Decimal(stats.cardOnlySales).toFixed(2)} (see &quot;Card Sales&quot; report)
+                      </p>
+                    )}
 
-                    {/* Additional Reports Card */}
-                    <div className="rounded border bg-white overflow-hidden" style={{ borderColor: colors.border }}>
-                      <div style={{ padding: '6px 12px', borderBottom: `1px solid ${colors.border}`, background: 'linear-gradient(180deg, #EAEAEA 0%, #D4D4D4 100%)' }}>
+                    {/* Reports */}
+                    <div style={PANEL}>
+                      <div style={PANEL_HEAD}>
                         <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: colors.textSecondary }}>Reports</span>
                       </div>
-                      <div className="p-3 space-y-2">
-                        <ReportButton
-                          type="card-sales"
-                          sessionId={cashUp.id}
-                          label="Card Sales"
-                          disabled={isOpen}
-                          fullWidth
-                        />
-                        <ReportButton
-                          type="transferred-purchases"
-                          sessionId={cashUp.id}
-                          label="Transferred Purchases"
-                          disabled={isOpen}
-                          fullWidth
-                        />
-                        <Btn icon={FolderOpen} onClick={() => setPreviousReportsOpen(true)} style={{ width: '100%', justifyContent: 'center' }}>
-                          Previous Reports
-                        </Btn>
+                      <div>
+                        {[
+                          { key: 'card-sales' as const, label: 'Card Sales' },
+                          { key: 'transferred-purchases' as const, label: 'Transferred Purchases' },
+                        ].map((r, i) => (
+                          <div
+                            key={r.key}
+                            className="flex items-center justify-between"
+                            style={{ padding: '5px 10px', borderTop: i > 0 ? '1px solid #E8E8E8' : undefined }}
+                          >
+                            <span style={{ fontSize: 12, color: colors.textPrimary }}>{r.label}</span>
+                            <ReportButton type={r.key} sessionId={cashUp.id} disabled={isOpen} />
+                          </div>
+                        ))}
+                        <div className="flex items-center justify-between" style={{ padding: '5px 10px', borderTop: '1px solid #E8E8E8' }}>
+                          <span style={{ fontSize: 12, color: colors.textPrimary }}>Previous Reports</span>
+                          <Btn size="sm" icon={FolderOpen} onClick={() => setPreviousReportsOpen(true)}>
+                            Browse
+                          </Btn>
+                        </div>
                       </div>
                     </div>
 
-                    {/* Card / EFT sales (submitted/approved) */}
-                    {!isOpen && new Decimal(cashUp.cardPaymentsTotal ?? '0').gt(0) && (
-                      <div className="rounded border bg-white overflow-hidden" style={{ borderColor: colors.border }}>
-                        <div style={{ padding: '6px 12px', borderBottom: `1px solid ${colors.border}`, background: 'linear-gradient(180deg, #EAEAEA 0%, #D4D4D4 100%)' }}>
-                          <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: colors.textSecondary }}>Card / EFT Sales</span>
-                        </div>
-                        <div className="p-3">
-                          <p className="font-mono font-bold" style={{ color: colors.process }}>{currSym} {new Decimal(cashUp.cardPaymentsTotal).toFixed(2)}</p>
-                          <p className="text-xs mt-0.5" style={{ color: colors.textSecondary }}>Excluded from cash reconciliation</p>
-                          {stats?.cardOnlySales && new Decimal(stats.cardOnlySales).gt(0) && (
-                            <p className="text-xs mt-1 pt-1 border-t" style={{ color: colors.textSecondary, borderColor: colors.border }}>
-                              Of which true card-swipe sales: {currSym} {new Decimal(stats.cardOnlySales).toFixed(2)} (see &quot;Card Sales&quot; report)
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Non-cash loan advances (submitted/approved) */}
-                    {!isOpen && stats?.nonCashAdvanced && new Decimal(stats.nonCashAdvanced).gt(0) && (
-                      <div className="rounded border bg-white overflow-hidden" style={{ borderColor: colors.border }}>
-                        <div style={{ padding: '6px 12px', borderBottom: `1px solid ${colors.border}`, background: 'linear-gradient(180deg, #EAEAEA 0%, #D4D4D4 100%)' }}>
-                          <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: colors.textSecondary }}>Non-Cash Loan Advances</span>
-                        </div>
-                        <div className="p-3">
-                          <p className="font-mono font-bold" style={{ color: colors.process }}>{currSym} {new Decimal(stats.nonCashAdvanced).toFixed(2)}</p>
-                          <p className="text-xs mt-0.5" style={{ color: colors.textSecondary }}>EFT/cheque advances — excluded from cash reconciliation</p>
-                        </div>
-                      </div>
-                    )}
-
                     {/* Today's Expenses */}
                     {expenses.length > 0 && (
-                      <div className="rounded border bg-white overflow-hidden" style={{ borderColor: colors.border }}>
-                        <div style={{ padding: '6px 12px', borderBottom: `1px solid ${colors.border}`, background: 'linear-gradient(180deg, #EAEAEA 0%, #D4D4D4 100%)' }}>
+                      <div style={PANEL}>
+                        <div style={PANEL_HEAD}>
                           <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: colors.textSecondary }}>Today&apos;s Expenses</span>
                         </div>
-                        <div className="p-3 space-y-2">
-                          {expenses.map((e) => (
-                            <div key={e.id} className="flex items-start justify-between gap-2 text-xs">
+                        <div>
+                          {expenses.map((e, i) => (
+                            <div
+                              key={e.id}
+                              className="flex items-start justify-between gap-2"
+                              style={{ padding: '5px 10px', borderTop: i > 0 ? '1px solid #E8E8E8' : undefined }}
+                            >
                               <div className="min-w-0">
-                                <p className="font-medium truncate" style={{ color: colors.textPrimary }}>{e.description || e.expenseType.name}</p>
-                                <p style={{ color: colors.textSecondary }}>{e.expenseType.name} · {e.paymentMethod}</p>
+                                <p className="text-xs font-medium truncate" style={{ color: colors.textPrimary }}>{e.description || e.expenseType.name}</p>
+                                <p className="text-[11px]" style={{ color: colors.textSecondary }}>{e.expenseType.name} · {e.paymentMethod}</p>
                               </div>
                               <div className="shrink-0 text-right">
-                                <p className="font-mono font-semibold" style={{ color: colors.textPrimary }}>{currSym} {new Decimal(e.amount).toFixed(2)}</p>
+                                <p className="font-mono font-semibold text-xs" style={{ color: colors.textPrimary }}>{currSym} {new Decimal(e.amount).toFixed(2)}</p>
                                 {e.status === 'approved' ? (
                                   <span className="text-[10px] font-medium" style={{ color: colors.action }}>✓ approved</span>
                                 ) : isManager ? (
