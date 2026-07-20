@@ -37,7 +37,7 @@ export function RpxDialogContent({
       showCloseButton={false}
       style={{
         maxWidth,
-        borderRadius: 4,
+        borderRadius: 10,
         border: '1px solid #B0B0B0',
         boxShadow: '0 6px 24px rgba(0,0,0,0.2)',
         background: '#fff',

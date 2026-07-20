@@ -414,7 +414,7 @@ function ManagePriceGroupModal({ groupId, onClose, onChanged }: {
   return (
     <>
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <RpxDialogContent maxWidth={960} style={{ height: '82vh', borderRadius: 10 }}>
+      <RpxDialogContent maxWidth={960} style={{ height: '82vh' }}>
         <RpxDialogHeader title={group?.name ?? (groupLoading ? 'Loading…' : 'Price Group')} onClose={onClose} />
 
         {groupLoading ? (
