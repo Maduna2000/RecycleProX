@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import useSWR from 'swr'
 import { toast } from 'sonner'
-import { ChevronDown, ChevronRight, LifeBuoy, Send, Loader2, Plus } from 'lucide-react'
+import { ChevronDown, ChevronRight, LifeBuoy, Send, Loader2, Plus, Lock } from 'lucide-react'
 import type { SupportTicket } from '@/lib/services/supportTicketClient'
 import { colors, fontSize, fontWeight, statusStyle } from '@/lib/design-tokens'
 import { format } from '@/lib/utils/format'
@@ -199,35 +199,49 @@ function TicketCard({ ticket, isAdmin, expanded, onToggle, onReplySent }: {
 
       {expanded && (
         <div style={{ borderTop: `1px solid ${colors.border}` }}>
-          <div className="space-y-2" style={{ padding: 14 }}>
-            <Bubble mine timestamp={ticket.createdAt}>{ticket.message}</Bubble>
-            {ticket.messages.map((m) => (
-              <Bubble key={m.id} mine={!m.sender} label={m.sender?.fullName} timestamp={m.createdAt}>
-                {m.message}
-              </Bubble>
-            ))}
-          </div>
-
-          {isAdmin && (
-            <div style={{ borderTop: `1px solid ${colors.border}`, padding: 12, background: colors.bg }}>
-              {(ticket.status === 'resolved' || ticket.status === 'closed') && (
-                <p style={{ fontSize: fontSize.xs, color: colors.textMuted, marginBottom: 6 }}>
-                  This ticket is {ticket.status} — sending a reply will reopen it.
-                </p>
-              )}
-              <div className="flex items-end gap-2">
-                <textarea
-                  rows={2}
-                  value={replyText}
-                  onChange={(e) => setReplyText(e.target.value)}
-                  placeholder="Write a reply…"
-                  style={{ ...inp, flex: 1, height: 'auto', padding: 8, resize: 'vertical' }}
-                />
-                <Btn variant="primary" icon={Send} loading={sending} disabled={!replyText.trim()} onClick={handleReply}>
-                  Send
-                </Btn>
-              </div>
+          {ticket.status === 'closed' ? (
+            <div className="flex flex-col items-center gap-1.5 text-center" style={{ padding: '22px 14px' }}>
+              <Lock className="w-4 h-4" style={{ color: colors.textMuted }} />
+              <p style={{ fontSize: fontSize.sm, color: colors.textSecondary }}>
+                This ticket is closed — its conversation is no longer available here.
+              </p>
+              <p style={{ fontSize: fontSize.xs, color: colors.textMuted }}>
+                Need more help with this? Open a new ticket and mention the old subject.
+              </p>
             </div>
+          ) : (
+            <>
+              <div className="space-y-2" style={{ padding: 14 }}>
+                <Bubble mine timestamp={ticket.createdAt}>{ticket.message}</Bubble>
+                {ticket.messages.map((m) => (
+                  <Bubble key={m.id} mine={!m.sender} label={m.sender?.fullName} timestamp={m.createdAt}>
+                    {m.message}
+                  </Bubble>
+                ))}
+              </div>
+
+              {isAdmin && (
+                <div style={{ borderTop: `1px solid ${colors.border}`, padding: 12, background: colors.bg }}>
+                  {ticket.status === 'resolved' && (
+                    <p style={{ fontSize: fontSize.xs, color: colors.textMuted, marginBottom: 6 }}>
+                      This ticket is resolved — sending a reply will reopen it.
+                    </p>
+                  )}
+                  <div className="flex items-end gap-2">
+                    <textarea
+                      rows={2}
+                      value={replyText}
+                      onChange={(e) => setReplyText(e.target.value)}
+                      placeholder="Write a reply…"
+                      style={{ ...inp, flex: 1, height: 'auto', padding: 8, resize: 'vertical' }}
+                    />
+                    <Btn variant="primary" icon={Send} loading={sending} disabled={!replyText.trim()} onClick={handleReply}>
+                      Send
+                    </Btn>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       )}
