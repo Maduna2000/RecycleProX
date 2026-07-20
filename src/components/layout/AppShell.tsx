@@ -718,7 +718,7 @@ export function AppShell({
 
       {/* ── ZONE 3: Content Area ──────────────────────────────── */}
       <main className="rpx-content flex-1 min-h-0 flex flex-col overflow-hidden bg-[#F1F3F4]">
-        <div className="flex flex-col flex-1 min-h-0 w-full max-w-[1600px] mx-auto px-5 pt-4 pb-4 overflow-y-auto">
+        <div className="flex flex-col flex-1 min-h-0 w-full max-w-[1600px] mx-auto px-5 overflow-y-auto">
           {children}
         </div>
       </main>
