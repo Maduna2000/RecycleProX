@@ -77,7 +77,7 @@ export function ProductCategoryPicker({
         onClick={() => (open ? handleClose() : handleOpen())}
         style={{
           height: 24, width: '100%', borderRadius: 2, border: '1px solid #ABABAB',
-          padding: '0 4px', fontSize: 11, color: selected ? '#212529' : '#9CA3AF',
+          padding: '0 4px', fontSize: 11, color: '#212529',
           background: '#fff', outline: 'none', textAlign: 'left',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4,
           cursor: 'pointer',
