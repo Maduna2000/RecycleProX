@@ -4,7 +4,10 @@ import { Prisma } from '@prisma/client'
 import logger from '@/lib/logger'
 import Decimal from 'decimal.js'
 import { recordMovement, recordVoidReversal } from '@/lib/services/stockService'
+import { applyBusinessLoanRepaymentTx } from '@/lib/services/businessLoanService'
 import type { CreateSaleInput, VoidSaleInput } from '@/lib/schemas/sale'
+import type { ProcessSaleSplitPaymentInput } from '@/lib/schemas/splitPayment'
+import { encodeJsonField } from '@/lib/db/queryHelpers'
 import { encodePhotoKeys, decodePhotoKeys } from '@/lib/offline/photoKeysCodec'
 
 // ─── Typed Errors ─────────────────────────────────────────────────────────────
@@ -34,6 +37,17 @@ export class ProductInactiveError extends Error {
 
 export class InsufficientStockError extends Error {
   constructor(name: string) { super(`Insufficient stock for "${name}"`); this.name = 'InsufficientStockError' }
+}
+
+export class SalePartialPaymentNotAllowedError extends Error {
+  constructor(paid: string, outstanding: string) {
+    super(`Full payment required. Paid R${paid} but R${outstanding} is owed.`)
+    this.name = 'SalePartialPaymentNotAllowedError'
+  }
+}
+
+export class SaleHasNoLinkedCustomerError extends Error {
+  constructor() { super('Sale has no linked account customer — business loan deduction is not available'); this.name = 'SaleHasNoLinkedCustomerError' }
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -298,6 +312,113 @@ export async function markSalePaid(
   logger.info(
     { saleId: id, userId, settleAmount: data.amount, isFullySettled: result.isFullySettled },
     'sale.payment.recorded'
+  )
+  return result
+}
+
+// ─── Process Split Payment ────────────────────────────────────────────────────
+// Sale-side counterpart to purchaseService.processSplitPayment. Lets a sale be
+// settled with cash + eft + a deduction against the buyer's business loan
+// (money the business owes them) instead of paying that portion out in cash.
+// Full settlement required in one call, same as the purchase-side version.
+
+export async function processSaleSplitPayment(
+  id: string,
+  data: ProcessSaleSplitPaymentInput,
+  userId: string
+) {
+  const result = await withSerializableRetry(() =>
+    prisma.$transaction(async (tx) => {
+      const sale = await tx.sale.findUniqueOrThrow({ where: { id } })
+      if (sale.status !== 'pending') throw new SaleNotPendingError(sale.status)
+
+      const cashAmt         = new Decimal(data.payments.cash || '0')
+      const eftAmt           = new Decimal(data.payments.eft  || '0')
+      const businessLoanAmt = new Decimal(data.payments.businessLoan || '0')
+
+      if (businessLoanAmt.greaterThan(0) && !sale.customerId) {
+        throw new SaleHasNoLinkedCustomerError()
+      }
+
+      const totalAmount = new Decimal(sale.totalAmount.toString())
+      const currentPaid = new Decimal(sale.amountPaid?.toString() ?? '0')
+      const existingDeduction = sale.businessLoanDeductionAmount
+        ? new Decimal(sale.businessLoanDeductionAmount.toString())
+        : new Decimal(0)
+
+      const paymentTotal = cashAmt.plus(eftAmt).plus(businessLoanAmt)
+      const outstanding  = totalAmount.minus(existingDeduction).minus(currentPaid)
+
+      if (paymentTotal.greaterThan(outstanding)) {
+        throw new SalePaymentExceedsBalanceError(paymentTotal.toFixed(2), outstanding.toFixed(2))
+      }
+
+      // Split payment requires FULL payment - no partial payments allowed
+      if (paymentTotal.lessThan(outstanding)) {
+        throw new SalePartialPaymentNotAllowedError(paymentTotal.toFixed(2), outstanding.toFixed(2))
+      }
+
+      // Apply business loan repayment if that leg is > 0
+      if (businessLoanAmt.greaterThan(0)) {
+        await applyBusinessLoanRepaymentTx(tx, sale.customerId!, businessLoanAmt.toString(), userId, id)
+      }
+
+      const newDeduction = existingDeduction.plus(businessLoanAmt)
+      const newPaid       = currentPaid.plus(cashAmt).plus(eftAmt)
+      const isFullySettled = newPaid.plus(newDeduction).gte(totalAmount)
+
+      // Determine primary payment method (largest non-loan amount)
+      const primaryMethod: 'cash' | 'eft' = eftAmt.greaterThan(cashAmt) ? 'eft' : 'cash'
+
+      const updated = await tx.sale.update({
+        where: { id },
+        data: {
+          amountPaid:                  newPaid,
+          businessLoanDeductionAmount: newDeduction,
+          paymentMethod:               primaryMethod,
+          hasOutstandingBalance:       !isFullySettled,
+          splitPayments: encodeJsonField({
+            cash:         cashAmt.toFixed(2),
+            eft:          eftAmt.toFixed(2),
+            businessLoan: businessLoanAmt.toFixed(2),
+          }),
+          ...(isFullySettled ? { status: 'completed' } : {}),
+        },
+      })
+
+      // Payment records for cash-up (loan leg is not a physical payment)
+      const today = new Date()
+      const prefix = `PAY-${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`
+      const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+
+      const payments: Array<{ method: 'cash' | 'eft'; amount: Decimal }> = []
+      if (cashAmt.greaterThan(0)) payments.push({ method: 'cash', amount: cashAmt })
+      if (eftAmt.greaterThan(0))  payments.push({ method: 'eft',  amount: eftAmt })
+
+      for (const p of payments) {
+        const payCount = await tx.payment.count({ where: { createdAt: { gte: startOfDay } } })
+        await tx.payment.create({
+          data: {
+            tenantId:        requireTenantId(),
+            refNumber:       `${prefix}-${String(payCount + 1).padStart(4, '0')}`,
+            ...(sale.customerId ? { customerId: sale.customerId } : {}),
+            amount:          p.amount,
+            paymentMethod:   p.method,
+            notes:           `Split payment for ${sale.refNumber} (${p.method})`,
+            source:          'sale',
+            saleId:          sale.id,
+            createdByUserId: userId,
+          } as Prisma.PaymentUncheckedCreateInput,
+        })
+      }
+
+      return { updated, isFullySettled }
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, maxWait: 10000, timeout: 30000 })
+  )
+
+  logger.info(
+    { saleId: id, userId, splitPayments: data.payments, isFullySettled: result.isFullySettled },
+    'sale.split.payment.recorded'
   )
   return result
 }

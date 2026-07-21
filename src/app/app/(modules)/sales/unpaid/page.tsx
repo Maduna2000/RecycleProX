@@ -2,12 +2,13 @@
 
 import { useState } from 'react'
 import useSWR, { mutate } from 'swr'
-import { Search, Printer, Ban, HandCoins, Loader2, X } from 'lucide-react'
+import { Search, Printer, Ban, HandCoins, Loader2, X, Split, AlertCircle } from 'lucide-react'
 import Decimal from 'decimal.js'
 import { DataTable, Avatar, type Column, type RowAction } from '@/components/ui/DataTable'
 import { InlineDetailPanel } from '@/components/ui/InlineDetailPanel'
 import { Dialog } from '@/components/ui/dialog'
 import { RecordPaymentModal, type PayTarget } from '@/components/sales/RecordPaymentModal'
+import { SaleSplitPaymentModal } from '@/components/sales/SaleSplitPaymentModal'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
 import { format } from '@/lib/utils/format'
 import { toast } from 'sonner'
@@ -24,11 +25,22 @@ type Sale = {
   refNumber: string
   totalAmount: string
   amountPaid?: string
+  businessLoanDeductionAmount?: string
   buyerName: string
   buyerIdNumber?: string
   customerId?: string
   createdAt: string
   lines: { id: string }[]
+}
+
+function BusinessLoanBadge({ customerId }: { customerId: string }) {
+  const { data } = useSWR<{ hasOutstanding: boolean }>(`/api/customers/${customerId}/business-loans`, fetcher)
+  if (!data?.hasOutstanding) return null
+  return (
+    <span title="This customer has a pending business loan" style={{ display: 'inline-flex', marginLeft: 6 }}>
+      <AlertCircle style={{ width: 11, height: 11, color: '#E65100' }} />
+    </span>
+  )
 }
 
 type SaleLine = {
@@ -66,6 +78,7 @@ export default function UnpaidSalesPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [payTarget,  setPayTarget]  = useState<PayTarget | null>(null)
   const [voidTarget, setVoidTarget] = useState<Sale | null>(null)
+  const [splitPayTarget, setSplitPayTarget] = useState<Sale | null>(null)
 
   const hasFilters = !!(search || from || to)
   function clearFilters() { setSearch(''); setFrom(''); setTo(''); setPage(1) }
@@ -89,6 +102,11 @@ export default function UnpaidSalesPage() {
     fetcher,
   )
 
+  const { data: splitTargetLoanData } = useSWR<{ hasOutstanding: boolean }>(
+    splitPayTarget?.customerId ? `/api/customers/${splitPayTarget.customerId}/business-loans` : null,
+    fetcher,
+  )
+
   const grandTotal = sales.reduce((acc, s) => acc.plus(outstanding(s)), new Decimal(0))
 
   const columns: Column<Sale>[] = [
@@ -107,8 +125,9 @@ export default function UnpaidSalesPage() {
         <div className="flex items-center gap-2">
           <Avatar name={row.buyerName} size={26} />
           <div>
-            <p style={{ fontSize: fontSize.sm, fontWeight: fontWeight.medium, color: colors.textPrimary }}>
+            <p style={{ fontSize: fontSize.sm, fontWeight: fontWeight.medium, color: colors.textPrimary, display: 'flex', alignItems: 'center' }}>
               {row.buyerName}
+              {row.customerId && <BusinessLoanBadge customerId={row.customerId} />}
             </p>
             {row.buyerIdNumber && (
               <p className="font-mono" style={{ fontSize: 10, color: colors.textSecondary }}>{row.buyerIdNumber}</p>
@@ -176,6 +195,12 @@ export default function UnpaidSalesPage() {
         totalAmount: row.totalAmount,
         amountPaid:  row.amountPaid ?? '0',
       }),
+    },
+    {
+      label:   'Split Payment',
+      icon:    Split,
+      hidden:  (row) => !row.customerId,
+      onClick: (row) => setSplitPayTarget(row),
     },
     {
       label:   'Print Receipt',
@@ -357,6 +382,22 @@ export default function UnpaidSalesPage() {
           sale={voidTarget}
           onClose={() => setVoidTarget(null)}
           onSuccess={() => { mutate(KEY); setVoidTarget(null); setSelectedId(null) }}
+        />
+      )}
+
+      {splitPayTarget && (
+        <SaleSplitPaymentModal
+          sale={{
+            id:                          splitPayTarget.id,
+            ref:                         splitPayTarget.refNumber,
+            totalAmount:                 splitPayTarget.totalAmount,
+            businessLoanDeductionAmount: splitPayTarget.businessLoanDeductionAmount ?? '0',
+            amountPaid:                  splitPayTarget.amountPaid ?? '0',
+            customerId:                  splitPayTarget.customerId ?? null,
+          }}
+          hasOutstandingBusinessLoan={splitTargetLoanData?.hasOutstanding === true}
+          onClose={() => setSplitPayTarget(null)}
+          onSuccess={() => { mutate(KEY); setSplitPayTarget(null); setSelectedId(null) }}
         />
       )}
 

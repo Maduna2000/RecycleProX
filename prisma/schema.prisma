@@ -116,58 +116,60 @@ model SystemSettings {
 }
 
 model Customer {
-  id                  String               @id @default(uuid())
-  tenantId            String
-  customerType        CustomerType         @default(casual)
-  primaryFunction     PrimaryFunction      @default(supplier)
-  idNumber            String?
-  firstName           String
-  lastName            String
-  dateOfBirth         DateTime?
-  gender              Gender?
-  nationality         String?
-  companyName         String?
-  contactPerson       String?
-  phone               String
-  email               String?
-  physicalAddress     String?
-  postalAddress       String?
-  vatNumber           String?
-  bankName            String?
-  bankAccountNo       String?
-  bankBranchCode      String?
-  creditLimit         Decimal?             @db.Decimal(18, 2)
-  policeRegisterNo    String?
-  licenseNumber       String?
-  licenseExpiry       DateTime?
-  tradeCommodities    Json?
-  customerNotes       String?
-  idPhotoR2Key        String?
-  priceGroupId        String?
-  isActive            Boolean              @default(true)
-  blacklisted         Boolean              @default(false)
-  blacklistReason     String?
-  blacklistedAt       DateTime?
-  blacklistedById     String?
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
-  createdByUserId     String?
-  dealerCategory      DealerCategory?
-  marketSector        MarketSector?
-  zeroRated           Boolean              @default(false)
-  accountCode         String?
-  companyRegNumber    String?
-  landline            String?
-  priceGroup          PriceGroup?          @relation(fields: [priceGroupId], references: [id])
-  documents           CustomerDocument[]
-  loans               Loan[]
-  loanRepayments      LoanRepayment[]
-  payments            Payment[]
-  purchases           Purchase[]
-  sales               Sale[]               @relation("SaleCustomer")
-  scaleOrders         ScaleOrder[]
-  gateEntries         GateEntry[]
-  transactionPayments TransactionPayment[]
+  id                     String                  @id @default(uuid())
+  tenantId               String
+  customerType           CustomerType            @default(casual)
+  primaryFunction        PrimaryFunction         @default(supplier)
+  idNumber               String?
+  firstName              String
+  lastName               String
+  dateOfBirth            DateTime?
+  gender                 Gender?
+  nationality            String?
+  companyName            String?
+  contactPerson          String?
+  phone                  String
+  email                  String?
+  physicalAddress        String?
+  postalAddress          String?
+  vatNumber              String?
+  bankName               String?
+  bankAccountNo          String?
+  bankBranchCode         String?
+  creditLimit            Decimal?                @db.Decimal(18, 2)
+  policeRegisterNo       String?
+  licenseNumber          String?
+  licenseExpiry          DateTime?
+  tradeCommodities       Json?
+  customerNotes          String?
+  idPhotoR2Key           String?
+  priceGroupId           String?
+  isActive               Boolean                 @default(true)
+  blacklisted            Boolean                 @default(false)
+  blacklistReason        String?
+  blacklistedAt          DateTime?
+  blacklistedById        String?
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  createdByUserId        String?
+  dealerCategory         DealerCategory?
+  marketSector           MarketSector?
+  zeroRated              Boolean                 @default(false)
+  accountCode            String?
+  companyRegNumber       String?
+  landline               String?
+  priceGroup             PriceGroup?             @relation(fields: [priceGroupId], references: [id])
+  documents              CustomerDocument[]
+  loans                  Loan[]
+  loanRepayments         LoanRepayment[]
+  businessLoans          BusinessLoan[]
+  businessLoanRepayments BusinessLoanRepayment[]
+  payments               Payment[]
+  purchases              Purchase[]
+  sales                  Sale[]                  @relation("SaleCustomer")
+  scaleOrders            ScaleOrder[]
+  gateEntries            GateEntry[]
+  transactionPayments    TransactionPayment[]
 
   @@unique([tenantId, idNumber])
   @@unique([tenantId, accountCode])
@@ -279,26 +281,26 @@ model PriceHistory {
 }
 
 model ProductCategory {
-  id         String              @id @default(uuid())
-  tenantId   String
-  name       String
-  colorHex   String?
-  sortOrder  Int                 @default(0)
-  isActive   Boolean             @default(true)
-  createdAt  DateTime            @default(now())
-  updatedAt  DateTime            @updatedAt
-  iconName   String?
-  parentId   String?
+  id               String              @id @default(uuid())
+  tenantId         String
+  name             String
+  colorHex         String?
+  sortOrder        Int                 @default(0)
+  isActive         Boolean             @default(true)
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  iconName         String?
+  parentId         String?
   // Enables this category as a selectable "trade commodity" option on
   // account-customer registration — see productService.ts's
   // listTradeCommodityOptions/setTradeCommodityFlag. Superseded the standalone
   // TradeCommodityCategory model (free-typed names, prone to drifting from
   // real product categories) on 2026-07-18.
-  isTradeCommodity Boolean        @default(false)
-  stepConfig CategoryStepConfig?
-  parent     ProductCategory?    @relation("SubCategories", fields: [parentId], references: [id])
-  children   ProductCategory[]   @relation("SubCategories")
-  products   Product[]           @relation("ProductCategoryProducts")
+  isTradeCommodity Boolean             @default(false)
+  stepConfig       CategoryStepConfig?
+  parent           ProductCategory?    @relation("SubCategories", fields: [parentId], references: [id])
+  children         ProductCategory[]   @relation("SubCategories")
+  products         Product[]           @relation("ProductCategoryProducts")
 
   @@unique([tenantId, name])
   @@index([tenantId])
@@ -388,32 +390,35 @@ model PurchaseLine {
 }
 
 model Sale {
-  id                    String        @id @default(uuid())
-  tenantId              String
-  refNumber             String
-  buyerId               String?
-  buyerName             String?
-  buyerIdNumber         String?
-  buyerPhone            String?
-  status                TxStatus      @default(completed)
-  totalAmount           Decimal       @db.Decimal(18, 2)
-  vatAmount             Decimal       @default(0) @db.Decimal(18, 2)
-  paymentMethod         PaymentMethod @default(cash)
-  notes                 String?
-  voidedAt              DateTime?
-  voidedById            String?
-  voidReason            String?
-  createdByUserId       String?
-  createdAt             DateTime      @default(now())
-  updatedAt             DateTime      @updatedAt
-  customerId            String?
-  photoR2Key            String?
-  amountPaid            Decimal?      @db.Decimal(18, 2)
-  hasOutstandingBalance Boolean       @default(false)
-  photoR2Keys           String[]      @default([])
-  customer              Customer?     @relation("SaleCustomer", fields: [customerId], references: [id])
-  lines                 SaleLine[]
-  payments              Payment[]
+  id                          String                  @id @default(uuid())
+  tenantId                    String
+  refNumber                   String
+  buyerId                     String?
+  buyerName                   String?
+  buyerIdNumber               String?
+  buyerPhone                  String?
+  status                      TxStatus                @default(completed)
+  totalAmount                 Decimal                 @db.Decimal(18, 2)
+  vatAmount                   Decimal                 @default(0) @db.Decimal(18, 2)
+  paymentMethod               PaymentMethod           @default(cash)
+  notes                       String?
+  voidedAt                    DateTime?
+  voidedById                  String?
+  voidReason                  String?
+  createdByUserId             String?
+  createdAt                   DateTime                @default(now())
+  updatedAt                   DateTime                @updatedAt
+  customerId                  String?
+  photoR2Key                  String?
+  amountPaid                  Decimal?                @db.Decimal(18, 2)
+  hasOutstandingBalance       Boolean                 @default(false)
+  photoR2Keys                 String[]                @default([])
+  businessLoanDeductionAmount Decimal?                @db.Decimal(18, 2)
+  splitPayments               Json?
+  customer                    Customer?               @relation("SaleCustomer", fields: [customerId], references: [id])
+  lines                       SaleLine[]
+  payments                    Payment[]
+  businessLoanRepayments      BusinessLoanRepayment[]
 
   @@unique([tenantId, refNumber])
   @@index([tenantId])
@@ -712,6 +717,63 @@ model LoanRepayment {
   @@index([tenantId, loanId])
   @@index([tenantId, customerId])
   @@index([tenantId, purchaseId])
+  @@index([tenantId, createdAt])
+}
+
+// A dealer (account customer) advances the business cash to buy stock — the
+// reverse of Loan/LoanRepayment above (business owes the dealer, not the
+// other way around). Kept as a fully separate model rather than a
+// `direction` flag on Loan: the amount on this one is admin-only-visible
+// (see businessLoanService.ts), and isolating that masking logic from the
+// existing, unrestricted Loan feature keeps the blast radius of a bug in
+// either one contained to itself.
+model BusinessLoan {
+  id              String                  @id @default(uuid())
+  tenantId        String
+  refNumber       String
+  customerId      String
+  principalAmount Decimal                 @db.Decimal(18, 2)
+  balanceAmount   Decimal                 @db.Decimal(18, 2)
+  paymentMethod   PaymentMethod           @default(cash)
+  notes           String?
+  status          BusinessLoanStatus      @default(active)
+  voidedAt        DateTime?
+  voidedById      String?
+  voidReason      String?
+  createdByUserId String?
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+  customer        Customer                @relation(fields: [customerId], references: [id])
+  repayments      BusinessLoanRepayment[]
+
+  @@unique([tenantId, refNumber])
+  @@index([tenantId])
+  @@index([tenantId, customerId])
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
+}
+
+model BusinessLoanRepayment {
+  id              String        @id @default(uuid())
+  tenantId        String
+  refNumber       String
+  businessLoanId  String
+  customerId      String
+  amount          Decimal       @db.Decimal(18, 2)
+  paymentMethod   PaymentMethod @default(cash)
+  notes           String?
+  createdByUserId String?
+  createdAt       DateTime      @default(now())
+  saleId          String?
+  customer        Customer      @relation(fields: [customerId], references: [id])
+  businessLoan    BusinessLoan  @relation(fields: [businessLoanId], references: [id], onDelete: Cascade)
+  sale            Sale?         @relation(fields: [saleId], references: [id])
+
+  @@unique([tenantId, refNumber])
+  @@index([tenantId])
+  @@index([tenantId, businessLoanId])
+  @@index([tenantId, customerId])
+  @@index([tenantId, saleId])
   @@index([tenantId, createdAt])
 }
 
@@ -1069,6 +1131,12 @@ enum StocktakeStatus {
 }
 
 enum LoanStatus {
+  active
+  settled
+  voided
+}
+
+enum BusinessLoanStatus {
   active
   settled
   voided

@@ -3,12 +3,13 @@
 import { useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Plus, Trash2, Loader2, Scale, RefreshCw, Camera, ClipboardList } from 'lucide-react'
+import { Plus, Trash2, Loader2, Scale, RefreshCw, Camera, ClipboardList, AlertCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import useSWR from 'swr'
 import { AccountSelectorPanel } from '@/components/customers/AccountSelectorPanel'
 import { PrintResultModal } from '@/components/PrintResultModal'
 import { RecordPaymentModal, type PayTarget } from '@/components/sales/RecordPaymentModal'
+import { SaleSplitPaymentModal } from '@/components/sales/SaleSplitPaymentModal'
 import Decimal from 'decimal.js'
 import { colors } from '@/lib/design-tokens'
 import { BAR_GRAD, CARD_BORDER } from '@/components/rpx/styles'
@@ -101,12 +102,13 @@ export default function NewSalePage() {
 
   // ── Transaction state ─────────────────────────────────────────────────────
   const [lines,        setLines]        = useState<LineItem[]>([emptyLine(1)])
-  const [paymentType,  setPaymentType]  = useState<'unpaid' | 'cash' | 'eft'>('cash')
+  const [paymentType,  setPaymentType]  = useState<'unpaid' | 'cash' | 'eft' | 'split'>('cash')
   const [notes,        setNotes]        = useState('')
   const [invoiceNo,    setInvoiceNo]    = useState('')
   const [submitting,   setSubmitting]   = useState(false)
   const [keyCounter,   setKeyCounter]   = useState(2)
   const [printDialog,  setPrintDialog]  = useState<{ id: string; refNumber: string } | null>(null)
+  const [splitPayTarget, setSplitPayTarget] = useState<{ id: string; ref: string; totalAmount: string } | null>(null)
 
   // ── Pending sales state ───────────────────────────────────────────────────
   const [actionMenuId,   setActionMenuId]   = useState<string | null>(null)
@@ -140,6 +142,13 @@ export default function NewSalePage() {
     { refreshInterval: 30_000 },
   )
   const pendingSales = pendingData?.sales ?? []
+
+  // Existence-only — never a figure. Any role can see this warning.
+  const { data: businessLoanData } = useSWR<{ hasOutstanding: boolean }>(
+    buyerMode === 'account' && customer ? `/api/customers/${customer.id}/business-loans` : null,
+    fetcher,
+  )
+  const hasOutstandingBusinessLoan = businessLoanData?.hasOutstanding === true
 
   const products = productsData?.products ?? []
   const stockMap = new Map((stockData?.stock ?? []).map((r) => [r.product.id, new Decimal(r.onHand ?? '0')]))
@@ -282,11 +291,17 @@ export default function NewSalePage() {
   }
 
   // ── Submit ────────────────────────────────────────────────────────────────
-  async function submitSale(isPending: boolean) {
+  async function submitSale(saveAsUnpaid: boolean) {
     if (buyerMode === 'account' && !customer) { toast.error('Select a buyer'); return }
     if (buyerMode === 'walkin' && !buyerName.trim()) { toast.error('Buyer name is required'); return }
     if (isBlacklisted) { toast.error('Buyer is blacklisted'); return }
-    if (hasStockError && !isPending) { toast.error('Some lines exceed available stock'); return }
+    if (hasStockError && !saveAsUnpaid) { toast.error('Some lines exceed available stock'); return }
+
+    // Split Payment can't be resolved without another round-trip (PIN unlock,
+    // then the split-payment endpoint), so the sale is created pending first,
+    // same mechanic as "Save as Unpaid" — the modal that follows settles it.
+    const isSplit = !saveAsUnpaid && paymentType === 'split'
+    const createAsPending = saveAsUnpaid || isSplit
 
     const validLines = lines.filter((l) => l.productId && l.quantity && l.unitPrice)
     if (validLines.length === 0) { toast.error('Add at least one product line'); return }
@@ -307,8 +322,8 @@ export default function NewSalePage() {
       buyerName:     effectiveName,
       buyerIdNumber: effectiveId   || undefined,
       buyerPhone:    effectivePhone || undefined,
-      paymentMethod: isPending ? 'cash' : (paymentType as 'cash' | 'eft'),
-      status:        isPending ? 'pending' : 'completed',
+      paymentMethod: createAsPending ? 'cash' : (paymentType as 'cash' | 'eft'),
+      status:        createAsPending ? 'pending' : 'completed',
       notes:         notes || (invoiceNo ? `INV:${invoiceNo}` : undefined),
       lines: validLines.map((l) => ({
         productId:       l.productId,
@@ -329,8 +344,8 @@ export default function NewSalePage() {
       if (queued) {
         await offlineDB.sales.add({
           id: localId, refNumber: `OFF-${Date.now()}`, buyerName: effectiveName,
-          status: isPending ? 'pending' : 'completed', totalAmount: total.toFixed(2),
-          paymentMethod: isPending ? 'cash' : paymentType,
+          status: createAsPending ? 'pending' : 'completed', totalAmount: total.toFixed(2),
+          paymentMethod: createAsPending ? 'cash' : paymentType,
           notes: body.notes, createdAt: new Date().toISOString(), _offlineCreated: true,
         })
         for (const l of validLines) {
@@ -340,7 +355,9 @@ export default function NewSalePage() {
             lineTotal: new Decimal(l.quantity || '0').times(l.unitPrice || '0').toFixed(2),
           })
         }
-        toast.success('Sale saved offline — will sync when connected')
+        toast.success(isSplit
+          ? 'Sale saved offline as unpaid — complete the split payment once back online'
+          : 'Sale saved offline — will sync when connected')
         router.push('/app/sales')
       } else {
         const sale = data as { id: string; refNumber: string }
@@ -364,9 +381,11 @@ export default function NewSalePage() {
           } catch { /* non-blocking */ }
         }
 
-        if (isPending) {
+        if (saveAsUnpaid) {
           toast.success(`Sale ${sale.refNumber} saved as unpaid`)
           router.push('/app/sales/unpaid')
+        } else if (isSplit) {
+          setSplitPayTarget({ id: sale.id, ref: sale.refNumber, totalAmount: total.toFixed(2) })
         } else {
           setPrintDialog({ id: sale.id, refNumber: sale.refNumber })
         }
@@ -511,6 +530,14 @@ export default function NewSalePage() {
                     </button>
                   </div>
                 </div>
+                {hasOutstandingBusinessLoan && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, padding: '4px 8px', borderRadius: 2, background: '#FFF3E0', border: '1px solid #FFCC80' }}>
+                    <AlertCircle style={{ width: 12, height: 12, color: '#E65100', flexShrink: 0 }} />
+                    <span style={{ fontSize: 10.5, color: '#E65100', fontWeight: 600 }}>
+                      This customer has a pending business loan
+                    </span>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -529,7 +556,10 @@ export default function NewSalePage() {
           {/* Payment Type */}
           <div style={{ flexShrink: 0, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '3px 10px', padding: '3px 10px' }}>
             <label style={{ fontSize: 11, fontWeight: 600, color: '#374151', whiteSpace: 'nowrap', width: '100%' }}>Payment Type:</label>
-            {(['unpaid', 'cash', 'eft'] as const).map((type) => (
+            {([
+              'unpaid', 'cash', 'eft',
+              ...(hasOutstandingBusinessLoan ? ['split' as const] : []),
+            ] as const).map((type) => (
               <label key={type} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#374151', cursor: 'pointer' }}>
                 <input
                   type="radio"
@@ -538,7 +568,7 @@ export default function NewSalePage() {
                   onChange={() => setPaymentType(type)}
                   style={{ width: 13, height: 13 }}
                 />
-                {type === 'unpaid' ? 'Unpaid' : type === 'eft' ? 'EFT' : type.charAt(0).toUpperCase() + type.slice(1)}
+                {type === 'unpaid' ? 'Unpaid' : type === 'eft' ? 'EFT' : type === 'split' ? 'Split Payment' : type.charAt(0).toUpperCase() + type.slice(1)}
               </label>
             ))}
           </div>
@@ -1113,6 +1143,27 @@ export default function NewSalePage() {
           onClose={() => router.push(`/app/sales/new?t=${Date.now()}`)}
           onViewPurchase={() => router.push(`/app/sales/${printDialog.id}`)}
           onDone={() => router.push('/app/dashboard')}
+        />
+      )}
+
+      {/* Split Payment modal — settles the just-created pending sale */}
+      {splitPayTarget && customer && (
+        <SaleSplitPaymentModal
+          sale={{
+            id: splitPayTarget.id,
+            ref: splitPayTarget.ref,
+            totalAmount: splitPayTarget.totalAmount,
+            businessLoanDeductionAmount: '0',
+            amountPaid: '0',
+            customerId: customer.id,
+          }}
+          hasOutstandingBusinessLoan={hasOutstandingBusinessLoan}
+          onClose={() => { mutatePending(); setSplitPayTarget(null) }}
+          onSuccess={() => {
+            const target = splitPayTarget
+            setSplitPayTarget(null)
+            if (target) setPrintDialog({ id: target.id, refNumber: target.ref })
+          }}
         />
       )}
 

@@ -1,0 +1,355 @@
+import { prisma } from '@/lib/db/prisma'
+import { requireTenantId } from '@/lib/db/tenantContext'
+import { verifyAdminPin } from '@/lib/services/authService'
+import logger from '@/lib/logger'
+import Decimal from 'decimal.js'
+import type { Prisma } from '@prisma/client'
+import type { CreateBusinessLoanInput, CreateBusinessLoanRepaymentInput, VoidBusinessLoanInput } from '@/lib/schemas/businessLoan'
+import { todaySASTDate, todaySASTDateStr } from '@/lib/utils/dayBounds'
+
+// ─── Typed Errors ─────────────────────────────────────────────────────────────
+
+export class BusinessLoanNotFoundError extends Error {
+  constructor(id: string) { super(`Business loan "${id}" not found`); this.name = 'BusinessLoanNotFoundError' }
+}
+
+export class BusinessLoanAlreadySettledError extends Error {
+  constructor(ref: string) { super(`Business loan "${ref}" is already settled`); this.name = 'BusinessLoanAlreadySettledError' }
+}
+
+export class BusinessLoanAlreadyVoidedError extends Error {
+  constructor(ref: string) { super(`Business loan "${ref}" is already voided`); this.name = 'BusinessLoanAlreadyVoidedError' }
+}
+
+export class BusinessLoanHasRepaymentsError extends Error {
+  constructor(ref: string) { super(`Business loan "${ref}" has repayments and cannot be voided`); this.name = 'BusinessLoanHasRepaymentsError' }
+}
+
+export class RepaymentExceedsBalanceError extends Error {
+  constructor(balance: string) { super(`Repayment amount exceeds outstanding balance of R ${balance}`); this.name = 'RepaymentExceedsBalanceError' }
+}
+
+export class CustomerBlacklistedError extends Error {
+  constructor() { super('Customer is blacklisted and cannot advance a business loan'); this.name = 'CustomerBlacklistedError' }
+}
+
+export class CustomerInactiveError extends Error {
+  constructor() { super('Customer account is inactive'); this.name = 'CustomerInactiveError' }
+}
+
+export class InvalidAdminPinError extends Error {
+  constructor() { super('Incorrect admin PIN'); this.name = 'InvalidAdminPinError' }
+}
+
+// ─── Reference number generators ─────────────────────────────────────────────
+
+async function generateBusinessLoanRef(): Promise<string> {
+  const prefix = `BLN-${todaySASTDateStr().replace(/-/g, '')}`
+  const startOfDay = todaySASTDate()
+  const count = await prisma.businessLoan.count({ where: { createdAt: { gte: startOfDay } } })
+  return `${prefix}-${String(count + 1).padStart(4, '0')}`
+}
+
+async function generateBusinessLoanRepaymentRef(): Promise<string> {
+  const prefix = `BRP-${todaySASTDateStr().replace(/-/g, '')}`
+  const startOfDay = todaySASTDate()
+  const count = await prisma.businessLoanRepayment.count({ where: { createdAt: { gte: startOfDay } } })
+  return `${prefix}-${String(count + 1).padStart(4, '0')}`
+}
+
+// ─── Apply Repayment inside an existing transaction ───────────────────────────
+// Called from saleService when sale proceeds should net against a business
+// loan instead of being paid to the customer. FIFO: oldest active loan for
+// this customer is paid down first, mirroring applyRepaymentTx in loanService.
+
+export async function applyBusinessLoanRepaymentTx(
+  tx: Prisma.TransactionClient,
+  customerId: string,
+  amount: string,
+  createdByUserId: string | undefined,
+  saleId?: string,
+): Promise<void> {
+  const prefix = `BRP-${todaySASTDateStr().replace(/-/g, '')}`
+  const startOfDay = todaySASTDate()
+
+  const baseCount = await tx.businessLoanRepayment.count({ where: { createdAt: { gte: startOfDay } } })
+
+  const activeLoans = await tx.businessLoan.findMany({
+    where: { customerId, status: 'active' },
+    orderBy: { createdAt: 'asc' },
+  })
+
+  let remaining = new Decimal(amount)
+  let seqOffset = 0
+
+  for (const loan of activeLoans) {
+    if (remaining.isZero()) break
+
+    const balance = new Decimal(loan.balanceAmount.toString())
+    const repayAmount = Decimal.min(remaining, balance)
+    const newBalance = balance.minus(repayAmount)
+    const isNowSettled = newBalance.isZero()
+    const refNumber = `${prefix}-${String(baseCount + seqOffset + 1).padStart(4, '0')}`
+    seqOffset++
+
+    await tx.businessLoanRepayment.create({
+      data: {
+        tenantId:        requireTenantId(),
+        refNumber,
+        businessLoanId:  loan.id,
+        customerId,
+        saleId,
+        amount:          repayAmount,
+        paymentMethod:   'cash',
+        createdByUserId,
+      },
+    })
+
+    await tx.businessLoan.update({
+      where: { id: loan.id },
+      data: {
+        balanceAmount: newBalance,
+        status:        isNowSettled ? 'settled' : 'active',
+      },
+    })
+
+    logger.info({ businessLoanId: loan.id, refNumber, repayAmount: repayAmount.toFixed(2), newBalance: newBalance.toFixed(2), settled: isNowSettled, saleId, createdByUserId }, 'businessLoan.repayment.from_sale')
+    remaining = remaining.minus(repayAmount)
+  }
+}
+
+// ─── Create Business Loan ─────────────────────────────────────────────────────
+
+export async function createBusinessLoan(data: CreateBusinessLoanInput, createdByUserId?: string) {
+  const customer = await prisma.customer.findUnique({ where: { id: data.customerId } })
+  if (!customer) throw new Error('Customer not found')
+  if (customer.blacklisted) throw new CustomerBlacklistedError()
+  if (!customer.isActive) throw new CustomerInactiveError()
+
+  const principal = new Decimal(data.principalAmount)
+  const refNumber = await generateBusinessLoanRef()
+
+  const loan = await prisma.$transaction(async (tx) => {
+    return tx.businessLoan.create({
+      data: {
+        tenantId:        requireTenantId(),
+        refNumber,
+        customerId:      data.customerId,
+        principalAmount: principal,
+        balanceAmount:   principal,
+        paymentMethod:   data.paymentMethod ?? 'cash',
+        notes:           data.notes,
+        status:          'active',
+        createdByUserId,
+      },
+      include: {
+        customer: { select: { id: true, firstName: true, lastName: true, idNumber: true } },
+      },
+    })
+  })
+
+  logger.info({ businessLoanId: loan.id, refNumber, customerId: data.customerId, principal: principal.toFixed(2), createdByUserId }, 'businessLoan.created')
+  return loan
+}
+
+// ─── Create Repayment (direct, business repaying the dealer) ─────────────────
+
+export async function createBusinessLoanRepayment(data: CreateBusinessLoanRepaymentInput, createdByUserId?: string) {
+  const loan = await prisma.businessLoan.findUnique({
+    where: { id: data.businessLoanId },
+    include: { customer: { select: { id: true, firstName: true, lastName: true, idNumber: true } } },
+  })
+  if (!loan) throw new BusinessLoanNotFoundError(data.businessLoanId)
+  if (loan.status === 'voided') throw new BusinessLoanAlreadyVoidedError(loan.refNumber)
+  if (loan.status === 'settled') throw new BusinessLoanAlreadySettledError(loan.refNumber)
+
+  const repayAmount = new Decimal(data.amount)
+  const currentBalance = new Decimal(loan.balanceAmount.toString())
+
+  if (repayAmount.greaterThan(currentBalance)) {
+    throw new RepaymentExceedsBalanceError(currentBalance.toFixed(2))
+  }
+
+  const newBalance = currentBalance.minus(repayAmount)
+  const isNowSettled = newBalance.isZero()
+  const refNumber = await generateBusinessLoanRepaymentRef()
+
+  const result = await prisma.$transaction(async (tx) => {
+    const repayment = await tx.businessLoanRepayment.create({
+      data: {
+        tenantId:        requireTenantId(),
+        refNumber,
+        businessLoanId:  data.businessLoanId,
+        customerId:      loan.customerId,
+        amount:          repayAmount,
+        paymentMethod:   data.paymentMethod ?? 'cash',
+        notes:           data.notes,
+        createdByUserId,
+      },
+    })
+
+    await tx.businessLoan.update({
+      where: { id: data.businessLoanId },
+      data: {
+        balanceAmount: newBalance,
+        status:        isNowSettled ? 'settled' : 'active',
+      },
+    })
+
+    return repayment
+  })
+
+  logger.info({ repaymentId: result.id, refNumber, businessLoanId: data.businessLoanId, amount: repayAmount.toFixed(2), newBalance: newBalance.toFixed(2), settled: isNowSettled, createdByUserId }, 'businessLoan.repayment.created')
+  return result
+}
+
+// ─── Void Business Loan ────────────────────────────────────────────────────────
+
+export async function voidBusinessLoan(id: string, data: VoidBusinessLoanInput, voidedById?: string) {
+  const loan = await prisma.businessLoan.findUnique({
+    where: { id },
+    include: { _count: { select: { repayments: true } } },
+  })
+  if (!loan) throw new BusinessLoanNotFoundError(id)
+  if (loan.status === 'voided') throw new BusinessLoanAlreadyVoidedError(loan.refNumber)
+  if (loan._count.repayments > 0) throw new BusinessLoanHasRepaymentsError(loan.refNumber)
+
+  const updated = await prisma.businessLoan.update({
+    where: { id },
+    data: { status: 'voided', voidedAt: new Date(), voidedById, voidReason: data.reason },
+    include: { customer: { select: { id: true, firstName: true, lastName: true, idNumber: true } } },
+  })
+
+  logger.info({ businessLoanId: id, refNumber: loan.refNumber, voidedById }, 'businessLoan.voided')
+  return updated
+}
+
+// ─── Get Business Loan ─────────────────────────────────────────────────────────
+
+export async function getBusinessLoan(id: string) {
+  const loan = await prisma.businessLoan.findUnique({
+    where: { id },
+    include: {
+      customer: { select: { id: true, firstName: true, lastName: true, idNumber: true, phone: true } },
+      repayments: { orderBy: { createdAt: 'asc' } },
+    },
+  })
+  if (!loan) throw new BusinessLoanNotFoundError(id)
+  return loan
+}
+
+// ─── List Business Loans ───────────────────────────────────────────────────────
+
+export async function listBusinessLoans(opts?: {
+  customerId?: string
+  status?: string
+  search?: string
+  from?: Date
+  to?: Date
+  page?: number
+  pageSize?: number
+}) {
+  const page     = opts?.page ?? 1
+  const pageSize = opts?.pageSize ?? 50
+  const skip     = (page - 1) * pageSize
+
+  const where = {
+    ...(opts?.customerId && { customerId: opts.customerId }),
+    ...(opts?.status && { status: opts.status as 'active' | 'settled' | 'voided' }),
+    ...(opts?.from || opts?.to ? {
+      createdAt: {
+        ...(opts?.from && { gte: opts.from }),
+        ...(opts?.to  && { lte: opts.to }),
+      },
+    } : {}),
+    ...(opts?.search && {
+      OR: [
+        { refNumber: { contains: opts.search, mode: 'insensitive' as const } },
+        { customer: { firstName: { contains: opts.search, mode: 'insensitive' as const } } },
+        { customer: { lastName:  { contains: opts.search, mode: 'insensitive' as const } } },
+        { customer: { idNumber:  { contains: opts.search, mode: 'insensitive' as const } } },
+      ],
+    }),
+  }
+
+  const [loans, total] = await Promise.all([
+    prisma.businessLoan.findMany({
+      where,
+      include: {
+        customer: { select: { id: true, firstName: true, lastName: true, idNumber: true } },
+        _count: { select: { repayments: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take: pageSize,
+    }),
+    prisma.businessLoan.count({ where }),
+  ])
+
+  return { loans, total, page, pageSize, pageCount: Math.ceil(total / pageSize) }
+}
+
+// ─── Customer Business Loan Summary ────────────────────────────────────────────
+// Full figures — callers must gate this behind an admin check (role check in
+// the API route, or a passed admin PIN) before returning it to a client.
+
+async function getCustomerBusinessLoanSummary(customerId: string) {
+  const [loanAgg, repayAgg, loans] = await Promise.all([
+    prisma.businessLoan.aggregate({
+      where: { customerId, status: { not: 'voided' } },
+      _sum: { principalAmount: true, balanceAmount: true },
+    }),
+    prisma.businessLoanRepayment.aggregate({
+      where: { customerId },
+      _sum: { amount: true },
+    }),
+    prisma.businessLoan.findMany({
+      where: { customerId },
+      include: { _count: { select: { repayments: true } } },
+      orderBy: { createdAt: 'desc' },
+    }),
+  ])
+
+  const totalAdvanced = new Decimal(loanAgg._sum.principalAmount?.toString() ?? '0')
+  const outstanding   = new Decimal(loanAgg._sum.balanceAmount?.toString()  ?? '0')
+  const totalRepaid   = new Decimal(repayAgg._sum.amount?.toString()         ?? '0')
+
+  return {
+    hasOutstanding: outstanding.greaterThan(0),
+    totalAdvanced:  totalAdvanced.toFixed(2),
+    totalRepaid:    totalRepaid.toFixed(2),
+    outstanding:    outstanding.toFixed(2),
+    loans,
+  }
+}
+
+// Existence-only check — safe to expose to any role. Never returns an amount.
+async function customerHasOutstandingBusinessLoan(customerId: string): Promise<boolean> {
+  const count = await prisma.businessLoan.count({
+    where: { customerId, status: 'active', balanceAmount: { gt: 0 } },
+  })
+  return count > 0
+}
+
+// ─── Masking boundary ──────────────────────────────────────────────────────────
+// The one place role → visibility is decided. Any role gets the boolean; only
+// 'admin' gets the actual figures and loan list.
+
+export async function getCustomerBusinessLoanSummaryForRole(customerId: string, role: string) {
+  if (role === 'admin') return getCustomerBusinessLoanSummary(customerId)
+  const hasOutstanding = await customerHasOutstandingBusinessLoan(customerId)
+  return { hasOutstanding }
+}
+
+// ─── Admin-PIN-gated reveal ─────────────────────────────────────────────────────
+// Used from the sale Split Payment flow: a manager without loan visibility
+// enters a PIN that must belong to an admin who has personally set one (never
+// the shared tenant-wide default — see verifyAdminPin). On success, returns
+// the same full summary an admin would see directly, in the same call — no
+// separate token/grant, the caller holds the figures in local state only.
+
+export async function verifyAdminPinForBusinessLoan(customerId: string, pin: string) {
+  const valid = await verifyAdminPin(pin)
+  if (!valid) throw new InvalidAdminPinError()
+  return getCustomerBusinessLoanSummary(customerId)
+}

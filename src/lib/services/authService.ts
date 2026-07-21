@@ -370,6 +370,23 @@ export async function resetPinToDefault(userId: string): Promise<void> {
   logger.info({ userId }, 'PIN reset to default')
 }
 
+// Verifies a PIN against any admin's personally-set PIN — unlike verifyPin()
+// this is not self-referential to a session user, and deliberately never
+// falls back to the shared default PIN: reveal actions gated by this (e.g.
+// business loan balance) require an admin to have actually set their own
+// PIN, not just know the tenant-wide fallback every cashier could guess.
+export async function verifyAdminPin(pin: string): Promise<boolean> {
+  const admins = await prisma.user.findMany({
+    where: { role: 'admin', isActive: true, pinHash: { not: null } },
+    select: { pinHash: true },
+  })
+
+  for (const admin of admins) {
+    if (admin.pinHash && await bcrypt.compare(pin, admin.pinHash)) return true
+  }
+  return false
+}
+
 // ─── User queries ─────────────────────────────────────────────────────────────
 
 const USER_SELECT = {

@@ -8,6 +8,7 @@ import { colors } from '@/lib/design-tokens'
 import { ArrowLeft, AlertTriangle, ShieldBan, ShieldCheck, Save, Pencil } from 'lucide-react'
 import { PhotoUploader, PhotoViewer } from '@/components/PhotoUploader'
 import { LoansTab } from '@/components/customers/LoansTab'
+import { BusinessLoanTab } from '@/components/customers/BusinessLoanTab'
 import { TradeCommoditiesSelect } from '@/components/customers/TradeCommoditiesSelect'
 import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
@@ -64,7 +65,7 @@ const DOCUMENT_TYPE_LABELS: Record<string, string> = {
   other:                'Other',
 }
 
-const TABS_ACCOUNT = ['Overview', 'Transactions', 'Loans', 'Documents', 'Blacklist'] as const
+const TABS_ACCOUNT = ['Overview', 'Transactions', 'Loans', 'Business Loan', 'Documents', 'Blacklist'] as const
 const TABS_CASUAL = ['Overview', 'Transactions', 'Documents', 'Blacklist'] as const
 const SECTION_TABS = ['Personal', 'Business', 'Banking', 'Compliance', 'Notes'] as const
 
@@ -480,6 +481,13 @@ export default function CustomerDetailPage() {
               customerName={fullName}
               userRole={session?.user?.role ?? ''}
               userAllowedModules={(session?.user as { allowedModules?: string[] })?.allowedModules ?? []}
+            />
+          )}
+          {tab === 'Business Loan' && customer.customerType === 'account' && (
+            <BusinessLoanTab
+              customerId={id}
+              customerName={fullName}
+              userRole={session?.user?.role ?? ''}
             />
           )}
           {tab === 'Documents'    && <DocumentsTab customer={customer} onPhotoSaved={() => mutate(`/api/customers/${id}`)} />}
