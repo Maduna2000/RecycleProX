@@ -50,15 +50,7 @@ function useToolbarButtons(pathname: string, role: string): ToolbarButton[] {
     ]
 
   if (pathname === '/app/casual' || pathname.startsWith('/app/casual/'))
-    return [
-      {
-        label: 'Export', icon: Download, variant: 'secondary',
-        items: [
-          { label: 'Export Excel', href: '/app/casual?export=xlsx' },
-          { label: 'Export PDF',   href: '/app/casual?export=pdf'  },
-        ],
-      },
-    ]
+    return []
 
   if (pathname === '/app/purchases' || pathname.startsWith('/app/purchases/'))
     return []

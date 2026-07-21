@@ -497,12 +497,13 @@ export default function SettingsPage() {
                   ? `${pendingCount} transaction${pendingCount > 1 ? 's' : ''} queued and waiting to sync.`
                   : 'All transactions are synced.'}
               </p>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+              <div style={{ display: 'flex', flexWrap: 'nowrap', gap: 5, alignItems: 'center' }}>
                 <Btn
                   size="sm"
                   icon={RefreshCw}
                   loading={syncing}
                   disabled={!isOnline}
+                  style={{ padding: '4px 8px', flex: 1, justifyContent: 'center' }}
                   onClick={async () => { setSyncing(true); await triggerSync(); setPending(await getPendingCount()); setSyncing(false) }}
                 >
                   {syncing ? 'Syncing…' : `Sync Now${pendingCount > 0 ? ` (${pendingCount})` : ''}`}
@@ -512,9 +513,11 @@ export default function SettingsPage() {
                   icon={RefreshCw}
                   loading={seeding}
                   disabled={!isOnline}
+                  title="Refresh offline data"
+                  style={{ padding: '4px 8px', flex: 1, justifyContent: 'center' }}
                   onClick={async () => { setSeeding(true); await runSeeder(true); setSeeding(false); toast.success('Offline data refreshed') }}
                 >
-                  {seeding ? 'Refreshing…' : 'Refresh Offline Data'}
+                  {seeding ? 'Refreshing…' : 'Refresh Data'}
                 </Btn>
               </div>
             </div>

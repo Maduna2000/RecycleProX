@@ -5,13 +5,13 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import useSWR, { mutate } from 'swr'
 import { Input } from '@/components/ui/input'
 import { Dialog } from '@/components/ui/dialog'
-import { Search, ShieldBan, ShieldCheck, UserX, Trash2, UserCheck, Eye } from 'lucide-react'
+import { Search, ShieldBan, ShieldCheck, UserX, Trash2, UserCheck, Eye, Download } from 'lucide-react'
 import { toast } from 'sonner'
 import { useSession } from 'next-auth/react'
 import { DataTable, StatusBadge, Column, RowAction } from '@/components/ui/DataTable'
 import { colors, fontSize } from '@/lib/design-tokens'
 import {
-  inp, Btn, Field, FilterBar, PortalPage,
+  inp, Btn, BtnMenu, Field, FilterBar, PortalPage,
   RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter,
 } from '@/components/rpx'
 
@@ -283,6 +283,17 @@ export default function CasualsPage() {
           <span style={{ fontSize: 11, color: '#6C757D', marginLeft: 'auto', paddingBottom: 8 }}>
             {customers.length} casual{customers.length !== 1 ? 's' : ''}
           </span>
+          <div style={{ paddingBottom: 8 }}>
+            <BtnMenu
+              size="sm"
+              icon={Download}
+              label="Export"
+              items={[
+                { label: 'Export Excel', href: '/app/casual?export=xlsx' },
+                { label: 'Export PDF',   href: '/app/casual?export=pdf'  },
+              ]}
+            />
+          </div>
         </FilterBar>
 
         {/* A–Z quick filter */}
