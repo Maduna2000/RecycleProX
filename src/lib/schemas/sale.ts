@@ -41,6 +41,7 @@ export const CreateSaleSchema = z.object({
   paymentMethod: z.enum(['cash', 'eft']).default('cash'),
   status:        z.enum(['pending', 'completed']).default('completed'),
   notes:         z.string().max(500).optional(),
+  businessLoanDeductionAmount: z.string().regex(/^\d+(\.\d{1,2})?$/, 'Invalid amount').optional(),
   lines:         z.array(SaleLineSchema).min(1, 'At least one product line is required'),
 })
 

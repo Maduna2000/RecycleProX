@@ -2,13 +2,12 @@
 
 import { useState, useEffect } from 'react'
 import useSWR, { mutate } from 'swr'
-import { Search, Printer, Ban, HandCoins, Loader2, X, Split, AlertCircle } from 'lucide-react'
+import { Search, Printer, Ban, HandCoins, Loader2, X, AlertCircle } from 'lucide-react'
 import Decimal from 'decimal.js'
 import { DataTable, Avatar, type Column, type RowAction } from '@/components/ui/DataTable'
 import { InlineDetailPanel } from '@/components/ui/InlineDetailPanel'
 import { Dialog } from '@/components/ui/dialog'
 import { RecordPaymentModal, type PayTarget } from '@/components/sales/RecordPaymentModal'
-import { SaleSplitPaymentModal } from '@/components/sales/SaleSplitPaymentModal'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
 import { format } from '@/lib/utils/format'
 import { toast } from 'sonner'
@@ -77,7 +76,6 @@ export default function UnpaidSalesPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [payTarget,  setPayTarget]  = useState<PayTarget | null>(null)
   const [voidTarget, setVoidTarget] = useState<Sale | null>(null)
-  const [splitPayTarget, setSplitPayTarget] = useState<Sale | null>(null)
 
   const hasFilters = !!(search || from || to)
   function clearFilters() { setSearch(''); setFrom(''); setTo(''); setPage(1) }
@@ -101,14 +99,9 @@ export default function UnpaidSalesPage() {
     fetcher,
   )
 
-  const { data: splitTargetLoanData } = useSWR<{ hasOutstanding: boolean }>(
-    splitPayTarget?.customerId ? `/api/customers/${splitPayTarget.customerId}/business-loans` : null,
-    fetcher,
-  )
-
   // Whether each row's linked customer has an outstanding business loan —
-  // drives both the warning badge and forcing Split Payment over a plain
-  // Record Payment (mirrors the same rule enforced at sale creation).
+  // existence-only badge; RecordPaymentModal handles the actual PIN-gated
+  // reveal and Split Payment option internally once opened.
   const [businessLoanFlags, setBusinessLoanFlags] = useState<Record<string, boolean>>({})
   useEffect(() => {
     const ids = Array.from(new Set(sales.map((s) => s.customerId).filter((id): id is string => !!id)))
@@ -212,19 +205,14 @@ export default function UnpaidSalesPage() {
     {
       label:   'Record Payment',
       icon:    HandCoins,
-      hidden:  (row) => !!row.customerId && businessLoanFlags[row.customerId] === true,
       onClick: (row) => setPayTarget({
-        id:          row.id,
-        ref:         row.refNumber,
-        totalAmount: row.totalAmount,
-        amountPaid:  row.amountPaid ?? '0',
+        id:                          row.id,
+        ref:                         row.refNumber,
+        totalAmount:                 row.totalAmount,
+        amountPaid:                  row.amountPaid ?? '0',
+        businessLoanDeductionAmount: row.businessLoanDeductionAmount,
+        customerId:                  row.customerId ?? null,
       }),
-    },
-    {
-      label:   'Split Payment',
-      icon:    Split,
-      hidden:  (row) => !row.customerId,
-      onClick: (row) => setSplitPayTarget(row),
     },
     {
       label:   'Print Receipt',
@@ -406,22 +394,6 @@ export default function UnpaidSalesPage() {
           sale={voidTarget}
           onClose={() => setVoidTarget(null)}
           onSuccess={() => { mutate(KEY); setVoidTarget(null); setSelectedId(null) }}
-        />
-      )}
-
-      {splitPayTarget && (
-        <SaleSplitPaymentModal
-          sale={{
-            id:                          splitPayTarget.id,
-            ref:                         splitPayTarget.refNumber,
-            totalAmount:                 splitPayTarget.totalAmount,
-            businessLoanDeductionAmount: splitPayTarget.businessLoanDeductionAmount ?? '0',
-            amountPaid:                  splitPayTarget.amountPaid ?? '0',
-            customerId:                  splitPayTarget.customerId ?? null,
-          }}
-          hasOutstandingBusinessLoan={splitTargetLoanData?.hasOutstanding === true}
-          onClose={() => setSplitPayTarget(null)}
-          onSuccess={() => { mutate(KEY); setSplitPayTarget(null); setSelectedId(null) }}
         />
       )}
 

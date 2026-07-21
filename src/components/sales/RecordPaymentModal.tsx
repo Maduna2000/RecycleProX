@@ -1,12 +1,13 @@
 'use client'
 
-import { useState } from 'react'
-import { HandCoins } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { HandCoins, AlertCircle, Split } from 'lucide-react'
 import { toast } from 'sonner'
 import Decimal from 'decimal.js'
 import { Dialog } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
+import { SaleSplitPaymentModal } from './SaleSplitPaymentModal'
 import { Btn, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
 
 export type PayTarget = {
@@ -14,6 +15,8 @@ export type PayTarget = {
   ref: string
   totalAmount: string
   amountPaid: string
+  businessLoanDeductionAmount?: string
+  customerId?: string | null
 }
 
 export function RecordPaymentModal({
@@ -29,10 +32,23 @@ export function RecordPaymentModal({
   const [amount,      setAmount]      = useState('')
   const [amountError, setAmountError] = useState<string | null>(null)
   const [loading,     setLoading]     = useState(false)
+  const [showSplit,   setShowSplit]   = useState(false)
+  const [hasOutstandingBusinessLoan, setHasOutstandingBusinessLoan] = useState(false)
 
   const totalAmount = new Decimal(sale.totalAmount)
   const alreadyPaid = new Decimal(sale.amountPaid)
   const remaining   = totalAmount.minus(alreadyPaid)
+
+  // Existence-only — never a figure without going through Split Payment's PIN gate.
+  useEffect(() => {
+    if (!sale.customerId) return
+    let cancelled = false
+    fetch(`/api/customers/${sale.customerId}/business-loans`)
+      .then((r) => r.json())
+      .then((d: { hasOutstanding?: boolean }) => { if (!cancelled) setHasOutstandingBusinessLoan(d.hasOutstanding === true) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [sale.customerId])
 
   function validateAmount(raw: string): string | null {
     if (!raw.trim()) return 'Amount is required'
@@ -88,6 +104,21 @@ export function RecordPaymentModal({
             </div>
           </div>
 
+          {/* Business loan alert — existence-only, no figure */}
+          {hasOutstandingBusinessLoan && (
+            <div className="flex items-start gap-2 px-3 py-2 rounded-lg" style={{ background: '#FFF3E0', border: '1px solid #FFCC80' }}>
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" style={{ color: '#E65100' }} />
+              <div>
+                <p className="text-xs font-medium" style={{ color: '#E65100' }}>
+                  This customer has a pending business loan
+                </p>
+                <p className="text-xs" style={{ color: '#EF6C00' }}>
+                  Use Split Payment to apply this sale toward it.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Amount input */}
           <div>
             <div className="flex items-center justify-between mb-1">
@@ -128,6 +159,25 @@ export function RecordPaymentModal({
             </Select>
           </div>
 
+          {/* Split Payment button */}
+          {sale.customerId && (
+            <button
+              type="button"
+              onClick={() => setShowSplit(true)}
+              disabled={loading}
+              className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded text-xs font-medium"
+              style={{
+                background: '#E3F2FD',
+                border: '1px solid #90CAF9',
+                color: '#1565C0',
+                cursor: loading ? 'not-allowed' : 'pointer',
+              }}
+            >
+              <Split className="w-3.5 h-3.5" />
+              Split Payment (Multiple Methods)
+            </button>
+          )}
+
         </div>
         </RpxDialogBody>
         <RpxDialogFooter>
@@ -137,6 +187,26 @@ export function RecordPaymentModal({
           </Btn>
         </RpxDialogFooter>
       </RpxDialogContent>
+
+      {/* Split Payment Modal */}
+      {showSplit && sale.customerId && (
+        <SaleSplitPaymentModal
+          sale={{
+            id:                          sale.id,
+            ref:                         sale.ref,
+            totalAmount:                 sale.totalAmount,
+            businessLoanDeductionAmount: sale.businessLoanDeductionAmount ?? '0',
+            amountPaid:                  sale.amountPaid,
+            customerId:                  sale.customerId,
+          }}
+          hasOutstandingBusinessLoan={hasOutstandingBusinessLoan}
+          onClose={() => setShowSplit(false)}
+          onSuccess={() => {
+            setShowSplit(false)
+            onSuccess()
+          }}
+        />
+      )}
     </Dialog>
   )
 }

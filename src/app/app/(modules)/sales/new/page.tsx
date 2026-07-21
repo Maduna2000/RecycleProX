@@ -9,7 +9,7 @@ import useSWR from 'swr'
 import { AccountSelectorPanel } from '@/components/customers/AccountSelectorPanel'
 import { PrintResultModal } from '@/components/PrintResultModal'
 import { RecordPaymentModal, type PayTarget } from '@/components/sales/RecordPaymentModal'
-import { SaleSplitPaymentModal } from '@/components/sales/SaleSplitPaymentModal'
+import { AdminPinUnlockModal, type BusinessLoanFullSummary } from '@/components/business-loans/AdminPinUnlockModal'
 import Decimal from 'decimal.js'
 import { colors } from '@/lib/design-tokens'
 import { BAR_GRAD, CARD_BORDER } from '@/components/rpx/styles'
@@ -102,13 +102,21 @@ export default function NewSalePage() {
 
   // ── Transaction state ─────────────────────────────────────────────────────
   const [lines,        setLines]        = useState<LineItem[]>([emptyLine(1)])
-  const [paymentType,  setPaymentType]  = useState<'unpaid' | 'cash' | 'eft' | 'split'>('cash')
+  const [paymentType,  setPaymentType]  = useState<'unpaid' | 'cash' | 'eft'>('cash')
   const [notes,        setNotes]        = useState('')
   const [invoiceNo,    setInvoiceNo]    = useState('')
   const [submitting,   setSubmitting]   = useState(false)
   const [keyCounter,   setKeyCounter]   = useState(2)
   const [printDialog,  setPrintDialog]  = useState<{ id: string; refNumber: string } | null>(null)
-  const [splitPayTarget, setSplitPayTarget] = useState<{ id: string; ref: string; totalAmount: string } | null>(null)
+
+  // ── Business loan deduction (mirrors the purchase module's "deduct from
+  // payout" checkbox, reversed: instead of reducing what we pay a supplier,
+  // this reduces the cash/eft the buyer needs to hand over because that
+  // portion is credited against what the business owes them) ───────────────
+  const [deductBusinessLoan,  setDeductBusinessLoan]  = useState(false)
+  const [businessLoanAmount,  setBusinessLoanAmount]  = useState('')
+  const [businessLoanPinOpen, setBusinessLoanPinOpen] = useState(false)
+  const [businessLoanSummary, setBusinessLoanSummary] = useState<BusinessLoanFullSummary | null>(null)
 
   // ── Pending sales state ───────────────────────────────────────────────────
   const [actionMenuId,   setActionMenuId]   = useState<string | null>(null)
@@ -143,23 +151,22 @@ export default function NewSalePage() {
   )
   const pendingSales = pendingData?.sales ?? []
 
-  // Existence-only — never a figure. Any role can see this warning.
+  // Existence-only — never a figure. Any role can see this warning; the
+  // actual balance requires an admin PIN (businessLoanPinOpen below), same
+  // gate as Split Payment on a pending sale.
   const { data: businessLoanData } = useSWR<{ hasOutstanding: boolean }>(
     buyerMode === 'account' && customer ? `/api/customers/${customer.id}/business-loans` : null,
     fetcher,
   )
   const hasOutstandingBusinessLoan = businessLoanData?.hasOutstanding === true
 
-  // 'cash'/'eft' aren't valid choices once a business loan is outstanding —
-  // this sale must be resolved via Split Payment or deferred as unpaid. If
-  // the flag flips true after a plain method was already selected (e.g. the
-  // account was just picked), fall back to the safe default rather than
-  // silently completing on a now-hidden radio option.
+  // Reset the deduction state whenever the buyer changes so a stale unlocked
+  // balance or checked box from a previous customer never carries over.
   useEffect(() => {
-    if (hasOutstandingBusinessLoan && (paymentType === 'cash' || paymentType === 'eft')) {
-      setPaymentType('split')
-    }
-  }, [hasOutstandingBusinessLoan, paymentType])
+    setDeductBusinessLoan(false)
+    setBusinessLoanAmount('')
+    setBusinessLoanSummary(null)
+  }, [customer?.id])
 
   const products = productsData?.products ?? []
   const stockMap = new Map((stockData?.stock ?? []).map((r) => [r.product.id, new Decimal(r.onHand ?? '0')]))
@@ -302,17 +309,11 @@ export default function NewSalePage() {
   }
 
   // ── Submit ────────────────────────────────────────────────────────────────
-  async function submitSale(saveAsUnpaid: boolean) {
+  async function submitSale(isPending: boolean) {
     if (buyerMode === 'account' && !customer) { toast.error('Select a buyer'); return }
     if (buyerMode === 'walkin' && !buyerName.trim()) { toast.error('Buyer name is required'); return }
     if (isBlacklisted) { toast.error('Buyer is blacklisted'); return }
-    if (hasStockError && !saveAsUnpaid) { toast.error('Some lines exceed available stock'); return }
-
-    // Split Payment can't be resolved without another round-trip (PIN unlock,
-    // then the split-payment endpoint), so the sale is created pending first,
-    // same mechanic as "Save as Unpaid" — the modal that follows settles it.
-    const isSplit = !saveAsUnpaid && paymentType === 'split'
-    const createAsPending = saveAsUnpaid || isSplit
+    if (hasStockError && !isPending) { toast.error('Some lines exceed available stock'); return }
 
     const validLines = lines.filter((l) => l.productId && l.quantity && l.unitPrice)
     if (validLines.length === 0) { toast.error('Add at least one product line'); return }
@@ -328,14 +329,19 @@ export default function NewSalePage() {
     const effectiveId   = buyerMode === 'walkin' ? buyerIdNumber.trim() : (customer?.idNumber ?? '')
     const effectivePhone = buyerMode === 'walkin' ? buyerPhone.trim()   : (customer?.phone   ?? '')
 
+    const businessLoanDeduction = deductBusinessLoan && businessLoanAmount && parseFloat(businessLoanAmount) > 0 && !isPending
+      ? businessLoanAmount : undefined
+    // Deduction is capped server-side — no client-side block needed
+
     const body = {
       ...(buyerMode === 'account' && customer ? { customerId: customer.id } : {}),
       buyerName:     effectiveName,
       buyerIdNumber: effectiveId   || undefined,
       buyerPhone:    effectivePhone || undefined,
-      paymentMethod: createAsPending ? 'cash' : (paymentType as 'cash' | 'eft'),
-      status:        createAsPending ? 'pending' : 'completed',
+      paymentMethod: isPending ? 'cash' : (paymentType as 'cash' | 'eft'),
+      status:        isPending ? 'pending' : 'completed',
       notes:         notes || (invoiceNo ? `INV:${invoiceNo}` : undefined),
+      ...(businessLoanDeduction ? { businessLoanDeductionAmount: businessLoanDeduction } : {}),
       lines: validLines.map((l) => ({
         productId:       l.productId,
         quantity:        l.quantity,
@@ -355,8 +361,8 @@ export default function NewSalePage() {
       if (queued) {
         await offlineDB.sales.add({
           id: localId, refNumber: `OFF-${Date.now()}`, buyerName: effectiveName,
-          status: createAsPending ? 'pending' : 'completed', totalAmount: total.toFixed(2),
-          paymentMethod: createAsPending ? 'cash' : paymentType,
+          status: isPending ? 'pending' : 'completed', totalAmount: total.toFixed(2),
+          paymentMethod: isPending ? 'cash' : paymentType,
           notes: body.notes, createdAt: new Date().toISOString(), _offlineCreated: true,
         })
         for (const l of validLines) {
@@ -366,9 +372,7 @@ export default function NewSalePage() {
             lineTotal: new Decimal(l.quantity || '0').times(l.unitPrice || '0').toFixed(2),
           })
         }
-        toast.success(isSplit
-          ? 'Sale saved offline as unpaid — complete the split payment once back online'
-          : 'Sale saved offline — will sync when connected')
+        toast.success('Sale saved offline — will sync when connected')
         router.push('/app/sales')
       } else {
         const sale = data as { id: string; refNumber: string }
@@ -392,11 +396,9 @@ export default function NewSalePage() {
           } catch { /* non-blocking */ }
         }
 
-        if (saveAsUnpaid) {
+        if (isPending) {
           toast.success(`Sale ${sale.refNumber} saved as unpaid`)
           router.push('/app/sales/unpaid')
-        } else if (isSplit) {
-          setSplitPayTarget({ id: sale.id, ref: sale.refNumber, totalAmount: total.toFixed(2) })
         } else {
           setPrintDialog({ id: sale.id, refNumber: sale.refNumber })
         }
@@ -553,6 +555,56 @@ export default function NewSalePage() {
             )}
           </div>
 
+          {/* Business loan deduction — mirrors the purchase module's "deduct
+              from payout" checkbox. Reveal requires a PIN (unlike Loans on
+              the purchase side, this figure is admin-restricted); once
+              unlocked it behaves identically: an editable amount capped at
+              min(outstanding, total), off by default. */}
+          {hasOutstandingBusinessLoan && (
+            <div style={{ flexShrink: 0, margin: '0 10px 4px', padding: '5px 8px', border: '1px solid #FFCC80', borderRadius: 2, background: '#FFF8F0' }}>
+              {!businessLoanSummary ? (
+                <button
+                  type="button"
+                  onClick={() => setBusinessLoanPinOpen(true)}
+                  style={{ fontSize: 11, fontWeight: 600, color: '#E65100', background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: 4 }}
+                >
+                  <AlertCircle style={{ width: 12, height: 12 }} />
+                  Enter admin PIN to apply this sale toward the business loan
+                </button>
+              ) : (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, color: '#92400E' }}>
+                    <AlertCircle style={{ width: 12, height: 12 }} />
+                    You owe this customer: R {new Decimal(businessLoanSummary.outstanding).toFixed(2)}
+                  </div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#78350F', cursor: 'pointer', marginTop: 3 }}>
+                    <input
+                      type="checkbox"
+                      checked={deductBusinessLoan}
+                      disabled={paymentType === 'unpaid'}
+                      onChange={(e) => {
+                        setDeductBusinessLoan(e.target.checked)
+                        if (e.target.checked) {
+                          setBusinessLoanAmount(Decimal.min(new Decimal(businessLoanSummary.outstanding), total).toFixed(2))
+                        } else {
+                          setBusinessLoanAmount('')
+                        }
+                      }}
+                    />
+                    Apply to business loan
+                    {deductBusinessLoan && (
+                      <input
+                        type="number" min="0" step="0.01" value={businessLoanAmount}
+                        onChange={(e) => setBusinessLoanAmount(e.target.value)}
+                        style={{ width: 80, fontSize: 11, border: '1px solid #D97706', borderRadius: 2, padding: '1px 4px', outline: 'none' }}
+                      />
+                    )}
+                  </label>
+                </>
+              )}
+            </div>
+          )}
+
           {/* Comments */}
           <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8, padding: '3px 10px', borderBottom: '1px solid #E0E0E0' }}>
             <label style={{ fontSize: 11, fontWeight: 600, color: '#374151', whiteSpace: 'nowrap' }}>Comments:</label>
@@ -567,23 +619,21 @@ export default function NewSalePage() {
           {/* Payment Type */}
           <div style={{ flexShrink: 0, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '3px 10px', padding: '3px 10px' }}>
             <label style={{ fontSize: 11, fontWeight: 600, color: '#374151', whiteSpace: 'nowrap', width: '100%' }}>Payment Type:</label>
-            {(hasOutstandingBusinessLoan ? (['unpaid', 'split'] as const) : (['unpaid', 'cash', 'eft'] as const)).map((type) => (
+            {(['unpaid', 'cash', 'eft'] as const).map((type) => (
               <label key={type} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#374151', cursor: 'pointer' }}>
                 <input
                   type="radio"
                   name="paymentType"
                   checked={paymentType === type}
-                  onChange={() => setPaymentType(type)}
+                  onChange={() => {
+                    setPaymentType(type)
+                    if (type === 'unpaid') { setDeductBusinessLoan(false); setBusinessLoanAmount('') }
+                  }}
                   style={{ width: 13, height: 13 }}
                 />
-                {type === 'unpaid' ? 'Unpaid' : type === 'eft' ? 'EFT' : type === 'split' ? 'Split Payment' : type.charAt(0).toUpperCase() + type.slice(1)}
+                {type === 'unpaid' ? 'Unpaid' : type === 'eft' ? 'EFT' : type.charAt(0).toUpperCase() + type.slice(1)}
               </label>
             ))}
-            {hasOutstandingBusinessLoan && (
-              <span style={{ fontSize: 10, color: '#E65100', width: '100%' }}>
-                This customer has a pending business loan — this sale must go through Split Payment or be saved as unpaid.
-              </span>
-            )}
           </div>
 
           </div>
@@ -930,7 +980,7 @@ export default function NewSalePage() {
                         {actionMenuId === s.id && actionMenuRect && (
                           <div style={{ position: 'fixed', right: window.innerWidth - actionMenuRect.right, bottom: window.innerHeight - actionMenuRect.top + 2, zIndex: 9999, background: '#fff', border: '1px solid #C0C0C0', borderRadius: 3, boxShadow: '0 4px 12px rgba(0,0,0,0.15)', minWidth: 180 }}>
                             {([
-                              { label: 'Record Payment',     action: () => { setPayTarget({ id: s.id, ref: s.refNumber, totalAmount: s.totalAmount, amountPaid: s.amountPaid ?? '0' }); setActionMenuId(null) } },
+                              { label: 'Record Payment',     action: () => { setPayTarget({ id: s.id, ref: s.refNumber, totalAmount: s.totalAmount, amountPaid: s.amountPaid ?? '0', customerId: s.customerId ?? null }); setActionMenuId(null) } },
                               { label: 'Print Slip',         action: () => { router.push(`/app/sales/${s.id}`); setActionMenuId(null) } },
                               { label: 'View Full Details',  action: () => { router.push(`/app/sales/${s.id}`); setActionMenuId(null) } },
                               { label: 'Reverse Sale',       destructive: true, action: () => { setVoidId(s.id); setActionMenuId(null) } },
@@ -1159,23 +1209,15 @@ export default function NewSalePage() {
         />
       )}
 
-      {/* Split Payment modal — settles the just-created pending sale */}
-      {splitPayTarget && customer && (
-        <SaleSplitPaymentModal
-          sale={{
-            id: splitPayTarget.id,
-            ref: splitPayTarget.ref,
-            totalAmount: splitPayTarget.totalAmount,
-            businessLoanDeductionAmount: '0',
-            amountPaid: '0',
-            customerId: customer.id,
-          }}
-          hasOutstandingBusinessLoan={hasOutstandingBusinessLoan}
-          onClose={() => { mutatePending(); setSplitPayTarget(null) }}
-          onSuccess={() => {
-            const target = splitPayTarget
-            setSplitPayTarget(null)
-            if (target) setPrintDialog({ id: target.id, refNumber: target.ref })
+      {/* Admin PIN — reveals the business loan balance so it can be applied
+          to this sale via the checkbox above */}
+      {businessLoanPinOpen && customer && (
+        <AdminPinUnlockModal
+          customerId={customer.id}
+          onClose={() => setBusinessLoanPinOpen(false)}
+          onUnlocked={(summary: BusinessLoanFullSummary) => {
+            setBusinessLoanSummary(summary)
+            setBusinessLoanPinOpen(false)
           }}
         />
       )}

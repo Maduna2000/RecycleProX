@@ -119,6 +119,15 @@ export async function createSale(data: CreateSaleInput, createdByUserId?: string
   const vatAmount   = subTotal.times(vatRate)
   const totalAmount = subTotal.plus(vatAmount)
 
+  // Cap at the total — never block the sale. Mirrors createPurchase's
+  // loanDeductionAmount handling exactly, just netting against what the
+  // business owes this customer instead of what the customer owes the
+  // business. Only meaningful when the sale settles immediately — a pending
+  // sale hasn't been paid for at all yet, so nothing to deduct from.
+  const isPending = data.status === 'pending'
+  const requestedDeduction = data.businessLoanDeductionAmount ? new Decimal(data.businessLoanDeductionAmount) : null
+  const deduction = requestedDeduction && !isPending ? Decimal.min(requestedDeduction, totalAmount) : null
+
   const sale = await withSerializableRetry(() =>
     prisma.$transaction(async (tx) => {
       // Ref number inside tx — races resolved by Serializable isolation
@@ -139,8 +148,6 @@ export async function createSale(data: CreateSaleInput, createdByUserId?: string
         if (line.quantity.gt(onHand)) throw new InsufficientStockError(line.productName)
       }
 
-      const isPending = data.status === 'pending'
-
       const s = await tx.sale.create({
         data: {
           tenantId:             requireTenantId(),
@@ -154,7 +161,8 @@ export async function createSale(data: CreateSaleInput, createdByUserId?: string
           totalAmount,
           vatAmount,
           paymentMethod:        data.paymentMethod ?? 'cash',
-          amountPaid:           isPending ? new Decimal(0) : totalAmount,
+          amountPaid:           isPending ? new Decimal(0) : totalAmount.minus(deduction ?? new Decimal(0)),
+          businessLoanDeductionAmount: deduction ?? undefined,
           hasOutstandingBalance: isPending,
           notes:                data.notes,
           createdByUserId,
@@ -186,6 +194,11 @@ export async function createSale(data: CreateSaleInput, createdByUserId?: string
           sourceId:  s.id,
           createdByUserId,
         })
+      }
+
+      // Apply the business loan deduction as a repayment (FIFO across active loans)
+      if (deduction && deduction.greaterThan(0) && data.customerId) {
+        await applyBusinessLoanRepaymentTx(tx, data.customerId, deduction.toString(), createdByUserId, s.id)
       }
 
       return s
