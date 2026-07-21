@@ -402,7 +402,7 @@ function CreateProductModal({ categories, onClose, onSuccess }: { categories: Ca
             <div>
               <Label>Unit</Label>
               <Select onValueChange={(v) => setValue('unit', v as 'kg' | 'ton' | 'each' | 'litre')} defaultValue="kg">
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="mt-1 w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="kg">kg</SelectItem>
                   <SelectItem value="ton">ton</SelectItem>
@@ -420,7 +420,7 @@ function CreateProductModal({ categories, onClose, onSuccess }: { categories: Ca
           <div>
             <Label>Category</Label>
             <Select onValueChange={(v) => setValue('category', v as string)}>
-              <SelectTrigger className="mt-1"><SelectValue placeholder="Select category" /></SelectTrigger>
+              <SelectTrigger className="mt-1 w-full"><SelectValue placeholder="Select category" /></SelectTrigger>
               <SelectContent>
                 {categories.map((c) => (
                   <React.Fragment key={c.id}>
@@ -499,7 +499,7 @@ function EditProductModal({ product, categories, onClose, onSuccess }: { product
             <div>
               <Label>Category</Label>
               <Select onValueChange={(v) => setValue('category', v as string)} defaultValue={product.category}>
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="mt-1 w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {categories.map((c) => (
                     <React.Fragment key={c.id}>
@@ -516,7 +516,7 @@ function EditProductModal({ product, categories, onClose, onSuccess }: { product
             <div>
               <Label>Unit</Label>
               <Select onValueChange={(v) => setValue('unit', v as 'kg' | 'ton' | 'each' | 'litre')} defaultValue={product.unit}>
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="mt-1 w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="kg">kg</SelectItem>
                   <SelectItem value="ton">ton</SelectItem>
