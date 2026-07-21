@@ -5,7 +5,10 @@ import { useParams, useRouter } from 'next/navigation'
 import useSWR, { mutate } from 'swr'
 import { Dialog } from '@/components/ui/dialog'
 import { colors } from '@/lib/design-tokens'
-import { ArrowLeft, AlertTriangle, ShieldBan, ShieldCheck, Save, Pencil } from 'lucide-react'
+import {
+  AlertTriangle, ShieldBan, ShieldCheck, Save, Pencil,
+  User, Receipt, HandCoins, Paperclip, Briefcase, Landmark, StickyNote,
+} from 'lucide-react'
 import { PhotoUploader, PhotoViewer } from '@/components/PhotoUploader'
 import { LoansTab } from '@/components/customers/LoansTab'
 import { TradeCommoditiesSelect } from '@/components/customers/TradeCommoditiesSelect'
@@ -22,7 +25,7 @@ import {
 } from '@/lib/schemas/customer'
 import {
   inp, lbl, HEADER_GRAD, NAVY,
-  Btn, TabStrip, PortalPage,
+  Btn,
   RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter,
 } from '@/components/rpx'
 
@@ -67,6 +70,11 @@ const DOCUMENT_TYPE_LABELS: Record<string, string> = {
 const TABS_ACCOUNT = ['Overview', 'Transactions', 'Loans', 'Documents', 'Blacklist'] as const
 const TABS_CASUAL = ['Overview', 'Transactions', 'Documents', 'Blacklist'] as const
 const SECTION_TABS = ['Personal', 'Business', 'Banking', 'Compliance', 'Notes'] as const
+
+const TAB_ICONS: Record<string, React.ElementType> = {
+  Overview: User, Transactions: Receipt, Loans: HandCoins, Documents: Paperclip, Blacklist: ShieldBan,
+  Personal: User, Business: Briefcase, Banking: Landmark, Compliance: ShieldCheck, Notes: StickyNote,
+}
 
 function SHdr({ title }: { title: string }) {
   return (
@@ -183,35 +191,38 @@ export default function CustomerDetailPage() {
   const fullName    = `${customer.firstName} ${customer.lastName}`
   const fmtDate     = (v?: string | null) => v ? new Date(v).toLocaleDateString('en-ZA') : '—'
 
+  const mainTabs = customer.customerType === 'account' ? TABS_ACCOUNT : TABS_CASUAL
+
   return (
-    <PortalPage
-      title={fullName}
-      actions={
-        !isEditing ? (
-          <Btn size="sm" icon={Pencil} onClick={() => setIsEditing(true)}>Edit</Btn>
-        ) : (
-          <>
-            <Btn size="sm" onClick={handleCancel} disabled={saving}>Cancel</Btn>
-            <Btn variant="primary" size="sm" icon={Save} loading={saving} onClick={handleSubmit(onSubmit)}>
-              {saving ? 'Saving...' : 'Save'}
-            </Btn>
-          </>
-        )
-      }
-    >
-      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, background: '#F5F5F5' }}>
-      {/* ── Sub-header ────────────────────────────────────────────────────────── */}
-      <div style={{ padding: '6px 10px', borderBottom: '1px solid #E0E0E0', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-        <Btn size="sm" icon={ArrowLeft} onClick={() => router.back()}>Customers</Btn>
-        <span style={{ fontSize: 11, color: '#6C757D' }}>{customer.customerType === 'account' ? 'Account Customer' : 'Casual Customer'}</span>
-        {customer.accountCode && (
-          <span style={{ fontSize: 11, fontFamily: 'monospace', fontWeight: 700, color: NAVY, background: '#E8EFF8', border: '1px solid #B0C4DE', borderRadius: 2, padding: '1px 6px' }}>
-            {customer.accountCode}
-          </span>
-        )}
-        {customer.idNumber && (
-          <span style={{ fontSize: 11, fontFamily: 'monospace', color: '#6C757D' }}>·  {customer.idNumber}</span>
-        )}
+    <Dialog open onOpenChange={(o) => { if (!o) router.back() }}>
+      <RpxDialogContent maxWidth={1040} style={{ height: '85vh' }}>
+        <RpxDialogHeader title={fullName} onClose={() => router.back()} />
+        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, background: '#F5F5F5' }}>
+      {/* ── Info + actions row ───────────────────────────────────────────────── */}
+      <div style={{ padding: '6px 10px', borderBottom: '1px solid #E0E0E0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+          <span style={{ fontSize: 11, color: '#6C757D' }}>{customer.customerType === 'account' ? 'Account Customer' : 'Casual Customer'}</span>
+          {customer.accountCode && (
+            <span style={{ fontSize: 11, fontFamily: 'monospace', fontWeight: 700, color: NAVY, background: '#E8EFF8', border: '1px solid #B0C4DE', borderRadius: 2, padding: '1px 6px' }}>
+              {customer.accountCode}
+            </span>
+          )}
+          {customer.idNumber && (
+            <span style={{ fontSize: 11, fontFamily: 'monospace', color: '#6C757D' }}>·  {customer.idNumber}</span>
+          )}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+          {!isEditing ? (
+            <Btn size="sm" icon={Pencil} onClick={() => setIsEditing(true)}>Edit</Btn>
+          ) : (
+            <>
+              <Btn size="sm" onClick={handleCancel} disabled={saving}>Cancel</Btn>
+              <Btn variant="primary" size="sm" icon={Save} loading={saving} onClick={handleSubmit(onSubmit)}>
+                {saving ? 'Saving...' : 'Save'}
+              </Btn>
+            </>
+          )}
+        </div>
       </div>
 
       {/* ── Blacklist banner ──────────────────────────────────────────────────── */}
@@ -228,13 +239,14 @@ export default function CustomerDetailPage() {
         </div>
       )}
 
-      {/* ── Tab strip ─────────────────────────────────────────────────────────── */}
-      <TabStrip
-        tabs={(customer.customerType === 'account' ? TABS_ACCOUNT : TABS_CASUAL).map((t) => ({ value: t, label: t }))}
-        active={tab}
-        onChange={setTab}
-        style={{ padding: '8px 10px 0', background: '#F5F5F5' }}
-      />
+      {/* ── Tab row ───────────────────────────────────────────────────────────── */}
+      <div className="flex items-center gap-1.5 flex-wrap shrink-0" style={{ padding: '8px 10px', background: '#F5F5F5' }}>
+        {mainTabs.map((t) => (
+          <Btn key={t} size="sm" icon={TAB_ICONS[t]} variant={tab === t ? 'primary' : 'secondary'} onClick={() => setTab(t)}>
+            {t}
+          </Btn>
+        ))}
+      </div>
 
       {/* ── Two-column layout: main content + sidebar ─────────────────────────── */}
       <div style={{ display: 'flex', alignItems: 'flex-start', flex: 1, minHeight: 0, overflowY: 'auto' }}>
@@ -244,16 +256,17 @@ export default function CustomerDetailPage() {
 
           {tab === 'Overview' && (
             <div>
-              {/* Secondary Tab Strip for sections */}
-              <TabStrip
-                tabs={(customer.customerNotes || isEditing
+              {/* Secondary tab row for sections */}
+              <div className="flex items-center gap-1.5 flex-wrap shrink-0" style={{ padding: '8px 10px', background: '#EFEFEF' }}>
+                {(customer.customerNotes || isEditing
                   ? SECTION_TABS
                   : SECTION_TABS.filter(t => t !== 'Notes')
-                ).map((t) => ({ value: t, label: t }))}
-                active={sectionTab}
-                onChange={(v) => setSectionTab(v as typeof SECTION_TABS[number])}
-                style={{ padding: '8px 10px 0', background: '#EFEFEF' }}
-              />
+                ).map((t) => (
+                  <Btn key={t} size="sm" icon={TAB_ICONS[t]} variant={sectionTab === t ? 'primary' : 'secondary'} onClick={() => setSectionTab(t)}>
+                    {t}
+                  </Btn>
+                ))}
+              </div>
 
               {/* Section Content - Personal */}
               {sectionTab === 'Personal' && (
@@ -559,6 +572,7 @@ export default function CustomerDetailPage() {
         </div>
       </div>
       </div>
+      </RpxDialogContent>
 
       {/* ── Modals ────────────────────────────────────────────────────────────── */}
       {blacklistOpen && (
@@ -568,7 +582,7 @@ export default function CustomerDetailPage() {
           onSuccess={() => { mutate(`/api/customers/${id}`); setBlacklistOpen(false) }}
         />
       )}
-    </PortalPage>
+    </Dialog>
   )
 }
 
