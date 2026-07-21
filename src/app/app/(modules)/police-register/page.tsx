@@ -164,7 +164,7 @@ export default function PoliceRegisterPage() {
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: tab === 'generate' ? 16 : 0 }}>
 
           {tab === 'generate' && (
-            <div style={{ maxWidth: 520 }}>
+            <div>
               {/* Officer Details card */}
               <div style={{ background: '#fff', border: '1px solid #D0D0D0', borderRadius: 2, overflow: 'hidden', marginBottom: 10 }}>
                 <div style={{ background: HEADER_GRAD, borderBottom: '1px solid #C0C0C0', padding: '4px 10px' }}>
