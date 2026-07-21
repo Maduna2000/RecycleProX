@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import useSWR, { mutate } from 'swr'
 import { Search, Printer, Ban, HandCoins, Loader2, X, Split, AlertCircle } from 'lucide-react'
 import Decimal from 'decimal.js'
@@ -33,9 +33,8 @@ type Sale = {
   lines: { id: string }[]
 }
 
-function BusinessLoanBadge({ customerId }: { customerId: string }) {
-  const { data } = useSWR<{ hasOutstanding: boolean }>(`/api/customers/${customerId}/business-loans`, fetcher)
-  if (!data?.hasOutstanding) return null
+function BusinessLoanBadge({ show }: { show: boolean }) {
+  if (!show) return null
   return (
     <span title="This customer has a pending business loan" style={{ display: 'inline-flex', marginLeft: 6 }}>
       <AlertCircle style={{ width: 11, height: 11, color: '#E65100' }} />
@@ -107,6 +106,30 @@ export default function UnpaidSalesPage() {
     fetcher,
   )
 
+  // Whether each row's linked customer has an outstanding business loan —
+  // drives both the warning badge and forcing Split Payment over a plain
+  // Record Payment (mirrors the same rule enforced at sale creation).
+  const [businessLoanFlags, setBusinessLoanFlags] = useState<Record<string, boolean>>({})
+  useEffect(() => {
+    const ids = Array.from(new Set(sales.map((s) => s.customerId).filter((id): id is string => !!id)))
+    const missing = ids.filter((id) => !(id in businessLoanFlags))
+    if (missing.length === 0) return
+    let cancelled = false
+    Promise.all(
+      missing.map((id) =>
+        fetch(`/api/customers/${id}/business-loans`)
+          .then((r) => r.json())
+          .then((d: { hasOutstanding?: boolean }) => [id, d.hasOutstanding === true] as const)
+          .catch(() => [id, false] as const)
+      ),
+    ).then((results) => {
+      if (cancelled) return
+      setBusinessLoanFlags((prev) => ({ ...prev, ...Object.fromEntries(results) }))
+    })
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sales])
+
   const grandTotal = sales.reduce((acc, s) => acc.plus(outstanding(s)), new Decimal(0))
 
   const columns: Column<Sale>[] = [
@@ -127,7 +150,7 @@ export default function UnpaidSalesPage() {
           <div>
             <p style={{ fontSize: fontSize.sm, fontWeight: fontWeight.medium, color: colors.textPrimary, display: 'flex', alignItems: 'center' }}>
               {row.buyerName}
-              {row.customerId && <BusinessLoanBadge customerId={row.customerId} />}
+              <BusinessLoanBadge show={!!row.customerId && businessLoanFlags[row.customerId] === true} />
             </p>
             {row.buyerIdNumber && (
               <p className="font-mono" style={{ fontSize: 10, color: colors.textSecondary }}>{row.buyerIdNumber}</p>
@@ -189,6 +212,7 @@ export default function UnpaidSalesPage() {
     {
       label:   'Record Payment',
       icon:    HandCoins,
+      hidden:  (row) => !!row.customerId && businessLoanFlags[row.customerId] === true,
       onClick: (row) => setPayTarget({
         id:          row.id,
         ref:         row.refNumber,

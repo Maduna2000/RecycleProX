@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useSession } from 'next-auth/react'
 import { Coins, CreditCard, Wallet, Lock, Split } from 'lucide-react'
 import { toast } from 'sonner'
 import Decimal from 'decimal.js'
@@ -93,6 +94,9 @@ export function SaleSplitPaymentModal({
   const [pinModalOpen, setPinModalOpen] = useState(false)
   const [unlockedSummary, setUnlockedSummary] = useState<BusinessLoanFullSummary | null>(null)
 
+  const { data: session } = useSession()
+  const isAdmin = session?.user?.role === 'admin'
+
   const totalAmount        = new Decimal(sale.totalAmount)
   const existingDeduction  = new Decimal(sale.businessLoanDeductionAmount || '0')
   const existingPaid       = new Decimal(sale.amountPaid)
@@ -105,10 +109,28 @@ export function SaleSplitPaymentModal({
   const remaining        = pendingAmount.minus(paymentTotal)
 
   const showBusinessLoanLeg = hasOutstandingBusinessLoan && !!sale.customerId
-  const isLocked = showBusinessLoanLeg && !unlockedSummary
+  const isLocked = showBusinessLoanLeg && !unlockedSummary && !isAdmin
   const maxLoanDeduction = unlockedSummary
     ? Decimal.min(new Decimal(unlockedSummary.outstanding), pendingAmount)
     : new Decimal(0)
+
+  // Admin already has full visibility on the customer profile — the PIN gate
+  // exists to reveal the figure to a manager, not to re-verify an admin who's
+  // already logged in as one. Fetch the real summary straight away instead.
+  useEffect(() => {
+    if (!showBusinessLoanLeg || !isAdmin || unlockedSummary || !sale.customerId) return
+    let cancelled = false
+    fetch(`/api/customers/${sale.customerId}/business-loans`)
+      .then((r) => r.json())
+      .then((data: BusinessLoanFullSummary) => {
+        if (cancelled || !data?.outstanding) return
+        setUnlockedSummary(data)
+        const suggested = Decimal.min(new Decimal(data.outstanding), pendingAmount)
+        setBusinessLoan(suggested.toFixed(2))
+      })
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showBusinessLoanLeg, isAdmin, sale.customerId])
 
   function validate(): string | null {
     if (paymentTotal.isZero()) return 'Enter at least one payment amount'
@@ -176,7 +198,9 @@ export function SaleSplitPaymentModal({
                     <p className="text-xs" style={{ color: '#EF6C00' }}>
                       {unlockedSummary
                         ? `Outstanding: R ${new Decimal(unlockedSummary.outstanding).toFixed(2)} — you may apply some or all of this sale toward it.`
-                        : 'Enter an admin PIN to view the balance and apply it toward this sale.'}
+                        : isAdmin
+                          ? 'Loading balance…'
+                          : 'Enter an admin PIN to view the balance and apply it toward this sale.'}
                     </p>
                   </div>
                 </div>

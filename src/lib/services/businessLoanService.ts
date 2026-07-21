@@ -37,6 +37,10 @@ export class CustomerInactiveError extends Error {
   constructor() { super('Customer account is inactive'); this.name = 'CustomerInactiveError' }
 }
 
+export class CustomerNotDealerTierError extends Error {
+  constructor() { super('Only Dealer 3 accounts can have a business loan recorded'); this.name = 'CustomerNotDealerTierError' }
+}
+
 export class InvalidAdminPinError extends Error {
   constructor() { super('Incorrect admin PIN'); this.name = 'InvalidAdminPinError' }
 }
@@ -125,6 +129,7 @@ export async function createBusinessLoan(data: CreateBusinessLoanInput, createdB
   if (!customer) throw new Error('Customer not found')
   if (customer.blacklisted) throw new CustomerBlacklistedError()
   if (!customer.isActive) throw new CustomerInactiveError()
+  if (customer.dealerCategory !== 'dealer_3') throw new CustomerNotDealerTierError()
 
   const principal = new Decimal(data.principalAmount)
   const refNumber = await generateBusinessLoanRef()

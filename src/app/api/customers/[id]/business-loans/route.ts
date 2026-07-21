@@ -8,6 +8,7 @@ import {
   getCustomerBusinessLoanSummaryForRole,
   CustomerBlacklistedError,
   CustomerInactiveError,
+  CustomerNotDealerTierError,
 } from '@/lib/services/businessLoanService'
 
 export async function GET(
@@ -45,8 +46,9 @@ export async function POST(
     const loan = await runWithRequestTenant(req, () => createBusinessLoan(parsed.data, session.user.id))
     return NextResponse.json(loan, { status: 201 })
   } catch (err) {
-    if (err instanceof CustomerBlacklistedError) return NextResponse.json({ error: err.message }, { status: 422 })
-    if (err instanceof CustomerInactiveError)    return NextResponse.json({ error: err.message }, { status: 422 })
+    if (err instanceof CustomerBlacklistedError)  return NextResponse.json({ error: err.message }, { status: 422 })
+    if (err instanceof CustomerInactiveError)     return NextResponse.json({ error: err.message }, { status: 422 })
+    if (err instanceof CustomerNotDealerTierError) return NextResponse.json({ error: err.message }, { status: 422 })
     logger.error({ err }, 'POST /api/customers/[id]/business-loans failed')
     return NextResponse.json({ error: 'Failed to create business loan' }, { status: 500 })
   }

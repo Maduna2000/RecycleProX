@@ -231,7 +231,10 @@ export default function CustomerDetailPage() {
 
       {/* ── Tab strip ─────────────────────────────────────────────────────────── */}
       <TabStrip
-        tabs={(customer.customerType === 'account' ? TABS_ACCOUNT : TABS_CASUAL).map((t) => ({ value: t, label: t }))}
+        tabs={(customer.customerType === 'account'
+          ? TABS_ACCOUNT.filter((t) => t !== 'Business Loan' || customer.dealerCategory === 'dealer_3')
+          : TABS_CASUAL
+        ).map((t) => ({ value: t, label: t }))}
         active={tab}
         onChange={setTab}
         style={{ padding: '8px 10px 0', background: '#F5F5F5' }}
@@ -483,7 +486,7 @@ export default function CustomerDetailPage() {
               userAllowedModules={(session?.user as { allowedModules?: string[] })?.allowedModules ?? []}
             />
           )}
-          {tab === 'Business Loan' && customer.customerType === 'account' && (
+          {tab === 'Business Loan' && customer.customerType === 'account' && customer.dealerCategory === 'dealer_3' && (
             <BusinessLoanTab
               customerId={id}
               customerName={fullName}

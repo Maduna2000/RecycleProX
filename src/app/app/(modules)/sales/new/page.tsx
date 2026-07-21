@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Plus, Trash2, Loader2, Scale, RefreshCw, Camera, ClipboardList, AlertCircle } from 'lucide-react'
@@ -149,6 +149,17 @@ export default function NewSalePage() {
     fetcher,
   )
   const hasOutstandingBusinessLoan = businessLoanData?.hasOutstanding === true
+
+  // 'cash'/'eft' aren't valid choices once a business loan is outstanding —
+  // this sale must be resolved via Split Payment or deferred as unpaid. If
+  // the flag flips true after a plain method was already selected (e.g. the
+  // account was just picked), fall back to the safe default rather than
+  // silently completing on a now-hidden radio option.
+  useEffect(() => {
+    if (hasOutstandingBusinessLoan && (paymentType === 'cash' || paymentType === 'eft')) {
+      setPaymentType('split')
+    }
+  }, [hasOutstandingBusinessLoan, paymentType])
 
   const products = productsData?.products ?? []
   const stockMap = new Map((stockData?.stock ?? []).map((r) => [r.product.id, new Decimal(r.onHand ?? '0')]))
@@ -556,10 +567,7 @@ export default function NewSalePage() {
           {/* Payment Type */}
           <div style={{ flexShrink: 0, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '3px 10px', padding: '3px 10px' }}>
             <label style={{ fontSize: 11, fontWeight: 600, color: '#374151', whiteSpace: 'nowrap', width: '100%' }}>Payment Type:</label>
-            {([
-              'unpaid', 'cash', 'eft',
-              ...(hasOutstandingBusinessLoan ? ['split' as const] : []),
-            ] as const).map((type) => (
+            {(hasOutstandingBusinessLoan ? (['unpaid', 'split'] as const) : (['unpaid', 'cash', 'eft'] as const)).map((type) => (
               <label key={type} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#374151', cursor: 'pointer' }}>
                 <input
                   type="radio"
@@ -571,6 +579,11 @@ export default function NewSalePage() {
                 {type === 'unpaid' ? 'Unpaid' : type === 'eft' ? 'EFT' : type === 'split' ? 'Split Payment' : type.charAt(0).toUpperCase() + type.slice(1)}
               </label>
             ))}
+            {hasOutstandingBusinessLoan && (
+              <span style={{ fontSize: 10, color: '#E65100', width: '100%' }}>
+                This customer has a pending business loan — this sale must go through Split Payment or be saved as unpaid.
+              </span>
+            )}
           </div>
 
           </div>
