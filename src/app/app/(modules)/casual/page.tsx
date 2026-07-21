@@ -280,9 +280,6 @@ export default function CasualsPage() {
               <option value="both">Both</option>
             </select>
           </Field>
-          <span style={{ fontSize: 11, color: '#6C757D', marginLeft: 'auto', paddingBottom: 8 }}>
-            {customers.length} casual{customers.length !== 1 ? 's' : ''}
-          </span>
           <div style={{ paddingBottom: 8 }}>
             <BtnMenu
               size="sm"
@@ -294,6 +291,9 @@ export default function CasualsPage() {
               ]}
             />
           </div>
+          <span style={{ fontSize: 11, color: '#6C757D', marginLeft: 'auto', paddingBottom: 8 }}>
+            {customers.length} casual{customers.length !== 1 ? 's' : ''}
+          </span>
         </FilterBar>
 
         {/* A–Z quick filter */}

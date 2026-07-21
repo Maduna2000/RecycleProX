@@ -370,7 +370,7 @@ function AdjustmentModal({
               <Label>Direction</Label>
               <Select value={direction} onValueChange={(v) => setDirection(v as 'in' | 'out')}>
                 <SelectTrigger className="mt-1 w-full"><SelectValue /></SelectTrigger>
-                <SelectContent>
+                <SelectContent className="w-fit min-w-36">
                   <SelectItem value="in">Stock IN (add)</SelectItem>
                   <SelectItem value="out">Stock OUT (remove)</SelectItem>
                 </SelectContent>
