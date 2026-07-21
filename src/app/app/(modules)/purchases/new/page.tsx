@@ -12,6 +12,7 @@ import { PrintResultModal } from '@/components/PrintResultModal'
 import { ProductCategoryPicker } from '@/components/products/ProductCategoryPicker'
 import Decimal from 'decimal.js'
 import { colors } from '@/lib/design-tokens'
+import { BAR_GRAD, CARD_BORDER } from '@/components/rpx/styles'
 import { useOfflineMutation } from '@/hooks/useOfflineFetch'
 import { offlineDB } from '@/lib/offline/db'
 
@@ -1288,7 +1289,7 @@ export default function NewPurchasePage() {
           type="button"
           onClick={() => submitPurchase(paymentType === 'unpaid')}
           disabled={submitting || (!!customer && !!customer.blacklisted)}
-          style={{ height: 28, padding: '0 24px', borderRadius: 2, fontSize: 12, fontWeight: 700, background: '#217346', border: '1px solid #176338', color: '#FFF', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, opacity: submitting || (!!customer && !!customer.blacklisted) ? 0.4 : 1 }}
+          style={{ height: 28, padding: '0 24px', borderRadius: 2, fontSize: 12, fontWeight: 700, background: BAR_GRAD, border: CARD_BORDER, color: colors.textPrimary, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, opacity: submitting || (!!customer && !!customer.blacklisted) ? 0.4 : 1 }}
         >
           {submitting
             ? <><Loader2 style={{ width: 13, height: 13, animation: 'spin 1s linear infinite' }} /> Submitting…</>
