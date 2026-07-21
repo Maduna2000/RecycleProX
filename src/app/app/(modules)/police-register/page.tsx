@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import useSWR, { mutate } from 'swr'
 import { Dialog } from '@/components/ui/dialog'
@@ -10,7 +11,7 @@ import { colors } from '@/lib/design-tokens'
 import { DEFAULT_POLICE_SERVICE_NAME, DEFAULT_POLICE_LEGAL_NOTE } from '@/lib/police-defaults'
 import {
   inp, lbl, TH, TD, HEADER_GRAD, NAVY,
-  Btn, Field, PortalPage, EmptyHint,
+  Btn, Field, EmptyHint,
   RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter,
 } from '@/components/rpx'
 
@@ -52,6 +53,7 @@ const SEARCH_TYPE_LABELS: Record<SearchLog['searchType'], string> = {
 type Tab = 'generate' | 'history'
 
 export default function PoliceRegisterPage() {
+  const router = useRouter()
   const { data: session } = useSession()
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
 
@@ -140,19 +142,25 @@ export default function PoliceRegisterPage() {
 
   return (
     <>
-      <PortalPage
-        tabs={[
-          { value: 'generate', label: 'Generate Register', icon: ClipboardList },
-          { value: 'history',  label: 'Visit History',     icon: History },
-        ]}
-        active={tab}
-        onChange={(v) => setTab(v as Tab)}
-        actions={
-          <Btn variant="primary" size="sm" icon={ShieldCheck} href="/police">
-            Officer Portal
-          </Btn>
-        }
-      >
+      <Dialog open onOpenChange={(o) => { if (!o) router.back() }}>
+        <RpxDialogContent maxWidth={760} style={{ height: '82vh' }}>
+          <RpxDialogHeader title="Police Register" onClose={() => router.back()} />
+
+          {/* ── Tab row + Officer Portal action, merged ─────────────────────── */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '8px 10px', borderBottom: '1px solid #E0E0E0', flexShrink: 0 }}>
+            <div className="flex items-center gap-1.5">
+              <Btn size="sm" icon={ClipboardList} variant={tab === 'generate' ? 'primary' : 'secondary'} onClick={() => setTab('generate')}>
+                Generate Register
+              </Btn>
+              <Btn size="sm" icon={History} variant={tab === 'history' ? 'primary' : 'secondary'} onClick={() => setTab('history')}>
+                Visit History
+              </Btn>
+            </div>
+            <Btn variant="primary" size="sm" icon={ShieldCheck} href="/police">
+              Officer Portal
+            </Btn>
+          </div>
+
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: tab === 'generate' ? 16 : 0 }}>
 
           {tab === 'generate' && (
@@ -233,7 +241,8 @@ export default function PoliceRegisterPage() {
             )
           )}
         </div>
-      </PortalPage>
+        </RpxDialogContent>
+      </Dialog>
 
       {sigDialogOpen && pendingVisitId && (
         <SignatureDialog
