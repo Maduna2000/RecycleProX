@@ -12,6 +12,7 @@ import { triggerSync, getPendingCount } from '@/lib/offline/sync'
 import { runSeeder } from '@/lib/offline/seeder'
 import { DEFAULT_POLICE_SERVICE_NAME, DEFAULT_POLICE_LEGAL_NOTE } from '@/lib/police-defaults'
 import { inp, HEADER_GRAD, NAVY, Btn, Field, PortalPage } from '@/components/rpx'
+import { TradeCommoditiesModal } from './_components/TradeCommoditiesModal'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -198,6 +199,7 @@ export default function SettingsPage() {
   const [syncing, setSyncing]       = useState(false)
   const [seeding, setSeeding]       = useState(false)
   const [pendingCount, setPending]  = useState(0)
+  const [tradeCommoditiesOpen, setTradeCommoditiesOpen] = useState(false)
   const isOnline = useOfflineStore((s) => s.isOnline)
 
   useEffect(() => { getPendingCount().then(setPending) }, [])
@@ -375,7 +377,7 @@ export default function SettingsPage() {
                       Configure the list of commodities shown when registering account customers.
                     </p>
                   </div>
-                  <Btn size="sm" href="/app/settings/trade-commodities" style={{ whiteSpace: 'nowrap' }}>
+                  <Btn size="sm" onClick={() => setTradeCommoditiesOpen(true)} style={{ whiteSpace: 'nowrap' }}>
                     Manage →
                   </Btn>
                 </div>
@@ -495,7 +497,7 @@ export default function SettingsPage() {
                   ? `${pendingCount} transaction${pendingCount > 1 ? 's' : ''} queued and waiting to sync.`
                   : 'All transactions are synced.'}
               </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
                 <Btn
                   size="sm"
                   icon={RefreshCw}
@@ -529,6 +531,10 @@ export default function SettingsPage() {
           {saving ? 'Saving…' : 'Save Settings'}
         </Btn>
       </div>
+
+      {tradeCommoditiesOpen && (
+        <TradeCommoditiesModal onClose={() => setTradeCommoditiesOpen(false)} />
+      )}
     </PortalPage>
   )
 }
