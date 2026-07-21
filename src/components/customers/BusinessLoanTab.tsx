@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import useSWR, { mutate } from 'swr'
-import { Loader2, MoreHorizontal, Lock } from 'lucide-react'
+import { Loader2, MoreHorizontal, Lock, HandCoins } from 'lucide-react'
 import { toast } from 'sonner'
 import Decimal from 'decimal.js'
 import { Dialog } from '@/components/ui/dialog'
@@ -11,9 +11,19 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { format } from '@/lib/utils/format'
-import { HEADER_GRAD, NAVY, lbl, Btn, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
+import { colors } from '@/lib/design-tokens'
+import { HEADER_GRAD, lbl, Btn, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
+
+// This tab is the mirror image of the "Loans" tab: Loans is money the
+// business advances TO this customer (a receivable — the customer owes us).
+// This tab is money the customer/dealer advanced TO the business (a
+// liability — we owe them). Same underlying pattern, opposite direction, so
+// everything here is deliberately styled and worded around "owe"/"borrowed"
+// rather than reusing Loans' "advance"/"outstanding" language, and uses
+// violet (a liability/debt color) instead of Loans' green, so the two tabs
+// are never mistaken for each other at a glance.
 
 type BusinessLoan = {
   id: string
@@ -48,17 +58,21 @@ const PAYMENT_METHODS = [
   { value: 'eft', label: 'EFT' },
 ]
 
-function SHdr({ title }: { title: string }) {
+function SHdr({ title, subtitle }: { title: string; subtitle: string }) {
   return (
-    <div style={{ background: HEADER_GRAD, borderBottom: '1px solid #C0C0C0', padding: '4px 10px', flexShrink: 0 }}>
-      <span style={{ fontSize: 11, fontWeight: 700, color: NAVY }}>{title}</span>
+    <div style={{ background: HEADER_GRAD, borderBottom: '1px solid #C0C0C0', padding: '5px 10px', flexShrink: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <HandCoins style={{ width: 12, height: 12, color: colors.violet }} />
+        <span style={{ fontSize: 11, fontWeight: 700, color: colors.violet }}>{title}</span>
+      </div>
+      <span style={{ fontSize: 10, color: '#6C757D' }}>{subtitle}</span>
     </div>
   )
 }
 
 function StatusBadge({ status }: { status: 'active' | 'settled' | 'voided' }) {
   const styles: Record<typeof status, { bg: string; color: string; text: string }> = {
-    active: { bg: '#DBEAFE', color: '#1E40AF', text: 'Active' },
+    active: { bg: colors.violetBg, color: colors.violet, text: 'You Owe' },
     settled: { bg: '#DCFCE7', color: '#166534', text: 'Settled' },
     voided: { bg: '#F3F4F6', color: '#6B7280', text: 'Voided' },
   }
@@ -100,12 +114,12 @@ export function BusinessLoanTab({ customerId, customerName, userRole }: Business
     return isAdmin && loan.status === 'active' && (loan._count?.repayments ?? 0) === 0
   }
 
-  const outstanding = data?.outstanding ? new Decimal(data.outstanding) : new Decimal(0)
+  const owed = data?.outstanding ? new Decimal(data.outstanding) : new Decimal(0)
 
   if (isLoading) {
     return (
       <div>
-        <SHdr title="Business Loan" />
+        <SHdr title="Business Loan" subtitle="Money the business borrowed from this dealer" />
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 0', color: '#9CA3AF', fontSize: 12, gap: 8 }}>
           <Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} />
           Loading...
@@ -118,7 +132,7 @@ export function BusinessLoanTab({ customerId, customerName, userRole }: Business
   if (!isAdmin) {
     return (
       <div>
-        <SHdr title="Business Loan" />
+        <SHdr title="Business Loan" subtitle="Money the business borrowed from this dealer" />
         <div style={{ padding: '24px 16px', textAlign: 'center' }}>
           <div
             style={{
@@ -127,17 +141,17 @@ export function BusinessLoanTab({ customerId, customerName, userRole }: Business
               gap: 8,
               padding: '8px 16px',
               borderRadius: 4,
-              background: data?.hasOutstanding ? '#FFF3E0' : '#F3F4F6',
-              border: `1px solid ${data?.hasOutstanding ? '#FFCC80' : '#E5E7EB'}`,
+              background: data?.hasOutstanding ? colors.violetBg : '#F3F4F6',
+              border: `1px solid ${data?.hasOutstanding ? '#C4B5FD' : '#E5E7EB'}`,
             }}
           >
-            <Lock style={{ width: 13, height: 13, color: data?.hasOutstanding ? '#E65100' : '#9CA3AF' }} />
-            <span style={{ fontSize: 12, fontWeight: 600, color: data?.hasOutstanding ? '#E65100' : '#6B7280' }}>
-              {data?.hasOutstanding ? 'Business loan outstanding' : 'No business loan'}
+            <Lock style={{ width: 13, height: 13, color: data?.hasOutstanding ? colors.violet : '#9CA3AF' }} />
+            <span style={{ fontSize: 12, fontWeight: 600, color: data?.hasOutstanding ? colors.violet : '#6B7280' }}>
+              {data?.hasOutstanding ? 'The business owes this dealer money' : 'The business owes this dealer nothing'}
             </span>
           </div>
           <p style={{ fontSize: 11, color: '#9CA3AF', marginTop: 10 }}>
-            Loan figures are only visible to a system admin.
+            The amount owed is only visible to a system admin.
           </p>
         </div>
       </div>
@@ -146,7 +160,7 @@ export function BusinessLoanTab({ customerId, customerName, userRole }: Business
 
   return (
     <div>
-      <SHdr title="Business Loan" />
+      <SHdr title="Business Loan" subtitle="Money the business borrowed from this dealer" />
 
       <div
         style={{
@@ -159,16 +173,16 @@ export function BusinessLoanTab({ customerId, customerName, userRole }: Business
         }}
       >
         <div>
-          <span style={lbl}>Outstanding Balance</span>
+          <span style={lbl}>You Owe {customerName}</span>
           <span
             style={{
               fontSize: 14,
               fontWeight: 700,
               fontFamily: 'monospace',
-              color: outstanding.gt(0) ? '#D97706' : '#059669',
+              color: owed.gt(0) ? colors.violet : '#059669',
             }}
           >
-            {format.currency(outstanding.toString())}
+            {format.currency(owed.toString())}
           </span>
         </div>
         <button
@@ -178,20 +192,20 @@ export function BusinessLoanTab({ customerId, customerName, userRole }: Business
             padding: '4px 12px',
             borderRadius: 2,
             cursor: 'pointer',
-            background: 'linear-gradient(180deg,#10B981 0%,#059669 100%)',
-            border: '1px solid #059669',
+            background: `linear-gradient(180deg, ${colors.violet} 0%, #6B21A8 100%)`,
+            border: `1px solid ${colors.violet}`,
             color: '#fff',
             fontWeight: 600,
           }}
         >
-          + New Loan
+          + Record Money Borrowed
         </button>
       </div>
 
       {loans.length === 0 ? (
         <div style={{ padding: '40px 0', textAlign: 'center' }}>
           <p style={{ color: '#9CA3AF', fontSize: 12, marginBottom: 12 }}>
-            No business loans for this customer
+            The business has never borrowed money from this dealer
           </p>
           <button
             onClick={() => setCreateOpen(true)}
@@ -200,13 +214,13 @@ export function BusinessLoanTab({ customerId, customerName, userRole }: Business
               padding: '4px 12px',
               borderRadius: 2,
               cursor: 'pointer',
-              background: 'linear-gradient(180deg,#10B981 0%,#059669 100%)',
-              border: '1px solid #059669',
+              background: `linear-gradient(180deg, ${colors.violet} 0%, #6B21A8 100%)`,
+              border: `1px solid ${colors.violet}`,
               color: '#fff',
               fontWeight: 600,
             }}
           >
-            + Create Loan
+            + Record Money Borrowed
           </button>
         </div>
       ) : (
@@ -214,7 +228,7 @@ export function BusinessLoanTab({ customerId, customerName, userRole }: Business
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead>
               <tr style={{ background: 'linear-gradient(180deg,#F5F5F5 0%,#EBEBEB 100%)', borderBottom: '1px solid #C0C0C0' }}>
-                {['Reference', 'Amount', 'Balance', 'Status', 'Date', ''].map((h) => (
+                {['Reference', 'Borrowed', 'Still Owed', 'Status', 'Date', ''].map((h) => (
                   <th
                     key={h}
                     style={{
@@ -249,7 +263,7 @@ export function BusinessLoanTab({ customerId, customerName, userRole }: Business
                       padding: '5px 10px',
                       fontFamily: 'monospace',
                       fontWeight: 600,
-                      color: new Decimal(loan.balanceAmount).gt(0) ? '#D97706' : '#059669',
+                      color: new Decimal(loan.balanceAmount).gt(0) ? colors.violet : '#059669',
                     }}
                   >
                     {format.currency(loan.balanceAmount)}
@@ -280,21 +294,21 @@ export function BusinessLoanTab({ customerId, customerName, userRole }: Business
                               borderRadius: 4,
                               boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
                               zIndex: 10,
-                              minWidth: 120,
+                              minWidth: 150,
                             }}
                           >
                             <button
                               onClick={() => { setRepayTarget(loan); setMenuOpenId(null) }}
                               style={{ display: 'block', width: '100%', padding: '6px 12px', fontSize: 11, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', color: '#374151' }}
                             >
-                              Repay
+                              Repay Dealer
                             </button>
                             {canVoidLoan(loan) && (
                               <button
                                 onClick={() => { setVoidTarget(loan); setMenuOpenId(null) }}
                                 style={{ display: 'block', width: '100%', padding: '6px 12px', fontSize: 11, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', color: '#DC2626' }}
                               >
-                                Void Loan
+                                Void Entry
                               </button>
                             )}
                           </div>
@@ -370,14 +384,14 @@ function CreateBusinessLoanDialog({
     })
     setLoading(false)
     if (res.ok) {
-      toast.success('Business loan created')
+      toast.success(`Recorded — the business now owes ${customerName}`)
       onSuccess()
     } else {
       const j = (await res.json()) as { error?: string | { formErrors?: string[] } }
       const msg =
         typeof j.error === 'string'
           ? j.error
-          : (j.error as { formErrors?: string[] })?.formErrors?.[0] ?? 'Failed to create business loan'
+          : (j.error as { formErrors?: string[] })?.formErrors?.[0] ?? 'Failed to record business loan'
       toast.error(msg)
     }
   }
@@ -385,11 +399,16 @@ function CreateBusinessLoanDialog({
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
       <RpxDialogContent maxWidth={440}>
-        <RpxDialogHeader title={`Create Business Loan for ${customerName}`} onClose={onClose} />
+        <RpxDialogHeader title={`Record Money Borrowed From ${customerName}`} icon={HandCoins} onClose={onClose} />
         <RpxDialogBody>
           <div className="space-y-4">
+            <p className="text-xs" style={{ color: '#6C757D' }}>
+              {customerName} advanced cash to the business (e.g. to fund a stock purchase). This
+              creates a liability — the business owes it back, either as a direct repayment or by
+              deducting it from a future sale to {customerName}.
+            </p>
             <div>
-              <Label>Amount (R) *</Label>
+              <Label>Amount Borrowed (R) *</Label>
               <Input
                 placeholder="0.00"
                 value={amount}
@@ -401,7 +420,7 @@ function CreateBusinessLoanDialog({
               />
             </div>
             <div>
-              <Label>Payment Method *</Label>
+              <Label>How It Was Received *</Label>
               <Select value={method} onValueChange={(v) => setMethod(v ?? 'cash')}>
                 <SelectTrigger className="mt-1 w-full">
                   <SelectValue />
@@ -421,7 +440,7 @@ function CreateBusinessLoanDialog({
         </RpxDialogBody>
         <RpxDialogFooter>
           <Btn onClick={onClose} disabled={loading}>Cancel</Btn>
-          <Btn variant="primary" onClick={onSubmit} disabled={!amount} loading={loading}>Create Loan</Btn>
+          <Btn variant="primary" onClick={onSubmit} disabled={!amount} loading={loading}>Record Loan</Btn>
         </RpxDialogFooter>
       </RpxDialogContent>
     </Dialog>
@@ -454,7 +473,7 @@ function RepayBusinessLoanDialog({
     })
     setLoading(false)
     if (res.ok) {
-      toast.success('Repayment recorded')
+      toast.success(`Repayment to ${customerName} recorded`)
       onSuccess()
     } else {
       const j = (await res.json()) as { error?: string }
@@ -465,14 +484,16 @@ function RepayBusinessLoanDialog({
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
       <RpxDialogContent maxWidth={420}>
-        <RpxDialogHeader title={`Repay ${customerName}`} onClose={onClose} />
+        <RpxDialogHeader title={`Repay ${customerName} Directly`} icon={HandCoins} onClose={onClose} />
         <RpxDialogBody>
           <div className="space-y-4">
             <p className="text-xs" style={{ color: '#6C757D' }}>
-              {loan.refNumber} — Balance {format.currency(loan.balanceAmount)}
+              {loan.refNumber} — the business still owes {format.currency(loan.balanceAmount)}. Use
+              this when repaying outside of a sale (a sale can instead deduct this via Split
+              Payment).
             </p>
             <div>
-              <Label>Amount (R) *</Label>
+              <Label>Amount To Repay (R) *</Label>
               <Input
                 placeholder="0.00"
                 value={amount}
@@ -501,7 +522,7 @@ function RepayBusinessLoanDialog({
         </RpxDialogBody>
         <RpxDialogFooter>
           <Btn onClick={onClose} disabled={loading}>Cancel</Btn>
-          <Btn variant="primary" onClick={onSubmit} disabled={!amount} loading={loading}>Repay</Btn>
+          <Btn variant="primary" onClick={onSubmit} disabled={!amount} loading={loading}>Repay {customerName}</Btn>
         </RpxDialogFooter>
       </RpxDialogContent>
     </Dialog>
@@ -533,24 +554,25 @@ function VoidBusinessLoanDialog({
     })
     setLoading(false)
     if (res.ok) {
-      toast.success('Business loan voided')
+      toast.success('Entry voided')
       onSuccess()
     } else {
       const j = (await res.json()) as { error?: string }
-      toast.error(j.error ?? 'Failed to void business loan')
+      toast.error(j.error ?? 'Failed to void entry')
     }
   }
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
       <RpxDialogContent maxWidth={440}>
-        <RpxDialogHeader title="Void Business Loan" onClose={onClose} />
+        <RpxDialogHeader title="Void Business Loan Entry" onClose={onClose} />
         <RpxDialogBody>
           <div className="space-y-4">
             <div className="rounded p-3 text-sm" style={{ background: '#FEF2F2', border: '1px solid #FECACA' }}>
               <p className="font-medium" style={{ color: '#DC2626' }}>{customerName} — {loan.refNumber}</p>
               <p className="text-xs mt-1" style={{ color: '#DC2626' }}>
-                This will void the business loan of {format.currency(loan.principalAmount)}. This action cannot be undone.
+                This removes the record that the business borrowed {format.currency(loan.principalAmount)}
+                {' '}from {customerName}. Use this only to correct a mistaken entry — this action cannot be undone.
               </p>
             </div>
             <div>
@@ -568,7 +590,7 @@ function VoidBusinessLoanDialog({
         </RpxDialogBody>
         <RpxDialogFooter>
           <Btn onClick={onClose} disabled={loading}>Cancel</Btn>
-          <Btn variant="danger" onClick={onSubmit} disabled={reason.length < 5} loading={loading}>Void Loan</Btn>
+          <Btn variant="danger" onClick={onSubmit} disabled={reason.length < 5} loading={loading}>Void Entry</Btn>
         </RpxDialogFooter>
       </RpxDialogContent>
     </Dialog>
