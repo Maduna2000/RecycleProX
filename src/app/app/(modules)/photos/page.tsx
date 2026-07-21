@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import useSWR from 'swr'
 import { Dialog } from '@/components/ui/dialog'
 import {
   Search, Download, Images, X, ChevronLeft, ChevronRight,
-  Loader2, FileText, IdCard, Scale, ShoppingCart, Receipt, FileDown,
+  Loader2, FileText, IdCard, Scale, ShoppingCart, Receipt,
 } from 'lucide-react'
 import { colors, fontSize } from '@/lib/design-tokens'
 import type { PhotoRecord } from '@/app/api/photos/search/route'
@@ -33,11 +33,11 @@ const TYPE_META: Record<PhotoRecord['type'], { label: string; color: string; bg:
 }
 
 const TABS = [
-  { value: 'all',          label: 'All'         },
-  { value: 'purchase',     label: 'Purchases'   },
-  { value: 'sale',         label: 'Sales'       },
-  { value: 'weighbridge',  label: 'Weighbridge' },
-  { value: 'casual',       label: 'ID Photos'   },
+  { value: 'all',          label: 'All',         icon: Images      },
+  { value: 'purchase',     label: 'Purchases',   icon: ShoppingCart },
+  { value: 'sale',         label: 'Sales',       icon: Receipt     },
+  { value: 'weighbridge',  label: 'Weighbridge', icon: Scale       },
+  { value: 'casual',       label: 'ID Photos',   icon: IdCard      },
 ] as const
 
 const EMPTY_MESSAGES: Record<string, string> = {
@@ -46,27 +46,6 @@ const EMPTY_MESSAGES: Record<string, string> = {
   sale:         'No sale photos',
   weighbridge:  'No weighbridge photos',
   casual:       'No ID photos',
-}
-
-// ─── CSV export ───────────────────────────────────────────────────────────────
-
-function exportCsv(photos: PhotoRecord[]) {
-  const header = 'Type,Ref#,Customer Name,ID Number,Product,Date\n'
-  const rows = photos.map((p) => {
-    const name    = p.customer ? `${p.customer.firstName} ${p.customer.lastName}` : ''
-    const idNo    = p.customer?.idNumber ?? ''
-    const prodName = p.product?.name ?? ''
-    const date    = new Date(p.createdAt).toLocaleDateString('en-ZA')
-    return [TYPE_META[p.type]?.label ?? p.type, p.refNumber ?? '', name, idNo, prodName, date]
-      .map((v) => `"${String(v).replace(/"/g, '""')}"`)
-      .join(',')
-  }).join('\n')
-  const blob = new Blob([header + rows], { type: 'text/csv' })
-  const a    = document.createElement('a')
-  a.href     = URL.createObjectURL(blob)
-  a.download = `photos-export-${new Date().toISOString().slice(0, 10)}.csv`
-  a.click()
-  URL.revokeObjectURL(a.href)
 }
 
 // ─── Photo card ───────────────────────────────────────────────────────────────
@@ -267,10 +246,8 @@ function ViewerDialog({
 
 function PhotoGrid({
   queryType,
-  onPhotosChange,
 }: {
-  queryType?:      string
-  onPhotosChange?: (photos: PhotoRecord[]) => void
+  queryType?: string
 }) {
   const [search, setSearch] = useState('')
   const [from,   setFrom]   = useState('')
@@ -296,14 +273,6 @@ function PhotoGrid({
   const photos    = data?.photos    ?? []
   const pageCount = data?.pageCount ?? 1
   const total     = data?.total     ?? 0
-
-  // Notify parent of current photos (for CSV export in header)
-  const stableOnPhotosChange = useCallback(
-    (p: PhotoRecord[]) => onPhotosChange?.(p),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [onPhotosChange]
-  )
-  useEffect(() => { stableOnPhotosChange(photos) }, [photos, stableOnPhotosChange])
 
   // Keyboard navigation in viewer
   useEffect(() => {
@@ -419,25 +388,25 @@ function PhotoGrid({
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function PhotosPage() {
-  const [activeTab,     setActiveTab]     = useState('all')
-  const [exportPhotos,  setExportPhotos]  = useState<PhotoRecord[]>([])
+  const [activeTab, setActiveTab] = useState('all')
 
   return (
-    <PortalPage
-      tabs={[...TABS]}
-      active={activeTab}
-      onChange={setActiveTab}
-      actions={
-        exportPhotos.length > 0 ? (
-          <Btn size="sm" icon={FileDown} onClick={() => exportCsv(exportPhotos)}>Export CSV</Btn>
-        ) : undefined
-      }
-    >
+    <PortalPage title="Photo Viewer">
+      <div className="flex items-center gap-1.5 shrink-0" style={{ padding: '10px 12px 0' }}>
+        {TABS.map((t) => (
+          <Btn
+            key={t.value}
+            size="sm"
+            icon={t.icon}
+            variant={activeTab === t.value ? 'primary' : 'secondary'}
+            onClick={() => setActiveTab(t.value)}
+          >
+            {t.label}
+          </Btn>
+        ))}
+      </div>
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 10 }}>
-        <PhotoGrid
-          queryType={activeTab === 'all' ? undefined : activeTab}
-          onPhotosChange={setExportPhotos}
-        />
+        <PhotoGrid queryType={activeTab === 'all' ? undefined : activeTab} />
       </div>
     </PortalPage>
   )
