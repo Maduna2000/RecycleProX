@@ -7,6 +7,7 @@ import useSWR, { mutate } from 'swr'
 import { CreateUserModal } from '@/components/users/CreateUserModal'
 import { EditUserModal } from '@/components/users/EditUserModal'
 import { ResetPasswordModal } from '@/components/users/ResetPasswordModal'
+import { SetPinModal } from '@/components/users/SetPinModal'
 import { MoreVertical, Search, Unlock, UserCheck, UserX, KeyRound, ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import { colors } from '@/lib/design-tokens'
@@ -18,6 +19,19 @@ type User = {
   id: string; fullName: string; username: string; role: string
   isActive: boolean; lockedAt: string | null; lastLoginAt: string | null
   allowedModules?: string[]
+  hasPersonalPin?: boolean
+}
+
+function PinBadge({ hasPersonalPin }: { hasPersonalPin?: boolean }) {
+  return hasPersonalPin ? (
+    <span style={{ display: 'inline-flex', padding: '1px 6px', borderRadius: 3, fontSize: 10, fontWeight: 600, background: colors.actionBg, color: colors.action }}>
+      Personal
+    </span>
+  ) : (
+    <span style={{ display: 'inline-flex', padding: '1px 6px', borderRadius: 3, fontSize: 10, fontWeight: 600, background: colors.neutralBg, color: colors.textSecondary }}>
+      Default
+    </span>
+  )
 }
 
 function StatusBadge({ user }: { user: User }) {
@@ -68,6 +82,7 @@ export default function UsersPage() {
   const [createOpen, setCreateOpen] = useState(false)
   const [editUser, setEditUser] = useState<User | null>(null)
   const [resetUser, setResetUser] = useState<User | null>(null)
+  const [pinUser, setPinUser] = useState<User | null>(null)
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
 
@@ -163,6 +178,7 @@ export default function UsersPage() {
                 <th style={TH}>Username</th>
                 <th style={TH}>Role</th>
                 <th style={TH}>Status</th>
+                <th style={TH}>PIN</th>
                 <th style={TH}>Last Login</th>
                 <th style={{ ...TH, width: 50, textAlign: 'center' }}></th>
               </tr>
@@ -179,6 +195,7 @@ export default function UsersPage() {
                   <td style={{ ...TD, color: '#6C757D' }}>{user.username}</td>
                   <td style={TD}><RoleBadge role={user.role} /></td>
                   <td style={TD}><StatusBadge user={user} /></td>
+                  <td style={TD}><PinBadge hasPersonalPin={user.hasPersonalPin} /></td>
                   <td style={{ ...TD, fontSize: 11, color: '#6C757D' }}>
                     {user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString('en-ZA') : '—'}
                   </td>
@@ -196,7 +213,7 @@ export default function UsersPage() {
               ))}
               {!users.length && (
                 <tr>
-                  <td colSpan={6}>
+                  <td colSpan={7}>
                     <EmptyHint text="No users found" height={120} />
                   </td>
                 </tr>
@@ -231,6 +248,15 @@ export default function UsersPage() {
                     onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
                   >
                     Reset Password
+                  </button>
+                  <button
+                    onClick={() => { closeMenu(); setPinUser(user) }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '6px 12px', fontSize: 12, color: '#212529', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = '#F1F3F4')}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
+                  >
+                    <KeyRound style={{ width: 12, height: 12, color: '#6C757D' }} />
+                    Set PIN
                   </button>
                   <button
                     onClick={() => handleResetPin(user)}
@@ -271,6 +297,13 @@ export default function UsersPage() {
       <CreateUserModal open={createOpen} onClose={() => setCreateOpen(false)} onSuccess={() => mutate(`/api/users?${query}`)} />
       {editUser && <EditUserModal user={editUser} onClose={() => setEditUser(null)} onSuccess={() => mutate(`/api/users?${query}`)} />}
       {resetUser && <ResetPasswordModal user={resetUser} onClose={() => setResetUser(null)} />}
+      {pinUser && (
+        <SetPinModal
+          user={pinUser}
+          onClose={() => setPinUser(null)}
+          onSuccess={() => { mutate(`/api/users?${query}`); setPinUser(null) }}
+        />
+      )}
     </>
   )
 }

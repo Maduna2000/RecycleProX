@@ -392,7 +392,7 @@ export async function verifyAdminPin(pin: string): Promise<boolean> {
 const USER_SELECT = {
   id: true, fullName: true, username: true, role: true,
   isActive: true, forcePasswordChange: true, failedAttempts: true,
-  lockedAt: true, lastLoginAt: true, createdAt: true,
+  lockedAt: true, lastLoginAt: true, createdAt: true, pinHash: true,
   moduleAccess: { select: { moduleKey: true } },
 } as const
 
@@ -426,17 +426,22 @@ export async function listUsers(opts: {
     prisma.user.count({ where }),
   ])
 
-  // Transform moduleAccess to allowedModules array
-  const transformedUsers = users.map((user) => ({
+  // Transform moduleAccess to allowedModules array; surface whether a personal
+  // PIN is set as a boolean only — the hash itself never leaves this function.
+  const transformedUsers = users.map(({ pinHash, ...user }) => ({
     ...user,
     allowedModules: user.moduleAccess.map((m) => m.moduleKey),
+    hasPersonalPin: !!pinHash,
   }))
 
   return { users: transformedUsers, total, page, totalPages: Math.ceil(total / limit) }
 }
 
 export async function getUser(id: string) {
-  return prisma.user.findUnique({ where: { id }, select: USER_SELECT })
+  const user = await prisma.user.findUnique({ where: { id }, select: USER_SELECT })
+  if (!user) return null
+  const { pinHash, ...rest } = user
+  return { ...rest, hasPersonalPin: !!pinHash }
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
