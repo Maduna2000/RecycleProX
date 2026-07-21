@@ -496,7 +496,7 @@ function AddExpenseModal({ mode, expense, onClose, onSuccess }: AddExpenseModalP
                     {selectedTypeName ?? ''}
                   </SelectValue>
                 </SelectTrigger>
-                <SelectContent className="w-fit min-w-36">
+                <SelectContent>
                   {(types ?? []).map((t) => (
                     <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
                   ))}
@@ -564,7 +564,7 @@ function AddExpenseModal({ mode, expense, onClose, onSuccess }: AddExpenseModalP
                   >
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="w-fit min-w-36">
+                  <SelectContent>
                     <SelectItem value="cash">Cash</SelectItem>
                     <SelectItem value="eft">EFT</SelectItem>
                   </SelectContent>
