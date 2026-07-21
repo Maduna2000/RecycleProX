@@ -25,6 +25,7 @@ export function BtnMenu({
   disabled,
   align = 'left',
   items,
+  style,
 }: {
   label:     string
   icon?:     React.ElementType
@@ -34,6 +35,7 @@ export function BtnMenu({
   disabled?: boolean
   align?:    'left' | 'right'
   items:     BtnMenuItem[]
+  style?:    React.CSSProperties
 }) {
   const [open, setOpen] = useState(false)
 
@@ -57,6 +59,7 @@ export function BtnMenu({
         icon={icon}
         loading={loading}
         disabled={disabled}
+        style={style}
         onClick={() => setOpen((o) => !o)}
       >
         {label}

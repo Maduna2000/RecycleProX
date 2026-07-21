@@ -280,17 +280,17 @@ export default function CasualsPage() {
               <option value="both">Both</option>
             </select>
           </Field>
-          <div style={{ paddingBottom: 8 }}>
+          <Field label={' '}>
             <BtnMenu
-              size="sm"
               icon={Download}
               label="Export"
+              style={{ height: 30 }}
               items={[
                 { label: 'Export Excel', href: '/app/casual?export=xlsx' },
                 { label: 'Export PDF',   href: '/app/casual?export=pdf'  },
               ]}
             />
-          </div>
+          </Field>
           <span style={{ fontSize: 11, color: '#6C757D', marginLeft: 'auto', paddingBottom: 8 }}>
             {customers.length} casual{customers.length !== 1 ? 's' : ''}
           </span>
