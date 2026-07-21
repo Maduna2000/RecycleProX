@@ -118,7 +118,7 @@ export function RecordPaymentModal({
           <div>
             <label className="block mb-1 text-xs font-medium" style={{ color: '#6C757D' }}>Payment Method</label>
             <Select onValueChange={(v) => setMethod(v as typeof method)} defaultValue="cash">
-              <SelectTrigger className="h-8 text-xs border-[#E0E0E0]">
+              <SelectTrigger className="h-8 w-full text-xs border-[#E0E0E0]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

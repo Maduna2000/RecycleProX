@@ -79,7 +79,7 @@ export function CreateCustomerModal({ open, onClose, onSuccess, defaultType = 'c
             <div>
               <Label>Customer Type</Label>
               <Select onValueChange={(v) => setValue('customerType', v as 'casual' | 'account')} defaultValue={defaultType}>
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="mt-1 w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="casual">Casual</SelectItem>
                   <SelectItem value="account">Account</SelectItem>
@@ -113,7 +113,7 @@ export function CreateCustomerModal({ open, onClose, onSuccess, defaultType = 'c
             <div>
               <Label>Price Group <span className="text-gray-400 font-normal">(optional)</span></Label>
               <Select onValueChange={(v: string | null) => setValue('priceGroupId', v === null || v === 'none' ? undefined : v)}>
-                <SelectTrigger className="mt-1"><SelectValue placeholder="No price group" /></SelectTrigger>
+                <SelectTrigger className="mt-1 w-full"><SelectValue placeholder="No price group" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">No price group</SelectItem>
                   {priceGroups.map((g) => (

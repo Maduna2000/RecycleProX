@@ -362,7 +362,7 @@ export default function StocktakeDetailPage() {
                   <div>
                     <Label htmlFor="add-product-select" style={{ fontSize: 11, fontWeight: 600, color: colors.textPrimary }}>Product</Label>
                     <Select value={productId} onValueChange={(v) => setProductId(v ?? '')}>
-                      <SelectTrigger id="add-product-select" style={{ marginTop: 4, height: 28, fontSize: 12 }}>
+                      <SelectTrigger id="add-product-select" style={{ marginTop: 4, height: 28, fontSize: 12, width: '100%' }}>
                         <SelectValue placeholder="Select product..." />
                       </SelectTrigger>
                       <SelectContent>

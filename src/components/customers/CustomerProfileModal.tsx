@@ -718,7 +718,7 @@ function EditCustomerModal({ customer, onClose, onSuccess }: {
                     <div>
                       <Label>Gender</Label>
                       <Select onValueChange={(v) => setValue('gender', v as 'male' | 'female' | 'other')} defaultValue={customer.gender ?? ''}>
-                        <SelectTrigger className="mt-1"><SelectValue placeholder="Select..." /></SelectTrigger>
+                        <SelectTrigger className="mt-1 w-full"><SelectValue placeholder="Select..." /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="male">Male</SelectItem>
                           <SelectItem value="female">Female</SelectItem>
@@ -773,7 +773,7 @@ function EditCustomerModal({ customer, onClose, onSuccess }: {
                 <div>
                   <Label>Market Sector</Label>
                   <Select onValueChange={(v) => setValue('marketSector', v === 'none' ? undefined : v as 'formal' | 'informal')} defaultValue={customer.marketSector ?? 'none'}>
-                    <SelectTrigger className="mt-1"><SelectValue placeholder="Select..." /></SelectTrigger>
+                    <SelectTrigger className="mt-1 w-full"><SelectValue placeholder="Select..." /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">Not set</SelectItem>
                       <SelectItem value="formal">Formal (scrap yard)</SelectItem>
@@ -788,7 +788,7 @@ function EditCustomerModal({ customer, onClose, onSuccess }: {
                     defaultValue={customer.dealerCategory ?? 'none'}
                     disabled={!isAdmin}
                   >
-                    <SelectTrigger className="mt-1"><SelectValue placeholder="Select..." /></SelectTrigger>
+                    <SelectTrigger className="mt-1 w-full"><SelectValue placeholder="Select..." /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">Not set</SelectItem>
                       <SelectItem value="casual">Casual</SelectItem>
@@ -818,7 +818,7 @@ function EditCustomerModal({ customer, onClose, onSuccess }: {
                 <div>
                   <Label>Customer Type</Label>
                   <Select onValueChange={(v) => setValue('customerType', v as 'casual' | 'account')} defaultValue={customer.customerType}>
-                    <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="mt-1 w-full"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="casual">Casual</SelectItem>
                       <SelectItem value="account">Account</SelectItem>
@@ -828,7 +828,7 @@ function EditCustomerModal({ customer, onClose, onSuccess }: {
                 <div>
                   <Label>Primary Function</Label>
                   <Select onValueChange={(v) => setValue('primaryFunction', v as 'customer' | 'supplier' | 'both')} defaultValue={customer.primaryFunction ?? 'supplier'}>
-                    <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="mt-1 w-full"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="supplier">Supplier (sells to us)</SelectItem>
                       <SelectItem value="customer">Customer (buys from us)</SelectItem>
@@ -843,7 +843,7 @@ function EditCustomerModal({ customer, onClose, onSuccess }: {
                   onValueChange={(v) => setValue('priceGroupId', !v || v === 'none' ? undefined : v)}
                   value={watch('priceGroupId') ?? 'none'}
                 >
-                  <SelectTrigger className="mt-1"><SelectValue placeholder="No price group" /></SelectTrigger>
+                  <SelectTrigger className="mt-1 w-full"><SelectValue placeholder="No price group" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">No price group</SelectItem>
                     {priceGroups.map((g) => (

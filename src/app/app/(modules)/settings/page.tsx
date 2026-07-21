@@ -145,7 +145,7 @@ function ScaleRow({ n, form, set }: { n: ScaleNum; form: SettingsMap; set: (k: k
         <span style={{ fontSize: 11, fontWeight: 700, color: '#1B3A6B', width: 52 }}>Scale {n}</span>
         <div style={{ width: 170 }}>
           <Select value={type} onValueChange={(v) => set(scaleKey(n, 'type'), v ?? '')}>
-            <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-7 w-full text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="none">Not Connected</SelectItem>
               <SelectItem value="tcp">TCP / Network</SelectItem>
@@ -171,7 +171,7 @@ function ScaleRow({ n, form, set }: { n: ScaleNum; form: SettingsMap; set: (k: k
           </Field>
           <Field label="Baud Rate">
             <Select value={form[scaleKey(n, 'baudRate')] ?? '9600'} onValueChange={(v) => set(scaleKey(n, 'baudRate'), v ?? '')}>
-              <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-7 w-full text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {['1200','2400','4800','9600','19200','38400','57600','115200'].map((b) => (
                   <SelectItem key={b} value={b}>{b}</SelectItem>
@@ -408,7 +408,7 @@ export default function SettingsPage() {
               </p>
               <Field label="Connection Type">
                 <Select value={(form.printerType ?? 'none') as PrinterType} onValueChange={(v) => set('printerType', v ?? '')}>
-                  <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="h-7 w-full text-xs"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">Not Connected</SelectItem>
                     <SelectItem value="serial">Serial / USB-Serial</SelectItem>
@@ -443,7 +443,7 @@ export default function SettingsPage() {
                   </Field>
                   <Field label="Baud Rate">
                     <Select value={form.printerBaudRate ?? '9600'} onValueChange={(v) => set('printerBaudRate', v ?? '')}>
-                      <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectTrigger className="h-7 w-full text-xs"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         {['9600','19200','38400','57600','115200'].map((b) => <SelectItem key={b} value={b}>{b}</SelectItem>)}
                       </SelectContent>

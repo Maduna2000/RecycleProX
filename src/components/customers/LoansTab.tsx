@@ -425,7 +425,7 @@ function CreateLoanDialog({
           <div>
             <Label>Payment Method *</Label>
             <Select value={method} onValueChange={(v) => setMethod(v ?? 'cash')}>
-              <SelectTrigger className="mt-1">
+              <SelectTrigger className="mt-1 w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
