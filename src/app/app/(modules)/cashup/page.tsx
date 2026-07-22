@@ -376,7 +376,7 @@ function ReasonModal({ title, message, confirmLabel, loading, onConfirm, onClose
 function ManageSessionsModal({ sessions, onClose, onVoided, currencySymbol = 'R' }: {
   sessions: CashUp[]
   onClose: () => void
-  onVoided: () => void
+  onVoided: () => Promise<void>
   currencySymbol?: string
 }) {
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -431,8 +431,8 @@ function ManageSessionsModal({ sessions, onClose, onVoided, currencySymbol = 'R'
     setVoiding(false)
 
     if (successCount > 0) {
+      await onVoided()
       toast.success(`Voided ${successCount} session${successCount > 1 ? 's' : ''}`)
-      onVoided()
       onClose()
     }
     if (failCount > 0) {
@@ -615,9 +615,11 @@ export default function CashUpPage() {
         body: JSON.stringify({ reason }),
       })
       if (res.ok) {
+        // Await both — the UI must reflect the void before we call this
+        // "done"; a fire-and-forget mutate here is what let the page show
+        // a stale "session open" state after a success toast.
+        await Promise.all([swrMutate(CASHUP_KEY), swrMutate('/api/cashup/open-sessions')])
         toast.success('Session voided')
-        swrMutate(CASHUP_KEY)
-        swrMutate('/api/cashup/open-sessions')
         setVoidReasonOpen(false)
       } else {
         const j = await res.json()
@@ -639,13 +641,23 @@ export default function CashUpPage() {
   async function handleOpen() {
     setOpening(true)
     try {
-      const { queued } = await offlineMutate({
+      const { queued, data: result } = await offlineMutate({
         method: 'POST', url: '/api/cashup',
         body: { sessionDate: todayISO },
         localId: `local_cashup_${todayISO}`,
       })
-      if (queued) toast.success('Cash-up session queued — will open when connected')
-      else { toast.success('Cash-up session opened'); swrMutate(CASHUP_KEY) }
+      if (queued) {
+        toast.success('Cash-up session queued — will open when connected')
+      } else {
+        // Seed the SWR cache straight from the POST response instead of
+        // firing an unawaited re-fetch — the response already IS the
+        // authoritative session, so there's no need for (or wait on) a
+        // second network round-trip. This was the exact gap that let the
+        // page show "success" while the panel stayed stuck on "no session"
+        // under network lag.
+        await swrMutate(CASHUP_KEY, result, { revalidate: false })
+        toast.success('Cash-up session opened')
+      }
     } catch { toast.error('Failed to open session') }
     finally { setOpening(false) }
   }
@@ -659,8 +671,8 @@ export default function CashUpPage() {
         body: JSON.stringify({ currency: newCurrency }),
       })
       if (res.ok) {
+        await swrMutate(CASHUP_KEY)
         toast.success(`Currency changed to ${CURRENCY_LABELS[newCurrency]}`)
-        swrMutate(CASHUP_KEY)
       } else {
         const j = await res.json()
         toast.error(j.error ?? 'Failed to update currency')
@@ -685,8 +697,12 @@ export default function CashUpPage() {
         },
         localId: cashUp.id,
       })
-      if (queued) toast.success('Cash-up saved offline — will submit when connected')
-      else { toast.success('Cash-up submitted for approval'); swrMutate(CASHUP_KEY) }
+      if (queued) {
+        toast.success('Cash-up saved offline — will submit when connected')
+      } else {
+        await swrMutate(CASHUP_KEY)
+        toast.success('Cash-up submitted for approval')
+      }
     } catch { toast.error('Failed to submit cash-up') }
     finally { setSubmitting(false) }
   }
@@ -694,33 +710,47 @@ export default function CashUpPage() {
   async function handleApprove() {
     if (!cashUp) return
     setApproving(true)
-    const res = await fetch(`/api/cashup/${cashUp.id}/approve`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({}),
-    })
-    setApproving(false)
-    if (res.ok) { toast.success('Cash-up approved'); swrMutate(CASHUP_KEY); refreshStats() }
-    else { const j = await res.json(); toast.error(j.error ?? 'Failed to approve cash-up') }
+    try {
+      const res = await fetch(`/api/cashup/${cashUp.id}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      if (res.ok) {
+        await Promise.all([swrMutate(CASHUP_KEY), refreshStats()])
+        toast.success('Cash-up approved')
+      } else {
+        const j = await res.json()
+        toast.error(j.error ?? 'Failed to approve cash-up')
+      }
+    } catch {
+      toast.error('Failed to approve cash-up')
+    } finally {
+      setApproving(false)
+    }
   }
 
   async function handleReject(reason: string) {
     if (!cashUp) return
     setRejecting(true)
-    const res = await fetch(`/api/cashup/${cashUp.id}/reject`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ reason }),
-    })
-    setRejecting(false)
-    if (res.ok) {
-      toast.success('Cash-up rejected — sent back to cashier')
-      swrMutate(CASHUP_KEY)
-      refreshStats()
-      setRejectReasonOpen(false)
-    } else {
-      const j = await res.json()
-      toast.error(j.error ?? 'Failed to reject cash-up')
+    try {
+      const res = await fetch(`/api/cashup/${cashUp.id}/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason }),
+      })
+      if (res.ok) {
+        await Promise.all([swrMutate(CASHUP_KEY), refreshStats()])
+        toast.success('Cash-up rejected — sent back to cashier')
+        setRejectReasonOpen(false)
+      } else {
+        const j = await res.json()
+        toast.error(j.error ?? 'Failed to reject cash-up')
+      }
+    } catch {
+      toast.error('Failed to reject cash-up')
+    } finally {
+      setRejecting(false)
     }
   }
 
@@ -1187,9 +1217,8 @@ export default function CashUpPage() {
         <ManageSessionsModal
           sessions={openSessions}
           onClose={() => setManageSessionsOpen(false)}
-          onVoided={() => {
-            refreshOpenSessions()
-            swrMutate(CASHUP_KEY)
+          onVoided={async () => {
+            await Promise.all([refreshOpenSessions(), swrMutate(CASHUP_KEY)])
           }}
           currencySymbol={CURRENCY_SYMBOLS[cashUp?.currency ?? 'ZAR']}
         />
