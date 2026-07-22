@@ -44,7 +44,11 @@ function useToolbarButtons(pathname: string, role: string): ToolbarButton[] {
   const isMgr  = role === 'admin' || role === 'manager'
   const isAdmin = role === 'admin'
 
-  if (pathname === '/app/customers' || pathname.startsWith('/app/customers/'))
+  // Exact match only — the list page gets "Add Account", but a customer's
+  // own profile (/app/customers/[id]) or the add-account page itself
+  // (/app/customers/new) shouldn't show a button that just re-opens the
+  // same or a redundant "add" flow.
+  if (pathname === '/app/customers')
     return [
       { label: 'Add Account', icon: Plus, href: '/app/customers/new', variant: 'primary' },
     ]
