@@ -3,7 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Plus, Trash2, Loader2, Scale, RefreshCw, Camera, ClipboardList, AlertCircle, Wallet } from 'lucide-react'
+import { Plus, Trash2, Loader2, Scale, RefreshCw, Camera, ClipboardList, Wallet } from 'lucide-react'
 import { toast } from 'sonner'
 import useSWR from 'swr'
 import { AccountSelectorPanel } from '@/components/customers/AccountSelectorPanel'
@@ -305,14 +305,22 @@ export default function NewSalePage() {
   }
 
   // ── Submit ────────────────────────────────────────────────────────────────
-  async function submitSale(isPending: boolean) {
+  // `loanOverride` lets a caller (the PIN-unlock success handler) pass the
+  // just-verified amount straight through instead of relying on state that
+  // hasn't re-rendered yet — setState + an immediate call in the same tick
+  // would otherwise submit against the stale (pre-unlock) closure.
+  async function submitSale(isPending: boolean, loanOverride?: { summary: BusinessLoanFullSummary; amount: string }) {
     if (buyerMode === 'account' && !customer) { toast.error('Select a buyer'); return }
     if (buyerMode === 'walkin' && !buyerName.trim()) { toast.error('Buyer name is required'); return }
     if (isBlacklisted) { toast.error('Buyer is blacklisted'); return }
     if (hasStockError && !isPending) { toast.error('Some lines exceed available stock'); return }
+
+    const effectiveLoanSummary = loanOverride?.summary ?? businessLoanSummary
+    const effectiveLoanAmount  = loanOverride?.amount   ?? businessLoanAmount
+
     // Mandatory — a sale to this customer can't complete via plain cash/eft
     // while an outstanding business loan hasn't been unlocked and applied.
-    if (!isPending && hasOutstandingBusinessLoan && !businessLoanSummary) {
+    if (!isPending && hasOutstandingBusinessLoan && !effectiveLoanSummary) {
       toast.error('Enter the admin PIN to apply the business loan before completing this sale')
       return
     }
@@ -331,8 +339,8 @@ export default function NewSalePage() {
     const effectiveId   = buyerMode === 'walkin' ? buyerIdNumber.trim() : (customer?.idNumber ?? '')
     const effectivePhone = buyerMode === 'walkin' ? buyerPhone.trim()   : (customer?.phone   ?? '')
 
-    const businessLoanDeduction = businessLoanSummary && businessLoanAmount && parseFloat(businessLoanAmount) > 0 && !isPending
-      ? businessLoanAmount : undefined
+    const businessLoanDeduction = effectiveLoanSummary && effectiveLoanAmount && parseFloat(effectiveLoanAmount) > 0 && !isPending
+      ? effectiveLoanAmount : undefined
     // Deduction is capped server-side — no client-side block needed
 
     const body = {
@@ -545,53 +553,9 @@ export default function NewSalePage() {
                     </button>
                   </div>
                 </div>
-                {hasOutstandingBusinessLoan && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, padding: '4px 8px', borderRadius: 2, background: '#FFF3E0', border: '1px solid #FFCC80' }}>
-                    <AlertCircle style={{ width: 12, height: 12, color: '#E65100', flexShrink: 0 }} />
-                    <span style={{ fontSize: 10.5, color: '#E65100', fontWeight: 600 }}>
-                      This customer has a pending business loan
-                    </span>
-                  </div>
-                )}
               </div>
             )}
           </div>
-
-          {/* Business loan deduction — MANDATORY once unlocked, not optional.
-              Unlike the purchase module's "deduct from payout" checkbox
-              (which stays off by default), a sale to a customer the business
-              owes money cannot be completed via plain cash/eft while
-              ignoring that debt: once the admin PIN reveals the balance, the
-              deduction is auto-applied and locked at min(outstanding,
-              total) — the remaining cash/eft due is whatever's left. Saving
-              as Unpaid stays available regardless (defers to whoever has
-              the PIN). */}
-          {hasOutstandingBusinessLoan && (
-            <div style={{ flexShrink: 0, margin: '0 10px 4px', padding: '5px 8px', border: '1px solid #FFCC80', borderRadius: 2, background: '#FFF8F0' }}>
-              {!businessLoanSummary ? (
-                <button
-                  type="button"
-                  onClick={() => setBusinessLoanPinOpen(true)}
-                  style={{ fontSize: 11, fontWeight: 600, color: '#E65100', background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: 4 }}
-                >
-                  <AlertCircle style={{ width: 12, height: 12 }} />
-                  Enter admin PIN to settle this sale — a plain cash/EFT sale can&apos;t be completed until this loan is applied
-                </button>
-              ) : (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 600, color: '#92400E' }}>
-                  <AlertCircle style={{ width: 12, height: 12, flexShrink: 0 }} />
-                  <span>
-                    Applying R {businessLoanAmount} of this sale to the business loan (you owe R {new Decimal(businessLoanSummary.outstanding).toFixed(2)} total)
-                    {' — remaining '}
-                    <span style={{ fontFamily: 'monospace' }}>
-                      R {Decimal.max(total.minus(new Decimal(businessLoanAmount || '0')), new Decimal(0)).toFixed(2)}
-                    </span>
-                    {' due via cash/EFT.'}
-                  </span>
-                </div>
-              )}
-            </div>
-          )}
 
           {/* Comments */}
           <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8, padding: '3px 10px', borderBottom: '1px solid #E0E0E0' }}>
@@ -620,6 +584,26 @@ export default function NewSalePage() {
               </label>
             ))}
           </div>
+
+          {/* Business loan notice — informational only, not a click target.
+              The actual PIN prompt happens when Save Sale is clicked, not
+              here, so there's nothing on this line the operator needs to
+              interact with. */}
+          {hasOutstandingBusinessLoan && (
+            <div style={{ flexShrink: 0, margin: '0 10px 4px', padding: '4px 8px', borderRadius: 2, background: '#FFF8F0', border: '1px solid #FFCC80', fontSize: 10.5, color: '#92400E' }}>
+              {!businessLoanSummary ? (
+                <>This customer has a pending business loan — Save Sale will ask for an admin PIN to apply it.</>
+              ) : (
+                <>
+                  Applying R {businessLoanAmount} to the business loan — remaining{' '}
+                  <span style={{ fontFamily: 'monospace' }}>
+                    R {Decimal.max(total.minus(new Decimal(businessLoanAmount || '0')), new Decimal(0)).toFixed(2)}
+                  </span>
+                  {' '}due via cash/EFT.
+                </>
+              )}
+            </div>
+          )}
 
           </div>
           {/* end Buyer sub-panel */}
@@ -1164,10 +1148,15 @@ export default function NewSalePage() {
         </button>
         <button
           type="button"
-          onClick={() => submitSale(false)}
-          disabled={submitting || isBlacklisted || paymentType === 'unpaid' || hasStockError || (hasOutstandingBusinessLoan && !businessLoanSummary)}
-          title={hasOutstandingBusinessLoan && !businessLoanSummary ? 'Enter the admin PIN above to apply the business loan first' : undefined}
-          style={{ height: 28, padding: '0 24px', borderRadius: 2, fontSize: 12, fontWeight: 700, background: BAR_GRAD, border: CARD_BORDER, color: colors.textPrimary, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, opacity: submitting || isBlacklisted || paymentType === 'unpaid' || hasStockError || (hasOutstandingBusinessLoan && !businessLoanSummary) ? 0.4 : 1 }}
+          onClick={() => {
+            // A business loan that hasn't been unlocked this session gates
+            // here, at the point of actually saving, rather than requiring
+            // a separate click somewhere else first.
+            if (hasOutstandingBusinessLoan && !businessLoanSummary) setBusinessLoanPinOpen(true)
+            else submitSale(false)
+          }}
+          disabled={submitting || isBlacklisted || paymentType === 'unpaid' || hasStockError}
+          style={{ height: 28, padding: '0 24px', borderRadius: 2, fontSize: 12, fontWeight: 700, background: BAR_GRAD, border: CARD_BORDER, color: colors.textPrimary, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, opacity: submitting || isBlacklisted || paymentType === 'unpaid' || hasStockError ? 0.4 : 1 }}
         >
           {submitting
             ? <><Loader2 style={{ width: 13, height: 13, animation: 'spin 1s linear infinite' }} /> Saving…</>
@@ -1201,16 +1190,19 @@ export default function NewSalePage() {
         />
       )}
 
-      {/* Admin PIN — reveals the business loan balance; once entered the
-          deduction is mandatory and auto-applied, not a manual choice */}
+      {/* Admin PIN — triggered by clicking Save Sale, not a separate step.
+          Reveals the business loan balance and immediately continues the
+          save with it applied (mandatory, not a manual choice). */}
       {businessLoanPinOpen && customer && (
         <AdminPinUnlockModal
           customerId={customer.id}
           onClose={() => setBusinessLoanPinOpen(false)}
           onUnlocked={(summary: BusinessLoanFullSummary) => {
+            const amount = Decimal.min(new Decimal(summary.outstanding), total).toFixed(2)
             setBusinessLoanSummary(summary)
-            setBusinessLoanAmount(Decimal.min(new Decimal(summary.outstanding), total).toFixed(2))
+            setBusinessLoanAmount(amount)
             setBusinessLoanPinOpen(false)
+            submitSale(false, { summary, amount })
           }}
         />
       )}

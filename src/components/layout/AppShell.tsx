@@ -9,7 +9,7 @@ import useSWR from 'swr'
 import Decimal from 'decimal.js'
 import {
   Plus,
-  ClipboardCheck, AlertCircle,
+  ClipboardCheck,
   Download, LogOut, Settings, Settings2, TrendingUp,
   Users, UserPlus, ChevronRight,
   Wifi, WifiOff,
@@ -59,13 +59,10 @@ function useToolbarButtons(pathname: string, role: string): ToolbarButton[] {
   if (pathname === '/app/purchases' || pathname.startsWith('/app/purchases/'))
     return []
 
-  if (pathname.startsWith('/app/sales/unpaid'))
-    return []
-
+  // "Unpaid Sales" now lives only inside the Pending Sales panel on the
+  // new-sale page itself, not the top nav bar — was a duplicate entry point.
   if (pathname === '/app/sales' || pathname.startsWith('/app/sales/'))
-    return [
-      { label: 'Unpaid Sales', icon: AlertCircle, href: '/app/sales/unpaid', variant: 'secondary' },
-    ]
+    return []
 
   if (pathname === '/app/payments' || pathname.startsWith('/app/payments/'))
     return [
