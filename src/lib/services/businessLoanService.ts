@@ -4,7 +4,7 @@ import { verifyAdminPin } from '@/lib/services/authService'
 import logger from '@/lib/logger'
 import Decimal from 'decimal.js'
 import type { Prisma } from '@prisma/client'
-import type { CreateBusinessLoanInput, CreateBusinessLoanRepaymentInput, VoidBusinessLoanInput } from '@/lib/schemas/businessLoan'
+import type { CreateBusinessLoanInput, VoidBusinessLoanInput } from '@/lib/schemas/businessLoan'
 import { todaySASTDate, todaySASTDateStr } from '@/lib/utils/dayBounds'
 
 // ─── Typed Errors ─────────────────────────────────────────────────────────────
@@ -13,20 +13,12 @@ export class BusinessLoanNotFoundError extends Error {
   constructor(id: string) { super(`Business loan "${id}" not found`); this.name = 'BusinessLoanNotFoundError' }
 }
 
-export class BusinessLoanAlreadySettledError extends Error {
-  constructor(ref: string) { super(`Business loan "${ref}" is already settled`); this.name = 'BusinessLoanAlreadySettledError' }
-}
-
 export class BusinessLoanAlreadyVoidedError extends Error {
   constructor(ref: string) { super(`Business loan "${ref}" is already voided`); this.name = 'BusinessLoanAlreadyVoidedError' }
 }
 
 export class BusinessLoanHasRepaymentsError extends Error {
   constructor(ref: string) { super(`Business loan "${ref}" has repayments and cannot be voided`); this.name = 'BusinessLoanHasRepaymentsError' }
-}
-
-export class RepaymentExceedsBalanceError extends Error {
-  constructor(balance: string) { super(`Repayment amount exceeds outstanding balance of R ${balance}`); this.name = 'RepaymentExceedsBalanceError' }
 }
 
 export class CustomerBlacklistedError extends Error {
@@ -51,13 +43,6 @@ async function generateBusinessLoanRef(): Promise<string> {
   const prefix = `BLN-${todaySASTDateStr().replace(/-/g, '')}`
   const startOfDay = todaySASTDate()
   const count = await prisma.businessLoan.count({ where: { createdAt: { gte: startOfDay } } })
-  return `${prefix}-${String(count + 1).padStart(4, '0')}`
-}
-
-async function generateBusinessLoanRepaymentRef(): Promise<string> {
-  const prefix = `BRP-${todaySASTDateStr().replace(/-/g, '')}`
-  const startOfDay = todaySASTDate()
-  const count = await prisma.businessLoanRepayment.count({ where: { createdAt: { gte: startOfDay } } })
   return `${prefix}-${String(count + 1).padStart(4, '0')}`
 }
 
@@ -155,57 +140,6 @@ export async function createBusinessLoan(data: CreateBusinessLoanInput, createdB
 
   logger.info({ businessLoanId: loan.id, refNumber, customerId: data.customerId, principal: principal.toFixed(2), createdByUserId }, 'businessLoan.created')
   return loan
-}
-
-// ─── Create Repayment (direct, business repaying the dealer) ─────────────────
-
-export async function createBusinessLoanRepayment(data: CreateBusinessLoanRepaymentInput, createdByUserId?: string) {
-  const loan = await prisma.businessLoan.findUnique({
-    where: { id: data.businessLoanId },
-    include: { customer: { select: { id: true, firstName: true, lastName: true, idNumber: true } } },
-  })
-  if (!loan) throw new BusinessLoanNotFoundError(data.businessLoanId)
-  if (loan.status === 'voided') throw new BusinessLoanAlreadyVoidedError(loan.refNumber)
-  if (loan.status === 'settled') throw new BusinessLoanAlreadySettledError(loan.refNumber)
-
-  const repayAmount = new Decimal(data.amount)
-  const currentBalance = new Decimal(loan.balanceAmount.toString())
-
-  if (repayAmount.greaterThan(currentBalance)) {
-    throw new RepaymentExceedsBalanceError(currentBalance.toFixed(2))
-  }
-
-  const newBalance = currentBalance.minus(repayAmount)
-  const isNowSettled = newBalance.isZero()
-  const refNumber = await generateBusinessLoanRepaymentRef()
-
-  const result = await prisma.$transaction(async (tx) => {
-    const repayment = await tx.businessLoanRepayment.create({
-      data: {
-        tenantId:        requireTenantId(),
-        refNumber,
-        businessLoanId:  data.businessLoanId,
-        customerId:      loan.customerId,
-        amount:          repayAmount,
-        paymentMethod:   data.paymentMethod ?? 'cash',
-        notes:           data.notes,
-        createdByUserId,
-      },
-    })
-
-    await tx.businessLoan.update({
-      where: { id: data.businessLoanId },
-      data: {
-        balanceAmount: newBalance,
-        status:        isNowSettled ? 'settled' : 'active',
-      },
-    })
-
-    return repayment
-  })
-
-  logger.info({ repaymentId: result.id, refNumber, businessLoanId: data.businessLoanId, amount: repayAmount.toFixed(2), newBalance: newBalance.toFixed(2), settled: isNowSettled, createdByUserId }, 'businessLoan.repayment.created')
-  return result
 }
 
 // ─── Void Business Loan ────────────────────────────────────────────────────────

@@ -96,9 +96,9 @@ function StatusBadge({ status }: { status: 'active' | 'settled' | 'voided' }) {
 
 export function BusinessLoanTab({ customerId, customerName, userRole }: BusinessLoanTabProps) {
   const [createOpen, setCreateOpen] = useState(false)
-  const [repayTarget, setRepayTarget] = useState<BusinessLoan | null>(null)
   const [voidTarget, setVoidTarget] = useState<BusinessLoan | null>(null)
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null)
+  const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
 
   const { data, isLoading } = useSWR<BusinessLoanSummaryResponse>(
     `/api/customers/${customerId}/business-loans`, fetcher)
@@ -275,45 +275,18 @@ export function BusinessLoanTab({ customerId, customerName, userRole }: Business
                     {new Date(loan.createdAt).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short' })}
                   </td>
                   <td style={{ padding: '5px 10px', width: 40, position: 'relative' }}>
-                    {loan.status === 'active' && new Decimal(loan.balanceAmount).gt(0) && (
-                      <>
-                        <button
-                          onClick={() => setMenuOpenId(menuOpenId === loan.id ? null : loan.id)}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, borderRadius: 2 }}
-                        >
-                          <MoreHorizontal style={{ width: 14, height: 14, color: '#6C757D' }} />
-                        </button>
-                        {menuOpenId === loan.id && (
-                          <div
-                            style={{
-                              position: 'absolute',
-                              right: 10,
-                              top: '100%',
-                              background: '#fff',
-                              border: '1px solid #E0E0E0',
-                              borderRadius: 4,
-                              boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                              zIndex: 10,
-                              minWidth: 150,
-                            }}
-                          >
-                            <button
-                              onClick={() => { setRepayTarget(loan); setMenuOpenId(null) }}
-                              style={{ display: 'block', width: '100%', padding: '6px 12px', fontSize: 11, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', color: '#374151' }}
-                            >
-                              Repay Dealer
-                            </button>
-                            {canVoidLoan(loan) && (
-                              <button
-                                onClick={() => { setVoidTarget(loan); setMenuOpenId(null) }}
-                                style={{ display: 'block', width: '100%', padding: '6px 12px', fontSize: 11, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', color: '#DC2626' }}
-                              >
-                                Void Entry
-                              </button>
-                            )}
-                          </div>
-                        )}
-                      </>
+                    {canVoidLoan(loan) && (
+                      <button
+                        onClick={(e) => {
+                          if (menuOpenId === loan.id) { setMenuOpenId(null); setMenuPos(null); return }
+                          const rect = e.currentTarget.getBoundingClientRect()
+                          setMenuPos({ top: rect.bottom + 2, right: window.innerWidth - rect.right })
+                          setMenuOpenId(loan.id)
+                        }}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, borderRadius: 2 }}
+                      >
+                        <MoreHorizontal style={{ width: 14, height: 14, color: '#6C757D' }} />
+                      </button>
                     )}
                   </td>
                 </tr>
@@ -323,21 +296,45 @@ export function BusinessLoanTab({ customerId, customerName, userRole }: Business
         </div>
       )}
 
+      {/* Fixed-position row menu — rendered outside the scrollable table so it
+          never gets clipped by the tab panel's inner scroller */}
+      {menuOpenId && menuPos && (
+        <>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 49 }} onClick={() => { setMenuOpenId(null); setMenuPos(null) }} />
+          <div
+            style={{
+              position: 'fixed',
+              top: menuPos.top,
+              right: menuPos.right,
+              zIndex: 50,
+              background: '#fff',
+              border: '1px solid #E0E0E0',
+              borderRadius: 4,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+              minWidth: 100,
+            }}
+          >
+            <button
+              onClick={() => {
+                const loan = loans.find((l) => l.id === menuOpenId)
+                if (loan) setVoidTarget(loan)
+                setMenuOpenId(null)
+                setMenuPos(null)
+              }}
+              style={{ display: 'block', width: '100%', padding: '6px 12px', fontSize: 11, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', color: '#DC2626' }}
+            >
+              Void Entry
+            </button>
+          </div>
+        </>
+      )}
+
       {createOpen && (
         <CreateBusinessLoanDialog
           customerId={customerId}
           customerName={customerName}
           onClose={() => setCreateOpen(false)}
           onSuccess={() => { revalidate(); setCreateOpen(false) }}
-        />
-      )}
-
-      {repayTarget && (
-        <RepayBusinessLoanDialog
-          loan={repayTarget}
-          customerName={customerName}
-          onClose={() => setRepayTarget(null)}
-          onSuccess={() => { revalidate(); setRepayTarget(null) }}
         />
       )}
 
@@ -404,8 +401,8 @@ function CreateBusinessLoanDialog({
           <div className="space-y-4">
             <p className="text-xs" style={{ color: '#6C757D' }}>
               {customerName} advanced cash to the business (e.g. to fund a stock purchase). This
-              creates a liability — the business owes it back, either as a direct repayment or by
-              deducting it from a future sale to {customerName}.
+              creates a liability — it&apos;s settled by deducting it from a future sale to{' '}
+              {customerName} (via Split Payment in the Sales module).
             </p>
             <div>
               <Label>Amount Borrowed (R) *</Label>
@@ -441,88 +438,6 @@ function CreateBusinessLoanDialog({
         <RpxDialogFooter>
           <Btn onClick={onClose} disabled={loading}>Cancel</Btn>
           <Btn variant="primary" onClick={onSubmit} disabled={!amount} loading={loading}>Record Loan</Btn>
-        </RpxDialogFooter>
-      </RpxDialogContent>
-    </Dialog>
-  )
-}
-
-// ─── Repay Business Loan Dialog ─────────────────────────────────────────────
-function RepayBusinessLoanDialog({
-  loan,
-  customerName,
-  onClose,
-  onSuccess,
-}: {
-  loan: BusinessLoan
-  customerName: string
-  onClose: () => void
-  onSuccess: () => void
-}) {
-  const [amount, setAmount] = useState('')
-  const [method, setMethod] = useState('cash')
-  const [loading, setLoading] = useState(false)
-
-  async function onSubmit() {
-    if (!amount) return
-    setLoading(true)
-    const res = await fetch(`/api/business-loans/${loan.id}/repay`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ amount, paymentMethod: method }),
-    })
-    setLoading(false)
-    if (res.ok) {
-      toast.success(`Repayment to ${customerName} recorded`)
-      onSuccess()
-    } else {
-      const j = (await res.json()) as { error?: string }
-      toast.error(j.error ?? 'Failed to record repayment')
-    }
-  }
-
-  return (
-    <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <RpxDialogContent maxWidth={420}>
-        <RpxDialogHeader title={`Repay ${customerName} Directly`} icon={HandCoins} onClose={onClose} />
-        <RpxDialogBody>
-          <div className="space-y-4">
-            <p className="text-xs" style={{ color: '#6C757D' }}>
-              {loan.refNumber} — the business still owes {format.currency(loan.balanceAmount)}. Use
-              this when repaying outside of a sale (a sale can instead deduct this via Split
-              Payment).
-            </p>
-            <div>
-              <Label>Amount To Repay (R) *</Label>
-              <Input
-                placeholder="0.00"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                className="mt-1"
-                type="number"
-                step="0.01"
-                min="0"
-                max={loan.balanceAmount}
-              />
-            </div>
-            <div>
-              <Label>Payment Method *</Label>
-              <Select value={method} onValueChange={(v) => setMethod(v ?? 'cash')}>
-                <SelectTrigger className="mt-1 w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PAYMENT_METHODS.map((m) => (
-                    <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </RpxDialogBody>
-        <RpxDialogFooter>
-          <Btn onClick={onClose} disabled={loading}>Cancel</Btn>
-          <Btn variant="primary" onClick={onSubmit} disabled={!amount} loading={loading}>Repay {customerName}</Btn>
         </RpxDialogFooter>
       </RpxDialogContent>
     </Dialog>

@@ -13,13 +13,6 @@ export const CreateBusinessLoanSchema = z.object({
   notes:           z.string().max(500).optional(),
 })
 
-export const CreateBusinessLoanRepaymentSchema = z.object({
-  businessLoanId: z.string().uuid('Invalid loan'),
-  amount:         positiveDecimalString,
-  paymentMethod:  z.enum(['cash', 'eft']).default('cash'),
-  notes:          z.string().max(500).optional(),
-})
-
 export const VoidBusinessLoanSchema = z.object({
   reason: z.string().min(5, 'Void reason must be at least 5 characters').max(500),
 })
@@ -30,6 +23,5 @@ export const VerifyBusinessLoanPinSchema = z.object({
 })
 
 export type CreateBusinessLoanInput           = z.infer<typeof CreateBusinessLoanSchema>
-export type CreateBusinessLoanRepaymentInput  = z.infer<typeof CreateBusinessLoanRepaymentSchema>
 export type VoidBusinessLoanInput             = z.infer<typeof VoidBusinessLoanSchema>
 export type VerifyBusinessLoanPinInput        = z.infer<typeof VerifyBusinessLoanPinSchema>

@@ -3,7 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Plus, Trash2, Loader2, Scale, RefreshCw, Camera, ClipboardList, AlertCircle } from 'lucide-react'
+import { Plus, Trash2, Loader2, Scale, RefreshCw, Camera, ClipboardList, AlertCircle, Wallet } from 'lucide-react'
 import { toast } from 'sonner'
 import useSWR from 'swr'
 import { AccountSelectorPanel } from '@/components/customers/AccountSelectorPanel'
@@ -915,6 +915,12 @@ export default function NewSalePage() {
                 style={{ fontSize: 10, padding: '1px 6px', background: '#E0E0E0', border: '1px solid #999', borderRadius: 2, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}
               >
                 <RefreshCw style={{ width: 9, height: 9 }} /> Refresh
+              </button>
+              <button
+                onClick={() => router.push('/app/sales/unpaid')}
+                style={{ fontSize: 10, padding: '1px 6px', background: '#E0E0E0', border: '1px solid #999', borderRadius: 2, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}
+              >
+                <Wallet style={{ width: 9, height: 9 }} /> Unpaid Sales
               </button>
               <button
                 onClick={() => router.push('/app/sales')}

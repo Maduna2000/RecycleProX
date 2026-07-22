@@ -93,6 +93,7 @@ export function LoansTab({ customerId, customerName, userRole, userAllowedModule
   const [createOpen, setCreateOpen] = useState(false)
   const [voidTarget, setVoidTarget] = useState<Loan | null>(null)
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null)
+  const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
 
   const { data, isLoading } = useSWR<LoansResponse>(`/api/customers/${customerId}/loans`, fetcher)
   const loans = data?.loans ?? []
@@ -273,55 +274,23 @@ export function LoansTab({ customerId, customerName, userRole, userAllowedModule
                   </td>
                   <td style={{ padding: '5px 10px', width: 40, position: 'relative' }}>
                     {canVoidLoan(loan) && (
-                      <>
-                        <button
-                          onClick={() => setMenuOpenId(menuOpenId === loan.id ? null : loan.id)}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            cursor: 'pointer',
-                            padding: 4,
-                            borderRadius: 2,
-                          }}
-                        >
-                          <MoreHorizontal style={{ width: 14, height: 14, color: '#6C757D' }} />
-                        </button>
-                        {menuOpenId === loan.id && (
-                          <div
-                            style={{
-                              position: 'absolute',
-                              right: 10,
-                              top: '100%',
-                              background: '#fff',
-                              border: '1px solid #E0E0E0',
-                              borderRadius: 4,
-                              boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                              zIndex: 10,
-                              minWidth: 100,
-                            }}
-                          >
-                            <button
-                              onClick={() => {
-                                setVoidTarget(loan)
-                                setMenuOpenId(null)
-                              }}
-                              style={{
-                                display: 'block',
-                                width: '100%',
-                                padding: '6px 12px',
-                                fontSize: 11,
-                                textAlign: 'left',
-                                background: 'none',
-                                border: 'none',
-                                cursor: 'pointer',
-                                color: '#DC2626',
-                              }}
-                            >
-                              Void Loan
-                            </button>
-                          </div>
-                        )}
-                      </>
+                      <button
+                        onClick={(e) => {
+                          if (menuOpenId === loan.id) { setMenuOpenId(null); setMenuPos(null); return }
+                          const rect = e.currentTarget.getBoundingClientRect()
+                          setMenuPos({ top: rect.bottom + 2, right: window.innerWidth - rect.right })
+                          setMenuOpenId(loan.id)
+                        }}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          padding: 4,
+                          borderRadius: 2,
+                        }}
+                      >
+                        <MoreHorizontal style={{ width: 14, height: 14, color: '#6C757D' }} />
+                      </button>
                     )}
                   </td>
                 </tr>
@@ -329,6 +298,49 @@ export function LoansTab({ customerId, customerName, userRole, userAllowedModule
             </tbody>
           </table>
         </div>
+      )}
+
+      {/* Fixed-position row menu — rendered outside the scrollable table so it
+          never gets clipped by the tab panel's inner scroller */}
+      {menuOpenId && menuPos && (
+        <>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 49 }} onClick={() => { setMenuOpenId(null); setMenuPos(null) }} />
+          <div
+            style={{
+              position: 'fixed',
+              top: menuPos.top,
+              right: menuPos.right,
+              zIndex: 50,
+              background: '#fff',
+              border: '1px solid #E0E0E0',
+              borderRadius: 4,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+              minWidth: 100,
+            }}
+          >
+            <button
+              onClick={() => {
+                const loan = loans.find((l) => l.id === menuOpenId)
+                if (loan) setVoidTarget(loan)
+                setMenuOpenId(null)
+                setMenuPos(null)
+              }}
+              style={{
+                display: 'block',
+                width: '100%',
+                padding: '6px 12px',
+                fontSize: 11,
+                textAlign: 'left',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                color: '#DC2626',
+              }}
+            >
+              Void Loan
+            </button>
+          </div>
+        </>
       )}
 
       {/* Create Loan Dialog */}
