@@ -200,7 +200,7 @@ export async function createPurchase(data: CreatePurchaseInput, createdByUserId?
       const lineTotal = unitPrice.times(quantity)
 
       // Server-side VAT: only lines the cashier ticked, never for zero-rated customers
-      const vatApplied = (line.vatApplied ?? true) && !customer.zeroRated
+      const vatApplied = (line.vatApplied ?? false) && !customer.zeroRated
       const vatAmount = vatApplied ? lineTotal.times(VAT_RATE).toDecimalPlaces(2) : new Decimal(0)
 
       // Detect cashier override: submitted price differs from the resolved standard price

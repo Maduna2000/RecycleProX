@@ -277,10 +277,10 @@ function AccountsList() {
     },
     {
       key: 'zeroRated',
-      header: 'Zero VAT',
+      header: 'VAT',
       width: '75px',
-      render: (r) => r.zeroRated
-        ? <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold" style={{ background: '#FEF3C7', color: '#92400E' }}>Y</span>
+      render: (r) => !r.zeroRated
+        ? <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold" style={{ background: '#DCFCE7', color: '#166534' }}>Y</span>
         : <span className="text-[11px]" style={{ color: colors.textSecondary }}>N</span>,
     },
     {

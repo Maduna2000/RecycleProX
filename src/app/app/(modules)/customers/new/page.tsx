@@ -72,7 +72,7 @@ export default function NewAccountPage() {
       customerType:     'account',
       primaryFunction:  'supplier',
       tradeCommodities: [],
-      zeroRated:        false,
+      zeroRated:        true,
       isActive:         true,
     },
   })

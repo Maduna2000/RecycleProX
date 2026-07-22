@@ -64,7 +64,7 @@ type PendingPurchase = {
   createdAt: string
 }
 
-const emptyLine = (key: number, vatApplied = true): LineItem => ({
+const emptyLine = (key: number, vatApplied = false): LineItem => ({
   key, productId: '', product: null, quantity: '', grossQty: '', tareQty: '',
   tareReason: '', deductionQty: '', deductionReason: '', unitPrice: '', vatApplied,
   weighMode: false, selectedScale: '1', weighingGross: false, weighingTare: false,
@@ -666,7 +666,7 @@ export default function NewPurchasePage() {
                       <span style={{ fontSize: 10, padding: '1px 5px', background: '#DBEAFE', color: '#1D4ED8', borderRadius: 2 }}>Custom Pricing</span>
                     )}
                     {customer.zeroRated && (
-                      <span style={{ fontSize: 10, padding: '1px 5px', background: '#FEF9C3', color: '#854D0E', borderRadius: 2 }}>Zero Rated</span>
+                      <span style={{ fontSize: 10, padding: '1px 5px', background: '#FEF9C3', color: '#854D0E', borderRadius: 2 }}>No VAT</span>
                     )}
                     {!showAllProducts && (customer.tradeCommodities?.length ?? 0) > 0 && (
                       <button onClick={() => setShowAllProducts(true)}

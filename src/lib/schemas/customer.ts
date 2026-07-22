@@ -79,7 +79,8 @@ export const CreateCustomerSchema = z.object({
   priceGroupId:     z.string().uuid().optional(),
   marketSector:     z.enum(['formal', 'informal']).optional(),
   dealerCategory:   z.enum(['casual', 'dealer_1', 'dealer_2', 'dealer_3']).optional(),
-  zeroRated:        z.boolean().optional().default(false),
+  // VAT is opt-in: a new account has no VAT applied unless explicitly ticked.
+  zeroRated:        z.boolean().optional().default(true),
   isActive:         z.boolean().optional().default(true),
 })
 
@@ -113,6 +114,11 @@ export const UpdateCustomerSchema = CreateCustomerSchema.partial().omit({ idNumb
   isActive:       z.boolean().optional(),
   dealerCategory: z.enum(['casual', 'dealer_1', 'dealer_2', 'dealer_3']).nullable().optional(),
   priceGroupId:   z.string().uuid().nullable().optional(),
+  // Overrides the inherited .default(true) — a partial update payload that
+  // omits zeroRated must leave the existing customer's VAT setting alone,
+  // not silently reset it (Zod's .partial() keeps the base field's default
+  // active for an omitted key, confirmed empirically before this change).
+  zeroRated:      z.boolean().optional(),
 })
 
 export const UploadCustomerDocumentSchema = z.object({

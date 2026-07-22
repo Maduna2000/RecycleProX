@@ -537,7 +537,7 @@ export default function NewSalePage() {
                       <span style={{ fontSize: 10, padding: '1px 5px', background: '#DBEAFE', color: '#1D4ED8', borderRadius: 2 }}>Custom Pricing</span>
                     )}
                     {customer.zeroRated && (
-                      <span style={{ fontSize: 10, padding: '1px 5px', background: '#FEF9C3', color: '#854D0E', borderRadius: 2 }}>Zero Rated</span>
+                      <span style={{ fontSize: 10, padding: '1px 5px', background: '#FEF9C3', color: '#854D0E', borderRadius: 2 }}>No VAT</span>
                     )}
                     <button onClick={() => setCustomer(null)}
                       style={{ fontSize: 10, padding: '1px 8px', border: '1px solid #ABABAB', borderRadius: 2, color: '#6C757D', background: 'none', cursor: 'pointer', marginLeft: 'auto' }}>
