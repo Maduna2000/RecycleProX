@@ -30,6 +30,7 @@ export default function ScalePage() {
   const [direction, setDirection]   = useState<'forward' | 'back'>('forward')
   const [customer, setCustomer]     = useState<SelectedCustomer | null>(null)
   const [product, setProduct]       = useState<SelectedProduct | null>(null)
+  const [productQueue, setProductQueue] = useState<SelectedProduct[]>([])
   const [weight, setWeight]         = useState<string | null>(null)
   const [cart, setCart]             = useState<CartLine[]>([])
   const [justAdded, setJustAdded]   = useState<CartLine | null>(null)
@@ -90,6 +91,7 @@ export default function ScalePage() {
     setDirection('forward')
     setCustomer(null)
     setProduct(null)
+    setProductQueue([])
     setWeight(null)
     setCart([])
     setJustAdded(null)
@@ -101,22 +103,29 @@ export default function ScalePage() {
     setDirection('back')
 
     // Smart navigation: skip disabled steps when going back
+    let nextStep: number
     if (step === 6) {
       // From Review (step 6) go back to LineAdded (step 5)
-      setStep(5)
+      nextStep = 5
     } else if (step === 5) {
       // From LineAdded (step 5) go back to Photos (step 4) or Weight (step 3) if photos disabled
-      setStep(stepConfig.requirePhotos ? 4 : (stepConfig.requireWeight ? 3 : 2))
+      nextStep = stepConfig.requirePhotos ? 4 : (stepConfig.requireWeight ? 3 : 2)
     } else if (step === 4) {
       // From Photos (step 4) go back to Weight (step 3) or Product (step 2) if weight disabled
-      setStep(stepConfig.requireWeight ? 3 : 2)
+      nextStep = stepConfig.requireWeight ? 3 : 2
     } else {
-      setStep(s => s - 1)
+      nextStep = step - 1
     }
+
+    // Landing back on the picker abandons any items still waiting in a
+    // multi-select queue — otherwise they'd sit invisibly and be silently
+    // dropped the next time a fresh batch is picked.
+    if (nextStep === 2 && productQueue.length > 0) setProductQueue([])
+    setStep(nextStep)
   }
 
-  // Handle product selection - fetch config and navigate to next step
-  async function handleProductSelect(p: SelectedProduct) {
+  // Fetch config and navigate to the next step for one product
+  async function beginProduct(p: SelectedProduct) {
     setProduct(p)
     const config = await fetchStepConfig(p.categoryId)
     setStepConfig(config)
@@ -133,6 +142,16 @@ export default function ScalePage() {
       setWeight(null)
       addToCartAndShowConfirmation(p, null, [], undefined)
     }
+  }
+
+  // Handle a batch pick from Step2Product's multi-select — process the first
+  // item now, queue the rest to be picked up automatically from Step5's
+  // "Add Another" action instead of returning to the category grid each time.
+  async function handleProductsSelected(list: SelectedProduct[]) {
+    if (list.length === 0) return
+    const [first, ...rest] = list
+    setProductQueue(rest)
+    await beginProduct(first!)
   }
 
   // Helper to add item to cart
@@ -180,6 +199,16 @@ export default function ScalePage() {
   }
 
   function handleAddAnother() {
+    // Items queued from a multi-select pick skip the category grid entirely
+    // and go straight into weighing the next one.
+    if (productQueue.length > 0) {
+      const [next, ...rest] = productQueue
+      setProductQueue(rest)
+      setJustAdded(null)
+      void beginProduct(next!)
+      return
+    }
+
     // Clear current line state, go back to Product step (keep customer)
     setProduct(null)
     setWeight(null)
@@ -339,7 +368,7 @@ export default function ScalePage() {
           )}
           {step === 2 && (
             <Step2Product
-              onSelect={handleProductSelect}
+              onContinue={handleProductsSelected}
             />
           )}
           {step === 3 && product && (
@@ -358,6 +387,7 @@ export default function ScalePage() {
             <Step5LineAdded
               justAdded={justAdded}
               cart={cart}
+              queueRemaining={productQueue.length}
               onAddAnother={handleAddAnother}
               onReview={handleGoToReview}
             />

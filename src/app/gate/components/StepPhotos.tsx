@@ -4,7 +4,7 @@ import { useState, useRef } from 'react'
 import { Camera, CheckCircle2, Loader2, RefreshCw } from 'lucide-react'
 
 interface PhotoSlot {
-  key:       'id' | 'vehicle' | 'face'
+  key:       'id' | 'vehicle'
   label:     string
   required:  boolean
   r2Key:     string | null
@@ -15,13 +15,11 @@ interface PhotoSlot {
 export interface PhotoConfig {
   requireIdPhoto:      boolean
   requireVehiclePhoto: boolean
-  requireFacePhoto:    boolean
 }
 
 export interface PhotoKeys {
   idPhotoR2Key?:      string
   vehiclePhotoR2Key?: string
-  facePhotoR2Key?:    string
 }
 
 interface Props {
@@ -58,12 +56,11 @@ async function compressImage(file: File): Promise<Blob> {
 
 export default function StepPhotos({ entryTempId, config, onConfirm }: Props) {
   const [slots, setSlots] = useState<PhotoSlot[]>([
-    { key: 'id',      label: 'ID Document',   required: config.requireIdPhoto,      r2Key: null, preview: null, uploading: false },
-    { key: 'vehicle', label: 'Vehicle',       required: config.requireVehiclePhoto, r2Key: null, preview: null, uploading: false },
-    { key: 'face',    label: 'Visitor Face',  required: config.requireFacePhoto,    r2Key: null, preview: null, uploading: false },
+    { key: 'id',      label: 'ID Document', required: config.requireIdPhoto,      r2Key: null, preview: null, uploading: false },
+    { key: 'vehicle', label: 'Vehicle',     required: config.requireVehiclePhoto, r2Key: null, preview: null, uploading: false },
   ])
   const [errors, setErrors] = useState<Record<number, string | null>>({})
-  const inputRefs = [useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null)]
+  const inputRefs = [useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null)]
 
   function updateSlot(i: number, patch: Partial<PhotoSlot>) {
     setSlots((prev) => prev.map((s, idx) => (idx === i ? { ...s, ...patch } : s)))
@@ -101,7 +98,6 @@ export default function StepPhotos({ entryTempId, config, onConfirm }: Props) {
     onConfirm({
       idPhotoR2Key:      slots[0]!.r2Key ?? undefined,
       vehiclePhotoR2Key: slots[1]!.r2Key ?? undefined,
-      facePhotoR2Key:    slots[2]!.r2Key ?? undefined,
     })
   }
 
@@ -115,7 +111,7 @@ export default function StepPhotos({ entryTempId, config, onConfirm }: Props) {
       </div>
       <p className="text-slate-500 mb-5 sm:mb-6">Required photos are marked with *</p>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {slots.map((slot, i) => (
           <div key={slot.key} className="bg-white rounded-2xl shadow-sm p-3">
             <div className="flex items-center justify-between mb-2">

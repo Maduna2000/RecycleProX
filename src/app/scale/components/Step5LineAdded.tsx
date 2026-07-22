@@ -15,11 +15,13 @@ export interface CartLine {
 interface Props {
   justAdded: CartLine
   cart:      CartLine[]
+  /** Items still waiting from a multi-select pick — when > 0, "Add Another" moves straight to weighing the next one. */
+  queueRemaining?: number
   onAddAnother: () => void
   onReview:     () => void
 }
 
-export default function Step5LineAdded({ justAdded, cart, onAddAnother, onReview }: Props) {
+export default function Step5LineAdded({ justAdded, cart, queueRemaining = 0, onAddAnother, onReview }: Props) {
   return (
     <div className="flex-1 flex flex-col items-center justify-center p-6 max-w-md mx-auto w-full gap-5">
 
@@ -67,7 +69,9 @@ export default function Step5LineAdded({ justAdded, cart, onAddAnother, onReview
           onClick={onAddAnother}
           className="w-full border-2 border-emerald-500 text-emerald-700 text-lg font-semibold h-14 rounded-xl flex items-center justify-center gap-2 hover:bg-emerald-50 transition-colors"
         >
-          <Plus className="w-5 h-5" /> Add Another Product
+          {queueRemaining > 0
+            ? <><ArrowRight className="w-5 h-5" /> Weigh Next Item ({queueRemaining} more waiting)</>
+            : <><Plus className="w-5 h-5" /> Add Another Product</>}
         </button>
 
         <button

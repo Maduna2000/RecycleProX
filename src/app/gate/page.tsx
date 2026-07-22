@@ -15,7 +15,7 @@ import CheckOutMode from './components/CheckOutMode'
 // never visited, forward navigation jumps 2 -> 4 and back navigation jumps
 // 4 -> 2. This keeps the step numbers stable everywhere else instead of
 // renumbering the whole flow depending on purpose.
-const DEFAULT_PHOTO_CONFIG: PhotoConfig = { requireIdPhoto: false, requireVehiclePhoto: true, requireFacePhoto: true }
+const DEFAULT_PHOTO_CONFIG: PhotoConfig = { requireIdPhoto: false, requireVehiclePhoto: true }
 
 function useTempId() {
   const [id] = useState(() => crypto.randomUUID())
@@ -84,7 +84,6 @@ export default function GatePage() {
         setPhotoConfig({
           requireIdPhoto:      config.requireIdPhoto ?? false,
           requireVehiclePhoto: config.requireVehiclePhoto ?? true,
-          requireFacePhoto:    config.requireFacePhoto ?? true,
         })
       }
     } catch {

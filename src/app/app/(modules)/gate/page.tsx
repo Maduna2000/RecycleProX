@@ -12,7 +12,7 @@ import { toast } from 'sonner'
 import { DataTable, StatusBadge, type Column, type RowAction } from '@/components/ui/DataTable'
 import { InlineDetailPanel } from '@/components/ui/InlineDetailPanel'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
-import { Btn, PortalPage, BAR_GRAD } from '@/components/rpx'
+import { Btn, Field, FilterBar, PortalPage, inp, BAR_GRAD } from '@/components/rpx'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -85,14 +85,6 @@ function formatDuration(createdAt: string, exitedAt: string | null): string {
   const hours = Math.floor(totalMinutes / 60)
   const minutes = totalMinutes % 60
   return hours === 0 ? `${minutes}m` : `${hours}h ${minutes}m`
-}
-
-function miniBtn(extra?: Record<string, unknown>) {
-  return {
-    fontSize: 10, padding: '1px 6px', background: '#E0E0E0', border: '1px solid #999',
-    borderRadius: 2, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3,
-    ...extra,
-  } as React.CSSProperties
 }
 
 // ─── On-site photo viewer ─────────────────────────────────────────────────────
@@ -403,39 +395,54 @@ function EntriesTab() {
   ]
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 gap-3">
-      <div className="flex flex-wrap items-center gap-2 shrink-0">
-        <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#9CA3AF] pointer-events-none" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search entry #, name, vehicle reg…" className="pl-8 pr-3 h-7 border border-[#E0E0E0] bg-white focus:outline-none focus:border-[#185ABD] text-[12px]" style={{ borderRadius: 2, width: 240 }} />
-        </div>
-
-        <select value={purpose} onChange={e => { setPurpose(e.target.value); setPage(1) }} className="h-7 px-2 border border-[#E0E0E0] bg-white focus:outline-none focus:border-[#185ABD] text-[12px] text-[#212529]" style={{ borderRadius: 2 }}>
-          <option value="">All Purposes</option>
-          <option value="sell">To Sell</option>
-          <option value="buy">To Buy</option>
-          <option value="visitor">Visitor</option>
-          <option value="other">Other</option>
-        </select>
-
-        <label className="flex items-center gap-1.5 h-7 px-2 text-[12px]" style={{ color: colors.textSecondary }}>
-          <input type="checkbox" checked={onSiteOnly} onChange={e => { setOnSiteOnly(e.target.checked); setPage(1) }} />
-          On site only
-        </label>
-
-        <input type="date" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setPage(1) }} className="h-7 px-2 border border-[#E0E0E0] bg-white focus:outline-none focus:border-[#185ABD] text-[12px] text-[#212529]" style={{ borderRadius: 2 }} title="From date" />
-        <input type="date" value={dateTo} onChange={e => { setDateTo(e.target.value); setPage(1) }} className="h-7 px-2 border border-[#E0E0E0] bg-white focus:outline-none focus:border-[#185ABD] text-[12px] text-[#212529]" style={{ borderRadius: 2 }} title="To date" />
-
+    <div className="flex flex-col flex-1 min-h-0">
+      <FilterBar>
+        <Field label="Search" width={230}>
+          <div style={{ position: 'relative' }}>
+            <Search style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', width: 12, height: 12, color: '#6C757D' }} />
+            <input
+              value={search}
+              onChange={e => { setSearch(e.target.value); setPage(1) }}
+              placeholder="Search entry #, name, vehicle reg…"
+              style={{ ...inp, paddingLeft: 26 }}
+            />
+          </div>
+        </Field>
+        <Field label="Purpose" width={130}>
+          <select style={inp} value={purpose} onChange={e => { setPurpose(e.target.value); setPage(1) }}>
+            <option value="">All Purposes</option>
+            <option value="sell">To Sell</option>
+            <option value="buy">To Buy</option>
+            <option value="visitor">Visitor</option>
+            <option value="other">Other</option>
+          </select>
+        </Field>
+        <Field label="From" width={140}>
+          <input type="date" style={inp} value={dateFrom} onChange={e => { setDateFrom(e.target.value); setPage(1) }} />
+        </Field>
+        <Field label="To" width={140}>
+          <input type="date" style={inp} value={dateTo} onChange={e => { setDateTo(e.target.value); setPage(1) }} />
+        </Field>
+        <Field label={' '}>
+          <label className="flex items-center gap-1.5" style={{ height: 30, fontSize: 12, color: colors.textSecondary, whiteSpace: 'nowrap' }}>
+            <input type="checkbox" checked={onSiteOnly} onChange={e => { setOnSiteOnly(e.target.checked); setPage(1) }} />
+            On site only
+          </label>
+        </Field>
         {hasFilters && (
-          <button onClick={clearFilters} style={miniBtn()}><X style={{ width: 9, height: 9 }} /> Reset</button>
+          <Field label={' '}>
+            <Btn size="sm" icon={X} onClick={clearFilters}>Reset</Btn>
+          </Field>
         )}
+        <Field label={' '}>
+          <Btn size="sm" icon={RefreshCw} onClick={() => fetchEntries(page)} title="Refresh" />
+        </Field>
+        <span style={{ fontSize: 11, color: '#6C757D', marginLeft: 'auto', paddingBottom: 8 }}>
+          {total} entr{total !== 1 ? 'ies' : 'y'}
+        </span>
+      </FilterBar>
 
-        <div className="ml-auto">
-          <button onClick={() => fetchEntries(page)} style={miniBtn()}><RefreshCw style={{ width: 9, height: 9 }} /></button>
-        </div>
-      </div>
-
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0" style={{ padding: 10 }}>
         <DataTable
           columns={columns}
           rows={entries}
@@ -522,19 +529,26 @@ function GuardsTab() {
   ] : []
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 gap-3">
-      <div className="flex items-center gap-2 shrink-0">
-        <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#9CA3AF] pointer-events-none" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search name or username…" className="pl-8 pr-3 h-7 border border-[#E0E0E0] bg-white focus:outline-none focus:border-[#185ABD] text-[12px]" style={{ borderRadius: 2, width: 220 }} />
-        </div>
-        <div className="ml-auto">
-          <button onClick={() => setShowCreate(true)} style={miniBtn()}><UserPlus style={{ width: 9, height: 9 }} /> Create Guard</button>
-        </div>
-      </div>
+    <div className="flex flex-col flex-1 min-h-0">
+      <FilterBar>
+        <Field label="Search" width={230}>
+          <div style={{ position: 'relative' }}>
+            <Search style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', width: 12, height: 12, color: '#6C757D' }} />
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search name or username…"
+              style={{ ...inp, paddingLeft: 26 }}
+            />
+          </div>
+        </Field>
+        <span style={{ marginLeft: 'auto', paddingBottom: 8 }}>
+          <Btn size="sm" variant="primary" icon={UserPlus} onClick={() => setShowCreate(true)}>Create Guard</Btn>
+        </span>
+      </FilterBar>
 
       <div className="flex flex-col flex-1 min-h-0">
-        <div className="flex-1 min-h-0">
+        <div className="flex-1 min-h-0" style={{ padding: 10 }}>
           <DataTable
             columns={columns}
             rows={guards}
@@ -578,7 +592,7 @@ function ConfigTab() {
 
   useEffect(() => { fetchConfigs() }, [fetchConfigs])
 
-  async function handleToggle(purpose: string, field: keyof Omit<PurposeConfig, 'purpose'>, value: boolean) {
+  async function handleToggle(purpose: string, field: keyof Omit<PurposeConfig, 'purpose' | 'requireFacePhoto'>, value: boolean) {
     const config = configs.find(c => c.purpose === purpose)
     if (!config) return
 
@@ -588,7 +602,7 @@ function ConfigTab() {
       const body = {
         requireIdPhoto:      field === 'requireIdPhoto'      ? value : config.requireIdPhoto,
         requireVehiclePhoto: field === 'requireVehiclePhoto' ? value : config.requireVehiclePhoto,
-        requireFacePhoto:    field === 'requireFacePhoto'     ? value : config.requireFacePhoto,
+        requireFacePhoto:    false,
       }
       const res = await fetch(`/api/gate/purpose-config/${purpose}`, {
         method: 'PUT',
@@ -626,30 +640,26 @@ function ConfigTab() {
           <p className="font-medium">Configure Required Photos</p>
           <p style={{ color: colors.textSecondary, marginTop: 2 }}>
             Enable or disable which photos a guard must capture for each entry purpose.
-            All three photo types are always available to capture — only the required ones block Continue.
+            Both photo types are always available to capture — only the required ones block Continue.
           </p>
         </div>
       </div>
 
       <div className="bg-white border" style={{ borderColor: colors.border, borderRadius: 2 }}>
-        <div className="grid items-center px-4 py-2 border-b" style={{ gridTemplateColumns: '1fr 100px 100px 100px', borderColor: colors.border, background: colors.bg }}>
+        <div className="grid items-center px-4 py-2 border-b" style={{ gridTemplateColumns: '1fr 100px 100px', borderColor: colors.border, background: colors.bg }}>
           <span style={{ fontSize: fontSize.xs, fontWeight: fontWeight.semibold, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Purpose</span>
           <span className="text-center" style={{ fontSize: fontSize.xs, fontWeight: fontWeight.semibold, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.05em' }}>ID Photo</span>
           <span className="text-center" style={{ fontSize: fontSize.xs, fontWeight: fontWeight.semibold, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Vehicle</span>
-          <span className="text-center" style={{ fontSize: fontSize.xs, fontWeight: fontWeight.semibold, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Face</span>
         </div>
 
         {configs.map((config) => (
-          <div key={config.purpose} className="grid items-center px-4 py-2.5 border-b last:border-b-0" style={{ gridTemplateColumns: '1fr 100px 100px 100px', borderColor: colors.border, background: saving === config.purpose ? colors.bg : 'transparent' }}>
+          <div key={config.purpose} className="grid items-center px-4 py-2.5 border-b last:border-b-0" style={{ gridTemplateColumns: '1fr 100px 100px', borderColor: colors.border, background: saving === config.purpose ? colors.bg : 'transparent' }}>
             <span style={{ fontSize: fontSize.sm, fontWeight: fontWeight.semibold, color: colors.textPrimary }}>{PURPOSE_LABELS[config.purpose] ?? config.purpose}</span>
             <div className="flex justify-center">
               <ToggleSwitch checked={config.requireIdPhoto} disabled={saving === config.purpose} onChange={(v) => handleToggle(config.purpose, 'requireIdPhoto', v)} />
             </div>
             <div className="flex justify-center">
               <ToggleSwitch checked={config.requireVehiclePhoto} disabled={saving === config.purpose} onChange={(v) => handleToggle(config.purpose, 'requireVehiclePhoto', v)} />
-            </div>
-            <div className="flex justify-center">
-              <ToggleSwitch checked={config.requireFacePhoto} disabled={saving === config.purpose} onChange={(v) => handleToggle(config.purpose, 'requireFacePhoto', v)} />
             </div>
           </div>
         ))}
