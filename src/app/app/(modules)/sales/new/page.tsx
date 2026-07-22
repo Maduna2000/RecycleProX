@@ -1139,19 +1139,12 @@ export default function NewSalePage() {
 
       {/* ── Action bar ────────────────────────────────────────────────────── */}
       <div
-        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 16px', borderTop: '2px solid #B0B0B0', background: 'linear-gradient(180deg,#F5F5F5 0%,#E8E8E8 100%)', flexShrink: 0 }}
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', padding: '6px 16px', borderTop: '2px solid #B0B0B0', background: 'linear-gradient(180deg,#F5F5F5 0%,#E8E8E8 100%)', flexShrink: 0 }}
       >
         <button
           type="button"
-          onClick={() => submitSale(true)}
-          disabled={submitting || isBlacklisted || paymentType !== 'unpaid'}
-          style={{ height: 28, padding: '0 20px', borderRadius: 2, fontSize: 12, fontWeight: 500, background: '#FFF', border: '1px solid #C9A020', color: '#92400E', cursor: 'pointer', opacity: submitting || isBlacklisted || paymentType !== 'unpaid' ? 0.4 : 1 }}
-        >
-          {submitting ? <Loader2 style={{ width: 13, height: 13, display: 'inline', animation: 'spin 1s linear infinite' }} /> : 'Save as Unpaid'}
-        </button>
-        <button
-          type="button"
           onClick={() => {
+            if (paymentType === 'unpaid') { submitSale(true); return }
             // A business loan that hasn't been unlocked this session gates
             // here, at the point of actually saving, rather than requiring
             // a separate click somewhere else first. Once unlocked, always
@@ -1162,12 +1155,12 @@ export default function NewSalePage() {
             else if (hasOutstandingBusinessLoan && businessLoanSummary) setSettlementConfirmOpen(true)
             else submitSale(false)
           }}
-          disabled={submitting || isBlacklisted || paymentType === 'unpaid' || hasStockError}
-          style={{ height: 28, padding: '0 24px', borderRadius: 2, fontSize: 12, fontWeight: 700, background: BAR_GRAD, border: CARD_BORDER, color: colors.textPrimary, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, opacity: submitting || isBlacklisted || paymentType === 'unpaid' || hasStockError ? 0.4 : 1 }}
+          disabled={submitting || isBlacklisted || (paymentType !== 'unpaid' && hasStockError)}
+          style={{ height: 28, padding: '0 24px', borderRadius: 2, fontSize: 12, fontWeight: 700, background: BAR_GRAD, border: CARD_BORDER, color: colors.textPrimary, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, opacity: submitting || isBlacklisted || (paymentType !== 'unpaid' && hasStockError) ? 0.4 : 1 }}
         >
           {submitting
             ? <><Loader2 style={{ width: 13, height: 13, animation: 'spin 1s linear infinite' }} /> Saving…</>
-            : `Save Sale · R ${total.toFixed(2)}`}
+            : paymentType === 'unpaid' ? 'Save Sale' : `Save Sale · R ${total.toFixed(2)}`}
         </button>
       </div>
 
@@ -1266,14 +1259,14 @@ function SaleSettlementModal({
         <RpxDialogHeader title="Confirm Sale Payment" icon={Split} onClose={onCancel} />
         <RpxDialogBody>
           <div className="space-y-4">
-            <div className="px-3 py-2.5 rounded-lg space-y-1" style={{ background: '#F8F9FA', border: '1px solid #E0E0E0' }}>
+            <div className="px-3 py-2.5 space-y-1" style={{ background: '#F8F9FA', border: '1px solid #E0E0E0', borderRadius: 2 }}>
               <div className="flex justify-between" style={{ fontSize: 12, color: '#6C757D' }}>
                 <span>Sale total</span>
                 <span className="font-mono">R {total.toFixed(2)}</span>
               </div>
             </div>
 
-            <div className="flex items-start gap-2 px-3 py-2 rounded-lg" style={{ background: '#FFF3E0', border: '1px solid #FFCC80' }}>
+            <div className="flex items-start gap-2 px-3 py-2" style={{ background: '#FFF3E0', border: '1px solid #FFCC80', borderRadius: 2 }}>
               <Lock className="w-4 h-4 shrink-0 mt-0.5" style={{ color: '#E65100' }} />
               <div className="w-full">
                 <div className="flex justify-between" style={{ fontSize: 12, fontWeight: 600, color: '#E65100' }}>

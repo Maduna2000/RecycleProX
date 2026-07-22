@@ -7,7 +7,7 @@ import { useSession } from 'next-auth/react'
 import { Search, Eye, Ban, Printer, FileText, Loader2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import Decimal from 'decimal.js'
-import { DataTable, StatusBadge, type Column, type RowAction, type SortDir } from '@/components/ui/DataTable'
+import { DataTable, StatusBadge, Avatar, type Column, type RowAction, type SortDir } from '@/components/ui/DataTable'
 import { InlineDetailPanel } from '@/components/ui/InlineDetailPanel'
 import { Dialog } from '@/components/ui/dialog'
 import { format } from '@/lib/utils/format'
@@ -118,12 +118,7 @@ export default function SalesPage() {
       header: 'Buyer',
       render: (row) => (
         <div className="flex items-center gap-2">
-          <div
-            className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0"
-            style={{ background: colors.action }}
-          >
-            {(row.buyerName?.[0] ?? '?').toUpperCase()}
-          </div>
+          <Avatar name={row.buyerName || '?'} size={26} />
           <div>
             <p style={{ fontSize: fontSize.sm, fontWeight: fontWeight.medium, color: colors.textPrimary }}>{row.buyerName}</p>
             {row.buyerIdNumber && (
