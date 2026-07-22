@@ -3,7 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Plus, Trash2, Loader2, Scale, RefreshCw, Camera, ClipboardList, Wallet } from 'lucide-react'
+import { Plus, Trash2, Loader2, Scale, RefreshCw, Camera, ClipboardList, Wallet, Lock, Split } from 'lucide-react'
 import { toast } from 'sonner'
 import useSWR from 'swr'
 import { AccountSelectorPanel } from '@/components/customers/AccountSelectorPanel'
@@ -13,6 +13,8 @@ import { AdminPinUnlockModal, type BusinessLoanFullSummary } from '@/components/
 import Decimal from 'decimal.js'
 import { colors } from '@/lib/design-tokens'
 import { BAR_GRAD, CARD_BORDER } from '@/components/rpx/styles'
+import { Dialog } from '@/components/ui/dialog'
+import { Btn, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
 import { useOfflineMutation } from '@/hooks/useOfflineFetch'
 import { offlineDB } from '@/lib/offline/db'
 
@@ -111,9 +113,10 @@ export default function NewSalePage() {
 
   // ── Business loan deduction — mandatory once the PIN reveals a balance;
   // there is no manual toggle. `businessLoanSummary` set = deduction applies. ─
-  const [businessLoanAmount,  setBusinessLoanAmount]  = useState('')
-  const [businessLoanPinOpen, setBusinessLoanPinOpen] = useState(false)
-  const [businessLoanSummary, setBusinessLoanSummary] = useState<BusinessLoanFullSummary | null>(null)
+  const [businessLoanAmount,   setBusinessLoanAmount]   = useState('')
+  const [businessLoanPinOpen,  setBusinessLoanPinOpen]  = useState(false)
+  const [businessLoanSummary,  setBusinessLoanSummary]  = useState<BusinessLoanFullSummary | null>(null)
+  const [settlementConfirmOpen, setSettlementConfirmOpen] = useState(false)
 
   // ── Pending sales state ───────────────────────────────────────────────────
   const [actionMenuId,   setActionMenuId]   = useState<string | null>(null)
@@ -1151,8 +1154,12 @@ export default function NewSalePage() {
           onClick={() => {
             // A business loan that hasn't been unlocked this session gates
             // here, at the point of actually saving, rather than requiring
-            // a separate click somewhere else first.
+            // a separate click somewhere else first. Once unlocked, always
+            // show the breakdown confirm step before actually submitting —
+            // never jump straight to "sale completed" without the operator
+            // seeing how much went to the loan vs cash/eft.
             if (hasOutstandingBusinessLoan && !businessLoanSummary) setBusinessLoanPinOpen(true)
+            else if (hasOutstandingBusinessLoan && businessLoanSummary) setSettlementConfirmOpen(true)
             else submitSale(false)
           }}
           disabled={submitting || isBlacklisted || paymentType === 'unpaid' || hasStockError}
@@ -1191,8 +1198,9 @@ export default function NewSalePage() {
       )}
 
       {/* Admin PIN — triggered by clicking Save Sale, not a separate step.
-          Reveals the business loan balance and immediately continues the
-          save with it applied (mandatory, not a manual choice). */}
+          Reveals the business loan balance, then hands off to the
+          settlement confirm modal below rather than submitting straight
+          away — the operator needs to see the loan/cash breakdown first. */}
       {businessLoanPinOpen && customer && (
         <AdminPinUnlockModal
           customerId={customer.id}
@@ -1202,11 +1210,95 @@ export default function NewSalePage() {
             setBusinessLoanSummary(summary)
             setBusinessLoanAmount(amount)
             setBusinessLoanPinOpen(false)
-            submitSale(false, { summary, amount })
+            setSettlementConfirmOpen(true)
+          }}
+        />
+      )}
+
+      {/* Settlement confirm — shows the loan/cash breakdown and requires an
+          explicit confirm click before the sale is actually submitted. */}
+      {settlementConfirmOpen && businessLoanSummary && (
+        <SaleSettlementModal
+          total={total}
+          businessLoanAmount={businessLoanAmount}
+          outstanding={businessLoanSummary.outstanding}
+          paymentType={paymentType === 'unpaid' ? 'cash' : paymentType}
+          submitting={submitting}
+          onCancel={() => setSettlementConfirmOpen(false)}
+          onConfirm={() => {
+            setSettlementConfirmOpen(false)
+            submitSale(false, { summary: businessLoanSummary, amount: businessLoanAmount })
           }}
         />
       )}
 
     </div>
+  )
+}
+
+// ─── Sale Settlement Confirm Modal ─────────────────────────────────────────────
+// Shown after the admin PIN reveals the business loan balance — the operator
+// must see exactly how the sale splits between the mandatory loan deduction
+// and cash/eft before it's actually submitted, never an instant auto-submit.
+function SaleSettlementModal({
+  total,
+  businessLoanAmount,
+  outstanding,
+  paymentType,
+  submitting,
+  onCancel,
+  onConfirm,
+}: {
+  total: Decimal
+  businessLoanAmount: string
+  outstanding: string
+  paymentType: 'cash' | 'eft'
+  submitting: boolean
+  onCancel: () => void
+  onConfirm: () => void
+}) {
+  const loanAmt    = new Decimal(businessLoanAmount || '0')
+  const remaining  = Decimal.max(total.minus(loanAmt), new Decimal(0))
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onCancel() }}>
+      <RpxDialogContent maxWidth={420}>
+        <RpxDialogHeader title="Confirm Sale Payment" icon={Split} onClose={onCancel} />
+        <RpxDialogBody>
+          <div className="space-y-4">
+            <div className="px-3 py-2.5 rounded-lg space-y-1" style={{ background: '#F8F9FA', border: '1px solid #E0E0E0' }}>
+              <div className="flex justify-between" style={{ fontSize: 12, color: '#6C757D' }}>
+                <span>Sale total</span>
+                <span className="font-mono">R {total.toFixed(2)}</span>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-2 px-3 py-2 rounded-lg" style={{ background: '#FFF3E0', border: '1px solid #FFCC80' }}>
+              <Lock className="w-4 h-4 shrink-0 mt-0.5" style={{ color: '#E65100' }} />
+              <div className="w-full">
+                <div className="flex justify-between" style={{ fontSize: 12, fontWeight: 600, color: '#E65100' }}>
+                  <span>Applied to business loan</span>
+                  <span className="font-mono">R {loanAmt.toFixed(2)}</span>
+                </div>
+                <p className="text-xs mt-0.5" style={{ color: '#EF6C00' }}>
+                  Outstanding balance: R {new Decimal(outstanding).toFixed(2)} — this amount is locked and mandatory.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-between pt-1 border-t" style={{ fontSize: 13, borderColor: '#E0E0E0' }}>
+              <span className="font-semibold" style={{ color: '#217346' }}>Due via {paymentType.toUpperCase()}</span>
+              <span className="font-mono font-bold" style={{ color: '#217346' }}>R {remaining.toFixed(2)}</span>
+            </div>
+          </div>
+        </RpxDialogBody>
+        <RpxDialogFooter>
+          <Btn onClick={onCancel} disabled={submitting}>Cancel</Btn>
+          <Btn variant="primary" loading={submitting} onClick={onConfirm}>
+            Confirm &amp; Complete Sale
+          </Btn>
+        </RpxDialogFooter>
+      </RpxDialogContent>
+    </Dialog>
   )
 }
