@@ -25,6 +25,7 @@ function PaymentInput({
   onChange,
   disabled,
   locked,
+  revealed,
   onUnlockClick,
   highlight,
 }: {
@@ -34,6 +35,7 @@ function PaymentInput({
   onChange: (v: string) => void
   disabled: boolean
   locked?: boolean
+  revealed?: boolean
   onUnlockClick?: () => void
   highlight?: boolean
 }) {
@@ -45,7 +47,7 @@ function PaymentInput({
         {locked && <Lock className="w-3 h-3" style={{ color: '#E65100' }} />}
       </div>
       <div className="flex-1 relative">
-        {locked ? (
+        {locked && !revealed ? (
           <button
             type="button"
             onClick={onUnlockClick}
@@ -63,9 +65,9 @@ function PaymentInput({
               placeholder="0.00"
               value={value}
               onChange={(e) => onChange(e.target.value)}
-              disabled={disabled}
+              disabled={disabled || locked}
               className="h-8 text-xs font-mono pl-6"
-              style={{ borderColor: highlight ? '#FFCC80' : undefined }}
+              style={{ borderColor: highlight ? '#FFCC80' : undefined, background: locked ? '#F5F5F5' : undefined }}
             />
           </>
         )}
@@ -104,16 +106,19 @@ export function SaleSplitPaymentModal({
   const paymentTotal     = cashAmt.plus(eftAmt).plus(businessLoanAmt)
   const remaining        = pendingAmount.minus(paymentTotal)
 
-  // Everyone — including an admin — must enter a PIN to reveal and use this
-  // leg. The figure is sensitive regardless of who happens to be at the
-  // till right now.
+  // Everyone — including an admin — must enter a PIN to reveal this leg.
+  // Once revealed it's auto-filled and LOCKED at the mandatory amount (not
+  // manually editable), mirroring the purchase module's loan-deduction
+  // field exactly — the loan can't be zeroed out or reduced, only the
+  // cash/eft split for whatever's left is up to the operator.
   const showBusinessLoanLeg = hasOutstandingBusinessLoan && !!sale.customerId
-  const isLocked = showBusinessLoanLeg && !unlockedSummary
+  const pendingReveal = showBusinessLoanLeg && !unlockedSummary
   const maxLoanDeduction = unlockedSummary
     ? Decimal.min(new Decimal(unlockedSummary.outstanding), pendingAmount)
     : new Decimal(0)
 
   function validate(): string | null {
+    if (pendingReveal) return 'Enter the admin PIN to reveal and apply the business loan first'
     if (paymentTotal.isZero()) return 'Enter at least one payment amount'
     if (paymentTotal.greaterThan(pendingAmount)) return 'Total exceeds pending amount'
     if (businessLoanAmt.greaterThan(maxLoanDeduction)) return 'Business loan deduction exceeds outstanding balance'
@@ -195,7 +200,8 @@ export function SaleSplitPaymentModal({
                     value={businessLoan}
                     onChange={setBusinessLoan}
                     disabled={loading}
-                    locked={isLocked}
+                    locked={showBusinessLoanLeg}
+                    revealed={!!unlockedSummary}
                     highlight={showBusinessLoanLeg}
                     onUnlockClick={() => setPinModalOpen(true)}
                   />
@@ -221,7 +227,7 @@ export function SaleSplitPaymentModal({
             <Btn
               variant="primary"
               loading={loading}
-              disabled={paymentTotal.isZero() || !remaining.isZero() || isLocked && businessLoanAmt.greaterThan(0)}
+              disabled={pendingReveal || paymentTotal.isZero() || !remaining.isZero()}
               onClick={handleSubmit}
             >
               Process Full Payment

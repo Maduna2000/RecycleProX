@@ -104,7 +104,9 @@ export function RecordPaymentModal({
             </div>
           </div>
 
-          {/* Business loan alert — existence-only, no figure */}
+          {/* Business loan alert — existence-only, no figure. Mandatory: this
+              sale cannot be settled via plain cash/eft while it's unpaid,
+              only through Split Payment (which PIN-gates the actual figure). */}
           {hasOutstandingBusinessLoan && (
             <div className="flex items-start gap-2 px-3 py-2 rounded-lg" style={{ background: '#FFF3E0', border: '1px solid #FFCC80' }}>
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" style={{ color: '#E65100' }} />
@@ -113,51 +115,54 @@ export function RecordPaymentModal({
                   This customer has a pending business loan
                 </p>
                 <p className="text-xs" style={{ color: '#EF6C00' }}>
-                  Use Split Payment to apply this sale toward it.
+                  This sale can only be settled via Split Payment until the loan is applied.
                 </p>
               </div>
             </div>
           )}
 
-          {/* Amount input */}
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="text-xs font-medium" style={{ color: '#6C757D' }}>Amount Received</label>
-              <button
-                type="button"
-                onClick={() => { setAmount(remaining.toFixed(2)); setAmountError(null) }}
-                className="text-xs underline"
-                style={{ color: '#217346' }}
-              >
-                Pay full balance
-              </button>
-            </div>
-            <Input
-              type="text"
-              inputMode="decimal"
-              placeholder="0.00"
-              value={amount}
-              onChange={(e) => { setAmount(e.target.value); setAmountError(null) }}
-              className="h-8 text-[12px] font-mono"
-            />
-            {amountError && (
-              <p className="text-xs mt-1" style={{ color: '#DC3545' }}>{amountError}</p>
-            )}
-          </div>
+          {/* Amount + method — only when there's no business loan to resolve first */}
+          {!hasOutstandingBusinessLoan && (
+            <>
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-medium" style={{ color: '#6C757D' }}>Amount Received</label>
+                  <button
+                    type="button"
+                    onClick={() => { setAmount(remaining.toFixed(2)); setAmountError(null) }}
+                    className="text-xs underline"
+                    style={{ color: '#217346' }}
+                  >
+                    Pay full balance
+                  </button>
+                </div>
+                <Input
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="0.00"
+                  value={amount}
+                  onChange={(e) => { setAmount(e.target.value); setAmountError(null) }}
+                  className="h-8 text-[12px] font-mono"
+                />
+                {amountError && (
+                  <p className="text-xs mt-1" style={{ color: '#DC3545' }}>{amountError}</p>
+                )}
+              </div>
 
-          {/* Payment method */}
-          <div>
-            <label className="block mb-1 text-xs font-medium" style={{ color: '#6C757D' }}>Payment Method</label>
-            <Select onValueChange={(v) => setMethod(v as typeof method)} defaultValue="cash">
-              <SelectTrigger className="h-8 w-full text-xs border-[#E0E0E0]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="cash">Cash</SelectItem>
-                <SelectItem value="eft">EFT</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+              <div>
+                <label className="block mb-1 text-xs font-medium" style={{ color: '#6C757D' }}>Payment Method</label>
+                <Select onValueChange={(v) => setMethod(v as typeof method)} defaultValue="cash">
+                  <SelectTrigger className="h-8 w-full text-xs border-[#E0E0E0]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">Cash</SelectItem>
+                    <SelectItem value="eft">EFT</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </>
+          )}
 
           {/* Split Payment button */}
           {sale.customerId && (
@@ -167,9 +172,9 @@ export function RecordPaymentModal({
               disabled={loading}
               className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded text-xs font-medium"
               style={{
-                background: '#E3F2FD',
+                background: hasOutstandingBusinessLoan ? '#1565C0' : '#E3F2FD',
                 border: '1px solid #90CAF9',
-                color: '#1565C0',
+                color: hasOutstandingBusinessLoan ? '#fff' : '#1565C0',
                 cursor: loading ? 'not-allowed' : 'pointer',
               }}
             >
@@ -182,9 +187,11 @@ export function RecordPaymentModal({
         </RpxDialogBody>
         <RpxDialogFooter>
           <Btn onClick={onClose} disabled={loading}>Cancel</Btn>
-          <Btn variant="primary" icon={HandCoins} loading={loading} onClick={handlePay}>
-            Record Payment
-          </Btn>
+          {!hasOutstandingBusinessLoan && (
+            <Btn variant="primary" icon={HandCoins} loading={loading} onClick={handlePay}>
+              Record Payment
+            </Btn>
+          )}
         </RpxDialogFooter>
       </RpxDialogContent>
 
