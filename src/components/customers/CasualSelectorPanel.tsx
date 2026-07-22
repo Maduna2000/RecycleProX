@@ -7,6 +7,14 @@ import { Loader2, ScanLine, UserCheck, UserPlus, AlertTriangle } from 'lucide-re
 import { toast } from 'sonner'
 import { validateSaId } from '@/lib/utils/saId'
 
+// Legacy grey toolbar-button look — matches "Edit Transaction" / "Refresh"
+// on the purchases and sales pages that host this panel.
+const legacyBtn: React.CSSProperties = {
+  height: 28, padding: '0 10px', background: '#E0E0E0', border: '1px solid #999',
+  borderRadius: 2, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
+  fontSize: 11, fontWeight: 500, color: '#212529', whiteSpace: 'nowrap', flexShrink: 0,
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type SelectedCustomer = {
@@ -338,9 +346,8 @@ export const CasualSelectorPanel = forwardRef<CasualSelectorPanelRef, Props>(
             disabled={scanStatus === 'scanning'}
             onClick={() => fileInputRef.current?.click()}
             title={scanR2Key ? 'Re-scan ID document' : 'Scan ID document — upload a photo'}
-            className="h-7 px-2.5 rounded border flex items-center gap-1.5 text-[11px] font-medium
-                       transition-colors border-[#185ABD] text-[#185ABD] bg-blue-50 hover:bg-blue-100
-                       disabled:opacity-50 disabled:cursor-not-allowed shrink-0 whitespace-nowrap"
+            style={legacyBtn}
+            className="disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {scanStatus === 'scanning' ? (
               <>

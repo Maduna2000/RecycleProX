@@ -6,6 +6,14 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Loader2, UserPlus, Search } from 'lucide-react'
 
+// Legacy grey toolbar-button look — matches "Edit Transaction" / "Refresh"
+// on the purchases and sales pages that host this panel.
+const legacyBtn: React.CSSProperties = {
+  height: 32, padding: '0 10px', background: '#E0E0E0', border: '1px solid #999',
+  borderRadius: 2, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
+  fontSize: 11, fontWeight: 500, color: '#212529', whiteSpace: 'nowrap', flexShrink: 0,
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type SelectedCustomer = {
@@ -85,21 +93,35 @@ export function AccountSelectorPanel({ onSelect }: Props) {
 
   return (
     <div className="space-y-2">
-      {/* Search input */}
-      <div className="relative">
-        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#6C757D] pointer-events-none" />
-        <Input
-          value={query}
-          onChange={(e) => handleQueryChange(e.target.value)}
-          placeholder="Search by name, account code, or phone…"
-          className="h-8 text-[12px] pl-8 pr-8"
-          aria-label="Search account customers"
-          autoFocus
-        />
-        {loading && (
-          <Loader2 className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 animate-spin text-[#6C757D]" />
-        )}
+      {/* Row 1: Search + inline Add Account button */}
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#6C757D] pointer-events-none" />
+          <Input
+            value={query}
+            onChange={(e) => handleQueryChange(e.target.value)}
+            placeholder="Search by name, account code, or phone…"
+            className="h-8 text-[12px] pl-8 pr-8"
+            aria-label="Search account customers"
+            autoFocus
+          />
+          {loading && (
+            <Loader2 className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 animate-spin text-[#6C757D]" />
+          )}
+        </div>
+
+        <button
+          type="button"
+          onClick={() => router.push(`/app/customers/new?returnTo=${encodeURIComponent(pathname)}`)}
+          style={legacyBtn}
+        >
+          <UserPlus className="w-3.5 h-3.5" /> Add Account
+        </button>
       </div>
+
+      {query.length < 2 && (
+        <p className="text-[10px]" style={{ color: '#6C757D' }}>Type 2+ characters to search</p>
+      )}
 
       {/* Results */}
       {results.length > 0 && (
@@ -150,22 +172,6 @@ export function AccountSelectorPanel({ onSelect }: Props) {
           No accounts found for &ldquo;{query}&rdquo;
         </p>
       )}
-
-      {/* Create new account — navigates to the standalone form; returnTo brings user back here */}
-      <div className="flex items-center justify-between pt-0.5">
-        <p className="text-[10px]" style={{ color: '#6C757D' }}>
-          {query.length < 2 ? 'Type 2+ characters to search' : ''}
-        </p>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          onClick={() => router.push(`/app/customers/new?returnTo=${encodeURIComponent(pathname)}`)}
-          className="h-7 px-2 text-[11px] flex items-center gap-1"
-        >
-          <UserPlus className="w-3.5 h-3.5" /> Create New Account
-        </Button>
-      </div>
     </div>
   )
 }

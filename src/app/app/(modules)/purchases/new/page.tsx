@@ -823,17 +823,20 @@ export default function NewPurchasePage() {
                         {qty.gt(0) ? `R ${lineSub.toFixed(2)}` : '—'}
                       </span>
 
-                      {/* VAT — checkbox toggles whether this line's notional VAT is applied */}
+                      {/* VAT — read-only indicator; applicability follows the account's VAT setting */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <input
-                          type="checkbox"
-                          checked={line.vatApplied}
-                          onChange={(e) => patchLine(line.key, { vatApplied: e.target.checked })}
-                          title="Apply VAT to this line"
-                          style={{ width: 12, height: 12, cursor: 'pointer', flexShrink: 0 }}
-                        />
-                        {qty.gt(0) && (
-                          <span style={{ fontSize: 11, fontFamily: 'monospace', color: line.vatApplied ? '#212529' : '#9CA3AF' }}>
+                        <span
+                          title={line.vatApplied ? 'VAT applies to this line' : 'VAT does not apply to this line'}
+                          style={{
+                            fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 2, flexShrink: 0,
+                            background: line.vatApplied ? '#DBEAFE' : '#F3F4F6',
+                            color:      line.vatApplied ? '#1D4ED8' : '#9CA3AF',
+                          }}
+                        >
+                          {line.vatApplied ? 'VAT' : 'No VAT'}
+                        </span>
+                        {qty.gt(0) && line.vatApplied && (
+                          <span style={{ fontSize: 11, fontFamily: 'monospace', color: '#212529' }}>
                             R {lineVat.toFixed(2)}
                           </span>
                         )}
