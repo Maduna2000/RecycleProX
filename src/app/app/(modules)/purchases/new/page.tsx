@@ -303,6 +303,14 @@ export default function NewPurchasePage() {
     setShowAllProducts(false)
   }
 
+  // Fired by CasualSelectorPanel when an ID search under Casual matches a
+  // customer who is actually registered as an Account — switch tabs and
+  // load them there instead of silently keeping the user on Casual.
+  const handleAccountMatch = useCallback((c: SelectedCustomer) => {
+    setCustomerType('account')
+    handleCustomerSelect(c)
+  }, [handleCustomerSelect])
+
   // ── Load from Scale Order ────────────────────────────────────────────────
   type ScaleOrderHit = {
     id: string
@@ -629,7 +637,12 @@ export default function NewPurchasePage() {
 
             {/* Casual panel — always shown in casual mode until customer confirmed */}
             {customerType === 'casual' && !customer && (
-              <CasualSelectorPanel ref={casualPanelRef} onSelect={handleCustomerSelect} hideConfirmButton />
+              <CasualSelectorPanel
+                ref={casualPanelRef}
+                onSelect={handleCustomerSelect}
+                onAccountMatch={handleAccountMatch}
+                hideConfirmButton
+              />
             )}
 
             {/* Account panel */}

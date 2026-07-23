@@ -24,6 +24,14 @@ type SelectedCustomer = {
   physicalAddress?: string | null
 }
 
+// Shape of a customer row returned by the ID lookup endpoint — a casual
+// search can turn up a customer who is actually registered as an Account.
+type LookupCustomer = SelectedCustomer & {
+  customerType?:  'casual' | 'account'
+  companyName?:   string | null
+  contactPerson?: string | null
+}
+
 type LookupStatus = 'idle' | 'loading' | 'found' | 'not_found'
 type ScanStatus   = 'idle' | 'scanning' | 'error'
 
@@ -37,6 +45,9 @@ interface CasualForm {
 
 interface Props {
   onSelect:          (customer: SelectedCustomer) => void
+  // Fired instead of onSelect when the ID lookup matches a customer who is
+  // registered as an Account (not Casual) — lets the host page switch tabs.
+  onAccountMatch?:   (customer: SelectedCustomer) => void
   hideConfirmButton?: boolean
 }
 
@@ -76,7 +87,7 @@ async function compressImage(file: File, maxPx = 1600, quality = 0.85): Promise<
 // ─── CasualSelectorPanel ──────────────────────────────────────────────────────
 
 export const CasualSelectorPanel = forwardRef<CasualSelectorPanelRef, Props>(
-  function CasualSelectorPanel({ onSelect, hideConfirmButton = false }, ref) {
+  function CasualSelectorPanel({ onSelect, onAccountMatch, hideConfirmButton = false }, ref) {
     const [form, setForm] = useState<CasualForm>({
       idNumber: '', firstName: '', lastName: '', phone: '', physicalAddress: '',
     })
@@ -103,8 +114,20 @@ export const CasualSelectorPanel = forwardRef<CasualSelectorPanelRef, Props>(
       try {
         const res = await fetch(`/api/customers/lookup?idNumber=${encodeURIComponent(idNumber)}`)
         if (!res.ok) { setLookupStatus('idle'); return }
-        const data = await res.json() as SelectedCustomer | null
+        const data = await res.json() as LookupCustomer | null
         if (data) {
+          // This ID belongs to a registered Account customer, not a Casual
+          // one — hand off to the host page's Account tab instead of
+          // silently treating them as casual.
+          if (data.customerType === 'account' && onAccountMatch) {
+            setLookupStatus('idle')
+            setIsLocked(false)
+            setExisting(null)
+            setForm({ idNumber: '', firstName: '', lastName: '', phone: '', physicalAddress: '' })
+            toast.info('This ID is registered as an Account customer — switched to Account tab')
+            onAccountMatch(data)
+            return
+          }
           setForm({
             idNumber:        data.idNumber,
             firstName:       data.firstName,
@@ -123,7 +146,7 @@ export const CasualSelectorPanel = forwardRef<CasualSelectorPanelRef, Props>(
       } catch {
         setLookupStatus('idle')
       }
-    }, [])
+    }, [onAccountMatch])
 
     function handleIdChange(value: string) {
       setForm((f) => ({ ...f, idNumber: value }))
