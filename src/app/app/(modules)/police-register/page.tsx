@@ -1,7 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState } from 'react'
 import { useSession } from 'next-auth/react'
 import useSWR, { mutate } from 'swr'
 import { Dialog } from '@/components/ui/dialog'
@@ -11,9 +10,10 @@ import { colors } from '@/lib/design-tokens'
 import { DEFAULT_POLICE_SERVICE_NAME, DEFAULT_POLICE_LEGAL_NOTE } from '@/lib/police-defaults'
 import {
   inp, lbl, TH, TD, HEADER_GRAD, NAVY,
-  Btn, Field, EmptyHint,
+  Btn, Field, EmptyHint, PortalPage,
   RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter,
 } from '@/components/rpx'
+import { useSignatureCanvas } from '@/hooks/useSignatureCanvas'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -53,7 +53,6 @@ const SEARCH_TYPE_LABELS: Record<SearchLog['searchType'], string> = {
 type Tab = 'generate' | 'history'
 
 export default function PoliceRegisterPage() {
-  const router = useRouter()
   const { data: session } = useSession()
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
 
@@ -142,25 +141,19 @@ export default function PoliceRegisterPage() {
 
   return (
     <>
-      <Dialog open onOpenChange={(o) => { if (!o) router.back() }}>
-        <RpxDialogContent maxWidth={760} style={{ height: '82vh' }}>
-          <RpxDialogHeader title="Police Register" onClose={() => router.back()} />
-
-          {/* ── Tab row + Officer Portal action, merged ─────────────────────── */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '8px 10px', borderBottom: '1px solid #E0E0E0', flexShrink: 0 }}>
-            <div className="flex items-center gap-1.5">
-              <Btn size="sm" icon={ClipboardList} variant={tab === 'generate' ? 'primary' : 'secondary'} onClick={() => setTab('generate')}>
-                Generate Register
-              </Btn>
-              <Btn size="sm" icon={History} variant={tab === 'history' ? 'primary' : 'secondary'} onClick={() => setTab('history')}>
-                Visit History
-              </Btn>
-            </div>
-            <Btn variant="primary" size="sm" icon={ShieldCheck} href="/police">
-              Officer Portal
-            </Btn>
-          </div>
-
+      <PortalPage
+        tabs={[
+          { value: 'generate', label: 'Generate Register', icon: ClipboardList },
+          { value: 'history',  label: 'Visit History',      icon: History },
+        ]}
+        active={tab}
+        onChange={(v) => setTab(v as Tab)}
+        actions={
+          <Btn variant="primary" size="sm" icon={ShieldCheck} href="/police">
+            Officer Portal
+          </Btn>
+        }
+      >
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: tab === 'generate' ? 16 : 0 }}>
 
           {tab === 'generate' && (
@@ -241,8 +234,7 @@ export default function PoliceRegisterPage() {
             )
           )}
         </div>
-        </RpxDialogContent>
-      </Dialog>
+      </PortalPage>
 
       {sigDialogOpen && pendingVisitId && (
         <SignatureDialog
@@ -430,78 +422,15 @@ function SignatureDialog({
   onClose: () => void
   onSaved: () => void
 }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const [drawing, setDrawing]    = useState(false)
-  const [hasStrokes, setStrokes] = useState(false)
-  const [saving, setSaving]      = useState(false)
-  const lastPos = useRef<{ x: number; y: number } | null>(null)
-
-  useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
-    ctx.fillStyle = '#fff'
-    ctx.fillRect(0, 0, canvas.width, canvas.height)
-  }, [])
-
-  function getPos(e: React.MouseEvent | React.TouchEvent, canvas: HTMLCanvasElement) {
-    const rect = canvas.getBoundingClientRect()
-    const scaleX = canvas.width  / rect.width
-    const scaleY = canvas.height / rect.height
-    if ('touches' in e) {
-      const t = e.touches[0]!
-      return { x: (t.clientX - rect.left) * scaleX, y: (t.clientY - rect.top) * scaleY }
-    }
-    return { x: ((e as React.MouseEvent).clientX - rect.left) * scaleX, y: ((e as React.MouseEvent).clientY - rect.top) * scaleY }
-  }
-
-  function startDraw(e: React.MouseEvent | React.TouchEvent) {
-    e.preventDefault()
-    const canvas = canvasRef.current
-    if (!canvas) return
-    setDrawing(true)
-    lastPos.current = getPos(e, canvas)
-  }
-
-  function draw(e: React.MouseEvent | React.TouchEvent) {
-    e.preventDefault()
-    if (!drawing) return
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const ctx = canvas.getContext('2d')
-    if (!ctx || !lastPos.current) return
-    const pos = getPos(e, canvas)
-    ctx.strokeStyle = '#1a1a1a'
-    ctx.lineWidth = 2
-    ctx.lineCap = 'round'
-    ctx.beginPath()
-    ctx.moveTo(lastPos.current.x, lastPos.current.y)
-    ctx.lineTo(pos.x, pos.y)
-    ctx.stroke()
-    lastPos.current = pos
-    setStrokes(true)
-  }
-
-  function stopDraw() { setDrawing(false); lastPos.current = null }
-
-  function clearCanvas() {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
-    ctx.fillStyle = '#fff'
-    ctx.fillRect(0, 0, canvas.width, canvas.height)
-    setStrokes(false)
-  }
+  const { canvasRef, hasStrokes, canvasProps, clearCanvas, toBlob } = useSignatureCanvas()
+  const [saving, setSaving] = useState(false)
 
   async function handleSave() {
-    const canvas = canvasRef.current
-    if (!canvas || !hasStrokes) return
+    if (!hasStrokes) return
     setSaving(true)
 
     try {
-      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'))
+      const blob = await toBlob()
       if (!blob) throw new Error('Failed to capture signature')
 
       const fd = new FormData()
@@ -542,13 +471,7 @@ function SignatureDialog({
               width={480}
               height={200}
               style={{ width: '100%', touchAction: 'none', cursor: 'crosshair', display: 'block' }}
-              onMouseDown={startDraw}
-              onMouseMove={draw}
-              onMouseUp={stopDraw}
-              onMouseLeave={stopDraw}
-              onTouchStart={startDraw}
-              onTouchMove={draw}
-              onTouchEnd={stopDraw}
+              {...canvasProps}
             />
           </div>
         </RpxDialogBody>

@@ -15,14 +15,17 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import useSWR from 'swr'
 import {
   ShieldCheck, Loader2, Search, FileDown, Pen, CheckCircle, RotateCcw,
-  ArrowLeft, Clock, AlertTriangle, X, User as UserIcon, Package, CalendarDays,
+  ArrowLeft, Clock, AlertTriangle, User as UserIcon, Package, CalendarDays,
 } from 'lucide-react'
 import { POLICE_VISIT_REASONS, VISIT_REASON_LABELS } from '@/lib/schemas/police'
 import { DEFAULT_POLICE_SERVICE_NAME, DEFAULT_POLICE_LEGAL_NOTE } from '@/lib/police-defaults'
 import {
-  NAVY, inp, lbl, TH, TD, btnPrimary, btnSecondary, btnDanger,
-  TabStrip, EmptyHint, SectionLabel, DL, Drawer,
+  NAVY, inp, lbl, TH, TD,
+  Btn, TabStrip, EmptyHint, SectionLabel, DL, Drawer,
+  RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter,
 } from '@/components/rpx'
+import { Dialog } from '@/components/ui/dialog'
+import { useSignatureCanvas } from '@/hooks/useSignatureCanvas'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -231,7 +234,7 @@ export default function PolicePortalPage() {
             <p style={{ fontSize: 12, color: '#6C757D', margin: 0, maxWidth: 420, textAlign: 'center' }}>
               The session expired due to inactivity or was ended by a manager. Register again to continue searching.
             </p>
-            <button style={btnPrimary} onClick={handleReset}>Start a new inspection</button>
+            <Btn variant="primary" onClick={handleReset}>Start a new inspection</Btn>
           </div>
         )}
 
@@ -370,11 +373,9 @@ function BeginInspectionCard({
               <p style={{ fontSize: 12, padding: '6px 10px', borderRadius: 2, color: '#DC3545', background: '#FDECEA', margin: 0 }}>{error}</p>
             )}
 
-            <button type="submit" disabled={!canSubmit || loading} style={{ ...btnPrimary, opacity: !canSubmit || loading ? 0.6 : 1, cursor: !canSubmit || loading ? 'not-allowed' : 'pointer', alignSelf: 'flex-start' }}>
-              {loading
-                ? <><Loader2 className="animate-spin" style={{ width: 13, height: 13 }} /> Starting…</>
-                : <><ShieldCheck style={{ width: 13, height: 13 }} /> Begin Inspection</>}
-            </button>
+            <Btn type="submit" variant="primary" icon={ShieldCheck} loading={loading} disabled={!canSubmit} style={{ alignSelf: 'flex-start' }}>
+              {loading ? 'Starting…' : 'Begin Inspection'}
+            </Btn>
           </form>
         </div>
 
@@ -465,9 +466,7 @@ function ActiveSession({
           <Clock style={{ width: 11, height: 11 }} /> {elapsed}
         </span>
         <div style={{ flex: 1 }} />
-        <button style={btnDanger} onClick={() => setSigOpen(true)}>
-          <Pen style={{ width: 11, height: 11 }} /> End Inspection &amp; Sign
-        </button>
+        <Btn variant="danger" icon={Pen} onClick={() => setSigOpen(true)}>End Inspection &amp; Sign</Btn>
       </div>
 
       {/* Tabs */}
@@ -558,18 +557,15 @@ function RegisterTab({ visitId, guardedFetch }: { visitId: string; guardedFetch:
           <label style={lbl}>To</label>
           <input type="date" value={to} max={todayYMD()} onChange={(e) => setTo(e.target.value)} style={{ ...inp, width: 150 }} />
         </div>
-        <button style={{ ...btnPrimary, padding: '6px 14px' }} onClick={handleSearch} disabled={loading}>
-          {loading ? <Loader2 className="animate-spin" style={{ width: 12, height: 12 }} /> : <Search style={{ width: 12, height: 12 }} />}
-          Search Register
-        </button>
+        <Btn variant="primary" icon={Search} loading={loading} onClick={handleSearch}>Search Register</Btn>
         {rows && (
-          <a
+          <Btn
+            icon={FileDown}
             href={`/api/police-register?date=${from}`}
-            style={{ ...btnSecondary, textDecoration: 'none' }}
             title="Download the official daily register PDF for the From date"
           >
-            <FileDown style={{ width: 11, height: 11 }} /> Register PDF ({from})
-          </a>
+            Register PDF ({from})
+          </Btn>
         )}
         {error && <span style={{ fontSize: 12, color: '#DC3545' }}>{error}</span>}
       </div>
@@ -720,10 +716,7 @@ function PersonTab({ visitId, guardedFetch }: { visitId: string; guardedFetch: G
           <label style={lbl}>Name, Company or ID Number</label>
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="e.g. Dlamini or 8501015800083" style={inp} />
         </div>
-        <button type="submit" style={{ ...btnPrimary, padding: '6px 14px' }} disabled={loading || q.trim().length < 2}>
-          {loading ? <Loader2 className="animate-spin" style={{ width: 12, height: 12 }} /> : <Search style={{ width: 12, height: 12 }} />}
-          Search Persons
-        </button>
+        <Btn type="submit" variant="primary" icon={Search} loading={loading} disabled={q.trim().length < 2}>Search Persons</Btn>
         {error && <span style={{ fontSize: 12, color: '#DC3545' }}>{error}</span>}
       </form>
 
@@ -775,15 +768,15 @@ function PersonTab({ visitId, guardedFetch }: { visitId: string; guardedFetch: G
       {detail && (
         <Drawer title={detail.customer.fullName} onClose={() => setDetail(null)}>
           {detail.customer.blacklisted && <BlacklistNotice reason={detail.customer.blacklistReason} />}
-          <button
+          <Btn
+            variant="primary"
+            icon={FileDown}
+            loading={reportBusy}
             onClick={() => handlePersonReport(detail.customer.customerId, detail.customer.fullName)}
-            disabled={reportBusy}
-            style={{ ...btnPrimary, padding: '6px 14px', marginBottom: 12, opacity: reportBusy ? 0.6 : 1, cursor: reportBusy ? 'wait' : 'pointer' }}
+            style={{ marginBottom: 12 }}
           >
-            {reportBusy
-              ? <><Loader2 className="animate-spin" style={{ width: 12, height: 12 }} /> Preparing…</>
-              : <><FileDown style={{ width: 12, height: 12 }} /> Download Person Record (PDF)</>}
-          </button>
+            {reportBusy ? 'Preparing…' : 'Download Person Record (PDF)'}
+          </Btn>
           <div style={{ display: 'flex', gap: 14, marginBottom: 12 }}>
             {detail.customer.idPhotoUrl && <PhotoImg src={detail.customer.idPhotoUrl} alt="ID photo" big />}
             <div style={{ flex: 1 }}>
@@ -903,17 +896,9 @@ function GoodsTab({ visitId, guardedFetch }: { visitId: string; guardedFetch: Gu
           <label style={lbl}>Min Quantity</label>
           <input type="number" min="0" step="any" value={minQty} onChange={(e) => setMinQty(e.target.value)} placeholder="Any" style={{ ...inp, width: 100 }} />
         </div>
-        <button style={{ ...btnPrimary, padding: '6px 14px' }} onClick={handleSearch} disabled={loading || !productId}>
-          {loading ? <Loader2 className="animate-spin" style={{ width: 12, height: 12 }} /> : <Search style={{ width: 12, height: 12 }} />}
-          Trace Goods
-        </button>
+        <Btn variant="primary" icon={Search} loading={loading} disabled={!productId} onClick={handleSearch}>Trace Goods</Btn>
         {rows && rows.length > 0 && lastQuery && (
-          <button style={{ ...btnSecondary, opacity: reportBusy ? 0.6 : 1, cursor: reportBusy ? 'wait' : 'pointer' }} onClick={handleGoodsReport} disabled={reportBusy}>
-            {reportBusy
-              ? <Loader2 className="animate-spin" style={{ width: 11, height: 11 }} />
-              : <FileDown style={{ width: 11, height: 11 }} />}
-            Download Report (PDF)
-          </button>
+          <Btn icon={FileDown} loading={reportBusy} onClick={handleGoodsReport}>Download Report (PDF)</Btn>
         )}
         {error && <span style={{ fontSize: 12, color: '#DC3545' }}>{error}</span>}
       </div>
@@ -987,76 +972,16 @@ function SignatureDialog({
   onSigned: () => void
   onSessionInvalid: () => void
 }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const [drawing, setDrawing]    = useState(false)
-  const [hasStrokes, setStrokes] = useState(false)
-  const [saving, setSaving]      = useState(false)
-  const [error, setError]        = useState<string | null>(null)
-  const lastPos = useRef<{ x: number; y: number } | null>(null)
-
-  useEffect(() => {
-    const canvas = canvasRef.current
-    const ctx = canvas?.getContext('2d')
-    if (!canvas || !ctx) return
-    ctx.fillStyle = '#fff'
-    ctx.fillRect(0, 0, canvas.width, canvas.height)
-  }, [])
-
-  function getPos(e: React.MouseEvent | React.TouchEvent, canvas: HTMLCanvasElement) {
-    const rect = canvas.getBoundingClientRect()
-    const scaleX = canvas.width  / rect.width
-    const scaleY = canvas.height / rect.height
-    if ('touches' in e) {
-      const t = e.touches[0]!
-      return { x: (t.clientX - rect.left) * scaleX, y: (t.clientY - rect.top) * scaleY }
-    }
-    return { x: ((e as React.MouseEvent).clientX - rect.left) * scaleX, y: ((e as React.MouseEvent).clientY - rect.top) * scaleY }
-  }
-
-  function startDraw(e: React.MouseEvent | React.TouchEvent) {
-    e.preventDefault()
-    const canvas = canvasRef.current
-    if (!canvas) return
-    setDrawing(true)
-    lastPos.current = getPos(e, canvas)
-  }
-
-  function draw(e: React.MouseEvent | React.TouchEvent) {
-    e.preventDefault()
-    if (!drawing) return
-    const canvas = canvasRef.current
-    const ctx = canvas?.getContext('2d')
-    if (!canvas || !ctx || !lastPos.current) return
-    const pos = getPos(e, canvas)
-    ctx.strokeStyle = '#1a1a1a'
-    ctx.lineWidth = 2
-    ctx.lineCap = 'round'
-    ctx.beginPath()
-    ctx.moveTo(lastPos.current.x, lastPos.current.y)
-    ctx.lineTo(pos.x, pos.y)
-    ctx.stroke()
-    lastPos.current = pos
-    setStrokes(true)
-  }
-
-  function stopDraw() { setDrawing(false); lastPos.current = null }
-
-  function clearCanvas() {
-    const canvas = canvasRef.current
-    const ctx = canvas?.getContext('2d')
-    if (!canvas || !ctx) return
-    ctx.fillStyle = '#fff'
-    ctx.fillRect(0, 0, canvas.width, canvas.height)
-    setStrokes(false)
-  }
+  const { canvasRef, hasStrokes, canvasProps, clearCanvas, toBlob } = useSignatureCanvas()
+  const [saving, setSaving] = useState(false)
+  const [error, setError]  = useState<string | null>(null)
 
   async function handleSave() {
-    const canvas = canvasRef.current
-    if (!canvas || !hasStrokes || saving) return
+    if (!hasStrokes || saving) return
     setSaving(true)
     setError(null)
     try {
-      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'))
+      const blob = await toBlob()
       if (!blob) throw new Error('Failed to capture signature')
 
       const fd = new FormData()
@@ -1085,57 +1010,35 @@ function SignatureDialog({
   }
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ background: '#fff', borderRadius: 4, width: '100%', maxWidth: 560, padding: 20 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 700, color: NAVY }}>
-            <Pen style={{ width: 15, height: 15 }} /> End Inspection — Officer Sign-off
-          </span>
-          <button onClick={onClose} disabled={saving} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
-            <X style={{ width: 16, height: 16, color: '#6C757D' }} />
-          </button>
-        </div>
-        <p style={{ fontSize: 12, color: '#6C757D', margin: '0 0 10px' }}>
-          By signing you confirm that you inspected this dealer&apos;s register. Your searches are recorded on the inspection certificate.
-        </p>
+    <Dialog open onOpenChange={(o) => { if (!o && !saving) onClose() }}>
+      <RpxDialogContent maxWidth={560}>
+        <RpxDialogHeader title="End Inspection — Officer Sign-off" icon={Pen} onClose={onClose} />
+        <RpxDialogBody>
+          <p style={{ fontSize: 12, color: '#6C757D', margin: '0 0 10px' }}>
+            By signing you confirm that you inspected this dealer&apos;s register. Your searches are recorded on the inspection certificate.
+          </p>
 
-        <div style={{ border: '1px solid #ABABAB', borderRadius: 3, overflow: 'hidden', background: '#fff' }}>
-          <canvas
-            ref={canvasRef}
-            width={520}
-            height={200}
-            style={{ width: '100%', touchAction: 'none', cursor: 'crosshair', display: 'block' }}
-            onMouseDown={startDraw}
-            onMouseMove={draw}
-            onMouseUp={stopDraw}
-            onMouseLeave={stopDraw}
-            onTouchStart={startDraw}
-            onTouchMove={draw}
-            onTouchEnd={stopDraw}
-          />
-        </div>
-
-        {error && <p style={{ fontSize: 12, color: '#DC3545', margin: '8px 0 0' }}>{error}</p>}
-
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12 }}>
-          <button style={btnSecondary} onClick={clearCanvas} disabled={saving}>
-            <RotateCcw style={{ width: 11, height: 11 }} /> Clear
-          </button>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button style={btnSecondary} onClick={onClose} disabled={saving}>Cancel</button>
-            <button
-              style={{ ...btnPrimary, padding: '6px 14px', opacity: saving || !hasStrokes ? 0.6 : 1, cursor: saving || !hasStrokes ? 'not-allowed' : 'pointer' }}
-              onClick={handleSave}
-              disabled={saving || !hasStrokes}
-            >
-              {saving
-                ? <><Loader2 className="animate-spin" style={{ width: 12, height: 12 }} /> Saving…</>
-                : <><CheckCircle style={{ width: 12, height: 12 }} /> Sign &amp; Complete</>}
-            </button>
+          <div style={{ border: '1px solid #ABABAB', borderRadius: 3, overflow: 'hidden', background: '#fff' }}>
+            <canvas
+              ref={canvasRef}
+              width={520}
+              height={200}
+              style={{ width: '100%', touchAction: 'none', cursor: 'crosshair', display: 'block' }}
+              {...canvasProps}
+            />
           </div>
-        </div>
-      </div>
-    </div>
+
+          {error && <p style={{ fontSize: 12, color: '#DC3545', margin: '8px 0 0' }}>{error}</p>}
+        </RpxDialogBody>
+        <RpxDialogFooter>
+          <Btn icon={RotateCcw} disabled={saving} onClick={clearCanvas} style={{ marginRight: 'auto' }}>Clear</Btn>
+          <Btn disabled={saving} onClick={onClose}>Cancel</Btn>
+          <Btn variant="primary" icon={CheckCircle} loading={saving} disabled={!hasStrokes} onClick={handleSave}>
+            {saving ? 'Saving…' : 'Sign & Complete'}
+          </Btn>
+        </RpxDialogFooter>
+      </RpxDialogContent>
+    </Dialog>
   )
 }
 
@@ -1151,10 +1054,10 @@ function DoneScreen({ visit, onFinish }: { visit: Visit; onFinish: () => void })
         performed have been recorded. Download your inspection certificate below.
       </p>
       <div style={{ display: 'flex', gap: 10 }}>
-        <a href={`/api/police-visits/${visit.id}/certificate`} style={{ ...btnPrimary, textDecoration: 'none' }}>
-          <FileDown style={{ width: 13, height: 13 }} /> Download Inspection Certificate
-        </a>
-        <button style={{ ...btnSecondary, padding: '7px 16px' }} onClick={onFinish}>Finish</button>
+        <Btn variant="primary" icon={FileDown} href={`/api/police-visits/${visit.id}/certificate`}>
+          Download Inspection Certificate
+        </Btn>
+        <Btn onClick={onFinish}>Finish</Btn>
       </div>
     </div>
   )
