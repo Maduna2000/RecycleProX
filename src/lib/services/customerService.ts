@@ -176,6 +176,28 @@ export async function updateCustomer(id: string, data: UpdateCustomerInput, user
   return customer
 }
 
+// Silently promotes a casual to account once they cross MIN_PURCHASES_FOR_ACCOUNT
+// completed purchases — called after a purchase completes (creation as
+// completed, or settlement of a pending one). Reuses updateCustomer's existing
+// promotion logic (account code generation, dealerCategory reset to 'casual',
+// priceGroupId reset to null) so auto- and manual promotion can never diverge.
+// No-op for anyone who isn't casual or hasn't crossed the threshold yet; never
+// throws — a failed auto-promotion must not break the purchase that triggered it.
+export async function autoPromoteCasualIfEligible(customerId: string, userId: string) {
+  try {
+    const customer = await prisma.customer.findUnique({ where: { id: customerId }, select: { customerType: true } })
+    if (!customer || customer.customerType !== 'casual') return
+
+    const completedPurchases = await prisma.purchase.count({ where: { customerId, status: 'completed' } })
+    if (completedPurchases <= MIN_PURCHASES_FOR_ACCOUNT) return
+
+    const promoted = await updateCustomer(customerId, { customerType: 'account' }, userId)
+    logger.info({ customerId, completedPurchases, accountCode: promoted.accountCode }, 'customer.auto_promoted')
+  } catch (err) {
+    logger.error({ err, customerId }, 'customer.auto_promote_failed')
+  }
+}
+
 export async function getCustomer(id: string) {
   return prisma.customer.findUniqueOrThrow({
     where: { id },

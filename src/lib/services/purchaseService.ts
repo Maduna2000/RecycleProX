@@ -7,6 +7,7 @@ import { resolvePrice } from '@/lib/services/productService'
 import { recordMovement, recordVoidReversal } from '@/lib/services/stockService'
 import { applyRepaymentTx } from '@/lib/services/loanService'
 import { recalculateApprovedCashUpForDate } from '@/lib/services/cashupService'
+import { autoPromoteCasualIfEligible } from '@/lib/services/customerService'
 import { sastDayLabelOfInstant, sastDateLabelToUTCDate } from '@/lib/utils/dayBounds'
 import { getAllSettings } from '@/lib/services/settingsService'
 import { generateVat264 } from '@/lib/pdf/vat264'
@@ -323,6 +324,10 @@ export async function createPurchase(data: CreatePurchaseInput, createdByUserId?
   // Fire-and-forget: generate VAT264 + purchase note PDFs and store in R2
   void generateAndStorePurchasePdfs(purchase)
 
+  if (purchase.status === 'completed' && createdByUserId) {
+    await autoPromoteCasualIfEligible(data.customerId, createdByUserId)
+  }
+
   return purchase
 }
 
@@ -462,6 +467,11 @@ export async function markPurchasePaid(
     { purchaseId: id, userId, settleAmount: data.amount, isFullySettled: result.isFullySettled },
     'purchase.payment.recorded'
   )
+
+  if (result.isFullySettled) {
+    await autoPromoteCasualIfEligible(result.updated.customerId, userId)
+  }
+
   return result
 }
 
@@ -573,6 +583,11 @@ export async function processSplitPayment(
     },
     'purchase.split.payment.recorded'
   )
+
+  if (result.isFullySettled) {
+    await autoPromoteCasualIfEligible(result.updated.customerId, userId)
+  }
+
   return result
 }
 

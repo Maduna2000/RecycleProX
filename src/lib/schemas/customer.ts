@@ -114,11 +114,13 @@ export const UpdateCustomerSchema = CreateCustomerSchema.partial().omit({ idNumb
   isActive:       z.boolean().optional(),
   dealerCategory: z.enum(['casual', 'dealer_1', 'dealer_2', 'dealer_3']).nullable().optional(),
   priceGroupId:   z.string().uuid().nullable().optional(),
-  // Overrides the inherited .default(true) — a partial update payload that
-  // omits zeroRated must leave the existing customer's VAT setting alone,
-  // not silently reset it (Zod's .partial() keeps the base field's default
-  // active for an omitted key, confirmed empirically before this change).
-  zeroRated:      z.boolean().optional(),
+  // Both of these override an inherited .default(...) — a partial update
+  // payload that omits the field must leave the existing customer's value
+  // alone, not silently reset it (Zod's .partial() keeps the base schema's
+  // default active for an omitted key, confirmed empirically before this
+  // change — see zeroRated, the first field this bit).
+  zeroRated:       z.boolean().optional(),
+  primaryFunction: z.enum(['customer', 'supplier', 'both']).optional(),
 })
 
 export const UploadCustomerDocumentSchema = z.object({
