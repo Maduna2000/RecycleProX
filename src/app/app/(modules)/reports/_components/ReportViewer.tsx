@@ -343,7 +343,7 @@ export function ReportViewer({ report }: ReportViewerProps) {
         </div>
 
         <div className="flex flex-wrap items-center gap-2" style={{ padding: '10px 12px' }}>
-          <ActionButton variant="primary" onClick={handleRun} disabled={isLoading || missingRequired.length > 0}>
+          <ActionButton onClick={handleRun} disabled={isLoading || missingRequired.length > 0}>
             {isLoading
               ? <><Loader2 style={{ width: 13, height: 13, animation: 'spin 1s linear infinite' }} /> Running…</>
               : 'Run Report'}

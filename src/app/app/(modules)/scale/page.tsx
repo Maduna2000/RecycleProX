@@ -6,7 +6,7 @@ import { useSession } from 'next-auth/react'
 import {
   Search, X, Download, RefreshCw,
   FileText, Images, CheckCircle2, XCircle,
-  UserPlus, Eye, EyeOff, Loader2, Scale,
+  UserPlus, Eye, EyeOff, Loader2,
   Info,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -1160,11 +1160,6 @@ function ScaleManagementInner() {
       tabs={[...TABS]}
       active={activeTab}
       onChange={changeTab}
-      actions={
-        <Btn size="sm" icon={Scale} href="/scale" target="_blank">
-          Open Scale Station
-        </Btn>
-      }
     >
       {activeTab === 'orders'    && <OrdersTab />}
       {activeTab === 'operators' && <OperatorsTab />}
