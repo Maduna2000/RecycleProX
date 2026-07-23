@@ -1,27 +1,19 @@
 'use client'
 
 /**
- * Reports module — two tabs:
- *  - Reports: catalog of business reports (grouped by area) with parameter
- *    panel, on-screen preview, and PDF/Excel downloads.
- *  - Overview: the original summary dashboard, unchanged.
+ * Reports module — catalog of business reports (grouped by area) with a
+ * parameter panel, on-screen preview, and PDF/Excel downloads.
  *
  * Deep-linkable: /app/reports?report=<id> selects a report in the catalog.
  */
-import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import { colors } from '@/lib/design-tokens'
-import { PortalPage } from '@/components/rpx'
+import { FileBarChart2 } from 'lucide-react'
+import { PortalPage, PANEL } from '@/components/rpx'
+import { colors, fontSize } from '@/lib/design-tokens'
 import { REPORT_CATALOG } from '@/lib/reports/catalog'
-import { OverviewTab } from './_components/OverviewTab'
 import { ReportCatalog } from './_components/ReportCatalog'
 import { ReportViewer } from './_components/ReportViewer'
-
-const TABS = [
-  { value: 'reports', label: 'Reports' },
-  { value: 'overview', label: 'Overview' },
-] as const
 
 export default function ReportsPage() {
   const { data: session } = useSession()
@@ -31,8 +23,6 @@ export default function ReportsPage() {
 
   const urlReport = searchParams.get('report')
   const selectedId = urlReport && REPORT_CATALOG.some((r) => r.id === urlReport) ? urlReport : null
-  const [tab, setTab] = useState<string>('reports')
-
   const selected = REPORT_CATALOG.find((r) => r.id === selectedId) ?? null
 
   if (!isManager) {
@@ -50,37 +40,28 @@ export default function ReportsPage() {
   }
 
   return (
-    <PortalPage
-      tabs={[...TABS]}
-      active={tab}
-      onChange={setTab}
-    >
-      {tab === 'overview' ? (
-        <div className="overflow-auto" style={{ padding: 10 }}>
-          <OverviewTab />
+    <PortalPage title="Reports">
+      <div className="flex gap-3 flex-1 min-h-0" style={{ padding: 10 }}>
+        {/* Catalog rail */}
+        <div className="w-80 shrink-0 flex flex-col min-h-0">
+          <ReportCatalog selectedId={selectedId} onSelect={handleSelect} />
         </div>
-      ) : (
-        <div className="flex gap-4 flex-1 min-h-0" style={{ padding: 10 }}>
-          {/* Catalog rail */}
-          <div className="w-80 shrink-0 overflow-auto pb-6">
-            <ReportCatalog selectedId={selectedId} onSelect={handleSelect} />
-          </div>
 
-          {/* Viewer */}
-          <div className="flex-1 min-w-0 overflow-auto pb-6">
-            {selected ? (
-              <ReportViewer report={selected} />
-            ) : (
-              <div
-                className="rounded border bg-white px-4 py-16 text-center"
-                style={{ borderColor: colors.border, color: colors.textSecondary, fontSize: 13 }}
-              >
-                Select a report from the catalog to set parameters, preview, and download.
-              </div>
-            )}
-          </div>
+        {/* Viewer */}
+        <div className="flex-1 min-w-0 overflow-auto pb-6">
+          {selected ? (
+            <ReportViewer report={selected} />
+          ) : (
+            <div
+              className="flex flex-col items-center justify-center gap-2 text-center"
+              style={{ ...PANEL, minHeight: 260, color: colors.textSecondary }}
+            >
+              <FileBarChart2 className="w-7 h-7" style={{ color: '#C0C0C0' }} />
+              <p style={{ fontSize: fontSize.sm }}>Select a report from the catalog to set parameters, preview, and download.</p>
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </PortalPage>
   )
 }

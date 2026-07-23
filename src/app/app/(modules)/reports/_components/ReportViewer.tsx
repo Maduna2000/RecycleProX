@@ -11,7 +11,7 @@ import type { ReportCatalogEntry, FilterSpec } from '@/lib/reports/catalog'
 import { DEALER_CATEGORY_OPTIONS } from '@/lib/reports/catalog'
 import type { ReportDocument } from '@/lib/reports/types'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
-import { Label } from '@/components/ui/label'
+import { PANEL, PANEL_HEAD, NAVY, inp, lbl } from '@/components/rpx'
 import { ActionButton } from './ActionButton'
 import { DateRangeFilter } from './DateRangeFilter'
 import { DownloadButtons } from './DownloadButtons'
@@ -69,16 +69,13 @@ function CustomerSearchSelect({
   const active = !!chosen
 
   return (
-    <div className="relative">
-      <Label className="text-xs mb-1 block" style={{ color: colors.textSecondary }}>
-        {label}
-      </Label>
+    <div style={{ position: 'relative', minWidth: 220 }}>
+      <label style={lbl}>{label}</label>
       <div
-        className="flex items-center h-9 rounded-md"
         style={{
-          border: `1px solid ${active ? colors.process : colors.border}`,
-          background: active ? colors.processBg : colors.surface,
-          minWidth: 220,
+          display: 'flex', alignItems: 'center', height: 30,
+          borderRadius: 2, border: `1px solid ${active ? NAVY : '#ABABAB'}`,
+          background: active ? '#EBF3FC' : '#fff',
         }}
       >
         <input
@@ -92,8 +89,12 @@ function CustomerSearchSelect({
           }}
           onFocus={() => setOpen(true)}
           onBlur={() => setTimeout(() => setOpen(false), 200)}
-          className="flex-1 min-w-0 bg-transparent text-sm outline-none px-2"
-          style={{ color: active ? colors.textPrimary : colors.textSecondary, fontWeight: active ? fontWeight.medium : fontWeight.regular }}
+          style={{
+            flex: 1, minWidth: 0, background: 'transparent', fontSize: 13, outline: 'none',
+            border: 'none', padding: '0 8px',
+            color: active ? colors.textPrimary : colors.textSecondary,
+            fontWeight: active ? fontWeight.medium : fontWeight.regular,
+          }}
         />
         {active && (
           <button
@@ -101,8 +102,7 @@ function CustomerSearchSelect({
             aria-label={`Clear ${label}`}
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => { setChosen(null); setTerm(''); onChange('') }}
-            className="flex items-center px-2"
-            style={{ color: colors.textSecondary, background: 'none', border: 'none', cursor: 'pointer' }}
+            style={{ display: 'flex', alignItems: 'center', padding: '0 8px', color: colors.textSecondary, background: 'none', border: 'none', cursor: 'pointer' }}
           >
             <X style={{ width: 12, height: 12 }} />
           </button>
@@ -110,15 +110,18 @@ function CustomerSearchSelect({
       </div>
       {open && !chosen && (data?.customers?.length ?? 0) > 0 && (
         <div
-          className="absolute z-20 mt-1 w-full max-h-56 overflow-auto rounded border bg-white shadow"
-          style={{ borderColor: colors.border }}
+          style={{
+            position: 'absolute', zIndex: 20, marginTop: 2, width: '100%', maxHeight: 224, overflowY: 'auto',
+            borderRadius: 2, border: '1px solid #B0B0B0', background: '#fff', boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+          }}
         >
           {data!.customers.map((c) => (
             <button
               key={c.id}
-              className="block w-full text-left px-2 py-1.5 hover:bg-gray-100"
-              style={{ fontSize: fontSize.sm, color: colors.textPrimary }}
+              style={{ display: 'block', width: '100%', textAlign: 'left', padding: '6px 8px', fontSize: fontSize.sm, color: colors.textPrimary, background: 'none', border: 'none', cursor: 'pointer' }}
               onMouseDown={(e) => e.preventDefault()}
+              onMouseEnter={(e) => { e.currentTarget.style.background = '#F5F5F5' }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
               onClick={() => {
                 setChosen(c)
                 setOpen(false)
@@ -127,7 +130,7 @@ function CustomerSearchSelect({
             >
               {customerLabel(c)}
               {c.idNumber && (
-                <span className="ml-2" style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>
+                <span style={{ marginLeft: 8, fontSize: fontSize.xs, color: colors.textSecondary }}>
                   {c.idNumber}
                 </span>
               )}
@@ -141,7 +144,7 @@ function CustomerSearchSelect({
 
 /**
  * Shared select for report filters — the "active" (non-default) state is
- * shown via a tinted fill + accent border, so a glance at the filter row
+ * shown via a tinted fill + navy border, so a glance at the filter row
  * shows exactly which filters are currently narrowing the report.
  */
 function FilterSelect({
@@ -158,13 +161,12 @@ function FilterSelect({
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="h-9 rounded-md px-2 text-sm cursor-pointer outline-none"
       style={{
-        border: `1px solid ${active ? colors.process : colors.border}`,
-        background: active ? colors.processBg : colors.surface,
+        ...inp, width: 'auto', minWidth: 170, cursor: 'pointer',
+        borderColor: active ? NAVY : '#ABABAB',
+        background: active ? '#EBF3FC' : '#fff',
         color: active ? colors.textPrimary : colors.textSecondary,
         fontWeight: active ? fontWeight.medium : fontWeight.regular,
-        minWidth: 170,
       }}
     >
       {children}
@@ -190,9 +192,7 @@ function ProductSelect({
   )
   return (
     <div>
-      <Label className="text-xs mb-1 block" style={{ color: colors.textSecondary }}>
-        {label}
-      </Label>
+      <label style={lbl}>{label}</label>
       <FilterSelect value={value} onChange={onChange}>
         {!required && <option value="">All products</option>}
         {(data?.products ?? []).map((p) => (
@@ -216,20 +216,17 @@ function TextFilter({
   const active = !!value
   return (
     <div>
-      <Label className="text-xs mb-1 block" style={{ color: colors.textSecondary }}>
-        {label}
-      </Label>
+      <label style={lbl}>{label}</label>
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder="Type to filter…"
-        className="h-9 rounded-md px-2 text-sm outline-none"
         style={{
-          border: `1px solid ${active ? colors.process : colors.border}`,
-          background: active ? colors.processBg : colors.surface,
+          ...inp, width: 170,
+          borderColor: active ? NAVY : '#ABABAB',
+          background: active ? '#EBF3FC' : '#fff',
           color: active ? colors.textPrimary : colors.textSecondary,
           fontWeight: active ? fontWeight.medium : fontWeight.regular,
-          minWidth: 170,
         }}
       />
     </div>
@@ -260,9 +257,7 @@ function FilterControl({
 
   return (
     <div>
-      <Label className="text-xs mb-1 block" style={{ color: colors.textSecondary }}>
-        {spec.label}
-      </Label>
+      <label style={lbl}>{spec.label}</label>
       <FilterSelect value={value} onChange={onChange}>
         {!spec.required && <option value="">All</option>}
         {options.map((o) => (
@@ -312,25 +307,23 @@ export function ReportViewer({ report }: ReportViewerProps) {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="rounded border bg-white p-4 space-y-3" style={{ borderColor: colors.border }}>
-        <div>
-          <h2 style={{ fontSize: fontSize.base, fontWeight: fontWeight.semibold, color: colors.textPrimary }}>
-            {report.label}
-          </h2>
-          <p style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>{report.description}</p>
+    <div className="space-y-3">
+      <div style={PANEL}>
+        <div style={PANEL_HEAD}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: colors.textPrimary }}>{report.label}</span>
+          <p style={{ margin: '2px 0 0', fontSize: fontSize.xs, color: colors.textSecondary, fontWeight: fontWeight.regular }}>
+            {report.description}
+          </p>
         </div>
 
-        <div style={{ borderTop: `1px solid ${colors.border}`, paddingTop: 12 }}>
+        <div style={{ padding: '10px 12px', borderBottom: '1px solid #E5E5E5' }}>
           <div className="flex items-center justify-between mb-2">
-            <span style={{ fontSize: fontSize.xs, fontWeight: fontWeight.semibold, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              Filters
-            </span>
+            <span style={{ ...lbl, marginBottom: 0 }}>Filters</span>
             {hasActiveFilters && (
               <button
                 type="button"
                 onClick={() => setFilters({})}
-                style={{ fontSize: fontSize.xs, fontWeight: fontWeight.medium, color: colors.process, background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
+                style={{ fontSize: fontSize.xs, fontWeight: fontWeight.medium, color: NAVY, background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
               >
                 Clear filters
               </button>
@@ -349,7 +342,7 @@ export function ReportViewer({ report }: ReportViewerProps) {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2" style={{ borderTop: `1px solid ${colors.border}`, paddingTop: 12 }}>
+        <div className="flex flex-wrap items-center gap-2" style={{ padding: '10px 12px' }}>
           <ActionButton variant="primary" onClick={handleRun} disabled={isLoading || missingRequired.length > 0}>
             {isLoading
               ? <><Loader2 style={{ width: 13, height: 13, animation: 'spin 1s linear infinite' }} /> Running…</>
@@ -385,8 +378,7 @@ export function ReportViewer({ report }: ReportViewerProps) {
 
       {!data && !isLoading && !error && (
         <div
-          className="rounded border bg-white px-4 py-10 text-center"
-          style={{ borderColor: colors.border, fontSize: fontSize.sm, color: colors.textSecondary }}
+          style={{ ...PANEL, padding: '40px 16px', textAlign: 'center', fontSize: fontSize.sm, color: colors.textSecondary }}
         >
           Set the date range and filters, then Run Report to preview — or download directly.
         </div>

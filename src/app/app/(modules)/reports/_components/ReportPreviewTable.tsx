@@ -6,22 +6,25 @@
  * rows, bold subtotal rows, grand-total band. Purpose-built rather than
  * DataTable (which has no grouped-band/colspan concept). Capped at 1,000
  * flat rows; downloads always render the full data server-side.
+ *
+ * Deliberately ruled (bordered cells, gradient header) rather than the
+ * borderless/shaded "soft" table style used elsewhere — this preview stands
+ * in for the printed report, so it reads as the same document.
  */
 import { useMemo } from 'react'
 import type { ReportDocument } from '@/lib/reports/types'
 import { flattenReportDocument } from '@/lib/reports/flatten'
 import { formatCell } from '@/lib/reports/format'
 import { colors, fontSize } from '@/lib/design-tokens'
+import { PANEL, HEADER_GRAD, CARD_BORDER } from '@/components/rpx'
 
 const PREVIEW_ROW_CAP = 1000
 
-// Modern/soft palette — no grid lines; rows are separated by a soft grey
-// fill alternating with no fill, rather than borders.
-const ZEBRA_FILL = '#F4F5F7'
-const HEADER_BG = '#F8F9FA'
-const GROUP_SHADES = ['#EEF0F2', '#F3F4F6', '#F8F9FA']
-const SUBTOTAL_BG = '#EEF0F2'
-const GRANDTOTAL_BG = '#E4E7EB'
+const GRID_LINE = '1px solid #E3E3E3'
+const ZEBRA_FILL = '#FAFAFA'
+const GROUP_SHADES = ['#E4E7EB', '#EDEFF1', '#F4F5F6']
+const SUBTOTAL_BG = '#F0F0F0'
+const GRANDTOTAL_BG = '#E0E0E0'
 
 interface ReportPreviewTableProps {
   doc: ReportDocument
@@ -36,10 +39,7 @@ export function ReportPreviewTable({ doc }: ReportPreviewTableProps) {
 
   if (flat.length === 0) {
     return (
-      <div
-        className="rounded border bg-white px-4 py-8 text-center"
-        style={{ borderColor: colors.border, fontSize: fontSize.sm, color: colors.textSecondary }}
-      >
+      <div style={{ ...PANEL, padding: '32px 16px', textAlign: 'center', fontSize: fontSize.sm, color: colors.textSecondary }}>
         No records for the selected parameters.
       </div>
     )
@@ -50,23 +50,25 @@ export function ReportPreviewTable({ doc }: ReportPreviewTableProps) {
   let dataRowCount = 0
 
   return (
-    <div className="rounded-lg border bg-white overflow-auto" style={{ borderColor: colors.border }}>
-      <table className="w-full" style={{ fontSize: fontSize.xs, borderCollapse: 'separate', borderSpacing: 0 }}>
+    <div style={{ ...PANEL, overflow: 'auto' }}>
+      <table style={{ width: '100%', fontSize: fontSize.xs, borderCollapse: 'collapse' }}>
         <thead>
           <tr>
-            {doc.columns.map((col) => (
+            {doc.columns.map((col, i) => (
               <th
                 key={col.key}
-                className="sticky top-0 px-3 py-2 font-semibold"
                 style={{
-                  background: HEADER_BG,
-                  borderBottom: `1px solid ${colors.border}`,
+                  position: 'sticky', top: 0, padding: '0 10px', height: 30,
+                  background: HEADER_GRAD,
+                  borderBottom: CARD_BORDER,
+                  borderRight: i < colCount - 1 ? GRID_LINE : undefined,
                   color: colors.textSecondary,
                   textAlign: col.align ?? 'left',
                   whiteSpace: 'nowrap',
                   textTransform: 'uppercase',
-                  letterSpacing: '0.03em',
-                  fontSize: fontSize.xs - 1,
+                  letterSpacing: '0.05em',
+                  fontWeight: 700,
+                  fontSize: 10,
                 }}
               >
                 {col.label}
@@ -81,16 +83,18 @@ export function ReportPreviewTable({ doc }: ReportPreviewTableProps) {
                 <tr key={i}>
                   <td
                     colSpan={colCount}
-                    className="px-3 py-1.5 font-semibold"
                     style={{
+                      padding: '5px 10px',
+                      fontWeight: 700,
                       background: GROUP_SHADES[Math.min(row.level, GROUP_SHADES.length - 1)],
-                      paddingLeft: 12 + row.level * 16,
+                      borderBottom: GRID_LINE,
+                      paddingLeft: 10 + row.level * 16,
                       color: colors.textPrimary,
                     }}
                   >
                     {row.label}
                     {row.meta && (
-                      <span className="ml-3 font-normal" style={{ color: colors.textSecondary }}>
+                      <span style={{ marginLeft: 12, fontWeight: 400, color: colors.textSecondary }}>
                         {row.meta}
                       </span>
                     )}
@@ -107,9 +111,9 @@ export function ReportPreviewTable({ doc }: ReportPreviewTableProps) {
 
             let rowStyle: React.CSSProperties
             if (row.type === 'grandTotal') {
-              rowStyle = { background: GRANDTOTAL_BG, borderTop: `2px solid ${colors.textSecondary}` }
+              rowStyle = { background: GRANDTOTAL_BG, borderTop: `2px solid ${colors.textPrimary}` }
             } else if (row.type === 'subtotal') {
-              rowStyle = { background: SUBTOTAL_BG, borderTop: `1px solid ${colors.border}` }
+              rowStyle = { background: SUBTOTAL_BG, borderTop: '1px solid #B0B0B0' }
             } else {
               rowStyle = { background: dataRowCount++ % 2 === 1 ? ZEBRA_FILL : 'transparent' }
             }
@@ -117,6 +121,11 @@ export function ReportPreviewTable({ doc }: ReportPreviewTableProps) {
             return (
               <tr key={i} style={rowStyle}>
                 {doc.columns.map((col, cIdx) => {
+                  const cellBorder: React.CSSProperties = {
+                    borderBottom: GRID_LINE,
+                    borderRight: cIdx < colCount - 1 ? GRID_LINE : undefined,
+                  }
+
                   // Total rows: label spans the leading non-measure columns
                   if (isTotal && cIdx === 0) {
                     const span = firstMeasureIdx === -1 ? colCount : firstMeasureIdx
@@ -125,8 +134,7 @@ export function ReportPreviewTable({ doc }: ReportPreviewTableProps) {
                         <td
                           key={col.key}
                           colSpan={span}
-                          className="px-3 py-1.5 font-semibold"
-                          style={{ textAlign: 'right', color: colors.textPrimary, whiteSpace: 'nowrap' }}
+                          style={{ padding: '5px 10px', fontWeight: 700, textAlign: 'right', color: colors.textPrimary, whiteSpace: 'nowrap', ...cellBorder }}
                         >
                           {row.label}
                         </td>
@@ -137,11 +145,7 @@ export function ReportPreviewTable({ doc }: ReportPreviewTableProps) {
 
                   if (col.isImage) {
                     return (
-                      <td
-                        key={col.key}
-                        className="px-3 py-1.5"
-                        style={{ textAlign: 'center', whiteSpace: 'nowrap' }}
-                      >
+                      <td key={col.key} style={{ padding: '5px 10px', textAlign: 'center', whiteSpace: 'nowrap', ...cellBorder }}>
                         {row.imageUrl ? (
                           <a href={row.imageUrl} target="_blank" rel="noopener noreferrer" style={{ color: colors.process }}>
                             View
@@ -157,12 +161,14 @@ export function ReportPreviewTable({ doc }: ReportPreviewTableProps) {
                   return (
                     <td
                       key={col.key}
-                      className={`px-3 py-1.5 ${isTotal ? 'font-semibold' : ''}`}
                       style={{
+                        padding: '5px 10px',
+                        fontWeight: isTotal ? 700 : 400,
                         textAlign: col.align ?? 'left',
                         color: colors.textPrimary,
                         fontFamily: col.format && col.format !== 'text' ? 'monospace' : undefined,
                         whiteSpace: 'nowrap',
+                        ...cellBorder,
                       }}
                     >
                       {has ? formatCell(cells[col.key], col.format, symbol) : ''}
@@ -175,10 +181,7 @@ export function ReportPreviewTable({ doc }: ReportPreviewTableProps) {
         </tbody>
       </table>
       {capped && (
-        <div
-          className="px-3 py-2 border-t text-center"
-          style={{ borderColor: colors.border, fontSize: fontSize.xs, color: colors.textSecondary }}
-        >
+        <div style={{ padding: '8px 10px', borderTop: CARD_BORDER, textAlign: 'center', fontSize: fontSize.xs, color: colors.textSecondary }}>
           Showing the first {PREVIEW_ROW_CAP.toLocaleString()} rows — download the PDF or Excel for the full report.
         </div>
       )}
