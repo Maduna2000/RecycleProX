@@ -14,30 +14,13 @@ import { toast } from 'sonner'
 import Decimal from 'decimal.js'
 import { format } from '@/lib/utils/format'
 import { colors } from '@/lib/design-tokens'
-import { BAR_GRAD, CARD_BORDER } from '@/components/rpx/styles'
 import {
-  TH, TD,
   Btn, PortalPage,
   RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter,
 } from '@/components/rpx'
+import { DataTable, type Column } from '@/components/ui/DataTable'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
-
-const secBtn: React.CSSProperties = {
-  display: 'inline-flex', alignItems: 'center', gap: 4, height: 24,
-  padding: '0 8px', fontSize: 11, fontWeight: 600, borderRadius: 2,
-  background: colors.surface, border: `1px solid ${colors.border}`, color: colors.textPrimary, cursor: 'pointer',
-}
-const priBtn: React.CSSProperties = {
-  display: 'inline-flex', alignItems: 'center', gap: 4, height: 24,
-  padding: '0 8px', fontSize: 11, fontWeight: 700, borderRadius: 2,
-  background: BAR_GRAD, border: CARD_BORDER, color: colors.textPrimary, cursor: 'pointer',
-}
-const scaleBtn: React.CSSProperties = {
-  display: 'inline-flex', alignItems: 'center', gap: 4, height: 24,
-  padding: '0 8px', fontSize: 11, fontWeight: 600, borderRadius: 2,
-  background: BAR_GRAD, border: CARD_BORDER, color: colors.textPrimary, cursor: 'pointer',
-}
 
 type Product = { id: string; code: string; name: string; unit: string; category: string }
 type StocktakeEntry = {
@@ -300,6 +283,101 @@ export default function StocktakeDetailPage() {
     )
   }
 
+  const columns: Column<StocktakeEntry>[] = [
+    {
+      key: 'product', header: 'Product',
+      render: (e) => (
+        <>
+          <p style={{ fontWeight: 500, color: colors.textPrimary }}>{e.product.name}</p>
+          <p style={{ fontSize: 10, fontFamily: 'monospace', color: colors.textSecondary }}>{e.product.code}</p>
+        </>
+      ),
+    },
+    {
+      key: 'category', header: 'Category', width: '120px',
+      render: (e) => (
+        <span style={{ padding: '2px 6px', borderRadius: 2, fontSize: 10, background: colors.neutralBg, color: colors.textSecondary }}>
+          {e.product.category}
+        </span>
+      ),
+    },
+    {
+      key: 'systemQty', header: 'System Qty', width: '110px',
+      render: (e) => <span style={{ fontFamily: 'monospace' }}>{Number(e.systemQty).toFixed(2)} {e.product.unit}</span>,
+    },
+    {
+      key: 'grossTare', header: 'Gross / Tare', width: '160px',
+      render: (e) => {
+        const ew = getEntryWeigh(e.id)
+        return (
+          <>
+            {(e.grossQty || e.tareQty) ? (
+              <span style={{ fontFamily: 'monospace', fontSize: 10, color: colors.textSecondary }}>
+                G:{Number(e.grossQty ?? 0).toFixed(2)} T:{Number(e.tareQty ?? 0).toFixed(2)}
+              </span>
+            ) : <span style={{ color: colors.disabled }}>—</span>}
+            {isOpen && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                <Select value={ew.selectedScale} onValueChange={(v) => patchEntryWeigh(e.id, { selectedScale: v as '1' | '2' | '3' })} disabled>
+                  <SelectTrigger style={{ height: 24, width: 60, fontSize: 10, padding: '0 4px', opacity: 0.5 }} aria-label="Select scale (coming soon)"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">Scale 1</SelectItem>
+                    <SelectItem value="2">Scale 2</SelectItem>
+                    <SelectItem value="3">Scale 3</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Btn disabled style={{ height: 32, minWidth: 32, padding: '0 6px', fontSize: 10 }} title="Scale integration coming soon">G</Btn>
+                <Btn disabled style={{ height: 32, minWidth: 32, padding: '0 6px', fontSize: 10 }} title="Scale integration coming soon">T</Btn>
+              </div>
+            )}
+          </>
+        )
+      },
+    },
+    {
+      key: 'countedQty', header: 'Net Counted', width: '110px',
+      render: (e) => <span style={{ fontFamily: 'monospace' }}>{Number(e.countedQty).toFixed(2)} {e.product.unit}</span>,
+    },
+    {
+      key: 'variance', header: 'Variance', width: '120px',
+      render: (e) => {
+        const variance = new Decimal(e.variance)
+        const hasVariance = variance.abs().gt(0)
+        const text = `${variance.gt(0) ? '+' : ''}${Number(e.variance).toFixed(2)} ${e.product.unit}`
+        // No per-row background hook in DataTable — a colored pill stands in for
+        // the full-row highlight this table used to show for variance entries.
+        return hasVariance ? (
+          <span style={{ display: 'inline-flex', padding: '2px 6px', borderRadius: 2, fontFamily: 'monospace', fontWeight: 600, fontSize: 11, background: colors.warningBg, color: variance.gt(0) ? colors.action : colors.danger }}>
+            {text}
+          </span>
+        ) : (
+          <span style={{ fontFamily: 'monospace', fontWeight: 600, color: colors.textSecondary }}>{text}</span>
+        )
+      },
+    },
+    {
+      key: 'photo', header: 'Photo', width: '140px',
+      render: (e) => (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          {e.photoR2Key ? (
+            <Btn icon={ExternalLink} onClick={() => viewPhoto(e.photoR2Key!)} style={{ height: 28, fontSize: 10 }}>View</Btn>
+          ) : (
+            <span style={{ fontSize: 10, color: colors.disabled }} aria-label="No photo">—</span>
+          )}
+          {isOpen && (
+            <Btn
+              icon={Camera}
+              loading={uploadingPhoto[e.productId]}
+              onClick={() => triggerPhotoUpload(e.productId)}
+              style={{ width: 32, height: 32, padding: 0, justifyContent: 'center' }}
+              title="Upload photo"
+            />
+          )}
+        </div>
+      ),
+    },
+  ]
+
   return (
     <>
     <PortalPage
@@ -391,15 +469,13 @@ export default function StocktakeDetailPage() {
                       aria-describedby={productId ? 'qty-unit' : undefined}
                     />
                   </div>
-                  <button
+                  <Btn
+                    icon={Scale}
                     onClick={() => setAddWeigh((p) => ({ ...p, weighMode: !p.weighMode }))}
-                    style={{ ...scaleBtn, background: addWeigh.weighMode ? colors.process : colors.surface, color: addWeigh.weighMode ? colors.textOnDark : colors.textPrimary, border: `1px solid ${addWeigh.weighMode ? colors.processHover : colors.border}`, width: 32, height: 32, padding: 0, justifyContent: 'center', opacity: 0.5, cursor: 'not-allowed' }}
+                    style={{ width: 32, height: 32, padding: 0, justifyContent: 'center', background: addWeigh.weighMode ? colors.process : undefined, color: addWeigh.weighMode ? colors.textOnDark : undefined }}
                     title="Scale integration coming soon"
-                    aria-label="Toggle scale mode (coming soon)"
                     disabled
-                  >
-                    <Scale style={{ width: 14, height: 14 }} aria-hidden="true" />
-                  </button>
+                  />
                 </div>
 
                 {/* Scale panel */}
@@ -420,18 +496,14 @@ export default function StocktakeDetailPage() {
                       <Label htmlFor="add-gross-qty" style={{ fontSize: 10, color: colors.textSecondary }}>Gross (kg)</Label>
                       <div style={{ display: 'flex', gap: 4, marginTop: 2 }}>
                         <Input id="add-gross-qty" value={addWeigh.grossQty} onChange={(e) => recomputeAddNet(e.target.value, addWeigh.tareQty)} placeholder="0.000" style={{ height: 24, width: 80, fontSize: 11, fontFamily: 'monospace' }} />
-                        <button onClick={handleAddWeighGross} disabled style={{ ...scaleBtn, width: 32, height: 32, padding: 0, justifyContent: 'center', opacity: 0.5, cursor: 'not-allowed' }} aria-label="Read gross weight from scale (coming soon)" title="Scale integration coming soon">
-                          <RefreshCw style={{ width: 12, height: 12 }} aria-hidden="true" />
-                        </button>
+                        <Btn icon={RefreshCw} onClick={handleAddWeighGross} disabled style={{ width: 32, height: 32, padding: 0, justifyContent: 'center' }} title="Scale integration coming soon" />
                       </div>
                     </div>
                     <div>
                       <Label htmlFor="add-tare-qty" style={{ fontSize: 10, color: colors.textSecondary }}>Tare (kg)</Label>
                       <div style={{ display: 'flex', gap: 4, marginTop: 2 }}>
                         <Input id="add-tare-qty" value={addWeigh.tareQty} onChange={(e) => recomputeAddNet(addWeigh.grossQty, e.target.value)} placeholder="0.000" style={{ height: 24, width: 80, fontSize: 11, fontFamily: 'monospace' }} />
-                        <button onClick={handleAddWeighTare} disabled style={{ ...secBtn, width: 32, height: 32, padding: 0, justifyContent: 'center', opacity: 0.5, cursor: 'not-allowed' }} aria-label="Read tare weight from scale (coming soon)" title="Scale integration coming soon">
-                          <RefreshCw style={{ width: 12, height: 12 }} aria-hidden="true" />
-                        </button>
+                        <Btn icon={RefreshCw} onClick={handleAddWeighTare} disabled style={{ width: 32, height: 32, padding: 0, justifyContent: 'center' }} title="Scale integration coming soon" />
                       </div>
                     </div>
                     <div>
@@ -444,9 +516,7 @@ export default function StocktakeDetailPage() {
                 )}
 
                 <div style={{ marginTop: 12, display: 'flex', justifyContent: 'flex-end' }}>
-                  <button onClick={handleAddEntryClick} disabled={saving} style={{ ...priBtn, opacity: saving ? 0.5 : 1 }} aria-label="Save entry">
-                    {saving ? <><Loader2 style={{ width: 11, height: 11, animation: 'spin 1s linear infinite' }} aria-hidden="true" /> Saving...</> : 'Save Entry'}
-                  </button>
+                  <Btn variant="primary" onClick={handleAddEntryClick} loading={saving}>Save Entry</Btn>
                 </div>
               </div>
             </div>
@@ -463,95 +533,9 @@ export default function StocktakeDetailPage() {
                 No entries yet — start counting products above
               </div>
             ) : (
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ borderBottom: `1px solid ${colors.border}` }}>
-                    <th style={TH}>Product</th>
-                    <th style={TH}>Category</th>
-                    <th style={TH}>System Qty</th>
-                    <th style={TH}>Gross / Tare</th>
-                    <th style={TH}>Net Counted</th>
-                    <th style={TH}>Variance</th>
-                    <th style={TH}>Photo</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {entries.map((e, i) => {
-                    const variance = new Decimal(e.variance)
-                    const hasVariance = variance.abs().gt(0)
-                    const ew = getEntryWeigh(e.id)
-                    return (
-                      <tr key={e.id} style={{ borderBottom: i < entries.length - 1 ? `1px solid ${colors.rowDivider}` : undefined, background: hasVariance ? colors.warningBg : undefined }}>
-                        <td style={TD}>
-                          <p style={{ fontWeight: 500, color: colors.textPrimary }}>{e.product.name}</p>
-                          <p style={{ fontSize: 10, fontFamily: 'monospace', color: colors.textSecondary }}>{e.product.code}</p>
-                        </td>
-                        <td style={TD}>
-                          <span style={{ padding: '2px 6px', borderRadius: 2, fontSize: 10, background: colors.neutralBg, color: colors.textSecondary }}>
-                            {e.product.category}
-                          </span>
-                        </td>
-                        <td style={{ ...TD, fontFamily: 'monospace' }}>{Number(e.systemQty).toFixed(2)} {e.product.unit}</td>
-                        <td style={TD}>
-                          {(e.grossQty || e.tareQty) ? (
-                            <span style={{ fontFamily: 'monospace', fontSize: 10, color: colors.textSecondary }}>
-                              G:{Number(e.grossQty ?? 0).toFixed(2)} T:{Number(e.tareQty ?? 0).toFixed(2)}
-                            </span>
-                          ) : <span style={{ color: colors.disabled }}>—</span>}
-                          {isOpen && (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 }}>
-                              <Select value={ew.selectedScale} onValueChange={(v) => patchEntryWeigh(e.id, { selectedScale: v as '1' | '2' | '3' })} disabled>
-                                <SelectTrigger style={{ height: 24, width: 60, fontSize: 10, padding: '0 4px', opacity: 0.5 }} aria-label="Select scale (coming soon)"><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="1">Scale 1</SelectItem>
-                                  <SelectItem value="2">Scale 2</SelectItem>
-                                  <SelectItem value="3">Scale 3</SelectItem>
-                                </SelectContent>
-                              </Select>
-                              <button disabled style={{ ...scaleBtn, height: 32, minWidth: 32, padding: '0 6px', fontSize: 10, opacity: 0.5, cursor: 'not-allowed' }} title="Scale integration coming soon" aria-label="Re-weigh gross (coming soon)">
-                                G
-                              </button>
-                              <button disabled style={{ ...secBtn, height: 32, minWidth: 32, padding: '0 6px', fontSize: 10, opacity: 0.5, cursor: 'not-allowed' }} title="Scale integration coming soon" aria-label="Re-weigh tare (coming soon)">
-                                T
-                              </button>
-                            </div>
-                          )}
-                        </td>
-                        <td style={{ ...TD, fontFamily: 'monospace' }}>{Number(e.countedQty).toFixed(2)} {e.product.unit}</td>
-                        <td style={TD}>
-                          <span style={{ fontFamily: 'monospace', fontWeight: 600, color: variance.gt(0) ? colors.action : variance.lt(0) ? colors.danger : colors.textSecondary }}>
-                            {variance.gt(0) ? '+' : ''}{Number(e.variance).toFixed(2)} {e.product.unit}
-                          </span>
-                        </td>
-                        <td style={TD}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                            {e.photoR2Key ? (
-                              <button onClick={() => viewPhoto(e.photoR2Key!)} style={{ ...secBtn, height: 28, fontSize: 10 }} aria-label={`View photo for ${e.product.name}`}>
-                                <ExternalLink style={{ width: 12, height: 12 }} aria-hidden="true" /> View
-                              </button>
-                            ) : (
-                              <span style={{ fontSize: 10, color: colors.disabled }} aria-label="No photo">—</span>
-                            )}
-                            {isOpen && (
-                              <button
-                                onClick={() => triggerPhotoUpload(e.productId)}
-                                disabled={uploadingPhoto[e.productId]}
-                                style={{ ...secBtn, width: 32, height: 32, padding: 0, justifyContent: 'center', opacity: uploadingPhoto[e.productId] ? 0.5 : 1 }}
-                                title="Upload photo"
-                                aria-label={`Upload photo for ${e.product.name}`}
-                              >
-                                {uploadingPhoto[e.productId]
-                                  ? <Loader2 style={{ width: 12, height: 12, animation: 'spin 1s linear infinite' }} aria-hidden="true" />
-                                  : <Camera style={{ width: 12, height: 12 }} aria-hidden="true" />}
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+              <div style={{ padding: 10 }}>
+                <DataTable columns={columns} rows={entries} rowKey={(e) => e.id} />
+              </div>
             )}
           </div>
         </div>
