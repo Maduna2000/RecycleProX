@@ -14,7 +14,8 @@ import { toast } from 'sonner'
 import { DataTable, StatusBadge, type Column, type RowAction } from '@/components/ui/DataTable'
 import { InlineDetailPanel } from '@/components/ui/InlineDetailPanel'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
-import { Btn, PortalPage, BAR_GRAD } from '@/components/rpx'
+import { Btn, PortalPage, BAR_GRAD, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
+import { Dialog } from '@/components/ui/dialog'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -587,56 +588,32 @@ function VoidModal({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: 'rgba(0, 0, 0, 0.1)', backdropFilter: 'blur(4px)' }}
-    >
-      <div
-        className="bg-white w-full max-w-sm mx-4"
-        style={{ borderRadius: 4, border: '1px solid #B0B0B0', boxShadow: '0 6px 24px rgba(0, 0, 0, 0.2)' }}
-      >
-        <div
-          className="flex items-center justify-between"
-          style={{ height: 34, padding: '0 8px 0 14px', borderBottom: '2px solid #B0B0B0', background: BAR_GRAD }}
-        >
-          <p style={{ fontSize: 13, fontWeight: 700, color: colors.danger }}>
-            Void Order
-          </p>
-          <button
-            onClick={onClose}
-            style={{ width: 24, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', borderRadius: 2, cursor: 'pointer', color: colors.textSecondary }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = colors.danger; e.currentTarget.style.color = '#fff' }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = colors.textSecondary }}
-            aria-label="Close"
-          >
-            <X style={{ width: 14, height: 14 }} />
-          </button>
-        </div>
-        <div className="px-4 py-3.5 flex flex-col gap-3">
-          <p style={{ fontSize: fontSize.sm, color: colors.textPrimary }}>
+    <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
+      <RpxDialogContent maxWidth={440}>
+        <RpxDialogHeader title="Void Order" icon={XCircle} onClose={onClose} />
+        <RpxDialogBody>
+          <p style={{ fontSize: fontSize.sm, color: colors.textPrimary, marginBottom: 10 }}>
             Void <strong>{order.orderNumber}</strong>? This cannot be undone.
           </p>
-          <div>
-            <label style={{ fontSize: fontSize.xs, fontWeight: fontWeight.medium, color: colors.textSecondary, display: 'block', marginBottom: 4 }}>
-              Reason *
-            </label>
-            <textarea
-              value={reason}
-              onChange={e => setReason(e.target.value)}
-              rows={3}
-              className="w-full border border-[#E0E0E0] px-3 py-2 focus:outline-none focus:border-[#185ABD] resize-none"
-              style={{ fontSize: fontSize.sm, borderRadius: 2 }}
-              placeholder="Enter reason for voiding…"
-            />
-          </div>
-          {error && <p style={{ fontSize: fontSize.xs, color: colors.danger }}>{error}</p>}
-        </div>
-        <div className="flex justify-end gap-2" style={{ padding: '10px 14px', borderTop: '1px solid #E0E0E0', background: '#F8F9FA' }}>
-          <Btn size="sm" onClick={onClose}>Cancel</Btn>
-          <Btn size="sm" variant="danger" onClick={handleVoid} loading={loading}>Void Order</Btn>
-        </div>
-      </div>
-    </div>
+          <label style={{ fontSize: fontSize.xs, fontWeight: fontWeight.medium, color: colors.textSecondary, display: 'block', marginBottom: 4 }}>
+            Reason *
+          </label>
+          <textarea
+            value={reason}
+            onChange={e => setReason(e.target.value)}
+            rows={3}
+            className="w-full border border-[#E0E0E0] px-3 py-2 focus:outline-none focus:border-[#185ABD] resize-none"
+            style={{ fontSize: fontSize.sm, borderRadius: 2 }}
+            placeholder="Enter reason for voiding…"
+          />
+          {error && <p style={{ fontSize: fontSize.xs, color: colors.danger, marginTop: 6 }}>{error}</p>}
+        </RpxDialogBody>
+        <RpxDialogFooter>
+          <Btn onClick={onClose} disabled={loading}>Cancel</Btn>
+          <Btn variant="danger" onClick={handleVoid} loading={loading}>Void Order</Btn>
+        </RpxDialogFooter>
+      </RpxDialogContent>
+    </Dialog>
   )
 }
 
