@@ -190,8 +190,8 @@ export async function generatePersonRecordReport(data: PersonRecordReportData): 
       y -= 18
     } else if (rows.length > 0) {
       page.drawText('Date / Time', { x: MARGIN + 6,   y, size: 8, font: bold, color: GRAY })
-      page.drawText('Ref No.',     { x: MARGIN + 110, y, size: 8, font: bold, color: GRAY })
-      page.drawText('Goods',       { x: MARGIN + 185, y, size: 8, font: bold, color: GRAY })
+      page.drawText('Ref No.',     { x: MARGIN + 95,  y, size: 8, font: bold, color: GRAY })
+      page.drawText('Goods',       { x: MARGIN + 200, y, size: 8, font: bold, color: GRAY })
       page.drawText('Amount (R)',  { x: PAGE_W - MARGIN - 70, y, size: 8, font: bold, color: GRAY })
       y -= 14
       for (let i = 0; i < rows.length; i++) {
@@ -201,8 +201,8 @@ export async function generatePersonRecordReport(data: PersonRecordReportData): 
         }
         const when = r.createdAt.toLocaleString('en-ZA', { dateStyle: 'short', timeStyle: 'short' })
         page.drawText(when,                     { x: MARGIN + 6,   y, size: 8, font: reg,  color: DARK })
-        page.drawText(r.refNumber,              { x: MARGIN + 110, y, size: 8, font: bold, color: DARK })
-        page.drawText(truncate(r.items, 44),    { x: MARGIN + 185, y, size: 8, font: reg,  color: DARK })
+        page.drawText(r.refNumber,              { x: MARGIN + 95,  y, size: 8, font: bold, color: DARK })
+        page.drawText(truncate(r.items, 40),    { x: MARGIN + 200, y, size: 8, font: reg,  color: DARK })
         const amt = `R ${new Decimal(r.totalAmount).toFixed(2)}`
         page.drawText(amt, { x: PAGE_W - MARGIN - 6 - reg.widthOfTextAtSize(amt, 8), y, size: 8, font: reg, color: DARK })
         y -= 15
@@ -299,10 +299,10 @@ export async function generateGoodsTraceReport(data: GoodsTraceReportData): Prom
       y -= 18
     } else if (rows.length > 0) {
       page.drawText('Date / Time', { x: MARGIN + 6,   y, size: 8, font: bold, color: GRAY })
-      page.drawText('Ref No.',     { x: MARGIN + 105, y, size: 8, font: bold, color: GRAY })
-      page.drawText('Seller',      { x: MARGIN + 175, y, size: 8, font: bold, color: GRAY })
-      page.drawText('ID Number',   { x: MARGIN + 295, y, size: 8, font: bold, color: GRAY })
-      page.drawText('Qty',         { x: MARGIN + 385, y, size: 8, font: bold, color: GRAY })
+      page.drawText('Ref No.',     { x: MARGIN + 95,  y, size: 8, font: bold, color: GRAY })
+      page.drawText('Seller',      { x: MARGIN + 195, y, size: 8, font: bold, color: GRAY })
+      page.drawText('ID Number',   { x: MARGIN + 320, y, size: 8, font: bold, color: GRAY })
+      page.drawText('Qty',         { x: MARGIN + 400, y, size: 8, font: bold, color: GRAY })
       page.drawText('Amount (R)',  { x: PAGE_W - MARGIN - 70, y, size: 8, font: bold, color: GRAY })
       y -= 14
       for (let i = 0; i < rows.length; i++) {
@@ -312,12 +312,12 @@ export async function generateGoodsTraceReport(data: GoodsTraceReportData): Prom
         }
         const when = r.createdAt.toLocaleString('en-ZA', { dateStyle: 'short', timeStyle: 'short' })
         page.drawText(when,        { x: MARGIN + 6,   y, size: 8, font: reg,  color: DARK })
-        page.drawText(r.refNumber, { x: MARGIN + 105, y, size: 8, font: bold, color: DARK })
-        page.drawText(truncate(r.supplierName, 24) + (r.blacklisted ? ' *' : ''), {
-          x: MARGIN + 175, y, size: 8, font: reg, color: r.blacklisted ? RED : DARK,
+        page.drawText(r.refNumber, { x: MARGIN + 95,  y, size: 8, font: bold, color: DARK })
+        page.drawText(truncate(r.supplierName, 20) + (r.blacklisted ? ' *' : ''), {
+          x: MARGIN + 195, y, size: 8, font: reg, color: r.blacklisted ? RED : DARK,
         })
-        page.drawText(r.idNumber ?? '—', { x: MARGIN + 295, y, size: 8, font: reg, color: DARK })
-        page.drawText(`${r.quantity}${data.unit}`, { x: MARGIN + 385, y, size: 8, font: reg, color: DARK })
+        page.drawText(r.idNumber ?? '—', { x: MARGIN + 320, y, size: 8, font: reg, color: DARK })
+        page.drawText(`${r.quantity}${data.unit}`, { x: MARGIN + 400, y, size: 8, font: reg, color: DARK })
         const amt = `R ${new Decimal(r.lineTotal).toFixed(2)}`
         page.drawText(amt, { x: PAGE_W - MARGIN - 6 - reg.widthOfTextAtSize(amt, 8), y, size: 8, font: reg, color: DARK })
         y -= 15
