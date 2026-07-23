@@ -10,7 +10,6 @@ import { DataTable, type Column } from '@/components/ui/DataTable'
 import { Dialog } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { CategoryFilterSelect, useProductCategories } from '@/components/products/CategoryFilterSelect'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
 import {
@@ -353,8 +352,7 @@ function AdjustmentModal({
           <div>
             <Label>Product</Label>
             <select
-              className="mt-1 w-full border rounded px-3 py-2 text-sm bg-white focus:outline-none"
-              style={{ borderColor: colors.border }}
+              style={{ ...inp, marginTop: 4 }}
               value={productId}
               onChange={(e) => setProductId(e.target.value)}
             >
@@ -368,13 +366,10 @@ function AdjustmentModal({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label>Direction</Label>
-              <Select value={direction} onValueChange={(v) => setDirection(v as 'in' | 'out')}>
-                <SelectTrigger className="mt-1 w-full"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="in">Stock IN (add)</SelectItem>
-                  <SelectItem value="out">Stock OUT (remove)</SelectItem>
-                </SelectContent>
-              </Select>
+              <select style={{ ...inp, marginTop: 4 }} value={direction} onChange={(e) => setDirection(e.target.value as 'in' | 'out')}>
+                <option value="in">Stock IN (add)</option>
+                <option value="out">Stock OUT (remove)</option>
+              </select>
             </div>
             <div>
               <Label>

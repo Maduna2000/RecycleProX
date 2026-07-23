@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef } from 'react'
 import useSWR, { mutate } from 'swr'
 import { useSession } from 'next-auth/react'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Loader2, Save, Printer, RefreshCw, CheckCircle2, XCircle, WifiOff } from 'lucide-react'
 import { toast } from 'sonner'
 import { colors } from '@/lib/design-tokens'
@@ -144,14 +143,11 @@ function ScaleRow({ n, form, set }: { n: ScaleNum; form: SettingsMap; set: (k: k
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: type !== 'none' ? 8 : 0 }}>
         <span style={{ fontSize: 11, fontWeight: 700, color: '#1B3A6B', width: 52 }}>Scale {n}</span>
         <div style={{ width: 170 }}>
-          <Select value={type} onValueChange={(v) => set(scaleKey(n, 'type'), v ?? '')}>
-            <SelectTrigger className="h-7 w-full text-xs"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">Not Connected</SelectItem>
-              <SelectItem value="tcp">TCP / Network</SelectItem>
-              <SelectItem value="serial">Serial / RS232</SelectItem>
-            </SelectContent>
-          </Select>
+          <select value={type} onChange={(e) => set(scaleKey(n, 'type'), e.target.value)} style={inp}>
+            <option value="none">Not Connected</option>
+            <option value="tcp">TCP / Network</option>
+            <option value="serial">Serial / RS232</option>
+          </select>
         </div>
       </div>
       {type === 'tcp' && (
@@ -170,14 +166,11 @@ function ScaleRow({ n, form, set }: { n: ScaleNum; form: SettingsMap; set: (k: k
             <input value={form[scaleKey(n, 'serialPort')] ?? ''} onChange={(e) => set(scaleKey(n, 'serialPort'), e.target.value)} placeholder="COM3 or /dev/ttyUSB0" style={{ ...inp, fontFamily: 'monospace' }} />
           </Field>
           <Field label="Baud Rate">
-            <Select value={form[scaleKey(n, 'baudRate')] ?? '9600'} onValueChange={(v) => set(scaleKey(n, 'baudRate'), v ?? '')}>
-              <SelectTrigger className="h-7 w-full text-xs"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {['1200','2400','4800','9600','19200','38400','57600','115200'].map((b) => (
-                  <SelectItem key={b} value={b}>{b}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <select value={form[scaleKey(n, 'baudRate')] ?? '9600'} onChange={(e) => set(scaleKey(n, 'baudRate'), e.target.value)} style={inp}>
+              {['1200','2400','4800','9600','19200','38400','57600','115200'].map((b) => (
+                <option key={b} value={b}>{b}</option>
+              ))}
+            </select>
           </Field>
         </div>
       )}
@@ -407,14 +400,11 @@ export default function SettingsPage() {
                 Configure a receipt printer via USB/Serial or TCP/IP. On cloud, receipts download instead.
               </p>
               <Field label="Connection Type">
-                <Select value={(form.printerType ?? 'none') as PrinterType} onValueChange={(v) => set('printerType', v ?? '')}>
-                  <SelectTrigger className="h-7 w-full text-xs"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Not Connected</SelectItem>
-                    <SelectItem value="serial">Serial / USB-Serial</SelectItem>
-                    <SelectItem value="tcp">TCP / Network (IP)</SelectItem>
-                  </SelectContent>
-                </Select>
+                <select value={(form.printerType ?? 'none') as PrinterType} onChange={(e) => set('printerType', e.target.value)} style={inp}>
+                  <option value="none">Not Connected</option>
+                  <option value="serial">Serial / USB-Serial</option>
+                  <option value="tcp">TCP / Network (IP)</option>
+                </select>
               </Field>
 
               {form.printerType === 'serial' && (
@@ -442,12 +432,9 @@ export default function SettingsPage() {
                     )}
                   </Field>
                   <Field label="Baud Rate">
-                    <Select value={form.printerBaudRate ?? '9600'} onValueChange={(v) => set('printerBaudRate', v ?? '')}>
-                      <SelectTrigger className="h-7 w-full text-xs"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {['9600','19200','38400','57600','115200'].map((b) => <SelectItem key={b} value={b}>{b}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+                    <select value={form.printerBaudRate ?? '9600'} onChange={(e) => set('printerBaudRate', e.target.value)} style={inp}>
+                      {['9600','19200','38400','57600','115200'].map((b) => <option key={b} value={b}>{b}</option>)}
+                    </select>
                   </Field>
                 </div>
               )}
