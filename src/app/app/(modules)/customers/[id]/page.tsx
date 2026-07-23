@@ -10,6 +10,7 @@ import { PhotoUploader, PhotoViewer } from '@/components/PhotoUploader'
 import { LoansTab } from '@/components/customers/LoansTab'
 import { BusinessLoanTab } from '@/components/customers/BusinessLoanTab'
 import { TradeCommoditiesSelect } from '@/components/customers/TradeCommoditiesSelect'
+import { TransactionsTab } from '@/components/customers/TransactionsTab'
 import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
 import { useForm } from 'react-hook-form'
@@ -584,41 +585,6 @@ export default function CustomerDetailPage() {
 }
 
 // ─── Transactions Tab ─────────────────────────────────────────────────────────
-function TransactionsTab({ customerId }: { customerId: string }) {
-  const { data } = useSWR(`/api/customers/${customerId}/transactions`, fetcher)
-  if (!data?.transactions?.length) {
-    return (
-      <div style={{ padding: '40px 0', textAlign: 'center', color: '#9CA3AF', fontSize: 12 }}>
-        No transactions yet
-      </div>
-    )
-  }
-  return (
-    <div style={{ overflowX: 'auto' }}>
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-        <thead>
-          <tr style={{ background: 'linear-gradient(180deg,#F5F5F5 0%,#EBEBEB 100%)', borderBottom: '1px solid #C0C0C0' }}>
-            {['Date', 'Reference', 'Type', 'Amount', 'Status'].map((h) => (
-              <th key={h} style={{ textAlign: 'left', padding: '5px 10px', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: '#6C757D', letterSpacing: '0.04em' }}>{h}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {data.transactions.map((tx: { id: string; type: string; reference: string; date: string; amount: string; status: string }, i: number) => (
-            <tr key={tx.id} style={{ borderBottom: '1px solid #F0F0F0', background: i % 2 === 0 ? '#fff' : '#FAFAFA' }}>
-              <td style={{ padding: '5px 10px' }}>{new Date(tx.date).toLocaleDateString('en-ZA')}</td>
-              <td style={{ padding: '5px 10px', fontFamily: 'monospace', fontSize: 11 }}>{tx.reference}</td>
-              <td style={{ padding: '5px 10px', textTransform: 'capitalize' }}>{tx.type}</td>
-              <td style={{ padding: '5px 10px', fontFamily: 'monospace' }}>R {tx.amount}</td>
-              <td style={{ padding: '5px 10px', textTransform: 'capitalize' }}>{tx.status}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
-}
-
 // ─── Documents Tab ────────────────────────────────────────────────────────────
 function DocumentsTab({ customer, onPhotoSaved }: { customer: Customer; onPhotoSaved: () => void }) {
   const { data: session } = useSession()
