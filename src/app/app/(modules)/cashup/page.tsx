@@ -45,6 +45,7 @@ type CashUp = {
   notes?:              string
   denominations?: Record<string, number>
   currencyWarning?: string | null
+  needsCurrencyConfirmation?: boolean
 }
 
 type LiveStats = {
@@ -586,6 +587,7 @@ export default function CashUpPage() {
   const [submitting, setSubmitting] = useState(false)
   const [approving,  setApproving]  = useState(false)
   const [rejecting,  setRejecting]  = useState(false)
+  const [confirmingCurrency, setConfirmingCurrency] = useState(false)
   const [rejectReasonOpen, setRejectReasonOpen] = useState(false)
   const [notes,      setNotes]      = useState('')
   const [counts, setCounts] = useState<Record<number, number>>(() =>
@@ -681,6 +683,25 @@ export default function CashUpPage() {
     }
   }
 
+  async function handleConfirmCurrency() {
+    if (!cashUp) return
+    setConfirmingCurrency(true)
+    try {
+      const res = await fetch(`/api/cashup/${cashUp.id}/confirm-currency`, { method: 'POST' })
+      if (res.ok) {
+        await swrMutate(CASHUP_KEY)
+        toast.success('Currency confirmed')
+      } else {
+        const j = await res.json()
+        toast.error(j.error ?? 'Failed to confirm currency')
+      }
+    } catch {
+      toast.error('Failed to confirm currency')
+    } finally {
+      setConfirmingCurrency(false)
+    }
+  }
+
   async function handleSubmit() {
     if (!cashUp) return
     setSubmitting(true)
@@ -702,7 +723,16 @@ export default function CashUpPage() {
         await swrMutate(CASHUP_KEY)
         toast.success('Cash-up submitted for approval')
       }
-    } catch { toast.error('Failed to submit cash-up') }
+    } catch (err) {
+      let msg = 'Failed to submit cash-up'
+      if (err instanceof Error) {
+        try {
+          const parsed = JSON.parse(err.message) as { error?: string }
+          if (parsed.error) msg = parsed.error
+        } catch { /* not JSON — keep default message */ }
+      }
+      toast.error(msg)
+    }
     finally { setSubmitting(false) }
   }
 
@@ -853,8 +883,17 @@ export default function CashUpPage() {
             </div>
 
             {cashUp.currencyWarning && (
-              <div className="rounded px-3 py-2 text-xs font-medium" style={{ background: colors.warningBg, color: colors.warning }}>
-                ⚠ {cashUp.currencyWarning}
+              <div className="flex items-center justify-between gap-3 rounded px-3 py-2 text-xs font-medium" style={{ background: colors.warningBg, color: colors.warning }}>
+                <span>⚠ {cashUp.currencyWarning}</span>
+                {cashUp.needsCurrencyConfirmation && (
+                  isManager ? (
+                    <Btn size="sm" onClick={handleConfirmCurrency} disabled={confirmingCurrency} style={{ whiteSpace: 'nowrap', flexShrink: 0 }}>
+                      {confirmingCurrency ? 'Confirming…' : 'Confirm currency'}
+                    </Btn>
+                  ) : (
+                    <span className="text-xs italic" style={{ flexShrink: 0 }}>Ask a manager to confirm</span>
+                  )
+                )}
               </div>
             )}
 
@@ -973,7 +1012,13 @@ export default function CashUpPage() {
                           divider
                           label="Cash On Hand (Counted)" value={declared.toFixed(2)} highlight currencySymbol={currSym}
                           action={isOpen && (
-                            <Btn size="sm" icon={Calculator} onClick={() => setCountCashOpen(true)} style={{ whiteSpace: 'nowrap', flexShrink: 0 }}>
+                            <Btn
+                              size="sm" icon={Calculator}
+                              onClick={() => setCountCashOpen(true)}
+                              disabled={cashUp.needsCurrencyConfirmation}
+                              title={cashUp.needsCurrencyConfirmation ? 'Confirm the currency mismatch above before counting cash' : undefined}
+                              style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
+                            >
                               Count Cash
                             </Btn>
                           )}

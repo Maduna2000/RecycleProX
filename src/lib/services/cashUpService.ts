@@ -30,6 +30,11 @@ export class CashUpNewerSessionOpenError extends Error {
   constructor() { super('Cannot reject — a newer session is already open. Void this session instead if it cannot be corrected.'); this.name = 'CashUpNewerSessionOpenError' }
 }
 
+export class CashUpCurrencyNotConfirmedError extends Error {
+  code = 'CURRENCY_NOT_CONFIRMED' as const
+  constructor() { super('This session\'s currency differs from the previous session and has not been confirmed yet — a manager must confirm before it can be submitted.'); this.name = 'CashUpCurrencyNotConfirmedError' }
+}
+
 // ─── Open a cash-up session ───────────────────────────────────────────────────
 // Only one open session at a time is allowed. Must submit previous day's first.
 export async function openCashUp(openedByUserId: string, sessionDateStr?: string, currency: Currency = 'ZAR') {
@@ -59,7 +64,7 @@ export async function openCashUp(openedByUserId: string, sessionDateStr?: string
 
   if (existing) {
     logger.warn({ existing: existing.id }, 'Cash-up session already open/submitted for this date')
-    return attachCurrencyWarning(existing, prevCashUp)
+    return buildCurrencyStatus(existing, prevCashUp)
   }
 
   // Opening balance = PREVIOUS session's closing balance (the carry-forward).
@@ -136,27 +141,61 @@ export async function openCashUp(openedByUserId: string, sessionDateStr?: string
       const winner = await prisma.cashUp.findUnique({ where: { tenantId_sessionDate: { tenantId: requireTenantId(), sessionDate } } })
       if (winner) {
         logger.warn({ sessionDate: dateStr }, 'CashUp: lost create race — returning existing session')
-        return attachCurrencyWarning(winner, prevCashUp)
+        return buildCurrencyStatus(winner, prevCashUp)
       }
     }
     throw err
   }
 
   logger.info({ cashUpId: cashUp.id, sessionDate: dateStr }, 'Cash-up session opened')
-  return attachCurrencyWarning(cashUp, prevCashUp)
+  return buildCurrencyStatus(cashUp, prevCashUp)
 }
 
-// Non-persisted warning shown when the new session's currency differs from the
-// previous day's — surfaced to the UI so a manager can double-check, but never blocks.
-function attachCurrencyWarning<T extends { currency: string }>(
+// Warning shown when a session's currency differs from the previous
+// session's. `needsCurrencyConfirmation` gates submission (see submitCashUp)
+// until a manager/admin explicitly confirms via confirmCurrency() below —
+// selecting a currency through the currency-change endpoint counts as an
+// explicit confirmation too.
+function buildCurrencyStatus<T extends { currency: string; currencyConfirmedAt: Date | null }>(
   cashUp: T,
   prevCashUp: { currency: string } | null
-): T & { currencyWarning: string | null } {
-  const currencyWarning =
-    prevCashUp && prevCashUp.currency !== cashUp.currency
-      ? `Previous session was in ${prevCashUp.currency}, this one is ${cashUp.currency} — confirm this is intentional.`
-      : null
-  return { ...cashUp, currencyWarning }
+): T & { currencyWarning: string | null; needsCurrencyConfirmation: boolean } {
+  const mismatched = prevCashUp !== null && prevCashUp.currency !== cashUp.currency
+  const currencyWarning = mismatched
+    ? `Previous session was in ${prevCashUp!.currency}, this one is ${cashUp.currency} — confirm this is intentional.`
+    : null
+  return { ...cashUp, currencyWarning, needsCurrencyConfirmation: mismatched && !cashUp.currencyConfirmedAt }
+}
+
+// Same as buildCurrencyStatus but looks up the previous session itself —
+// for call sites (route handlers) that only have the cashUp row, not
+// prevCashUp already in hand.
+export async function attachCurrencyStatus<T extends { sessionDate: Date; currency: string; currencyConfirmedAt: Date | null }>(
+  cashUp: T
+): Promise<T & { currencyWarning: string | null; needsCurrencyConfirmation: boolean }> {
+  const prevCashUp = await prisma.cashUp.findFirst({
+    where:   { sessionDate: { lt: cashUp.sessionDate } },
+    orderBy: { sessionDate: 'desc' },
+    select:  { currency: true },
+  })
+  return buildCurrencyStatus(cashUp, prevCashUp)
+}
+
+// ─── Confirm a currency mismatch (manager/admin only, enforced at the route) ──
+export async function confirmCurrency(cashUpId: string, userId: string) {
+  const cashUp = await prisma.cashUp.findUniqueOrThrow({ where: { id: cashUpId } })
+
+  if (cashUp.status !== 'open') {
+    throw new Error(`Cannot confirm currency on a cash-up with status "${cashUp.status}"`)
+  }
+
+  const updated = await prisma.cashUp.update({
+    where: { id: cashUpId },
+    data: { currencyConfirmedAt: new Date(), currencyConfirmedByUserId: userId },
+  })
+
+  logger.info({ cashUpId, userId }, 'Cash-up currency mismatch confirmed')
+  return attachCurrencyStatus(updated)
 }
 
 // ─── Get the open/submitted session for today (or a specific date) ───────────
@@ -297,6 +336,17 @@ export async function submitCashUp(
 
   if (cashUp.status !== 'open') {
     throw new Error(`Cannot submit cash-up with status "${cashUp.status}"`)
+  }
+
+  if (!cashUp.currencyConfirmedAt) {
+    const prevCashUp = await prisma.cashUp.findFirst({
+      where:   { sessionDate: { lt: cashUp.sessionDate } },
+      orderBy: { sessionDate: 'desc' },
+      select:  { currency: true },
+    })
+    if (prevCashUp && prevCashUp.currency !== cashUp.currency) {
+      throw new CashUpCurrencyNotConfirmedError()
+    }
   }
 
   // Both drawingsReceived and loansTotal are fully server-derived — never from user input.
