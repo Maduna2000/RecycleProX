@@ -9,6 +9,7 @@ import useSWR from 'swr'
 import Decimal from 'decimal.js'
 import { Loader2, TrendingUp, ShoppingCart, Users, ArrowRightLeft, Receipt, Download } from 'lucide-react'
 import { colors, fontSize } from '@/lib/design-tokens'
+import { TH, TD } from '@/components/rpx'
 import { ActionButton } from './ActionButton'
 import { DateRangeFilter } from './DateRangeFilter'
 
@@ -183,18 +184,18 @@ export function OverviewTab() {
                   {fmt(data.expenses.total)}
                 </span>
               </div>
-              <table className="w-full text-sm">
+              <table className="w-full">
                 <thead>
                   <tr style={{ borderBottom: `1px solid ${colors.border}` }}>
-                    <th className="pb-2 font-medium text-left" style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>Category</th>
-                    <th className="pb-2 font-medium text-right" style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>Amount</th>
+                    <th style={TH}>Category</th>
+                    <th style={{ ...TH, textAlign: 'right' }}>Amount</th>
                   </tr>
                 </thead>
                 <tbody>
                   {data.expenses.byCategory.map((e) => (
                     <tr key={e.name} style={{ borderBottom: `1px solid ${colors.bg}` }}>
-                      <td className="py-1.5" style={{ color: colors.textPrimary, fontSize: fontSize.sm }}>{e.name}</td>
-                      <td className="py-1.5 text-right font-mono" style={{ color: colors.warning, fontSize: fontSize.sm }}>{fmt(e.total)}</td>
+                      <td style={TD}>{e.name}</td>
+                      <td style={{ ...TD, textAlign: 'right', fontFamily: 'monospace', color: colors.warning }}>{fmt(e.total)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -206,20 +207,20 @@ export function OverviewTab() {
           {data.topProducts.length > 0 && (
             <div className="rounded border p-4 bg-white" style={{ borderColor: colors.border }}>
               <h2 className="font-semibold text-sm mb-3" style={{ color: colors.textPrimary }}>Top Products by Purchase Value</h2>
-              <table className="w-full text-sm">
+              <table className="w-full">
                 <thead>
                   <tr style={{ borderBottom: `1px solid ${colors.border}` }}>
-                    <th className="pb-2 font-medium text-left w-8" style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>#</th>
-                    <th className="pb-2 font-medium text-left" style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>Product</th>
-                    <th className="pb-2 font-medium text-right" style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>Total Paid Out</th>
+                    <th style={{ ...TH, width: 32 }}>#</th>
+                    <th style={TH}>Product</th>
+                    <th style={{ ...TH, textAlign: 'right' }}>Total Paid Out</th>
                   </tr>
                 </thead>
                 <tbody>
                   {data.topProducts.map((p, i) => (
                     <tr key={p.productId} style={{ borderBottom: `1px solid ${colors.bg}` }}>
-                      <td className="py-1.5" style={{ color: colors.textSecondary, fontSize: fontSize.sm }}>{i + 1}</td>
-                      <td className="py-1.5" style={{ color: colors.textPrimary, fontSize: fontSize.sm }}>{p.productName}</td>
-                      <td className="py-1.5 text-right font-mono" style={{ color: colors.danger, fontSize: fontSize.sm }}>{fmt(p.totalValue)}</td>
+                      <td style={{ ...TD, color: colors.textSecondary }}>{i + 1}</td>
+                      <td style={TD}>{p.productName}</td>
+                      <td style={{ ...TD, textAlign: 'right', fontFamily: 'monospace', color: colors.danger }}>{fmt(p.totalValue)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -231,20 +232,20 @@ export function OverviewTab() {
           {data.topSaleProducts?.length > 0 && (
             <div className="rounded border p-4 bg-white" style={{ borderColor: colors.border }}>
               <h2 className="font-semibold text-sm mb-3" style={{ color: colors.textPrimary }}>Top Products by Sale Revenue</h2>
-              <table className="w-full text-sm">
+              <table className="w-full">
                 <thead>
                   <tr style={{ borderBottom: `1px solid ${colors.border}` }}>
-                    <th className="pb-2 font-medium text-left w-8" style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>#</th>
-                    <th className="pb-2 font-medium text-left" style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>Product</th>
-                    <th className="pb-2 font-medium text-right" style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>Total Revenue</th>
+                    <th style={{ ...TH, width: 32 }}>#</th>
+                    <th style={TH}>Product</th>
+                    <th style={{ ...TH, textAlign: 'right' }}>Total Revenue</th>
                   </tr>
                 </thead>
                 <tbody>
                   {data.topSaleProducts.map((p, i) => (
                     <tr key={p.productId} style={{ borderBottom: `1px solid ${colors.bg}` }}>
-                      <td className="py-1.5" style={{ color: colors.textSecondary, fontSize: fontSize.sm }}>{i + 1}</td>
-                      <td className="py-1.5" style={{ color: colors.textPrimary, fontSize: fontSize.sm }}>{p.productName}</td>
-                      <td className="py-1.5 text-right font-mono" style={{ color: colors.action, fontSize: fontSize.sm }}>{fmt(p.totalValue)}</td>
+                      <td style={{ ...TD, color: colors.textSecondary }}>{i + 1}</td>
+                      <td style={TD}>{p.productName}</td>
+                      <td style={{ ...TD, textAlign: 'right', fontFamily: 'monospace', color: colors.action }}>{fmt(p.totalValue)}</td>
                     </tr>
                   ))}
                 </tbody>
