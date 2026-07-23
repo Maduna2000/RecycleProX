@@ -9,13 +9,12 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
-import { Loader2, Calendar, PlusCircle, Undo2, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Loader2, Calendar, PlusCircle, Undo2 } from 'lucide-react'
 import Decimal from 'decimal.js'
 import { colors } from '@/lib/design-tokens'
 import { z } from 'zod'
-import { Btn, PortalPage, TH, TD, HEADER_GRAD } from '@/components/rpx'
-import { CARD_BORDER } from '@/components/rpx/styles'
-import { PANEL, PANEL_HEAD } from '@/components/legacy/legacyPanel'
+import { Btn, PortalPage, PANEL, PANEL_HEAD } from '@/components/rpx'
+import { DataTable, type Column } from '@/components/ui/DataTable'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -156,6 +155,89 @@ export default function FloatPage() {
     }
   }
 
+  const historyColumns: Column<CashFloat>[] = [
+    {
+      key: 'date', header: 'Date',
+      render: (f) => (
+        <>
+          <p className="font-medium" style={{ fontSize: 12, color: colors.textPrimary }}>
+            {new Date(f.floatDate).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })}
+          </p>
+          {f.notes && <p className="mt-0.5" style={{ fontSize: 11, color: colors.textSecondary }}>{f.notes}</p>}
+        </>
+      ),
+    },
+    {
+      key: 'openingAmount', header: 'Opening Float', width: '130px',
+      render: (f) => <span className="font-mono font-semibold" style={{ fontSize: 12, color: colors.textPrimary }}>R {new Decimal(f.openingAmount).toFixed(2)}</span>,
+    },
+    {
+      key: 'currentBalance', header: 'Current Float', width: '150px',
+      render: (f) => (
+        <>
+          <span className="font-mono font-semibold" style={{ fontSize: 12, color: f.closingAmount ? colors.textSecondary : colors.action }}>
+            R {new Decimal(f.currentBalance).toFixed(2)}
+          </span>
+          {f.closingAmount && <span className="ml-1" style={{ fontSize: 11, color: colors.textSecondary }}>(closed)</span>}
+        </>
+      ),
+    },
+  ]
+
+  const movementColumns: Column<FloatMovement>[] = [
+    {
+      key: 'time', header: 'Time', width: '70px',
+      render: (m) => <span style={{ fontSize: 11, color: colors.textSecondary }}>{new Date(m.createdAt).toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' })}</span>,
+    },
+    {
+      key: 'type', header: 'Type', width: '90px',
+      render: (m) => (
+        <span style={{
+          display: 'inline-flex', padding: '1px 6px', borderRadius: 3, fontSize: 11, fontWeight: 600,
+          ...(m.movementType === 'top_up'
+            ? { background: colors.actionBg, color: colors.action }
+            : { background: '#F0F0F0', color: colors.textSecondary }),
+        }}>
+          {m.movementType === 'top_up' ? 'Top-Up' : m.movementType}
+        </span>
+      ),
+    },
+    {
+      key: 'amount', header: 'Amount', width: '100px',
+      render: (m) => <span style={{ fontSize: 12, fontFamily: 'monospace', fontWeight: 600, color: colors.action }}>+R {new Decimal(m.amount).toFixed(2)}</span>,
+    },
+    {
+      key: 'expected', header: 'Expected in Drawer', width: '140px',
+      render: (m, i) => {
+        const isLastMovement = i === movements.length - 1
+        const floatBalanceAfter = new Decimal(m.balanceAfter)
+        const expectedInDrawer = isLastMovement && calFloat
+          ? calFloat
+          : (cashUpOpeningBalance && liveStats
+              ? cashUpOpeningBalance
+                  .plus(floatBalanceAfter)
+                  .plus(new Decimal(liveStats.cashSales ?? '0'))
+                  .minus(new Decimal(liveStats.cashPurchases ?? '0'))
+                  .minus(new Decimal(liveStats.cashPayments ?? '0'))
+                  .minus(new Decimal(liveStats.expenses ?? '0'))
+                  .minus(new Decimal(liveStats.loanAdvance ?? '0'))
+                  .plus(new Decimal(liveStats.loanRepayment ?? '0'))
+              : floatBalanceAfter)
+        return <span style={{ fontSize: 12, fontFamily: 'monospace', color: colors.action }}>R {expectedInDrawer.toFixed(2)}</span>
+      },
+    },
+    {
+      key: 'note', header: 'Note',
+      render: (m) => <span style={{ fontSize: 11, color: colors.textSecondary }}>{m.referenceNote ?? '—'}</span>,
+    },
+    ...(isManager ? [{
+      key: 'actions', header: '', width: '100px',
+      render: (m: FloatMovement, i: number) => i === movements.length - 1
+        ? <Btn size="sm" icon={Undo2} loading={reversingMovement} onClick={() => handleReverseMovement(m.id)}>Reverse</Btn>
+        : null,
+    }] : []),
+  ]
+
   async function handleReverseMovement(movementId: string) {
     setReversingMovement(true)
     try {
@@ -271,71 +353,21 @@ export default function FloatPage() {
               </div>
             </div>
 
-            {loadingHistory ? (
-              <div className="flex items-center gap-2 text-sm p-3" style={{ color: colors.textSecondary }}>
-                <Loader2 className="w-4 h-4 animate-spin" /> Loading…
-              </div>
-            ) : !history?.length ? (
+            {!history?.length && !loadingHistory ? (
               <div className="text-center py-5 text-sm" style={{ color: colors.textSecondary }}>No float history</div>
             ) : (
-              <>
-                <div className="overflow-x-auto">
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead>
-                      <tr style={{ background: HEADER_GRAD, borderBottom: '1px solid #C0C0C0' }}>
-                        <th style={TH}>Date</th>
-                        <th style={{ ...TH, textAlign: 'right' }}>Opening Float</th>
-                        <th style={{ ...TH, textAlign: 'right' }}>Current Float</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {history.slice((historyPage - 1) * HISTORY_PAGE_SIZE, historyPage * HISTORY_PAGE_SIZE).map((f, i) => (
-                        <tr key={f.id} style={{ background: i % 2 === 0 ? '#fff' : '#FAFAFA', borderBottom: `1px solid #F0F0F0` }}>
-                          <td style={TD}>
-                            <p className="font-medium" style={{ fontSize: 12, color: colors.textPrimary }}>
-                              {new Date(f.floatDate).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })}
-                            </p>
-                            {f.notes && <p className="mt-0.5" style={{ fontSize: 11, color: colors.textSecondary }}>{f.notes}</p>}
-                          </td>
-                          <td style={{ ...TD, textAlign: 'right' }}>
-                            <span className="font-mono font-semibold" style={{ fontSize: 12, color: colors.textPrimary }}>
-                              R {new Decimal(f.openingAmount).toFixed(2)}
-                            </span>
-                          </td>
-                          <td style={{ ...TD, textAlign: 'right' }}>
-                            <span className="font-mono font-semibold" style={{ fontSize: 12, color: f.closingAmount ? colors.textSecondary : colors.action }}>
-                              R {new Decimal(f.currentBalance).toFixed(2)}
-                            </span>
-                            {f.closingAmount && (
-                              <span className="ml-1" style={{ fontSize: 11, color: colors.textSecondary }}>(closed)</span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                {/* Pagination */}
-                {history.length > HISTORY_PAGE_SIZE && (
-                  <div className="flex items-center justify-between px-3 py-1.5" style={{ borderTop: CARD_BORDER, background: colors.toolbar }}>
-                    <span className="text-xs" style={{ color: colors.textSecondary }}>
-                      Showing {(historyPage - 1) * HISTORY_PAGE_SIZE + 1}–{Math.min(historyPage * HISTORY_PAGE_SIZE, history.length)} of {history.length}
-                    </span>
-                    <div className="flex items-center gap-1">
-                      <Btn size="sm" icon={ChevronLeft} disabled={historyPage <= 1} onClick={() => setHistoryPage(p => p - 1)} />
-                      <span className="text-xs px-2" style={{ color: colors.textPrimary }}>
-                        Page {historyPage} of {Math.ceil(history.length / HISTORY_PAGE_SIZE)}
-                      </span>
-                      <Btn
-                        size="sm"
-                        icon={ChevronRight}
-                        disabled={historyPage >= Math.ceil(history.length / HISTORY_PAGE_SIZE)}
-                        onClick={() => setHistoryPage(p => p + 1)}
-                      />
-                    </div>
-                  </div>
-                )}
-              </>
+              <div className="p-2">
+                <DataTable
+                  columns={historyColumns}
+                  rows={(history ?? []).slice((historyPage - 1) * HISTORY_PAGE_SIZE, historyPage * HISTORY_PAGE_SIZE)}
+                  rowKey={(f) => f.id}
+                  loading={loadingHistory}
+                  total={history?.length}
+                  page={historyPage}
+                  pageSize={HISTORY_PAGE_SIZE}
+                  onPageChange={setHistoryPage}
+                />
+              </div>
             )}
           </div>
         </div>
@@ -351,71 +383,8 @@ export default function FloatPage() {
               No float movements yet today
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ background: HEADER_GRAD, borderBottom: '1px solid #C0C0C0' }}>
-                    {['Time', 'Type', 'Amount', 'Expected in Drawer', 'Note', ...(isManager ? [''] : [])].map((h, idx) => (
-                      <th key={idx} style={TH}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {movements.map((m, i) => {
-                    const isLastMovement = i === movements.length - 1
-                    // For the last movement, use calFloat directly so it matches "Current Balance"
-                    // For earlier movements, calculate based on that movement's float balance
-                    const floatBalanceAfter = new Decimal(m.balanceAfter)
-                    const expectedInDrawer = isLastMovement && calFloat
-                      ? calFloat
-                      : (cashUpOpeningBalance && liveStats
-                          ? cashUpOpeningBalance
-                              .plus(floatBalanceAfter)
-                              .plus(new Decimal(liveStats.cashSales ?? '0'))
-                              .minus(new Decimal(liveStats.cashPurchases ?? '0'))
-                              .minus(new Decimal(liveStats.cashPayments ?? '0'))
-                              .minus(new Decimal(liveStats.expenses ?? '0'))
-                              .minus(new Decimal(liveStats.loanAdvance ?? '0'))
-                              .plus(new Decimal(liveStats.loanRepayment ?? '0'))
-                          : floatBalanceAfter)
-                    return (
-                      <tr key={m.id} style={{ background: i % 2 === 0 ? '#fff' : '#FAFAFA', borderBottom: `1px solid #F0F0F0` }}>
-                        <td style={{ padding: '6px 12px', fontSize: 11, color: colors.textSecondary }}>
-                          {new Date(m.createdAt).toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' })}
-                        </td>
-                        <td style={{ padding: '6px 12px' }}>
-                          <span style={{
-                            display: 'inline-flex', padding: '1px 6px', borderRadius: 3, fontSize: 11, fontWeight: 600,
-                            ...(m.movementType === 'top_up'
-                              ? { background: colors.actionBg, color: colors.action }
-                              : { background: '#F0F0F0', color: colors.textSecondary }),
-                          }}>
-                            {m.movementType === 'top_up' ? 'Top-Up' : m.movementType}
-                          </span>
-                        </td>
-                        <td style={{ padding: '6px 12px', fontSize: 12, fontFamily: 'monospace', fontWeight: 600, color: colors.action }}>
-                          +R {new Decimal(m.amount).toFixed(2)}
-                        </td>
-                        <td style={{ padding: '6px 12px', fontSize: 12, fontFamily: 'monospace', color: colors.action }}>
-                          R {expectedInDrawer.toFixed(2)}
-                        </td>
-                        <td style={{ padding: '6px 12px', fontSize: 11, color: colors.textSecondary }}>
-                          {m.referenceNote ?? '—'}
-                        </td>
-                        {isManager && (
-                          <td style={{ padding: '6px 12px', textAlign: 'right' }}>
-                            {isLastMovement && (
-                              <Btn size="sm" icon={Undo2} loading={reversingMovement} onClick={() => handleReverseMovement(m.id)}>
-                                Reverse
-                              </Btn>
-                            )}
-                          </td>
-                        )}
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+            <div className="p-2">
+              <DataTable columns={movementColumns} rows={movements} rowKey={(m) => m.id} />
             </div>
           )}
         </div>

@@ -15,9 +15,8 @@ import { colors } from '@/lib/design-tokens'
 import { useOfflineMutation } from '@/hooks/useOfflineFetch'
 import { ReportButton } from './_components/ReportButton'
 import { PreviousReportsModal } from './_components/PreviousReportsModal'
-import { PANEL, PANEL_HEAD } from '@/components/legacy/legacyPanel'
 import { CARD_BORDER } from '@/components/rpx/styles'
-import { Btn, PortalPage, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
+import { Btn, PortalPage, PANEL, PANEL_HEAD, inp, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -909,16 +908,7 @@ export default function CashUpPage() {
                               <select
                                 value={cashUp.currency ?? 'ZAR'}
                                 onChange={(e) => handleCurrencyChange(e.target.value as Currency)}
-                                style={{
-                                  fontSize: 12,
-                                  padding: '2px 6px',
-                                  border: `1px solid ${colors.border}`,
-                                  borderRadius: 2,
-                                  background: '#fff',
-                                  fontFamily: 'monospace',
-                                  fontWeight: 600,
-                                  cursor: 'pointer',
-                                }}
+                                style={{ ...inp, width: 'auto', height: 26, fontFamily: 'monospace', fontWeight: 600, cursor: 'pointer' }}
                               >
                                 <option value="ZAR">R - South African Rand</option>
                                 <option value="SZL">E - Eswatini Lilangeni</option>

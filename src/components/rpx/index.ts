@@ -2,6 +2,7 @@ export {
   NAVY, HEADER_GRAD, BAR_GRAD, CARD_BORDER,
   inp, lbl, TH, TD,
   btnPrimary, btnSecondary, btnDanger,
+  PANEL, PANEL_HEAD,
 } from './styles'
 export { Btn, type BtnProps, type BtnVariant } from './Btn'
 export { BtnMenu, type BtnMenuItem } from './BtnMenu'

@@ -74,3 +74,12 @@ export const btnDanger: React.CSSProperties = {
   ...btnSecondary,
   background: BAR_GRAD, color: colors.danger, border: CARD_BORDER,
 }
+
+/**
+ * Panel chrome for grid-tile layouts (Cash-Up, Float, …) — matches
+ * ContentCard/Dialog exactly (#B0B0B0 border, BAR_GRAD title strip) but,
+ * unlike ContentCard, isn't hard-coded to a single full-bleed page body, so
+ * it can be reused as one of several independently-sized tiles in a grid.
+ */
+export const PANEL: React.CSSProperties = { border: CARD_BORDER, borderRadius: 3, overflow: 'hidden', background: '#fff' }
+export const PANEL_HEAD: React.CSSProperties = { padding: '5px 10px', borderBottom: CARD_BORDER, background: BAR_GRAD }
