@@ -1,20 +1,20 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
-import { createPortal } from 'react-dom'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import {
   Search, X, Download, RefreshCw,
   FileText, Images, CheckCircle2, XCircle,
   UserPlus, Eye, EyeOff, Loader2, Scale,
-  ChevronLeft, ChevronRight, Info,
+  Info,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { DataTable, StatusBadge, type Column, type RowAction } from '@/components/ui/DataTable'
 import { InlineDetailPanel } from '@/components/ui/InlineDetailPanel'
+import { PhotoViewerModal } from '@/components/ui/PhotoViewerModal'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
-import { Btn, PortalPage, BAR_GRAD, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
+import { Btn, Field, FilterBar, PortalPage, inp, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
 import { Dialog } from '@/components/ui/dialog'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -139,414 +139,6 @@ function StatsStrip() {
       ))}
     </div>
   )
-}
-
-// ─── Photo Viewer Modal ───────────────────────────────────────────────────────
-// Windows-style light modal showing both photos side by side
-
-function FullscreenPhotoViewer({ order, onClose }: { order: OrderDetail | null; onClose: () => void }) {
-  const [mounted, setMounted] = useState(false)
-  const [expandedIndex, setExpandedIndex] = useState<number | null>(null)
-
-  const urls = order?.photoUrls ?? []
-  // Each product line always contributes photos in the same fixed order it
-  // was captured in (see Step4Photos.tsx): scale reading, then product/load.
-  // Building labels per-line (rather than one hardcoded pair) is what makes
-  // orders with more than one product show correctly here — previously this
-  // was hardcoded to exactly 2 labels, which silently worked only for
-  // single-product orders and mislabeled everything from product 2 onward.
-  const lines = order ? orderLines(order) : []
-  const labels = lines.flatMap((l) =>
-    (l.photoUrls ?? []).map((_, i) => `${l.product.name} — ${i === 0 ? 'Scale Reading' : i === 1 ? 'Product / Load' : `Photo ${i + 1}`}`)
-  )
-
-  // Wait for client-side mount
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  // Reset expanded state when order changes
-  useEffect(() => {
-    setExpandedIndex(null)
-  }, [order?.id])
-
-  // Keyboard navigation
-  useEffect(() => {
-    if (!order) return
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        if (expandedIndex !== null) {
-          setExpandedIndex(null)
-        } else {
-          onClose()
-        }
-      }
-    }
-
-    document.addEventListener('keydown', handleKeyDown)
-    document.body.style.overflow = 'hidden'
-
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown)
-      document.body.style.overflow = ''
-    }
-  }, [order, onClose, expandedIndex])
-
-  if (!order || !mounted) return null
-
-  const customerName = order.customer
-    ? `${order.customer.firstName} ${order.customer.lastName}`
-    : 'Walk-in'
-  const dateStr = new Date(order.createdAt).toLocaleString('en-ZA', {
-    day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
-  })
-
-  const modalContent = (
-    <div
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        zIndex: 9999,
-        background: 'rgba(0, 0, 0, 0.1)',
-        backdropFilter: 'blur(4px)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 24,
-      }}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose()
-      }}
-    >
-      {/* Modal container - matches the shared RpxDialog chrome */}
-      <div
-        style={{
-          background: colors.surface,
-          border: '1px solid #B0B0B0',
-          borderRadius: 4,
-          width: '100%',
-          maxWidth: 900,
-          maxHeight: 'calc(100vh - 48px)',
-          display: 'flex',
-          flexDirection: 'column',
-          boxShadow: '0 6px 24px rgba(0, 0, 0, 0.2)',
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            height: 34,
-            padding: '0 8px 0 14px',
-            borderBottom: '2px solid #B0B0B0',
-            background: BAR_GRAD,
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <Images style={{ width: 14, height: 14, color: colors.primary }} />
-            <div>
-              <span style={{ fontSize: 13, fontWeight: 700, color: colors.primary }}>
-                Photos — {order.orderNumber}
-              </span>
-              <span style={{ fontSize: fontSize.xs, color: colors.textSecondary, marginLeft: 12 }}>
-                {customerName} · {dateStr}
-              </span>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            style={{
-              width: 24,
-              height: 22,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: 'none',
-              border: 'none',
-              borderRadius: 2,
-              cursor: 'pointer',
-              color: colors.textSecondary,
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = colors.danger; e.currentTarget.style.color = '#fff' }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = colors.textSecondary }}
-            aria-label="Close"
-          >
-            <X style={{ width: 14, height: 14 }} />
-          </button>
-        </div>
-
-        {/* Content - Photo grid */}
-        <div
-          style={{
-            flex: 1,
-            overflow: 'auto',
-            padding: 16,
-            background: colors.bg,
-          }}
-        >
-          {urls.length === 0 ? (
-            <div
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: 48,
-                color: colors.textSecondary,
-              }}
-            >
-              <Images style={{ width: 48, height: 48, opacity: 0.3, marginBottom: 12 }} />
-              <span style={{ fontSize: fontSize.sm }}>No photos available for this order</span>
-            </div>
-          ) : (
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: urls.length === 1 ? '1fr' : 'repeat(2, 1fr)',
-                gap: 16,
-              }}
-            >
-              {urls.map((url, i) => (
-                <div
-                  key={i}
-                  style={{
-                    background: colors.surface,
-                    border: `1px solid ${colors.border}`,
-                    borderRadius: 2,
-                    overflow: 'hidden',
-                  }}
-                >
-                  {/* Photo header */}
-                  <div
-                    style={{
-                      padding: '10px 12px',
-                      borderBottom: `1px solid ${colors.border}`,
-                      background: colors.toolbar,
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <span
-                        style={{
-                          fontSize: fontSize.sm,
-                          fontWeight: fontWeight.semibold,
-                          color: colors.textPrimary,
-                        }}
-                      >
-                        {labels[i] ?? `Photo ${i + 1}`}
-                      </span>
-                      <span
-                        style={{
-                          fontSize: fontSize.xs,
-                          color: colors.textMuted,
-                        }}
-                      >
-                        {i + 1} of {urls.length}
-                      </span>
-                    </div>
-                    <div style={{ fontSize: fontSize.xs, color: colors.textSecondary, marginTop: 2 }}>
-                      {dateStr} · {order.operator.fullName}
-                    </div>
-                  </div>
-
-                  {/* Photo */}
-                  <div
-                    style={{
-                      position: 'relative',
-                      background: colors.bg,
-                      cursor: 'pointer',
-                    }}
-                    onClick={() => setExpandedIndex(i)}
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={url}
-                      alt={labels[i] ?? `Photo ${i + 1}`}
-                      style={{
-                        width: '100%',
-                        height: 280,
-                        objectFit: 'contain',
-                        display: 'block',
-                      }}
-                    />
-                    {/* Hover overlay */}
-                    <div
-                      style={{
-                        position: 'absolute',
-                        inset: 0,
-                        background: 'rgba(0, 0, 0, 0)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        transition: 'background 150ms ease',
-                      }}
-                      onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(0, 0, 0, 0.05)' }}
-                      onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(0, 0, 0, 0)' }}
-                    >
-                      <span
-                        style={{
-                          padding: '6px 12px',
-                          background: colors.surface,
-                          border: `1px solid ${colors.border}`,
-                          borderRadius: 2,
-                          fontSize: fontSize.xs,
-                          color: colors.textSecondary,
-                          opacity: 0,
-                          transition: 'opacity 150ms ease',
-                        }}
-                        className="expand-hint"
-                      >
-                        Click to expand
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div
-          style={{
-            padding: '10px 16px',
-            borderTop: `1px solid ${colors.border}`,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            background: colors.surface,
-          }}
-        >
-          <span style={{ fontSize: fontSize.xs, color: colors.textMuted }}>
-            {urls.length} photo{urls.length !== 1 ? 's' : ''} · Click to expand
-          </span>
-          <Btn size="sm" onClick={onClose}>Close</Btn>
-        </div>
-      </div>
-
-      {/* Expanded photo overlay */}
-      {expandedIndex !== null && urls[expandedIndex] && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            zIndex: 10000,
-            background: 'rgba(0, 0, 0, 0.9)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: 24,
-          }}
-          onClick={() => setExpandedIndex(null)}
-        >
-          {/* Close button */}
-          <button
-            onClick={() => setExpandedIndex(null)}
-            style={{
-              position: 'absolute',
-              top: 16,
-              right: 16,
-              width: 40,
-              height: 40,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: 'rgba(255, 255, 255, 0.1)',
-              border: 'none',
-              borderRadius: 2,
-              cursor: 'pointer',
-            }}
-          >
-            <X style={{ width: 20, height: 20, color: '#fff' }} />
-          </button>
-
-          {/* Navigation */}
-          {urls.length > 1 && (
-            <>
-              <button
-                onClick={(e) => { e.stopPropagation(); setExpandedIndex((expandedIndex - 1 + urls.length) % urls.length) }}
-                style={{
-                  position: 'absolute',
-                  left: 16,
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  width: 48,
-                  height: 48,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  border: 'none',
-                  borderRadius: 2,
-                  cursor: 'pointer',
-                }}
-              >
-                <ChevronLeft style={{ width: 24, height: 24, color: '#fff' }} />
-              </button>
-              <button
-                onClick={(e) => { e.stopPropagation(); setExpandedIndex((expandedIndex + 1) % urls.length) }}
-                style={{
-                  position: 'absolute',
-                  right: 16,
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  width: 48,
-                  height: 48,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  border: 'none',
-                  borderRadius: 2,
-                  cursor: 'pointer',
-                }}
-              >
-                <ChevronRight style={{ width: 24, height: 24, color: '#fff' }} />
-              </button>
-            </>
-          )}
-
-          {/* Expanded image */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={urls[expandedIndex]}
-              alt={labels[expandedIndex] ?? `Photo ${expandedIndex + 1}`}
-              style={{
-                maxWidth: 'calc(100vw - 120px)',
-                maxHeight: 'calc(100vh - 120px)',
-                objectFit: 'contain',
-                borderRadius: 2,
-              }}
-              onClick={(e) => e.stopPropagation()}
-            />
-            <div
-              style={{
-                padding: '8px 16px',
-                background: 'rgba(255, 255, 255, 0.1)',
-                borderRadius: 2,
-                fontSize: fontSize.sm,
-                color: '#fff',
-              }}
-            >
-              {labels[expandedIndex] ?? `Photo ${expandedIndex + 1}`} · {expandedIndex + 1} / {urls.length}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-
-  return createPortal(modalContent, document.body)
 }
 
 // ─── Void Modal ───────────────────────────────────────────────────────────────
@@ -1023,142 +615,66 @@ function OrdersTab() {
       <StatsStrip />
 
       {/* Filter bar */}
-      <div className="flex flex-wrap items-center gap-2 shrink-0">
-        <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#9CA3AF] pointer-events-none" />
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search order #, customer…"
-            className="pl-8 pr-3 h-7 border border-[#E0E0E0] bg-white focus:outline-none focus:border-[#185ABD] text-[12px]"
-            style={{ borderRadius: 2, width: 220 }}
-          />
-        </div>
-
-        <select
-          value={status}
-          onChange={e => { setStatus(e.target.value); setPage(1) }}
-          className="h-7 px-2 border border-[#E0E0E0] bg-white focus:outline-none focus:border-[#185ABD] text-[12px] text-[#212529]"
-          style={{ borderRadius: 2 }}
-        >
-          <option value="">All Statuses</option>
-          <option value="pending">Pending</option>
-          <option value="processed">Processed</option>
-          <option value="voided">Voided</option>
-        </select>
-
-        <select
-          value={customerType}
-          onChange={e => { setCustomerType(e.target.value); setPage(1) }}
-          className="h-7 px-2 border border-[#E0E0E0] bg-white focus:outline-none focus:border-[#185ABD] text-[12px] text-[#212529]"
-          style={{ borderRadius: 2 }}
-        >
-          <option value="">All Customers</option>
-          <option value="casual">Walk-in</option>
-          <option value="account">Account</option>
-        </select>
-
-        <select
-          value={categoryName}
-          onChange={e => { setCategoryName(e.target.value); setPage(1) }}
-          className="h-7 px-2 border border-[#E0E0E0] bg-white focus:outline-none focus:border-[#185ABD] text-[12px] text-[#212529]"
-          style={{ borderRadius: 2 }}
-        >
-          <option value="">All Categories</option>
-          {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-        </select>
-
-        <select
-          value={operatorId}
-          onChange={e => { setOperatorId(e.target.value); setPage(1) }}
-          className="h-7 px-2 border border-[#E0E0E0] bg-white focus:outline-none focus:border-[#185ABD] text-[12px] text-[#212529]"
-          style={{ borderRadius: 2 }}
-        >
-          <option value="">All Operators</option>
-          {operators.map(op => <option key={op.id} value={op.id}>{op.fullName}</option>)}
-        </select>
-
-        <input
-          type="date"
-          value={dateFrom}
-          onChange={e => { setDateFrom(e.target.value); setPage(1) }}
-          className="h-7 px-2 border border-[#E0E0E0] bg-white focus:outline-none focus:border-[#185ABD] text-[12px] text-[#212529]"
-          style={{ borderRadius: 2 }}
-          title="From date"
-        />
-        <input
-          type="date"
-          value={dateTo}
-          onChange={e => { setDateTo(e.target.value); setPage(1) }}
-          className="h-7 px-2 border border-[#E0E0E0] bg-white focus:outline-none focus:border-[#185ABD] text-[12px] text-[#212529]"
-          style={{ borderRadius: 2 }}
-          title="To date"
-        />
-
+      <FilterBar>
+        <Field label="Search" width={220}>
+          <div style={{ position: 'relative' }}>
+            <Search style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', width: 12, height: 12, color: '#6C757D' }} />
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search order #, customer…"
+              style={{ ...inp, paddingLeft: 26 }}
+            />
+          </div>
+        </Field>
+        <Field label="Status" width={120}>
+          <select style={inp} value={status} onChange={e => { setStatus(e.target.value); setPage(1) }}>
+            <option value="">All Statuses</option>
+            <option value="pending">Pending</option>
+            <option value="processed">Processed</option>
+            <option value="voided">Voided</option>
+          </select>
+        </Field>
+        <Field label="Customer" width={120}>
+          <select style={inp} value={customerType} onChange={e => { setCustomerType(e.target.value); setPage(1) }}>
+            <option value="">All Customers</option>
+            <option value="casual">Walk-in</option>
+            <option value="account">Account</option>
+          </select>
+        </Field>
+        <Field label="Category" width={140}>
+          <select style={inp} value={categoryName} onChange={e => { setCategoryName(e.target.value); setPage(1) }}>
+            <option value="">All Categories</option>
+            {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+          </select>
+        </Field>
+        <Field label="Operator" width={140}>
+          <select style={inp} value={operatorId} onChange={e => { setOperatorId(e.target.value); setPage(1) }}>
+            <option value="">All Operators</option>
+            {operators.map(op => <option key={op.id} value={op.id}>{op.fullName}</option>)}
+          </select>
+        </Field>
+        <Field label="From" width={140}>
+          <input type="date" style={inp} value={dateFrom} onChange={e => { setDateFrom(e.target.value); setPage(1) }} />
+        </Field>
+        <Field label="To" width={140}>
+          <input type="date" style={inp} value={dateTo} onChange={e => { setDateTo(e.target.value); setPage(1) }} />
+        </Field>
         {hasFilters && (
-          <button
-            onClick={clearFilters}
-            style={{
-              fontSize: 10,
-              padding: '1px 6px',
-              background: '#E0E0E0',
-              border: '1px solid #999',
-              borderRadius: 2,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 3,
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = '#D0D0D0' }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = '#E0E0E0' }}
-          >
-            <X style={{ width: 9, height: 9 }} /> Reset
-          </button>
+          <Field label={' '}>
+            <Btn size="sm" icon={X} onClick={clearFilters}>Reset</Btn>
+          </Field>
         )}
-
-        <div className="ml-auto flex items-center gap-1.5">
-          <button
-            onClick={() => fetchOrders(page)}
-            style={{
-              fontSize: 10,
-              padding: '1px 6px',
-              background: '#E0E0E0',
-              border: '1px solid #999',
-              borderRadius: 2,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 3,
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = '#D0D0D0' }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = '#E0E0E0' }}
-          >
-            <RefreshCw style={{ width: 9, height: 9 }} />
-          </button>
-          <button
-            onClick={handleExport}
-            disabled={exporting}
-            style={{
-              fontSize: 10,
-              padding: '1px 6px',
-              background: '#E0E0E0',
-              border: '1px solid #999',
-              borderRadius: 2,
-              cursor: exporting ? 'not-allowed' : 'pointer',
-              opacity: exporting ? 0.6 : 1,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 3,
-            }}
-            onMouseEnter={(e) => { if (!exporting) e.currentTarget.style.background = '#D0D0D0' }}
-            onMouseLeave={(e) => { if (!exporting) e.currentTarget.style.background = '#E0E0E0' }}
-            title="Export CSV"
-          >
-            {exporting ? <Loader2 style={{ width: 9, height: 9, animation: 'spin 1s linear infinite' }} /> : <Download style={{ width: 9, height: 9 }} />}
-            Export
-          </button>
-        </div>
-      </div>
+        <Field label={' '}>
+          <Btn size="sm" icon={RefreshCw} onClick={() => fetchOrders(page)} title="Refresh" />
+        </Field>
+        <Field label={' '}>
+          <Btn size="sm" icon={Download} loading={exporting} onClick={handleExport}>Export</Btn>
+        </Field>
+        <span style={{ fontSize: 11, color: '#6C757D', marginLeft: 'auto', paddingBottom: 8 }}>
+          {total} order{total !== 1 ? 's' : ''}
+        </span>
+      </FilterBar>
 
       {/* Table + photo panel stacked */}
       <div className="flex flex-col flex-1 min-h-0">
@@ -1178,7 +694,27 @@ function OrdersTab() {
           />
         </div>
 
-        <FullscreenPhotoViewer order={photoOrder} onClose={() => setPhotoOrder(null)} />
+        {photoOrder && (() => {
+          const urls = photoOrder.photoUrls ?? []
+          // Each product line always contributes photos in the same fixed
+          // order it was captured in (see Step4Photos.tsx): scale reading,
+          // then product/load. Building labels per-line (rather than one
+          // hardcoded pair) is what makes orders with more than one product
+          // show correctly here.
+          const labels = orderLines(photoOrder).flatMap((l) =>
+            (l.photoUrls ?? []).map((_, i) => `${l.product.name} — ${i === 0 ? 'Scale Reading' : i === 1 ? 'Product / Load' : `Photo ${i + 1}`}`)
+          )
+          const customerName = photoOrder.customer ? `${photoOrder.customer.firstName} ${photoOrder.customer.lastName}` : 'Walk-in'
+          const dateStr = new Date(photoOrder.createdAt).toLocaleString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+          return (
+            <PhotoViewerModal
+              title={`Photos — ${photoOrder.orderNumber}`}
+              subtitle={`${customerName} · ${dateStr}`}
+              photos={urls.map((url, i) => ({ label: labels[i] ?? `Photo ${i + 1}`, url }))}
+              onClose={() => setPhotoOrder(null)}
+            />
+          )
+        })()}
       </div>
 
       <VoidModal order={voidTarget} onClose={() => setVoidTarget(null)} onVoided={handleVoided} />
@@ -1293,38 +829,22 @@ function OperatorsTab() {
 
   return (
     <div className="flex flex-col flex-1 min-h-0 gap-3">
-      <div className="flex items-center gap-2 shrink-0">
-        <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#9CA3AF] pointer-events-none" />
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search name or username…"
-            className="pl-8 pr-3 h-7 border border-[#E0E0E0] bg-white focus:outline-none focus:border-[#185ABD] text-[12px]"
-            style={{ borderRadius: 2, width: 220 }}
-          />
-        </div>
-        <div className="ml-auto">
-          <button
-            onClick={() => setShowCreate(true)}
-            style={{
-              fontSize: 10,
-              padding: '1px 6px',
-              background: '#E0E0E0',
-              border: '1px solid #999',
-              borderRadius: 2,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 3,
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = '#D0D0D0' }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = '#E0E0E0' }}
-          >
-            <UserPlus style={{ width: 9, height: 9 }} /> Create Operator
-          </button>
-        </div>
-      </div>
+      <FilterBar>
+        <Field label="Search" width={230}>
+          <div style={{ position: 'relative' }}>
+            <Search style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', width: 12, height: 12, color: '#6C757D' }} />
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search name or username…"
+              style={{ ...inp, paddingLeft: 26 }}
+            />
+          </div>
+        </Field>
+        <span style={{ marginLeft: 'auto', paddingBottom: 8 }}>
+          <Btn size="sm" variant="primary" icon={UserPlus} onClick={() => setShowCreate(true)}>Create Operator</Btn>
+        </span>
+      </FilterBar>
 
       <div className="flex flex-col flex-1 min-h-0">
         <div className="flex-1 min-h-0">

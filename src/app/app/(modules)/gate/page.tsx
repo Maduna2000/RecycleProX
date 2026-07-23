@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
-import { createPortal } from 'react-dom'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import {
@@ -11,8 +10,9 @@ import {
 import { toast } from 'sonner'
 import { DataTable, StatusBadge, type Column, type RowAction } from '@/components/ui/DataTable'
 import { InlineDetailPanel } from '@/components/ui/InlineDetailPanel'
+import { PhotoViewerModal } from '@/components/ui/PhotoViewerModal'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
-import { Btn, Field, FilterBar, PortalPage, inp, BAR_GRAD } from '@/components/rpx'
+import { Btn, Field, FilterBar, PortalPage, inp } from '@/components/rpx'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -87,71 +87,6 @@ function formatDuration(createdAt: string, exitedAt: string | null): string {
   return hours === 0 ? `${minutes}m` : `${hours}h ${minutes}m`
 }
 
-// ─── On-site photo viewer ─────────────────────────────────────────────────────
-
-function PhotoViewerModal({ entry, onClose }: { entry: EntryDetail | null; onClose: () => void }) {
-  const [mounted, setMounted] = useState(false)
-  useEffect(() => setMounted(true), [])
-  if (!entry || !mounted) return null
-
-  const photos = [
-    { label: 'ID Document',  url: entry.idPhotoUrl },
-    { label: 'Vehicle',      url: entry.vehiclePhotoUrl },
-    { label: 'Visitor Face', url: entry.facePhotoUrl },
-  ].filter((p) => p.url)
-
-  const modalContent = (
-    <div
-      style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.1)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
-    >
-      <div style={{ background: colors.surface, border: '1px solid #B0B0B0', borderRadius: 4, width: '100%', maxWidth: 900, maxHeight: 'calc(100vh - 48px)', display: 'flex', flexDirection: 'column', boxShadow: '0 6px 24px rgba(0,0,0,0.2)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 34, padding: '0 8px 0 14px', borderBottom: '2px solid #B0B0B0', background: BAR_GRAD }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <Images style={{ width: 14, height: 14, color: colors.primary }} />
-            <span style={{ fontSize: 13, fontWeight: 700, color: colors.primary }}>
-              Photos — {entry.entryNumber}
-            </span>
-            <span style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>
-              {entry.visitorFirstName} {entry.visitorLastName}
-            </span>
-          </div>
-          <button
-            onClick={onClose}
-            style={{ width: 24, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', borderRadius: 2, cursor: 'pointer', color: colors.textSecondary }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = colors.danger; e.currentTarget.style.color = '#fff' }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = colors.textSecondary }}
-            aria-label="Close"
-          >
-            <X style={{ width: 14, height: 14 }} />
-          </button>
-        </div>
-        <div style={{ flex: 1, overflow: 'auto', padding: 16, background: colors.bg }}>
-          {photos.length === 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 48, color: colors.textSecondary }}>
-              <Images style={{ width: 48, height: 48, opacity: 0.3, marginBottom: 12 }} />
-              <span style={{ fontSize: fontSize.sm }}>No photos captured for this entry</span>
-            </div>
-          ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: photos.length === 1 ? '1fr' : 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
-              {photos.map((p) => (
-                <div key={p.label} style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 2, overflow: 'hidden' }}>
-                  <div style={{ padding: '8px 12px', borderBottom: `1px solid ${colors.border}`, background: colors.toolbar, fontSize: fontSize.sm, fontWeight: fontWeight.semibold, color: colors.textPrimary }}>
-                    {p.label}
-                  </div>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={p.url!} alt={p.label} style={{ width: '100%', height: 260, objectFit: 'contain', display: 'block', background: colors.bg }} />
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-
-  return createPortal(modalContent, document.body)
-}
 
 // ─── Create Guard Panel ───────────────────────────────────────────────────────
 
@@ -458,7 +393,18 @@ function EntriesTab() {
         />
       </div>
 
-      <PhotoViewerModal entry={photoEntry} onClose={() => setPhotoEntry(null)} />
+      {photoEntry && (
+        <PhotoViewerModal
+          title={`Photos — ${photoEntry.entryNumber}`}
+          subtitle={`${photoEntry.visitorFirstName} ${photoEntry.visitorLastName}`}
+          photos={[
+            { label: 'ID Document',  url: photoEntry.idPhotoUrl },
+            { label: 'Vehicle',      url: photoEntry.vehiclePhotoUrl },
+            { label: 'Visitor Face', url: photoEntry.facePhotoUrl },
+          ].filter((p): p is { label: string; url: string } => !!p.url)}
+          onClose={() => setPhotoEntry(null)}
+        />
+      )}
     </div>
   )
 }
