@@ -4,11 +4,11 @@ import { useEffect, useRef, useState } from 'react'
 import useSWR, { mutate } from 'swr'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from '@/lib/utils/format'
 import { colors } from '@/lib/design-tokens'
-import { TH, TD, HEADER_GRAD, PortalPage, EmptyHint } from '@/components/rpx'
+import { PortalPage } from '@/components/rpx'
+import { DataTable, StatusBadge, type Column } from '@/components/ui/DataTable'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -21,14 +21,6 @@ type StocktakeItem = {
   createdAt: string
   createdBy: { fullName: string }
   _count: { entries: number }
-}
-
-function StatusBadge({ status }: { status: 'open' | 'completed' | 'voided' }) {
-  if (status === 'open')
-    return <span style={{ display: 'inline-flex', padding: '1px 6px', borderRadius: 3, fontSize: 11, fontWeight: 600, background: colors.actionBg, color: colors.action }}>Open</span>
-  if (status === 'voided')
-    return <span style={{ display: 'inline-flex', padding: '1px 6px', borderRadius: 3, fontSize: 11, fontWeight: 600, background: colors.dangerBg, color: colors.danger }}>Voided</span>
-  return <span style={{ display: 'inline-flex', padding: '1px 6px', borderRadius: 3, fontSize: 11, fontWeight: 600, background: colors.neutralBg, color: colors.textSecondary }}>Completed</span>
 }
 
 export default function StocktakePage() {
@@ -83,46 +75,45 @@ export default function StocktakePage() {
   const items = data?.items ?? []
   const count = data?.total ?? 0
 
+  const columns: Column<StocktakeItem>[] = [
+    {
+      key: 'refNumber', header: 'Ref #',
+      render: (s) => <span style={{ fontFamily: 'monospace', fontWeight: 600, color: colors.textPrimary }}>{s.refNumber}</span>,
+    },
+    {
+      key: 'status', header: 'Status', width: '110px',
+      render: (s) => <StatusBadge status={s.status} />,
+    },
+    {
+      key: 'count', header: 'Products Counted',
+      render: (s) => s._count.entries,
+    },
+    {
+      key: 'createdBy', header: 'Created By',
+      render: (s) => s.createdBy.fullName,
+    },
+    {
+      key: 'createdAt', header: 'Date',
+      render: (s) => <span style={{ color: '#6C757D', fontSize: 11 }}>{format.datetime(s.createdAt)}</span>,
+    },
+    {
+      key: 'completedAt', header: 'Completed',
+      render: (s) => <span style={{ color: '#6C757D', fontSize: 11 }}>{s.completedAt ? format.datetime(s.completedAt) : '—'}</span>,
+    },
+  ]
+
   return (
     <PortalPage title={`Stocktake (${count} on record)`}>
-        {/* Table */}
-        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-          {isLoading ? (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 120, color: '#6C757D', fontSize: 12, gap: 8 }}>
-              <Loader2 style={{ width: 14, height: 14 }} className="animate-spin" /> Loading…
-            </div>
-          ) : items.length === 0 ? (
-            <EmptyHint text="No stocktakes yet — create one to start counting" />
-          ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
-                <tr style={{ background: HEADER_GRAD, borderBottom: '1px solid #C0C0C0' }}>
-                  {['Ref #', 'Status', 'Products Counted', 'Created By', 'Date', 'Completed'].map((h) => (
-                    <th key={h} style={TH}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((s, i) => (
-                  <tr
-                    key={s.id}
-                    style={{ background: i % 2 === 1 ? '#FAFAFA' : '#fff', borderBottom: '1px solid #F0F0F0', height: 30, cursor: 'pointer' }}
-                    onClick={() => router.push(`/app/stocktake/${s.id}`)}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = '#EEF4FB')}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = i % 2 === 1 ? '#FAFAFA' : '#fff')}
-                  >
-                    <td style={{ ...TD, fontFamily: 'monospace', fontWeight: 600 }}>{s.refNumber}</td>
-                    <td style={TD}><StatusBadge status={s.status} /></td>
-                    <td style={TD}>{s._count.entries}</td>
-                    <td style={TD}>{s.createdBy.fullName}</td>
-                    <td style={{ ...TD, color: '#6C757D', fontSize: 11 }}>{format.datetime(s.createdAt)}</td>
-                    <td style={{ ...TD, color: '#6C757D', fontSize: 11 }}>{s.completedAt ? format.datetime(s.completedAt) : '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
+      <div style={{ flex: 1, minHeight: 0, padding: 10 }}>
+        <DataTable
+          columns={columns}
+          rows={items}
+          rowKey={(s) => s.id}
+          onRowClick={(s) => router.push(`/app/stocktake/${s.id}`)}
+          loading={isLoading}
+          emptyMessage="No stocktakes yet — create one to start counting"
+        />
+      </div>
     </PortalPage>
   )
 }

@@ -8,10 +8,11 @@ import { CreateUserModal } from '@/components/users/CreateUserModal'
 import { EditUserModal } from '@/components/users/EditUserModal'
 import { ResetPasswordModal } from '@/components/users/ResetPasswordModal'
 import { SetPinModal } from '@/components/users/SetPinModal'
-import { MoreVertical, Search, Unlock, UserCheck, UserX, KeyRound, ArrowLeft } from 'lucide-react'
+import { Search, Unlock, UserCheck, UserX, KeyRound, ArrowLeft, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
 import { colors } from '@/lib/design-tokens'
-import { inp, TH, TD, HEADER_GRAD, Btn, Field, PortalPage, FilterBar, EmptyHint } from '@/components/rpx'
+import { inp, Btn, Field, PortalPage, FilterBar } from '@/components/rpx'
+import { DataTable, type Column, type RowAction } from '@/components/ui/DataTable'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -83,8 +84,6 @@ export default function UsersPage() {
   const [editUser, setEditUser] = useState<User | null>(null)
   const [resetUser, setResetUser] = useState<User | null>(null)
   const [pinUser, setPinUser] = useState<User | null>(null)
-  const [menuOpenId, setMenuOpenId] = useState<string | null>(null)
-  const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
 
   useEffect(() => {
     if (searchParams.get('create') === '1') {
@@ -105,35 +104,44 @@ export default function UsersPage() {
   const users = data?.users ?? []
 
   async function handleToggleActive(user: User) {
-    closeMenu()
     const res = await fetch(`/api/users/${user.id}/toggle-active`, { method: 'POST' })
     if (res.ok) { toast.success(`User ${user.isActive ? 'deactivated' : 'activated'}`); mutate(`/api/users?${query}`) }
     else toast.error('Failed to update user')
   }
 
   async function handleUnlock(user: User) {
-    closeMenu()
     const res = await fetch(`/api/users/${user.id}/unlock`, { method: 'POST' })
     if (res.ok) { toast.success('Account unlocked'); mutate(`/api/users?${query}`) }
     else toast.error('Failed to unlock account')
   }
 
   async function handleResetPin(user: User) {
-    closeMenu()
     const res = await fetch(`/api/users/${user.id}/reset-pin`, { method: 'POST' })
     if (res.ok) toast.success(`PIN reset to default for ${user.fullName}`)
     else toast.error('Failed to reset PIN')
   }
 
-  function openMenu(e: React.MouseEvent<HTMLButtonElement>, userId: string) {
-    e.stopPropagation()
-    if (menuOpenId === userId) { setMenuOpenId(null); setMenuPos(null); return }
-    const rect = e.currentTarget.getBoundingClientRect()
-    setMenuPos({ top: rect.bottom + 2, right: window.innerWidth - rect.right })
-    setMenuOpenId(userId)
-  }
+  const columns: Column<User>[] = [
+    { key: 'fullName', header: 'Full Name', render: (u) => <span style={{ fontWeight: 600 }}>{u.fullName}</span> },
+    { key: 'username', header: 'Username', render: (u) => <span style={{ color: '#6C757D' }}>{u.username}</span> },
+    { key: 'role', header: 'Role', width: '110px', render: (u) => <RoleBadge role={u.role} /> },
+    { key: 'status', header: 'Status', width: '90px', render: (u) => <StatusBadge user={u} /> },
+    { key: 'pin', header: 'PIN', width: '90px', render: (u) => <PinBadge hasPersonalPin={u.hasPersonalPin} /> },
+    {
+      key: 'lastLoginAt', header: 'Last Login',
+      render: (u) => <span style={{ fontSize: 11, color: '#6C757D' }}>{u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString('en-ZA') : '—'}</span>,
+    },
+  ]
 
-  function closeMenu() { setMenuOpenId(null); setMenuPos(null) }
+  const rowActions: RowAction<User>[] = [
+    { label: 'Edit', icon: Pencil, onClick: (u) => setEditUser(u) },
+    { label: 'Reset Password', icon: KeyRound, onClick: (u) => setResetUser(u) },
+    { label: 'Set PIN', icon: KeyRound, onClick: (u) => setPinUser(u) },
+    { label: 'Reset PIN to Default', icon: KeyRound, onClick: handleResetPin },
+    { label: 'Deactivate', icon: UserX, hidden: (u) => !u.isActive, onClick: handleToggleActive },
+    { label: 'Activate', icon: UserCheck, hidden: (u) => u.isActive, onClick: handleToggleActive },
+    { label: 'Unlock', icon: Unlock, hidden: (u) => !u.lockedAt, onClick: handleUnlock },
+  ]
 
   return (
     <>
@@ -170,129 +178,16 @@ export default function UsersPage() {
         </FilterBar>
 
         {/* Table */}
-        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
-              <tr style={{ background: HEADER_GRAD, borderBottom: '1px solid #C0C0C0' }}>
-                <th style={TH}>Full Name</th>
-                <th style={TH}>Username</th>
-                <th style={TH}>Role</th>
-                <th style={TH}>Status</th>
-                <th style={TH}>PIN</th>
-                <th style={TH}>Last Login</th>
-                <th style={{ ...TH, width: 50, textAlign: 'center' }}></th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.map((user, i) => (
-                <tr
-                  key={user.id}
-                  style={{ background: i % 2 === 1 ? '#FAFAFA' : '#fff', borderBottom: '1px solid #F0F0F0', height: 36 }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = '#EEF4FB')}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = i % 2 === 1 ? '#FAFAFA' : '#fff')}
-                >
-                  <td style={{ ...TD, fontWeight: 600 }}>{user.fullName}</td>
-                  <td style={{ ...TD, color: '#6C757D' }}>{user.username}</td>
-                  <td style={TD}><RoleBadge role={user.role} /></td>
-                  <td style={TD}><StatusBadge user={user} /></td>
-                  <td style={TD}><PinBadge hasPersonalPin={user.hasPersonalPin} /></td>
-                  <td style={{ ...TD, fontSize: 11, color: '#6C757D' }}>
-                    {user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString('en-ZA') : '—'}
-                  </td>
-                  <td style={{ ...TD, textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
-                    <button
-                      onClick={(e) => openMenu(e, user.id)}
-                      style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, borderRadius: 2, border: 'none', background: 'transparent', cursor: 'pointer', color: '#6C757D' }}
-                      onMouseEnter={(e) => (e.currentTarget.style.background = '#E0E0E0')}
-                      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                    >
-                      <MoreVertical style={{ width: 14, height: 14 }} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {!users.length && (
-                <tr>
-                  <td colSpan={7}>
-                    <EmptyHint text="No users found" height={120} />
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+        <div style={{ flex: 1, minHeight: 0, padding: 10 }}>
+          <DataTable
+            columns={columns}
+            rows={users}
+            rowKey={(user) => user.id}
+            rowActions={rowActions}
+            emptyMessage="No users found"
+          />
         </div>
     </PortalPage>
-
-      {/* Fixed dropdown menu */}
-      {menuOpenId && menuPos && (
-        <>
-          <div style={{ position: 'fixed', inset: 0, zIndex: 49 }} onClick={closeMenu} />
-          <div style={{ position: 'fixed', top: menuPos.top, right: menuPos.right, zIndex: 50, background: '#fff', border: '1px solid #D0D0D0', borderRadius: 3, boxShadow: '0 4px 12px rgba(0,0,0,0.12)', minWidth: 180, padding: '2px 0' }}>
-            {(() => {
-              const user = users.find((u) => u.id === menuOpenId)
-              if (!user) return null
-              return (
-                <>
-                  <button
-                    onClick={() => { closeMenu(); setEditUser(user) }}
-                    style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '6px 12px', fontSize: 12, color: '#212529', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = '#F1F3F4')}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => { closeMenu(); setResetUser(user) }}
-                    style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '6px 12px', fontSize: 12, color: '#212529', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = '#F1F3F4')}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
-                  >
-                    Reset Password
-                  </button>
-                  <button
-                    onClick={() => { closeMenu(); setPinUser(user) }}
-                    style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '6px 12px', fontSize: 12, color: '#212529', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = '#F1F3F4')}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
-                  >
-                    <KeyRound style={{ width: 12, height: 12, color: '#6C757D' }} />
-                    Set PIN
-                  </button>
-                  <button
-                    onClick={() => handleResetPin(user)}
-                    style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '6px 12px', fontSize: 12, color: '#212529', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = '#F1F3F4')}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
-                  >
-                    <KeyRound style={{ width: 12, height: 12, color: '#6C757D' }} />
-                    Reset PIN to Default
-                  </button>
-                  <div style={{ height: 1, background: '#E0E0E0', margin: '4px 0' }} />
-                  <button
-                    onClick={() => handleToggleActive(user)}
-                    style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '6px 12px', fontSize: 12, color: '#212529', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = '#F1F3F4')}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
-                  >
-                    {user.isActive ? <><UserX style={{ width: 12, height: 12, color: '#6C757D' }} /> Deactivate</> : <><UserCheck style={{ width: 12, height: 12, color: '#6C757D' }} /> Activate</>}
-                  </button>
-                  {user.lockedAt && (
-                    <button
-                      onClick={() => handleUnlock(user)}
-                      style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '6px 12px', fontSize: 12, color: '#212529', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
-                      onMouseEnter={(e) => (e.currentTarget.style.background = '#F1F3F4')}
-                      onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
-                    >
-                      <Unlock style={{ width: 12, height: 12, color: '#6C757D' }} />
-                      Unlock
-                    </button>
-                  )}
-                </>
-              )
-            })()}
-          </div>
-        </>
-      )}
 
       <CreateUserModal open={createOpen} onClose={() => setCreateOpen(false)} onSuccess={() => mutate(`/api/users?${query}`)} />
       {editUser && <EditUserModal user={editUser} onClose={() => setEditUser(null)} onSuccess={() => mutate(`/api/users?${query}`)} />}

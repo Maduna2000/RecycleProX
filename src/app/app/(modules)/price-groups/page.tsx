@@ -6,7 +6,7 @@ import useSWR, { mutate } from 'swr'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog } from '@/components/ui/dialog'
-import { Star, MoreVertical, ExternalLink, Pencil, Trash2, Save, RotateCcw, Copy, Loader2 } from 'lucide-react'
+import { Star, ExternalLink, Pencil, Trash2, Save, RotateCcw, Copy, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -16,9 +16,10 @@ import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { colors } from '@/lib/design-tokens'
 import {
   TH, TD, HEADER_GRAD,
-  Btn, PortalPage, EmptyHint,
+  Btn, PortalPage,
   RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter,
 } from '@/components/rpx'
+import { DataTable, StatusBadge, type Column, type RowAction } from '@/components/ui/DataTable'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -36,8 +37,6 @@ export default function PriceGroupsPage() {
   const [createOpen, setCreateOpen] = useState(false)
   const [editGroup, setEditGroup] = useState<PriceGroup | null>(null)
   const [manageGroupId, setManageGroupId] = useState<string | null>(null)
-  const [menuOpenId, setMenuOpenId] = useState<string | null>(null)
-  const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
 
   // Toolbar "Add Price Group" deep-link (?create=1)
@@ -51,18 +50,7 @@ export default function PriceGroupsPage() {
   const { data } = useSWR<{ groups: PriceGroup[] }>('/api/price-groups', fetcher)
   const groups = data?.groups ?? []
 
-  function openMenu(e: React.MouseEvent<HTMLButtonElement>, groupId: string) {
-    e.stopPropagation()
-    if (menuOpenId === groupId) { setMenuOpenId(null); setMenuPos(null); return }
-    const rect = e.currentTarget.getBoundingClientRect()
-    setMenuPos({ top: rect.bottom + 2, right: window.innerWidth - rect.right })
-    setMenuOpenId(groupId)
-  }
-
-  function closeMenu() { setMenuOpenId(null); setMenuPos(null) }
-
   async function handleDelete(group: PriceGroup) {
-    closeMenu()
     const confirmed = await confirm({
       title: 'Delete Price Group',
       message: `Permanently delete "${group.name}"? Its price overrides will be removed. This cannot be undone.`,
@@ -77,115 +65,53 @@ export default function PriceGroupsPage() {
     else { const j = await res.json(); toast.error(j.error ?? 'Failed to delete price group') }
   }
 
+  const columns: Column<PriceGroup>[] = [
+    {
+      key: 'name', header: 'Name',
+      render: (g) => (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600 }}>
+          {g.isDefault && <Star style={{ width: 12, height: 12, color: colors.warning, fill: colors.warning, flexShrink: 0 }} />}
+          {g.name}
+        </div>
+      ),
+    },
+    { key: 'description', header: 'Description', render: (g) => <span style={{ color: '#6C757D' }}>{g.description ?? '—'}</span> },
+    { key: 'customers', header: 'Customers', width: '100px', render: (g) => <span style={{ color: '#6C757D' }}>{g._count.customers}</span> },
+    { key: 'overrides', header: 'Price Overrides', width: '120px', render: (g) => <span style={{ color: '#6C757D' }}>{g._count.overrides}</span> },
+    {
+      key: 'default', header: 'Default', width: '90px',
+      render: (g) => g.isDefault
+        ? <span style={{ display: 'inline-flex', padding: '1px 6px', borderRadius: 3, fontSize: 11, fontWeight: 600, background: colors.warningBg, color: colors.warning }}>Default</span>
+        : null,
+    },
+    { key: 'status', header: 'Status', width: '90px', render: (g) => <StatusBadge status={g.isActive ? 'active' : 'inactive'} /> },
+  ]
+
+  const rowActions: RowAction<PriceGroup>[] = [
+    { label: 'Open / Manage', icon: ExternalLink, onClick: (g) => setManageGroupId(g.id) },
+    { label: 'Edit', icon: Pencil, hidden: () => !isManager, onClick: (g) => setEditGroup(g) },
+    {
+      label: 'Delete', icon: Trash2, danger: true, hidden: () => !isManager,
+      onClick: (g) => {
+        if (g.isDefault) { toast.error('Set another group as default before deleting'); return }
+        handleDelete(g)
+      },
+    },
+  ]
+
   return (
     <PortalPage title={`Price Groups (${groups.length})`}>
         {/* Table */}
-        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-          {groups.length === 0 ? (
-            <EmptyHint text="No price groups created yet" />
-          ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
-                <tr style={{ background: HEADER_GRAD, borderBottom: '1px solid #C0C0C0' }}>
-                  {['Name', 'Description', 'Customers', 'Price Overrides', 'Default', 'Status', ''].map((h) => (
-                    <th key={h} style={TH}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {groups.map((g, i) => (
-                  <tr
-                    key={g.id}
-                    onClick={() => setManageGroupId(g.id)}
-                    style={{ background: i % 2 === 1 ? '#FAFAFA' : '#fff', borderBottom: '1px solid #F0F0F0', height: 30, cursor: 'pointer' }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = '#EEF4FB')}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = i % 2 === 1 ? '#FAFAFA' : '#fff')}
-                  >
-                    <td style={{ ...TD, fontWeight: 600 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        {g.isDefault && <Star style={{ width: 12, height: 12, color: colors.warning, fill: colors.warning, flexShrink: 0 }} />}
-                        {g.name}
-                      </div>
-                    </td>
-                    <td style={{ ...TD, color: '#6C757D' }}>{g.description ?? '—'}</td>
-                    <td style={{ ...TD, color: '#6C757D' }}>{g._count.customers}</td>
-                    <td style={{ ...TD, color: '#6C757D' }}>{g._count.overrides}</td>
-                    <td style={TD}>
-                      {g.isDefault && (
-                        <span style={{ display: 'inline-flex', padding: '1px 6px', borderRadius: 3, fontSize: 11, fontWeight: 600, background: colors.warningBg, color: colors.warning }}>Default</span>
-                      )}
-                    </td>
-                    <td style={TD}>
-                      <span style={{ display: 'inline-flex', padding: '1px 6px', borderRadius: 3, fontSize: 11, fontWeight: 600, ...(g.isActive ? { background: colors.actionBg, color: colors.action } : { background: colors.neutralBg, color: colors.textSecondary }) }}>
-                        {g.isActive ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td style={{ ...TD, width: 36, textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
-                      <button
-                        onClick={(e) => openMenu(e, g.id)}
-                        style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: 2, border: 'none', background: 'transparent', cursor: 'pointer', color: '#6C757D' }}
-                        onMouseEnter={(e) => (e.currentTarget.style.background = '#E0E0E0')}
-                        onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                      >
-                        <MoreVertical style={{ width: 13, height: 13 }} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+        <div style={{ flex: 1, minHeight: 0, padding: 10 }}>
+          <DataTable
+            columns={columns}
+            rows={groups}
+            rowKey={(g) => g.id}
+            rowActions={rowActions}
+            onRowClick={(g) => setManageGroupId(g.id)}
+            emptyMessage="No price groups created yet"
+          />
         </div>
-
-      {/* Fixed dropdown — escapes overflow:hidden clipping */}
-      {menuOpenId && menuPos && (() => {
-        const activeGroup = groups.find((g) => g.id === menuOpenId) ?? null
-        return (
-          <>
-            <div style={{ position: 'fixed', inset: 0, zIndex: 49 }} onClick={closeMenu} />
-            <div style={{ position: 'fixed', top: menuPos.top, right: menuPos.right, zIndex: 50, background: '#fff', border: '1px solid #D0D0D0', borderRadius: 3, boxShadow: '0 4px 12px rgba(0,0,0,0.12)', minWidth: 170, padding: '2px 0' }}>
-              <button
-                onClick={() => { const id = menuOpenId; closeMenu(); setManageGroupId(id) }}
-                style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '6px 12px', fontSize: 12, color: '#212529', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = '#F1F3F4')}
-                onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
-              >
-                <ExternalLink style={{ width: 12, height: 12, color: '#6C757D', flexShrink: 0 }} />
-                Open / Manage
-              </button>
-              {isManager && activeGroup && (
-                <>
-                  <button
-                    onClick={() => { closeMenu(); setEditGroup(activeGroup) }}
-                    style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '6px 12px', fontSize: 12, color: '#212529', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = '#F1F3F4')}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
-                  >
-                    <Pencil style={{ width: 12, height: 12, color: '#6C757D', flexShrink: 0 }} />
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => { if (!activeGroup.isDefault) handleDelete(activeGroup) }}
-                    disabled={activeGroup.isDefault}
-                    title={activeGroup.isDefault ? 'Set another group as default before deleting' : undefined}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '6px 12px', fontSize: 12,
-                      color: activeGroup.isDefault ? '#C0C0C0' : colors.danger,
-                      background: 'none', border: 'none', textAlign: 'left',
-                      cursor: activeGroup.isDefault ? 'not-allowed' : 'pointer',
-                    }}
-                    onMouseEnter={(e) => { if (!activeGroup.isDefault) e.currentTarget.style.background = colors.dangerBg }}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
-                  >
-                    <Trash2 style={{ width: 12, height: 12, flexShrink: 0 }} />
-                    Delete
-                  </button>
-                </>
-              )}
-            </div>
-          </>
-        )
-      })()}
 
       {createOpen && (
         <CreatePriceGroupModal

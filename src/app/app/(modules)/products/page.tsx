@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog } from '@/components/ui/dialog'
-import { Search, Pencil, Plus, Eye, EyeOff, Trash2, X, Package, Loader2, MoreVertical } from 'lucide-react'
+import { Search, Pencil, Eye, EyeOff, Trash2, X, Package } from 'lucide-react'
 import * as LucideIcons from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { toast } from 'sonner'
@@ -19,10 +19,11 @@ import { useSession } from 'next-auth/react'
 import Decimal from 'decimal.js'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
 import {
-  inp, TH, TD, HEADER_GRAD,
+  inp,
   Btn, Field, PortalPage, FilterBar,
   RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter,
 } from '@/components/rpx'
+import { DataTable, type Column, type RowAction } from '@/components/ui/DataTable'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -67,7 +68,6 @@ export default function ProductsPage() {
   const [bulkDelOpen,   setBulkDelOpen]  = useState(false)
   const [bulkLoading,   setBulkLoading]  = useState<'deactivate' | 'reactivate' | null>(null)
   const [catManageOpen, setCatManageOpen] = useState(false)
-  const [menuOpenId,    setMenuOpenId]   = useState<string | null>(null)
 
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
 
@@ -85,13 +85,6 @@ export default function ProductsPage() {
       router.replace('/app/products')
     }
   }, [searchParams, router])
-
-  useEffect(() => {
-    if (!menuOpenId) return
-    const close = () => setMenuOpenId(null)
-    document.addEventListener('click', close)
-    return () => document.removeEventListener('click', close)
-  }, [menuOpenId])
 
   const activeParam = statusFilter === 'active' ? 'true' : statusFilter === 'inactive' ? 'false' : undefined
   const query = new URLSearchParams({
@@ -149,7 +142,40 @@ export default function ProductsPage() {
     }
   }
 
-  const allSelected = products.length > 0 && selectedKeys.size === products.length
+  const columns: Column<Product>[] = [
+    { key: 'code', header: 'Code', width: '100px', render: (p) => <span style={{ fontFamily: 'monospace', color: '#6C757D', fontSize: 11 }}>{p.code}</span> },
+    { key: 'name', header: 'Name', render: (p) => <span style={{ fontWeight: 600, color: '#212529' }}>{p.name}</span> },
+    {
+      key: 'category', header: 'Category', width: '130px',
+      render: (p) => {
+        const cat    = allCategoryNames.find(c => c.name === p.category)
+        const catSty = getCategoryStyle(cat?.colorHex, p.category)
+        return <span style={{ ...catSty, display: 'inline-flex', padding: '1px 6px', borderRadius: 3, fontSize: 11, fontWeight: 600 }}>{p.category}</span>
+      },
+    },
+    { key: 'unit', header: 'Unit', width: '64px', render: (p) => <span style={{ textTransform: 'uppercase', color: '#6C757D', fontSize: 11 }}>{p.unit}</span> },
+    { key: 'buyPrice', header: 'Buy Price', width: '90px', render: (p) => <span style={{ fontFamily: 'monospace', color: colors.action }}>R {new Decimal(p.defaultBuyPrice).toFixed(2)}</span> },
+    { key: 'sellPrice', header: 'Sell Price', width: '90px', render: (p) => <span style={{ fontFamily: 'monospace', color: colors.process }}>R {new Decimal(p.defaultSellPrice).toFixed(2)}</span> },
+    {
+      key: 'margin', header: 'Margin', width: '70px',
+      render: (p) => { const m = calcMargin(p.defaultBuyPrice, p.defaultSellPrice); return <span style={{ fontFamily: 'monospace', fontWeight: 600, color: m.color }}>{m.pct}</span> },
+    },
+    {
+      key: 'status', header: 'Status', width: '76px',
+      render: (p) => (
+        <span style={{ display: 'inline-flex', padding: '1px 6px', borderRadius: 3, fontSize: 11, fontWeight: 600, ...(p.isActive ? { background: colors.actionBg, color: colors.action } : { background: colors.neutralBg, color: colors.textSecondary }) }}>
+          {p.isActive ? 'Active' : 'Inactive'}
+        </span>
+      ),
+    },
+  ]
+
+  const rowActions: RowAction<Product>[] = [
+    { label: 'Edit', icon: Pencil, onClick: (p) => setEditTarget(p) },
+    { label: 'Deactivate', icon: EyeOff, hidden: (p) => !p.isActive, onClick: handleToggleActive },
+    { label: 'Reactivate', icon: Eye, hidden: (p) => p.isActive, onClick: handleToggleActive },
+    { label: 'Delete', icon: Trash2, danger: true, onClick: (p) => setDeleteTarget(p) },
+  ]
 
   return (
     <PortalPage title={`Products (${products.length})`}>
@@ -199,126 +225,18 @@ export default function ProductsPage() {
         )}
 
         {/* Table */}
-        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-          {isLoading ? (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 120, color: '#6C757D', fontSize: 12, gap: 8 }}>
-              <Loader2 style={{ width: 14, height: 14 }} className="animate-spin" /> Loading…
-            </div>
-          ) : products.length === 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 120, color: '#6C757D', fontSize: 12, gap: 8 }}>
-              <span>No products found</span>
-              {isManager && (
-                <Btn size="sm" icon={Plus} onClick={() => setCreateOpen(true)}>Add Product</Btn>
-              )}
-            </div>
-          ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
-                <tr style={{ background: HEADER_GRAD, borderBottom: '1px solid #C0C0C0' }}>
-                  {isManager && (
-                    <th style={{ ...TH, width: 32, textAlign: 'center' }}>
-                      <input
-                        type="checkbox"
-                        style={{ width: 12, height: 12, cursor: 'pointer' }}
-                        checked={allSelected}
-                        onChange={(e) => setSelectedKeys(e.target.checked ? new Set(products.map(p => p.id)) : new Set())}
-                      />
-                    </th>
-                  )}
-                  <th style={{ ...TH, width: 100 }}>Code</th>
-                  <th style={TH}>Name</th>
-                  <th style={{ ...TH, width: 120 }}>Category</th>
-                  <th style={{ ...TH, width: 56 }}>Unit</th>
-                  <th style={{ ...TH, width: 90 }}>Buy Price</th>
-                  <th style={{ ...TH, width: 90 }}>Sell Price</th>
-                  <th style={{ ...TH, width: 70 }}>Margin</th>
-                  <th style={{ ...TH, width: 76 }}>Status</th>
-                  {isManager && <th style={{ ...TH, width: 72 }}></th>}
-                </tr>
-              </thead>
-              <tbody>
-                {products.map((p, i) => {
-                  const m      = calcMargin(p.defaultBuyPrice, p.defaultSellPrice)
-                  const cat    = allCategoryNames.find(c => c.name === p.category)
-                  const catSty = getCategoryStyle(cat?.colorHex, p.category)
-                  const rowBg  = i % 2 === 1 ? '#FAFAFA' : '#fff'
-                  return (
-                    <tr
-                      key={p.id}
-                      style={{ background: rowBg, borderBottom: '1px solid #F0F0F0', height: 30 }}
-                      onMouseEnter={(e) => (e.currentTarget.style.background = '#EEF4FB')}
-                      onMouseLeave={(e) => (e.currentTarget.style.background = rowBg)}
-                    >
-                      {isManager && (
-                        <td style={{ ...TD, width: 32, textAlign: 'center' }}>
-                          <input
-                            type="checkbox"
-                            style={{ width: 12, height: 12, cursor: 'pointer' }}
-                            checked={selectedKeys.has(p.id)}
-                            onChange={(e) => {
-                              const next = new Set(selectedKeys)
-                              if (e.target.checked) { next.add(p.id) } else { next.delete(p.id) }
-                              setSelectedKeys(next)
-                            }}
-                          />
-                        </td>
-                      )}
-                      <td style={{ ...TD, fontFamily: 'monospace', color: '#6C757D', fontSize: 11 }}>{p.code}</td>
-                      <td style={{ ...TD, fontWeight: 600, color: '#212529' }}>{p.name}</td>
-                      <td style={TD}>
-                        <span style={{ ...catSty, display: 'inline-flex', padding: '1px 6px', borderRadius: 3, fontSize: 11, fontWeight: 600 }}>{p.category}</span>
-                      </td>
-                      <td style={{ ...TD, textTransform: 'uppercase', color: '#6C757D', fontSize: 11 }}>{p.unit}</td>
-                      <td style={{ ...TD, fontFamily: 'monospace', color: colors.action }}>R {new Decimal(p.defaultBuyPrice).toFixed(2)}</td>
-                      <td style={{ ...TD, fontFamily: 'monospace', color: colors.process }}>R {new Decimal(p.defaultSellPrice).toFixed(2)}</td>
-                      <td style={{ ...TD, fontFamily: 'monospace', fontWeight: 600, color: m.color }}>{m.pct}</td>
-                      <td style={TD}>
-                        <span style={{ display: 'inline-flex', padding: '1px 6px', borderRadius: 3, fontSize: 11, fontWeight: 600, ...(p.isActive ? { background: colors.actionBg, color: colors.action } : { background: colors.neutralBg, color: colors.textSecondary }) }}>
-                          {p.isActive ? 'Active' : 'Inactive'}
-                        </span>
-                      </td>
-                      {isManager && (
-                        <td style={{ ...TD, width: 32, textAlign: 'center' }}>
-                          <div style={{ position: 'relative', display: 'inline-block' }}>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); setMenuOpenId(menuOpenId === p.id ? null : p.id) }}
-                              style={{ width: 22, height: 22, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', cursor: 'pointer', borderRadius: 2, color: '#9AAABF' }}
-                              onMouseEnter={(e) => (e.currentTarget.style.color = '#212529')}
-                              onMouseLeave={(e) => (e.currentTarget.style.color = '#9AAABF')}
-                            >
-                              <MoreVertical style={{ width: 14, height: 14 }} />
-                            </button>
-                            {menuOpenId === p.id && (
-                              <div
-                                onClick={(e) => e.stopPropagation()}
-                                style={{ position: 'absolute', right: 0, top: 24, zIndex: 50, background: '#fff', border: '1px solid #D0D0D0', borderRadius: 3, boxShadow: '0 4px 12px rgba(0,0,0,0.12)', minWidth: 140, overflow: 'hidden' }}
-                              >
-                                {[
-                                  { label: 'Edit', icon: <Pencil style={{ width: 12, height: 12 }} />, color: colors.textPrimary, action: () => { setEditTarget(p); setMenuOpenId(null) } },
-                                  { label: p.isActive ? 'Deactivate' : 'Reactivate', icon: p.isActive ? <EyeOff style={{ width: 12, height: 12 }} /> : <Eye style={{ width: 12, height: 12 }} />, color: colors.warning, action: () => { handleToggleActive(p); setMenuOpenId(null) } },
-                                  { label: 'Delete', icon: <Trash2 style={{ width: 12, height: 12 }} />, color: colors.danger, action: () => { setDeleteTarget(p); setMenuOpenId(null) } },
-                                ].map((item) => (
-                                  <button
-                                    key={item.label}
-                                    onClick={item.action}
-                                    style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '7px 12px', fontSize: 12, background: 'none', border: 'none', cursor: 'pointer', color: item.color, textAlign: 'left' }}
-                                    onMouseEnter={(e) => (e.currentTarget.style.background = '#F5F5F5')}
-                                    onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
-                                  >
-                                    {item.icon}{item.label}
-                                  </button>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        </td>
-                      )}
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          )}
+        <div style={{ flex: 1, minHeight: 0, padding: 10 }}>
+          <DataTable
+            columns={columns}
+            rows={products}
+            rowKey={(p) => p.id}
+            rowActions={isManager ? rowActions : undefined}
+            selectedKeys={isManager ? selectedKeys : undefined}
+            onSelectionChange={isManager ? setSelectedKeys : undefined}
+            loading={isLoading}
+            emptyMessage="No products found"
+            emptyAction={isManager ? { label: 'Add Product', onClick: () => setCreateOpen(true) } : undefined}
+          />
         </div>
 
       {createOpen && (
@@ -980,19 +898,13 @@ function ManageCategoriesModal({ categories, onClose, onSuccess }: {
             {cat.iconName && <CatIcon name={cat.iconName} size={12} />}
             <span style={{ flex: 1, fontSize: 12, fontWeight: isChild ? 400 : 600, color: colors.textPrimary }}>{cat.name}</span>
             {cat._count && <span style={{ fontSize: 10, color: colors.textSecondary }}>{cat._count.products}p</span>}
-            <button onClick={() => startEdit(cat)} style={{ fontSize: 11, color: colors.process, background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px' }}>Edit</button>
+            <Btn size="sm" style={{ padding: '2px 8px' }} onClick={() => startEdit(cat)}>Edit</Btn>
             {hasChildren ? (
               <span style={{ fontSize: 10, color: colors.textSecondary, padding: '2px 4px' }} title="Delete sub-categories first">Has subs</span>
             ) : (
               <>
-                <button onClick={() => void handleDeactivate(cat)} disabled={deleting === cat.id}
-                  style={{ fontSize: 11, color: colors.warning, background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', opacity: deleting === cat.id ? 0.5 : 1 }}>
-                  {deleting === cat.id ? '…' : 'Deactivate'}
-                </button>
-                <button onClick={() => void handleDelete(cat)} disabled={deleting === cat.id}
-                  style={{ fontSize: 11, color: colors.danger, background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', opacity: deleting === cat.id ? 0.5 : 1 }}>
-                  {deleting === cat.id ? '…' : 'Delete'}
-                </button>
+                <Btn size="sm" style={{ padding: '2px 8px', color: colors.warning }} loading={deleting === cat.id} onClick={() => void handleDeactivate(cat)}>Deactivate</Btn>
+                <Btn size="sm" variant="danger" style={{ padding: '2px 8px' }} loading={deleting === cat.id} onClick={() => void handleDelete(cat)}>Delete</Btn>
               </>
             )}
           </div>
