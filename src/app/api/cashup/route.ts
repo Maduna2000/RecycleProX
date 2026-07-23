@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { OpenCashUpSchema } from '@/lib/schemas/cashup'
-import { openCashUp, listCashUps, getOpenSession, getAnyOpenSession } from '@/lib/services/cashUpService'
+import { openCashUp, listCashUps, getOpenSession, getAnyOpenSession, attachCurrencyStatus } from '@/lib/services/cashUpService'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 // GET /api/cashup — list history OR ?today=1 for the open session
@@ -19,17 +19,20 @@ export async function GET(req: NextRequest) {
       // An explicit date was requested — honor it directly rather than letting
       // an unrelated open session from another date silently override it.
       if (dateStr) {
-        const cashUp = await runWithRequestTenant(req, () => getOpenSession(dateStr))
+        const cashUp = await runWithRequestTenant(req, async () => {
+          const found = await getOpenSession(dateStr)
+          return found ? attachCurrencyStatus(found) : null
+        })
         return NextResponse.json({ cashUp })
       }
 
       // No explicit date — check for any open session (could be from a previous
       // day that needs submission) before falling back to today's session.
-      const openSession = await runWithRequestTenant(req, () => getAnyOpenSession())
-      if (openSession) {
-        return NextResponse.json({ cashUp: openSession })
-      }
-      const cashUp = await runWithRequestTenant(req, () => getOpenSession())
+      const cashUp = await runWithRequestTenant(req, async () => {
+        const openSession = await getAnyOpenSession()
+        const found = openSession ?? await getOpenSession()
+        return found ? attachCurrencyStatus(found) : null
+      })
       return NextResponse.json({ cashUp })
     }
 

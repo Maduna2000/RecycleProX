@@ -661,6 +661,8 @@ model CashUp {
   rejectedByUserId    String?
   rejectedAt          DateTime?
   rejectionReason     String?
+  currencyConfirmedAt       DateTime?
+  currencyConfirmedByUserId String?
   createdAt           DateTime     @default(now())
   updatedAt           DateTime     @updatedAt
 
