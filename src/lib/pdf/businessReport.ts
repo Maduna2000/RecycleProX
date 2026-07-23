@@ -45,7 +45,6 @@ const HEADER_ROW_H = 20
 const CELL_PADDING = 4
 const BORDER_WIDTH = 0.5
 const DATA_FONT_SIZE = 7.5
-const CHAR_W = 4.2 // approx Helvetica width at 7.5pt, for truncation budgeting
 
 // WinAnsi-safe: pdf-lib throws on chars outside WinAnsi; replace rather than
 // crash. Latin-1 plus the typographic chars WinAnsi does encode (dashes,
@@ -55,10 +54,22 @@ function sanitize(text: string): string {
   return text.replace(/[^\x20-\xFF–—‘’“”•…]/g, '?')
 }
 
-function truncate(text: string, maxWidthPt: number): string {
-  const maxChars = Math.max(3, Math.floor((maxWidthPt - CELL_PADDING * 2) / CHAR_W))
-  if (text.length <= maxChars) return text
-  return text.substring(0, maxChars - 1) + '…'
+// Measures with the ACTUAL font/size the text will be drawn with — a fixed
+// per-character width estimate (the previous approach) is only right for one
+// specific font+size, and silently under-truncates everywhere else (notably
+// bold labels, which run wider per character than the regular 7.5pt data
+// font that estimate was calibrated for). Under-truncated text then renders
+// wider than the column it was budgeted for and spills into the next one —
+// this is what caused long group/company names in subtotal bands to run
+// straight into the adjacent amount column.
+function truncate(text: string, maxWidthPt: number, font: PDFFont, size: number): string {
+  const avail = maxWidthPt - CELL_PADDING * 2
+  if (font.widthOfTextAtSize(text, size) <= avail) return text
+  let result = text
+  while (result.length > 1 && font.widthOfTextAtSize(result + '…', size) > avail) {
+    result = result.slice(0, -1)
+  }
+  return result + '…'
 }
 
 interface Ctx {
@@ -179,7 +190,7 @@ function drawPageHeader(ctx: Ctx, first: boolean): void {
 
   // Title (left) + PRINT DATE box (right)
   const title = sanitize(report.title.toUpperCase())
-  page.drawText(truncate(title, ctx.contentW - 150), {
+  page.drawText(truncate(title, ctx.contentW - 150, bold, 12), {
     x: MARGIN, y: y - 4, size: 12, font: bold, color: BLACK,
   })
 
@@ -243,7 +254,7 @@ function drawTableHeader(ctx: Ctx): void {
         thickness: BORDER_WIDTH, color: BLACK,
       })
     }
-    const label = truncate(sanitize(col.label), colW)
+    const label = truncate(sanitize(col.label), colW, bold, 8)
     const textX = col.align === 'right'
       ? x + colW - bold.widthOfTextAtSize(label, 8) - CELL_PADDING
       : x + CELL_PADDING
@@ -282,7 +293,7 @@ function drawLedgerColumnsRow(ctx: Ctx, bandLabel: string | undefined): void {
   })
 
   if (bandLabel) {
-    page.drawText(truncate(sanitize(bandLabel), ledgerLabelSpan(ctx)), {
+    page.drawText(truncate(sanitize(bandLabel), ledgerLabelSpan(ctx), bold, 9), {
       x: MARGIN, y: rowY + 4.5, size: 9, font: bold, color: BLACK,
     })
   }
@@ -318,7 +329,7 @@ function drawLedgerGroupHeader(ctx: Ctx, row: FlatRow): void {
     // Account category: plain bold heading, breathing room above
     ctx.y -= 6
     const rowY = ctx.y - 14
-    page.drawText(truncate(sanitize(row.label ?? ''), ctx.contentW), {
+    page.drawText(truncate(sanitize(row.label ?? ''), ctx.contentW, bold, 10), {
       x: MARGIN, y: rowY + 2, size: 10, font: bold, color: BLACK,
     })
     ctx.y = rowY
@@ -337,10 +348,10 @@ function drawLedgerGroupHeader(ctx: Ctx, row: FlatRow): void {
       start: { x: MARGIN, y: ctx.y - 2 }, end: { x: ctx.pageW - MARGIN, y: ctx.y - 2 },
       thickness: 0.5, color: BLACK,
     })
-    page.drawText(truncate(sanitize(row.label ?? ''), ctx.contentW * 0.45), {
+    page.drawText(truncate(sanitize(row.label ?? ''), ctx.contentW * 0.45, bold, 8.5), {
       x: MARGIN, y: rowY + 3.5, size: 8.5, font: bold, color: BLACK,
     })
-    const meta = truncate(sanitize(row.meta ?? ''), ctx.contentW * 0.5)
+    const meta = truncate(sanitize(row.meta ?? ''), ctx.contentW * 0.5, ctx.reg, 7.5)
     page.drawText(meta, {
       x: ctx.pageW - MARGIN - ctx.reg.widthOfTextAtSize(meta, 7.5),
       y: rowY + 4, size: 7.5, font: ctx.reg, color: DARK_GRAY,
@@ -350,7 +361,7 @@ function drawLedgerGroupHeader(ctx: Ctx, row: FlatRow): void {
   }
   // Subcategory: small bold label on its own line
   const rowY = ctx.y - LEDGER_ROW_H
-  page.drawText(truncate(sanitize(row.label ?? ''), ctx.contentW * 0.4), {
+  page.drawText(truncate(sanitize(row.label ?? ''), ctx.contentW * 0.4, bold, 7.5), {
     x: MARGIN + 2, y: rowY + 3, size: 7.5, font: bold, color: BLACK,
   })
   ctx.y = rowY
@@ -392,7 +403,8 @@ function drawLedgerTotalRow(ctx: Ctx, row: FlatRow, grand: boolean): void {
   const size = grand || level === 0 ? 9 : 8
   const label = truncate(
     sanitize(grand ? (row.label ?? 'GRAND TOTAL:') : (row.label ?? '').replace(/\s+TOTAL:$/, '')),
-    Math.max(labelSpanW, 120)
+    Math.max(labelSpanW, 120),
+    bold, size
   )
   page.drawText(label, {
     x: Math.max(MARGIN, MARGIN + labelSpanW - bold.widthOfTextAtSize(label, size) - 10),
@@ -466,13 +478,13 @@ function drawGroupHeader(ctx: Ctx, row: FlatRow): void {
   })
 
   const indent = MARGIN + CELL_PADDING + row.level * 10
-  const label = truncate(sanitize(row.label ?? ''), ctx.contentW - row.level * 10 - (row.meta ? 180 : 0))
+  const label = truncate(sanitize(row.label ?? ''), ctx.contentW - row.level * 10 - (row.meta ? 180 : 0), bold, 8)
   page.drawText(label, {
     x: indent, y: bandY + (GROUP_H - 8) / 2, size: 8, font: bold, color: BLACK,
   })
 
   if (row.meta) {
-    const meta = truncate(sanitize(row.meta), 176)
+    const meta = truncate(sanitize(row.meta), 176, reg, 7)
     page.drawText(meta, {
       x: ctx.pageW - MARGIN - reg.widthOfTextAtSize(meta, 7) - CELL_PADDING,
       y: bandY + (GROUP_H - 7) / 2, size: 7, font: reg, color: DARK_GRAY,
@@ -527,7 +539,7 @@ function drawCellsInColumns(
       }
     } else if (Object.prototype.hasOwnProperty.call(cells, col.key)) {
       const raw = cells[col.key]
-      const value = truncate(sanitize(formatCell(raw, col.format, ctx.report.meta.currencySymbol)), colW)
+      const value = truncate(sanitize(formatCell(raw, col.format, ctx.report.meta.currencySymbol)), colW, font, size)
       const textX = col.align === 'right'
         ? x + colW - font.widthOfTextAtSize(value, size) - CELL_PADDING
         : x + CELL_PADDING
@@ -575,7 +587,7 @@ function drawSubtotalRow(ctx: Ctx, row: FlatRow): void {
   const labelSpanW = report.columns
     .slice(0, firstMeasureIdx === -1 ? report.columns.length : firstMeasureIdx)
     .reduce((w, c) => w + c.width * ctx.contentW, 0)
-  const label = truncate(sanitize(row.label ?? 'TOTAL:'), Math.max(labelSpanW, 120))
+  const label = truncate(sanitize(row.label ?? 'TOTAL:'), Math.max(labelSpanW, 120), bold, 8)
   const labelX = Math.max(
     MARGIN + CELL_PADDING,
     MARGIN + labelSpanW - bold.widthOfTextAtSize(label, 8) - CELL_PADDING
