@@ -18,7 +18,7 @@ const pwaConfig = withPWA({
     },
     // Seed data GET endpoints — network-first with IndexedDB fallback handled in app
     {
-      urlPattern: /\/api\/(products|customers|price-groups|float|cashup)/,
+      urlPattern: /\/api\/(products|customers|price-groups|float)/,
       handler: 'NetworkFirst',
       options: {
         cacheName: 'api-seed-data',
@@ -35,6 +35,15 @@ const pwaConfig = withPWA({
         networkTimeoutSeconds: 5,
         expiration: { maxEntries: 100, maxAgeSeconds: 60 * 60 },
       },
+    },
+    // Cash-up session state — network-only. This is live, rapidly-mutating
+    // financial state (is there an open session, what's its status); a stale
+    // cached response after a network hiccup can make an open session look
+    // closed (or vice versa), which is worse than a visible loading/error
+    // state for a cash-reconciliation flow.
+    {
+      urlPattern: /\/api\/cashup/,
+      handler: 'NetworkOnly',
     },
     // Next.js pages — network-first
     {
