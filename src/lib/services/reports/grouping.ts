@@ -159,8 +159,13 @@ export function groupRows<T>(items: T[], opts: GroupRowsOptions<T>): GroupedRepo
   const formatTotals = opts.formatTotals ?? defaultFormatTotals
   const built = buildLevel(items, 0, undefined, 0, opts)
   const totals = sumMeasures(items, opts.measures)
+  // Zero group levels (a flat report, e.g. purchases-average-cost) makes
+  // buildLevel return top-level `rows` with no `groups` — wrap them in one
+  // unlabeled pseudo-group so they still reach the caller. flattenReportDocument
+  // skips drawing a band for an empty label, so this stays visually flat.
+  const groups = built.groups ?? (built.rows ? [{ level: 0, label: '', rows: built.rows }] : [])
   return {
-    groups: built.groups ?? [],
+    groups,
     grandTotal: formatTotals(totals),
     totals,
   }

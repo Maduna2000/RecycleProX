@@ -6,7 +6,12 @@
 import type { FlatRow, ReportDocument, ReportGroup } from './types'
 
 function walkGroup(group: ReportGroup, out: FlatRow[]): void {
-  out.push({ type: 'groupHeader', level: group.level, label: group.label, meta: group.meta })
+  // An empty label marks a pseudo-group groupRows() uses to carry rows for a
+  // flat (zero-group-level) report — draw its rows/subtotal, but no band.
+  const isBandless = group.label === '' && !group.meta
+  if (!isBandless) {
+    out.push({ type: 'groupHeader', level: group.level, label: group.label, meta: group.meta })
+  }
 
   if (group.groups) {
     for (const child of group.groups) walkGroup(child, out)
