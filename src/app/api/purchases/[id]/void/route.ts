@@ -38,12 +38,6 @@ export async function POST(
     // Return specific error messages for known error types
     const message = err instanceof Error ? err.message : 'Failed to void purchase'
     logger.error({ err, purchaseId: id }, 'POST /api/purchases/[id]/void failed')
-
-    // If the error message contains "approved", return a 409 Conflict instead of 500
-    if (message.includes('approved')) {
-      return NextResponse.json({ error: message }, { status: 409 })
-    }
-
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }

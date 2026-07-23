@@ -326,6 +326,90 @@ async function calcSystemTotals(sessionDate: Date, drawingsReceived = new Decima
   return { cashSales, cashPurchases, cashPayments, cashExpected, cardPayments, expensesTotal }
 }
 
+// ─── Recalculate an approved cash-up after a completed sale/purchase is voided ──
+// Called from inside voidSale's/voidPurchase's own transaction — the sale or
+// purchase status change and this correction commit together, never one
+// without the other. Only the specific component that changed (cash sales or
+// cash purchases) is re-aggregated; everything else on the cash-up (expenses,
+// drawings, loans, card payments) is left untouched since voiding one sale or
+// purchase doesn't affect those. declaredCash is never touched — it's the
+// cashier's physical count from that day, a historical fact, not a derived
+// figure. No-op if the date's cash-up isn't approved (voidSale/voidPurchase
+// only call this once they've confirmed it is).
+export async function recalculateApprovedCashUpForDate(
+  tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
+  sessionDate: Date,
+  changed: 'sales' | 'purchases'
+) {
+  const cashUp = await tx.cashUp.findFirst({ where: { sessionDate, status: 'approved' } })
+  if (!cashUp) return
+
+  const { start, end } = getDayBoundsSAST(sessionDate)
+
+  const openingBalance   = new Decimal(cashUp.openingBalance.toString())
+  const declaredCash     = new Decimal(cashUp.declaredCash?.toString() ?? '0')
+  const cashPayments     = new Decimal(cashUp.systemCashPayments.toString())
+  const expensesTotal    = new Decimal(cashUp.expensesTotal.toString())
+  const drawingsReceived = new Decimal(cashUp.drawingsReceived.toString())
+  const loansTotal       = new Decimal(cashUp.loansTotal.toString())
+
+  let cashSales      = new Decimal(cashUp.systemCashSales.toString())
+  let cashPurchases  = new Decimal(cashUp.systemCashPurchases.toString())
+
+  if (changed === 'sales') {
+    const agg = await tx.sale.aggregate({
+      _sum: { totalAmount: true },
+      where: { paymentMethod: 'cash', status: 'completed', createdAt: { gte: start, lte: end } },
+    })
+    cashSales = new Decimal(agg._sum.totalAmount?.toString() ?? '0')
+  } else {
+    const agg = await tx.purchase.aggregate({
+      _sum: { totalAmount: true },
+      where: { paymentMethod: 'cash', status: 'completed', createdAt: { gte: start, lte: end } },
+    })
+    cashPurchases = new Decimal(agg._sum.totalAmount?.toString() ?? '0')
+  }
+
+  const cashExpected = cashSales.minus(cashPurchases).minus(cashPayments).minus(expensesTotal).plus(drawingsReceived).plus(loansTotal)
+  const fullExpected = openingBalance.plus(cashExpected)
+  const variance = declaredCash.minus(fullExpected)
+
+  await tx.cashUp.update({
+    where: { id: cashUp.id },
+    data: {
+      systemCashSales:     cashSales,
+      systemCashPurchases: cashPurchases,
+      systemCashExpected:  fullExpected,
+      variance,
+    },
+  })
+
+  logger.warn(
+    { cashUpId: cashUp.id, sessionDate, changed, newVariance: variance.toFixed(2) },
+    'cashup.recalculated_after_void'
+  )
+
+  // Re-propagate finPeriodCumulative through this cash-up and every later
+  // approved one — each is a running sum of variance ordered by sessionDate,
+  // so a changed variance on an earlier day shifts every later day's total.
+  const priorApproved = await tx.cashUp.aggregate({
+    where: { status: 'approved', sessionDate: { lt: sessionDate } },
+    _sum: { variance: true },
+  })
+  let running = new Decimal(priorApproved._sum.variance?.toString() ?? '0')
+
+  const fromThisDateOnward = await tx.cashUp.findMany({
+    where: { status: 'approved', sessionDate: { gte: sessionDate } },
+    orderBy: { sessionDate: 'asc' },
+  })
+
+  for (const c of fromThisDateOnward) {
+    const v = c.id === cashUp.id ? variance : new Decimal(c.variance?.toString() ?? '0')
+    running = running.plus(v)
+    await tx.cashUp.update({ where: { id: c.id }, data: { finPeriodCumulative: running } })
+  }
+}
+
 // ─── Submit (cashier declares cash) ──────────────────────────────────────────
 export async function submitCashUp(
   cashUpId: string,

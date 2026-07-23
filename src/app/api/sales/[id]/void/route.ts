@@ -25,12 +25,6 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
     const message = err instanceof Error ? err.message : 'Failed to void sale'
     logger.error({ err }, 'POST /api/sales/[id]/void failed')
-
-    // If the error message contains "approved", return a 409 Conflict instead of 500
-    if (message.includes('approved')) {
-      return NextResponse.json({ error: message }, { status: 409 })
-    }
-
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }

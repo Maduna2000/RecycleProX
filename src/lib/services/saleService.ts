@@ -5,6 +5,8 @@ import logger from '@/lib/logger'
 import Decimal from 'decimal.js'
 import { recordMovement, recordVoidReversal } from '@/lib/services/stockService'
 import { applyBusinessLoanRepaymentTx } from '@/lib/services/businessLoanService'
+import { recalculateApprovedCashUpForDate } from '@/lib/services/cashupService'
+import { sastDayLabelOfInstant, sastDateLabelToUTCDate } from '@/lib/utils/dayBounds'
 import type { CreateSaleInput, VoidSaleInput } from '@/lib/schemas/sale'
 import type { ProcessSaleSplitPaymentInput } from '@/lib/schemas/splitPayment'
 import { encodeJsonField } from '@/lib/db/queryHelpers'
@@ -216,18 +218,13 @@ export async function voidSale(id: string, data: VoidSaleInput, voidedById?: str
   if (!sale) throw new SaleNotFoundError(id)
   if (sale.status === 'voided') throw new SaleAlreadyVoidedError(sale.refNumber)
 
-  // Block voiding COMPLETED sales if the date has an approved cash-up.
-  // Pending sales can be voided anytime — they weren't included in cash-up totals.
-  const sessionDate = new Date(sale.createdAt)
-  sessionDate.setHours(0, 0, 0, 0)
-  const approvedCashUp = await prisma.cashUp.findFirst({
-    where: { sessionDate, status: 'approved' },
-  })
-  if (approvedCashUp && sale.status === 'completed') {
-    throw new Error(
-      `Cannot void completed sale ${sale.refNumber}: the cash-up for that date (${sessionDate.toISOString().slice(0, 10)}) has already been approved. Contact a manager to investigate discrepancies.`
-    )
-  }
+  // If this completed sale's day already has an approved cash-up, voiding it
+  // still goes ahead — recalculateApprovedCashUpForDate below corrects that
+  // cash-up's totals (and every later approved day's finPeriodCumulative) in
+  // the same transaction, rather than blocking the void until a manager
+  // reconciles it by hand.
+  const sessionDate = sastDateLabelToUTCDate(sastDayLabelOfInstant(sale.createdAt))
+  const wasCompleted = sale.status === 'completed'
 
   const updated = await prisma.$transaction(async (tx) => {
     const s = await tx.sale.update({
@@ -246,6 +243,10 @@ export async function voidSale(id: string, data: VoidSaleInput, voidedById?: str
       sourceId:       id,
       createdByUserId: voidedById,
     })
+
+    if (wasCompleted) {
+      await recalculateApprovedCashUpForDate(tx, sessionDate, 'sales')
+    }
 
     return s
   })

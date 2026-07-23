@@ -6,6 +6,8 @@ import Decimal from 'decimal.js'
 import { resolvePrice } from '@/lib/services/productService'
 import { recordMovement, recordVoidReversal } from '@/lib/services/stockService'
 import { applyRepaymentTx } from '@/lib/services/loanService'
+import { recalculateApprovedCashUpForDate } from '@/lib/services/cashupService'
+import { sastDayLabelOfInstant, sastDateLabelToUTCDate } from '@/lib/utils/dayBounds'
 import { getAllSettings } from '@/lib/services/settingsService'
 import { generateVat264 } from '@/lib/pdf/vat264'
 import { generateTransactionSlip } from '@/lib/pdf/slip'
@@ -334,18 +336,13 @@ export async function voidPurchase(id: string, data: VoidPurchaseInput, voidedBy
   if (!purchase) throw new PurchaseNotFoundError(id)
   if (purchase.status === 'voided') throw new PurchaseAlreadyVoidedError(purchase.refNumber)
 
-  // Block voiding COMPLETED purchases if the date has an approved cash-up.
-  // Pending purchases can be voided anytime — they weren't included in cash-up totals.
-  const sessionDate = new Date(purchase.createdAt)
-  sessionDate.setHours(0, 0, 0, 0)
-  const approvedCashUp = await prisma.cashUp.findFirst({
-    where: { sessionDate, status: 'approved' },
-  })
-  if (approvedCashUp && purchase.status === 'completed') {
-    throw new Error(
-      `Cannot void completed purchase ${purchase.refNumber}: the cash-up for that date (${sessionDate.toISOString().slice(0, 10)}) has already been approved. Contact a manager to investigate discrepancies.`
-    )
-  }
+  // If this completed purchase's day already has an approved cash-up, voiding
+  // it still goes ahead — recalculateApprovedCashUpForDate below corrects that
+  // cash-up's totals (and every later approved day's finPeriodCumulative) in
+  // the same transaction, rather than blocking the void until a manager
+  // reconciles it by hand.
+  const sessionDate = sastDateLabelToUTCDate(sastDayLabelOfInstant(purchase.createdAt))
+  const wasCompleted = purchase.status === 'completed'
 
   const updated = await prisma.$transaction(async (tx) => {
     const p = await tx.purchase.update({
@@ -364,6 +361,10 @@ export async function voidPurchase(id: string, data: VoidPurchaseInput, voidedBy
       sourceId: id,
       createdByUserId: voidedById,
     })
+
+    if (wasCompleted) {
+      await recalculateApprovedCashUpForDate(tx, sessionDate, 'purchases')
+    }
 
     return p
   })
