@@ -10,11 +10,12 @@ import {
   Info,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from 'pdf-lib'
 import { DataTable, StatusBadge, type Column, type RowAction } from '@/components/ui/DataTable'
 import { InlineDetailPanel } from '@/components/ui/InlineDetailPanel'
 import { PhotoViewerModal } from '@/components/ui/PhotoViewerModal'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
-import { Btn, Field, FilterBar, PortalPage, inp, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
+import { Btn, BtnMenu, Field, FilterBar, PortalPage, inp, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
 import { Dialog } from '@/components/ui/dialog'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -56,6 +57,28 @@ function orderTotalWeight(o: ScaleOrder): number {
 
 function orderProductNames(o: ScaleOrder): string {
   return orderLines(o).map(l => l.product.name).join(', ')
+}
+
+// ─── Export (CSV / PDF) ─────────────────────────────────────────────────────
+
+const EXPORT_HEADERS = ['Order #', 'Date', 'Customer', 'Type', 'Product', 'Category', 'Weight (kg)', 'Order Total (kg)', 'Status', 'Operator']
+
+// pdf-lib's standard fonts use WinAnsi encoding — replace anything outside
+// its printable range rather than let drawText() throw on an odd character
+// in a customer/product name.
+// eslint-disable-next-line no-control-regex
+function sanitizePdfText(text: string): string {
+  return text.replace(/[^\x20-\xFF–—''""•…]/g, '?')
+}
+
+function truncatePdfText(text: string, maxWidthPt: number, font: PDFFont, size: number): string {
+  const clean = sanitizePdfText(text)
+  if (font.widthOfTextAtSize(clean, size) <= maxWidthPt) return clean
+  let result = clean
+  while (result.length > 1 && font.widthOfTextAtSize(result + '…', size) > maxWidthPt) {
+    result = result.slice(0, -1)
+  }
+  return result + '…'
 }
 
 type StatsData = {
@@ -445,39 +468,43 @@ function OrdersTab() {
     setOrders(prev => prev.map(o => o.id === id ? { ...o, status: 'voided' } : o))
   }
 
-  async function handleExport() {
+  async function fetchExportRows(): Promise<string[][]> {
+    const params = new URLSearchParams({
+      pageSize: '10000',
+      ...(debouncedSearch && { search: debouncedSearch }),
+      ...(status          && { status }),
+      ...(dateFrom        && { dateFrom }),
+      ...(dateTo          && { dateTo }),
+      ...(categoryName    && { categoryName }),
+      ...(operatorId      && { operatorId }),
+      ...(customerType    && { customerType }),
+    })
+    const data = await fetcher(`/api/scale/orders?${params}`)
+    const rows: ScaleOrder[] = data.orders ?? []
+    // One row per product line so every weight is captured
+    return rows.flatMap(o => {
+      const total = orderTotalWeight(o).toFixed(2)
+      return orderLines(o).map(l => [
+        o.orderNumber,
+        new Date(o.createdAt).toLocaleString('en-ZA'),
+        o.customer ? `${o.customer.firstName} ${o.customer.lastName}` : 'Walk-in',
+        o.customer?.customerType === 'account' ? 'Account' : 'Walk-in',
+        l.product.name,
+        l.product.category,
+        l.weight ? Number(l.weight).toFixed(2) : '—',
+        total,
+        o.status,
+        o.operator.fullName,
+      ])
+    })
+  }
+
+  async function handleExportCsv() {
     setExporting(true)
     try {
-      const params = new URLSearchParams({
-        pageSize: '10000',
-        ...(debouncedSearch && { search: debouncedSearch }),
-        ...(status          && { status }),
-        ...(dateFrom        && { dateFrom }),
-        ...(dateTo          && { dateTo }),
-        ...(categoryName    && { categoryName }),
-        ...(operatorId      && { operatorId }),
-        ...(customerType    && { customerType }),
-      })
-      const data = await fetcher(`/api/scale/orders?${params}`)
-      const rows: ScaleOrder[] = data.orders ?? []
-      const headers = ['Order #', 'Date', 'Customer', 'Type', 'Product', 'Category', 'Weight (kg)', 'Order Total (kg)', 'Status', 'Operator']
-      // One row per product line so every weight is captured
-      const lines = rows.flatMap(o => {
-        const total = orderTotalWeight(o).toFixed(2)
-        return orderLines(o).map(l => [
-          o.orderNumber,
-          new Date(o.createdAt).toLocaleString('en-ZA'),
-          o.customer ? `${o.customer.firstName} ${o.customer.lastName}` : 'Walk-in',
-          o.customer?.customerType === 'account' ? 'Account' : 'Walk-in',
-          l.product.name,
-          l.product.category,
-          l.weight ? Number(l.weight).toFixed(2) : '—',
-          total,
-          o.status,
-          o.operator.fullName,
-        ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
-      })
-      const csv = [headers.join(','), ...lines].join('\n')
+      const rows = await fetchExportRows()
+      const lines = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
+      const csv = [EXPORT_HEADERS.join(','), ...lines].join('\n')
       const blob = new Blob([csv], { type: 'text/csv' })
       const url  = URL.createObjectURL(blob)
       const a    = Object.assign(document.createElement('a'), { href: url, download: `scale-orders-${Date.now()}.csv` })
@@ -485,6 +512,70 @@ function OrdersTab() {
       URL.revokeObjectURL(url)
     } catch {
       toast.error('Export failed')
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  async function handleExportPdf() {
+    setExporting(true)
+    try {
+      const rows = await fetchExportRows()
+
+      const PAGE_W = 842, PAGE_H = 595 // A4 landscape, points
+      const MARGIN = 30
+      const ROW_H = 16
+      const HEADER_H = 18
+      const FONT_SIZE = 7.5
+      const COL_W = [65, 90, 90, 55, 95, 75, 65, 80, 55, 90] // sums to 760 = PAGE_W - MARGIN*2
+
+      const doc  = await PDFDocument.create()
+      const font = await doc.embedFont(StandardFonts.Helvetica)
+      const bold = await doc.embedFont(StandardFonts.HelveticaBold)
+
+      const colWidth = (i: number) => COL_W[i] ?? 70
+
+      const drawColumnHeader = (page: PDFPage, headerY: number) => {
+        page.drawRectangle({ x: MARGIN, y: headerY - HEADER_H, width: PAGE_W - MARGIN * 2, height: HEADER_H, color: rgb(0.9, 0.9, 0.9) })
+        let x = MARGIN
+        EXPORT_HEADERS.forEach((h, i) => {
+          page.drawText(truncatePdfText(h, colWidth(i) - 6, bold, FONT_SIZE), { x: x + 3, y: headerY - HEADER_H + 5, size: FONT_SIZE, font: bold, color: rgb(0.1, 0.1, 0.1) })
+          x += colWidth(i)
+        })
+      }
+
+      const startPage = (): { page: PDFPage; y: number } => {
+        const page = doc.addPage([PAGE_W, PAGE_H])
+        let y = PAGE_H - MARGIN
+        page.drawText('Scale Orders Export', { x: MARGIN, y, size: 12, font: bold })
+        page.drawText(`Generated ${new Date().toLocaleString('en-ZA')}`, { x: PAGE_W - MARGIN - 160, y, size: 8, font, color: rgb(0.4, 0.4, 0.4) })
+        y -= 20
+        drawColumnHeader(page, y)
+        y -= HEADER_H
+        return { page, y }
+      }
+
+      let { page, y } = startPage()
+
+      for (const row of rows) {
+        if (y - ROW_H < MARGIN) ({ page, y } = startPage())
+        let x = MARGIN
+        row.forEach((cell, i) => {
+          page.drawText(truncatePdfText(cell, colWidth(i) - 6, font, FONT_SIZE), { x: x + 3, y: y - ROW_H + 5, size: FONT_SIZE, font, color: rgb(0.15, 0.15, 0.15) })
+          x += colWidth(i)
+        })
+        page.drawLine({ start: { x: MARGIN, y: y - ROW_H }, end: { x: PAGE_W - MARGIN, y: y - ROW_H }, thickness: 0.3, color: rgb(0.85, 0.85, 0.85) })
+        y -= ROW_H
+      }
+
+      const bytes = await doc.save()
+      const blob  = new Blob([bytes as BlobPart], { type: 'application/pdf' })
+      const url   = URL.createObjectURL(blob)
+      const a     = Object.assign(document.createElement('a'), { href: url, download: `scale-orders-${Date.now()}.pdf` })
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      toast.error('PDF export failed')
     } finally {
       setExporting(false)
     }
@@ -666,10 +757,19 @@ function OrdersTab() {
           </Field>
         )}
         <Field label={' '}>
-          <Btn size="sm" icon={RefreshCw} onClick={() => fetchOrders(page)} title="Refresh" />
+          <Btn size="sm" icon={RefreshCw} onClick={() => fetchOrders(page)}>Refresh</Btn>
         </Field>
         <Field label={' '}>
-          <Btn size="sm" icon={Download} loading={exporting} onClick={handleExport}>Export</Btn>
+          <BtnMenu
+            size="sm"
+            icon={Download}
+            label="Export"
+            loading={exporting}
+            items={[
+              { label: 'CSV', icon: Download, onClick: handleExportCsv },
+              { label: 'PDF', icon: FileText, onClick: handleExportPdf },
+            ]}
+          />
         </Field>
         <span style={{ fontSize: 11, color: '#6C757D', marginLeft: 'auto', paddingBottom: 8 }}>
           {total} order{total !== 1 ? 's' : ''}
