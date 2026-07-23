@@ -7,7 +7,9 @@
  */
 import Decimal from 'decimal.js'
 import { prisma } from '@/lib/db/prisma'
+import { Prisma } from '@prisma/client'
 import { saleLineVat } from '@/lib/utils/vat'
+import { decodeJsonField } from '@/lib/db/queryHelpers'
 import { getRangeBoundsSAST } from '@/lib/utils/dayBounds'
 import { groupRows } from '@/lib/services/reports/grouping'
 import { countDataRows } from '@/lib/reports/flatten'
@@ -17,6 +19,7 @@ import type {
   SalesDailyParams,
   SalesByProductParams,
   SalesByCustomerParams,
+  SalesSplitPaymentsParams,
 } from '@/lib/schemas/report'
 
 type MetaBase = Omit<ReportMeta, 'rowCount'>
@@ -37,6 +40,16 @@ function saleStatusLabel(s: { status: string; amountPaid: unknown }): string {
     return new Decimal(String(s.amountPaid ?? 0)).greaterThan(0) ? 'PARTIAL' : 'UNPAID'
   }
   return s.status.toUpperCase()
+}
+
+interface SaleSplitLegs {
+  cash: string
+  eft: string
+  businessLoan: string
+}
+
+function saleSplitLegs(splitPayments: unknown): SaleSplitLegs {
+  return decodeJsonField<SaleSplitLegs>(splitPayments)
 }
 
 /**
@@ -330,6 +343,89 @@ export async function buildSalesByCustomer(
       { key: 'vat', label: 'VAT', width: 0.13, align: 'right', format: 'money', excelWidth: 12 },
       { key: 'total', label: 'Total', width: 0.15, align: 'right', format: 'money', excelWidth: 13 },
       { key: 'outstanding', label: 'Outstanding', width: 0.15, align: 'right', format: 'money', excelWidth: 13 },
+    ],
+    groups,
+    grandTotal,
+    meta: { ...meta, rowCount: countDataRows(groups) },
+  }
+}
+
+/**
+ * Sales — Split Payments: every sale settled by a cash/EFT/business-loan
+ * split, grouped by buyer, with the three legs broken into their own
+ * columns instead of one collapsed "Split" payment-method label.
+ */
+export async function buildSalesSplitPayments(
+  params: SalesSplitPaymentsParams,
+  meta: MetaBase
+): Promise<ReportDocument> {
+  const { start, end } = getRangeBoundsSAST(params.from, params.to)
+
+  const sales = await prisma.sale.findMany({
+    where: {
+      createdAt: { gte: start, lte: end },
+      splitPayments: { not: Prisma.DbNull },
+      ...(params.customerId ? { customerId: params.customerId } : {}),
+    },
+    select: {
+      refNumber: true,
+      createdAt: true,
+      splitPayments: true,
+      buyerName: true,
+      customer: { select: { firstName: true, lastName: true, companyName: true } },
+    },
+  })
+
+  const totalOf = (legs: SaleSplitLegs) =>
+    new Decimal(legs.cash || '0').plus(legs.eft || '0').plus(legs.businessLoan || '0')
+
+  const { groups, grandTotal } = groupRows(sales, {
+    groups: [{ label: buyerBandName }],
+    row: {
+      key: (s) => s.refNumber,
+      build: (items) => {
+        const s = items[0]!
+        const legs = saleSplitLegs(s.splitPayments)
+        return {
+          ticket: s.refNumber,
+          date: s.createdAt.toISOString(),
+          cash: new Decimal(legs.cash || '0').toFixed(2),
+          eft: new Decimal(legs.eft || '0').toFixed(2),
+          businessLoan: new Decimal(legs.businessLoan || '0').toFixed(2),
+          total: totalOf(legs).toFixed(2),
+        }
+      },
+      sortBy: (items) => items[0]!.createdAt.toISOString(),
+    },
+    measures: {
+      cash: (s) => new Decimal(saleSplitLegs(s.splitPayments).cash || '0'),
+      eft: (s) => new Decimal(saleSplitLegs(s.splitPayments).eft || '0'),
+      businessLoan: (s) => new Decimal(saleSplitLegs(s.splitPayments).businessLoan || '0'),
+      total: (s) => totalOf(saleSplitLegs(s.splitPayments)),
+    },
+    formatTotals: (t) => ({
+      cash: t.cash!.toFixed(2),
+      eft: t.eft!.toFixed(2),
+      businessLoan: t.businessLoan!.toFixed(2),
+      total: t.total!.toFixed(2),
+    }),
+  })
+
+  return {
+    reportId: 'sales-split-payments',
+    title: 'Sales — Split Payments',
+    params: {
+      from: params.from,
+      to: params.to,
+      ...(params.customerId ? { filters: { customerId: params.customerId } } : {}),
+    },
+    columns: [
+      { key: 'ticket', label: 'Ticket', width: 0.15, format: 'text', excelWidth: 16 },
+      { key: 'date', label: 'Date', width: 0.18, format: 'datetime', excelWidth: 18 },
+      { key: 'cash', label: 'Cash', width: 0.15, align: 'right', format: 'money', excelWidth: 14 },
+      { key: 'eft', label: 'EFT', width: 0.15, align: 'right', format: 'money', excelWidth: 14 },
+      { key: 'businessLoan', label: 'Business Loan', width: 0.19, align: 'right', format: 'money', excelWidth: 16 },
+      { key: 'total', label: 'Total', width: 0.18, align: 'right', format: 'money', excelWidth: 14 },
     ],
     groups,
     grandTotal,

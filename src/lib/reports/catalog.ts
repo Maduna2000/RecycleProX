@@ -81,6 +81,26 @@ export const REPORT_CATALOG: ReportCatalogEntry[] = [
       { key: 'productId', label: 'Product', type: 'product' },
     ],
   },
+  {
+    id: 'purchases-average-cost',
+    label: 'Purchase Average Cost Report',
+    description:
+      'Every product actually purchased in the period, one flat row each, with total quantity and the quantity-weighted average purchase price across every supplier.',
+    area: 'purchases',
+    filters: [
+      { key: 'productId', label: 'Product', type: 'product' },
+    ],
+  },
+  {
+    id: 'purchases-split-payments',
+    label: 'Purchases — Split Payments',
+    description:
+      'Every purchase settled by a cash / EFT / loan split, grouped by supplier, with each leg broken out and totalled.',
+    area: 'purchases',
+    filters: [
+      { key: 'customerId', label: 'Supplier', type: 'customer' },
+    ],
+  },
   // ── Sales ──────────────────────────────────────────────────────────────────
   {
     id: 'sales-daily',
@@ -105,6 +125,16 @@ export const REPORT_CATALOG: ReportCatalogEntry[] = [
     label: 'Sales per Customer',
     description:
       'One row per sale under each buyer: date, reference, payment method and status, VAT, total, and outstanding balance.',
+    area: 'sales',
+    filters: [
+      { key: 'customerId', label: 'Customer', type: 'customer' },
+    ],
+  },
+  {
+    id: 'sales-split-payments',
+    label: 'Sales — Split Payments',
+    description:
+      'Every sale settled by a cash / EFT / business-loan split, grouped by buyer, with each leg broken out and totalled.',
     area: 'sales',
     filters: [
       { key: 'customerId', label: 'Customer', type: 'customer' },

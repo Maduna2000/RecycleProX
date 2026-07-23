@@ -13,11 +13,14 @@ import {
   PurchasesDailyParamsSchema,
   PurchasesSupplierStatementParamsSchema,
   PurchasesPerProductDayParamsSchema,
+  PurchasesAverageCostParamsSchema,
+  PurchasesSplitPaymentsParamsSchema,
   PurchasesByIdSearchParamsSchema,
   TopSellersParamsSchema,
   SalesDailyParamsSchema,
   SalesByProductParamsSchema,
   SalesByCustomerParamsSchema,
+  SalesSplitPaymentsParamsSchema,
   ExpensesReportParamsSchema,
   LoansOutstandingParamsSchema,
   LoanPaymentsParamsSchema,
@@ -31,6 +34,8 @@ import {
   buildPurchasesDaily,
   buildPurchasesSupplierStatement,
   buildPurchasesPerProductDay,
+  buildPurchasesAverageCost,
+  buildPurchasesSplitPayments,
   buildPurchasesByCasualId,
   buildPurchasesByAccountId,
   buildTopSellersByCategory,
@@ -39,6 +44,7 @@ import {
   buildSalesDaily,
   buildSalesByProduct,
   buildSalesByCustomer,
+  buildSalesSplitPayments,
 } from './builders/sales'
 import {
   buildCashupHistory,
@@ -86,6 +92,14 @@ export const REPORT_REGISTRY: Record<string, ReportDefinition> = {
     paramsSchema: PurchasesPerProductDayParamsSchema,
     build: buildPurchasesPerProductDay,
   },
+  'purchases-average-cost': {
+    paramsSchema: PurchasesAverageCostParamsSchema,
+    build: buildPurchasesAverageCost,
+  },
+  'purchases-split-payments': {
+    paramsSchema: PurchasesSplitPaymentsParamsSchema,
+    build: buildPurchasesSplitPayments,
+  },
   'sales-daily': {
     paramsSchema: SalesDailyParamsSchema,
     build: buildSalesDaily,
@@ -97,6 +111,10 @@ export const REPORT_REGISTRY: Record<string, ReportDefinition> = {
   'sales-by-customer': {
     paramsSchema: SalesByCustomerParamsSchema,
     build: buildSalesByCustomer,
+  },
+  'sales-split-payments': {
+    paramsSchema: SalesSplitPaymentsParamsSchema,
+    build: buildSalesSplitPayments,
   },
   'cashup-history': {
     paramsSchema: BaseReportParamsSchema,

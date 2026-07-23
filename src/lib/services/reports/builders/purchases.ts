@@ -3,9 +3,9 @@
  */
 import Decimal from 'decimal.js'
 import { prisma } from '@/lib/db/prisma'
-import type { Prisma } from '@prisma/client'
+import { Prisma } from '@prisma/client'
 import { purchaseLineAmounts } from '@/lib/utils/vat'
-import { ciContains } from '@/lib/db/queryHelpers'
+import { ciContains, decodeJsonField } from '@/lib/db/queryHelpers'
 import { getRangeBoundsSAST } from '@/lib/utils/dayBounds'
 import { groupRows } from '@/lib/services/reports/grouping'
 import { countDataRows } from '@/lib/reports/flatten'
@@ -16,6 +16,8 @@ import type {
   PurchasesDailyParams,
   PurchasesSupplierStatementParams,
   PurchasesPerProductDayParams,
+  PurchasesAverageCostParams,
+  PurchasesSplitPaymentsParams,
   PurchasesByIdSearchParams,
   TopSellersParams,
 } from '@/lib/schemas/report'
@@ -36,6 +38,16 @@ function purchaseStatusLabel(p: { status: string; amountPaid: unknown }): string
 
 function paymentMethodLabel(p: { paymentMethod: string; splitPayments: unknown }): string {
   return p.splitPayments ? 'Split' : p.paymentMethod.toUpperCase()
+}
+
+interface PurchaseSplitLegs {
+  cash: string
+  eft: string
+  loan: string
+}
+
+function purchaseSplitLegs(splitPayments: unknown): PurchaseSplitLegs {
+  return decodeJsonField<PurchaseSplitLegs>(splitPayments)
 }
 
 // Legacy account-category band names (CASUALS / DEALERS 1 / DEALERS 3 …)
@@ -497,6 +509,177 @@ export async function buildPurchasesPerProductDay(
       { key: 'subTotal', label: 'Sub Total', width: 0.125, align: 'right', format: 'money', excelWidth: 13 },
       { key: 'vat', label: 'VAT', width: 0.09, align: 'right', format: 'money', excelWidth: 11 },
       { key: 'grandTotal', label: 'Grand Total', width: 0.14, align: 'right', format: 'money', excelWidth: 14 },
+    ],
+    groups,
+    grandTotal,
+    meta: { ...meta, rowCount: countDataRows(groups) },
+  }
+}
+
+/**
+ * Purchase Average Cost Report: every product actually purchased in the
+ * period, one flat row each (no category grouping) — with the quantity-
+ * weighted average purchase price across every supplier who sold it
+ * (avgPrice = grandTotal / mass, not a simple average of unit prices).
+ */
+export async function buildPurchasesAverageCost(
+  params: PurchasesAverageCostParams,
+  meta: MetaBase
+): Promise<ReportDocument> {
+  const { start, end } = getRangeBoundsSAST(params.from, params.to)
+
+  const averageCostArgs = {
+    where: {
+      purchase: { status: 'completed', createdAt: { gte: start, lte: end } },
+      ...(params.productId ? { productId: params.productId } : {}),
+    },
+    select: {
+      quantity: true,
+      lineTotal: true,
+      vatAmount: true,
+      product: { select: { code: true, name: true } },
+      purchase: { select: { customer: { select: { zeroRated: true } } } },
+    },
+  } satisfies Prisma.PurchaseLineFindManyArgs
+
+  const lines = await prisma.purchaseLine.findMany(averageCostArgs)
+
+  type Line = Prisma.PurchaseLineGetPayload<{ select: typeof averageCostArgs.select }>
+  const amountsOf = (l: Line) => purchaseLineAmounts(l, l.purchase.customer.zeroRated)
+
+  const { groups, grandTotal } = groupRows(lines, {
+    groups: [],
+    row: {
+      key: (l) => l.product.code,
+      build: (items, totals) => {
+        const mass = totals.mass!
+        const grand = totals.grandTotal!
+        return {
+          code: items[0]!.product.code,
+          name: items[0]!.product.name,
+          avgPrice: mass.isZero() ? null : grand.div(mass).toFixed(2),
+          mass: mass.toFixed(3),
+          subTotal: totals.subTotal!.toFixed(2),
+          vat: totals.vat!.toFixed(2),
+          grandTotal: grand.toFixed(2),
+        }
+      },
+      sortBy: (items) => items[0]!.product.name,
+    },
+    measures: {
+      mass: (l) => new Decimal(l.quantity.toString()),
+      subTotal: (l) => amountsOf(l).subTotal,
+      vat: (l) => amountsOf(l).vat,
+      grandTotal: (l) => amountsOf(l).grandTotal,
+    },
+    formatTotals: (t) => ({
+      mass: t.mass!.toFixed(3),
+      subTotal: t.subTotal!.toFixed(2),
+      vat: t.vat!.toFixed(2),
+      grandTotal: t.grandTotal!.toFixed(2),
+    }),
+  })
+
+  return {
+    reportId: 'purchases-average-cost',
+    title: 'Purchase Average Cost Report',
+    params: {
+      from: params.from,
+      to: params.to,
+      ...(params.productId ? { filters: { productId: params.productId } } : {}),
+    },
+    columns: [
+      { key: 'code', label: 'Code', width: 0.1, format: 'text', excelWidth: 12 },
+      { key: 'name', label: 'Product', width: 0.26, format: 'text', excelWidth: 28 },
+      { key: 'avgPrice', label: 'Avg Price Incl.', width: 0.14, align: 'right', format: 'money', excelWidth: 15 },
+      { key: 'mass', label: 'Mass', width: 0.12, align: 'right', format: 'mass', excelWidth: 12 },
+      { key: 'subTotal', label: 'Sub Total', width: 0.13, align: 'right', format: 'money', excelWidth: 14 },
+      { key: 'vat', label: 'VAT', width: 0.11, align: 'right', format: 'money', excelWidth: 12 },
+      { key: 'grandTotal', label: 'Grand Total', width: 0.14, align: 'right', format: 'money', excelWidth: 14 },
+    ],
+    groups,
+    grandTotal,
+    meta: { ...meta, rowCount: countDataRows(groups) },
+  }
+}
+
+/**
+ * Purchases — Split Payments: every purchase settled by a cash/EFT/loan
+ * split, grouped by supplier, with the three legs broken into their own
+ * columns instead of one collapsed "Split" payment-method label.
+ */
+export async function buildPurchasesSplitPayments(
+  params: PurchasesSplitPaymentsParams,
+  meta: MetaBase
+): Promise<ReportDocument> {
+  const { start, end } = getRangeBoundsSAST(params.from, params.to)
+
+  const splitPaymentArgs = {
+    where: {
+      createdAt: { gte: start, lte: end },
+      splitPayments: { not: Prisma.DbNull },
+      ...(params.customerId ? { customerId: params.customerId } : {}),
+    },
+    select: {
+      refNumber: true,
+      createdAt: true,
+      splitPayments: true,
+      customer: { select: { firstName: true, lastName: true, companyName: true } },
+    },
+  } satisfies Prisma.PurchaseFindManyArgs
+
+  const purchases = await prisma.purchase.findMany(splitPaymentArgs)
+
+  const totalOf = (legs: PurchaseSplitLegs) =>
+    new Decimal(legs.cash || '0').plus(legs.eft || '0').plus(legs.loan || '0')
+
+  const { groups, grandTotal } = groupRows(purchases, {
+    groups: [{ label: (p) => customerBandName(p.customer) }],
+    row: {
+      key: (p) => p.refNumber,
+      build: (items) => {
+        const p = items[0]!
+        const legs = purchaseSplitLegs(p.splitPayments)
+        return {
+          ticket: p.refNumber,
+          date: p.createdAt.toISOString(),
+          cash: new Decimal(legs.cash || '0').toFixed(2),
+          eft: new Decimal(legs.eft || '0').toFixed(2),
+          loan: new Decimal(legs.loan || '0').toFixed(2),
+          total: totalOf(legs).toFixed(2),
+        }
+      },
+      sortBy: (items) => items[0]!.createdAt.toISOString(),
+    },
+    measures: {
+      cash: (p) => new Decimal(purchaseSplitLegs(p.splitPayments).cash || '0'),
+      eft: (p) => new Decimal(purchaseSplitLegs(p.splitPayments).eft || '0'),
+      loan: (p) => new Decimal(purchaseSplitLegs(p.splitPayments).loan || '0'),
+      total: (p) => totalOf(purchaseSplitLegs(p.splitPayments)),
+    },
+    formatTotals: (t) => ({
+      cash: t.cash!.toFixed(2),
+      eft: t.eft!.toFixed(2),
+      loan: t.loan!.toFixed(2),
+      total: t.total!.toFixed(2),
+    }),
+  })
+
+  return {
+    reportId: 'purchases-split-payments',
+    title: 'Purchases — Split Payments',
+    params: {
+      from: params.from,
+      to: params.to,
+      ...(params.customerId ? { filters: { customerId: params.customerId } } : {}),
+    },
+    columns: [
+      { key: 'ticket', label: 'Ticket', width: 0.16, format: 'text', excelWidth: 16 },
+      { key: 'date', label: 'Date', width: 0.19, format: 'datetime', excelWidth: 18 },
+      { key: 'cash', label: 'Cash', width: 0.16, align: 'right', format: 'money', excelWidth: 14 },
+      { key: 'eft', label: 'EFT', width: 0.16, align: 'right', format: 'money', excelWidth: 14 },
+      { key: 'loan', label: 'Loan', width: 0.16, align: 'right', format: 'money', excelWidth: 14 },
+      { key: 'total', label: 'Total', width: 0.17, align: 'right', format: 'money', excelWidth: 14 },
     ],
     groups,
     grandTotal,

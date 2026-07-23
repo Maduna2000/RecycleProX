@@ -43,6 +43,15 @@ export const PurchasesPerProductDayParamsSchema = rangeParams({
   productId: z.string().uuid().optional(),
 })
 
+/** Flat per-product list (no category grouping) of everything actually purchased in the period, with a quantity-weighted average price. */
+export const PurchasesAverageCostParamsSchema = rangeParams({
+  productId: z.string().uuid().optional(),
+})
+
+export const PurchasesSplitPaymentsParamsSchema = rangeParams({
+  customerId: z.string().uuid().optional(),
+})
+
 /** Search a casual/account seller by partial ID number and/or a transaction by partial ref number. */
 export const PurchasesByIdSearchParamsSchema = rangeParams({
   idNumber: z.string().trim().max(20).optional(),
@@ -68,6 +77,10 @@ export const SalesDailyParamsSchema = rangeParams({
 export const SalesByProductParamsSchema = rangeParams({})
 
 export const SalesByCustomerParamsSchema = rangeParams({
+  customerId: z.string().uuid().optional(),
+})
+
+export const SalesSplitPaymentsParamsSchema = rangeParams({
   customerId: z.string().uuid().optional(),
 })
 
@@ -111,10 +124,13 @@ export type PurchasesByProductCategoryParams = z.infer<typeof PurchasesByProduct
 export type PurchasesDailyParams = z.infer<typeof PurchasesDailyParamsSchema>
 export type PurchasesSupplierStatementParams = z.infer<typeof PurchasesSupplierStatementParamsSchema>
 export type PurchasesPerProductDayParams = z.infer<typeof PurchasesPerProductDayParamsSchema>
+export type PurchasesAverageCostParams = z.infer<typeof PurchasesAverageCostParamsSchema>
+export type PurchasesSplitPaymentsParams = z.infer<typeof PurchasesSplitPaymentsParamsSchema>
 export type PurchasesByIdSearchParams = z.infer<typeof PurchasesByIdSearchParamsSchema>
 export type SalesDailyParams = z.infer<typeof SalesDailyParamsSchema>
 export type SalesByProductParams = z.infer<typeof SalesByProductParamsSchema>
 export type SalesByCustomerParams = z.infer<typeof SalesByCustomerParamsSchema>
+export type SalesSplitPaymentsParams = z.infer<typeof SalesSplitPaymentsParamsSchema>
 export type ExpensesReportParams = z.infer<typeof ExpensesReportParamsSchema>
 export type LoansOutstandingParams = z.infer<typeof LoansOutstandingParamsSchema>
 export type LoanPaymentsParams = z.infer<typeof LoanPaymentsParamsSchema>
