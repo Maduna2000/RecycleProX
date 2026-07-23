@@ -155,8 +155,14 @@ export async function openCashUp(openedByUserId: string, sessionDateStr?: string
 // session's. `needsCurrencyConfirmation` gates submission (see submitCashUp)
 // until a manager/admin explicitly confirms via confirmCurrency() below —
 // selecting a currency through the currency-change endpoint counts as an
-// explicit confirmation too.
-function buildCurrencyStatus<T extends { currency: string; currencyConfirmedAt: Date | null }>(
+// explicit confirmation too. Both confirmCurrency() and the currency-change
+// endpoint only accept 'open' sessions, so the flag must never come back true
+// for a submitted/approved/voided one — otherwise the UI offers a button the
+// server will 400 on (the "previous session" comparison is re-evaluated on
+// every read, so a session that was fine at submission time can still look
+// mismatched later if an earlier-dated session's currency changes after the
+// fact).
+function buildCurrencyStatus<T extends { status: string; currency: string; currencyConfirmedAt: Date | null }>(
   cashUp: T,
   prevCashUp: { currency: string } | null
 ): T & { currencyWarning: string | null; needsCurrencyConfirmation: boolean } {
@@ -164,13 +170,14 @@ function buildCurrencyStatus<T extends { currency: string; currencyConfirmedAt: 
   const currencyWarning = mismatched
     ? `Previous session was in ${prevCashUp!.currency}, this one is ${cashUp.currency} — confirm this is intentional.`
     : null
-  return { ...cashUp, currencyWarning, needsCurrencyConfirmation: mismatched && !cashUp.currencyConfirmedAt }
+  const needsCurrencyConfirmation = mismatched && !cashUp.currencyConfirmedAt && cashUp.status === 'open'
+  return { ...cashUp, currencyWarning, needsCurrencyConfirmation }
 }
 
 // Same as buildCurrencyStatus but looks up the previous session itself —
 // for call sites (route handlers) that only have the cashUp row, not
 // prevCashUp already in hand.
-export async function attachCurrencyStatus<T extends { sessionDate: Date; currency: string; currencyConfirmedAt: Date | null }>(
+export async function attachCurrencyStatus<T extends { sessionDate: Date; status: string; currency: string; currencyConfirmedAt: Date | null }>(
   cashUp: T
 ): Promise<T & { currencyWarning: string | null; needsCurrencyConfirmation: boolean }> {
   const prevCashUp = await prisma.cashUp.findFirst({
