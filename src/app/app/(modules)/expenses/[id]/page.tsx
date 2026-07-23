@@ -11,26 +11,9 @@ import {
 import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { colors } from '@/lib/design-tokens'
-import { BAR_GRAD, CARD_BORDER } from '@/components/rpx/styles'
+import { Btn, PortalPage } from '@/components/rpx'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
-
-// Windows aesthetic styles
-const secBtn: React.CSSProperties = {
-  display: 'inline-flex', alignItems: 'center', gap: 4, height: 24,
-  padding: '0 8px', fontSize: 11, fontWeight: 600, borderRadius: 2,
-  background: colors.surface, border: `1px solid ${colors.border}`, color: colors.textPrimary, cursor: 'pointer',
-}
-const priBtn: React.CSSProperties = {
-  display: 'inline-flex', alignItems: 'center', gap: 4, height: 24,
-  padding: '0 8px', fontSize: 11, fontWeight: 700, borderRadius: 2,
-  background: BAR_GRAD, border: CARD_BORDER, color: colors.textPrimary, cursor: 'pointer',
-}
-const dangerBtn: React.CSSProperties = {
-  display: 'inline-flex', alignItems: 'center', gap: 4, height: 24,
-  padding: '0 8px', fontSize: 11, fontWeight: 600, borderRadius: 2,
-  background: colors.surface, border: `1px solid ${colors.danger}`, color: colors.danger, cursor: 'pointer',
-}
 
 type ExpenseDetail = {
   id: string; refNumber: string; description: string
@@ -169,21 +152,29 @@ export default function ExpenseDetailPage() {
   const attachList = attachments ?? expense.attachments ?? []
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, padding: 8 }}>
-      {/* Main container with Windows border */}
-      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, background: '#fff', border: '1px solid #B0B0B0', borderRadius: 2, overflow: 'hidden' }}>
+    <PortalPage
+      title={expense.refNumber}
+      actions={
+        <>
+          {isMgr && isPending && (
+            <Btn variant="primary" size="sm" icon={CheckCircle} loading={approving} onClick={handleApprove}>Approve</Btn>
+          )}
+          {isMgr && !isVoided && (
+            <Btn variant="danger" size="sm" icon={Trash2} loading={voiding} onClick={handleVoid}>Void</Btn>
+          )}
+        </>
+      }
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
 
-        {/* Title bar with gradient */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 10px', borderBottom: '2px solid #B0B0B0', background: 'linear-gradient(180deg,#EAEAEA 0%,#D4D4D4 100%)', flexShrink: 0 }}>
-          <button onClick={() => router.push('/app/expenses')} style={{ ...secBtn, padding: '0 6px' }}>
-            <ArrowLeft style={{ width: 12, height: 12 }} />
-          </button>
+        {/* Sub-header */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderBottom: '1px solid #E0E0E0', flexShrink: 0 }}>
+          <Btn size="sm" icon={ArrowLeft} onClick={() => router.push('/app/expenses')}>Expenses</Btn>
           <span style={{ fontSize: 13, fontWeight: 700, color: colors.primary, fontFamily: 'monospace' }}>{expense.refNumber}</span>
           <StatusBadge status={expense.status} />
           <span style={{ fontSize: 10, color: colors.textSecondary, padding: '2px 6px', background: colors.processBg, border: `1px solid ${colors.process}`, borderRadius: 2 }}>
             {expense.expenseType.name}
           </span>
-          <div style={{ flex: 1 }} />
         </div>
 
         {/* Voided banner */}
@@ -265,15 +256,7 @@ export default function ExpenseDetailPage() {
                   onChange={handleUpload}
                   disabled={uploading}
                 />
-                <button
-                  onClick={() => fileRef.current?.click()}
-                  disabled={uploading}
-                  style={{ ...secBtn, opacity: uploading ? 0.5 : 1 }}
-                >
-                  {uploading
-                    ? <><Loader2 style={{ width: 11, height: 11, animation: 'spin 1s linear infinite' }} /> Uploading…</>
-                    : <><Upload style={{ width: 11, height: 11 }} /> Upload Slip</>}
-                </button>
+                <Btn icon={Upload} loading={uploading} onClick={() => fileRef.current?.click()}>Upload Slip</Btn>
               </div>
             </div>
 
@@ -302,13 +285,9 @@ export default function ExpenseDetailPage() {
                         </div>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, marginLeft: 12 }}>
-                        <button onClick={() => handleView(a.r2Key)} style={secBtn}>
-                          <Eye style={{ width: 11, height: 11 }} /> View
-                        </button>
+                        <Btn size="sm" icon={Eye} onClick={() => handleView(a.r2Key)}>View</Btn>
                         {isMgr && (
-                          <button onClick={() => handleDelete(a.id)} style={{ ...dangerBtn, padding: '0 6px' }}>
-                            <X style={{ width: 11, height: 11 }} />
-                          </button>
+                          <Btn size="sm" variant="danger" icon={X} onClick={() => handleDelete(a.id)} />
                         )}
                       </div>
                     </div>
@@ -318,25 +297,7 @@ export default function ExpenseDetailPage() {
             </div>
           </div>
         </div>
-
-        {/* Actions footer */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6, padding: '8px 12px', borderTop: '1px solid #B0B0B0', background: 'linear-gradient(180deg,#F5F5F5 0%,#ECECEC 100%)', flexShrink: 0 }}>
-          {isMgr && isPending && (
-            <button onClick={handleApprove} disabled={approving} style={{ ...priBtn, opacity: approving ? 0.5 : 1 }}>
-              {approving
-                ? <Loader2 style={{ width: 11, height: 11, animation: 'spin 1s linear infinite' }} />
-                : <><CheckCircle style={{ width: 11, height: 11 }} /> Approve</>}
-            </button>
-          )}
-          {isMgr && !isVoided && (
-            <button onClick={handleVoid} disabled={voiding} style={{ ...dangerBtn, opacity: voiding ? 0.5 : 1 }}>
-              {voiding
-                ? <Loader2 style={{ width: 11, height: 11, animation: 'spin 1s linear infinite' }} />
-                : <><Trash2 style={{ width: 11, height: 11 }} /> Void</>}
-            </button>
-          )}
-        </div>
       </div>
-    </div>
+    </PortalPage>
   )
 }
