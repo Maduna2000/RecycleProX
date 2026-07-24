@@ -12,3 +12,15 @@ export function authorizeInternalRequest(req: NextRequest): boolean {
   if (!expected || provided.length !== expected.length) return false
   return timingSafeEqual(Buffer.from(provided), Buffer.from(expected))
 }
+
+// Dedicated secret for the KPI export route (called by the sibling
+// "golden-key-control-tower" app), kept separate from
+// INTERNAL_API_SHARED_SECRET so that app's access is independently
+// revocable/rotatable without affecting the Portal's. Same header name and
+// constant-time comparison as authorizeInternalRequest for consistency.
+export function authorizeKpiExportRequest(req: NextRequest): boolean {
+  const provided = req.headers.get('x-internal-secret') ?? ''
+  const expected = process.env.KPI_EXPORT_SHARED_SECRET ?? ''
+  if (!expected || provided.length !== expected.length) return false
+  return timingSafeEqual(Buffer.from(provided), Buffer.from(expected))
+}

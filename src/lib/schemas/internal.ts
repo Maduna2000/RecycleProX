@@ -26,3 +26,16 @@ export const RegisterExistingTenantSchema = z.object({
 })
 
 export type RegisterExistingTenantInput = z.infer<typeof RegisterExistingTenantSchema>
+
+// Called by the sibling "golden-key-control-tower" app's sync runner —
+// pulls one tenant's aggregated KPIs for a period. periodEnd is exclusive
+// for period-flow metrics (revenue, buying, expenses, visit counts) and
+// inclusive as the as-at date for snapshot metrics (stock value, loans/
+// debts outstanding, cash on hand).
+export const KpiExportRequestSchema = z.object({
+  tenantId: z.string().min(1),
+  periodStart: z.coerce.date(),
+  periodEnd: z.coerce.date(),
+})
+
+export type KpiExportRequestInput = z.infer<typeof KpiExportRequestSchema>
