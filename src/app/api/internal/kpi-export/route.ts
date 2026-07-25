@@ -5,8 +5,6 @@ import { KpiExportRequestSchema } from '@/lib/schemas/internal'
 import { computeKpiExport } from '@/lib/services/kpiExportService'
 import { withTenantId } from '@/lib/db/tenantContext'
 import { authorizeKpiExportRequest } from '@/lib/internal/authorizeInternalRequest'
-import { registryPrisma } from '@/lib/db/registryPrisma'
-// TEMP DIAGNOSTIC — remove after the cross-tenant investigation is done.
 
 // Server-to-server only — called by the sibling "golden-key-control-tower"
 // app's sync runner to pull one tenant's KPIs for a period. Each yard is its
@@ -26,10 +24,8 @@ export async function POST(req: NextRequest) {
   const { tenantId, periodStart, periodEnd } = parsed.data
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const tenant = await (registryPrisma as any).tenant.findUnique({ where: { id: tenantId } })
     const result = await withTenantId(tenantId, () => computeKpiExport(periodStart, periodEnd))
-    return NextResponse.json({ ...result, _debug: { requestedTenantId: tenantId, resolvedSchemaName: tenant?.schemaName, resolvedCompanyName: tenant?.companyName } })
+    return NextResponse.json(result)
   } catch (err) {
     logger.error({ err, tenantId }, 'KPI export failed')
     return NextResponse.json({ error: 'KPI export failed' }, { status: 500 })
