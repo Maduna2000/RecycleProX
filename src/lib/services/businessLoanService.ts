@@ -21,6 +21,14 @@ export class BusinessLoanHasRepaymentsError extends Error {
   constructor(ref: string) { super(`Business loan "${ref}" has repayments and cannot be voided`); this.name = 'BusinessLoanHasRepaymentsError' }
 }
 
+export class BusinessLoanAlreadySettledError extends Error {
+  constructor(ref: string) { super(`Business loan "${ref}" is already settled`); this.name = 'BusinessLoanAlreadySettledError' }
+}
+
+export class BusinessLoanRepaymentExceedsBalanceError extends Error {
+  constructor(balance: string) { super(`Payment amount exceeds outstanding balance of R ${balance}`); this.name = 'BusinessLoanRepaymentExceedsBalanceError' }
+}
+
 export class CustomerBlacklistedError extends Error {
   constructor() { super('Customer is blacklisted and cannot advance a business loan'); this.name = 'CustomerBlacklistedError' }
 }
@@ -105,6 +113,94 @@ export async function applyBusinessLoanRepaymentTx(
     logger.info({ businessLoanId: loan.id, refNumber, repayAmount: repayAmount.toFixed(2), newBalance: newBalance.toFixed(2), settled: isNowSettled, saleId, createdByUserId }, 'businessLoan.repayment.from_sale')
     remaining = remaining.minus(repayAmount)
   }
+}
+
+// ─── Record a manual repayment ────────────────────────────────────────────────
+// The "Record Payment" action on the Business Loan tab — pays down ONE
+// specific loan directly, unlike applyBusinessLoanRepaymentTx above (which
+// nets a sale's proceeds FIFO across every active loan a customer has).
+// Split across cash/EFT in one action, mirroring the Purchases module's
+// split-payment modal — but "vice versa": that modal pays the pending
+// balance up to exactly zero in one mandatory full settlement, while this
+// one pays the outstanding balanceAmount DOWN and allows a partial amount,
+// since a loan owed to a dealer is naturally repaid over several visits.
+// Writes one BusinessLoanRepayment row per non-zero leg so each keeps its
+// own payment method on record.
+
+export async function recordBusinessLoanRepayment(
+  businessLoanId: string,
+  payments: { cash: string; eft: string },
+  createdByUserId?: string,
+  notes?: string,
+) {
+  const loan = await prisma.businessLoan.findUnique({ where: { id: businessLoanId } })
+  if (!loan) throw new BusinessLoanNotFoundError(businessLoanId)
+  if (loan.status === 'voided')  throw new BusinessLoanAlreadyVoidedError(loan.refNumber)
+  if (loan.status === 'settled') throw new BusinessLoanAlreadySettledError(loan.refNumber)
+
+  const cash  = new Decimal(payments.cash || '0')
+  const eft   = new Decimal(payments.eft  || '0')
+  const total = cash.plus(eft)
+
+  const currentBalance = new Decimal(loan.balanceAmount.toString())
+  if (total.greaterThan(currentBalance)) {
+    throw new BusinessLoanRepaymentExceedsBalanceError(currentBalance.toFixed(2))
+  }
+
+  const newBalance   = currentBalance.minus(total)
+  const isNowSettled = newBalance.isZero()
+
+  const prefix     = `BRP-${todaySASTDateStr().replace(/-/g, '')}`
+  const startOfDay = todaySASTDate()
+
+  const legs: { method: 'cash' | 'eft'; amount: Decimal }[] = []
+  if (cash.greaterThan(0)) legs.push({ method: 'cash', amount: cash })
+  if (eft.greaterThan(0))  legs.push({ method: 'eft', amount: eft })
+
+  const repayments = await prisma.$transaction(async (tx) => {
+    const baseCount = await tx.businessLoanRepayment.count({ where: { createdAt: { gte: startOfDay } } })
+
+    const created = []
+    for (let i = 0; i < legs.length; i++) {
+      const leg = legs[i]!
+      const refNumber = `${prefix}-${String(baseCount + i + 1).padStart(4, '0')}`
+      created.push(await tx.businessLoanRepayment.create({
+        data: {
+          tenantId:        requireTenantId(),
+          refNumber,
+          businessLoanId:  loan.id,
+          customerId:      loan.customerId,
+          amount:          leg.amount,
+          paymentMethod:   leg.method,
+          notes,
+          createdByUserId,
+        },
+      }))
+    }
+
+    await tx.businessLoan.update({
+      where: { id: businessLoanId },
+      data: {
+        balanceAmount: newBalance,
+        status:        isNowSettled ? 'settled' : 'active',
+      },
+    })
+
+    return created
+  })
+
+  logger.info(
+    {
+      businessLoanId,
+      refNumbers: repayments.map((r) => r.refNumber),
+      total:      total.toFixed(2),
+      newBalance: newBalance.toFixed(2),
+      settled:    isNowSettled,
+      createdByUserId,
+    },
+    'businessLoan.repayment.recorded'
+  )
+  return repayments
 }
 
 // ─── Create Business Loan ─────────────────────────────────────────────────────
