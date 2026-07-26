@@ -661,12 +661,18 @@ model CashUp {
   rejectedByUserId    String?
   rejectedAt          DateTime?
   rejectionReason     String?
-  currencyConfirmedAt       DateTime?
-  currencyConfirmedByUserId String?
   createdAt           DateTime     @default(now())
   updatedAt           DateTime     @updatedAt
 
-  @@unique([tenantId, sessionDate])
+  // A day can hold more than one session (separate shifts) — sessionDate is
+  // NOT unique per tenant. The real invariant, "at most one session may be
+  // 'open' at a time", is enforced by a partial unique index that Prisma's
+  // schema DSL can't express directly (declared via raw SQL only — see
+  // migration 20260724000000_cashup_multi_session_per_day, same pattern as
+  // the RLS policies in 20260716000003_enable_rls):
+  //   CREATE UNIQUE INDEX "CashUp_tenantId_one_open_key"
+  //     ON "CashUp"("tenantId") WHERE status = 'open';
+  @@index([tenantId, sessionDate])
   @@index([tenantId])
   @@index([tenantId, status])
   @@index([tenantId, openedByUserId])

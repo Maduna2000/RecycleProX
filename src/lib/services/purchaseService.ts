@@ -368,7 +368,7 @@ export async function voidPurchase(id: string, data: VoidPurchaseInput, voidedBy
     })
 
     if (wasCompleted) {
-      await recalculateApprovedCashUpForDate(tx, sessionDate, 'purchases')
+      await recalculateApprovedCashUpForDate(tx, sessionDate, purchase.createdAt, 'purchases')
     }
 
     return p
