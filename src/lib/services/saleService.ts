@@ -245,7 +245,7 @@ export async function voidSale(id: string, data: VoidSaleInput, voidedById?: str
     })
 
     if (wasCompleted) {
-      await recalculateApprovedCashUpForDate(tx, sessionDate, 'sales')
+      await recalculateApprovedCashUpForDate(tx, sessionDate, sale.createdAt, 'sales')
     }
 
     return s

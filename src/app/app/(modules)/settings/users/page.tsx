@@ -8,10 +8,10 @@ import { CreateUserModal } from '@/components/users/CreateUserModal'
 import { EditUserModal } from '@/components/users/EditUserModal'
 import { ResetPasswordModal } from '@/components/users/ResetPasswordModal'
 import { SetPinModal } from '@/components/users/SetPinModal'
-import { Search, Unlock, UserCheck, UserX, KeyRound, ArrowLeft, Pencil } from 'lucide-react'
+import { Search, Unlock, UserCheck, UserX, KeyRound, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
 import { colors } from '@/lib/design-tokens'
-import { inp, Btn, Field, PortalPage, FilterBar } from '@/components/rpx'
+import { inp, Field, PortalPage, FilterBar } from '@/components/rpx'
 import { DataTable, type Column, type RowAction } from '@/components/ui/DataTable'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
@@ -147,7 +147,6 @@ export default function UsersPage() {
     <>
     <PortalPage
       title={`Users (${users.length})`}
-      actions={<Btn size="sm" icon={ArrowLeft} href="/app/settings">Settings</Btn>}
     >
         {/* Filters */}
         <FilterBar>

@@ -4,7 +4,6 @@ import logger from '@/lib/logger'
 import { prisma } from '@/lib/db/prisma'
 import { z } from 'zod'
 import { CURRENCIES } from '@/lib/schemas/cashup'
-import { attachCurrencyStatus } from '@/lib/services/cashUpService'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 const UpdateCurrencySchema = z.object({
@@ -37,18 +36,11 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       if (!cashUp) throw new CashUpNotFoundForCurrencyError()
       if (cashUp.status !== 'open') throw new CashUpNotOpenForCurrencyError()
 
-      // Update the currency — an explicit manager/admin selection here counts
-      // as confirming the currency is intentional, same as the dedicated
-      // confirm-currency endpoint.
-      const saved = await prisma.cashUp.update({
+      // Update the currency
+      return prisma.cashUp.update({
         where: { id },
-        data: {
-          currency: parsed.data.currency,
-          currencyConfirmedAt: new Date(),
-          currencyConfirmedByUserId: session.user.id,
-        },
+        data: { currency: parsed.data.currency },
       })
-      return attachCurrencyStatus(saved)
     })
 
     logger.info({ cashUpId: id, currency: parsed.data.currency }, 'Cash-up currency updated')

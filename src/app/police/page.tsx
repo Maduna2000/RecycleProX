@@ -20,8 +20,8 @@ import {
 import { POLICE_VISIT_REASONS, VISIT_REASON_LABELS } from '@/lib/schemas/police'
 import { DEFAULT_POLICE_SERVICE_NAME, DEFAULT_POLICE_LEGAL_NOTE } from '@/lib/police-defaults'
 import {
-  NAVY, inp, lbl, TH, TD,
-  Btn, TabStrip, EmptyHint, SectionLabel, DL, Drawer,
+  NAVY, HEADER_GRAD, inp, lbl, TH, TD,
+  Btn, Field, TabStrip, EmptyHint, SectionLabel, DL, Drawer,
   RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter,
 } from '@/components/rpx'
 import { Dialog } from '@/components/ui/dialog'
@@ -309,83 +309,73 @@ function BeginInspectionCard({
   }
 
   return (
-    <div style={{ display: 'flex', justifyContent: 'center', padding: '32px 16px' }}>
-      <div style={{ width: '100%', maxWidth: 560 }}>
-        <div style={{ background: '#fff', border: '1px solid #B0B0B0', borderRadius: 3, overflow: 'hidden' }}>
-          <div style={{ background: 'linear-gradient(180deg,#FFFFFF 0%,#E8E8E8 100%)', borderBottom: '1px solid #C0C0C0', padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <ShieldCheck style={{ width: 15, height: 15, color: NAVY }} />
-            <span style={{ fontSize: 13, fontWeight: 700, color: NAVY }}>Begin Inspection — Officer Registration</span>
+    <div style={{ padding: 16 }}>
+      <div style={{ background: '#fff', border: '1px solid #D0D0D0', borderRadius: 2, overflow: 'hidden', marginBottom: 10 }}>
+        <div style={{ background: HEADER_GRAD, borderBottom: '1px solid #C0C0C0', padding: '4px 10px', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <ShieldCheck style={{ width: 14, height: 14, color: NAVY }} />
+          <span style={{ fontSize: 11, fontWeight: 700, color: NAVY }}>Begin Inspection — Officer Registration</span>
+        </div>
+
+        <form onSubmit={handleSubmit} style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <p style={{ margin: 0, fontSize: 12, color: '#6C757D' }}>
+            In terms of the applicable second-hand goods legislation, please identify yourself before the register is made available.
+          </p>
+
+          <Field label="Full Name" required>
+            <input value={officerName} onChange={(e) => setOfficerName(e.target.value)} placeholder="e.g. J. Nkosi" style={inp} autoFocus />
+          </Field>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+            <Field label="Rank" required>
+              <input value={rank} onChange={(e) => setRank(e.target.value)} placeholder="e.g. Constable" style={inp} />
+            </Field>
+            <Field label="Service / Force Number" required>
+              <input value={badgeNumber} onChange={(e) => setBadgeNumber(e.target.value)} placeholder="e.g. 7012345-6" style={inp} />
+            </Field>
+            <Field label="Police Station" required>
+              <input value={stationName} onChange={(e) => setStationName(e.target.value)} placeholder="e.g. Pretoria Central" style={inp} />
+            </Field>
           </div>
 
-          <form onSubmit={handleSubmit} style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <p style={{ margin: 0, fontSize: 12, color: '#6C757D' }}>
-              In terms of the applicable second-hand goods legislation, please identify yourself before the register is made available.
-            </p>
-
-            <div>
-              <label style={lbl}>Full Name <span style={{ color: '#DC3545' }}>*</span></label>
-              <input value={officerName} onChange={(e) => setOfficerName(e.target.value)} placeholder="e.g. J. Nkosi" style={inp} autoFocus />
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <div>
-                <label style={lbl}>Rank <span style={{ color: '#DC3545' }}>*</span></label>
-                <input value={rank} onChange={(e) => setRank(e.target.value)} placeholder="e.g. Constable" style={inp} />
-              </div>
-              <div>
-                <label style={lbl}>Service / Force Number <span style={{ color: '#DC3545' }}>*</span></label>
-                <input value={badgeNumber} onChange={(e) => setBadgeNumber(e.target.value)} placeholder="e.g. 7012345-6" style={inp} />
-              </div>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <div>
-                <label style={lbl}>Police Station <span style={{ color: '#DC3545' }}>*</span></label>
-                <input value={stationName} onChange={(e) => setStationName(e.target.value)} placeholder="e.g. Pretoria Central" style={inp} />
-              </div>
-              <div>
-                <label style={lbl}>Contact Number</label>
-                <input value={contactNumber} onChange={(e) => setContactNumber(e.target.value)} placeholder="Optional" style={inp} />
-              </div>
-            </div>
-
-            <div>
-              <label style={lbl}>Reason for Visit <span style={{ color: '#DC3545' }}>*</span></label>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <Field label="Contact Number">
+              <input value={contactNumber} onChange={(e) => setContactNumber(e.target.value)} placeholder="Optional" style={inp} />
+            </Field>
+            <Field label="Reason for Visit" required>
               <select value={visitReason} onChange={(e) => setVisitReason(e.target.value)} style={{ ...inp, height: 30 }}>
                 {POLICE_VISIT_REASONS.map((r) => (
                   <option key={r} value={r}>{VISIT_REASON_LABELS[r]}</option>
                 ))}
               </select>
-            </div>
+            </Field>
+          </div>
 
-            <div>
-              <label style={lbl}>Note (optional)</label>
-              <textarea
-                value={visitNote}
-                onChange={(e) => setVisitNote(e.target.value)}
-                placeholder="Case number, description of goods sought, etc."
-                rows={2}
-                style={{ ...inp, height: 'auto', padding: '6px 8px', resize: 'vertical' }}
-              />
-            </div>
+          <Field label="Note (optional)">
+            <textarea
+              value={visitNote}
+              onChange={(e) => setVisitNote(e.target.value)}
+              placeholder="Case number, description of goods sought, etc."
+              rows={2}
+              style={{ ...inp, height: 'auto', padding: '6px 8px', resize: 'vertical' }}
+            />
+          </Field>
 
-            {error && (
-              <p style={{ fontSize: 12, padding: '6px 10px', borderRadius: 2, color: '#DC3545', background: '#FDECEA', margin: 0 }}>{error}</p>
-            )}
+          {error && (
+            <p style={{ fontSize: 12, padding: '6px 10px', borderRadius: 2, color: '#DC3545', background: '#FDECEA', margin: 0 }}>{error}</p>
+          )}
 
-            <Btn type="submit" variant="primary" icon={ShieldCheck} loading={loading} disabled={!canSubmit} style={{ alignSelf: 'flex-start' }}>
-              {loading ? 'Starting…' : 'Begin Inspection'}
-            </Btn>
-          </form>
-        </div>
+          <Btn type="submit" variant="primary" icon={ShieldCheck} loading={loading} disabled={!canSubmit} style={{ alignSelf: 'flex-start' }}>
+            {loading ? 'Starting…' : 'Begin Inspection'}
+          </Btn>
+        </form>
+      </div>
 
-        <div style={{ marginTop: 12, background: '#EFF4FB', border: `1px solid ${NAVY}`, borderRadius: 3, padding: '10px 14px' }}>
-          <p style={{ fontWeight: 700, color: NAVY, margin: '0 0 3px', fontSize: 11 }}>{serviceName} — legal notice</p>
-          <p style={{ color: '#33507E', margin: 0, fontSize: 11 }}>{legalNote}</p>
-          <p style={{ color: '#33507E', margin: '6px 0 0', fontSize: 10.5 }}>
-            All searches performed during this session are recorded against your visit and appear on the inspection certificate.
-          </p>
-        </div>
+      <div style={{ background: '#EFF4FB', border: `1px solid ${NAVY}`, borderRadius: 2, padding: '8px 12px', fontSize: 11 }}>
+        <p style={{ fontWeight: 700, color: NAVY, margin: '0 0 3px' }}>{serviceName} — legal notice</p>
+        <p style={{ color: '#33507E', margin: 0 }}>{legalNote}</p>
+        <p style={{ color: '#33507E', margin: '6px 0 0', fontSize: 10.5 }}>
+          All searches performed during this session are recorded against your visit and appear on the inspection certificate.
+        </p>
       </div>
     </div>
   )

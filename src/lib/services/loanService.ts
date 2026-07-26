@@ -4,7 +4,8 @@ import logger from '@/lib/logger'
 import Decimal from 'decimal.js'
 import type { Prisma } from '@prisma/client'
 import type { CreateLoanInput, CreateRepaymentInput, VoidLoanInput } from '@/lib/schemas/loan'
-import { getDayBoundsSAST, todaySASTDate, todaySASTDateStr } from '@/lib/utils/dayBounds'
+import { todaySASTDate, todaySASTDateStr } from '@/lib/utils/dayBounds'
+import type { DateWindow } from '@/lib/services/cashUpWindow'
 
 // ─── Typed Errors ─────────────────────────────────────────────────────────────
 
@@ -314,8 +315,8 @@ export async function getCustomerLoanSummary(customerId: string) {
 
 // ─── Daily loan totals (for CashUp auto-calculation) ─────────────────────────
 
-export async function getLoanTotalsForDate(date: Date) {
-  const { start, end } = getDayBoundsSAST(date)
+export async function getLoanTotalsForDate(window: DateWindow) {
+  const { start, end } = window
 
   // Only cash-method loans/repayments affect the drawer. Repayments are always
   // cash in practice (applyRepaymentTx hardcodes it — it's a deduction from a

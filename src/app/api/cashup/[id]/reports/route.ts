@@ -18,6 +18,8 @@ import {
   getTransferredPurchasesForDate,
   getDrawingsReceivedForDateReport,
 } from '@/lib/services/cashUpService'
+import { getSessionWindow, type DateWindow } from '@/lib/services/cashUpWindow'
+import { prisma } from '@/lib/db/prisma'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 class CashUpNotFoundForReportError extends Error {}
@@ -65,8 +67,13 @@ export async function GET(
       // Get settings for company info
       const settings = await getAllSettings()
 
+      // Scoped to this session's own reconciliation window, not the whole
+      // calendar day — a day can hold more than one session (separate
+      // shifts) — except unpaid-today/unpaid-all, which stay day/global.
+      const window = await getSessionWindow(prisma, cashUp)
+
       // Fetch report data based on type
-      const entries = await getReportData(reportType, cashUp.sessionDate)
+      const entries = await getReportData(reportType, window, cashUp.sessionDate)
 
       return { cashUp, settings, entries }
     })
@@ -113,26 +120,27 @@ export async function GET(
 
 async function getReportData(
   reportType: CashupReportType,
+  window: DateWindow,
   sessionDate: Date
 ): Promise<ReportEntry[]> {
   switch (reportType) {
     case 'cash-sales':
-      return getCashSalesForDate(sessionDate) as unknown as Promise<ReportEntry[]>
+      return getCashSalesForDate(window) as unknown as Promise<ReportEntry[]>
 
     case 'cash-purchases':
-      return getCashPurchasesForDate(sessionDate) as unknown as Promise<ReportEntry[]>
+      return getCashPurchasesForDate(window) as unknown as Promise<ReportEntry[]>
 
     case 'account-payments':
-      return getAccountPaymentsForDate(sessionDate) as unknown as Promise<ReportEntry[]>
+      return getAccountPaymentsForDate(window) as unknown as Promise<ReportEntry[]>
 
     case 'expenses':
-      return getExpensesForDateReport(sessionDate) as unknown as Promise<ReportEntry[]>
+      return getExpensesForDateReport(window) as unknown as Promise<ReportEntry[]>
 
     case 'loan-advances':
-      return getLoanAdvancesForDate(sessionDate) as unknown as Promise<ReportEntry[]>
+      return getLoanAdvancesForDate(window) as unknown as Promise<ReportEntry[]>
 
     case 'loan-repayments':
-      return getLoanRepaymentsForDate(sessionDate) as unknown as Promise<ReportEntry[]>
+      return getLoanRepaymentsForDate(window) as unknown as Promise<ReportEntry[]>
 
     case 'unpaid-today':
       return getUnpaidPurchases('today', sessionDate) as unknown as Promise<ReportEntry[]>
@@ -141,13 +149,13 @@ async function getReportData(
       return getUnpaidPurchases('all') as unknown as Promise<ReportEntry[]>
 
     case 'card-sales':
-      return getCardSalesForDate(sessionDate) as unknown as Promise<ReportEntry[]>
+      return getCardSalesForDate(window) as unknown as Promise<ReportEntry[]>
 
     case 'transferred-purchases':
-      return getTransferredPurchasesForDate(sessionDate) as unknown as Promise<ReportEntry[]>
+      return getTransferredPurchasesForDate(window) as unknown as Promise<ReportEntry[]>
 
     case 'drawings-received':
-      return getDrawingsReceivedForDateReport(sessionDate) as unknown as Promise<ReportEntry[]>
+      return getDrawingsReceivedForDateReport(window) as unknown as Promise<ReportEntry[]>
 
     default:
       return []
