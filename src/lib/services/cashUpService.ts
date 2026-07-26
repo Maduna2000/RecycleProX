@@ -239,6 +239,14 @@ export async function rejectCashUp(cashUpId: string, rejectedByUserId: string, r
     where: { id: cashUpId },
     data: {
       status: 'open',
+      // Clear closedAt/closedByUserId along with the status flip — a
+      // non-null closedAt is what getSessionWindow (cashUpWindow.ts) reads
+      // as "this session's reconciliation window ends here". Left in place,
+      // a rejected-then-resubmitted session's window would stop at the
+      // original (pre-rejection) submission instant, silently dropping
+      // every transaction the cashier enters while fixing the correction.
+      closedAt:        null,
+      closedByUserId:  null,
       rejectedByUserId,
       rejectedAt: new Date(),
       rejectionReason: reason,

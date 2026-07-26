@@ -246,7 +246,8 @@ export async function getTodayStats() {
     prisma.sale.count({ where: { status: 'completed', createdAt: { gte: start, lte: end } } }),
     prisma.purchase.count({ where: { status: 'completed', createdAt: { gte: start, lte: end } } }),
     prisma.cashUp.findFirst({
-      where: { sessionDate: start, status: { in: ['open', 'submitted'] } },
+      where:   { sessionDate: start, status: { in: ['open', 'submitted'] } },
+      orderBy: { openedAt: 'desc' },
     }),
   ])
 
