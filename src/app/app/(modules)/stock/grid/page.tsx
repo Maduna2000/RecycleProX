@@ -64,7 +64,7 @@ export default function StockGridPage() {
       key: 'name',
       header: 'Product',
       render: (r) => (
-        <div>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
           <p style={{ fontSize: fontSize.sm, fontWeight: 500, color: colors.textPrimary }}>{r.name}</p>
           <p className="font-mono" style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>{r.code}</p>
         </div>
