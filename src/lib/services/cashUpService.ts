@@ -6,6 +6,7 @@ import { SubmitCashUpInput, ApproveCashUpInput, type Currency } from '@/lib/sche
 import { getMostRecentFloatBefore, updateClosingAmount, getDrawingsReceivedForDate } from './floatService'
 import { getExpenseTotalsForDate } from './expenseService'
 import { getLoanTotalsForDate } from './loanService'
+import { getSessionWindow, type DateWindow } from './cashUpWindow'
 import { sastDateLabelToUTCDate, getDayBoundsSAST, todaySASTDateStr } from '@/lib/utils/dayBounds'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -30,13 +31,12 @@ export class CashUpNewerSessionOpenError extends Error {
   constructor() { super('Cannot reject — a newer session is already open. Void this session instead if it cannot be corrected.'); this.name = 'CashUpNewerSessionOpenError' }
 }
 
-export class CashUpCurrencyNotConfirmedError extends Error {
-  code = 'CURRENCY_NOT_CONFIRMED' as const
-  constructor() { super('This session\'s currency differs from the previous session and has not been confirmed yet — a manager must confirm before it can be submitted.'); this.name = 'CashUpCurrencyNotConfirmedError' }
-}
-
 // ─── Open a cash-up session ───────────────────────────────────────────────────
-// Only one open session at a time is allowed. Must submit previous day's first.
+// A day can hold more than one session (separate shifts) — the only real
+// rule is that at most one session may be 'open' at a time, enforced here
+// and backed by a partial unique DB index (see migration
+// 20260724000000_cashup_multi_session_per_day) so a race between two opens
+// can't slip both through.
 export async function openCashUp(openedByUserId: string, sessionDateStr?: string, currency: Currency = 'ZAR') {
   const dateStr = sessionDateStr ?? todayStr()
   const sessionDate = toDate(dateStr)
@@ -51,20 +51,27 @@ export async function openCashUp(openedByUserId: string, sessionDateStr?: string
     throw new Error('You must submit the previous day\'s cash-up before opening a new session')
   }
 
-  // Fetched up front so it's available both for the early "already exists" return
-  // below and for the opening-balance carry-forward logic further down.
+  // Fetched up front so it's available both for the early "already open" return
+  // below and for the opening-balance carry-forward logic further down. Uses
+  // <= (not <) and a secondary openedAt sort so an earlier session on THIS
+  // SAME day (a prior shift) counts as "the previous session" too, not just
+  // sessions from earlier calendar days.
   const prevCashUp = await prisma.cashUp.findFirst({
-    where:   { sessionDate: { lt: sessionDate } },
-    orderBy: { sessionDate: 'desc' },
+    where:   { sessionDate: { lte: sessionDate } },
+    orderBy: [{ sessionDate: 'desc' }, { openedAt: 'desc' }],
   })
 
-  const existing = await prisma.cashUp.findFirst({
-    where: { sessionDate, status: { not: 'approved' } },
+  // Only an already-OPEN session for today blocks opening a new one — a
+  // submitted/approved/voided session from an earlier shift today must NOT
+  // silently resurrect itself (that row can never be submitted again), it
+  // should let a fresh session for the next shift be created instead.
+  const existingOpen = await prisma.cashUp.findFirst({
+    where: { sessionDate, status: 'open' },
   })
 
-  if (existing) {
-    logger.warn({ existing: existing.id }, 'Cash-up session already open/submitted for this date')
-    return buildCurrencyStatus(existing, prevCashUp)
+  if (existingOpen) {
+    logger.warn({ existing: existingOpen.id }, 'Cash-up session already open for this date')
+    return existingOpen
   }
 
   // Opening balance = PREVIOUS session's closing balance (the carry-forward).
@@ -90,7 +97,7 @@ export async function openCashUp(openedByUserId: string, sessionDateStr?: string
     )
   } else if (prevCashUp && prevCashUp.status === 'open') {
     // Previous session still open — calculate expected from transactions
-    const prevStats   = await getLiveStats(prevCashUp.sessionDate)
+    const prevStats   = await getLiveStats(prevCashUp.sessionDate, prevCashUp)
     const prevOpen    = new Decimal(prevCashUp.openingBalance.toString())
     const prevDraw    = new Decimal(prevStats.floatTopUps)
     const calcClosing = prevOpen
@@ -134,75 +141,22 @@ export async function openCashUp(openedByUserId: string, sessionDateStr?: string
       },
     })
   } catch (err: unknown) {
-    // Two concurrent requests can both pass the "existing" check above before either
-    // commits; the DB's unique constraint on sessionDate is the real guard. If we lose
-    // the race, just return whatever the winner created instead of erroring.
+    // Two concurrent requests can both pass the "existingOpen" check above
+    // before either commits; the partial unique index on (tenantId) WHERE
+    // status='open' is the real guard. If we lose the race, just return
+    // whatever the winner created instead of erroring.
     if ((err as { code?: string })?.code === 'P2002') {
-      const winner = await prisma.cashUp.findUnique({ where: { tenantId_sessionDate: { tenantId: requireTenantId(), sessionDate } } })
+      const winner = await prisma.cashUp.findFirst({ where: { status: 'open' }, orderBy: { openedAt: 'desc' } })
       if (winner) {
-        logger.warn({ sessionDate: dateStr }, 'CashUp: lost create race — returning existing session')
-        return buildCurrencyStatus(winner, prevCashUp)
+        logger.warn({ sessionDate: dateStr }, 'CashUp: lost create race — returning existing open session')
+        return winner
       }
     }
     throw err
   }
 
   logger.info({ cashUpId: cashUp.id, sessionDate: dateStr }, 'Cash-up session opened')
-  return buildCurrencyStatus(cashUp, prevCashUp)
-}
-
-// Warning shown when a session's currency differs from the previous
-// session's. `needsCurrencyConfirmation` gates submission (see submitCashUp)
-// until a manager/admin explicitly confirms via confirmCurrency() below —
-// selecting a currency through the currency-change endpoint counts as an
-// explicit confirmation too. Both confirmCurrency() and the currency-change
-// endpoint only accept 'open' sessions, so the flag must never come back true
-// for a submitted/approved/voided one — otherwise the UI offers a button the
-// server will 400 on (the "previous session" comparison is re-evaluated on
-// every read, so a session that was fine at submission time can still look
-// mismatched later if an earlier-dated session's currency changes after the
-// fact).
-function buildCurrencyStatus<T extends { status: string; currency: string; currencyConfirmedAt: Date | null }>(
-  cashUp: T,
-  prevCashUp: { currency: string } | null
-): T & { currencyWarning: string | null; needsCurrencyConfirmation: boolean } {
-  const mismatched = prevCashUp !== null && prevCashUp.currency !== cashUp.currency
-  const currencyWarning = mismatched
-    ? `Previous session was in ${prevCashUp!.currency}, this one is ${cashUp.currency} — confirm this is intentional.`
-    : null
-  const needsCurrencyConfirmation = mismatched && !cashUp.currencyConfirmedAt && cashUp.status === 'open'
-  return { ...cashUp, currencyWarning, needsCurrencyConfirmation }
-}
-
-// Same as buildCurrencyStatus but looks up the previous session itself —
-// for call sites (route handlers) that only have the cashUp row, not
-// prevCashUp already in hand.
-export async function attachCurrencyStatus<T extends { sessionDate: Date; status: string; currency: string; currencyConfirmedAt: Date | null }>(
-  cashUp: T
-): Promise<T & { currencyWarning: string | null; needsCurrencyConfirmation: boolean }> {
-  const prevCashUp = await prisma.cashUp.findFirst({
-    where:   { sessionDate: { lt: cashUp.sessionDate } },
-    orderBy: { sessionDate: 'desc' },
-    select:  { currency: true },
-  })
-  return buildCurrencyStatus(cashUp, prevCashUp)
-}
-
-// ─── Confirm a currency mismatch (manager/admin only, enforced at the route) ──
-export async function confirmCurrency(cashUpId: string, userId: string) {
-  const cashUp = await prisma.cashUp.findUniqueOrThrow({ where: { id: cashUpId } })
-
-  if (cashUp.status !== 'open') {
-    throw new Error(`Cannot confirm currency on a cash-up with status "${cashUp.status}"`)
-  }
-
-  const updated = await prisma.cashUp.update({
-    where: { id: cashUpId },
-    data: { currencyConfirmedAt: new Date(), currencyConfirmedByUserId: userId },
-  })
-
-  logger.info({ cashUpId, userId }, 'Cash-up currency mismatch confirmed')
-  return attachCurrencyStatus(updated)
+  return cashUp
 }
 
 // ─── Get the open/submitted session for today (or a specific date) ───────────
@@ -263,10 +217,10 @@ export async function voidCashUp(cashUpId: string, voidedByUserId: string, reaso
 // ─── Reject a submitted session (send back to cashier for correction) ────────
 // Unlike voidCashUp, this reopens the session rather than terminating it — for
 // cases like a fat-fingered declared-cash entry where the day should still be
-// reconciled, just recounted. Blocked if a later date's session is already open,
-// since that would leave two 'open' sessions at once and getAnyOpenSession()
-// would silently hide this one from the cashup page (it always shows the
-// latest-dated open session).
+// reconciled, just recounted. Blocked if any other session is already open —
+// reopening this one to 'open' would otherwise leave two open sessions at
+// once, which the partial unique DB index (see cashUpWindow.ts) would reject
+// anyway; this check just gives a clearer error first.
 export async function rejectCashUp(cashUpId: string, rejectedByUserId: string, reason: string) {
   const cashUp = await prisma.cashUp.findUniqueOrThrow({ where: { id: cashUpId } })
 
@@ -274,10 +228,10 @@ export async function rejectCashUp(cashUpId: string, rejectedByUserId: string, r
     throw new CashUpNotSubmittedError(cashUp.status)
   }
 
-  const newerOpen = await prisma.cashUp.findFirst({
-    where: { sessionDate: { gt: cashUp.sessionDate }, status: 'open' },
+  const otherOpen = await prisma.cashUp.findFirst({
+    where: { status: 'open', id: { not: cashUpId } },
   })
-  if (newerOpen) {
+  if (otherOpen) {
     throw new CashUpNewerSessionOpenError()
   }
 
@@ -285,6 +239,14 @@ export async function rejectCashUp(cashUpId: string, rejectedByUserId: string, r
     where: { id: cashUpId },
     data: {
       status: 'open',
+      // Clear closedAt/closedByUserId along with the status flip — a
+      // non-null closedAt is what getSessionWindow (cashUpWindow.ts) reads
+      // as "this session's reconciliation window ends here". Left in place,
+      // a rejected-then-resubmitted session's window would stop at the
+      // original (pre-rejection) submission instant, silently dropping
+      // every transaction the cashier enters while fixing the correction.
+      closedAt:        null,
+      closedByUserId:  null,
       rejectedByUserId,
       rejectedAt: new Date(),
       rejectionReason: reason,
@@ -295,10 +257,12 @@ export async function rejectCashUp(cashUpId: string, rejectedByUserId: string, r
   return updated
 }
 
-// ─── Calculate system totals for a date ──────────────────────────────────────
-// Sums completed transactions for the session date (midnight to midnight).
-async function calcSystemTotals(sessionDate: Date, drawingsReceived = new Decimal(0), loansTotal = new Decimal(0)) {
-  const { start, end } = getDayBoundsSAST(sessionDate)
+// ─── Calculate system totals for a session's window ──────────────────────────
+// Sums completed transactions within a session's own reconciliation window
+// (see cashUpWindow.ts) — not the whole calendar day, since a day can now
+// hold more than one session (separate shifts).
+async function calcSystemTotals(window: DateWindow, drawingsReceived = new Decimal(0), loansTotal = new Decimal(0)) {
+  const { start, end } = window
 
   const [salesCashAgg, salesEftAgg, purchasesAgg, paymentsAgg] = await Promise.all([
     prisma.sale.aggregate({
@@ -323,7 +287,7 @@ async function calcSystemTotals(sessionDate: Date, drawingsReceived = new Decima
   const cardPayments    = new Decimal(salesEftAgg._sum.totalAmount?.toString() ?? '0')
   const cashPurchases   = new Decimal(purchasesAgg._sum.totalAmount?.toString() ?? '0')
   const cashPayments    = new Decimal(paymentsAgg._sum.amount?.toString() ?? '0')
-  const expensesTotal   = await getExpenseTotalsForDate(sessionDate)
+  const expensesTotal   = await getExpenseTotalsForDate(window)
 
   // Expected in drawer = opening + drawings + cash sales - cash purchases - cash payments - expenses - loan advances + loan repayments
   // "Drawings Received" = additional cash injected into drawer by management (positive, like RecyclePro X).
@@ -341,17 +305,33 @@ async function calcSystemTotals(sessionDate: Date, drawingsReceived = new Decima
 // drawings, loans, card payments) is left untouched since voiding one sale or
 // purchase doesn't affect those. declaredCash is never touched — it's the
 // cashier's physical count from that day, a historical fact, not a derived
-// figure. No-op if the date's cash-up isn't approved (voidSale/voidPurchase
-// only call this once they've confirmed it is).
+// figure. No-op if there's no approved session covering the voided
+// transaction (voidSale/voidPurchase only call this once they've confirmed
+// one exists).
+//
+// transactionCreatedAt is the voided sale/purchase's own createdAt — needed
+// to pick the right session when a day has more than one approved session
+// (separate shifts), since sessionDate alone no longer identifies a single
+// row.
 export async function recalculateApprovedCashUpForDate(
   tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
   sessionDate: Date,
+  transactionCreatedAt: Date,
   changed: 'sales' | 'purchases'
 ) {
-  const cashUp = await tx.cashUp.findFirst({ where: { sessionDate, status: 'approved' } })
-  if (!cashUp) return
+  const approvedToday = await tx.cashUp.findMany({
+    where:   { sessionDate, status: 'approved' },
+    orderBy: { openedAt: 'asc' },
+  })
+  if (approvedToday.length === 0) return
 
-  const { start, end } = getDayBoundsSAST(sessionDate)
+  let cashUp = approvedToday[0]!
+  if (approvedToday.length > 1) {
+    cashUp = await findSessionForInstant(tx, approvedToday, transactionCreatedAt)
+  }
+
+  const window = await getSessionWindow(tx, cashUp)
+  const { start, end } = window
 
   const openingBalance   = new Decimal(cashUp.openingBalance.toString())
   const declaredCash     = new Decimal(cashUp.declaredCash?.toString() ?? '0')
@@ -397,8 +377,9 @@ export async function recalculateApprovedCashUpForDate(
   )
 
   // Re-propagate finPeriodCumulative through this cash-up and every later
-  // approved one — each is a running sum of variance ordered by sessionDate,
-  // so a changed variance on an earlier day shifts every later day's total.
+  // approved one — each is a running sum of variance ordered chronologically
+  // (sessionDate, then openedAt to break ties within a day), so a changed
+  // variance on an earlier session shifts every later session's total.
   const priorApproved = await tx.cashUp.aggregate({
     where: { status: 'approved', sessionDate: { lt: sessionDate } },
     _sum: { variance: true },
@@ -406,8 +387,8 @@ export async function recalculateApprovedCashUpForDate(
   let running = new Decimal(priorApproved._sum.variance?.toString() ?? '0')
 
   const fromThisDateOnward = await tx.cashUp.findMany({
-    where: { status: 'approved', sessionDate: { gte: sessionDate } },
-    orderBy: { sessionDate: 'asc' },
+    where:   { status: 'approved', sessionDate: { gte: sessionDate } },
+    orderBy: [{ sessionDate: 'asc' }, { openedAt: 'asc' }],
   })
 
   for (const c of fromThisDateOnward) {
@@ -415,6 +396,24 @@ export async function recalculateApprovedCashUpForDate(
     running = running.plus(v)
     await tx.cashUp.update({ where: { id: c.id }, data: { finPeriodCumulative: running } })
   }
+}
+
+// Picks which of a day's several approved sessions a transaction actually
+// belongs to, by finding the one whose reconciliation window contains its
+// createdAt. Falls back to the earliest session if none match (shouldn't
+// happen — every instant in a day belongs to exactly one session's window —
+// but a transaction predating the first session, e.g. a backfilled record,
+// needs somewhere safe to land rather than being silently dropped).
+async function findSessionForInstant<T extends { sessionDate: Date; openedAt: Date; closedAt: Date | null }>(
+  tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
+  sessions: T[],
+  instant: Date
+): Promise<T> {
+  for (const s of sessions) {
+    const window = await getSessionWindow(tx, s)
+    if (instant >= window.start && instant < window.end) return s
+  }
+  return sessions[0]!
 }
 
 // ─── Submit (cashier declares cash) ──────────────────────────────────────────
@@ -429,24 +428,17 @@ export async function submitCashUp(
     throw new Error(`Cannot submit cash-up with status "${cashUp.status}"`)
   }
 
-  if (!cashUp.currencyConfirmedAt) {
-    const prevCashUp = await prisma.cashUp.findFirst({
-      where:   { sessionDate: { lt: cashUp.sessionDate } },
-      orderBy: { sessionDate: 'desc' },
-      select:  { currency: true },
-    })
-    if (prevCashUp && prevCashUp.currency !== cashUp.currency) {
-      throw new CashUpCurrencyNotConfirmedError()
-    }
-  }
+  // Scoped to this session's own reconciliation window, not the whole
+  // calendar day — a day can hold more than one session (separate shifts).
+  const window = await getSessionWindow(prisma, cashUp)
 
   // Both drawingsReceived and loansTotal are fully server-derived — never from user input.
   // drawingsReceived = only mid-day top-ups (FloatMovements), NOT the opening float.
-  const drawingsReceived = await getDrawingsReceivedForDate(cashUp.sessionDate)
-  const loanTotals = await getLoanTotalsForDate(cashUp.sessionDate)
+  const drawingsReceived = await getDrawingsReceivedForDate(window)
+  const loanTotals = await getLoanTotalsForDate(window)
   // netCashOut is positive = cash went out as advances (reduces drawer), so we subtract it
   const loansTotal = new Decimal(loanTotals.netCashOut).negated()
-  const totals = await calcSystemTotals(cashUp.sessionDate, drawingsReceived, loansTotal)
+  const totals = await calcSystemTotals(window, drawingsReceived, loansTotal)
 
   const openingBalance = new Decimal(cashUp.openingBalance.toString())
   const declared  = new Decimal(input.declaredCash)
@@ -527,8 +519,22 @@ export async function approveCashUp(
 
 // ─── Live stats for the cash-up page ─────────────────────────────────────────
 // Returns real-time transaction totals for a given session date.
-export async function getLiveStats(sessionDate: Date) {
-  const { start, end } = getDayBoundsSAST(sessionDate)
+// sessionContext, when given, scopes the transactional totals (sales,
+// purchases, payments, loans, expenses, drawings) to that specific session's
+// own reconciliation window rather than the whole calendar day — a day can
+// hold more than one session (separate shifts). unpaidToday always stays
+// day-bounded regardless, since "purchases still unpaid, created today" is a
+// follow-up list, not a per-shift cash reconciliation figure. Without a
+// sessionContext (no session open yet for this date), falls back to the
+// whole day — used for the pre-open live preview on the cash-up page.
+export async function getLiveStats(
+  sessionDate: Date,
+  sessionContext?: { openedAt: Date; closedAt: Date | null }
+) {
+  const { start: dayStart, end: dayEnd } = getDayBoundsSAST(sessionDate)
+  const { start, end } = sessionContext
+    ? await getSessionWindow(prisma, { sessionDate, ...sessionContext })
+    : { start: dayStart, end: dayEnd }
 
   const [
     salesCashAgg,
@@ -574,13 +580,13 @@ export async function getLiveStats(sessionDate: Date) {
       _sum: { amount: true },
       where: { paymentMethod: 'cash', voidedAt: null, createdAt: { gte: start, lte: end } },
     }),
-    getLoanTotalsForDate(sessionDate),
-    getExpenseTotalsForDate(sessionDate),
+    getLoanTotalsForDate({ start, end }),
+    getExpenseTotalsForDate({ start, end }),
     prisma.$queryRaw<{ total: string; count: bigint }[]>`
       SELECT COALESCE(SUM("totalAmount" - COALESCE("loanDeductionAmount", 0) - "amountPaid"), 0)::text AS total,
              COUNT(*)::bigint AS count
       FROM "Purchase"
-      WHERE status = 'pending' AND "createdAt" >= ${start} AND "createdAt" <= ${end}
+      WHERE status = 'pending' AND "createdAt" >= ${dayStart} AND "createdAt" <= ${dayEnd}
     `,
     prisma.$queryRaw<{ total: string; count: bigint }[]>`
       SELECT COALESCE(SUM("totalAmount" - COALESCE("loanDeductionAmount", 0) - "amountPaid"), 0)::text AS total,
@@ -657,8 +663,8 @@ export interface CashSaleRecord {
   totalAmount: string
 }
 
-export async function getCashSalesForDate(sessionDate: Date): Promise<CashSaleRecord[]> {
-  const { start, end } = getDayBoundsSAST(sessionDate)
+export async function getCashSalesForDate(window: DateWindow): Promise<CashSaleRecord[]> {
+  const { start, end } = window
 
   const sales = await prisma.sale.findMany({
     where: { paymentMethod: 'cash', status: 'completed', createdAt: { gte: start, lte: end } },
@@ -687,8 +693,8 @@ export interface CashPurchaseRecord {
   totalAmount: string
 }
 
-export async function getCashPurchasesForDate(sessionDate: Date): Promise<CashPurchaseRecord[]> {
-  const { start, end } = getDayBoundsSAST(sessionDate)
+export async function getCashPurchasesForDate(window: DateWindow): Promise<CashPurchaseRecord[]> {
+  const { start, end } = window
 
   const purchases = await prisma.purchase.findMany({
     where: { paymentMethod: 'cash', status: 'completed', createdAt: { gte: start, lte: end } },
@@ -717,8 +723,8 @@ export interface AccountPaymentRecord {
   amount: string
 }
 
-export async function getAccountPaymentsForDate(sessionDate: Date): Promise<AccountPaymentRecord[]> {
-  const { start, end } = getDayBoundsSAST(sessionDate)
+export async function getAccountPaymentsForDate(window: DateWindow): Promise<AccountPaymentRecord[]> {
+  const { start, end } = window
 
   const payments = await prisma.payment.findMany({
     where: { paymentMethod: 'cash', voidedAt: null, createdAt: { gte: start, lte: end } },
@@ -744,8 +750,8 @@ export interface ExpenseRecord {
   amount: string
 }
 
-export async function getExpensesForDateReport(sessionDate: Date): Promise<ExpenseRecord[]> {
-  const { start, end } = getDayBoundsSAST(sessionDate)
+export async function getExpensesForDateReport(window: DateWindow): Promise<ExpenseRecord[]> {
+  const { start, end } = window
 
   const expenses = await prisma.expense.findMany({
     where: {
@@ -774,8 +780,8 @@ export interface LoanAdvanceRecord {
   principalAmount: string
 }
 
-export async function getLoanAdvancesForDate(sessionDate: Date): Promise<LoanAdvanceRecord[]> {
-  const { start, end } = getDayBoundsSAST(sessionDate)
+export async function getLoanAdvancesForDate(window: DateWindow): Promise<LoanAdvanceRecord[]> {
+  const { start, end } = window
 
   const loans = await prisma.loan.findMany({
     where: {
@@ -803,8 +809,8 @@ export interface LoanRepaymentRecord {
   amount: string
 }
 
-export async function getLoanRepaymentsForDate(sessionDate: Date): Promise<LoanRepaymentRecord[]> {
-  const { start, end } = getDayBoundsSAST(sessionDate)
+export async function getLoanRepaymentsForDate(window: DateWindow): Promise<LoanRepaymentRecord[]> {
+  const { start, end } = window
 
   const repayments = await prisma.loanRepayment.findMany({
     where: { createdAt: { gte: start, lte: end } },
@@ -875,8 +881,8 @@ export interface CardSaleRecord {
   totalAmount: string
 }
 
-export async function getCardSalesForDate(sessionDate: Date): Promise<CardSaleRecord[]> {
-  const { start, end } = getDayBoundsSAST(sessionDate)
+export async function getCardSalesForDate(window: DateWindow): Promise<CardSaleRecord[]> {
+  const { start, end } = window
 
   const sales = await prisma.sale.findMany({
     where: { paymentMethod: 'card', status: 'completed', createdAt: { gte: start, lte: end } },
@@ -901,8 +907,8 @@ export interface TransferredPurchaseRecord {
   totalAmount: string
 }
 
-export async function getTransferredPurchasesForDate(sessionDate: Date): Promise<TransferredPurchaseRecord[]> {
-  const { start, end } = getDayBoundsSAST(sessionDate)
+export async function getTransferredPurchasesForDate(window: DateWindow): Promise<TransferredPurchaseRecord[]> {
+  const { start, end } = window
 
   const purchases = await prisma.purchase.findMany({
     where: { paymentMethod: 'eft', status: 'completed', createdAt: { gte: start, lte: end } },
@@ -927,8 +933,8 @@ export interface DrawingsReceivedRecord {
   amount: string
 }
 
-export async function getDrawingsReceivedForDateReport(sessionDate: Date): Promise<DrawingsReceivedRecord[]> {
-  const { start, end } = getDayBoundsSAST(sessionDate)
+export async function getDrawingsReceivedForDateReport(window: DateWindow): Promise<DrawingsReceivedRecord[]> {
+  const { start, end } = window
 
   // Drawings Received = only mid-day top-ups (additional cash injected during the session)
   // CashFloat.openingAmount is NOT included because it's the starting cash,

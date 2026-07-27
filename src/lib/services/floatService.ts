@@ -13,6 +13,7 @@ import { withSerializableRetry } from '@/lib/db/withSerializableRetry'
 // itself isn't stable across the two clients this codebase compiles against.
 type FloatMovementType = 'opening' | 'top_up' | 'withdrawal' | 'adjustment'
 import { sastDateLabelToUTCDate, normalizeToDateLabel, getDayBoundsSAST, todaySASTDate } from '@/lib/utils/dayBounds'
+import type { DateWindow } from '@/lib/services/cashUpWindow'
 
 export class FloatMovementLockedError extends Error {
   code = 'CASHUP_LOCKED' as const
@@ -142,12 +143,10 @@ export async function getFloatTopUpsForDate(date: Date): Promise<Decimal> {
  *
  * Drawings received = additional cash injected INTO the drawer during the day.
  */
-export async function getDrawingsReceivedForDate(date: Date): Promise<Decimal> {
-  const { start, end } = getDayBoundsSAST(date)
-
+export async function getDrawingsReceivedForDate(window: DateWindow): Promise<Decimal> {
   const topUpsResult = await prisma.floatMovement.aggregate({
     _sum: { amount: true },
-    where: { movementType: 'top_up', createdAt: { gte: start, lte: end } },
+    where: { movementType: 'top_up', createdAt: { gte: window.start, lte: window.end } },
   })
 
   return new Decimal(topUpsResult._sum.amount?.toString() ?? '0')
@@ -185,12 +184,18 @@ export async function addFloatMovement(
   const tenantId = requireTenantId()
   const today = todaySASTDate()
 
-  // Once today's cash-up has been submitted, its drawingsReceived figure is
-  // frozen — a movement added after that point would never be reflected in any
-  // reconciliation. Block it rather than silently lose track of the cash.
-  const todaysCashUp = await prisma.cashUp.findUnique({
-    where: { tenantId_sessionDate: { tenantId, sessionDate: today } },
-    select: { status: true },
+  // Once today's latest cash-up session has been submitted, its
+  // drawingsReceived figure is frozen — a movement added after that point
+  // would never be reflected in any reconciliation. Block it rather than
+  // silently lose track of the cash; opening a new session (a second shift)
+  // unblocks this again, since that new session's window picks up right
+  // where the submitted one left off. A day can have more than one session
+  // now (see cashUpWindow.ts), so this must look at the most recent one for
+  // today, not assume there's only ever one.
+  const todaysCashUp = await prisma.cashUp.findFirst({
+    where:   { sessionDate: today },
+    orderBy: { openedAt: 'desc' },
+    select:  { status: true },
   })
   if (todaysCashUp && (todaysCashUp.status === 'submitted' || todaysCashUp.status === 'approved')) {
     throw new FloatMovementLockedError(

@@ -3,7 +3,8 @@ import { requireTenantId } from '@/lib/db/tenantContext'
 import Decimal from 'decimal.js'
 import logger from '@/lib/logger'
 import type { CreateExpenseInput, CreateExpenseTypeInput, UpdateExpenseInput, SettlePendingExpenseInput } from '@/lib/schemas/expense'
-import { getDayBoundsSAST, todaySASTDate } from '@/lib/utils/dayBounds'
+import { todaySASTDate } from '@/lib/utils/dayBounds'
+import type { DateWindow } from '@/lib/services/cashUpWindow'
 
 // ─── Ref number ───────────────────────────────────────────────────────────────
 
@@ -275,26 +276,19 @@ export async function voidExpense(id: string, userId: string) {
   return expense
 }
 
-export async function getExpenseTotalsForDate(date: Date): Promise<Decimal> {
-  const { start, end } = getDayBoundsSAST(date)
-
-  // Find the cashup session for this date
-  const cashUp = await prisma.cashUp.findFirst({
-    where: { sessionDate: start },
-    select: { id: true },
-  })
-
-  // Include both pending and approved expenses (exclude only voided)
-  // Use cashUpId link when available, fallback to createdAt for unlinked expenses
+// window is a specific cash-up session's reconciliation window (see
+// cashUpWindow.ts) — a calendar day can now hold more than one session
+// (separate shifts), so "this date's expenses" is no longer well-defined
+// without knowing which session's time slice is being asked about. An
+// expense stamped with cashUpId (createExpense links it to whichever
+// session was open at creation time) is always created inside that
+// session's own window by construction, so window-based createdAt
+// filtering alone is sufficient — no separate cashUpId branch needed.
+export async function getExpenseTotalsForDate(window: DateWindow): Promise<Decimal> {
   const result = await prisma.expense.aggregate({
     where: {
       status: { in: ['pending', 'approved'] },
-      OR: [
-        // Expenses linked to this cashup session (regardless of createdAt)
-        ...(cashUp ? [{ cashUpId: cashUp.id }] : []),
-        // Fallback: Expenses created on this date without a cashUpId link
-        { cashUpId: null, createdAt: { gte: start, lte: end } },
-      ],
+      createdAt: { gte: window.start, lte: window.end },
     },
     _sum: { amount: true },
   })

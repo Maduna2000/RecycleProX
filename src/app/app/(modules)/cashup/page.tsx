@@ -44,8 +44,6 @@ type CashUp = {
   variance?:           string
   notes?:              string
   denominations?: Record<string, number>
-  currencyWarning?: string | null
-  needsCurrencyConfirmation?: boolean
 }
 
 type LiveStats = {
@@ -587,7 +585,6 @@ export default function CashUpPage() {
   const [submitting, setSubmitting] = useState(false)
   const [approving,  setApproving]  = useState(false)
   const [rejecting,  setRejecting]  = useState(false)
-  const [confirmingCurrency, setConfirmingCurrency] = useState(false)
   const [rejectReasonOpen, setRejectReasonOpen] = useState(false)
   const [notes,      setNotes]      = useState('')
   const [counts, setCounts] = useState<Record<number, number>>(() =>
@@ -680,25 +677,6 @@ export default function CashUpPage() {
       }
     } catch {
       toast.error('Failed to update currency')
-    }
-  }
-
-  async function handleConfirmCurrency() {
-    if (!cashUp) return
-    setConfirmingCurrency(true)
-    try {
-      const res = await fetch(`/api/cashup/${cashUp.id}/confirm-currency`, { method: 'POST' })
-      if (res.ok) {
-        await swrMutate(CASHUP_KEY)
-        toast.success('Currency confirmed')
-      } else {
-        const j = await res.json()
-        toast.error(j.error ?? 'Failed to confirm currency')
-      }
-    } catch {
-      toast.error('Failed to confirm currency')
-    } finally {
-      setConfirmingCurrency(false)
     }
   }
 
@@ -882,20 +860,6 @@ export default function CashUpPage() {
               )}
             </div>
 
-            {cashUp.currencyWarning && (
-              <div className="flex items-center justify-between gap-3 rounded px-3 py-2 text-xs font-medium" style={{ background: colors.warningBg, color: colors.warning }}>
-                <span>⚠ {cashUp.currencyWarning}</span>
-                {cashUp.needsCurrencyConfirmation && (
-                  isManager ? (
-                    <Btn size="sm" onClick={handleConfirmCurrency} disabled={confirmingCurrency} style={{ whiteSpace: 'nowrap', flexShrink: 0 }}>
-                      {confirmingCurrency ? 'Confirming…' : 'Confirm currency'}
-                    </Btn>
-                  ) : (
-                    <span className="text-xs italic" style={{ flexShrink: 0 }}>Ask a manager to confirm</span>
-                  )
-                )}
-              </div>
-            )}
 
             {/* ── 2-column layout: left = reconciliation, right = count + panels ── */}
             {(() => {
@@ -1015,8 +979,6 @@ export default function CashUpPage() {
                             <Btn
                               size="sm" icon={Calculator}
                               onClick={() => setCountCashOpen(true)}
-                              disabled={cashUp.needsCurrencyConfirmation}
-                              title={cashUp.needsCurrencyConfirmation ? 'Confirm the currency mismatch above before counting cash' : undefined}
                               style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
                             >
                               Count Cash

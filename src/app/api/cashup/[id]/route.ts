@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { SubmitCashUpSchema } from '@/lib/schemas/cashup'
-import { getCashUp, submitCashUp, attachCurrencyStatus } from '@/lib/services/cashUpService'
+import { getCashUp, submitCashUp } from '@/lib/services/cashUpService'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 // GET /api/cashup/[id]
@@ -14,10 +14,7 @@ export async function GET(
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   try {
-    const cashUp = await runWithRequestTenant(req, async () => {
-      const found = await getCashUp(params.id)
-      return found ? attachCurrencyStatus(found) : null
-    })
+    const cashUp = await runWithRequestTenant(req, () => getCashUp(params.id))
     if (!cashUp) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     return NextResponse.json({ cashUp })
   } catch (err) {

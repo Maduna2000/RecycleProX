@@ -114,7 +114,7 @@ export default function StockPage() {
         const belowReorder = minLevel !== null && parseFloat(r.onHand) < minLevel
         return (
           <div className="flex items-center gap-2">
-            <div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
               <p style={{ fontSize: fontSize.sm, fontWeight: fontWeight.medium, color: colors.textPrimary }}>
                 {r.product.name}
               </p>
