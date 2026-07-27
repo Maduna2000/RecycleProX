@@ -184,6 +184,7 @@ export default function UnpaidPurchasesPage() {
     {
       label:   'Print Slip',
       icon:    Printer,
+      hidden:  (row) => new Decimal(row.amountPaid).lessThanOrEqualTo(0),
       onClick: (row) => window.open(`/api/purchases/${row.id}/receipt?format=pdf`, '_blank'),
     },
     {

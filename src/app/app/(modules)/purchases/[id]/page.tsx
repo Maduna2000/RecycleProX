@@ -36,6 +36,7 @@ type Purchase = {
   refNumber: string
   status: 'completed' | 'voided' | 'pending'
   totalAmount: string
+  amountPaid: string
   loanDeductionAmount?: string
   paymentMethod: string
   notes?: string
@@ -89,6 +90,10 @@ export default function PurchaseDetailPage() {
       </div>
     )
   }
+
+  // A receipt only makes sense once money has actually changed hands —
+  // voided purchases and purchases still awaiting payment have nothing "paid" to show.
+  const receiptEligible = purchase.status !== 'voided' && (purchase.status === 'completed' || Number(purchase.amountPaid) > 0)
 
   const hasLoanDeduction = purchase.loanDeductionAmount && Number(purchase.loanDeductionAmount) > 0
   const netPayout = hasLoanDeduction
@@ -249,7 +254,13 @@ export default function PurchaseDetailPage() {
         {/* Actions footer */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderTop: '1px solid #E0E0E0', background: '#F8F9FA', flexShrink: 0 }}>
           <div style={{ display: 'flex', gap: 6 }}>
-            <Btn size="sm" icon={Printer} onClick={() => window.open(`/api/purchases/${purchase.id}/receipt?format=pdf`, '_blank')}>
+            <Btn
+              size="sm"
+              icon={Printer}
+              disabled={!receiptEligible}
+              title={receiptEligible ? undefined : 'Receipt is only available once the purchase has been paid'}
+              onClick={() => window.open(`/api/purchases/${purchase.id}/receipt?format=pdf`, '_blank')}
+            >
               Print Receipt
             </Btn>
             <Btn size="sm" icon={FileText} onClick={() => window.open(`/api/purchases/${purchase.id}/vat264`, '_blank')}>

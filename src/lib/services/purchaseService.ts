@@ -389,10 +389,33 @@ export async function getPurchase(id: string) {
         include: { product: true },
         orderBy: { createdAt: 'asc' },
       },
+      scaleOrder: { include: { operator: { select: { fullName: true } } } },
     },
   })
   if (!purchase) throw new PurchaseNotFoundError(id)
   return purchase
+}
+
+// ─── Payment status derivation ─────────────────────────────────────────────
+// Single source of truth for "is this purchase paid" — used to label receipts
+// and to gate which purchases are eligible for a printed/downloaded receipt.
+
+export type PurchasePaymentStatus = 'completed' | 'partial' | 'pending' | 'voided'
+
+export function derivePurchasePaymentStatus(purchase: {
+  status:     string
+  amountPaid: { toString(): string }
+}): PurchasePaymentStatus {
+  if (purchase.status === 'voided') return 'voided'
+  if (purchase.status === 'pending') {
+    return new Decimal(purchase.amountPaid.toString()).greaterThan(0) ? 'partial' : 'pending'
+  }
+  return 'completed'
+}
+
+/** A receipt (thermal or PDF) may only be produced once money has actually changed hands. */
+export function isPurchaseReceiptEligible(status: PurchasePaymentStatus): boolean {
+  return status === 'completed' || status === 'partial'
 }
 
 // ─── Mark Purchase Paid (partial or full settlement) ─────────────────────────

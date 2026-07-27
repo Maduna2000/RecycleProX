@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import Decimal from 'decimal.js'
-import { getPurchase } from '@/lib/services/purchaseService'
+import { prisma } from '@/lib/db/prisma'
+import { getPurchase, derivePurchasePaymentStatus, isPurchaseReceiptEligible } from '@/lib/services/purchaseService'
 import { getAllSettings } from '@/lib/services/settingsService'
 import { getCustomerLoanSummary } from '@/lib/services/loanService'
 import { generateTransactionSlip } from '@/lib/pdf/slip'
+import { purchaseHeaderAmounts } from '@/lib/utils/vat'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 /**
@@ -26,11 +28,15 @@ export async function GET(
   const format = req.nextUrl.searchParams.get('format') ?? 'pdf'
 
   try {
-    const { purchase, settings, remainingLoanBalance } = await runWithRequestTenant(req, async () => {
+    const { purchase, settings, doneByUser, remainingLoanBalance } = await runWithRequestTenant(req, async () => {
       const [purchase, settings] = await Promise.all([
         getPurchase(id),
         getAllSettings(),
       ])
+
+      const doneByUser = purchase.createdByUserId
+        ? await prisma.user.findUnique({ where: { id: purchase.createdByUserId }, select: { fullName: true } })
+        : null
 
       const loanDec = purchase.loanDeductionAmount
         ? new Decimal(purchase.loanDeductionAmount.toString())
@@ -45,19 +51,31 @@ export async function GET(
         }
       }
 
-      return { purchase, settings, remainingLoanBalance }
+      return { purchase, settings, doneByUser, remainingLoanBalance }
     })
 
+    // A receipt can only be produced once the purchase has actually been paid —
+    // pending/unpaid purchases have nothing to show as "paid" on a receipt.
+    const paymentStatus = derivePurchasePaymentStatus(purchase)
+    if (!isPurchaseReceiptEligible(paymentStatus)) {
+      return NextResponse.json(
+        { error: paymentStatus === 'voided' ? 'Cannot generate a receipt for a voided purchase' : 'Receipt is only available once the purchase has been paid' },
+        { status: 400 },
+      )
+    }
+
     const amountPaidDec = new Decimal(purchase.amountPaid.toString())
-
-    const slipStatus: 'completed' | 'pending' | 'partial' =
-      purchase.status === 'completed'            ? 'completed'
-      : amountPaidDec.greaterThan(0)             ? 'partial'
-      : 'pending'
-
     const slipAmountPaid = amountPaidDec.greaterThan(0) ? amountPaidDec.toFixed(2) : undefined
 
+    const zeroRated = purchase.customer.zeroRated
+    const header = purchaseHeaderAmounts(purchase, zeroRated)
+    const vatRatePct = settings.vatRate ?? '15'
+
+    const cashierName = doneByUser?.fullName ?? session.user.name ?? 'Cashier'
+    const scaleOpName = purchase.scaleOrder?.operator?.fullName
+
     const lines = purchase.lines.map((l) => ({
+      productCode: l.product.code,
       productName: l.product.name,
       qty:         Number(l.quantity),
       unitPrice:   l.unitPrice.toString(),
@@ -78,15 +96,27 @@ export async function GET(
     if (format === 'thermal') {
       const { buildPurchaseReceipt } = await import('@/lib/print/thermal')
       const buf = await buildPurchaseReceipt({
-        refNumber:     purchase.refNumber,
-        customerName:  `${purchase.customer.firstName} ${purchase.customer.lastName}`,
-        customerIdNo:  purchase.customer.idNumber ?? undefined,
+        refNumber:         purchase.refNumber,
+        customerCode:      purchase.customer.accountCode ?? undefined,
+        customerName:      purchase.customer.companyName?.trim() || `${purchase.customer.firstName} ${purchase.customer.lastName}`,
+        customerIdNo:      purchase.customer.idNumber ?? undefined,
+        customerVatNumber: purchase.customer.vatNumber ?? undefined,
         lines,
-        totalAmount:   purchase.totalAmount.toString(),
-        paymentMethod: purchase.paymentMethod,
-        cashierName:   session.user.name ?? 'Cashier',
-        createdAt:     purchase.createdAt,
-        splitPayments: splitPayments ?? undefined,
+        totalAmount:       header.grandTotal.toFixed(2),
+        subtotalAmount:    header.subTotal.toFixed(2),
+        vatAmount:         header.vat.toFixed(2),
+        vatRatePct,
+        paymentMethod:     purchase.paymentMethod,
+        cashierName,
+        scaleOpName,
+        createdAt:         purchase.createdAt,
+        status:            paymentStatus,
+        slipNo:            purchase.wbTicketNumber ?? undefined,
+        splitPayments:     splitPayments ?? undefined,
+        companyName:       settings.yardName,
+        companyAddress:    settings.yardAddress,
+        companyPhone:      settings.yardPhone,
+        companyVatNumber:  settings.yardVat ?? settings.vatNumber,
       })
       return new NextResponse(buf.buffer as ArrayBuffer, {
         headers: {
@@ -102,27 +132,27 @@ export async function GET(
       refNumber:      purchase.refNumber,
       date:           purchase.createdAt,
       partyLabel:     'Supplier',
-      partyName:      `${purchase.customer.firstName} ${purchase.customer.lastName}`,
+      partyName:      purchase.customer.companyName?.trim() || `${purchase.customer.firstName} ${purchase.customer.lastName}`,
       partyIdNumber:  purchase.customer.idNumber ?? undefined,
       partyPhone:     purchase.customer.phone ?? undefined,
       lines,
-      totalAmount:    purchase.totalAmount.toString(),
-      ...(purchase.vatAmount && new Decimal(purchase.vatAmount.toString()).greaterThan(0) ? {
-        vatAmount:      new Decimal(purchase.vatAmount.toString()).toFixed(2),
-        subtotalAmount: new Decimal(purchase.totalAmount.toString()).minus(purchase.vatAmount.toString()).toFixed(2),
+      totalAmount:    header.grandTotal.toFixed(2),
+      ...(header.vat.greaterThan(0) ? {
+        vatAmount:      header.vat.toFixed(2),
+        subtotalAmount: header.subTotal.toFixed(2),
       } : {}),
       loanDeduction:  purchase.loanDeductionAmount?.toString(),
       paymentMethod:  purchase.paymentMethod,
-      cashierName:    session.user.name ?? 'Cashier',
+      cashierName,
       notes:          purchase.notes ?? undefined,
-      status:              slipStatus,
+      status:              paymentStatus === 'voided' ? 'pending' : paymentStatus,
       amountPaid:          slipAmountPaid,
       remainingLoanBalance,
       splitPayments:  splitPayments ?? undefined,
       companyName:    settings.yardName,
       companyAddress: settings.yardAddress,
       companyPhone:   settings.yardPhone,
-      vatNumber:      settings.vatNumber,
+      vatNumber:      settings.yardVat ?? settings.vatNumber,
       receiptFooter:  settings.receiptFooter,
     })
 

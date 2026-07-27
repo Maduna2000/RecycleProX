@@ -24,6 +24,7 @@ type Purchase = {
   refNumber: string
   status: 'completed' | 'voided' | 'pending'
   totalAmount: string
+  amountPaid: string
   paymentMethod: string
   createdAt: string
   customer: { id: string; firstName: string; lastName: string; idNumber: string | null }
@@ -173,6 +174,7 @@ export default function PurchasesPage() {
     {
       label:   'Print Slip',
       icon:    Printer,
+      hidden:  (row) => row.status === 'voided' || (row.status === 'pending' && new Decimal(row.amountPaid).lessThanOrEqualTo(0)),
       onClick: (row) => window.open(`/api/purchases/${row.id}/receipt?format=pdf`, '_blank'),
     },
     {

@@ -3,11 +3,14 @@ import { auth } from '@/auth'
 import { prisma } from '@/lib/db/prisma'
 import { getAllSettings } from '@/lib/services/settingsService'
 import { buildPurchaseReceipt, buildSaleReceipt } from '@/lib/print/thermal'
+import { derivePurchasePaymentStatus, isPurchaseReceiptEligible } from '@/lib/services/purchaseService'
+import { purchaseHeaderAmounts } from '@/lib/utils/vat'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
 import logger from '@/lib/logger'
 import Decimal from 'decimal.js'
 
 class SlipRecordNotFoundError extends Error {}
+class SlipNotPayableError extends Error {}
 
 /**
  * POST /api/print/slip
@@ -47,29 +50,60 @@ export async function POST(req: Request) {
           include: {
             customer: true,
             lines: { include: { product: true } },
+            scaleOrder: { include: { operator: { select: { fullName: true } } } },
           },
         })
         if (!purchase) throw new SlipRecordNotFoundError('Purchase not found')
         return purchase
       })
 
+      const paymentStatus = derivePurchasePaymentStatus(purchase)
+      if (!isPurchaseReceiptEligible(paymentStatus)) {
+        throw new SlipNotPayableError(
+          paymentStatus === 'voided' ? 'Cannot print a receipt for a voided purchase' : 'Receipt is only available once the purchase has been paid'
+        )
+      }
+
+      const doneByUser = purchase.createdByUserId
+        ? await prisma.user.findUnique({ where: { id: purchase.createdByUserId }, select: { fullName: true } })
+        : null
+
+      const zeroRated = purchase.customer.zeroRated
+      const header = purchaseHeaderAmounts(purchase, zeroRated)
+
       // Build receipt data
       const lines = purchase.lines.map(line => ({
+        productCode: line.product.code,
         productName: line.product.name,
         qty: Number(line.quantity),
         unitPrice: line.unitPrice.toString(),
-        lineTotal: new Decimal(line.unitPrice).times(line.quantity).toString(),
+        lineTotal: line.lineTotal.toString(),
+        grossQty: line.grossQty ? Number(line.grossQty) : undefined,
+        tareQty:  line.tareQty  ? Number(line.tareQty)  : undefined,
       }))
 
       receiptBuffer = await buildPurchaseReceipt({
-        refNumber: purchase.refNumber,
-        customerName: `${purchase.customer.firstName} ${purchase.customer.lastName}`,
-        customerIdNo: purchase.customer.idNumber ?? undefined,
+        refNumber:         purchase.refNumber,
+        customerCode:      purchase.customer.accountCode ?? undefined,
+        customerName:      purchase.customer.companyName?.trim() || `${purchase.customer.firstName} ${purchase.customer.lastName}`,
+        customerIdNo:      purchase.customer.idNumber ?? undefined,
+        customerVatNumber: purchase.customer.vatNumber ?? undefined,
         lines,
-        totalAmount: purchase.totalAmount.toString(),
-        paymentMethod: purchase.paymentMethod,
-        cashierName: session.user.name ?? 'Cashier',
-        createdAt: purchase.createdAt,
+        totalAmount:       header.grandTotal.toFixed(2),
+        subtotalAmount:    header.subTotal.toFixed(2),
+        vatAmount:         header.vat.toFixed(2),
+        vatRatePct:        cfg.vatRate ?? '15',
+        paymentMethod:     purchase.paymentMethod,
+        cashierName:       doneByUser?.fullName ?? session.user.name ?? 'Cashier',
+        scaleOpName:       purchase.scaleOrder?.operator?.fullName,
+        createdAt:         purchase.createdAt,
+        status:            paymentStatus,
+        slipNo:            purchase.wbTicketNumber ?? undefined,
+        splitPayments:     purchase.splitPayments as { cash: string; eft: string; cheque: string; loan: string } | undefined,
+        companyName:       cfg.yardName,
+        companyAddress:    cfg.yardAddress,
+        companyPhone:      cfg.yardPhone,
+        companyVatNumber:  cfg.yardVat ?? cfg.vatNumber,
       })
     } else {
       // Fetch sale with related data
@@ -133,6 +167,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true })
   } catch (err) {
     if (err instanceof SlipRecordNotFoundError) return NextResponse.json({ error: err.message }, { status: 404 })
+    if (err instanceof SlipNotPayableError) return NextResponse.json({ error: err.message }, { status: 400 })
     logger.error({ err, type, id }, 'print-slip.failed')
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'Print failed' },
