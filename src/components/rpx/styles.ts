@@ -18,6 +18,12 @@ export const NAVY = colors.primary
 export const HEADER_GRAD = 'linear-gradient(180deg,#FFFFFF 0%,#E8E8E8 100%)'
 /** Dialog / drawer / section title-bar background. */
 export const BAR_GRAD = 'linear-gradient(180deg,#EAEAEA 0%,#D4D4D4 100%)'
+/** Primary money/CTA affordance (Loans "+ New Loan" and equivalents). */
+export const ACTION_GRAD = `linear-gradient(180deg,${colors.action} 0%,${colors.actionHover} 100%)`
+/** Business-Loan CTA — deliberately distinct from ACTION_GRAD per the app's
+ * "differentiate mirrored features" convention (Business Loan is the reverse
+ * of Loan and must not look identical to it). */
+export const VIOLET_GRAD = `linear-gradient(180deg,${colors.violet} 0%,#6B21A8 100%)`
 /** Outer border of content cards and dialogs. */
 export const CARD_BORDER = '1px solid #B0B0B0'
 

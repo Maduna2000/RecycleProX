@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea'
 import { format } from '@/lib/utils/format'
 import { colors } from '@/lib/design-tokens'
-import { HEADER_GRAD, lbl, Btn, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
+import { HEADER_GRAD, VIOLET_GRAD, lbl, Btn, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -179,7 +179,7 @@ export function BusinessLoanTab({ customerId, customerName, userRole }: Business
               fontSize: 14,
               fontWeight: 700,
               fontFamily: 'monospace',
-              color: owed.gt(0) ? colors.violet : '#059669',
+              color: owed.gt(0) ? colors.violet : colors.action,
             }}
           >
             {format.currency(owed.toString())}
@@ -192,7 +192,7 @@ export function BusinessLoanTab({ customerId, customerName, userRole }: Business
             padding: '4px 12px',
             borderRadius: 2,
             cursor: 'pointer',
-            background: `linear-gradient(180deg, ${colors.violet} 0%, #6B21A8 100%)`,
+            background: VIOLET_GRAD,
             border: `1px solid ${colors.violet}`,
             color: '#fff',
             fontWeight: 600,
@@ -214,7 +214,7 @@ export function BusinessLoanTab({ customerId, customerName, userRole }: Business
               padding: '4px 12px',
               borderRadius: 2,
               cursor: 'pointer',
-              background: `linear-gradient(180deg, ${colors.violet} 0%, #6B21A8 100%)`,
+              background: VIOLET_GRAD,
               border: `1px solid ${colors.violet}`,
               color: '#fff',
               fontWeight: 600,
@@ -227,7 +227,7 @@ export function BusinessLoanTab({ customerId, customerName, userRole }: Business
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead>
-              <tr style={{ background: 'linear-gradient(180deg,#F5F5F5 0%,#EBEBEB 100%)', borderBottom: '1px solid #C0C0C0' }}>
+              <tr style={{ background: HEADER_GRAD, borderBottom: '1px solid #C0C0C0' }}>
                 {['Reference', 'Borrowed', 'Still Owed', 'Status', 'Date', ''].map((h) => (
                   <th
                     key={h}
@@ -263,7 +263,7 @@ export function BusinessLoanTab({ customerId, customerName, userRole }: Business
                       padding: '5px 10px',
                       fontFamily: 'monospace',
                       fontWeight: 600,
-                      color: new Decimal(loan.balanceAmount).gt(0) ? colors.violet : '#059669',
+                      color: new Decimal(loan.balanceAmount).gt(0) ? colors.violet : colors.action,
                     }}
                   >
                     {format.currency(loan.balanceAmount)}

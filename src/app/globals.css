@@ -131,9 +131,9 @@ main.rpx-content select {
 main.rpx-content input:focus,
 main.rpx-content textarea:focus,
 main.rpx-content select:focus {
-  border-color: #0078D7;
+  border-color: #185ABD;
   outline: none;
-  box-shadow: inset 1px 1px 2px rgba(0, 0, 0, 0.12), 0 0 0 2px rgba(0, 120, 215, 0.18);
+  box-shadow: inset 1px 1px 2px rgba(0, 0, 0, 0.12), 0 0 0 2px rgba(24, 90, 189, 0.18);
 }
 
 main.rpx-content input:disabled,

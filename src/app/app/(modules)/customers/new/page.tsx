@@ -293,7 +293,7 @@ export default function NewAccountPage() {
                       key={s}
                       className="flex items-center gap-2 px-2 py-1 cursor-pointer text-[12px]"
                       style={{
-                        background: marketSector === s ? '#0078D7' : 'transparent',
+                        background: marketSector === s ? colors.borderFocus : 'transparent',
                         color: marketSector === s ? '#FFFFFF' : '#212529',
                       }}
                     >

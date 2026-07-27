@@ -16,10 +16,10 @@ function getStrength(pw: string): { label: string; color: string; score: number 
   if (/[A-Z]/.test(pw)) score++
   if (/[0-9]/.test(pw)) score++
   if (/[^a-zA-Z0-9]/.test(pw)) score++
-  if (score <= 1) return { label: 'Weak', color: 'bg-red-500', score }
-  if (score === 2) return { label: 'Fair', color: 'bg-amber-500', score }
-  if (score === 3) return { label: 'Good', color: 'bg-blue-500', score }
-  return { label: 'Strong', color: 'bg-green-500', score }
+  if (score <= 1) return { label: 'Weak', color: colors.danger, score }
+  if (score === 2) return { label: 'Fair', color: colors.warning, score }
+  if (score === 3) return { label: 'Good', color: colors.process, score }
+  return { label: 'Strong', color: colors.action, score }
 }
 
 const rules = [
@@ -111,8 +111,8 @@ export default function ChangePasswordPage() {
                   const pass = r.test(newPassword)
                   return (
                     <li key={r.label} className="flex items-center gap-2 text-xs">
-                      {pass ? <CheckCircle2 className="w-3.5 h-3.5 text-green-500 shrink-0" /> : <XCircle className="w-3.5 h-3.5 text-gray-300 shrink-0" />}
-                      <span className={pass ? 'text-green-700' : 'text-gray-500'}>{r.label}</span>
+                      {pass ? <CheckCircle2 className="w-3.5 h-3.5 shrink-0" style={{ color: colors.action }} /> : <XCircle className="w-3.5 h-3.5 shrink-0" style={{ color: colors.textMuted }} />}
+                      <span style={{ color: pass ? colors.action : colors.textSecondary }}>{r.label}</span>
                     </li>
                   )
                 })}
@@ -121,10 +121,14 @@ export default function ChangePasswordPage() {
                 <div className="mt-4">
                   <div className="flex gap-1 mb-1">
                     {[1, 2, 3, 4].map((i) => (
-                      <div key={i} className={`h-1.5 flex-1 rounded-full ${i <= strength.score ? strength.color : 'bg-gray-200'}`} />
+                      <div
+                        key={i}
+                        className="h-1.5 flex-1 rounded-full"
+                        style={{ background: i <= strength.score ? strength.color : colors.border }}
+                      />
                     ))}
                   </div>
-                  <p className="text-xs text-gray-500">{strength.label}</p>
+                  <p className="text-xs" style={{ color: colors.textSecondary }}>{strength.label}</p>
                 </div>
               )}
             </div>

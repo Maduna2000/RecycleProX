@@ -14,7 +14,7 @@ import Decimal from 'decimal.js'
 import { colors } from '@/lib/design-tokens'
 import { BAR_GRAD, CARD_BORDER } from '@/components/rpx/styles'
 import { Dialog } from '@/components/ui/dialog'
-import { Btn, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
+import { Btn, HEADER_GRAD, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
 import { useOfflineMutation } from '@/hooks/useOfflineFetch'
 import { offlineDB } from '@/lib/offline/db'
 
@@ -424,9 +424,9 @@ export default function NewSalePage() {
   }
 
   // ── Shared styles ─────────────────────────────────────────────────────────
-  const cellInput      = 'w-full px-1.5 py-0.5 text-[11px] font-mono border rounded-[2px] bg-white focus:outline-none focus:border-[#0078D7]'
+  const cellInput      = 'w-full px-1.5 py-0.5 text-[11px] font-mono border rounded-[2px] bg-white focus:outline-none focus:border-[#185ABD]'
   const cellInputStyle = { borderColor: '#ABABAB', color: '#212529' }
-  const headerBg       = { background: 'linear-gradient(180deg,#FFFFFF 0%,#E8E8E8 100%)', borderBottom: '2px solid #B0B0B0' }
+  const headerBg       = { background: HEADER_GRAD, borderBottom: '2px solid #B0B0B0' }
 
   // ─── Render ───────────────────────────────────────────────────────────────
   return (
@@ -439,7 +439,7 @@ export default function NewSalePage() {
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
 
           {/* Title bar */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderBottom: '2px solid #B0B0B0', background: 'linear-gradient(180deg,#EAEAEA 0%,#D4D4D4 100%)', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderBottom: '2px solid #B0B0B0', background: BAR_GRAD, flexShrink: 0 }}>
             <span style={{ fontSize: 12, fontWeight: 700, color: '#1B3A6B', marginRight: 2 }}>Buyer Name</span>
 
             {/* Walk-in / Account toggle */}
@@ -700,7 +700,7 @@ export default function NewSalePage() {
                       </span>
 
                       {/* Total */}
-                      <span style={{ fontSize: 11, fontFamily: 'monospace', fontWeight: 600, padding: '0 4px', color: qty.gt(0) ? '#217346' : '#9CA3AF' }}>
+                      <span style={{ fontSize: 11, fontFamily: 'monospace', fontWeight: 600, padding: '0 4px', color: qty.gt(0) ? colors.action : '#9CA3AF' }}>
                         {qty.gt(0) ? `R ${lineTot.toFixed(2)}` : '—'}
                       </span>
 
@@ -831,8 +831,8 @@ export default function NewSalePage() {
 
                         {parseFloat(line.deductionQty || '0') > 0 && (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                            <span style={{ fontSize: 10, fontWeight: 600, color: '#217346' }}>Paid Qty (kg)</span>
-                            <div style={{ height: 24, display: 'flex', alignItems: 'center', padding: '0 6px', borderRadius: 2, border: '1px solid #217346', background: '#F0FDF4', fontFamily: 'monospace', fontSize: 11, fontWeight: 700, color: '#217346', minWidth: 56 }}>
+                            <span style={{ fontSize: 10, fontWeight: 600, color: colors.action }}>Paid Qty (kg)</span>
+                            <div style={{ height: 24, display: 'flex', alignItems: 'center', padding: '0 6px', borderRadius: 2, border: `1px solid ${colors.action}`, background: colors.actionBg, fontFamily: 'monospace', fontSize: 11, fontWeight: 700, color: colors.action, minWidth: 56 }}>
                               {line.quantity || '0.000'}
                             </div>
                           </div>
@@ -938,8 +938,8 @@ export default function NewSalePage() {
                       <span style={{ fontSize: 10, fontFamily: 'monospace', color: '#1B3A6B', fontWeight: 600 }}>{s.refNumber}</span>
                       <span style={{ fontSize: 11, color: '#212529', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.buyerName}</span>
                       <span style={{ fontSize: 10, color: '#6C757D', textAlign: 'center' }}>{s.lines.length}</span>
-                      <span style={{ fontSize: 10, fontFamily: 'monospace', color: '#217346', fontWeight: 600 }}>R {new Decimal(s.totalAmount).toFixed(2)}</span>
-                      <span style={{ fontSize: 10, fontFamily: 'monospace', fontWeight: 600, color: '#217346' }}>R {bal.toFixed(2)}</span>
+                      <span style={{ fontSize: 10, fontFamily: 'monospace', color: colors.action, fontWeight: 600 }}>R {new Decimal(s.totalAmount).toFixed(2)}</span>
+                      <span style={{ fontSize: 10, fontFamily: 'monospace', fontWeight: 600, color: colors.action }}>R {bal.toFixed(2)}</span>
                       <span style={{ fontSize: 10, color: '#9CA3AF' }}>{timeAgo(s.createdAt)}</span>
 
                       {/* ⋮ action menu */}
@@ -1027,7 +1027,7 @@ export default function NewSalePage() {
               <div style={{ height: 1, background: '#C0C0C0', margin: '2px 0' }} />
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 700 }}>
                 <span style={{ color: '#212529' }}>Total</span>
-                <span style={{ fontFamily: 'monospace', color: '#217346' }}>R {total.toFixed(2)}</span>
+                <span style={{ fontFamily: 'monospace', color: colors.action }}>R {total.toFixed(2)}</span>
               </div>
             </div>
           </div>
@@ -1139,7 +1139,7 @@ export default function NewSalePage() {
 
       {/* ── Action bar ────────────────────────────────────────────────────── */}
       <div
-        style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', padding: '6px 16px', borderTop: '2px solid #B0B0B0', background: 'linear-gradient(180deg,#F5F5F5 0%,#E8E8E8 100%)', flexShrink: 0 }}
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', padding: '6px 16px', borderTop: '2px solid #B0B0B0', background: HEADER_GRAD, flexShrink: 0 }}
       >
         <button
           type="button"
@@ -1280,8 +1280,8 @@ function SaleSettlementModal({
             </div>
 
             <div className="flex justify-between pt-1 border-t" style={{ fontSize: 13, borderColor: '#E0E0E0' }}>
-              <span className="font-semibold" style={{ color: '#217346' }}>Due via {paymentType.toUpperCase()}</span>
-              <span className="font-mono font-bold" style={{ color: '#217346' }}>R {remaining.toFixed(2)}</span>
+              <span className="font-semibold" style={{ color: colors.action }}>Due via {paymentType.toUpperCase()}</span>
+              <span className="font-mono font-bold" style={{ color: colors.action }}>R {remaining.toFixed(2)}</span>
             </div>
           </div>
         </RpxDialogBody>

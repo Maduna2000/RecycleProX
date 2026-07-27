@@ -8,6 +8,7 @@ import { Dialog } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { SaleSplitPaymentModal } from './SaleSplitPaymentModal'
+import { colors } from '@/lib/design-tokens'
 import { Btn, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
 
 export type PayTarget = {
@@ -93,7 +94,7 @@ export function RecordPaymentModal({
               <span className="font-mono">R {totalAmount.toFixed(2)}</span>
             </div>
             {alreadyPaid.gt(0) && (
-              <div className="flex justify-between" style={{ fontSize: 12, color: '#217346' }}>
+              <div className="flex justify-between" style={{ fontSize: 12, color: colors.action }}>
                 <span>Already paid</span>
                 <span className="font-mono">− R {alreadyPaid.toFixed(2)}</span>
               </div>
@@ -108,13 +109,13 @@ export function RecordPaymentModal({
               sale cannot be settled via plain cash/eft while it's unpaid,
               only through Split Payment (which PIN-gates the actual figure). */}
           {hasOutstandingBusinessLoan && (
-            <div className="flex items-start gap-2 px-3 py-2 rounded-lg" style={{ background: '#FFF3E0', border: '1px solid #FFCC80' }}>
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" style={{ color: '#E65100' }} />
+            <div className="flex items-start gap-2 px-3 py-2 rounded-lg" style={{ background: colors.alertBg, border: `1px solid ${colors.alertBorder}` }}>
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" style={{ color: colors.alertIcon }} />
               <div>
-                <p className="text-xs font-medium" style={{ color: '#E65100' }}>
+                <p className="text-xs font-medium" style={{ color: colors.alertIcon }}>
                   This customer has a pending business loan
                 </p>
-                <p className="text-xs" style={{ color: '#EF6C00' }}>
+                <p className="text-xs" style={{ color: colors.alertText }}>
                   This sale can only be settled via Split Payment until the loan is applied.
                 </p>
               </div>
@@ -131,7 +132,7 @@ export function RecordPaymentModal({
                     type="button"
                     onClick={() => { setAmount(remaining.toFixed(2)); setAmountError(null) }}
                     className="text-xs underline"
-                    style={{ color: '#217346' }}
+                    style={{ color: colors.action }}
                   >
                     Pay full balance
                   </button>
@@ -145,7 +146,7 @@ export function RecordPaymentModal({
                   className="h-8 text-[12px] font-mono"
                 />
                 {amountError && (
-                  <p className="text-xs mt-1" style={{ color: '#DC3545' }}>{amountError}</p>
+                  <p className="text-xs mt-1" style={{ color: colors.danger }}>{amountError}</p>
                 )}
               </div>
 

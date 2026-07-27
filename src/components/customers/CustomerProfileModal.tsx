@@ -21,7 +21,7 @@ import {
   type BlacklistInput,
 } from '@/lib/schemas/customer'
 import { colors } from '@/lib/design-tokens'
-import { Btn, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
+import { Btn, HEADER_GRAD, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -75,7 +75,7 @@ function getProfileTabs(customerType: string) {
 // ─── Design tokens (mirrors Settings page) ────────────────────────────────────
 
 const sHdrStyle: React.CSSProperties = {
-  background: 'linear-gradient(180deg,#FFFFFF 0%,#E8E8E8 100%)',
+  background: HEADER_GRAD,
   borderBottom: '1px solid #C0C0C0',
   padding: '4px 10px',
 }
@@ -144,7 +144,7 @@ export function CustomerProfileModal({
         {customer && (
           <>
             {/* ── Customer info bar ─────────────────────────────────────────── */}
-            <div style={{ background: 'linear-gradient(180deg,#FAFAFA 0%,#F0F0F0 100%)', borderBottom: '1px solid #D0D0D0', padding: '4px 10px', flexShrink: 0 }}>
+            <div style={{ background: HEADER_GRAD, borderBottom: '1px solid #D0D0D0', padding: '4px 10px', flexShrink: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
                   <span style={{ fontSize: 12, fontWeight: 700, color: '#212529' }}>

@@ -11,7 +11,8 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { format } from '@/lib/utils/format'
-import { HEADER_GRAD, NAVY, lbl, Btn, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
+import { colors } from '@/lib/design-tokens'
+import { HEADER_GRAD, ACTION_GRAD, NAVY, lbl, Btn, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -145,7 +146,7 @@ export function LoansTab({ customerId, customerName, userRole, userAllowedModule
               fontSize: 14,
               fontWeight: 700,
               fontFamily: 'monospace',
-              color: outstanding.gt(0) ? '#D97706' : '#059669',
+              color: outstanding.gt(0) ? '#D97706' : colors.action,
             }}
           >
             {format.currency(outstanding.toString())}
@@ -159,8 +160,8 @@ export function LoansTab({ customerId, customerName, userRole, userAllowedModule
               padding: '4px 12px',
               borderRadius: 2,
               cursor: 'pointer',
-              background: 'linear-gradient(180deg,#10B981 0%,#059669 100%)',
-              border: '1px solid #059669',
+              background: ACTION_GRAD,
+              border: `1px solid ${colors.actionHover}`,
               color: '#fff',
               fontWeight: 600,
             }}
@@ -199,8 +200,8 @@ export function LoansTab({ customerId, customerName, userRole, userAllowedModule
                 padding: '4px 12px',
                 borderRadius: 2,
                 cursor: 'pointer',
-                background: 'linear-gradient(180deg,#10B981 0%,#059669 100%)',
-                border: '1px solid #059669',
+                background: ACTION_GRAD,
+                border: `1px solid ${colors.actionHover}`,
                 color: '#fff',
                 fontWeight: 600,
               }}
@@ -215,7 +216,7 @@ export function LoansTab({ customerId, customerName, userRole, userAllowedModule
             <thead>
               <tr
                 style={{
-                  background: 'linear-gradient(180deg,#F5F5F5 0%,#EBEBEB 100%)',
+                  background: HEADER_GRAD,
                   borderBottom: '1px solid #C0C0C0',
                 }}
               >
@@ -258,7 +259,7 @@ export function LoansTab({ customerId, customerName, userRole, userAllowedModule
                       padding: '5px 10px',
                       fontFamily: 'monospace',
                       fontWeight: 600,
-                      color: new Decimal(loan.balanceAmount).gt(0) ? '#D97706' : '#059669',
+                      color: new Decimal(loan.balanceAmount).gt(0) ? '#D97706' : colors.action,
                     }}
                   >
                     {format.currency(loan.balanceAmount)}

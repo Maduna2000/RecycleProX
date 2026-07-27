@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import Decimal from 'decimal.js'
 import { Dialog } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { colors } from '@/lib/design-tokens'
 import { Btn, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
 import { AdminPinUnlockModal, type BusinessLoanFullSummary } from '@/components/business-loans/AdminPinUnlockModal'
 
@@ -41,10 +42,10 @@ function PaymentInput({
 }) {
   return (
     <div className="flex items-center gap-2">
-      <div className="w-32 flex items-center gap-1.5" style={{ color: highlight ? '#E65100' : '#6C757D' }}>
+      <div className="w-32 flex items-center gap-1.5" style={{ color: highlight ? colors.alertIcon : '#6C757D' }}>
         {icon}
         <span className="text-xs font-medium">{label}</span>
-        {locked && <Lock className="w-3 h-3" style={{ color: '#E65100' }} />}
+        {locked && <Lock className="w-3 h-3" style={{ color: colors.alertIcon }} />}
       </div>
       <div className="flex-1 relative">
         {locked && !revealed ? (
@@ -52,7 +53,7 @@ function PaymentInput({
             type="button"
             onClick={onUnlockClick}
             className="w-full h-8 text-xs rounded border text-left px-2"
-            style={{ background: '#F5F5F5', borderColor: '#FFCC80', color: '#E65100' }}
+            style={{ background: '#F5F5F5', borderColor: colors.alertBorder, color: colors.alertIcon }}
           >
             Enter admin PIN to unlock
           </button>
@@ -67,7 +68,7 @@ function PaymentInput({
               onChange={(e) => onChange(e.target.value)}
               disabled={disabled || locked}
               className="h-8 text-xs font-mono pl-6"
-              style={{ borderColor: highlight ? '#FFCC80' : undefined, background: locked ? '#F5F5F5' : undefined }}
+              style={{ borderColor: highlight ? colors.alertBorder : undefined, background: locked ? '#F5F5F5' : undefined }}
             />
           </>
         )}
@@ -165,23 +166,23 @@ export function SaleSplitPaymentModal({
           <RpxDialogHeader title="Split Payment" icon={Split} onClose={onClose} />
           <RpxDialogBody>
             <div className="space-y-4">
-              <div className="px-3 py-2.5 rounded-lg" style={{ background: '#FFF8E1', border: '1px solid #FFE082' }}>
+              <div className="px-3 py-2.5 rounded-lg" style={{ background: colors.alertBg, border: `1px solid ${colors.alertBorder}` }}>
                 <div className="flex justify-between items-center">
-                  <span className="text-xs font-medium" style={{ color: '#F57F17' }}>Amount to Pay (Full Payment Required)</span>
-                  <span className="font-mono font-bold" style={{ fontSize: 16, color: '#F57F17' }}>
+                  <span className="text-xs font-medium" style={{ color: colors.alertIcon }}>Amount to Pay (Full Payment Required)</span>
+                  <span className="font-mono font-bold" style={{ fontSize: 16, color: colors.alertIcon }}>
                     R {pendingAmount.toFixed(2)}
                   </span>
                 </div>
               </div>
 
               {showBusinessLoanLeg && (
-                <div className="flex items-start gap-2 px-3 py-2 rounded-lg" style={{ background: '#FFF3E0', border: '1px solid #FFCC80' }}>
-                  <Lock className="w-4 h-4 shrink-0 mt-0.5" style={{ color: '#E65100' }} />
+                <div className="flex items-start gap-2 px-3 py-2 rounded-lg" style={{ background: colors.alertBg, border: `1px solid ${colors.alertBorder}` }}>
+                  <Lock className="w-4 h-4 shrink-0 mt-0.5" style={{ color: colors.alertIcon }} />
                   <div>
-                    <p className="text-xs font-medium" style={{ color: '#E65100' }}>
+                    <p className="text-xs font-medium" style={{ color: colors.alertIcon }}>
                       This customer has a pending business loan
                     </p>
-                    <p className="text-xs" style={{ color: '#EF6C00' }}>
+                    <p className="text-xs" style={{ color: colors.alertText }}>
                       {unlockedSummary
                         ? `Outstanding: R ${new Decimal(unlockedSummary.outstanding).toFixed(2)} — you may apply some or all of this sale toward it.`
                         : 'Enter an admin PIN to view the balance and apply it toward this sale.'}
@@ -213,13 +214,13 @@ export function SaleSplitPaymentModal({
                   <span>Payment Total</span>
                   <span className="font-mono">R {paymentTotal.toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between text-xs font-medium" style={{ color: remaining.isZero() ? '#217346' : '#DC3545' }}>
+                <div className="flex justify-between text-xs font-medium" style={{ color: remaining.isZero() ? colors.action : colors.danger }}>
                   <span>{remaining.isZero() ? 'Fully Covered' : remaining.lessThan(0) ? 'Over-payment' : 'Remaining (Must be R 0.00)'}</span>
                   <span className="font-mono">{remaining.isZero() ? '✓' : `R ${remaining.abs().toFixed(2)}`}</span>
                 </div>
               </div>
 
-              {error && <p className="text-xs" style={{ color: '#DC3545' }}>{error}</p>}
+              {error && <p className="text-xs" style={{ color: colors.danger }}>{error}</p>}
             </div>
           </RpxDialogBody>
           <RpxDialogFooter>

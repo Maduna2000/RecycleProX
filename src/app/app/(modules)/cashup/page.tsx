@@ -16,7 +16,7 @@ import { useOfflineMutation } from '@/hooks/useOfflineFetch'
 import { ReportButton } from './_components/ReportButton'
 import { PreviousReportsModal } from './_components/PreviousReportsModal'
 import { CARD_BORDER } from '@/components/rpx/styles'
-import { Btn, PortalPage, PANEL, PANEL_HEAD, inp, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
+import { Btn, PortalPage, PANEL, PANEL_HEAD, HEADER_GRAD, inp, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -229,7 +229,7 @@ function CountCashModal({ counts, setCounts, notes, setNotes, submitting, handle
             <div style={{ border: `1px solid ${colors.border}`, borderRadius: 3, overflow: 'hidden' }}>
               <div
                 className="px-2 py-1 text-xs font-semibold uppercase tracking-wide"
-                style={{ background: 'linear-gradient(180deg,#FFFFFF 0%,#E8E8E8 100%)', color: colors.textSecondary, borderBottom: `1px solid ${colors.border}` }}
+                style={{ background: HEADER_GRAD, color: colors.textSecondary, borderBottom: `1px solid ${colors.border}` }}
               >
                 Notes
               </div>
@@ -240,7 +240,7 @@ function CountCashModal({ counts, setCounts, notes, setNotes, submitting, handle
             <div style={{ border: `1px solid ${colors.border}`, borderRadius: 3, overflow: 'hidden' }}>
               <div
                 className="px-2 py-1 text-xs font-semibold uppercase tracking-wide"
-                style={{ background: 'linear-gradient(180deg,#FFFFFF 0%,#E8E8E8 100%)', color: colors.textSecondary, borderBottom: `1px solid ${colors.border}` }}
+                style={{ background: HEADER_GRAD, color: colors.textSecondary, borderBottom: `1px solid ${colors.border}` }}
               >
                 Coins
               </div>

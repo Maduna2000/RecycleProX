@@ -1,5 +1,5 @@
 export {
-  NAVY, HEADER_GRAD, BAR_GRAD, CARD_BORDER,
+  NAVY, HEADER_GRAD, BAR_GRAD, ACTION_GRAD, VIOLET_GRAD, CARD_BORDER,
   inp, lbl, TH, TD,
   btnPrimary, btnSecondary, btnDanger,
   PANEL, PANEL_HEAD,

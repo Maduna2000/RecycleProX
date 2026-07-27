@@ -20,12 +20,19 @@ export const colors = {
   /** Navy — top nav bar, active tab background, primary buttons (see @/components/rpx Btn) */
   primary:       '#1B3A6B',
   /**
-   * Emerald-500 — success/status green ONLY (badges, positive money, net weight).
+   * Ledger green — success/status green ONLY (badges, positive money, net weight).
+   * Matches tailwind.config.ts's rpx.green — the two files previously disagreed
+   * (this used to be emerald #10b981) which caused ~15 files to hand-roll #217346
+   * directly instead of importing this token. Now there is one green.
    * NOT for buttons: primary actions use the navy Btn from @/components/rpx.
    */
-  action:        '#10b981',
+  action:        '#217346',
   /** Blue — secondary buttons, links, info states */
   process:       '#185ABD',
+  /** Win7 dialog/wizard "main instruction" blue — page and section titles */
+  mainInstruction: '#003399',
+  /** Link blue — genuine navigational links only, not buttons styled as links */
+  link:          '#0066CC',
   /** Amber — pending states, warnings, loan banners */
   warning:       '#C9A020',
   /** Red — void, delete, errors, blacklisted indicators */
@@ -118,8 +125,8 @@ export const colors = {
   violetBg:      '#F3EFFF',
 
   // Button hover darkens
-  /** Emerald-600 — hover state for action/primary buttons */
-  actionHover:   '#059669',
+  /** Darkened ledger green — hover state for action/primary buttons */
+  actionHover:   '#1a5c38',
   /** Darker blue — hover state for process/secondary buttons */
   processHover:  '#1249A0',
 
@@ -289,18 +296,18 @@ export const styles = {
     fontWeight: fontWeight.semibold,
   } as React.CSSProperties,
 
-  // Page title
+  // Page title — Win7 main-instruction blue, not body-text black
   pageTitle: {
     fontSize:   fontSize.lg,
     fontWeight: fontWeight.semibold,
-    color:      colors.textPrimary,
+    color:      colors.mainInstruction,
   } as React.CSSProperties,
 
-  // Section title
+  // Section title — Win7 main-instruction blue, not body-text black
   sectionTitle: {
     fontSize:   fontSize.md,
     fontWeight: fontWeight.semibold,
-    color:      colors.textPrimary,
+    color:      colors.mainInstruction,
   } as React.CSSProperties,
 
   // Stat card value

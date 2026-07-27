@@ -200,13 +200,13 @@ export default function SaleDetailPage() {
               <tfoot>
                 {sale.vatAmount && Number(sale.vatAmount) > 0 && (
                   <>
-                    <tr style={{ background: 'linear-gradient(180deg,#F5F5F5 0%,#ECECEC 100%)' }}>
+                    <tr style={{ background: HEADER_GRAD }}>
                       <td colSpan={3} style={{ ...TD, textAlign: 'right', color: colors.textSecondary }}>Sub Total</td>
                       <td style={{ ...TD, fontFamily: 'monospace', textAlign: 'right', color: colors.textPrimary }}>
                         R {(Number(sale.totalAmount) - Number(sale.vatAmount)).toFixed(2)}
                       </td>
                     </tr>
-                    <tr style={{ background: 'linear-gradient(180deg,#F5F5F5 0%,#ECECEC 100%)' }}>
+                    <tr style={{ background: HEADER_GRAD }}>
                       <td colSpan={3} style={{ ...TD, textAlign: 'right', color: colors.textSecondary }}>VAT</td>
                       <td style={{ ...TD, fontFamily: 'monospace', textAlign: 'right', color: colors.textSecondary }}>
                         R {Number(sale.vatAmount).toFixed(2)}
@@ -214,7 +214,7 @@ export default function SaleDetailPage() {
                     </tr>
                   </>
                 )}
-                <tr style={{ borderTop: `2px solid ${colors.border}`, background: 'linear-gradient(180deg,#F5F5F5 0%,#ECECEC 100%)' }}>
+                <tr style={{ borderTop: `2px solid ${colors.border}`, background: HEADER_GRAD }}>
                   <td colSpan={3} style={{ ...TD, textAlign: 'right', fontWeight: 600, color: colors.textSecondary }}>Total</td>
                   <td style={{ ...TD, fontFamily: 'monospace', fontWeight: 700, fontSize: 14, textAlign: 'right', color: colors.action }}>
                     R {Number(sale.totalAmount).toFixed(2)}

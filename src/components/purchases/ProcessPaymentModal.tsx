@@ -7,6 +7,7 @@ import Decimal from 'decimal.js'
 import { Dialog } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { SplitPaymentModal, type SplitPayTarget } from './SplitPaymentModal'
+import { colors } from '@/lib/design-tokens'
 import { Btn, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
 
 export type PayTarget = {
@@ -96,7 +97,7 @@ export function ProcessPaymentModal({
               </div>
             )}
             {alreadyPaid.gt(0) && (
-              <div className="flex justify-between" style={{ fontSize: 12, color: '#217346' }}>
+              <div className="flex justify-between" style={{ fontSize: 12, color: colors.action }}>
                 <span>Already paid</span>
                 <span className="font-mono">− R {alreadyPaid.toFixed(2)}</span>
               </div>
@@ -109,13 +110,13 @@ export function ProcessPaymentModal({
 
           {/* Loan alert - MANDATORY */}
           {!loanLoading && outstandingDec.greaterThan(0) && (
-            <div className="flex items-start gap-2 px-3 py-2 rounded-lg" style={{ background: '#FFF3E0', border: '1px solid #FFCC80' }}>
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" style={{ color: '#E65100' }} />
+            <div className="flex items-start gap-2 px-3 py-2 rounded-lg" style={{ background: colors.alertBg, border: `1px solid ${colors.alertBorder}` }}>
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" style={{ color: colors.alertIcon }} />
               <div>
-                <p className="text-xs font-medium" style={{ color: '#E65100' }}>
+                <p className="text-xs font-medium" style={{ color: colors.alertIcon }}>
                   Outstanding Loan: R {outstandingDec.toFixed(2)}
                 </p>
-                <p className="text-xs" style={{ color: '#EF6C00' }}>
+                <p className="text-xs" style={{ color: colors.alertText }}>
                   Use Split Payment to deduct loan from this payment.
                 </p>
               </div>
@@ -129,7 +130,7 @@ export function ProcessPaymentModal({
             </div>
             <div
               className="h-8 flex items-center px-3 rounded border text-[12px] font-mono font-semibold"
-              style={{ background: '#F5F5F5', borderColor: '#E0E0E0', color: '#217346' }}
+              style={{ background: '#F5F5F5', borderColor: '#E0E0E0', color: colors.action }}
             >
               R {remaining.toFixed(2)}
             </div>

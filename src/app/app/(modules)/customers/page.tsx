@@ -185,7 +185,7 @@ function AccountsList() {
       header: 'Acc Code',
       width: '80px',
       render: (r) => r.accountCode
-        ? <span className="font-mono text-[11px] font-semibold" style={{ color: '#185ABD' }}>{r.accountCode}</span>
+        ? <span className="font-mono text-[11px] font-semibold" style={{ color: colors.borderFocus }}>{r.accountCode}</span>
         : <span className="text-[11px]" style={{ color: colors.textSecondary }}>—</span>,
     },
     {

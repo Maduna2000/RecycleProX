@@ -4,7 +4,7 @@ import { useState, useRef } from 'react'
 import { ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight, MoreHorizontal, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { colors, fontSize, fontWeight, layout } from '@/lib/design-tokens'
-import { Btn } from '@/components/rpx'
+import { Btn, HEADER_GRAD } from '@/components/rpx'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -225,7 +225,7 @@ export function DataTable<T>({
           {/* Header */}
           <thead className="sticky top-0 z-10">
             <tr style={{
-              background: 'linear-gradient(180deg, #FFFFFF 0%, #E8E8E8 100%)',
+              background: HEADER_GRAD,
               borderBottom: '2px solid #B0B0B0',
             }}>
               {multiSelect && (
@@ -336,7 +336,7 @@ export function DataTable<T>({
                     }}
                     onMouseEnter={(e) => {
                       if (!isSelected && !isChecked)
-                        (e.currentTarget as HTMLTableRowElement).style.background = '#D6E8FF'
+                        (e.currentTarget as HTMLTableRowElement).style.background = colors.rowHover
                     }}
                     onMouseLeave={(e) => {
                       if (!isSelected && !isChecked)

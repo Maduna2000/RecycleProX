@@ -213,7 +213,7 @@ export default function PurchaseDetailPage() {
                         − R {Number(purchase.loanDeductionAmount).toFixed(2)}
                       </td>
                     </tr>
-                    <tr style={{ borderTop: `2px solid ${colors.border}`, background: 'linear-gradient(180deg,#F5F5F5 0%,#ECECEC 100%)' }}>
+                    <tr style={{ borderTop: `2px solid ${colors.border}`, background: HEADER_GRAD }}>
                       <td colSpan={3} style={{ ...TD, textAlign: 'right', fontWeight: 600, color: colors.textPrimary }}>Cash Paid Out</td>
                       <td style={{ ...TD, fontFamily: 'monospace', fontWeight: 700, fontSize: 14, textAlign: 'right', color: colors.action }}>
                         R {netPayout.toFixed(2)}
@@ -221,7 +221,7 @@ export default function PurchaseDetailPage() {
                     </tr>
                   </>
                 ) : (
-                  <tr style={{ borderTop: `2px solid ${colors.border}`, background: 'linear-gradient(180deg,#F5F5F5 0%,#ECECEC 100%)' }}>
+                  <tr style={{ borderTop: `2px solid ${colors.border}`, background: HEADER_GRAD }}>
                     <td colSpan={3} style={{ ...TD, textAlign: 'right', fontWeight: 600, color: colors.textSecondary }}>Total Payout</td>
                     <td style={{ ...TD, fontFamily: 'monospace', fontWeight: 700, fontSize: 14, textAlign: 'right', color: colors.action }}>
                       R {Number(purchase.totalAmount).toFixed(2)}

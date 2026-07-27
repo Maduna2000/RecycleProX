@@ -5,6 +5,7 @@
  * content card, filter bars, field wrappers, and small display helpers.
  */
 
+import { colors } from '@/lib/design-tokens'
 import { NAVY, CARD_BORDER, lbl } from './styles'
 
 // ─── Field / FormLabel ────────────────────────────────────────────────────────
@@ -13,7 +14,7 @@ export function FormLabel({ required, children }: { required?: boolean; children
   return (
     <label style={lbl}>
       {children}
-      {required && <span style={{ color: '#DC3545' }}> *</span>}
+      {required && <span style={{ color: colors.danger }}> *</span>}
     </label>
   )
 }

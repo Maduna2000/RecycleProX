@@ -19,8 +19,9 @@ import {
 } from 'lucide-react'
 import { POLICE_VISIT_REASONS, VISIT_REASON_LABELS } from '@/lib/schemas/police'
 import { DEFAULT_POLICE_SERVICE_NAME, DEFAULT_POLICE_LEGAL_NOTE } from '@/lib/police-defaults'
+import { colors } from '@/lib/design-tokens'
 import {
-  NAVY, inp, lbl, TH, TD,
+  NAVY, HEADER_GRAD, inp, lbl, TH, TD,
   Btn, TabStrip, EmptyHint, SectionLabel, DL, Drawer,
   RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter,
 } from '@/components/rpx'
@@ -312,7 +313,7 @@ function BeginInspectionCard({
     <div style={{ display: 'flex', justifyContent: 'center', padding: '32px 16px' }}>
       <div style={{ width: '100%', maxWidth: 560 }}>
         <div style={{ background: '#fff', border: '1px solid #B0B0B0', borderRadius: 3, overflow: 'hidden' }}>
-          <div style={{ background: 'linear-gradient(180deg,#FFFFFF 0%,#E8E8E8 100%)', borderBottom: '1px solid #C0C0C0', padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ background: HEADER_GRAD, borderBottom: '1px solid #C0C0C0', padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 8 }}>
             <ShieldCheck style={{ width: 15, height: 15, color: NAVY }} />
             <span style={{ fontSize: 13, fontWeight: 700, color: NAVY }}>Begin Inspection — Officer Registration</span>
           </div>
@@ -323,24 +324,24 @@ function BeginInspectionCard({
             </p>
 
             <div>
-              <label style={lbl}>Full Name <span style={{ color: '#DC3545' }}>*</span></label>
+              <label style={lbl}>Full Name <span style={{ color: colors.danger }}>*</span></label>
               <input value={officerName} onChange={(e) => setOfficerName(e.target.value)} placeholder="e.g. J. Nkosi" style={inp} autoFocus />
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div>
-                <label style={lbl}>Rank <span style={{ color: '#DC3545' }}>*</span></label>
+                <label style={lbl}>Rank <span style={{ color: colors.danger }}>*</span></label>
                 <input value={rank} onChange={(e) => setRank(e.target.value)} placeholder="e.g. Constable" style={inp} />
               </div>
               <div>
-                <label style={lbl}>Service / Force Number <span style={{ color: '#DC3545' }}>*</span></label>
+                <label style={lbl}>Service / Force Number <span style={{ color: colors.danger }}>*</span></label>
                 <input value={badgeNumber} onChange={(e) => setBadgeNumber(e.target.value)} placeholder="e.g. 7012345-6" style={inp} />
               </div>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div>
-                <label style={lbl}>Police Station <span style={{ color: '#DC3545' }}>*</span></label>
+                <label style={lbl}>Police Station <span style={{ color: colors.danger }}>*</span></label>
                 <input value={stationName} onChange={(e) => setStationName(e.target.value)} placeholder="e.g. Pretoria Central" style={inp} />
               </div>
               <div>
@@ -350,7 +351,7 @@ function BeginInspectionCard({
             </div>
 
             <div>
-              <label style={lbl}>Reason for Visit <span style={{ color: '#DC3545' }}>*</span></label>
+              <label style={lbl}>Reason for Visit <span style={{ color: colors.danger }}>*</span></label>
               <select value={visitReason} onChange={(e) => setVisitReason(e.target.value)} style={{ ...inp, height: 30 }}>
                 {POLICE_VISIT_REASONS.map((r) => (
                   <option key={r} value={r}>{VISIT_REASON_LABELS[r]}</option>
@@ -370,7 +371,7 @@ function BeginInspectionCard({
             </div>
 
             {error && (
-              <p style={{ fontSize: 12, padding: '6px 10px', borderRadius: 2, color: '#DC3545', background: '#FDECEA', margin: 0 }}>{error}</p>
+              <p style={{ fontSize: 12, padding: '6px 10px', borderRadius: 2, color: colors.danger, background: colors.dangerBg, margin: 0 }}>{error}</p>
             )}
 
             <Btn type="submit" variant="primary" icon={ShieldCheck} loading={loading} disabled={!canSubmit} style={{ alignSelf: 'flex-start' }}>
@@ -379,10 +380,10 @@ function BeginInspectionCard({
           </form>
         </div>
 
-        <div style={{ marginTop: 12, background: '#EFF4FB', border: `1px solid ${NAVY}`, borderRadius: 3, padding: '10px 14px' }}>
+        <div style={{ marginTop: 12, background: colors.processBg, border: `1px solid ${NAVY}`, borderRadius: 3, padding: '10px 14px' }}>
           <p style={{ fontWeight: 700, color: NAVY, margin: '0 0 3px', fontSize: 11 }}>{serviceName} — legal notice</p>
-          <p style={{ color: '#33507E', margin: 0, fontSize: 11 }}>{legalNote}</p>
-          <p style={{ color: '#33507E', margin: '6px 0 0', fontSize: 10.5 }}>
+          <p style={{ color: colors.process, margin: 0, fontSize: 11 }}>{legalNote}</p>
+          <p style={{ color: colors.process, margin: '6px 0 0', fontSize: 10.5 }}>
             All searches performed during this session are recorded against your visit and appear on the inspection certificate.
           </p>
         </div>
@@ -454,15 +455,15 @@ function ActiveSession({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
       {/* Inspection banner */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 16px', background: '#FFF7E6', borderBottom: '1px solid #F2AB1A', flexShrink: 0 }}>
-        <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#DC3545', display: 'inline-block', animation: 'pulse 2s infinite' }} />
-        <span style={{ fontSize: 12, fontWeight: 700, color: '#7A5200' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 16px', background: colors.warningBg, borderBottom: `1px solid ${colors.warning}`, flexShrink: 0 }}>
+        <span style={{ width: 8, height: 8, borderRadius: '50%', background: colors.danger, display: 'inline-block', animation: 'pulse 2s infinite' }} />
+        <span style={{ fontSize: 12, fontWeight: 700, color: colors.warning }}>
           Police inspection in progress — {visit.rank ? `${visit.rank} ` : ''}{visit.officerName}
         </span>
-        <span style={{ fontSize: 11, color: '#9A7B2D' }}>
+        <span style={{ fontSize: 11, color: colors.warning }}>
           {visit.stationName}{visit.badgeNumber ? ` · No. ${visit.badgeNumber}` : ''}
         </span>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, color: '#9A7B2D' }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, color: colors.warning }}>
           <Clock style={{ width: 11, height: 11 }} /> {elapsed}
         </span>
         <div style={{ flex: 1 }} />
@@ -567,7 +568,7 @@ function RegisterTab({ visitId, guardedFetch }: { visitId: string; guardedFetch:
             Register PDF ({from})
           </Btn>
         )}
-        {error && <span style={{ fontSize: 12, color: '#DC3545' }}>{error}</span>}
+        {error && <span style={{ fontSize: 12, color: colors.danger }}>{error}</span>}
       </div>
 
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
@@ -578,7 +579,7 @@ function RegisterTab({ visitId, guardedFetch }: { visitId: string; guardedFetch:
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
-              <tr style={{ background: 'linear-gradient(180deg,#FFFFFF 0%,#E8E8E8 100%)', borderBottom: '1px solid #C0C0C0' }}>
+              <tr style={{ background: HEADER_GRAD, borderBottom: '1px solid #C0C0C0' }}>
                 {['Date / Time', 'Ref No.', 'Seller', 'ID Number', 'Goods', 'Amount (R)', ''].map((h) => (
                   <th key={h} style={TH}>{h}</th>
                 ))}
@@ -717,7 +718,7 @@ function PersonTab({ visitId, guardedFetch }: { visitId: string; guardedFetch: G
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="e.g. Dlamini or 8501015800083" style={inp} />
         </div>
         <Btn type="submit" variant="primary" icon={Search} loading={loading} disabled={q.trim().length < 2}>Search Persons</Btn>
-        {error && <span style={{ fontSize: 12, color: '#DC3545' }}>{error}</span>}
+        {error && <span style={{ fontSize: 12, color: colors.danger }}>{error}</span>}
       </form>
 
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
@@ -728,7 +729,7 @@ function PersonTab({ visitId, guardedFetch }: { visitId: string; guardedFetch: G
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
-              <tr style={{ background: 'linear-gradient(180deg,#FFFFFF 0%,#E8E8E8 100%)', borderBottom: '1px solid #C0C0C0' }}>
+              <tr style={{ background: HEADER_GRAD, borderBottom: '1px solid #C0C0C0' }}>
                 {['Photo', 'Name', 'ID Number', 'Phone', 'Address', 'Transactions', 'Last Sale', ''].map((h) => (
                   <th key={h} style={TH}>{h}</th>
                 ))}
@@ -900,7 +901,7 @@ function GoodsTab({ visitId, guardedFetch }: { visitId: string; guardedFetch: Gu
         {rows && rows.length > 0 && lastQuery && (
           <Btn icon={FileDown} loading={reportBusy} onClick={handleGoodsReport}>Download Report (PDF)</Btn>
         )}
-        {error && <span style={{ fontSize: 12, color: '#DC3545' }}>{error}</span>}
+        {error && <span style={{ fontSize: 12, color: colors.danger }}>{error}</span>}
       </div>
 
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
@@ -911,7 +912,7 @@ function GoodsTab({ visitId, guardedFetch }: { visitId: string; guardedFetch: Gu
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
-              <tr style={{ background: 'linear-gradient(180deg,#FFFFFF 0%,#E8E8E8 100%)', borderBottom: '1px solid #C0C0C0' }}>
+              <tr style={{ background: HEADER_GRAD, borderBottom: '1px solid #C0C0C0' }}>
                 {['Date / Time', 'Ref No.', 'Seller', 'ID Number', 'Quantity', 'Line Total (R)', 'Photos', ''].map((h) => (
                   <th key={h} style={TH}>{h}</th>
                 ))}
@@ -1028,7 +1029,7 @@ function SignatureDialog({
             />
           </div>
 
-          {error && <p style={{ fontSize: 12, color: '#DC3545', margin: '8px 0 0' }}>{error}</p>}
+          {error && <p style={{ fontSize: 12, color: colors.danger, margin: '8px 0 0' }}>{error}</p>}
         </RpxDialogBody>
         <RpxDialogFooter>
           <Btn icon={RotateCcw} disabled={saving} onClick={clearCanvas} style={{ marginRight: 'auto' }}>Clear</Btn>
@@ -1047,7 +1048,7 @@ function SignatureDialog({
 function DoneScreen({ visit, onFinish }: { visit: Visit; onFinish: () => void }) {
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, padding: 24 }}>
-      <CheckCircle style={{ width: 44, height: 44, color: '#1C8743' }} />
+      <CheckCircle style={{ width: 44, height: 44, color: colors.action }} />
       <p style={{ fontSize: 16, fontWeight: 700, color: '#212529', margin: 0 }}>Inspection completed</p>
       <p style={{ fontSize: 12.5, color: '#6C757D', margin: 0, maxWidth: 440, textAlign: 'center' }}>
         Thank you, {visit.rank ? `${visit.rank} ` : ''}{visit.officerName}. Your visit and all searches
@@ -1067,7 +1068,7 @@ function DoneScreen({ visit, onFinish }: { visit: Visit; onFinish: () => void })
 
 function BlacklistBadge() {
   return (
-    <span style={{ display: 'inline-flex', marginLeft: 6, padding: '1px 6px', borderRadius: 3, fontSize: 10, fontWeight: 700, background: '#FDECEA', color: '#DC3545', verticalAlign: 'middle' }}>
+    <span style={{ display: 'inline-flex', marginLeft: 6, padding: '1px 6px', borderRadius: 3, fontSize: 10, fontWeight: 700, background: colors.dangerBg, color: colors.danger, verticalAlign: 'middle' }}>
       BLACKLISTED
     </span>
   )
@@ -1075,8 +1076,8 @@ function BlacklistBadge() {
 
 function BlacklistNotice({ reason }: { reason: string | null }) {
   return (
-    <div style={{ background: '#FDECEA', border: '1px solid #DC3545', borderRadius: 3, padding: '8px 12px', margin: '0 0 12px' }}>
-      <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: '#DC3545' }}>
+    <div style={{ background: colors.dangerBg, border: '1px solid #DC3545', borderRadius: 3, padding: '8px 12px', margin: '0 0 12px' }}>
+      <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: colors.danger }}>
         <AlertTriangle style={{ width: 12, height: 12, display: 'inline', verticalAlign: '-2px' }} /> This person is blacklisted at this yard
       </p>
       {reason && <p style={{ margin: '3px 0 0', fontSize: 11.5, color: '#8A2530' }}>Reason: {reason}</p>}
