@@ -2,13 +2,20 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { PutObjectCommand } from '@aws-sdk/client-s3'
 import { getR2Client, R2_BUCKET } from '@/lib/r2/client'
-import { mimeToExt, ALLOWED_PHOTO_TYPES, MAX_PHOTO_BYTES } from '@/lib/r2'
+import {
+  mimeToExt, ALLOWED_PHOTO_TYPES, MAX_PHOTO_BYTES, ALLOWED_DOCUMENT_TYPES, MAX_DOCUMENT_BYTES,
+  customerDocumentKey, expenseAttachmentKey,
+} from '@/lib/r2'
 import { tenantContext } from '@/lib/db/tenantContext'
 import { randomUUID } from 'crypto'
 import logger from '@/lib/logger'
 
-const CONTEXTS = ['customer_id', 'purchase_photo', 'purchase_signature', 'police_signature', 'stocktake_entry', 'scale_order', 'gate_entry'] as const
+const CONTEXTS = ['customer_id', 'purchase_photo', 'purchase_signature', 'police_signature', 'stocktake_entry', 'scale_order', 'gate_entry', 'customer_document', 'expense_attachment'] as const
 type UploadContext = typeof CONTEXTS[number]
+
+// Contexts that accept PDFs up to 20 MB rather than photo-only up to 10 MB —
+// mirrors the isDocumentContext split in src/app/api/r2/upload-url/route.ts.
+const DOCUMENT_CONTEXTS = new Set<UploadContext>(['customer_document', 'expense_attachment'])
 
 // Mirrors the tenantKeyPrefix() convention in src/lib/r2/index.ts — no-op
 // (empty prefix) today since nothing populates tenantContext yet.
@@ -23,6 +30,8 @@ function buildKey(context: UploadContext, referenceId: string, ext: string, phot
     case 'stocktake_entry':    return `${prefix}stocktakes/${referenceId}/photo-${randomUUID()}.${ext}`
     case 'scale_order':        return `${prefix}scale-orders/${referenceId}/photo-${photoIndex ?? 0}-${randomUUID()}.${ext}`
     case 'gate_entry':         return `${prefix}gate-entries/${referenceId}/photo-${photoIndex ?? 0}-${randomUUID()}.${ext}`
+    case 'customer_document':  return customerDocumentKey(referenceId, ext)
+    case 'expense_attachment': return expenseAttachmentKey(referenceId, ext)
   }
 }
 
@@ -53,14 +62,17 @@ export async function POST(req: NextRequest) {
   if (!file) {
     return NextResponse.json({ error: 'file field is required' }, { status: 422 })
   }
-  if (!ALLOWED_PHOTO_TYPES.includes(file.type)) {
+  const isDocumentContext = DOCUMENT_CONTEXTS.has(context as UploadContext)
+  const allowedTypes = isDocumentContext ? ALLOWED_DOCUMENT_TYPES : ALLOWED_PHOTO_TYPES
+  const maxBytes = isDocumentContext ? MAX_DOCUMENT_BYTES : MAX_PHOTO_BYTES
+  if (!allowedTypes.includes(file.type)) {
     return NextResponse.json(
-      { error: `Unsupported file type. Allowed: ${ALLOWED_PHOTO_TYPES.join(', ')}` },
+      { error: `Unsupported file type. Allowed: ${allowedTypes.join(', ')}` },
       { status: 422 },
     )
   }
-  if (file.size > MAX_PHOTO_BYTES) {
-    return NextResponse.json({ error: 'File too large — maximum 10 MB' }, { status: 422 })
+  if (file.size > maxBytes) {
+    return NextResponse.json({ error: `File too large — maximum ${isDocumentContext ? '20' : '10'} MB.` }, { status: 422 })
   }
 
   try {

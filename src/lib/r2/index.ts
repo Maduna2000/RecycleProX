@@ -139,3 +139,8 @@ export function mimeToExt(mimeType: string): string {
 
 export const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
 export const MAX_PHOTO_BYTES = 10 * 1024 * 1024  // 10 MB
+
+// ─── Allowed document MIME types (customer documents, expense attachments) ────
+
+export const ALLOWED_DOCUMENT_TYPES = [...ALLOWED_PHOTO_TYPES, 'application/pdf']
+export const MAX_DOCUMENT_BYTES = 20 * 1024 * 1024  // 20 MB
