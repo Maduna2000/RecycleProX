@@ -6,7 +6,7 @@ import useSWR from 'swr'
 import { useSession } from 'next-auth/react'
 import Decimal from 'decimal.js'
 import {
-  ArrowLeft, CheckCircle, Trash2, Paperclip, Eye, Loader2, Upload, X,
+  CheckCircle, Trash2, Paperclip, Eye, Loader2, Upload, X,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
@@ -172,7 +172,6 @@ export default function ExpenseDetailPage() {
 
         {/* Sub-header */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderBottom: '1px solid #E0E0E0', flexShrink: 0 }}>
-          <Btn size="sm" icon={ArrowLeft} onClick={() => router.push('/app/expenses')}>Expenses</Btn>
           <span style={{ fontSize: 13, fontWeight: 700, color: colors.primary, fontFamily: 'monospace' }}>{expense.refNumber}</span>
           <StatusBadge status={expense.status} />
           <span style={{ fontSize: 10, color: colors.textSecondary, padding: '2px 6px', background: colors.processBg, border: `1px solid ${colors.process}`, borderRadius: 2 }}>

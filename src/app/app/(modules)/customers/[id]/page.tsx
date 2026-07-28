@@ -1,11 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams } from 'next/navigation'
 import useSWR, { mutate } from 'swr'
 import { Dialog } from '@/components/ui/dialog'
 import { colors } from '@/lib/design-tokens'
-import { ArrowLeft, AlertTriangle, ShieldBan, ShieldCheck, Save, Pencil } from 'lucide-react'
+import { AlertTriangle, ShieldBan, ShieldCheck, Save, Pencil } from 'lucide-react'
 import { PhotoUploader, PhotoViewer } from '@/components/PhotoUploader'
 import { LoansTab } from '@/components/customers/LoansTab'
 import { BusinessLoanTab } from '@/components/customers/BusinessLoanTab'
@@ -90,7 +90,6 @@ function Pill({ text, bg, color }: { text: string; bg: string; color: string }) 
 // ─── Main page ─────────────────────────────────────────────────────────────────
 export default function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>()
-  const router = useRouter()
   const { data: session } = useSession()
   const isAdmin = session?.user?.role === 'admin'
   const [tab, setTab] = useState<string>('Overview')
@@ -189,31 +188,16 @@ export default function CustomerDetailPage() {
     <PortalPage title={fullName}>
       <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, background: '#F5F5F5' }}>
       {/* ── Sub-header ────────────────────────────────────────────────────────── */}
-      <div style={{ padding: '6px 10px', borderBottom: '1px solid #E0E0E0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-          <Btn size="sm" icon={ArrowLeft} onClick={() => router.back()}>Customers</Btn>
-          <span style={{ fontSize: 11, color: '#6C757D' }}>{customer.customerType === 'account' ? 'Account Customer' : 'Casual Customer'}</span>
-          {customer.accountCode && (
-            <span style={{ fontSize: 11, fontFamily: 'monospace', fontWeight: 700, color: NAVY, background: '#E8EFF8', border: '1px solid #B0C4DE', borderRadius: 2, padding: '1px 6px' }}>
-              {customer.accountCode}
-            </span>
-          )}
-          {customer.idNumber && (
-            <span style={{ fontSize: 11, fontFamily: 'monospace', color: '#6C757D' }}>·  {customer.idNumber}</span>
-          )}
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-          {!isEditing ? (
-            <Btn size="sm" icon={Pencil} onClick={() => setIsEditing(true)}>Edit</Btn>
-          ) : (
-            <>
-              <Btn size="sm" onClick={handleCancel} disabled={saving}>Cancel</Btn>
-              <Btn variant="primary" size="sm" icon={Save} loading={saving} onClick={handleSubmit(onSubmit)}>
-                {saving ? 'Saving...' : 'Save'}
-              </Btn>
-            </>
-          )}
-        </div>
+      <div style={{ padding: '6px 10px', borderBottom: '1px solid #E0E0E0', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+        <span style={{ fontSize: 11, color: '#6C757D' }}>{customer.customerType === 'account' ? 'Account Customer' : 'Casual Customer'}</span>
+        {customer.accountCode && (
+          <span style={{ fontSize: 11, fontFamily: 'monospace', fontWeight: 700, color: NAVY, background: '#E8EFF8', border: '1px solid #B0C4DE', borderRadius: 2, padding: '1px 6px' }}>
+            {customer.accountCode}
+          </span>
+        )}
+        {customer.idNumber && (
+          <span style={{ fontSize: 11, fontFamily: 'monospace', color: '#6C757D' }}>·  {customer.idNumber}</span>
+        )}
       </div>
 
       {/* ── Blacklist banner ──────────────────────────────────────────────────── */}
@@ -230,16 +214,30 @@ export default function CustomerDetailPage() {
         </div>
       )}
 
-      {/* ── Tab strip ─────────────────────────────────────────────────────────── */}
-      <TabStrip
-        tabs={(customer.customerType === 'account'
-          ? TABS_ACCOUNT.filter((t) => t !== 'Business Loan' || customer.dealerCategory === 'dealer_3')
-          : TABS_CASUAL
-        ).map((t) => ({ value: t, label: t }))}
-        active={tab}
-        onChange={setTab}
-        style={{ padding: '8px 10px 0', background: '#F5F5F5' }}
-      />
+      {/* ── Tab strip + Edit/Save controls (same row) ─────────────────────────── */}
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, padding: '8px 10px 0', background: '#F5F5F5' }}>
+        <TabStrip
+          tabs={(customer.customerType === 'account'
+            ? TABS_ACCOUNT.filter((t) => t !== 'Business Loan' || customer.dealerCategory === 'dealer_3')
+            : TABS_CASUAL
+          ).map((t) => ({ value: t, label: t }))}
+          active={tab}
+          onChange={setTab}
+        />
+        <div style={{ flex: 1 }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingBottom: 5 }}>
+          {!isEditing ? (
+            <Btn size="sm" icon={Pencil} onClick={() => setIsEditing(true)}>Edit</Btn>
+          ) : (
+            <>
+              <Btn size="sm" onClick={handleCancel} disabled={saving}>Cancel</Btn>
+              <Btn variant="primary" size="sm" icon={Save} loading={saving} onClick={handleSubmit(onSubmit)}>
+                {saving ? 'Saving...' : 'Save'}
+              </Btn>
+            </>
+          )}
+        </div>
+      </div>
 
       {/* ── Two-column layout: main content + sidebar ─────────────────────────── */}
       <div style={{ display: 'flex', alignItems: 'flex-start', flex: 1, minHeight: 0, overflowY: 'auto' }}>
