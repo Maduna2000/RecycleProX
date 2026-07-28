@@ -87,16 +87,17 @@ export default function ExpenseDetailPage() {
     if (file.size > 20 * 1024 * 1024) { toast.error('File too large — max 20 MB'); return }
     setUploading(true)
     try {
-      const presignRes = await fetch('/api/r2/upload-url', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ context: 'expense_attachment', referenceId: id, contentType: file.type, fileSize: file.size }),
-      })
-      if (!presignRes.ok) { toast.error('Failed to get upload URL'); return }
-      const { uploadUrl, key } = await presignRes.json()
-
-      const uploadRes = await fetch(uploadUrl, { method: 'PUT', body: file, headers: { 'Content-Type': file.type } })
-      if (!uploadRes.ok) { toast.error('Upload failed'); return }
+      const fd = new FormData()
+      fd.append('context', 'expense_attachment')
+      fd.append('referenceId', id)
+      fd.append('file', file)
+      const uploadRes = await fetch('/api/r2/upload', { method: 'POST', body: fd })
+      if (!uploadRes.ok) {
+        const j = await uploadRes.json().catch(() => ({}))
+        toast.error(j.error ?? 'Upload failed')
+        return
+      }
+      const { key } = await uploadRes.json()
 
       const saveRes = await fetch(`/api/expenses/${id}/attachments`, {
         method: 'POST',
@@ -105,6 +106,8 @@ export default function ExpenseDetailPage() {
       })
       if (saveRes.ok) { toast.success('Attachment uploaded'); mutateAttachments() }
       else { toast.error('Failed to save attachment') }
+    } catch {
+      toast.error('Upload failed — check your connection')
     } finally {
       setUploading(false)
       e.target.value = ''
