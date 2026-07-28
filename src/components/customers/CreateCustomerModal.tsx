@@ -160,7 +160,7 @@ export function CreateCustomerModal({ open, onClose, onSuccess, defaultType = 'c
         <RpxDialogFooter>
           <Btn onClick={onClose} disabled={loading}>Cancel</Btn>
           <Btn variant="primary" type="submit" form="create-customer-form" loading={loading}>
-            {loading ? 'Creating...' : 'Create Customer'}
+            {loading ? 'Adding...' : 'Add Customer'}
           </Btn>
         </RpxDialogFooter>
       </RpxDialogContent>

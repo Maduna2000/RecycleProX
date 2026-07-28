@@ -58,7 +58,7 @@ const OFFICER = {
   officerName: 'J. Nkosi',
   rank: 'Constable',
   badgeNumber: '7012345-6',
-  stationName: 'Pretoria Central',
+  stationName: 'Mbabane Central',
   contactNumber: undefined,
   visitReason: 'routine_inspection' as const,
   visitNote: undefined,

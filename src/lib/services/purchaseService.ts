@@ -115,7 +115,7 @@ async function generateAndStorePurchasePdfs(purchase: PurchaseWithCustomerAndLin
   try {
     const bytes = await generateVat264({
       dealerName:     settings.yardName    ?? 'Renovo Pro',
-      dealerAddress:  settings.yardAddress ?? 'Pretoria, South Africa',
+      dealerAddress:  settings.yardAddress ?? 'Matsapha, Eswatini',
       dealerVatNo:    settings.vatNumber   ?? '',
       dealerPhone:    settings.dealerPhone,
       refNumber:      purchase.refNumber,

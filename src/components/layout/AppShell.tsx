@@ -120,7 +120,7 @@ function useToolbarButtons(pathname: string, role: string): ToolbarButton[] {
 
   if (pathname === '/app/audit-log' || pathname.startsWith('/app/audit-log/'))
     return isAdmin ? [
-      { label: 'Export', icon: Download, href: '/app/audit-log?export=1', variant: 'secondary' },
+      { label: 'Download', icon: Download, href: '/app/audit-log?export=1', variant: 'secondary' },
     ] : []
 
   if (pathname === '/app/settings' || pathname.startsWith('/app/settings/'))

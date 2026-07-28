@@ -176,7 +176,7 @@ export default function PoliceRegisterPage() {
                       <input value={badgeNumber} onChange={(e) => setBadge(e.target.value)} placeholder="12345" style={inp} />
                     </Field>
                     <Field label="Police Station">
-                      <input value={stationName} onChange={(e) => setStation(e.target.value)} placeholder="Pretoria Central" style={inp} />
+                      <input value={stationName} onChange={(e) => setStation(e.target.value)} placeholder="Mbabane Central" style={inp} />
                     </Field>
                   </div>
                   <div>

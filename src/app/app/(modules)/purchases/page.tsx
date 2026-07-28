@@ -187,7 +187,7 @@ export default function PurchasesPage() {
       onClick: (row) => window.open(`/api/purchases/${row.id}/vat264`, '_blank'),
     },
     {
-      label:   'Reverse Purchase',
+      label:   'Void Purchase',
       icon:    Ban,
       danger:  true,
       hidden:  (row) => !isManager || row.status === 'voided',
@@ -461,7 +461,7 @@ function VoidDialog({
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
       <RpxDialogContent maxWidth={440}>
-        <RpxDialogHeader title="Reverse Purchase" onClose={onClose} />
+        <RpxDialogHeader title="Void Purchase" onClose={onClose} />
         <RpxDialogBody>
           <p style={{ fontSize: 12.5, color: colors.textSecondary, margin: '0 0 12px' }}>
             You are about to void{' '}

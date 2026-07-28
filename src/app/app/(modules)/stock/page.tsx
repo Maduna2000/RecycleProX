@@ -71,7 +71,7 @@ export default function StockPage() {
   // All Time = live levels; a period scopes In/Out to that window with an
   // opening balance carried in
   const stockKey = `/api/stock/on-hand${period ? `?period=${period}&date=${periodDate}` : ''}`
-  const { data: stockData } = useSWR<{ stock: StockEntry[] }>(stockKey, fetcher)
+  const { data: stockData, error: stockError } = useSWR<{ stock: StockEntry[] }>(stockKey, fetcher)
   const { expandCategory } = useProductCategories()
 
   const allStock = stockData?.stock ?? []
@@ -288,6 +288,7 @@ export default function StockPage() {
           rows={pagedStock}
           rowKey={(r) => r.product.id}
           loading={!stockData}
+          error={stockError}
           total={stock.length}
           page={safePage}
           pageSize={PAGE_SIZE}

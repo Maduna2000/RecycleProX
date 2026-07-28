@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { HandCoins, AlertCircle, Split } from 'lucide-react'
+import { CreditCard, AlertCircle, Split } from 'lucide-react'
 import { toast } from 'sonner'
 import Decimal from 'decimal.js'
 import { Dialog } from '@/components/ui/dialog'
@@ -70,7 +70,7 @@ export function RecordPaymentModal({
     })
     setLoading(false)
     if (res.ok) {
-      toast.success(`Payment recorded for ${sale.ref}`)
+      toast.success(`Payment processed for ${sale.ref}`)
       onSuccess()
     } else {
       const j = await res.json() as { error?: string }
@@ -81,7 +81,7 @@ export function RecordPaymentModal({
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
       <RpxDialogContent maxWidth={400}>
-        <RpxDialogHeader title="Record Payment" icon={HandCoins} onClose={onClose} />
+        <RpxDialogHeader title="Process Payment" icon={CreditCard} onClose={onClose} />
         <RpxDialogBody>
         <div className="space-y-4">
           {/* Balance summary */}
@@ -186,8 +186,8 @@ export function RecordPaymentModal({
         <RpxDialogFooter>
           <Btn onClick={onClose} disabled={loading}>Cancel</Btn>
           {!hasOutstandingBusinessLoan && (
-            <Btn variant="primary" icon={HandCoins} loading={loading} onClick={handlePay}>
-              Record Payment
+            <Btn variant="primary" icon={CreditCard} loading={loading} onClick={handlePay}>
+              Process Payment
             </Btn>
           )}
         </RpxDialogFooter>

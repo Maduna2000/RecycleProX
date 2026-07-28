@@ -36,7 +36,7 @@ export default function StockGridPage() {
   const [page,         setPage]         = useState(1)
 
   const gridKey = `/api/stock/grid?period=${gridPeriod}&date=${gridDate}${gridCategory ? `&category=${gridCategory}` : ''}`
-  const { data: gridData, isLoading: gridLoading } = useSWR<{ grid: GridRow[] }>(gridKey, fetcher)
+  const { data: gridData, isLoading: gridLoading, error: gridError } = useSWR<{ grid: GridRow[] }>(gridKey, fetcher)
 
   const gridRows   = gridData?.grid ?? []
   const PAGE_SIZE  = 50
@@ -169,11 +169,11 @@ export default function StockGridPage() {
         <BtnMenu
           size="sm"
           icon={Download}
-          label="Export"
+          label="Download"
           loading={exporting}
           items={[
-            { label: 'Export Excel', onClick: () => handleExport('xlsx') },
-            { label: 'Export PDF',   onClick: () => handleExport('pdf')  },
+            { label: 'Download PDF',   onClick: () => handleExport('pdf')  },
+            { label: 'Download Excel', onClick: () => handleExport('xlsx') },
           ]}
         />
         <span style={{ marginLeft: 'auto', fontSize: 11, color: '#6C757D', paddingBottom: 8 }}>
@@ -195,6 +195,7 @@ export default function StockGridPage() {
             page={safePage}
             pageSize={PAGE_SIZE}
             onPageChange={setPage}
+            error={gridError}
             emptyMessage="No data for selected period"
           />
         )}

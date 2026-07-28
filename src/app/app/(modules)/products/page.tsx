@@ -91,7 +91,7 @@ export default function ProductsPage() {
   })
 
   const swrKey = `/api/products?${query}`
-  const { data, isLoading } = useSWR<{ products: Product[] }>(swrKey, fetcher)
+  const { data, isLoading, error } = useSWR<{ products: Product[] }>(swrKey, fetcher)
   const products = data?.products ?? []
 
   const { data: catData, mutate: mutateCats } = useSWR<{ categories: CategoryItem[] }>('/api/product-categories', fetcher)
@@ -231,6 +231,7 @@ export default function ProductsPage() {
             selectedKeys={isManager ? selectedKeys : undefined}
             onSelectionChange={isManager ? setSelectedKeys : undefined}
             loading={isLoading}
+            error={error}
             emptyMessage="No products found"
             emptyAction={isManager ? { label: 'Add Product', onClick: () => setCreateOpen(true) } : undefined}
           />

@@ -80,7 +80,7 @@ export default function UnpaidPurchasesPage() {
   if (to)     query.set('to',     to)
 
   const KEY = `/api/purchases?${query}`
-  const { data, isLoading } = useSWR<{ purchases: Purchase[] }>(KEY, fetcher)
+  const { data, isLoading, error } = useSWR<{ purchases: Purchase[] }>(KEY, fetcher)
   const purchases = data?.purchases ?? []
 
   const PAGE_SIZE      = 50
@@ -187,7 +187,7 @@ export default function UnpaidPurchasesPage() {
       onClick: (row) => window.open(`/api/purchases/${row.id}/receipt?format=pdf`, '_blank'),
     },
     {
-      label:   'Reverse Purchase',
+      label:   'Void Purchase',
       icon:    Ban,
       danger:  true,
       hidden:  () => !isManager,
@@ -252,6 +252,7 @@ export default function UnpaidPurchasesPage() {
           selectedKey={selectedId}
           rowActions={rowActions}
           loading={isLoading}
+          error={error}
           total={purchases.length}
           page={safePage}
           pageSize={PAGE_SIZE}
@@ -418,7 +419,7 @@ function VoidDialog({
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
       <RpxDialogContent maxWidth={440}>
-        <RpxDialogHeader title="Reverse Purchase" onClose={onClose} />
+        <RpxDialogHeader title="Void Purchase" onClose={onClose} />
         <RpxDialogBody>
           <p style={{ fontSize: 12.5, color: colors.textSecondary, margin: '0 0 12px' }}>
             You are about to reverse{' '}
@@ -437,7 +438,7 @@ function VoidDialog({
         <RpxDialogFooter>
           <Btn onClick={onClose} disabled={loading}>Cancel</Btn>
           <Btn variant="danger" onClick={onConfirm} disabled={reason.trim().length < 5} loading={loading}>
-            Confirm Reversal
+            Confirm Void
           </Btn>
         </RpxDialogFooter>
       </RpxDialogContent>

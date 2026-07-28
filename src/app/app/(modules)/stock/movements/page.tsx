@@ -48,7 +48,7 @@ export default function StockMovementsPage() {
     pageSize: '200',
   })
 
-  const { data: movementsData, isLoading: movLoading } = useSWR<{ movements: Movement[]; total: number }>(
+  const { data: movementsData, isLoading: movLoading, error: movError } = useSWR<{ movements: Movement[]; total: number }>(
     `/api/stock/movements?${movementsQuery}`,
     fetcher,
   )
@@ -166,6 +166,7 @@ export default function StockMovementsPage() {
           rows={movements}
           rowKey={(r) => r.id}
           loading={movLoading}
+          error={movError}
           emptyMessage="No movements recorded yet"
           total={movementsData?.total}
           pageSize={200}

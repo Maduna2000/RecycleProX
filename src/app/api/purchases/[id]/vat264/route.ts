@@ -68,7 +68,7 @@ export async function GET(
 
     const pdfBytes = await generateVat264({
       dealerName:    settings.yardName    ?? 'Renovo Pro',
-      dealerAddress: settings.yardAddress ?? 'Pretoria, South Africa',
+      dealerAddress: settings.yardAddress ?? 'Matsapha, Eswatini',
       dealerVatNo:   settings.vatNumber   ?? '',
       dealerPhone:   settings.dealerPhone,
       refNumber:     purchase.refNumber,

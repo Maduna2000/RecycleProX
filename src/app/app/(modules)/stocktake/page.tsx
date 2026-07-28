@@ -31,7 +31,7 @@ export default function StocktakePage() {
   const createFired = useRef(false)
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
 
-  const { data, isLoading } = useSWR<{ items: StocktakeItem[]; total: number }>(
+  const { data, isLoading, error } = useSWR<{ items: StocktakeItem[]; total: number }>(
     isManager ? '/api/stocktake' : null,
     fetcher
   )
@@ -111,6 +111,7 @@ export default function StocktakePage() {
           rowKey={(s) => s.id}
           onRowClick={(s) => router.push(`/app/stocktake/${s.id}`)}
           loading={isLoading}
+          error={error}
           emptyMessage="No stocktakes yet — create one to start counting"
         />
       </div>

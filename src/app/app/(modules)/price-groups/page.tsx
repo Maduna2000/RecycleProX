@@ -47,7 +47,7 @@ export default function PriceGroupsPage() {
     }
   }, [searchParams, isManager, router])
 
-  const { data } = useSWR<{ groups: PriceGroup[] }>('/api/price-groups', fetcher)
+  const { data, isLoading, error } = useSWR<{ groups: PriceGroup[] }>('/api/price-groups', fetcher)
   const groups = data?.groups ?? []
 
   async function handleDelete(group: PriceGroup) {
@@ -109,6 +109,8 @@ export default function PriceGroupsPage() {
             rowKey={(g) => g.id}
             rowActions={rowActions}
             onRowClick={(g) => setManageGroupId(g.id)}
+            loading={isLoading}
+            error={error}
             emptyMessage="No price groups created yet"
           />
         </div>

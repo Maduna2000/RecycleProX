@@ -334,7 +334,7 @@ function BeginInspectionCard({
               <input value={badgeNumber} onChange={(e) => setBadgeNumber(e.target.value)} placeholder="e.g. 7012345-6" style={inp} />
             </Field>
             <Field label="Police Station" required>
-              <input value={stationName} onChange={(e) => setStationName(e.target.value)} placeholder="e.g. Pretoria Central" style={inp} />
+              <input value={stationName} onChange={(e) => setStationName(e.target.value)} placeholder="e.g. Mbabane Central" style={inp} />
             </Field>
           </div>
 
