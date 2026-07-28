@@ -1,12 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useState, useEffect, useRef } from 'react'
+import { useParams } from 'next/navigation'
 import useSWR, { mutate } from 'swr'
 import { Dialog } from '@/components/ui/dialog'
 import { colors, badgeStyle } from '@/lib/design-tokens'
-import { ArrowLeft, AlertTriangle, ShieldBan, ShieldCheck, Save, Pencil } from 'lucide-react'
-import { PhotoUploader, PhotoViewer } from '@/components/PhotoUploader'
+import { AlertTriangle, ShieldBan, ShieldCheck, Save, Pencil, FileText } from 'lucide-react'
 import { LoansTab } from '@/components/customers/LoansTab'
 import { BusinessLoanTab } from '@/components/customers/BusinessLoanTab'
 import { TradeCommoditiesSelect } from '@/components/customers/TradeCommoditiesSelect'
@@ -86,7 +85,6 @@ function Pill({ text, bg, color }: { text: string; bg: string; color: string }) 
 // ─── Main page ─────────────────────────────────────────────────────────────────
 export default function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>()
-  const router = useRouter()
   const { data: session } = useSession()
   const isAdmin = session?.user?.role === 'admin'
   const [tab, setTab] = useState<string>('Overview')
@@ -185,31 +183,16 @@ export default function CustomerDetailPage() {
     <PortalPage title={fullName}>
       <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, background: '#F5F5F5' }}>
       {/* ── Sub-header ────────────────────────────────────────────────────────── */}
-      <div style={{ padding: '6px 10px', borderBottom: '1px solid #E0E0E0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-          <Btn size="sm" icon={ArrowLeft} onClick={() => router.back()}>Customers</Btn>
-          <span style={{ fontSize: 11, color: '#6C757D' }}>{customer.customerType === 'account' ? 'Account Customer' : 'Casual Customer'}</span>
-          {customer.accountCode && (
-            <span style={{ fontSize: 11, fontFamily: 'monospace', fontWeight: 700, color: NAVY, background: '#E8EFF8', border: '1px solid #B0C4DE', borderRadius: 2, padding: '1px 6px' }}>
-              {customer.accountCode}
-            </span>
-          )}
-          {customer.idNumber && (
-            <span style={{ fontSize: 11, fontFamily: 'monospace', color: '#6C757D' }}>·  {customer.idNumber}</span>
-          )}
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-          {!isEditing ? (
-            <Btn size="sm" icon={Pencil} onClick={() => setIsEditing(true)}>Edit</Btn>
-          ) : (
-            <>
-              <Btn size="sm" onClick={handleCancel} disabled={saving}>Cancel</Btn>
-              <Btn variant="primary" size="sm" icon={Save} loading={saving} onClick={handleSubmit(onSubmit)}>
-                {saving ? 'Saving...' : 'Save'}
-              </Btn>
-            </>
-          )}
-        </div>
+      <div style={{ padding: '6px 10px', borderBottom: '1px solid #E0E0E0', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+        <span style={{ fontSize: 11, color: '#6C757D' }}>{customer.customerType === 'account' ? 'Account Customer' : 'Casual Customer'}</span>
+        {customer.accountCode && (
+          <span style={{ fontSize: 11, fontFamily: 'monospace', fontWeight: 700, color: NAVY, background: '#E8EFF8', border: '1px solid #B0C4DE', borderRadius: 2, padding: '1px 6px' }}>
+            {customer.accountCode}
+          </span>
+        )}
+        {customer.idNumber && (
+          <span style={{ fontSize: 11, fontFamily: 'monospace', color: '#6C757D' }}>·  {customer.idNumber}</span>
+        )}
       </div>
 
       {/* ── Blacklist banner ──────────────────────────────────────────────────── */}
@@ -226,16 +209,30 @@ export default function CustomerDetailPage() {
         </div>
       )}
 
-      {/* ── Tab strip ─────────────────────────────────────────────────────────── */}
-      <TabStrip
-        tabs={(customer.customerType === 'account'
-          ? TABS_ACCOUNT.filter((t) => t !== 'Business Loan' || customer.dealerCategory === 'dealer_3')
-          : TABS_CASUAL
-        ).map((t) => ({ value: t, label: t }))}
-        active={tab}
-        onChange={setTab}
-        style={{ padding: '8px 10px 0', background: '#F5F5F5' }}
-      />
+      {/* ── Tab strip + Edit/Save controls (same row) ─────────────────────────── */}
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, padding: '8px 10px 0', background: '#F5F5F5' }}>
+        <TabStrip
+          tabs={(customer.customerType === 'account'
+            ? TABS_ACCOUNT.filter((t) => t !== 'Business Loan' || customer.dealerCategory === 'dealer_3')
+            : TABS_CASUAL
+          ).map((t) => ({ value: t, label: t }))}
+          active={tab}
+          onChange={setTab}
+        />
+        <div style={{ flex: 1 }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingBottom: 5 }}>
+          {!isEditing ? (
+            <Btn size="sm" icon={Pencil} onClick={() => setIsEditing(true)}>Edit</Btn>
+          ) : (
+            <>
+              <Btn size="sm" onClick={handleCancel} disabled={saving}>Cancel</Btn>
+              <Btn variant="primary" size="sm" icon={Save} loading={saving} onClick={handleSubmit(onSubmit)}>
+                {saving ? 'Saving...' : 'Save'}
+              </Btn>
+            </>
+          )}
+        </div>
+      </div>
 
       {/* ── Two-column layout: main content + sidebar ─────────────────────────── */}
       <div style={{ display: 'flex', alignItems: 'flex-start', flex: 1, minHeight: 0, overflowY: 'auto' }}>
@@ -491,7 +488,7 @@ export default function CustomerDetailPage() {
               userRole={session?.user?.role ?? ''}
             />
           )}
-          {tab === 'Documents'    && <DocumentsTab customer={customer} onPhotoSaved={() => mutate(`/api/customers/${id}`)} />}
+          {tab === 'Documents'    && <DocumentsTab customer={customer} />}
           {tab === 'Blacklist'    && (
             <BlacklistTab
               customer={customer}
@@ -583,29 +580,33 @@ export default function CustomerDetailPage() {
 
 // ─── Transactions Tab ─────────────────────────────────────────────────────────
 // ─── Documents Tab ────────────────────────────────────────────────────────────
-function DocumentsTab({ customer, onPhotoSaved }: { customer: Customer; onPhotoSaved: () => void }) {
+const docLinkBtn: React.CSSProperties = { fontSize: 11, cursor: 'pointer', textDecoration: 'underline', background: 'none', border: 'none', padding: 0 }
+
+function DocumentsTab({ customer }: { customer: Customer }) {
   const { data: session } = useSession()
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
-  const [justUploaded, setJustUploaded] = useState(false)
-  const [docType, setDocType]           = useState<string>('id_copy')
-  const [uploading, setUploading]       = useState(false)
+  const [docType, setDocType]     = useState<string>('id_copy')
+  const [uploading, setUploading] = useState(false)
+  const [reuploadTarget, setReuploadTarget] = useState<CustomerDoc | null>(null)
+  const docFileRef      = useRef<HTMLInputElement>(null)
+  const reuploadFileRef = useRef<HTMLInputElement>(null)
   const { data: docs, mutate: mutateDocs } = useSWR<CustomerDoc[]>(`/api/customers/${customer.id}/documents`, fetcher)
 
-  async function savePhotoKey(key: string) {
-    const res = await fetch(`/api/customers/${customer.id}`, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ idPhotoR2Key: key }),
-    })
-    if (res.ok) { setJustUploaded(true); onPhotoSaved() }
-    else { const j = await res.json(); toast.error(j.error ?? 'Failed to save photo reference') }
-  }
-
-  async function handlePhotoDeleted() {
-    const res = await fetch(`/api/customers/${customer.id}`, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ idPhotoR2Key: null }),
-    })
-    if (res.ok) onPhotoSaved()
+  // Shared by both the "new document" and "replace document" flows below —
+  // just the R2 upload half, since what happens with the returned key differs.
+  async function uploadDocumentFile(file: File): Promise<string | null> {
+    const fd = new FormData()
+    fd.append('context', 'customer_document')
+    fd.append('referenceId', customer.id)
+    fd.append('file', file)
+    const uploadRes = await fetch('/api/r2/upload', { method: 'POST', body: fd })
+    if (!uploadRes.ok) {
+      const j = await uploadRes.json().catch(() => ({}))
+      toast.error(j.error ?? 'Upload failed')
+      return null
+    }
+    const { key } = await uploadRes.json()
+    return key
   }
 
   async function handleDocUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -613,17 +614,8 @@ function DocumentsTab({ customer, onPhotoSaved }: { customer: Customer; onPhotoS
     if (!file) return
     setUploading(true)
     try {
-      const fd = new FormData()
-      fd.append('context', 'customer_document')
-      fd.append('referenceId', customer.id)
-      fd.append('file', file)
-      const uploadRes = await fetch('/api/r2/upload', { method: 'POST', body: fd })
-      if (!uploadRes.ok) {
-        const j = await uploadRes.json().catch(() => ({}))
-        toast.error(j.error ?? 'Upload failed')
-        return
-      }
-      const { key } = await uploadRes.json()
+      const key = await uploadDocumentFile(file)
+      if (!key) return
       const saveRes = await fetch(`/api/customers/${customer.id}/documents`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ documentType: docType, r2Key: key, fileName: file.name }),
@@ -633,6 +625,35 @@ function DocumentsTab({ customer, onPhotoSaved }: { customer: Customer; onPhotoS
     } catch {
       toast.error('Upload failed — check your connection')
     } finally { setUploading(false); e.target.value = '' }
+  }
+
+  function triggerReupload(doc: CustomerDoc) {
+    setReuploadTarget(doc)
+    reuploadFileRef.current?.click()
+  }
+
+  // Replace = upload the new file and record it under the same document
+  // (same type) first, only removing the old row/object once that succeeds —
+  // so a failed upload never costs the existing document.
+  async function handleDocReupload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    const target = reuploadTarget
+    if (!file || !target) return
+    setUploading(true)
+    try {
+      const key = await uploadDocumentFile(file)
+      if (!key) return
+      const saveRes = await fetch(`/api/customers/${customer.id}/documents`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ documentType: target.documentType, r2Key: key, fileName: file.name }),
+      })
+      if (!saveRes.ok) { toast.error('Failed to save replacement'); return }
+      await fetch(`/api/customers/${customer.id}/documents/${target.id}`, { method: 'DELETE' })
+      toast.success('Document replaced')
+      mutateDocs()
+    } catch {
+      toast.error('Upload failed — check your connection')
+    } finally { setUploading(false); setReuploadTarget(null); e.target.value = '' }
   }
 
   async function handleDocDelete(docId: string) {
@@ -662,51 +683,39 @@ function DocumentsTab({ customer, onPhotoSaved }: { customer: Customer; onPhotoS
               <option key={v} value={v}>{l}</option>
             ))}
           </select>
-          <label style={{ display: 'inline-block', cursor: uploading ? 'not-allowed' : 'pointer' }}>
-            <span style={{ pointerEvents: 'none' }}>
-              <Btn size="sm" loading={uploading}>{uploading ? 'Uploading…' : '+ Upload Document'}</Btn>
-            </span>
-            <input type="file" style={{ display: 'none' }} accept=".pdf,.jpg,.jpeg,.png" onChange={handleDocUpload} disabled={uploading} />
-          </label>
+          <Btn size="sm" loading={uploading} onClick={() => docFileRef.current?.click()}>
+            {uploading ? 'Uploading…' : '+ Upload Document'}
+          </Btn>
+          <input ref={docFileRef} type="file" style={{ display: 'none' }} accept=".pdf,.jpg,.jpeg,.png" onChange={handleDocUpload} disabled={uploading} />
+          <input ref={reuploadFileRef} type="file" style={{ display: 'none' }} accept=".pdf,.jpg,.jpeg,.png" onChange={handleDocReupload} disabled={uploading} />
         </div>
 
         {!docs?.length ? (
           <p style={{ fontSize: 12, color: '#9CA3AF' }}>No compliance documents uploaded yet.</p>
         ) : (
-          <div style={{ border: '1px solid #E0E0E0', borderRadius: 2, overflow: 'hidden' }}>
-            {docs.map((doc, i) => (
-              <div key={doc.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '5px 10px', background: i % 2 === 0 ? '#fff' : '#FAFAFA', borderBottom: i < docs.length - 1 ? '1px solid #F0F0F0' : undefined }}>
-                <div>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: '#212529' }}>{DOCUMENT_TYPE_LABELS[doc.documentType] ?? doc.documentType}</span>
-                  <span style={{ fontSize: 10, color: '#9CA3AF', marginLeft: 6 }}>{doc.fileName} · {new Date(doc.uploadedAt).toLocaleDateString('en-ZA')}</span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {docs.map((doc) => (
+              <div key={doc.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px', border: '1px solid #E0E0E0', borderRadius: 4, background: '#fff' }}>
+                <div style={{ width: 30, height: 30, borderRadius: 4, background: '#F3F4F6', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <FileText style={{ width: 14, height: 14, color: '#9CA3AF' }} />
                 </div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button onClick={() => handleDocView(doc.r2Key)} style={{ fontSize: 11, color: '#1B3A6B', cursor: 'pointer', textDecoration: 'underline', background: 'none', border: 'none', padding: 0 }}>View</button>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontSize: 12, fontWeight: 600, color: '#212529', margin: 0 }}>{DOCUMENT_TYPE_LABELS[doc.documentType] ?? doc.documentType}</p>
+                  <p style={{ fontSize: 10, color: '#9CA3AF', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {doc.fileName} · {new Date(doc.uploadedAt).toLocaleDateString('en-ZA')}
+                  </p>
+                </div>
+                <div style={{ display: 'flex', gap: 10, flexShrink: 0 }}>
+                  <button onClick={() => handleDocView(doc.r2Key)} style={{ ...docLinkBtn, color: '#1B3A6B' }}>View</button>
                   {isManager && (
-                    <button onClick={() => handleDocDelete(doc.id)} style={{ fontSize: 11, color: '#C53030', cursor: 'pointer', textDecoration: 'underline', background: 'none', border: 'none', padding: 0 }}>Delete</button>
+                    <button onClick={() => triggerReupload(doc)} disabled={uploading} style={{ ...docLinkBtn, color: '#1B3A6B', opacity: uploading ? 0.5 : 1 }}>Re-upload</button>
+                  )}
+                  {isManager && (
+                    <button onClick={() => handleDocDelete(doc.id)} style={{ ...docLinkBtn, color: '#C53030' }}>Delete</button>
                   )}
                 </div>
               </div>
             ))}
-          </div>
-        )}
-      </div>
-
-      {/* ID Photo */}
-      <SHdr title="ID Document Photo" />
-      <div style={{ padding: '10px 12px' }}>
-        {customer.idPhotoR2Key ? (
-          <PhotoViewer
-            r2Key={customer.idPhotoR2Key}
-            alt={`${customer.firstName} ${customer.lastName} ID`}
-            canDelete={isManager}
-            onDelete={handlePhotoDeleted}
-            autoLoad={justUploaded}
-          />
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <p style={{ fontSize: 12, color: '#9CA3AF', margin: 0 }}>No ID photo uploaded yet.</p>
-            <PhotoUploader context="customer_id" referenceId={customer.id} label="Upload ID Photo" onUploaded={savePhotoKey} />
           </div>
         )}
       </div>

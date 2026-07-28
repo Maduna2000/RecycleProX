@@ -2,13 +2,13 @@
 
 import { useState } from 'react'
 import useSWR, { mutate } from 'swr'
-import { Loader2, ToggleLeft, ToggleRight, Package } from 'lucide-react'
+import { Loader2, ToggleLeft, ToggleRight } from 'lucide-react'
 import { toast } from 'sonner'
 import { Dialog } from '@/components/ui/dialog'
 import { colors } from '@/lib/design-tokens'
 import {
   TH, TD, HEADER_GRAD,
-  Btn, EmptyHint,
+  EmptyHint,
   RpxDialogContent, RpxDialogHeader,
 } from '@/components/rpx'
 
@@ -58,18 +58,18 @@ export function TradeCommoditiesModal({ onClose }: { onClose: () => void }) {
           onClose={onClose}
         />
 
-        {/* Help text + Manage Categories — merged into one row */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 10px', background: '#FAFAFA', borderBottom: '1px solid #E0E0E0', flexShrink: 0 }}>
-          <p style={{ fontSize: 11, color: '#6C757D', flex: 1, margin: 0 }}>
+        {/* Help text */}
+        <div style={{ padding: '6px 10px', background: '#FAFAFA', borderBottom: '1px solid #E0E0E0', flexShrink: 0 }}>
+          <p style={{ fontSize: 11, color: '#6C757D', margin: 0 }}>
             Sourced from Products &rarr; Categories. Toggle the ones customers can select when registering an account.
           </p>
-          <Btn size="sm" icon={Package} href="/app/products" style={{ whiteSpace: 'nowrap' }}>
-            Manage Categories
-          </Btn>
         </div>
 
-        {/* Table */}
-        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+        {/* Table — explicit maxHeight (not just flex:1) so this scrolls even
+            if the fixed-position dialog's own height ends up content-sized
+            rather than clamped, which some browsers do when a flex column's
+            height comes only from max-height rather than a definite value. */}
+        <div style={{ flex: '1 1 auto', minHeight: 0, maxHeight: 'calc(80vh - 70px)', overflowY: 'auto' }}>
           {isLoading ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 24, color: colors.textSecondary }}>
               <Loader2 className="w-4 h-4 animate-spin" /> Loading…
