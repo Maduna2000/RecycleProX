@@ -3,7 +3,7 @@ import { requireTenantId } from '@/lib/db/tenantContext'
 import { Prisma, type GateEntryPurpose } from '@prisma/client'
 import logger from '@/lib/logger'
 import { ciContains } from '@/lib/db/queryHelpers'
-import type { CreateGateEntryInput, UpdateGatePurposeConfigInput } from '@/lib/schemas/gate'
+import type { CreateGateEntryInput, UpdateGatePurposeConfigInput, CreateSellOptionInput, UpdateSellOptionInput } from '@/lib/schemas/gate'
 
 // ─── Typed Errors ─────────────────────────────────────────────────────────────
 
@@ -97,7 +97,7 @@ export async function createGateEntry(data: CreateGateEntryInput, operatorId: st
         tenantId,
         entryNumber,
         purpose:           data.purpose,
-        categoryName:      data.purpose === 'sell' ? (data.categoryName ?? null) : null,
+        categoryNames:     data.purpose === 'sell' ? (data.categoryNames ?? []) : [],
         customerId:        customer?.id ?? null,
         visitorFirstName:  data.visitorFirstName,
         visitorLastName:   data.visitorLastName,
@@ -256,4 +256,57 @@ export async function updatePurposeConfig(purpose: GateEntryPurpose, data: Updat
     : await prisma.gatePurposeConfig.create({ data: { tenantId, purpose, ...data } })
   logger.info({ purpose, ...data }, 'gatePurposeConfig.updated')
   return updated
+}
+
+// ─── Sell Options (admin-managed picklist for the "what are they selling?" step) ─
+// Independent of ProductCategory — this is a heads-up tag on the visitor log,
+// not the actual purchase transaction, so it has its own flat, no-hierarchy
+// list rather than reusing the product catalogue's category tree.
+
+export async function listSellOptions(includeInactive = false) {
+  return prisma.gateSellOption.findMany({
+    where:   includeInactive ? {} : { isActive: true },
+    orderBy: [{ sortOrder: 'asc' }, { label: 'asc' }],
+  })
+}
+
+export async function createSellOption(data: CreateSellOptionInput) {
+  const tenantId = requireTenantId()
+  const existing = await prisma.gateSellOption.findUnique({ where: { tenantId_label: { tenantId, label: data.label } } })
+  if (existing) throw new Error(`"${data.label}" already exists`)
+
+  const option = await prisma.gateSellOption.create({
+    data: {
+      tenantId,
+      label:     data.label,
+      colorHex:  data.colorHex  || null,
+      iconName:  data.iconName  || null,
+      sortOrder: data.sortOrder ?? 0,
+    },
+  })
+  logger.info({ optionId: option.id, label: option.label }, 'gateSellOption.created')
+  return option
+}
+
+export async function updateSellOption(id: string, data: UpdateSellOptionInput) {
+  const existing = await prisma.gateSellOption.findUnique({ where: { id } })
+  if (!existing) throw new Error('Sell option not found')
+
+  if (data.label && data.label !== existing.label) {
+    const conflict = await prisma.gateSellOption.findUnique({
+      where: { tenantId_label: { tenantId: requireTenantId(), label: data.label } },
+    })
+    if (conflict) throw new Error(`"${data.label}" already exists`)
+  }
+
+  const updated = await prisma.gateSellOption.update({ where: { id }, data })
+  logger.info({ optionId: id, ...data }, 'gateSellOption.updated')
+  return updated
+}
+
+export async function deleteSellOption(id: string) {
+  const existing = await prisma.gateSellOption.findUnique({ where: { id } })
+  if (!existing) throw new Error('Sell option not found')
+  await prisma.gateSellOption.delete({ where: { id } })
+  logger.info({ optionId: id, label: existing.label }, 'gateSellOption.deleted')
 }

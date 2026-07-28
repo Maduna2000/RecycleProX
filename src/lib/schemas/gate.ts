@@ -9,7 +9,7 @@ export const GateEntryPurposeSchema = z.enum(['sell', 'buy', 'visitor', 'other']
 // customerId it knows would fail the check.
 export const CreateGateEntrySchema = z.object({
   purpose:           GateEntryPurposeSchema,
-  categoryName:      z.string().min(1).optional(),
+  categoryNames:     z.array(z.string().min(1)).optional(),
   visitorFirstName:  z.string().min(1, 'First name is required'),
   visitorLastName:   z.string().min(1, 'Last name is required'),
   visitorIdNumber:   z.string().min(1, 'ID number is required'),
@@ -20,8 +20,8 @@ export const CreateGateEntrySchema = z.object({
   facePhotoR2Key:    z.string().optional(),
   notes:             z.string().max(500).optional(),
 }).refine(
-  (d) => d.purpose !== 'sell' || !!d.categoryName,
-  { message: 'Category is required when entering to sell', path: ['categoryName'] },
+  (d) => d.purpose !== 'sell' || (d.categoryNames && d.categoryNames.length > 0),
+  { message: 'At least one category is required when entering to sell', path: ['categoryNames'] },
 )
 
 export const UpdateGatePurposeConfigSchema = z.object({
@@ -36,6 +36,23 @@ export const CreateGuardSchema = z.object({
   password: z.string().min(8, 'Password must be at least 8 characters'),
 })
 
+// Admin-managed picklist a guard chooses from at the "what are they selling?"
+// step — independent of the Products module's ProductCategory tree.
+export const CreateSellOptionSchema = z.object({
+  label:     z.string().min(1, 'Label is required'),
+  colorHex:  z.string().optional(),
+  iconName:  z.string().optional(),
+  sortOrder: z.number().int().optional(),
+})
+
+export const UpdateSellOptionSchema = z.object({
+  label:     z.string().min(1).optional(),
+  colorHex:  z.string().optional(),
+  iconName:  z.string().optional(),
+  sortOrder: z.number().int().optional(),
+  isActive:  z.boolean().optional(),
+})
+
 export interface GatePurposeConfigResponse {
   purpose:             'sell' | 'buy' | 'visitor' | 'other'
   requireIdPhoto:      boolean
@@ -46,3 +63,5 @@ export interface GatePurposeConfigResponse {
 export type CreateGateEntryInput        = z.infer<typeof CreateGateEntrySchema>
 export type UpdateGatePurposeConfigInput = z.infer<typeof UpdateGatePurposeConfigSchema>
 export type CreateGuardInput            = z.infer<typeof CreateGuardSchema>
+export type CreateSellOptionInput       = z.infer<typeof CreateSellOptionSchema>
+export type UpdateSellOptionInput       = z.infer<typeof UpdateSellOptionSchema>

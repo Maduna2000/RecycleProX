@@ -7,19 +7,19 @@ import type { Purpose } from './StepPurpose'
 import type { PhotoKeys } from './StepPhotos'
 
 interface Props {
-  visitor:      VisitorInfo
-  purpose:      Purpose
-  categoryName: string | null
-  vehicleReg:   string
-  photoKeys:    PhotoKeys
-  onSubmitted:  () => void
+  visitor:       VisitorInfo
+  purpose:       Purpose
+  categoryNames: string[]
+  vehicleReg:    string
+  photoKeys:     PhotoKeys
+  onSubmitted:   () => void
 }
 
 const PURPOSE_LABELS: Record<Purpose, string> = {
   sell: 'To Sell', buy: 'To Buy', visitor: 'Visitor', other: 'Other',
 }
 
-export default function StepReview({ visitor, purpose, categoryName, vehicleReg, photoKeys, onSubmitted }: Props) {
+export default function StepReview({ visitor, purpose, categoryNames, vehicleReg, photoKeys, onSubmitted }: Props) {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState<{ entryNumber: string } | null>(null)
@@ -33,7 +33,7 @@ export default function StepReview({ visitor, purpose, categoryName, vehicleReg,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           purpose,
-          categoryName:     categoryName ?? undefined,
+          categoryNames:    categoryNames.length > 0 ? categoryNames : undefined,
           visitorFirstName: visitor.firstName,
           visitorLastName:  visitor.lastName,
           visitorIdNumber:  visitor.idNumber,
@@ -88,7 +88,7 @@ export default function StepReview({ visitor, purpose, categoryName, vehicleReg,
         <Row label="ID Number" value={visitor.idNumber} pad />
         {visitor.phone && <Row label="Phone" value={visitor.phone} pad />}
         <Row label="Purpose" value={PURPOSE_LABELS[purpose]} pad />
-        {categoryName && <Row label="Category" value={categoryName} pad />}
+        {categoryNames.length > 0 && <Row label="Category" value={categoryNames.join(', ')} pad />}
         {vehicleReg && <Row label="Vehicle Reg" value={vehicleReg} pad />}
       </div>
 

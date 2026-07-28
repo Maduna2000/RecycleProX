@@ -29,7 +29,7 @@ export default function GatePage() {
   const [step, setStep] = useState(1)
   const [visitor, setVisitor] = useState<VisitorInfo | null>(null)
   const [purpose, setPurpose] = useState<Purpose | null>(null)
-  const [categoryName, setCategoryName] = useState<string | null>(null)
+  const [categoryNames, setCategoryNames] = useState<string[]>([])
   const [vehicleReg, setVehicleReg] = useState('')
   const [photoConfig, setPhotoConfig] = useState<PhotoConfig>(DEFAULT_PHOTO_CONFIG)
   const [photoKeys, setPhotoKeys] = useState<PhotoKeys>({})
@@ -43,7 +43,7 @@ export default function GatePage() {
     setStep(1)
     setVisitor(null)
     setPurpose(null)
-    setCategoryName(null)
+    setCategoryNames([])
     setVehicleReg('')
     setPhotoConfig(DEFAULT_PHOTO_CONFIG)
     setPhotoKeys({})
@@ -109,7 +109,7 @@ export default function GatePage() {
           <StepPurpose onSelect={handlePurposeSelect} />
         )}
         {step === 3 && purpose === 'sell' && (
-          <StepCategory onSelect={(c) => { setCategoryName(c); setStep(4) }} />
+          <StepCategory onSelect={(c) => { setCategoryNames(c); setStep(4) }} />
         )}
         {step === 4 && (
           <StepVehicle onNext={(reg) => { setVehicleReg(reg); setStep(5) }} />
@@ -125,7 +125,7 @@ export default function GatePage() {
           <StepReview
             visitor={visitor}
             purpose={purpose}
-            categoryName={purpose === 'sell' ? categoryName : null}
+            categoryNames={purpose === 'sell' ? categoryNames : []}
             vehicleReg={vehicleReg}
             photoKeys={photoKeys}
             onSubmitted={reset}

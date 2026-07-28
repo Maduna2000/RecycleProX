@@ -5,8 +5,10 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import {
   Search, X, RefreshCw, Images, CheckCircle2, EyeOff,
-  UserPlus, Eye, ShieldCheck, Info, LogOut,
+  UserPlus, Eye, ShieldCheck, Info, LogOut, Package, Plus, Pencil, Trash2,
 } from 'lucide-react'
+import * as LucideIcons from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { DataTable, StatusBadge, type Column, type RowAction } from '@/components/ui/DataTable'
 import { InlineDetailPanel } from '@/components/ui/InlineDetailPanel'
@@ -21,7 +23,7 @@ type GateEntry = {
   id:               string
   entryNumber:      string
   purpose:          'sell' | 'buy' | 'visitor' | 'other'
-  categoryName:     string | null
+  categoryNames:    string[]
   vehicleReg:       string | null
   visitorFirstName: string
   visitorLastName:  string
@@ -307,8 +309,12 @@ function EntriesTab() {
       render: (e) => <span style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>{PURPOSE_LABELS[e.purpose] ?? e.purpose}</span>,
     },
     {
-      key: 'categoryName', header: 'Category', width: '98px',
-      render: (e) => <span className="truncate block" style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>{e.categoryName ?? '—'}</span>,
+      key: 'categoryNames', header: 'Category', width: '98px',
+      render: (e) => (
+        <span className="truncate block" title={e.categoryNames.join(', ')} style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>
+          {e.categoryNames.length > 0 ? e.categoryNames.join(', ') : '—'}
+        </span>
+      ),
     },
     {
       key: 'vehicleReg', header: 'Vehicle Reg', width: '88px',
@@ -598,7 +604,7 @@ function ConfigTab() {
   ]
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 gap-3">
+    <div className="flex flex-col flex-1 min-h-0 gap-4 overflow-y-auto">
       <div className="flex items-start gap-3 p-3 shrink-0" style={{ background: colors.processBg, border: `1px solid ${colors.process}`, borderRadius: 2 }}>
         <Info className="w-4 h-4 shrink-0 mt-0.5" style={{ color: colors.process }} />
         <div style={{ fontSize: fontSize.xs, color: colors.textPrimary }}>
@@ -610,7 +616,7 @@ function ConfigTab() {
         </div>
       </div>
 
-      <div className="flex-1 min-h-0" style={{ padding: 10 }}>
+      <div className="shrink-0" style={{ height: 190, padding: 10 }}>
         <DataTable
           columns={columns}
           rows={configs}
@@ -619,6 +625,199 @@ function ConfigTab() {
           error={error ?? undefined}
           emptyMessage="No purpose configurations found"
         />
+      </div>
+
+      <SellCategoriesSection />
+    </div>
+  )
+}
+
+// ─── Sell Categories (admin-managed picklist for the "sell" purpose) ────────
+
+function SellIcon({ name, size = 14 }: { name: string | null; size?: number }) {
+  if (!name) return <Package style={{ width: size, height: size }} />
+  const Icon = (LucideIcons as unknown as Record<string, LucideIcon>)[name]
+  return Icon ? <Icon style={{ width: size, height: size }} /> : <Package style={{ width: size, height: size }} />
+}
+
+const ICON_PRESETS = ['Layers', 'Zap', 'Cpu', 'Package', 'Archive', 'FileText', 'Monitor', 'Box', 'Recycle', 'Truck', 'Factory', 'Leaf']
+
+function IconPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
+      {ICON_PRESETS.map(name => (
+        <button
+          key={name}
+          type="button"
+          title={name}
+          onClick={() => onChange(value === name ? '' : name)}
+          style={{
+            width: 28, height: 28, borderRadius: 4, border: `1px solid ${value === name ? colors.action : colors.border}`,
+            background: value === name ? `${colors.action}18` : '#fff', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', color: value === name ? colors.action : colors.textSecondary,
+          }}
+        >
+          <SellIcon name={name} size={14} />
+        </button>
+      ))}
+    </div>
+  )
+}
+
+type SellOption = {
+  id:        string
+  label:     string
+  colorHex:  string | null
+  iconName:  string | null
+  sortOrder: number
+  isActive:  boolean
+}
+
+function SellCategoriesSection() {
+  const [options,  setOptions]  = useState<SellOption[]>([])
+  const [loading,  setLoading]  = useState(true)
+  const [error,    setError]    = useState<string | null>(null)
+
+  const [newLabel, setNewLabel] = useState('')
+  const [newColor, setNewColor] = useState('#607D8B')
+  const [newIcon,  setNewIcon]  = useState('')
+  const [adding,   setAdding]   = useState(false)
+
+  const [editId,    setEditId]    = useState<string | null>(null)
+  const [editLabel, setEditLabel] = useState('')
+  const [editColor, setEditColor] = useState('')
+  const [editIcon,  setEditIcon]  = useState('')
+  const [saving,    setSaving]    = useState(false)
+  const [deleting,  setDeleting]  = useState<string | null>(null)
+
+  const fetchOptions = useCallback(async () => {
+    setLoading(true); setError(null)
+    try {
+      const data = await fetcher('/api/gate/sell-options?all=1')
+      setOptions(data.options ?? [])
+    } catch {
+      setError('Failed to load sell categories')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { fetchOptions() }, [fetchOptions])
+
+  async function handleAdd() {
+    if (!newLabel.trim()) return
+    setAdding(true)
+    const res = await fetch('/api/gate/sell-options', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ label: newLabel.trim(), colorHex: newColor, iconName: newIcon || null }),
+    })
+    setAdding(false)
+    if (res.ok) { toast.success('Category added'); setNewLabel(''); setNewIcon(''); fetchOptions() }
+    else { const j = await res.json(); toast.error(j.error ?? 'Failed to add category') }
+  }
+
+  function startEdit(opt: SellOption) {
+    setEditId(opt.id)
+    setEditLabel(opt.label)
+    setEditColor(opt.colorHex ?? '#607D8B')
+    setEditIcon(opt.iconName ?? '')
+  }
+
+  async function handleSaveEdit(id: string) {
+    setSaving(true)
+    const res = await fetch(`/api/gate/sell-options/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ label: editLabel.trim(), colorHex: editColor, iconName: editIcon || null }),
+    })
+    setSaving(false)
+    if (res.ok) { toast.success('Category updated'); setEditId(null); fetchOptions() }
+    else { const j = await res.json(); toast.error(j.error ?? 'Failed to update category') }
+  }
+
+  async function handleToggleActive(opt: SellOption) {
+    const res = await fetch(`/api/gate/sell-options/${opt.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ isActive: !opt.isActive }),
+    })
+    if (res.ok) {
+      setOptions(prev => prev.map(o => o.id === opt.id ? { ...o, isActive: !opt.isActive } : o))
+    } else {
+      const j = await res.json(); toast.error(j.error ?? 'Failed to update category')
+    }
+  }
+
+  async function handleDelete(opt: SellOption) {
+    setDeleting(opt.id)
+    const res = await fetch(`/api/gate/sell-options/${opt.id}`, { method: 'DELETE' })
+    setDeleting(null)
+    if (res.ok) { toast.success('Category deleted'); fetchOptions() }
+    else { const j = await res.json(); toast.error(j.error ?? 'Failed to delete category') }
+  }
+
+  return (
+    <div className="shrink-0">
+      <p style={{ fontSize: fontSize.sm, fontWeight: fontWeight.semibold, color: colors.textPrimary, marginBottom: 4 }}>Sell Categories</p>
+      <p style={{ fontSize: fontSize.xs, color: colors.textSecondary, marginBottom: 8 }}>
+        These are the options a guard picks from when someone enters to sell — configured independently of the Products catalogue. A guard can select more than one.
+      </p>
+
+      <div style={{ maxHeight: 320, overflowY: 'auto', border: `1px solid ${colors.border}`, borderRadius: 3, background: '#fff' }}>
+        {loading ? (
+          <p style={{ padding: 16, textAlign: 'center', fontSize: fontSize.xs, color: colors.textSecondary }}>Loading…</p>
+        ) : error ? (
+          <p style={{ padding: 16, textAlign: 'center', fontSize: fontSize.xs, color: colors.danger }}>{error}</p>
+        ) : options.length === 0 ? (
+          <p style={{ padding: 16, textAlign: 'center', fontSize: fontSize.xs, color: colors.textSecondary }}>No sell categories yet</p>
+        ) : options.map((opt) => (
+          <div key={opt.id} style={{ borderBottom: `1px solid ${colors.border}` }}>
+            {editId === opt.id ? (
+              <div style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input type="color" value={editColor} onChange={(e) => setEditColor(e.target.value)}
+                    style={{ width: 26, height: 26, borderRadius: 3, border: `1px solid ${colors.border}`, cursor: 'pointer', padding: 1 }} />
+                  <input value={editLabel} onChange={(e) => setEditLabel(e.target.value)}
+                    style={{ flex: 1, height: 26, border: `1px solid ${colors.border}`, borderRadius: 3, padding: '0 6px', fontSize: 12, outline: 'none' }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') void handleSaveEdit(opt.id); if (e.key === 'Escape') setEditId(null) }}
+                    autoFocus />
+                </div>
+                <IconPicker value={editIcon} onChange={setEditIcon} />
+                <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', marginTop: 2 }}>
+                  <Btn size="sm" variant="primary" onClick={() => void handleSaveEdit(opt.id)} loading={saving} disabled={!editLabel.trim()}>Save</Btn>
+                  <Btn size="sm" onClick={() => setEditId(null)} disabled={saving}>Cancel</Btn>
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px' }}>
+                <span style={{ width: 12, height: 12, borderRadius: 2, background: opt.colorHex ?? '#607D8B', display: 'inline-block', flexShrink: 0 }} />
+                {opt.iconName && <SellIcon name={opt.iconName} size={12} />}
+                <span style={{ flex: 1, fontSize: 12, fontWeight: 600, color: opt.isActive ? colors.textPrimary : colors.textMuted }}>{opt.label}</span>
+                <ToggleSwitch checked={opt.isActive} disabled={deleting === opt.id} onChange={() => void handleToggleActive(opt)} />
+                <button onClick={() => startEdit(opt)} title="Edit" style={{ padding: 4, color: colors.textSecondary, background: 'none', border: 'none', cursor: 'pointer' }}>
+                  <Pencil className="w-3.5 h-3.5" />
+                </button>
+                <button onClick={() => void handleDelete(opt)} title="Delete" disabled={deleting === opt.id} style={{ padding: 4, color: colors.danger, background: 'none', border: 'none', cursor: 'pointer' }}>
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div style={{ background: colors.neutralBg, border: `1px solid ${colors.border}`, borderRadius: 3, padding: '10px 12px', marginTop: 8 }}>
+        <p style={{ fontSize: 11, fontWeight: 600, color: colors.textSecondary, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Add Sell Category</p>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <input type="color" value={newColor} onChange={(e) => setNewColor(e.target.value)}
+            style={{ width: 32, height: 28, borderRadius: 3, border: `1px solid ${colors.border}`, cursor: 'pointer', padding: 2 }} />
+          <input placeholder="Category name…" value={newLabel} onChange={(e) => setNewLabel(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') void handleAdd() }}
+            style={{ flex: 1, height: 28, border: `1px solid ${colors.border}`, borderRadius: 3, padding: '0 8px', fontSize: 12, outline: 'none', background: '#fff' }} />
+          <Btn size="sm" variant="primary" icon={Plus} onClick={() => void handleAdd()} loading={adding} disabled={!newLabel.trim()}>Add</Btn>
+        </div>
+        <IconPicker value={newIcon} onChange={setNewIcon} />
       </div>
     </div>
   )

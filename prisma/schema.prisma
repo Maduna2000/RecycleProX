@@ -964,7 +964,7 @@ model GateEntry {
   tenantId          String
   entryNumber       String
   purpose           GateEntryPurpose
-  categoryName      String?
+  categoryNames     String[]         @default([])
   customerId        String?
   visitorFirstName  String
   visitorLastName   String
@@ -1003,6 +1003,26 @@ model GatePurposeConfig {
   requireFacePhoto    Boolean          @default(true)
 
   @@unique([tenantId, purpose])
+  @@index([tenantId])
+}
+
+// Admin-managed picklist a guard chooses from at the "what are they selling?"
+// step — deliberately independent of ProductCategory (that catalogue is for
+// the actual purchase/weighing transaction later; this is just a heads-up
+// tag on the visitor log). Flat list, no hierarchy — mirrors ProductCategory's
+// shape (name/colorHex/iconName/sortOrder/isActive) minus parent/child.
+model GateSellOption {
+  id        String   @id @default(uuid())
+  tenantId  String
+  label     String
+  colorHex  String?
+  iconName  String?
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, label])
   @@index([tenantId])
 }
 
