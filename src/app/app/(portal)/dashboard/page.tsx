@@ -44,12 +44,14 @@ const TILES: Tile[] = [
 ]
 
 // ─── Design maps ──────────────────────────────────────────────────────────────
-// Glossy Win7/Aero tile treatment: a translucent glass-highlight gradient
-// layered over each group's base color gradient, plus an inner bevel
-// (light top edge / dark bottom edge) for a raised, lacquered look. Hover
-// intensifies the glow and border rather than scaling the tile — Win7
-// motion is glows and fades, not the spring/scale interaction this used to
-// have (that read as a Windows 8/10 Start-tile launcher, not Aero).
+// Glossy Win7/Aero tile treatment: each tile is its own colour top-to-bottom
+// (light shade -> base shade of the *same* hue, no white layered on top) —
+// the "glossy" read comes entirely from that light-to-base sheen plus an
+// inner bevel (light top edge / dark bottom edge) for a raised, lacquered
+// look. Hover intensifies the glow (still the group's own colour) and
+// border rather than scaling the tile — Win7 motion is glows and fades,
+// not the spring/scale interaction this used to have (that read as a
+// Windows 8/10 Start-tile launcher, not Aero).
 
 const GROUP_COLORS: Record<TileGroup, { light: string; base: string; hover: string }> = {
   navy:  { light: '#1e4a8a', base: '#1B3A6B', hover: '#2558a8' },
@@ -77,13 +79,10 @@ const SUBTITLE_COLOR: Record<TileGroup, string> = {
 
 function glossBackground(group: TileGroup): string {
   const { light, base } = GROUP_COLORS[group]
-  return [
-    'linear-gradient(180deg, rgba(255,255,255,0.32) 0%, rgba(255,255,255,0.08) 42%, rgba(255,255,255,0) 52%)',
-    `linear-gradient(180deg, ${light} 0%, ${base} 100%)`,
-  ].join(', ')
+  return `linear-gradient(180deg, ${light} 0%, ${base} 100%)`
 }
 
-const BEVEL = 'inset 0 1px 0 rgba(255,255,255,0.45), inset 0 -1px 0 rgba(0,0,0,0.18)'
+const BEVEL = 'inset 0 1px 0 rgba(255,255,255,0.5), inset 0 3px 5px rgba(255,255,255,0.14), inset 0 -2px 4px rgba(0,0,0,0.28)'
 function glowBoxShadow(group: TileGroup): string {
   return `${BEVEL}, 0 0 18px 2px ${GROUP_GLOW[group]}`
 }
