@@ -36,7 +36,7 @@ export default function StockGridPage() {
   const [page,         setPage]         = useState(1)
 
   const gridKey = `/api/stock/grid?period=${gridPeriod}&date=${gridDate}${gridCategory ? `&category=${gridCategory}` : ''}`
-  const { data: gridData, isLoading: gridLoading } = useSWR<{ grid: GridRow[] }>(gridKey, fetcher)
+  const { data: gridData, isLoading: gridLoading, error: gridError } = useSWR<{ grid: GridRow[] }>(gridKey, fetcher)
 
   const gridRows   = gridData?.grid ?? []
   const PAGE_SIZE  = 50
@@ -90,6 +90,7 @@ export default function StockGridPage() {
       key: 'openingQty',
       header: 'Opening',
       width: '88px',
+      align: 'right',
       render: (r) => (
         <span className="font-mono text-xs" style={{ color: colors.textSecondary }}>{r.openingQty}</span>
       ),
@@ -98,6 +99,7 @@ export default function StockGridPage() {
       key: 'purchasedQty',
       header: 'Purchased',
       width: '90px',
+      align: 'right',
       render: (r) => (
         <span className="font-mono text-xs" style={{ color: colors.action }}>{r.purchasedQty}</span>
       ),
@@ -106,6 +108,7 @@ export default function StockGridPage() {
       key: 'soldQty',
       header: 'Sold',
       width: '80px',
+      align: 'right',
       render: (r) => (
         <span className="font-mono text-xs" style={{ color: colors.danger }}>{r.soldQty}</span>
       ),
@@ -114,6 +117,7 @@ export default function StockGridPage() {
       key: 'adjustedQty',
       header: 'Adjusted',
       width: '84px',
+      align: 'right',
       render: (r) => (
         <span className="font-mono text-xs" style={{ color: colors.process }}>{r.adjustedQty}</span>
       ),
@@ -122,6 +126,7 @@ export default function StockGridPage() {
       key: 'closingQty',
       header: 'Closing',
       width: '84px',
+      align: 'right',
       render: (r) => {
         const isNeg = new Decimal(r.closingQty).isNegative()
         return (
@@ -138,6 +143,7 @@ export default function StockGridPage() {
       key: 'closingValue',
       header: 'Value (R)',
       width: '96px',
+      align: 'right',
       render: (r) => (
         <span className="font-mono text-xs" style={{ color: colors.textPrimary }}>R {r.closingValue}</span>
       ),
@@ -163,11 +169,11 @@ export default function StockGridPage() {
         <BtnMenu
           size="sm"
           icon={Download}
-          label="Export"
+          label="Download"
           loading={exporting}
           items={[
-            { label: 'Export Excel', onClick: () => handleExport('xlsx') },
-            { label: 'Export PDF',   onClick: () => handleExport('pdf')  },
+            { label: 'Download PDF',   onClick: () => handleExport('pdf')  },
+            { label: 'Download Excel', onClick: () => handleExport('xlsx') },
           ]}
         />
         <span style={{ marginLeft: 'auto', fontSize: 11, color: '#6C757D', paddingBottom: 8 }}>
@@ -189,6 +195,7 @@ export default function StockGridPage() {
             page={safePage}
             pageSize={PAGE_SIZE}
             onPageChange={setPage}
+            error={gridError}
             emptyMessage="No data for selected period"
           />
         )}

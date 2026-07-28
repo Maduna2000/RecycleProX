@@ -20,6 +20,7 @@
 
 import { X } from 'lucide-react'
 import { DialogContent } from '@/components/ui/dialog'
+import { colors } from '@/lib/design-tokens'
 import { NAVY, BAR_GRAD } from './styles'
 
 export function RpxDialogContent({
@@ -37,7 +38,7 @@ export function RpxDialogContent({
       showCloseButton={false}
       style={{
         maxWidth,
-        borderRadius: 10,
+        borderRadius: 3,
         border: '1px solid #B0B0B0',
         boxShadow: '0 6px 24px rgba(0,0,0,0.2)',
         background: '#fff',
@@ -84,7 +85,7 @@ export function RpxDialogHeader({
             width: 24, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center',
             background: 'none', border: 'none', cursor: 'pointer', borderRadius: 2, color: '#6C757D',
           }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = '#C0392B'; e.currentTarget.style.color = '#fff' }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = colors.danger; e.currentTarget.style.color = '#fff' }}
           onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = '#6C757D' }}
         >
           <X style={{ width: 14, height: 14 }} />

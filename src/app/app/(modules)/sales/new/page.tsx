@@ -958,10 +958,10 @@ export default function NewSalePage() {
                         {actionMenuId === s.id && actionMenuRect && (
                           <div style={{ position: 'fixed', right: window.innerWidth - actionMenuRect.right, bottom: window.innerHeight - actionMenuRect.top + 2, zIndex: 9999, background: '#fff', border: '1px solid #C0C0C0', borderRadius: 3, boxShadow: '0 4px 12px rgba(0,0,0,0.15)', minWidth: 180 }}>
                             {([
-                              { label: 'Record Payment',     action: () => { setPayTarget({ id: s.id, ref: s.refNumber, totalAmount: s.totalAmount, amountPaid: s.amountPaid ?? '0', customerId: s.customerId ?? null }); setActionMenuId(null) } },
+                              { label: 'Process Payment',    action: () => { setPayTarget({ id: s.id, ref: s.refNumber, totalAmount: s.totalAmount, amountPaid: s.amountPaid ?? '0', customerId: s.customerId ?? null }); setActionMenuId(null) } },
                               { label: 'Print Slip',         action: () => { router.push(`/app/sales/${s.id}`); setActionMenuId(null) } },
                               { label: 'View Full Details',  action: () => { router.push(`/app/sales/${s.id}`); setActionMenuId(null) } },
-                              { label: 'Reverse Sale',       destructive: true, action: () => { setVoidId(s.id); setActionMenuId(null) } },
+                              { label: 'Void Sale',          destructive: true, action: () => { setVoidId(s.id); setActionMenuId(null) } },
                             ] as { label: string; action: () => void; destructive?: boolean }[]).map((item, idx) => (
                               <button
                                 key={idx}
@@ -978,10 +978,10 @@ export default function NewSalePage() {
                       </div>
                     </div>
 
-                    {/* Reverse inline form */}
+                    {/* Void Sale inline form */}
                     {voidId === s.id && (
                       <div style={{ padding: '6px 12px', background: '#FFF5F5', borderTop: '1px solid #FECACA', display: 'flex', alignItems: 'flex-start', gap: 8, flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: 11, fontWeight: 600, color: '#991B1B', paddingTop: 4 }}>Reverse reason:</span>
+                        <span style={{ fontSize: 11, fontWeight: 600, color: '#991B1B', paddingTop: 4 }}>Void reason:</span>
                         <textarea
                           value={voidReason}
                           onChange={(e) => setVoidReason(e.target.value)}
@@ -996,7 +996,7 @@ export default function NewSalePage() {
                             onClick={() => handleVoidSale(s.id)}
                             style={{ height: 24, padding: '0 10px', fontSize: 11, fontWeight: 600, background: '#DC2626', color: '#fff', border: 'none', borderRadius: 2, cursor: 'pointer', opacity: actionLoading || voidReason.trim().length < 5 ? 0.5 : 1 }}
                           >
-                            {actionLoading ? '…' : 'Reverse'}
+                            {actionLoading ? '…' : 'Void'}
                           </button>
                           <button
                             onClick={() => { setVoidId(null); setVoidReason('') }}

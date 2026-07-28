@@ -4,15 +4,8 @@ import { useState, useRef, useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { Btn } from '@/components/rpx'
 import { Loader2, UserPlus, Search } from 'lucide-react'
-
-// Legacy grey toolbar-button look — matches "Edit Transaction" / "Refresh"
-// on the purchases and sales pages that host this panel.
-const legacyBtn: React.CSSProperties = {
-  height: 32, padding: '0 10px', background: '#E0E0E0', border: '1px solid #999',
-  borderRadius: 2, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
-  fontSize: 11, fontWeight: 500, color: '#212529', whiteSpace: 'nowrap', flexShrink: 0,
-}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -110,13 +103,13 @@ export function AccountSelectorPanel({ onSelect }: Props) {
           )}
         </div>
 
-        <button
-          type="button"
+        <Btn
+          variant="secondary"
+          icon={UserPlus}
           onClick={() => router.push(`/app/customers/new?returnTo=${encodeURIComponent(pathname)}`)}
-          style={legacyBtn}
         >
-          <UserPlus className="w-3.5 h-3.5" /> Add Account
-        </button>
+          Add Account
+        </Btn>
       </div>
 
       {query.length < 2 && (

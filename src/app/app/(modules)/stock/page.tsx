@@ -8,8 +8,6 @@ import { TrendingUp, TrendingDown, Minus, AlertTriangle, Search } from 'lucide-r
 import { toast } from 'sonner'
 import { DataTable, type Column } from '@/components/ui/DataTable'
 import { Dialog } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { CategoryFilterSelect, useProductCategories } from '@/components/products/CategoryFilterSelect'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
 import {
@@ -73,7 +71,7 @@ export default function StockPage() {
   // All Time = live levels; a period scopes In/Out to that window with an
   // opening balance carried in
   const stockKey = `/api/stock/on-hand${period ? `?period=${period}&date=${periodDate}` : ''}`
-  const { data: stockData } = useSWR<{ stock: StockEntry[] }>(stockKey, fetcher)
+  const { data: stockData, error: stockError } = useSWR<{ stock: StockEntry[] }>(stockKey, fetcher)
   const { expandCategory } = useProductCategories()
 
   const allStock = stockData?.stock ?? []
@@ -147,6 +145,7 @@ export default function StockPage() {
       key: 'opening',
       header: 'Opening',
       width: '110px',
+      align: 'right' as const,
       render: (r: StockEntry) => (
         <span className="font-mono text-xs" style={{ color: colors.textSecondary }}>
           {Number(r.opening ?? 0).toFixed(2)} {r.product.unit}
@@ -157,6 +156,7 @@ export default function StockPage() {
       key: 'totalIn',
       header: period ? 'In' : 'Total In',
       width: '110px',
+      align: 'right',
       render: (r) => (
         <span className="font-mono text-xs" style={{ color: colors.action }}>
           {Number(r.totalIn).toFixed(2)} {r.product.unit}
@@ -167,6 +167,7 @@ export default function StockPage() {
       key: 'totalOut',
       header: period ? 'Out' : 'Total Out',
       width: '110px',
+      align: 'right',
       render: (r) => (
         <span className="font-mono text-xs" style={{ color: colors.danger }}>
           {Number(r.totalOut).toFixed(2)} {r.product.unit}
@@ -177,10 +178,11 @@ export default function StockPage() {
       key: 'onHand',
       header: 'On Hand',
       width: '120px',
+      align: 'right',
       render: (r) => {
         const qty = parseFloat(r.onHand)
         return (
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center justify-end gap-1.5">
             {qty > 0
               ? <TrendingUp  className="w-3.5 h-3.5" style={{ color: colors.action }} />
               : qty < 0
@@ -286,6 +288,7 @@ export default function StockPage() {
           rows={pagedStock}
           rowKey={(r) => r.product.id}
           loading={!stockData}
+          error={stockError}
           total={stock.length}
           page={safePage}
           pageSize={PAGE_SIZE}
@@ -349,8 +352,7 @@ function AdjustmentModal({
         <RpxDialogHeader title="Manual Stock Adjustment" onClose={onClose} />
         <RpxDialogBody>
         <div className="space-y-4">
-          <div>
-            <Label>Product</Label>
+          <Field label="Product">
             <select
               style={{ ...inp, marginTop: 4 }}
               value={productId}
@@ -361,45 +363,35 @@ function AdjustmentModal({
                 <option key={p.id} value={p.id}>{p.name} ({p.code})</option>
               ))}
             </select>
-          </div>
+          </Field>
 
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label>Direction</Label>
+            <Field label="Direction">
               <select style={{ ...inp, marginTop: 4 }} value={direction} onChange={(e) => setDirection(e.target.value as 'in' | 'out')}>
                 <option value="in">Stock IN (add)</option>
                 <option value="out">Stock OUT (remove)</option>
               </select>
-            </div>
-            <div>
-              <Label>
-                Quantity{' '}
-                {selectedProduct && (
-                  <span className="font-normal" style={{ color: colors.textSecondary }}>
-                    ({selectedProduct.unit})
-                  </span>
-                )}
-              </Label>
-              <Input
+            </Field>
+            <Field label={`Quantity${selectedProduct ? ` (${selectedProduct.unit})` : ''}`}>
+              <input
                 value={quantity}
                 onChange={(e) => setQuantity(e.target.value)}
                 placeholder="0.000"
-                className="mt-1 font-mono"
+                style={{ ...inp, marginTop: 4, fontFamily: 'monospace' }}
                 disabled={loading}
               />
-            </div>
+            </Field>
           </div>
 
-          <div>
-            <Label>Reason / Notes</Label>
-            <Input
+          <Field label="Reason / Notes">
+            <input
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="e.g. Write-off, inventory count correction"
-              className="mt-1"
+              style={{ ...inp, marginTop: 4 }}
               disabled={loading}
             />
-          </div>
+          </Field>
 
         </div>
         </RpxDialogBody>

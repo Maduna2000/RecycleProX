@@ -87,7 +87,7 @@ export default function SalesPage() {
     pageSize: '50',
   })
 
-  const { data, isLoading } = useSWR<{ sales: Sale[]; total: number }>(
+  const { data, isLoading, error } = useSWR<{ sales: Sale[]; total: number }>(
     `/api/sales?${query}`,
     fetcher,
   )
@@ -139,6 +139,7 @@ export default function SalesPage() {
       header: 'Total',
       width: '110px',
       sortable: true,
+      align: 'right',
       render: (row) => (
         <span className="font-mono font-semibold" style={{ color: colors.textPrimary }}>
           R {new Decimal(row.totalAmount).toFixed(2)}
@@ -254,7 +255,9 @@ export default function SalesPage() {
           selectedKey={selectedId}
           rowActions={rowActions}
           loading={isLoading}
+          error={error}
           emptyMessage="No sales found"
+          emptyAction={{ label: '+ New Sale', onClick: () => router.push('/app/sales/new') }}
           total={data?.total}
           page={page}
           pageSize={50}

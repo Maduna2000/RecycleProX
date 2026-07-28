@@ -8,6 +8,7 @@ import { FileDown, Pen, CheckCircle, ExternalLink, RotateCcw, ChevronDown, Chevr
 import { toast } from 'sonner'
 import { colors } from '@/lib/design-tokens'
 import { DEFAULT_POLICE_SERVICE_NAME, DEFAULT_POLICE_LEGAL_NOTE } from '@/lib/police-defaults'
+import { StatusBadge as SharedStatusBadge } from '@/components/ui/DataTable'
 import {
   inp, lbl, TH, TD, HEADER_GRAD, NAVY,
   Btn, Field, EmptyHint, PortalPage,
@@ -175,7 +176,7 @@ export default function PoliceRegisterPage() {
                       <input value={badgeNumber} onChange={(e) => setBadge(e.target.value)} placeholder="12345" style={inp} />
                     </Field>
                     <Field label="Police Station">
-                      <input value={stationName} onChange={(e) => setStation(e.target.value)} placeholder="Pretoria Central" style={inp} />
+                      <input value={stationName} onChange={(e) => setStation(e.target.value)} placeholder="Mbabane Central" style={inp} />
                     </Field>
                   </div>
                   <div>
@@ -249,18 +250,13 @@ export default function PoliceRegisterPage() {
 
 // ─── Visit History table ──────────────────────────────────────────────────────
 
+// A police visit's "active" means an inspection session currently under way
+// — semantically "in progress", not the enabled/live meaning statusStyle()'s
+// own 'active' key carries elsewhere (which renders green) — so it's
+// remapped to the shared 'in_progress' status (blue), not forced onto a
+// same-named key with a different meaning.
 function StatusBadge({ status }: { status: PoliceVisit['status'] }) {
-  const style: Record<PoliceVisit['status'], { bg: string; fg: string; label: string }> = {
-    active:    { bg: '#E7F1FF', fg: '#185ABD', label: 'Active' },
-    completed: { bg: '#E6F4EA', fg: '#1C8743', label: 'Completed' },
-    expired:   { bg: '#FDECEA', fg: '#DC3545', label: 'Expired' },
-  }
-  const s = style[status]
-  return (
-    <span style={{ display: 'inline-flex', padding: '1px 8px', borderRadius: 3, fontSize: 11, fontWeight: 700, background: s.bg, color: s.fg }}>
-      {s.label}
-    </span>
-  )
+  return <SharedStatusBadge status={status === 'active' ? 'in_progress' : status} />
 }
 
 function VisitHistoryTable({ visits }: { visits: PoliceVisit[] }) {

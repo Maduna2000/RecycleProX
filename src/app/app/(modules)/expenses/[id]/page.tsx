@@ -12,6 +12,7 @@ import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { colors } from '@/lib/design-tokens'
 import { Btn, PortalPage } from '@/components/rpx'
+import { StatusBadge } from '@/components/ui/DataTable'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -23,20 +24,6 @@ type ExpenseDetail = {
   createdAt: string; approvedAt?: string | null; approvedById?: string | null
   expenseType: { name: string }
   attachments: { id: string; fileName: string; r2Key: string; notes?: string | null; uploadedAt: string }[]
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const styles: Record<string, React.CSSProperties> = {
-    approved: { background: colors.actionBg, color: colors.action, border: `1px solid ${colors.action}` },
-    pending: { background: colors.warningBg, color: colors.warning, border: `1px solid ${colors.warning}` },
-    voided: { background: colors.dangerBg, color: colors.danger, border: `1px solid ${colors.danger}` },
-  }
-  const labels: Record<string, string> = { approved: 'Approved', pending: 'Pending', voided: 'Voided' }
-  return (
-    <span style={{ ...styles[status], padding: '2px 6px', borderRadius: 2, fontSize: 10, fontWeight: 600, textTransform: 'uppercase' }}>
-      {labels[status] ?? status}
-    </span>
-  )
 }
 
 export default function ExpenseDetailPage() {

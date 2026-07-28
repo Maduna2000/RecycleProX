@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Search, Download, Eye, CheckCircle2, XCircle, Loader2, X, RefreshCw, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react'
-import { StatusBadge } from '../components/StatusBadge'
+import { StatusBadge } from '@/components/ui/DataTable'
 import { colors, fontSize, fontWeight, layout } from '@/lib/design-tokens'
 
 interface OrderLine {

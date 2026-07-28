@@ -3,17 +3,10 @@
 import { useState, useRef, useCallback, useEffect, forwardRef, useImperativeHandle } from 'react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { Btn } from '@/components/rpx'
 import { Loader2, ScanLine, UserCheck, UserPlus, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
 import { validateSaId } from '@/lib/utils/saId'
-
-// Legacy grey toolbar-button look — matches "Edit Transaction" / "Refresh"
-// on the purchases and sales pages that host this panel.
-const legacyBtn: React.CSSProperties = {
-  height: 28, padding: '0 10px', background: '#E0E0E0', border: '1px solid #999',
-  borderRadius: 2, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
-  fontSize: 11, fontWeight: 500, color: '#212529', whiteSpace: 'nowrap', flexShrink: 0,
-}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -364,26 +357,18 @@ export const CasualSelectorPanel = forwardRef<CasualSelectorPanelRef, Props>(
             )}
           </div>
 
-          <button
-            type="button"
+          <Btn
+            variant="secondary"
+            icon={ScanLine}
+            loading={scanStatus === 'scanning'}
             disabled={scanStatus === 'scanning'}
             onClick={() => fileInputRef.current?.click()}
             title={scanR2Key ? 'Re-scan ID document' : 'Scan ID document — upload a photo'}
-            style={legacyBtn}
-            className="disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {scanStatus === 'scanning' ? (
-              <>
-                <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
-                {scanPhase === 'upload' ? 'Uploading…' : scanProgress !== null ? `${scanProgress}%` : 'Reading…'}
-              </>
-            ) : (
-              <>
-                <ScanLine className="w-3.5 h-3.5 shrink-0" />
-                {scanR2Key ? 'Re-scan' : 'Scan ID'}
-              </>
-            )}
-          </button>
+            {scanStatus === 'scanning'
+              ? (scanPhase === 'upload' ? 'Uploading…' : scanProgress !== null ? `${scanProgress}%` : 'Reading…')
+              : (scanR2Key ? 'Re-scan' : 'Scan ID')}
+          </Btn>
         </div>
 
         {/* Hidden file input */}

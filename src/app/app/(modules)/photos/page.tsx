@@ -264,7 +264,7 @@ function PhotoGrid({
     pageSize: '24',
   })
 
-  const { data, isLoading } = useSWR<PhotosResponse>(
+  const { data, isLoading, error } = useSWR<PhotosResponse>(
     `/api/photos/search?${query}`,
     fetcher,
     { keepPreviousData: true }
@@ -336,8 +336,15 @@ function PhotoGrid({
         </div>
       )}
 
+      {/* Error state */}
+      {!isLoading && error && (
+        <div className="flex flex-col items-center justify-center py-20 gap-2" style={{ color: colors.danger }}>
+          <p className="text-sm">Failed to load photos. Please try again.</p>
+        </div>
+      )}
+
       {/* Empty state */}
-      {!isLoading && photos.length === 0 && (
+      {!isLoading && !error && photos.length === 0 && (
         <div className="flex flex-col items-center justify-center py-20 gap-3" style={{ color: colors.textSecondary }}>
           <Images className="w-12 h-12 opacity-20" />
           <p className="text-sm">{emptyMsg}</p>
@@ -348,7 +355,7 @@ function PhotoGrid({
       )}
 
       {/* Grid */}
-      {photos.length > 0 && (
+      {!error && photos.length > 0 && (
         <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
           {photos.map((photo, i) => (
             <PhotoCard

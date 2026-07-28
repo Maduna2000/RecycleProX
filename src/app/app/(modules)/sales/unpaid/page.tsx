@@ -86,7 +86,7 @@ export default function UnpaidSalesPage() {
   if (to)     query.set('to',     to)
 
   const KEY = `/api/sales?${query}`
-  const { data, isLoading } = useSWR<{ sales: Sale[] }>(KEY, fetcher)
+  const { data, isLoading, error } = useSWR<{ sales: Sale[] }>(KEY, fetcher)
   const sales = data?.sales ?? []
 
   const PAGE_SIZE  = 50
@@ -203,7 +203,7 @@ export default function UnpaidSalesPage() {
 
   const rowActions: RowAction<Sale>[] = [
     {
-      label:   'Record Payment',
+      label:   'Process Payment',
       icon:    HandCoins,
       onClick: (row) => setPayTarget({
         id:                          row.id,
@@ -220,7 +220,7 @@ export default function UnpaidSalesPage() {
       onClick: (row) => window.open(`/api/sales/${row.id}/receipt?format=pdf`, '_blank'),
     },
     {
-      label:   'Reverse Sale',
+      label:   'Void Sale',
       icon:    Ban,
       danger:  true,
       hidden:  () => !isManager,
@@ -285,6 +285,7 @@ export default function UnpaidSalesPage() {
           selectedKey={selectedId}
           rowActions={rowActions}
           loading={isLoading}
+          error={error}
           total={sales.length}
           page={safePage}
           pageSize={PAGE_SIZE}
@@ -431,7 +432,7 @@ function VoidDialog({
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
       <RpxDialogContent maxWidth={440}>
-        <RpxDialogHeader title="Reverse Sale" onClose={onClose} />
+        <RpxDialogHeader title="Void Sale" onClose={onClose} />
         <RpxDialogBody>
           <p style={{ fontSize: 12.5, color: colors.textSecondary, margin: '0 0 12px' }}>
             You are about to reverse{' '}
@@ -450,7 +451,7 @@ function VoidDialog({
         <RpxDialogFooter>
           <Btn onClick={onClose} disabled={loading}>Cancel</Btn>
           <Btn variant="danger" loading={loading} disabled={reason.trim().length < 5} onClick={onConfirm}>
-            Confirm Reversal
+            Confirm Void
           </Btn>
         </RpxDialogFooter>
       </RpxDialogContent>

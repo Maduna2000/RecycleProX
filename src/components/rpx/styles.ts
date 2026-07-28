@@ -65,14 +65,17 @@ export const btnPrimary: React.CSSProperties = {
   fontSize: 12, fontWeight: 700, padding: '7px 16px',
   background: BAR_GRAD, color: colors.textPrimary, border: CARD_BORDER,
   borderRadius: 3, cursor: 'pointer',
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.6)',
 }
 
-/** Grey secondary button — pairs with the (also grey) primary. */
+/** Grey secondary button — pairs with the (also grey) primary. Same 3px
+ * radius as btnPrimary (previously 2px — the two variants disagreed). */
 export const btnSecondary: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 5,
   fontSize: 11, fontWeight: 600, padding: '5px 12px',
   background: BAR_GRAD, color: colors.textPrimary, border: CARD_BORDER,
-  borderRadius: 2, cursor: 'pointer',
+  borderRadius: 3, cursor: 'pointer',
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.6)',
 }
 
 /** Destructive button — same grey fill, red label instead of a solid red block. */

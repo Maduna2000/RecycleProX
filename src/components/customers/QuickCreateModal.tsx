@@ -91,7 +91,7 @@ export function QuickCreateModal({ open, prefillQuery, onClose, onSuccess }: Pro
         <RpxDialogFooter>
           <Btn onClick={onClose} disabled={loading}>Cancel</Btn>
           <Btn variant="primary" type="submit" form="quick-create-form" loading={loading}>
-            {loading ? 'Creating...' : 'Create Customer'}
+            {loading ? 'Creating...' : 'Quick Create'}
           </Btn>
         </RpxDialogFooter>
       </RpxDialogContent>

@@ -185,6 +185,7 @@ export default function SettingsPage() {
   const { data, isLoading } = useSWR<SettingsMap>('/api/settings', fetcher)
   const [form, setForm]             = useState<SettingsMap>({})
   const [saving, setSaving]         = useState(false)
+  const [errors, setErrors]         = useState<Record<string, string>>({})
   const [detectingPorts, setDetect] = useState(false)
   const [availablePorts, setPorts]  = useState<SerialPortInfo[]>([])
   const [testingPrinter, setTest]   = useState(false)
@@ -206,7 +207,16 @@ export default function SettingsPage() {
     )
   }
 
+  function validate(): boolean {
+    const next: Record<string, string> = {}
+    if (!form.yardName?.trim())  next.yardName  = 'Yard / business name is required'
+    if (!form.vatNumber?.trim()) next.vatNumber = 'VAT registration number is required'
+    setErrors(next)
+    return Object.keys(next).length === 0
+  }
+
   async function handleSave() {
+    if (!validate()) { toast.error('Fix the highlighted fields before saving'); return }
     setSaving(true)
     const res = await fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
     setSaving(false)
@@ -216,6 +226,7 @@ export default function SettingsPage() {
 
   function set(key: keyof SettingsMap, value: string) {
     setForm((prev) => ({ ...prev, [key]: value }))
+    setErrors((prev) => { if (!prev[key]) return prev; const next = { ...prev }; delete next[key]; return next })
   }
 
   async function detectPorts() {
@@ -255,11 +266,21 @@ export default function SettingsPage() {
               <SHdr title="Yard Information" />
               <div style={{ padding: '10px 12px', borderBottom: '1px solid #E0E0E0' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 12px' }}>
-                  <Field label="Yard / Business Name">
-                    <input value={form.yardName ?? ''} onChange={(e) => set('yardName', e.target.value)} placeholder="e.g. Renovo Pro Yard" style={inp} />
+                  <Field label="Yard / Business Name" required>
+                    <input
+                      value={form.yardName ?? ''} onChange={(e) => set('yardName', e.target.value)}
+                      placeholder="e.g. Renovo Pro Yard"
+                      style={{ ...inp, borderColor: errors.yardName ? colors.danger : undefined }}
+                    />
+                    {errors.yardName && <p style={{ fontSize: 10, color: colors.danger, marginTop: 2 }}>{errors.yardName}</p>}
                   </Field>
-                  <Field label="VAT Registration Number">
-                    <input value={form.vatNumber ?? ''} onChange={(e) => set('vatNumber', e.target.value)} placeholder="e.g. 4123456789" style={inp} />
+                  <Field label="VAT Registration Number" required>
+                    <input
+                      value={form.vatNumber ?? ''} onChange={(e) => set('vatNumber', e.target.value)}
+                      placeholder="e.g. 4123456789"
+                      style={{ ...inp, borderColor: errors.vatNumber ? colors.danger : undefined }}
+                    />
+                    {errors.vatNumber && <p style={{ fontSize: 10, color: colors.danger, marginTop: 2 }}>{errors.vatNumber}</p>}
                   </Field>
                   <Field label="Physical Address">
                     <input value={form.yardAddress ?? ''} onChange={(e) => set('yardAddress', e.target.value)} placeholder="Street, City, Province, Code" style={inp} />

@@ -5,9 +5,8 @@ import { Coins, CreditCard, Wallet, AlertCircle, Lock, Split } from 'lucide-reac
 import { toast } from 'sonner'
 import Decimal from 'decimal.js'
 import { Dialog } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
 import { colors } from '@/lib/design-tokens'
-import { Btn, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
+import { Btn, inp, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
 
 export type SplitPayTarget = {
   id: string
@@ -44,17 +43,20 @@ function PaymentInput({
       </div>
       <div className="flex-1 relative">
         <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs" style={{ color: '#6C757D' }}>R</span>
-        <Input
+        <input
           type="text"
           inputMode="decimal"
           placeholder="0.00"
           value={value}
           onChange={(e) => onChange(e.target.value)}
           disabled={disabled || locked}
-          className="h-8 text-xs font-mono pl-6"
           style={{
+            ...inp,
+            fontFamily: 'monospace',
+            fontSize: 12,
+            paddingLeft: 22,
             borderColor: highlight ? colors.alertBorder : undefined,
-            background: locked ? '#F5F5F5' : undefined,
+            background: locked ? '#F5F5F5' : '#fff',
           }}
         />
       </div>

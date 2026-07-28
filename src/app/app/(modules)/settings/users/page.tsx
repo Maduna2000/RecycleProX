@@ -10,9 +10,9 @@ import { ResetPasswordModal } from '@/components/users/ResetPasswordModal'
 import { SetPinModal } from '@/components/users/SetPinModal'
 import { Search, Unlock, UserCheck, UserX, KeyRound, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
-import { colors } from '@/lib/design-tokens'
+import { colors, badgeStyle } from '@/lib/design-tokens'
 import { inp, Field, PortalPage, FilterBar } from '@/components/rpx'
-import { DataTable, type Column, type RowAction } from '@/components/ui/DataTable'
+import { DataTable, type Column, type RowAction, StatusBadge as SharedStatusBadge } from '@/components/ui/DataTable'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -25,36 +25,15 @@ type User = {
 
 function PinBadge({ hasPersonalPin }: { hasPersonalPin?: boolean }) {
   return hasPersonalPin ? (
-    <span style={{ display: 'inline-flex', padding: '1px 6px', borderRadius: 3, fontSize: 10, fontWeight: 600, background: colors.actionBg, color: colors.action }}>
-      Personal
-    </span>
+    <span style={badgeStyle(colors.action, colors.actionBg)}>Personal</span>
   ) : (
-    <span style={{ display: 'inline-flex', padding: '1px 6px', borderRadius: 3, fontSize: 10, fontWeight: 600, background: colors.neutralBg, color: colors.textSecondary }}>
-      Default
-    </span>
+    <span style={badgeStyle(colors.textSecondary, colors.neutralBg)}>Default</span>
   )
 }
 
 function StatusBadge({ user }: { user: User }) {
-  if (user.lockedAt) {
-    return (
-      <span style={{ display: 'inline-flex', padding: '1px 6px', borderRadius: 3, fontSize: 10, fontWeight: 600, background: colors.dangerBg, color: colors.danger }}>
-        Locked
-      </span>
-    )
-  }
-  if (!user.isActive) {
-    return (
-      <span style={{ display: 'inline-flex', padding: '1px 6px', borderRadius: 3, fontSize: 10, fontWeight: 600, background: colors.neutralBg, color: colors.textSecondary }}>
-        Inactive
-      </span>
-    )
-  }
-  return (
-    <span style={{ display: 'inline-flex', padding: '1px 6px', borderRadius: 3, fontSize: 10, fontWeight: 600, background: colors.actionBg, color: colors.action }}>
-      Active
-    </span>
-  )
+  const status = user.lockedAt ? 'locked' : !user.isActive ? 'inactive' : 'active'
+  return <SharedStatusBadge status={status} />
 }
 
 const ROLE_STYLES: Record<string, { background: string; color: string }> = {
@@ -68,7 +47,7 @@ function RoleBadge({ role }: { role: string }) {
   const style = ROLE_STYLES[role] ?? { background: colors.neutralBg, color: colors.textSecondary }
   const displayName = role === 'scale_operator' ? 'Scale Op' : role
   return (
-    <span style={{ display: 'inline-flex', padding: '1px 6px', borderRadius: 3, fontSize: 10, fontWeight: 600, textTransform: 'capitalize', ...style }}>
+    <span style={{ ...badgeStyle(style.color, style.background), textTransform: 'capitalize' }}>
       {displayName}
     </span>
   )

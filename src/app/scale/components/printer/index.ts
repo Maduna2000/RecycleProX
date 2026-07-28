@@ -1,5 +1,0 @@
-export { default as PrinterSetupWizard } from './PrinterSetupWizard'
-export { default as StepConnectionType } from './StepConnectionType'
-export { default as StepDeviceSelection } from './StepDeviceSelection'
-export { default as StepConfiguration } from './StepConfiguration'
-export { default as StepTestPrint } from './StepTestPrint'

@@ -233,8 +233,10 @@ export const layout = {
   tableRowH:     30,
   /** Top nav zone height */
   navbarH:       48,
-  /** Contextual toolbar zone height */
-  toolbarH:      36,
+  /** Contextual toolbar zone height — matches AppShell's actual rendered
+   * `var(--rpx-toolbar-h, 32px)` (previously declared as 36 here, disagreeing
+   * with what the shell actually renders). */
+  toolbarH:      32,
   /** Zone 3 content padding (all sides) */
   contentPadding: 24,
 } as const
@@ -333,6 +335,7 @@ type AppStatus =
   | 'settled' | 'approved' | 'submitted' | 'open'
   | 'blacklisted' | 'locked'
   | 'in_progress' | 'waiting_for_customer' | 'resolved' | 'closed'
+  | 'on site' | 'paid' | 'processed' | 'expired'
 
 interface StatusStyle {
   color:      string
@@ -345,10 +348,13 @@ const STATUS_MAP: Record<AppStatus, StatusStyle> = {
   completed:   { color: colors.action,    background: colors.actionBg,   label: 'Completed' },
   settled:     { color: colors.action,    background: colors.actionBg,   label: 'Settled' },
   approved:    { color: colors.action,    background: colors.actionBg,   label: 'Approved' },
+  paid:        { color: colors.action,    background: colors.actionBg,   label: 'Paid' },
+  processed:   { color: colors.action,    background: colors.actionBg,   label: 'Processed' },
 
   pending:     { color: colors.warning,   background: colors.warningBg,  label: 'Pending' },
   submitted:   { color: colors.warning,   background: colors.warningBg,  label: 'Submitted' },
   open:        { color: colors.process,   background: colors.processBg,  label: 'Open' },
+  'on site':   { color: colors.process,   background: colors.processBg,  label: 'On Site' },
   in_progress: { color: colors.process,   background: colors.processBg,  label: 'In Progress' },
   waiting_for_customer: { color: colors.warning, background: colors.warningBg, label: 'Awaiting Your Reply' },
   resolved:    { color: colors.action,    background: colors.actionBg,   label: 'Resolved' },
@@ -356,9 +362,30 @@ const STATUS_MAP: Record<AppStatus, StatusStyle> = {
   voided:      { color: colors.danger,    background: colors.dangerBg,   label: 'Voided' },
   blacklisted: { color: colors.danger,    background: colors.dangerBg,   label: 'Blacklisted' },
   locked:      { color: colors.danger,    background: colors.dangerBg,   label: 'Locked' },
+  expired:     { color: colors.danger,    background: colors.dangerBg,   label: 'Expired' },
 
   inactive:    { color: colors.textSecondary, background: colors.neutralBg, label: 'Inactive' },
   closed:      { color: colors.textSecondary, background: colors.neutralBg, label: 'Closed' },
+}
+
+/**
+ * The one canonical badge/pill shape used app-wide — pill radius, 11px
+ * medium-weight text, 2px/8px padding. `statusStyle()` below is this same
+ * shape driven by `STATUS_MAP`; use `badgeStyle()` directly for badges that
+ * aren't a lifecycle status (role, direction, category, pin, etc.) so every
+ * badge in the app renders identically regardless of what it labels.
+ */
+export function badgeStyle(color: string, background: string): React.CSSProperties {
+  return {
+    display:      'inline-flex',
+    alignItems:   'center',
+    padding:      '2px 8px',
+    borderRadius: 999,
+    fontSize:     fontSize.xs,
+    fontWeight:   fontWeight.medium,
+    color,
+    background,
+  }
 }
 
 /**
@@ -381,16 +408,7 @@ export function statusStyle(status: string): {
   }
 
   return {
-    badge: {
-      display:      'inline-flex',
-      alignItems:   'center',
-      padding:      '2px 8px',
-      borderRadius: 999,
-      fontSize:     fontSize.xs,
-      fontWeight:   fontWeight.medium,
-      color:        s.color,
-      background:   s.background,
-    } as React.CSSProperties,
+    badge:    badgeStyle(s.color, s.background),
     dotColor: s.color,
     label:    s.label,
   }
@@ -408,6 +426,7 @@ const designTokens = {
   layout,
   styles,
   statusStyle,
+  badgeStyle,
 }
 
 export default designTokens

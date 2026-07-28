@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { Scale, ClipboardList, Layers, Package, TrendingUp, Clock, CheckCircle2, XCircle } from 'lucide-react'
 import { getScaleStats } from '@/lib/services/scaleService'
 import { listScaleOrders } from '@/lib/services/scaleService'
-import { StatusBadge } from './components/StatusBadge'
+import { StatusBadge } from '@/components/ui/DataTable'
 
 async function StatsCards() {
   const stats = await getScaleStats()

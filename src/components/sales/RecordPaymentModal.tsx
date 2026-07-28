@@ -1,15 +1,13 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { HandCoins, AlertCircle, Split } from 'lucide-react'
+import { CreditCard, AlertCircle, Split } from 'lucide-react'
 import { toast } from 'sonner'
 import Decimal from 'decimal.js'
 import { Dialog } from '@/components/ui/dialog'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Input } from '@/components/ui/input'
 import { SaleSplitPaymentModal } from './SaleSplitPaymentModal'
 import { colors } from '@/lib/design-tokens'
-import { Btn, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
+import { Btn, inp, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
 
 export type PayTarget = {
   id: string
@@ -72,7 +70,7 @@ export function RecordPaymentModal({
     })
     setLoading(false)
     if (res.ok) {
-      toast.success(`Payment recorded for ${sale.ref}`)
+      toast.success(`Payment processed for ${sale.ref}`)
       onSuccess()
     } else {
       const j = await res.json() as { error?: string }
@@ -83,7 +81,7 @@ export function RecordPaymentModal({
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
       <RpxDialogContent maxWidth={400}>
-        <RpxDialogHeader title="Record Payment" icon={HandCoins} onClose={onClose} />
+        <RpxDialogHeader title="Process Payment" icon={CreditCard} onClose={onClose} />
         <RpxDialogBody>
         <div className="space-y-4">
           {/* Balance summary */}
@@ -137,13 +135,13 @@ export function RecordPaymentModal({
                     Pay full balance
                   </button>
                 </div>
-                <Input
+                <input
                   type="text"
                   inputMode="decimal"
                   placeholder="0.00"
                   value={amount}
                   onChange={(e) => { setAmount(e.target.value); setAmountError(null) }}
-                  className="h-8 text-[12px] font-mono"
+                  style={{ ...inp, fontFamily: 'monospace', fontSize: 12 }}
                 />
                 {amountError && (
                   <p className="text-xs mt-1" style={{ color: colors.danger }}>{amountError}</p>
@@ -152,15 +150,14 @@ export function RecordPaymentModal({
 
               <div>
                 <label className="block mb-1 text-xs font-medium" style={{ color: '#6C757D' }}>Payment Method</label>
-                <Select onValueChange={(v) => setMethod(v as typeof method)} defaultValue="cash">
-                  <SelectTrigger className="h-8 w-full text-xs border-[#E0E0E0]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="cash">Cash</SelectItem>
-                    <SelectItem value="eft">EFT</SelectItem>
-                  </SelectContent>
-                </Select>
+                <select
+                  value={method}
+                  onChange={(e) => setMethod(e.target.value as typeof method)}
+                  style={inp}
+                >
+                  <option value="cash">Cash</option>
+                  <option value="eft">EFT</option>
+                </select>
               </div>
             </>
           )}
@@ -189,8 +186,8 @@ export function RecordPaymentModal({
         <RpxDialogFooter>
           <Btn onClick={onClose} disabled={loading}>Cancel</Btn>
           {!hasOutstandingBusinessLoan && (
-            <Btn variant="primary" icon={HandCoins} loading={loading} onClick={handlePay}>
-              Record Payment
+            <Btn variant="primary" icon={CreditCard} loading={loading} onClick={handlePay}>
+              Process Payment
             </Btn>
           )}
         </RpxDialogFooter>

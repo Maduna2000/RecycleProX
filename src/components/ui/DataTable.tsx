@@ -3,7 +3,7 @@
 import { useState, useRef } from 'react'
 import { ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight, MoreHorizontal, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { colors, fontSize, fontWeight, layout } from '@/lib/design-tokens'
+import { colors, statusStyle } from '@/lib/design-tokens'
 import { Btn, HEADER_GRAD } from '@/components/rpx'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -15,6 +15,8 @@ export interface Column<T> {
   header:    string
   width?:    string
   sortable?: boolean
+  /** Right-align for money/ID/date columns — tabular figures should never be left-aligned. */
+  align?:    'left' | 'right'
   render:    (row: T, index: number) => React.ReactNode
 }
 
@@ -51,42 +53,13 @@ export interface DataTableProps<T> {
 }
 
 // ─── Status Badge helper ──────────────────────────────────────────────────────
-
-const STATUS_STYLES: Record<string, { color: string; background: string }> = {
-  active:      { color: colors.action,        background: colors.actionBg },
-  'on site':   { color: colors.action,        background: colors.actionBg },
-  completed:   { color: colors.action,        background: colors.actionBg },
-  done:        { color: colors.action,        background: colors.actionBg },
-  approved:    { color: colors.action,        background: colors.actionBg },
-  settled:     { color: colors.action,        background: colors.actionBg },
-  pending:     { color: colors.warning,       background: colors.warningBg },
-  open:        { color: colors.process,       background: colors.processBg },
-  submitted:   { color: colors.process,       background: colors.processBg },
-  voided:      { color: colors.danger,        background: colors.dangerBg },
-  void:        { color: colors.danger,        background: colors.dangerBg },
-  blacklisted: { color: colors.danger,        background: colors.dangerBg },
-  locked:      { color: colors.danger,        background: colors.dangerBg },
-  inactive:    { color: colors.textSecondary, background: colors.neutralBg },
-}
+// Thin wrapper around the shared statusStyle() helper (design-tokens.ts) so
+// every status pill in the app — however it's rendered — comes from the same
+// color map and the same badge shape.
 
 export function StatusBadge({ status }: { status: string }) {
-  const s = STATUS_STYLES[status.toLowerCase()] ?? {
-    color: colors.textSecondary, background: colors.neutralBg,
-  }
-  return (
-    <span style={{
-      display:      'inline-flex',
-      alignItems:   'center',
-      padding:      '2px 8px',
-      borderRadius: layout.btnRadius,
-      fontSize:     fontSize.xs,
-      fontWeight:   fontWeight.medium,
-      color:        s.color,
-      background:   s.background,
-    }}>
-      {status.charAt(0).toUpperCase() + status.slice(1)}
-    </span>
-  )
+  const { badge, label } = statusStyle(status.toLowerCase())
+  return <span style={badge}>{label}</span>
 }
 
 // ─── Avatar helper ────────────────────────────────────────────────────────────
@@ -247,7 +220,7 @@ export function DataTable<T>({
                   <th
                     key={col.key}
                     className={cn(
-                      'text-left px-3',
+                      'px-3',
                       col.sortable && 'cursor-pointer select-none hover:bg-[#D6E8FF]/60',
                     )}
                     style={{
@@ -258,11 +231,12 @@ export function DataTable<T>({
                       textTransform: 'uppercase',
                       height:        30,
                       width:         col.width,
+                      textAlign:     col.align === 'right' ? 'right' : 'left',
                       borderRight:   colBorder(isLastData),
                     }}
                     onClick={() => col.sortable && handleSort(col.key)}
                   >
-                    <span className="flex items-center gap-1">
+                    <span className={cn('flex items-center gap-1', col.align === 'right' && 'justify-end')}>
                       {col.header}
                       {col.sortable && (
                         sortKey === col.key
@@ -374,6 +348,7 @@ export function DataTable<T>({
                             padding:     '4px 10px',
                             fontSize:    12,
                             color:       isSelected || isChecked ? '#00205B' : '#212529',
+                            textAlign:   col.align === 'right' ? 'right' : 'left',
                             borderRight: colBorder(isLastData),
                           }}
                         >

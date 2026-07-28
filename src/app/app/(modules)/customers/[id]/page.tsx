@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import useSWR, { mutate } from 'swr'
 import { Dialog } from '@/components/ui/dialog'
-import { colors } from '@/lib/design-tokens'
+import { colors, badgeStyle } from '@/lib/design-tokens'
 import { AlertTriangle, ShieldBan, ShieldCheck, Save, Pencil, FileText } from 'lucide-react'
 import { LoansTab } from '@/components/customers/LoansTab'
 import { BusinessLoanTab } from '@/components/customers/BusinessLoanTab'
@@ -79,11 +79,7 @@ function SHdr({ title }: { title: string }) {
 
 // ─── Pill badge ────────────────────────────────────────────────────────────────
 function Pill({ text, bg, color }: { text: string; bg: string; color: string }) {
-  return (
-    <span style={{ display: 'inline-block', fontSize: 10, fontWeight: 700, borderRadius: 2, padding: '1px 6px', background: bg, color }}>
-      {text}
-    </span>
-  )
+  return <span style={badgeStyle(color, bg)}>{text}</span>
 }
 
 // ─── Main page ─────────────────────────────────────────────────────────────────
@@ -263,18 +259,19 @@ export default function CustomerDetailPage() {
                   <SHdr title="Personal Details" />
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px 16px', padding: '10px 12px' }}>
                     <div>
-                      <span style={lbl}>First Name</span>
+                      <span style={lbl}>First Name <span style={{ color: colors.danger }}>*</span></span>
                       <input {...register('firstName')} disabled={!isEditing || saving} style={isEditing ? inp : inpDisabled} />
                       {errors.firstName && <span style={{ fontSize: 10, color: '#DC2626' }}>{errors.firstName.message}</span>}
                     </div>
                     <div>
-                      <span style={lbl}>Last Name</span>
+                      <span style={lbl}>Last Name <span style={{ color: colors.danger }}>*</span></span>
                       <input {...register('lastName')} disabled={!isEditing || saving} style={isEditing ? inp : inpDisabled} />
                       {errors.lastName && <span style={{ fontSize: 10, color: '#DC2626' }}>{errors.lastName.message}</span>}
                     </div>
                     <div>
                       <span style={lbl}>ID Number</span>
                       <input value={customer.idNumber} disabled style={inpDisabled} />
+                      <span style={{ fontSize: 10, color: colors.textMuted }}>Cannot be changed once a record exists</span>
                     </div>
                     <div>
                       <span style={lbl}>Date of Birth</span>
@@ -294,7 +291,7 @@ export default function CustomerDetailPage() {
                       <input {...register('nationality')} disabled={!isEditing || saving} style={isEditing ? inp : inpDisabled} />
                     </div>
                     <div>
-                      <span style={lbl}>Phone (Mobile)</span>
+                      <span style={lbl}>Phone (Mobile) <span style={{ color: colors.danger }}>*</span></span>
                       <input {...register('phone')} disabled={!isEditing || saving} style={{ ...(isEditing ? inp : inpDisabled), fontFamily: 'monospace' }} />
                       {errors.phone && <span style={{ fontSize: 10, color: '#DC2626' }}>{errors.phone.message}</span>}
                     </div>

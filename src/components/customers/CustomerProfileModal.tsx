@@ -20,7 +20,7 @@ import {
   type UpdateCustomerFormInput,
   type BlacklistInput,
 } from '@/lib/schemas/customer'
-import { colors } from '@/lib/design-tokens'
+import { colors, badgeStyle } from '@/lib/design-tokens'
 import { Btn, HEADER_GRAD, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
@@ -86,11 +86,7 @@ const lblStyle: React.CSSProperties = {
 }
 
 function Pill({ text, bg, color }: { text: string; bg: string; color: string }) {
-  return (
-    <span style={{ display: 'inline-block', fontSize: 10, fontWeight: 700, borderRadius: 2, padding: '1px 6px', background: bg, color }}>
-      {text}
-    </span>
-  )
+  return <span style={badgeStyle(color, bg)}>{text}</span>
 }
 
 // ─── Main Modal ───────────────────────────────────────────────────────────────

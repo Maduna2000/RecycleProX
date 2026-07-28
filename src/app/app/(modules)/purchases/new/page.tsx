@@ -1108,7 +1108,7 @@ export default function NewPurchasePage() {
                           {([
                             { label: 'View Customer History',  action: () => { router.push(`/app/customers/${p.customer.id}`); setActionMenuId(null) } },
                             { label: 'Log to Police Register', action: () => { router.push(`/app/police-register/new?purchaseId=${p.id}`); setActionMenuId(null) } },
-                            { label: 'Reverse Purchase', destructive: true, action: () => { setVoidId(p.id); setActionMenuId(null) } },
+                            { label: 'Void Purchase', destructive: true, action: () => { setVoidId(p.id); setActionMenuId(null) } },
                           ] as { label: string; action: () => void; destructive?: boolean }[]).map((item, idx) => (
                             <button
                               key={idx}
@@ -1125,10 +1125,10 @@ export default function NewPurchasePage() {
                     </div>
                   </div>
 
-                  {/* Reverse Purchase inline form */}
+                  {/* Void Purchase inline form */}
                   {voidId === p.id && (
                     <div style={{ padding: '6px 12px', background: '#FFF5F5', borderTop: '1px solid #FECACA', display: 'flex', alignItems: 'flex-start', gap: 8, flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: 11, fontWeight: 600, color: '#991B1B', paddingTop: 4 }}>Reverse reason:</span>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: '#991B1B', paddingTop: 4 }}>Void reason:</span>
                       <textarea
                         value={voidReason}
                         onChange={(e) => setVoidReason(e.target.value)}
@@ -1143,7 +1143,7 @@ export default function NewPurchasePage() {
                           onClick={() => handleVoidPurchase(p.id)}
                           style={{ height: 24, padding: '0 10px', fontSize: 11, fontWeight: 600, background: '#DC2626', color: '#fff', border: 'none', borderRadius: 2, cursor: 'pointer', opacity: actionLoading || voidReason.trim().length < 5 ? 0.5 : 1 }}
                         >
-                          {actionLoading ? '…' : 'Reverse'}
+                          {actionLoading ? '…' : 'Void'}
                         </button>
                         <button
                           onClick={() => { setVoidId(null); setVoidReason('') }}
