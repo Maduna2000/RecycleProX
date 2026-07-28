@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useSearchParams } from 'next/navigation'
 import useSWR, { mutate } from 'swr'
 import { Dialog } from '@/components/ui/dialog'
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Search, Pencil, Eye, EyeOff, Trash2, X, Package, ChevronDown, ChevronRight } from 'lucide-react'
 import * as LucideIcons from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -289,6 +290,7 @@ export default function ProductsPage() {
 // ─── Create Product Modal ─────────────────────────────────────────────────────
 function CreateProductModal({ categories, onClose, onSuccess }: { categories: CategoryItem[]; onClose: () => void; onSuccess: () => void }) {
   const [loading, setLoading] = useState(false)
+  const [category, setCategory] = useState('')
   const { register, handleSubmit, setValue, formState: { errors } } = useForm<CreateProductFormInput, unknown, CreateProductInput>({
     resolver: zodResolver(CreateProductSchema),
     defaultValues: { unit: 'kg', isActive: true, sortOrder: 0 },
@@ -329,18 +331,25 @@ function CreateProductModal({ categories, onClose, onSuccess }: { categories: Ca
             {errors.name && <p className="text-xs text-red-600 mt-1">{errors.name.message}</p>}
           </Field>
           <Field label="Category">
-            <select style={{ ...inp, marginTop: 4 }} onChange={(e) => setValue('category', e.target.value)} defaultValue="">
-              <option value="" disabled>Select category</option>
-              {categories.map((c) => (
-                <React.Fragment key={c.id}>
-                  {c.children.length === 0
-                    ? <option value={c.name}>{c.name}</option>
-                    : <option value={c.name} disabled>{c.name}</option>
-                  }
-                  {c.children.map(s => <option key={s.id} value={s.name}>&nbsp;&nbsp;↳ {s.name}</option>)}
-                </React.Fragment>
-              ))}
-            </select>
+            <Select value={category} onValueChange={(v) => { setCategory(v ?? ''); setValue('category', v ?? '') }}>
+              <SelectTrigger style={{ ...inp, marginTop: 4 }}>
+                <SelectValue placeholder="Select category" />
+              </SelectTrigger>
+              <SelectContent>
+                {categories.map((c) => (
+                  c.children.length === 0 ? (
+                    <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
+                  ) : (
+                    <SelectGroup key={c.id}>
+                      <SelectLabel>{c.name}</SelectLabel>
+                      {c.children.map((s) => (
+                        <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>
+                      ))}
+                    </SelectGroup>
+                  )
+                ))}
+              </SelectContent>
+            </Select>
             {errors.category && <p className="text-xs text-red-600 mt-1">{errors.category.message}</p>}
           </Field>
           <div className="grid grid-cols-2 gap-3">
@@ -368,6 +377,7 @@ function CreateProductModal({ categories, onClose, onSuccess }: { categories: Ca
 // ─── Edit Product Modal ───────────────────────────────────────────────────────
 function EditProductModal({ product, categories, onClose, onSuccess }: { product: Product; categories: CategoryItem[]; onClose: () => void; onSuccess: () => void }) {
   const [loading, setLoading] = useState(false)
+  const [category, setCategory] = useState(product.category)
   const { register, handleSubmit, setValue, formState: { errors } } = useForm<UpdateProductInput>({
     resolver: zodResolver(UpdateProductSchema),
     defaultValues: {
@@ -402,17 +412,25 @@ function EditProductModal({ product, categories, onClose, onSuccess }: { product
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Category">
-              <select style={{ ...inp, marginTop: 4 }} onChange={(e) => setValue('category', e.target.value)} defaultValue={product.category}>
-                {categories.map((c) => (
-                  <React.Fragment key={c.id}>
-                    {c.children.length === 0
-                      ? <option value={c.name}>{c.name}</option>
-                      : <option value={c.name} disabled>{c.name}</option>
-                    }
-                    {c.children.map(s => <option key={s.id} value={s.name}>&nbsp;&nbsp;↳ {s.name}</option>)}
-                  </React.Fragment>
-                ))}
-              </select>
+              <Select value={category} onValueChange={(v) => { setCategory(v ?? ''); setValue('category', v ?? '') }}>
+                <SelectTrigger style={{ ...inp, marginTop: 4 }}>
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map((c) => (
+                    c.children.length === 0 ? (
+                      <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
+                    ) : (
+                      <SelectGroup key={c.id}>
+                        <SelectLabel>{c.name}</SelectLabel>
+                        {c.children.map((s) => (
+                          <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>
+                        ))}
+                      </SelectGroup>
+                    )
+                  ))}
+                </SelectContent>
+              </Select>
             </Field>
             <Field label="Unit">
               <select style={{ ...inp, marginTop: 4 }} onChange={(e) => setValue('unit', e.target.value as 'kg' | 'ton' | 'each' | 'litre')} defaultValue={product.unit}>
