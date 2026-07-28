@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams } from 'next/navigation'
 import useSWR, { mutate } from 'swr'
-import { ArrowLeft, Save, Pencil } from 'lucide-react'
+import { Save, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -57,7 +57,6 @@ function Pill({ text, bg, color }: { text: string; bg: string; color: string }) 
 // ─── Main page ─────────────────────────────────────────────────────────────────
 export default function CasualCustomerDetailPage() {
   const { id } = useParams<{ id: string }>()
-  const router = useRouter()
   const [tab, setTab] = useState<typeof TABS[number]>('Overview')
   const [sectionTab, setSectionTab] = useState<typeof SECTION_TABS[number]>('Personal')
   const [isEditing, setIsEditing] = useState(false)
@@ -112,38 +111,37 @@ export default function CasualCustomerDetailPage() {
   const fullName = `${customer.firstName} ${customer.lastName}`
 
   return (
-    <PortalPage
-      title={fullName}
-      actions={
-        !isEditing ? (
-          <Btn size="sm" icon={Pencil} onClick={() => setIsEditing(true)}>Edit</Btn>
-        ) : (
-          <>
-            <Btn size="sm" onClick={handleCancel} disabled={saving}>Cancel</Btn>
-            <Btn variant="primary" size="sm" icon={Save} loading={saving} onClick={handleSubmit(onSubmit)}>
-              {saving ? 'Saving...' : 'Save'}
-            </Btn>
-          </>
-        )
-      }
-    >
+    <PortalPage title={fullName}>
       <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, background: '#F5F5F5' }}>
       {/* ── Sub-header ────────────────────────────────────────────────────────── */}
       <div style={{ padding: '6px 10px', borderBottom: '1px solid #E0E0E0', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-        <Btn size="sm" icon={ArrowLeft} onClick={() => router.push('/app/casual')}>Casuals</Btn>
         <Pill text="Casual Seller" bg="#FEF3C7" color="#92400E" />
         {customer.idNumber && (
           <span style={{ fontSize: 11, fontFamily: 'monospace', color: '#6C757D' }}>·  {customer.idNumber}</span>
         )}
       </div>
 
-      {/* ── Tab strip ─────────────────────────────────────────────────────────── */}
-      <TabStrip
-        tabs={TABS.map((t) => ({ value: t, label: t }))}
-        active={tab}
-        onChange={(v) => setTab(v as typeof TABS[number])}
-        style={{ padding: '8px 10px 0', background: '#F5F5F5' }}
-      />
+      {/* ── Tab strip + Edit/Save controls (same row) ─────────────────────────── */}
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, padding: '8px 10px 0', background: '#F5F5F5' }}>
+        <TabStrip
+          tabs={TABS.map((t) => ({ value: t, label: t }))}
+          active={tab}
+          onChange={(v) => setTab(v as typeof TABS[number])}
+        />
+        <div style={{ flex: 1 }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingBottom: 5 }}>
+          {!isEditing ? (
+            <Btn size="sm" icon={Pencil} onClick={() => setIsEditing(true)}>Edit</Btn>
+          ) : (
+            <>
+              <Btn size="sm" onClick={handleCancel} disabled={saving}>Cancel</Btn>
+              <Btn variant="primary" size="sm" icon={Save} loading={saving} onClick={handleSubmit(onSubmit)}>
+                {saving ? 'Saving...' : 'Save'}
+              </Btn>
+            </>
+          )}
+        </div>
+      </div>
 
       {/* ── Two-column layout: main content + sidebar ─────────────────────────── */}
       <div style={{ display: 'flex', alignItems: 'flex-start', flex: 1, minHeight: 0, overflowY: 'auto' }}>

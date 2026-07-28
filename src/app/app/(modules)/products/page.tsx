@@ -1,11 +1,11 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSearchParams } from 'next/navigation'
 import useSWR, { mutate } from 'swr'
 import { Dialog } from '@/components/ui/dialog'
-import { Search, Pencil, Eye, EyeOff, Trash2, X, Package } from 'lucide-react'
+import { Search, Pencil, Eye, EyeOff, Trash2, X, Package, ChevronDown, ChevronRight } from 'lucide-react'
 import * as LucideIcons from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { toast } from 'sonner'
@@ -262,6 +262,7 @@ export default function ProductsPage() {
       {bulkOpen && (
         <BulkPriceModal
           products={products.filter(p => p.isActive)}
+          categoryOrder={allCategoryNames}
           onClose={() => setBulkOpen(false)}
           onSuccess={() => { revalidate(); setBulkOpen(false) }}
         />
@@ -494,7 +495,9 @@ function ConfirmDeleteModal({ product, onClose, onSuccess }: { product: Product;
 }
 
 // ─── Bulk Price Update Modal ──────────────────────────────────────────────────
-function BulkPriceModal({ products, onClose, onSuccess }: { products: Product[]; onClose: () => void; onSuccess: () => void }) {
+function BulkPriceModal({ products, categoryOrder, onClose, onSuccess }: {
+  products: Product[]; categoryOrder: SubCategoryItem[]; onClose: () => void; onSuccess: () => void
+}) {
   const [loading, setLoading] = useState(false)
   const [preview, setPreview] = useState(false)
   const [reason,  setReason]  = useState('')
@@ -504,6 +507,44 @@ function BulkPriceModal({ products, onClose, onSuccess }: { products: Product[];
       sell: Number(p.defaultSellPrice).toFixed(2),
     }]))
   )
+
+  // Group by category, ordered to match the category manager's own sort order
+  // (falling back to alphabetical for any category not found there) rather
+  // than insertion order, so this matches what the user already expects from
+  // elsewhere in the app.
+  const grouped = useMemo(() => {
+    const map = new Map<string, Product[]>()
+    for (const p of products) {
+      const key = p.category || 'Uncategorized'
+      if (!map.has(key)) map.set(key, [])
+      map.get(key)!.push(p)
+    }
+    const orderIndex = new Map(categoryOrder.map((c, i) => [c.name, i]))
+    return Array.from(map.entries()).sort(([a], [b]) => {
+      const ia = orderIndex.get(a), ib = orderIndex.get(b)
+      if (ia !== undefined && ib !== undefined) return ia - ib
+      if (ia !== undefined) return -1
+      if (ib !== undefined) return 1
+      return a.localeCompare(b)
+    })
+  }, [products, categoryOrder])
+
+  // Collapsed by default — with dozens of categories, an all-expanded list is
+  // exactly the unmanageable wall of rows this grouping exists to avoid.
+  const [collapsedCats, setCollapsedCats] = useState<Set<string>>(
+    () => new Set(grouped.map(([cat]) => cat))
+  )
+  function toggleCat(cat: string) {
+    setCollapsedCats((prev) => {
+      const next = new Set(prev)
+      if (next.has(cat)) next.delete(cat); else next.add(cat)
+      return next
+    })
+  }
+  const allCollapsed = collapsedCats.size >= grouped.length
+  function toggleAll() {
+    setCollapsedCats(allCollapsed ? new Set() : new Set(grouped.map(([cat]) => cat)))
+  }
 
   const changed = products.filter((p) => {
     const orig = { buy: Number(p.defaultBuyPrice).toFixed(2), sell: Number(p.defaultSellPrice).toFixed(2) }
@@ -537,7 +578,10 @@ function BulkPriceModal({ products, onClose, onSuccess }: { products: Product[];
 
         {!preview ? (
           <div className="space-y-3">
-            <p style={{ fontSize: 12, color: colors.textSecondary }}>Edit buy/sell prices below. Only changed prices will be updated.</p>
+            <div className="flex justify-between items-center">
+              <p style={{ fontSize: 12, color: colors.textSecondary }}>Edit buy/sell prices below. Only changed prices will be updated.</p>
+              <Btn onClick={toggleAll}>{allCollapsed ? 'Expand All' : 'Collapse All'}</Btn>
+            </div>
             <table className="w-full" style={{ fontSize: fontSize.sm }}>
               <thead>
                 <tr style={{ borderBottom: `1px solid ${colors.border}` }}>
@@ -548,31 +592,57 @@ function BulkPriceModal({ products, onClose, onSuccess }: { products: Product[];
                   ))}
                 </tr>
               </thead>
-              <tbody>
-                {products.map((p) => (
-                  <tr
-                    key={p.id}
-                    style={{
-                      borderBottom: `1px solid ${colors.border}`,
-                      background:
-                        prices[p.id]?.buy  !== Number(p.defaultBuyPrice).toFixed(2) ||
-                        prices[p.id]?.sell !== Number(p.defaultSellPrice).toFixed(2)
-                          ? colors.warningBg : undefined,
-                    }}
-                  >
-                    <td className="px-2 py-2">
-                      <p style={{ fontWeight: fontWeight.medium, color: colors.textPrimary }}>{p.name}</p>
-                      <p className="font-mono" style={{ fontSize: fontSize.xs, color: colors.textMuted }}>{p.code}</p>
-                    </td>
-                    <td className="px-2 py-2">
-                      <input value={prices[p.id]?.buy ?? ''} onChange={(e) => setPrices((prev) => ({ ...prev, [p.id]: { ...prev[p.id]!, buy: e.target.value } }))} style={{ ...inp, width: 112, fontFamily: 'monospace' }} />
-                    </td>
-                    <td className="px-2 py-2">
-                      <input value={prices[p.id]?.sell ?? ''} onChange={(e) => setPrices((prev) => ({ ...prev, [p.id]: { ...prev[p.id]!, sell: e.target.value } }))} style={{ ...inp, width: 112, fontFamily: 'monospace' }} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
+              {grouped.map(([cat, items]) => {
+                const isCollapsed = collapsedCats.has(cat)
+                const catMeta = categoryOrder.find((c) => c.name === cat)
+                const catStyle = getCategoryStyle(catMeta?.colorHex, cat)
+                const changedInCat = items.filter((p) =>
+                  prices[p.id]?.buy  !== Number(p.defaultBuyPrice).toFixed(2) ||
+                  prices[p.id]?.sell !== Number(p.defaultSellPrice).toFixed(2)
+                ).length
+                return (
+                  <tbody key={cat}>
+                    <tr
+                      onClick={() => toggleCat(cat)}
+                      style={{ cursor: 'pointer', background: colors.neutralBg, borderTop: `1px solid ${colors.border}`, borderBottom: `1px solid ${colors.border}` }}
+                    >
+                      <td colSpan={3} className="px-2 py-2">
+                        <div className="flex items-center gap-2">
+                          {isCollapsed ? <ChevronRight style={{ width: 14, height: 14, color: colors.textSecondary }} /> : <ChevronDown style={{ width: 14, height: 14, color: colors.textSecondary }} />}
+                          <span style={{ ...catStyle, display: 'inline-flex', padding: '1px 6px', borderRadius: 3, fontSize: 11, fontWeight: 600 }}>{cat}</span>
+                          <span style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>{items.length} product{items.length !== 1 ? 's' : ''}</span>
+                          {changedInCat > 0 && (
+                            <span style={{ fontSize: fontSize.xs, fontWeight: fontWeight.semibold, color: colors.warning }}>{changedInCat} changed</span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                    {!isCollapsed && items.map((p) => (
+                      <tr
+                        key={p.id}
+                        style={{
+                          borderBottom: `1px solid ${colors.border}`,
+                          background:
+                            prices[p.id]?.buy  !== Number(p.defaultBuyPrice).toFixed(2) ||
+                            prices[p.id]?.sell !== Number(p.defaultSellPrice).toFixed(2)
+                              ? colors.warningBg : undefined,
+                        }}
+                      >
+                        <td className="px-2 py-2">
+                          <p style={{ fontWeight: fontWeight.medium, color: colors.textPrimary }}>{p.name}</p>
+                          <p className="font-mono" style={{ fontSize: fontSize.xs, color: colors.textMuted }}>{p.code}</p>
+                        </td>
+                        <td className="px-2 py-2">
+                          <input value={prices[p.id]?.buy ?? ''} onChange={(e) => setPrices((prev) => ({ ...prev, [p.id]: { ...prev[p.id]!, buy: e.target.value } }))} style={{ ...inp, width: 112, fontFamily: 'monospace' }} />
+                        </td>
+                        <td className="px-2 py-2">
+                          <input value={prices[p.id]?.sell ?? ''} onChange={(e) => setPrices((prev) => ({ ...prev, [p.id]: { ...prev[p.id]!, sell: e.target.value } }))} style={{ ...inp, width: 112, fontFamily: 'monospace' }} />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                )
+              })}
             </table>
             <Field label="Reason for update (optional)">
               <input value={reason} onChange={(e) => setReason(e.target.value)} style={{ ...inp, marginTop: 4 }} placeholder="e.g. Market price adjustment" />
