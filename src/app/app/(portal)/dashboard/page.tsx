@@ -44,21 +44,27 @@ const TILES: Tile[] = [
 ]
 
 // ─── Design maps ──────────────────────────────────────────────────────────────
+// Glossy Win7/Aero tile treatment: a translucent glass-highlight gradient
+// layered over each group's base color gradient, plus an inner bevel
+// (light top edge / dark bottom edge) for a raised, lacquered look. Hover
+// intensifies the glow and border rather than scaling the tile — Win7
+// motion is glows and fades, not the spring/scale interaction this used to
+// have (that read as a Windows 8/10 Start-tile launcher, not Aero).
 
-const GRADIENT: Record<TileGroup, string> = {
-  navy:  'from-rpx-navy-light to-rpx-navy',
-  blue:  'from-rpx-blue-light to-rpx-blue',
-  green: 'from-rpx-green-light to-rpx-green',
-  amber: 'from-rpx-amber-light to-rpx-amber',
-  grey:  'from-[#4a5568] to-[#374151]',
+const GROUP_COLORS: Record<TileGroup, { light: string; base: string; hover: string }> = {
+  navy:  { light: '#1e4a8a', base: '#1B3A6B', hover: '#2558a8' },
+  blue:  { light: '#1d6bc7', base: '#185ABD', hover: '#2278d4' },
+  green: { light: '#278a54', base: '#217346', hover: '#2e9e60' },
+  amber: { light: '#c49b1c', base: '#C9A020', hover: '#d4a820' },
+  grey:  { light: '#4a5568', base: '#374151', hover: '#5a6578' },
 }
 
-const GRADIENT_HOVER: Record<TileGroup, string> = {
-  navy:  'hover:from-rpx-navy-hover hover:to-rpx-navy-light',
-  blue:  'hover:from-rpx-blue-hover hover:to-rpx-blue-light',
-  green: 'hover:from-rpx-green-hover hover:to-rpx-green-light',
-  amber: 'hover:from-rpx-amber-hover hover:to-rpx-amber-light',
-  grey:  'hover:from-[#5a6578] hover:to-[#4a5568]',
+const GROUP_GLOW: Record<TileGroup, string> = {
+  navy:  'rgba(37,88,168,0.55)',
+  blue:  'rgba(34,120,212,0.55)',
+  green: 'rgba(46,158,96,0.55)',
+  amber: 'rgba(212,168,32,0.55)',
+  grey:  'rgba(90,101,120,0.55)',
 }
 
 const SUBTITLE_COLOR: Record<TileGroup, string> = {
@@ -67,6 +73,19 @@ const SUBTITLE_COLOR: Record<TileGroup, string> = {
   green: 'text-[#a8d4b8]',
   amber: 'text-[#fde9a0]',
   grey:  'text-white/50',
+}
+
+function glossBackground(group: TileGroup): string {
+  const { light, base } = GROUP_COLORS[group]
+  return [
+    'linear-gradient(180deg, rgba(255,255,255,0.32) 0%, rgba(255,255,255,0.08) 42%, rgba(255,255,255,0) 52%)',
+    `linear-gradient(180deg, ${light} 0%, ${base} 100%)`,
+  ].join(', ')
+}
+
+const BEVEL = 'inset 0 1px 0 rgba(255,255,255,0.45), inset 0 -1px 0 rgba(0,0,0,0.18)'
+function glowBoxShadow(group: TileGroup): string {
+  return `${BEVEL}, 0 0 18px 2px ${GROUP_GLOW[group]}`
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -89,18 +108,25 @@ export default function DashboardPage() {
             onClick={() => !isDisabled && router.push(tile.href)}
             disabled={isDisabled}
             aria-label={isDisabled ? `${tile.label} — Coming Soon` : tile.label}
+            style={{
+              background: glossBackground(tile.group),
+              boxShadow:  BEVEL,
+            }}
+            onMouseEnter={(e) => {
+              if (isDisabled) return
+              e.currentTarget.style.boxShadow   = glowBoxShadow(tile.group)
+              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.28)'
+            }}
+            onMouseLeave={(e) => {
+              if (isDisabled) return
+              e.currentTarget.style.boxShadow   = BEVEL
+              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'
+            }}
             className={cn(
               'flex flex-col items-center justify-center gap-2.5 rounded-xl border border-white/[0.12]',
-              'bg-gradient-to-br transition-all duration-150 ease-out cursor-pointer',
+              'transition-[box-shadow,border-color,filter] duration-150 ease-out cursor-pointer',
               'focus:outline-none focus-visible:ring-2 focus-visible:ring-rpx-accent/70',
-              GRADIENT[tile.group],
-              isDisabled
-                ? 'opacity-30 cursor-not-allowed'
-                : cn(
-                    GRADIENT_HOVER[tile.group],
-                    'hover:border-white/25 hover:shadow-xl hover:shadow-black/40 hover:scale-[1.02]',
-                    'active:scale-[0.97] active:brightness-95',
-                  ),
+              isDisabled ? 'opacity-30 cursor-not-allowed' : 'active:brightness-90',
             )}
           >
             <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center shrink-0">
