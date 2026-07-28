@@ -41,10 +41,12 @@ function CustomerSearchSelect({
   label,
   value,
   onChange,
+  customerType,
 }: {
   label: string
   value: string
   onChange: (id: string) => void
+  customerType?: 'account' | 'casual'
 }) {
   const [term, setTerm] = useState('')
   const [debounced, setDebounced] = useState('')
@@ -56,8 +58,9 @@ function CustomerSearchSelect({
     return () => clearTimeout(t)
   }, [term])
 
+  const typeParam = customerType ? `&type=${customerType}` : ''
   const { data } = useSWR<{ customers: CustomerHit[] }>(
-    open && debounced.length >= 2 ? `/api/customers?search=${encodeURIComponent(debounced)}&limit=10` : null,
+    open && debounced.length >= 2 ? `/api/customers?search=${encodeURIComponent(debounced)}&limit=10${typeParam}` : null,
     fetcher
   )
 
@@ -243,7 +246,7 @@ function FilterControl({
   onChange: (v: string) => void
 }) {
   if (spec.type === 'customer') {
-    return <CustomerSearchSelect label={spec.label} value={value} onChange={onChange} />
+    return <CustomerSearchSelect label={spec.label} value={value} onChange={onChange} customerType={spec.customerType} />
   }
   if (spec.type === 'product') {
     return <ProductSelect label={spec.label} value={value} onChange={onChange} required={spec.required} />
