@@ -5,8 +5,8 @@ import useSWR from 'swr'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
-import { ChevronLeft, ChevronRight, Loader2, X } from 'lucide-react'
-import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
+import { ChevronLeft, ChevronRight, ChevronDown, Loader2, X } from 'lucide-react'
+import { colors, fontSize, fontWeight, badgeStyle } from '@/lib/design-tokens'
 import { inp, Btn, Field, PortalPage, FilterBar, TH, HEADER_GRAD } from '@/components/rpx'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
@@ -210,28 +210,25 @@ export default function AuditLogPage() {
                       onMouseEnter={(e) => (e.currentTarget.style.background = colors.rowHover)}
                       onMouseLeave={(e) => (e.currentTarget.style.background = idx % 2 === 1 ? colors.neutralBg : colors.surface)}
                     >
-                      <td className="px-3" style={{ height: 32, fontSize: fontSize.xs, color: colors.textSecondary, fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
+                      <td className="px-3" style={{ height: 30, fontSize: fontSize.xs, color: colors.textSecondary, fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
                         {new Date(entry.createdAt).toLocaleString('en-ZA')}
                       </td>
-                      <td className="px-3" style={{ height: 32 }}>
-                        <span
-                          style={{
-                            display: 'inline-flex', alignItems: 'center',
-                            padding: '2px 8px', borderRadius: 3,
-                            fontSize: fontSize.xs, fontWeight: fontWeight.semibold,
-                            ...ACTION_STYLES[entry.action],
-                          }}
-                        >
+                      <td className="px-3" style={{ height: 30 }}>
+                        <span style={badgeStyle(ACTION_STYLES[entry.action].color, ACTION_STYLES[entry.action].background)}>
                           {entry.action}
                         </span>
                       </td>
-                      <td className="px-3" style={{ height: 32, fontSize: fontSize.sm, fontWeight: fontWeight.medium, color: colors.textPrimary }}>{entry.tableName}</td>
-                      <td className="px-3" style={{ height: 32, fontSize: fontSize.xs, color: colors.textSecondary, fontFamily: 'monospace', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{entry.recordId}</td>
-                      <td className="px-3" style={{ height: 32, fontSize: fontSize.sm, color: colors.textPrimary }}>
+                      <td className="px-3" style={{ height: 30, fontSize: fontSize.sm, fontWeight: fontWeight.medium, color: colors.textPrimary }}>{entry.tableName}</td>
+                      <td className="px-3" style={{ height: 30, fontSize: fontSize.xs, color: colors.textSecondary, fontFamily: 'monospace', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{entry.recordId}</td>
+                      <td className="px-3" style={{ height: 30, fontSize: fontSize.sm, color: colors.textPrimary }}>
                         {entry.changedByName ?? (entry.changedById ? entry.changedById.substring(0, 8) + '…' : '—')}
                       </td>
-                      <td className="px-3" style={{ height: 32, fontSize: fontSize.xs, color: colors.textSecondary }}>{entry.ipAddress ?? '—'}</td>
-                      <td className="px-3 text-xs" style={{ height: 32, color: colors.textSecondary }}>{expanded === entry.id ? '▲' : '▼'}</td>
+                      <td className="px-3" style={{ height: 30, fontSize: fontSize.xs, color: colors.textSecondary }}>{entry.ipAddress ?? '—'}</td>
+                      <td className="px-3" style={{ height: 30, color: colors.textSecondary }}>
+                        {expanded === entry.id
+                          ? <ChevronDown style={{ width: 12, height: 12 }} />
+                          : <ChevronRight style={{ width: 12, height: 12 }} />}
+                      </td>
                     </tr>
                     {expanded === entry.id && (
                       <tr key={`${entry.id}-detail`} style={{ background: colors.bg, borderBottom: `1px solid ${colors.border}`, borderLeft: `3px solid ${colors.process}` }}>

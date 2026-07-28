@@ -4,7 +4,7 @@ Read-only audit. No code was changed in the production of this report. Companion
 
 **Coverage:** every route under `src/app` and every file under `src/components` was read by at least one of four parallel research passes plus direct review of the shared shell/token files. Every finding below is a source-code claim with a file:line citation; true rendered contrast ratios and pixel-level layout breakage were not independently visually verified and are called out as such where it matters.
 
-**Execution status:** [`BACKLOG.md`](./BACKLOG.md) BATCH-1 (Tokens & gradients), BATCH-2 (Controls), and BATCH-3 (Shell, address bar & navigation) have all been executed — see the **STATUS: FIXED**/**STATUS: PARTIALLY FIXED** annotations inline on the affected findings below, plus "Additional fixes" notes per batch for drift fixed without its own numbered finding. Verified via `tsc --noEmit` and `next lint` after each batch (all clean — 3 pre-existing warnings unrelated to any of the three batches). BATCH-4 through BATCH-6 remain open.
+**Execution status:** [`BACKLOG.md`](./BACKLOG.md) BATCH-1 through BATCH-4 have all been executed — see the **STATUS: FIXED**/**STATUS: PARTIALLY FIXED** annotations inline on the affected findings below, plus "Additional fixes" notes per batch for drift fixed without its own numbered finding. Verified via `tsc --noEmit` and `next lint` after each batch (all clean — 3 pre-existing warnings unrelated to any batch). BATCH-5 and BATCH-6 remain open.
 
 ---
 
@@ -187,6 +187,10 @@ Columns: **Shell** (AppShell/kiosk-consistent chrome) · **Cmd** (command/toolba
 **Effort:** S   **Risk:** Low   **Blast radius:** 2 declaring files + scattered hardcoded call sites
 
 ### [SEV-2] FND-006 · Status/role/pin badges reimplemented locally at least 9 times
+
+**STATUS: FIXED (BATCH-4), with a root cause found one level deeper than originally cataloged.** While consolidating, `components/ui/DataTable.tsx`'s own `StatusBadge` turned out to be a **second, independent** implementation of the exact same concept as `design-tokens.ts`'s `statusStyle()` — different color map (`STATUS_STYLES` vs `STATUS_MAP`), different radius (`layout.btnRadius`/3px vs a 999px pill), different fallback-label logic — despite `DataTable.tsx`'s version being the far more prevalent of the two (confirmed 20+ call sites vs. `statusStyle()`'s 1). Rather than picking one arbitrarily: `DataTable.tsx`'s `StatusBadge` now delegates to `statusStyle()` (deleting its local `STATUS_STYLES` map), and `STATUS_MAP` gained the extra keys the deleted map had (`on site`, `paid`, `processed`) plus one `expired` a caller needed. A new `badgeStyle(color, background)` helper was added to `design-tokens.ts` — the same shape `statusStyle()` builds internally — for badges that aren't a lifecycle status at all (role, PIN, direction, category tags), so those don't get force-fitted into `STATUS_MAP`.
+- Routed onto the shared `StatusBadge` (deleting the local re-implementation): `stocktake/[id]/page.tsx`, `expenses/[id]/page.tsx`, `police-register/page.tsx` (remapping its internal "active" session state to the shared `in_progress` key — blue, not green, since an in-progress officer visit isn't the same concept as an enabled/active record), `settings/users/page.tsx`'s Status badge, and `scale/admin/components/StatusBadge.tsx` (file deleted entirely, both its 2 call sites repointed to the shared import).
+- Routed onto the new `badgeStyle()` (keeping their own color-mapping logic, fixing only the shape): `settings/users/page.tsx`'s Pin and Role badges, `customers/page.tsx`'s `PrimaryFunctionBadge`/`DealerCategoryBadge`, the near-identical `Pill` in both `customers/[id]/page.tsx` and `CustomerProfileModal.tsx`, `payments/page.tsx`'s `DirectionBadge`, and `audit-log/page.tsx`'s action-type badge (not in the original 9, caught as the same drift while touching that file for FND-012/013 below).
 **Pages:** `stocktake/[id]`, `expenses/[id]`, `police-register`, `settings/users` (×3: Pin/Status/Role), `scale/admin/components/StatusBadge.tsx`, `customers/page.tsx` (`PrimaryFunctionBadge`/`DealerCategoryBadge`), `customers/[id]`/`CustomerProfileModal` (2 separate `Pill` copies).
 **Evidence:** full file:line list in [INVENTORY.md §2](./INVENTORY.md#2-component-layer). `statusStyle()` used correctly in exactly 1 of ~44 pages (`support/page.tsx:145`).
 **Problem:** the same "status pill" concept renders in 4–5 visibly different shapes across the app.
@@ -224,11 +228,15 @@ Columns: **Shell** (AppShell/kiosk-consistent chrome) · **Cmd** (command/toolba
 **Effort:** S   **Risk:** Low   **Blast radius:** ~6 files
 
 ### [SEV-2] FND-012 · Row height for "list of records" pages is inconsistent
+
+**STATUS: FIXED (BATCH-4), with a scoped deviation from the literal plan.** The backlog's original plan was to rebuild audit-log's table on the shared `DataTable` component outright. On inspection, `DataTable` has no built-in support for an inline-expanding detail row — audit-log's core interaction (click a row to reveal an Old-Values/New-Values JSON diff directly beneath it) isn't reachable through `DataTable`'s per-cell `render()` model without either extending `DataTable` with a new row-expansion feature (a shared-component change well beyond this batch) or dropping the inline-expand UX for a modal. Neither was in scope, so instead: the two specific violations named in this finding — 32px rows instead of the house 30px, and the Unicode ▲/▼ (fixed in FND-013 below) — were corrected in place on the existing hand-rolled table, which fully resolves what this finding actually cited without a structural rewrite.
 **Evidence:** `layout.tableRowH=30` (`design-tokens.ts:226`), enforced by `DataTable.tsx` and rpx `TD`/`TH` — vs. `audit-log/page.tsx:213,216,228-234` (hand-rolled table, **32px**, the confirmed outlier) vs. `cashup/page.tsx` recon ledger (24-26px) vs. `police-register/page.tsx:372` nested sub-table (24px).
 **Fix:** rebuild audit-log's table on the shared `DataTable`/`TH`/`TD` primitives — this also resolves FND-013 for free.
 **Effort:** M   **Risk:** Low (read-only table, no interaction logic to preserve)   **Blast radius:** 1 file
 
 ### [SEV-2] FND-013 · audit-log breaks the app's otherwise-universal lucide icon rule
+
+**STATUS: FIXED (BATCH-4).** The Unicode `▲`/`▼` expand indicator now swaps between lucide `ChevronDown`/`ChevronRight`, matching `police-register/page.tsx`'s identical expand affordance exactly (same two icons, same swap-by-state pattern, not a CSS rotation of one icon).
 **Evidence:** `audit-log/page.tsx:234` renders literal Unicode `▲`/`▼` for row-expand, vs. the structurally identical pattern in `police-register/page.tsx:311` correctly using `ChevronDown`/`ChevronRight`.
 **Fix:** swap in the same lucide icons.
 **Effort:** S (trivial)   **Blast radius:** 1 file
@@ -332,6 +340,12 @@ Columns: **Shell** (AppShell/kiosk-consistent chrome) · **Cmd** (command/toolba
 ### Additional BATCH-3 fix (not individually numbered above)
 
 **`BannerBar` absent from `(portal)/layout.tsx`** (INVENTORY.md §6, no dedicated FND number) — **STATUS: FIXED.** Wired `<BannerBar banners={banners} />` into the dashboard's layout, fetching via the same `fetchActiveBanners(session.user.tenantSlug)` call `(modules)/layout.tsx` already uses — its absence looked like an unremarked gap (platform subscription/maintenance banners are exactly as relevant on the dashboard as anywhere else), unlike `WindowedContent`'s dashboard exemption, which is provably deliberate (`WindowedContent.tsx:18` hard-codes `if (pathname === '/app/dashboard') return`). **Deliberately not changed:** the dashboard still doesn't get `LicenseGate` or `WindowedContent` — extending license enforcement to a route it doesn't currently cover is a business-logic scope decision beyond what this UI audit's backlog asked for, not a styling fix, and is flagged here rather than silently done.
+
+### Additional BATCH-4 fixes (not individually numbered above)
+
+**Settings: zero required-field marking, no client-side validation** (called out in the Aero-score table row for `/app/settings`, no dedicated FND number) — **STATUS: FIXED.** `Yard/Business Name` and `VAT Registration Number` — the two fields the audit specifically named as "functionally-required-feeling" — now render with the same required-asterisk convention used on `customers/new`, and `handleSave()` validates both are non-empty before submitting, showing an inline error and toast rather than silently PUTting incomplete data. This is a lightweight local-state validator, not a full Zod/react-hook-form wire-up (the page has no such form-library scaffolding today) — a full schema-driven rewrite of this form is a larger change than this batch's "add missing validation" scope called for.
+
+**`customers/[id]`: no required marking in edit mode; three different "why is this disabled" states rendered identically** (called out in the customers-module batch report, no dedicated FND number) — **STATUS: FIXED.** First Name, Last Name, and Phone — all `z.string().min(1)` in `UpdateCustomerSchema` — now carry the same required-asterisk convention as the create form. The permanently-disabled ID Number field (disabled regardless of edit mode, unlike every other field which is only disabled outside edit mode) now carries an explanatory "Cannot be changed once a record exists" hint so it reads as a different kind of disabled, not just "not in edit mode yet." **Already correctly handled, no change needed:** Dealer Category's role-gating already appends "(admin only)" to its own label — on inspection this was not the blank slate the original audit pass described, so the fix here is narrower than that finding implied.
 
 ---
 

@@ -18,7 +18,7 @@ import {
   Btn, PortalPage, BAR_GRAD, PANEL,
   RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter,
 } from '@/components/rpx'
-import { DataTable, type Column } from '@/components/ui/DataTable'
+import { DataTable, type Column, StatusBadge } from '@/components/ui/DataTable'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -46,20 +46,6 @@ type Stocktake = {
   voidedBy?: { fullName: string } | null
   voidReason?: string | null
   entries: StocktakeEntry[]
-}
-
-function StatusBadge({ status }: { status: 'open' | 'completed' | 'voided' }) {
-  const styleMap: Record<string, React.CSSProperties> = {
-    open: { background: colors.actionBg, color: colors.action, border: `1px solid ${colors.action}` },
-    completed: { background: colors.neutralBg, color: colors.textSecondary, border: `1px solid ${colors.border}` },
-    voided: { background: colors.dangerBg, color: colors.danger, border: `1px solid ${colors.danger}` },
-  }
-  const labelMap: Record<string, string> = { open: 'Open', completed: 'Completed', voided: 'Voided' }
-  return (
-    <span style={{ ...styleMap[status], padding: '2px 6px', borderRadius: 2, fontSize: 10, fontWeight: 600, textTransform: 'uppercase' }}>
-      {labelMap[status]}
-    </span>
-  )
 }
 
 type EntryWeighState = {

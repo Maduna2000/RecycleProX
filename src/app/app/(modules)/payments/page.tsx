@@ -10,7 +10,7 @@ import { DataTable, Avatar, StatusBadge, type Column, type RowAction } from '@/c
 import { Dialog } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { format } from '@/lib/utils/format'
-import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
+import { colors, fontSize, fontWeight, badgeStyle } from '@/lib/design-tokens'
 import {
   inp, Btn, Field, PortalPage, FilterBar,
   RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter,
@@ -35,16 +35,7 @@ type Payment = {
 function DirectionBadge({ source }: { source: 'sale' | 'purchase' }) {
   const isReceived = source === 'sale'
   return (
-    <span
-      className="inline-flex items-center rounded-full"
-      style={{
-        padding: '2px 8px',
-        fontSize: fontSize.xs,
-        fontWeight: fontWeight.medium,
-        color: isReceived ? colors.action : colors.process,
-        background: isReceived ? colors.actionBg : colors.processBg,
-      }}
-    >
+    <span style={badgeStyle(isReceived ? colors.action : colors.process, isReceived ? colors.actionBg : colors.processBg)}>
       {isReceived ? 'Received' : 'Paid Out'}
     </span>
   )

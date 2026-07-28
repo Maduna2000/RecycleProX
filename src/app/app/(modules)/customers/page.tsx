@@ -6,7 +6,7 @@ import useSWR, { mutate } from 'swr'
 import { AlertTriangle, Eye, ShieldBan, ShieldCheck, UserX, Trash2, UserMinus, Search } from 'lucide-react'
 import { DataTable, Avatar, StatusBadge, type Column, type RowAction } from '@/components/ui/DataTable'
 import { Dialog } from '@/components/ui/dialog'
-import { colors } from '@/lib/design-tokens'
+import { colors, badgeStyle } from '@/lib/design-tokens'
 import { toast } from 'sonner'
 import { useSession } from 'next-auth/react'
 import {
@@ -81,11 +81,7 @@ function PrimaryFunctionBadge({ fn }: { fn: string }) {
     both:     { label: 'Both',     bg: colors.warningBg, color: colors.warning },
   }
   const meta = map[fn] ?? { label: fn, bg: colors.neutralBg, color: colors.textSecondary }
-  return (
-    <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: meta.bg, color: meta.color }}>
-      {meta.label}
-    </span>
-  )
+  return <span style={badgeStyle(meta.color, meta.bg)}>{meta.label}</span>
 }
 
 // ─── Dealer category badge ─────────────────────────────────────────────────────
@@ -98,7 +94,7 @@ function DealerCategoryBadge({ cat }: { cat?: string | null }) {
     dealer_3: { label: 'Dealer 3', bg: colors.warningBg, color: colors.warning },
   }
   const meta = map[cat] ?? { label: cat, bg: colors.neutralBg, color: colors.textSecondary }
-  return <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: meta.bg, color: meta.color }}>{meta.label}</span>
+  return <span style={badgeStyle(meta.color, meta.bg)}>{meta.label}</span>
 }
 
 // ─── Accounts list ─────────────────────────────────────────────────────────────

@@ -3,7 +3,7 @@
 import { useState, useRef } from 'react'
 import { ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight, MoreHorizontal, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { colors, fontSize, fontWeight, layout } from '@/lib/design-tokens'
+import { colors, statusStyle } from '@/lib/design-tokens'
 import { Btn, HEADER_GRAD } from '@/components/rpx'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -53,42 +53,13 @@ export interface DataTableProps<T> {
 }
 
 // ─── Status Badge helper ──────────────────────────────────────────────────────
-
-const STATUS_STYLES: Record<string, { color: string; background: string }> = {
-  active:      { color: colors.action,        background: colors.actionBg },
-  'on site':   { color: colors.action,        background: colors.actionBg },
-  completed:   { color: colors.action,        background: colors.actionBg },
-  done:        { color: colors.action,        background: colors.actionBg },
-  approved:    { color: colors.action,        background: colors.actionBg },
-  settled:     { color: colors.action,        background: colors.actionBg },
-  pending:     { color: colors.warning,       background: colors.warningBg },
-  open:        { color: colors.process,       background: colors.processBg },
-  submitted:   { color: colors.process,       background: colors.processBg },
-  voided:      { color: colors.danger,        background: colors.dangerBg },
-  void:        { color: colors.danger,        background: colors.dangerBg },
-  blacklisted: { color: colors.danger,        background: colors.dangerBg },
-  locked:      { color: colors.danger,        background: colors.dangerBg },
-  inactive:    { color: colors.textSecondary, background: colors.neutralBg },
-}
+// Thin wrapper around the shared statusStyle() helper (design-tokens.ts) so
+// every status pill in the app — however it's rendered — comes from the same
+// color map and the same badge shape.
 
 export function StatusBadge({ status }: { status: string }) {
-  const s = STATUS_STYLES[status.toLowerCase()] ?? {
-    color: colors.textSecondary, background: colors.neutralBg,
-  }
-  return (
-    <span style={{
-      display:      'inline-flex',
-      alignItems:   'center',
-      padding:      '2px 8px',
-      borderRadius: layout.btnRadius,
-      fontSize:     fontSize.xs,
-      fontWeight:   fontWeight.medium,
-      color:        s.color,
-      background:   s.background,
-    }}>
-      {status.charAt(0).toUpperCase() + status.slice(1)}
-    </span>
-  )
+  const { badge, label } = statusStyle(status.toLowerCase())
+  return <span style={badge}>{label}</span>
 }
 
 // ─── Avatar helper ────────────────────────────────────────────────────────────
