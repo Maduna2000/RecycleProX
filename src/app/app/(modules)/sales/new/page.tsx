@@ -14,6 +14,7 @@ import Decimal from 'decimal.js'
 import { colors } from '@/lib/design-tokens'
 import { BAR_GRAD, CARD_BORDER } from '@/components/rpx/styles'
 import { Dialog } from '@/components/ui/dialog'
+import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { Btn, HEADER_GRAD, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
 import { useOfflineMutation } from '@/hooks/useOfflineFetch'
 import { offlineDB } from '@/lib/offline/db'
@@ -94,6 +95,7 @@ export default function NewSalePage() {
   const router    = useRouter()
   const readScale = useScaleRead()
   const { mutate: offlineMutate } = useOfflineMutation()
+  const { confirm } = useConfirm()
 
   // ── Buyer state ───────────────────────────────────────────────────────────
   const [buyerMode,     setBuyerMode]     = useState<'walkin' | 'account'>('walkin')
@@ -194,6 +196,52 @@ export default function NewSalePage() {
   })
 
   const isBlacklisted = buyerMode === 'account' && customer?.blacklisted === true
+
+  // ── Reset (built from scratch — the pending-success path here just
+  // navigates away today; Cancel is the first place this is needed) ───────
+  function resetForm() {
+    setBuyerMode('walkin')
+    setCustomer(null)
+    setBuyerName('')
+    setBuyerIdNumber('')
+    setBuyerPhone('')
+    setLines([emptyLine(keyCounter)])
+    setKeyCounter((k) => k + 1)
+    setPaymentType('cash')
+    setNotes('')
+    setInvoiceNo('')
+    setBusinessLoanAmount('')
+    setBusinessLoanPinOpen(false)
+    setBusinessLoanSummary(null)
+    setSettlementConfirmOpen(false)
+    setPhotoFile(null)
+    setPhotoPreview(null)
+    setScale1(null)
+    setScale2(null)
+    setReadingScale1(false)
+    setReadingScale2(false)
+  }
+
+  const hasEnteredData =
+    !!customer ||
+    !!buyerName || !!buyerIdNumber || !!buyerPhone ||
+    lines.some((l) => l.productId || l.quantity || l.unitPrice) ||
+    !!photoFile
+
+  async function handleCancel() {
+    if (hasEnteredData) {
+      const confirmed = await confirm({
+        title: 'Discard this sale?',
+        message: 'You have entered details for this sale. Leaving now will discard everything entered so far.',
+        variant: 'warning',
+        confirmLabel: 'Discard',
+        cancelLabel: 'Keep editing',
+      })
+      if (!confirmed) return
+    }
+    resetForm()
+    router.push('/app/sales')
+  }
 
   // ── Line management ───────────────────────────────────────────────────────
   function addLine() {
@@ -1139,8 +1187,9 @@ export default function NewSalePage() {
 
       {/* ── Action bar ────────────────────────────────────────────────────── */}
       <div
-        style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', padding: '6px 16px', borderTop: '2px solid #B0B0B0', background: HEADER_GRAD, flexShrink: 0 }}
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 16px', borderTop: '2px solid #B0B0B0', background: HEADER_GRAD, flexShrink: 0 }}
       >
+        <Btn onClick={handleCancel} disabled={submitting}>Cancel</Btn>
         <button
           type="button"
           onClick={() => {

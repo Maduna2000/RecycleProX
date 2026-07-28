@@ -12,7 +12,8 @@ import { PrintResultModal } from '@/components/PrintResultModal'
 import { ProductCategoryPicker } from '@/components/products/ProductCategoryPicker'
 import Decimal from 'decimal.js'
 import { colors } from '@/lib/design-tokens'
-import { HEADER_GRAD, BAR_GRAD, CARD_BORDER } from '@/components/rpx/styles'
+import { HEADER_GRAD, BAR_GRAD, CARD_BORDER, Btn } from '@/components/rpx'
+import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { useOfflineMutation } from '@/hooks/useOfflineFetch'
 import { offlineDB } from '@/lib/offline/db'
 
@@ -95,6 +96,7 @@ export default function NewPurchasePage() {
   const router    = useRouter()
   const readScale = useScaleRead()
   const { mutate: offlineMutate } = useOfflineMutation()
+  const { confirm } = useConfirm()
 
   // ── Core purchase state ──────────────────────────────────────────────────
   const [customer,        setCustomer]        = useState<SelectedCustomer | null>(null)
@@ -195,6 +197,49 @@ export default function NewPurchasePage() {
     ? new Decimal(deductionAmount || '0')
     : new Decimal(0)
   const cashToPay = Decimal.max(grandTotal.minus(loanDeduct), new Decimal(0))
+
+  // ── Reset (shared by the pending-save success path and Cancel) ──────────
+  function resetForm() {
+    setCustomer(null)
+    setCustomerType('casual')
+    setLines([emptyLine(keyCounter)])
+    setKeyCounter((k) => k + 1)
+    setPaymentType('unpaid')
+    setNotes('')
+    setGrvNumber('')
+    setInvoiceNo('')
+    setDeductLoan(false)
+    setDeductionAmount('')
+    setPhotoFile(null)
+    setPhotoPreview(null)
+    setScaleOrderLink(null)
+    setScaleOrderSearch('')
+    setScale1(null)
+    setScale2(null)
+    setReadingScale1(false)
+    setReadingScale2(false)
+  }
+
+  const hasEnteredData =
+    !!customer ||
+    lines.some((l) => l.productId || l.quantity || l.unitPrice) ||
+    !!photoFile ||
+    !!scaleOrderLink
+
+  async function handleCancel() {
+    if (hasEnteredData) {
+      const confirmed = await confirm({
+        title: 'Discard this purchase?',
+        message: 'You have entered details for this purchase. Leaving now will discard everything entered so far.',
+        variant: 'warning',
+        confirmLabel: 'Discard',
+        cancelLabel: 'Keep editing',
+      })
+      if (!confirmed) return
+    }
+    resetForm()
+    router.push('/app/purchases')
+  }
 
   // ── Line management ──────────────────────────────────────────────────────
   function addLine() {
@@ -474,20 +519,7 @@ export default function NewPurchasePage() {
 
         if (status === 'pending') {
           // Reset form so operator can continue making orders
-          setCustomer(null)
-          setCustomerType('casual')
-          setLines([emptyLine(keyCounter)])
-          setKeyCounter((k) => k + 1)
-          setPaymentType('unpaid')
-          setNotes('')
-          setGrvNumber('')
-          setInvoiceNo('')
-          setDeductLoan(false)
-          setDeductionAmount('')
-          setPhotoFile(null)
-          setPhotoPreview(null)
-          setScaleOrderLink(null)
-          setScaleOrderSearch('')
+          resetForm()
           mutatePending()
           toast.success(`Purchase ${purchase.refNumber} saved as unpaid`)
         } else {
@@ -1299,8 +1331,9 @@ export default function NewPurchasePage() {
 
       {/* ── Action bar ────────────────────────────────────────────────────── */}
       <div
-        style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', padding: '6px 16px', borderTop: '2px solid #B0B0B0', background: HEADER_GRAD, flexShrink: 0 }}
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 16px', borderTop: '2px solid #B0B0B0', background: HEADER_GRAD, flexShrink: 0 }}
       >
+        <Btn onClick={handleCancel} disabled={submitting}>Cancel</Btn>
         <button
           type="button"
           onClick={() => submitPurchase(paymentType === 'unpaid')}
