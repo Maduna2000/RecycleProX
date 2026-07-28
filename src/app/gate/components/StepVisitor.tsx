@@ -15,10 +15,12 @@ const VisitorSchema = z.object({
 type VisitorForm = z.infer<typeof VisitorSchema>
 
 export interface VisitorInfo {
-  firstName: string
-  lastName:  string
-  idNumber:  string
-  phone?:    string
+  firstName:       string
+  lastName:        string
+  idNumber:        string
+  phone?:          string
+  /** Matched an existing account-type Customer by exact ID number — see handleIdLookup. */
+  isAccountHolder?: boolean
 }
 
 interface Props {
@@ -35,6 +37,7 @@ export default function StepVisitor({ onNext }: Props) {
   const form = useForm<VisitorForm>({ resolver: zodResolver(VisitorSchema) })
   const [lookingUp, setLookingUp] = useState(false)
   const [matched, setMatched] = useState<{ firstName: string; lastName: string } | null>(null)
+  const [isAccountHolder, setIsAccountHolder] = useState(false)
   const [blacklistError, setBlacklistError] = useState<string | null>(null)
   const [repeatInfo, setRepeatInfo] = useState<{ count: number; lastVisitAt: string | null } | null>(null)
   const lastLookedUp = useRef<string>('')
@@ -47,6 +50,7 @@ export default function StepVisitor({ onNext }: Props) {
     setLookingUp(true)
     setBlacklistError(null)
     setMatched(null)
+    setIsAccountHolder(false)
     setRepeatInfo(null)
 
     try {
@@ -65,6 +69,7 @@ export default function StepVisitor({ onNext }: Props) {
             form.setValue('lastName', customer.lastName, { shouldValidate: true })
             form.setValue('phone', customer.phone || '')
             setMatched({ firstName: customer.firstName, lastName: customer.lastName })
+            setIsAccountHolder(customer.customerType === 'account')
           }
         }
       }
@@ -83,7 +88,7 @@ export default function StepVisitor({ onNext }: Props) {
 
   function handleSubmit(data: VisitorForm) {
     if (blacklistError) return
-    onNext({ firstName: data.firstName, lastName: data.lastName, idNumber: data.idNumber, phone: data.phone })
+    onNext({ firstName: data.firstName, lastName: data.lastName, idNumber: data.idNumber, phone: data.phone, isAccountHolder })
   }
 
   return (
@@ -115,7 +120,9 @@ export default function StepVisitor({ onNext }: Props) {
           )}
           {matched && (
             <p className="text-emerald-700 text-xs font-medium mt-1.5 flex items-center gap-1.5 bg-emerald-50 rounded-lg px-2.5 py-1.5 w-fit">
-              <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> Registered customer: {matched.firstName} {matched.lastName}
+              <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+              Registered customer: {matched.firstName} {matched.lastName}
+              {isAccountHolder && ' — photo capture will be skipped'}
             </p>
           )}
         </div>

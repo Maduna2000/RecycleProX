@@ -12,6 +12,8 @@ interface Props {
   categoryNames: string[]
   vehicleReg:    string
   photoKeys:     PhotoKeys
+  /** Set when StepPhotos exempted a required slot (account holder / no-vehicle walk-in) — carried straight through as the entry's notes. */
+  notes?:        string
   onSubmitted:   () => void
 }
 
@@ -19,7 +21,7 @@ const PURPOSE_LABELS: Record<Purpose, string> = {
   sell: 'To Sell', buy: 'To Buy', visitor: 'Visitor', other: 'Other',
 }
 
-export default function StepReview({ visitor, purpose, categoryNames, vehicleReg, photoKeys, onSubmitted }: Props) {
+export default function StepReview({ visitor, purpose, categoryNames, vehicleReg, photoKeys, notes, onSubmitted }: Props) {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState<{ entryNumber: string } | null>(null)
@@ -39,6 +41,7 @@ export default function StepReview({ visitor, purpose, categoryNames, vehicleReg
           visitorIdNumber:  visitor.idNumber,
           visitorPhone:     visitor.phone,
           vehicleReg:       vehicleReg || undefined,
+          notes,
           ...photoKeys,
         }),
       })
@@ -90,6 +93,7 @@ export default function StepReview({ visitor, purpose, categoryNames, vehicleReg
         <Row label="Purpose" value={PURPOSE_LABELS[purpose]} pad />
         {categoryNames.length > 0 && <Row label="Category" value={categoryNames.join(', ')} pad />}
         {vehicleReg && <Row label="Vehicle Reg" value={vehicleReg} pad />}
+        {notes && <Row label="Note" value={notes} pad />}
       </div>
 
       {error && (

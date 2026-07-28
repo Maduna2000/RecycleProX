@@ -33,6 +33,7 @@ export default function GatePage() {
   const [vehicleReg, setVehicleReg] = useState('')
   const [photoConfig, setPhotoConfig] = useState<PhotoConfig>(DEFAULT_PHOTO_CONFIG)
   const [photoKeys, setPhotoKeys] = useState<PhotoKeys>({})
+  const [photoExemptionNote, setPhotoExemptionNote] = useState<string | undefined>(undefined)
   const tempId = useTempId()
 
   const steps = purpose === 'sell'
@@ -47,6 +48,7 @@ export default function GatePage() {
     setVehicleReg('')
     setPhotoConfig(DEFAULT_PHOTO_CONFIG)
     setPhotoKeys({})
+    setPhotoExemptionNote(undefined)
   }
 
   function handleBack() {
@@ -118,7 +120,8 @@ export default function GatePage() {
           <StepPhotos
             entryTempId={tempId}
             config={photoConfig}
-            onConfirm={(keys) => { setPhotoKeys(keys); setStep(6) }}
+            isAccountHolder={visitor?.isAccountHolder ?? false}
+            onConfirm={(keys, exemptionNote) => { setPhotoKeys(keys); setPhotoExemptionNote(exemptionNote); setStep(6) }}
           />
         )}
         {step === 6 && visitor && purpose && (
@@ -128,6 +131,7 @@ export default function GatePage() {
             categoryNames={purpose === 'sell' ? categoryNames : []}
             vehicleReg={vehicleReg}
             photoKeys={photoKeys}
+            notes={photoExemptionNote}
             onSubmitted={reset}
           />
         )}
