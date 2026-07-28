@@ -59,7 +59,7 @@ import {
 } from './builders/cash'
 import { buildStockOnHand, buildStockMovement } from './builders/stock'
 import { buildStocktakeReport } from './builders/stocktake'
-import { buildDealersPriceList, buildAccountList, buildCasualList } from './builders/accounts'
+import { buildDealersPriceList, buildAccountList, buildAccountIdUploadStatus, buildCasualList } from './builders/accounts'
 import {
   buildPoliceRegisterReport,
   buildPoliceCopperReport,
@@ -171,6 +171,10 @@ export const REPORT_REGISTRY: Record<string, ReportDefinition> = {
   'account-list': {
     paramsSchema: BaseReportParamsSchema,
     build: buildAccountList,
+  },
+  'account-id-status': {
+    paramsSchema: BaseReportParamsSchema,
+    build: buildAccountIdUploadStatus,
   },
   'casual-list': {
     paramsSchema: BaseReportParamsSchema,
