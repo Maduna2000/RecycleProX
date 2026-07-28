@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import useSWR, { mutate } from 'swr'
 import { Dialog } from '@/components/ui/dialog'
+import { DocumentViewerModal } from '@/components/ui/DocumentViewerModal'
 import { colors, badgeStyle } from '@/lib/design-tokens'
 import { AlertTriangle, ShieldBan, ShieldCheck, Save, Pencil, FileText } from 'lucide-react'
 import { LoansTab } from '@/components/customers/LoansTab'
@@ -588,6 +589,8 @@ function DocumentsTab({ customer }: { customer: Customer }) {
   const [docType, setDocType]     = useState<string>('id_copy')
   const [uploading, setUploading] = useState(false)
   const [reuploadTarget, setReuploadTarget] = useState<CustomerDoc | null>(null)
+  const [viewingDoc, setViewingDoc] = useState<{ doc: CustomerDoc; url: string } | null>(null)
+  const [viewLoading, setViewLoading] = useState<string | null>(null)
   const docFileRef      = useRef<HTMLInputElement>(null)
   const reuploadFileRef = useRef<HTMLInputElement>(null)
   const { data: docs, mutate: mutateDocs } = useSWR<CustomerDoc[]>(`/api/customers/${customer.id}/documents`, fetcher)
@@ -662,9 +665,11 @@ function DocumentsTab({ customer }: { customer: Customer }) {
     else toast.error('Failed to delete document')
   }
 
-  async function handleDocView(r2Key: string) {
-    const res = await fetch(`/api/r2/view-url?key=${encodeURIComponent(r2Key)}`)
-    if (res.ok) { const { url } = await res.json(); window.open(url, '_blank') }
+  async function handleDocView(doc: CustomerDoc) {
+    setViewLoading(doc.id)
+    const res = await fetch(`/api/r2/view-url?key=${encodeURIComponent(doc.r2Key)}`)
+    setViewLoading(null)
+    if (res.ok) { const { url } = await res.json(); setViewingDoc({ doc, url }) }
     else toast.error('Failed to get view URL')
   }
 
@@ -706,7 +711,9 @@ function DocumentsTab({ customer }: { customer: Customer }) {
                   </p>
                 </div>
                 <div style={{ display: 'flex', gap: 10, flexShrink: 0 }}>
-                  <button onClick={() => handleDocView(doc.r2Key)} style={{ ...docLinkBtn, color: '#1B3A6B' }}>View</button>
+                  <button onClick={() => handleDocView(doc)} disabled={viewLoading === doc.id} style={{ ...docLinkBtn, color: '#1B3A6B', opacity: viewLoading === doc.id ? 0.5 : 1 }}>
+                    {viewLoading === doc.id ? 'Loading…' : 'View'}
+                  </button>
                   {isManager && (
                     <button onClick={() => triggerReupload(doc)} disabled={uploading} style={{ ...docLinkBtn, color: '#1B3A6B', opacity: uploading ? 0.5 : 1 }}>Re-upload</button>
                   )}
@@ -719,6 +726,16 @@ function DocumentsTab({ customer }: { customer: Customer }) {
           </div>
         )}
       </div>
+
+      {viewingDoc && (
+        <DocumentViewerModal
+          title={DOCUMENT_TYPE_LABELS[viewingDoc.doc.documentType] ?? viewingDoc.doc.documentType}
+          subtitle={new Date(viewingDoc.doc.uploadedAt).toLocaleDateString('en-ZA')}
+          url={viewingDoc.url}
+          fileName={viewingDoc.doc.fileName}
+          onClose={() => setViewingDoc(null)}
+        />
+      )}
     </div>
   )
 }
