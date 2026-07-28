@@ -427,25 +427,20 @@ function AddExpenseModal({ mode, expense, onClose, onSuccess }: AddExpenseModalP
     // Upload slip attachment if one was selected
     if (slipFile && created?.id) {
       try {
-        const presignRes = await fetch('/api/r2/upload-url', {
-          method:  'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({ context: 'expense_attachment', referenceId: created.id, contentType: slipFile.type, fileSize: slipFile.size }),
-        })
-        if (!presignRes.ok) {
+        const fd = new FormData()
+        fd.append('context', 'expense_attachment')
+        fd.append('referenceId', created.id)
+        fd.append('file', slipFile)
+        const uploadRes = await fetch('/api/r2/upload', { method: 'POST', body: fd })
+        if (!uploadRes.ok) {
           toast.warning('Expense saved — slip upload failed. Add it from expense details.')
         } else {
-          const { uploadUrl, key } = await presignRes.json()
-          const uploadRes = await fetch(uploadUrl, { method: 'PUT', body: slipFile, headers: { 'Content-Type': slipFile.type } })
-          if (!uploadRes.ok) {
-            toast.warning('Expense saved — slip upload failed. Add it from expense details.')
-          } else {
-            await fetch(`/api/expenses/${created.id}/attachments`, {
-              method:  'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body:    JSON.stringify({ r2Key: key, fileName: slipFile.name }),
-            })
-          }
+          const { key } = await uploadRes.json()
+          await fetch(`/api/expenses/${created.id}/attachments`, {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ r2Key: key, fileName: slipFile.name }),
+          })
         }
       } catch {
         toast.warning('Expense saved — slip upload failed. Add it from expense details.')
@@ -681,30 +676,18 @@ function UpdatePendingExpenseModal({ expense, onClose, onSuccess }: UpdatePendin
     // Upload slip first if provided
     if (slipFile) {
       try {
-        const presignRes = await fetch('/api/r2/upload-url', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            context: 'expense_attachment',
-            referenceId: expense.id,
-            contentType: slipFile.type,
-            fileSize: slipFile.size,
-          }),
-        })
-        if (presignRes.ok) {
-          const { uploadUrl, key } = await presignRes.json()
-          const uploadRes = await fetch(uploadUrl, {
-            method: 'PUT',
-            body: slipFile,
-            headers: { 'Content-Type': slipFile.type },
+        const fd = new FormData()
+        fd.append('context', 'expense_attachment')
+        fd.append('referenceId', expense.id)
+        fd.append('file', slipFile)
+        const uploadRes = await fetch('/api/r2/upload', { method: 'POST', body: fd })
+        if (uploadRes.ok) {
+          const { key } = await uploadRes.json()
+          await fetch(`/api/expenses/${expense.id}/attachments`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ r2Key: key, fileName: slipFile.name }),
           })
-          if (uploadRes.ok) {
-            await fetch(`/api/expenses/${expense.id}/attachments`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ r2Key: key, fileName: slipFile.name }),
-            })
-          }
         }
       } catch {
         toast.warning('Slip upload failed. You can add it from expense details.')

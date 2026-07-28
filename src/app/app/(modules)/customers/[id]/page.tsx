@@ -616,20 +616,25 @@ function DocumentsTab({ customer, onPhotoSaved }: { customer: Customer; onPhotoS
     if (!file) return
     setUploading(true)
     try {
-      const presignRes = await fetch('/api/r2/upload-url', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contentType: file.type, context: 'customer_document', referenceId: customer.id, fileSize: file.size }),
-      })
-      if (!presignRes.ok) { toast.error('Failed to get upload URL'); return }
-      const { uploadUrl: url, key } = await presignRes.json()
-      const uploadRes = await fetch(url, { method: 'PUT', body: file, headers: { 'Content-Type': file.type } })
-      if (!uploadRes.ok) { toast.error('Upload failed'); return }
+      const fd = new FormData()
+      fd.append('context', 'customer_document')
+      fd.append('referenceId', customer.id)
+      fd.append('file', file)
+      const uploadRes = await fetch('/api/r2/upload', { method: 'POST', body: fd })
+      if (!uploadRes.ok) {
+        const j = await uploadRes.json().catch(() => ({}))
+        toast.error(j.error ?? 'Upload failed')
+        return
+      }
+      const { key } = await uploadRes.json()
       const saveRes = await fetch(`/api/customers/${customer.id}/documents`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ documentType: docType, r2Key: key, fileName: file.name }),
       })
       if (saveRes.ok) { toast.success('Document uploaded'); mutateDocs() }
       else toast.error('Failed to save document')
+    } catch {
+      toast.error('Upload failed — check your connection')
     } finally { setUploading(false); e.target.value = '' }
   }
 

@@ -5,12 +5,10 @@ import { z } from 'zod'
 import {
   getUploadUrl, customerIdPhotoKey, customerDocumentKey, expenseAttachmentKey, purchasePhotoKey,
   scaleOrderPhotoKey, mimeToExt, ALLOWED_PHOTO_TYPES, MAX_PHOTO_BYTES,
+  ALLOWED_DOCUMENT_TYPES, MAX_DOCUMENT_BYTES,
 } from '@/lib/r2'
 import { tenantContext } from '@/lib/db/tenantContext'
 import { randomUUID } from 'crypto'
-
-const ALLOWED_DOCUMENT_TYPES = [...ALLOWED_PHOTO_TYPES, 'application/pdf']
-const MAX_DOCUMENT_BYTES = 20 * 1024 * 1024  // 20 MB
 
 const Schema = z.object({
   context: z.enum(['customer_id', 'purchase_photo', 'police_signature', 'stocktake_entry', 'customer_document', 'expense_attachment', 'scale_order']),
