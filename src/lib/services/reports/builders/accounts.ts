@@ -163,6 +163,76 @@ export async function buildAccountList(
   }
 }
 
+/**
+ * Account (dealer) customers as at the "to" date, with whether an "ID"
+ * document has been uploaded via the customer profile's Documents tab
+ * (CustomerDocument, documentType 'id_copy') — the dedicated ID Photo field
+ * (idPhotoR2Key, set during gate/scale/purchase intake) is a separate,
+ * older mechanism and deliberately not counted here.
+ */
+export async function buildAccountIdUploadStatus(
+  params: BaseReportParams,
+  meta: MetaBase
+): Promise<ReportDocument> {
+  const { end } = getRangeBoundsSAST(params.from, params.to)
+
+  const customers = await prisma.customer.findMany({
+    where: { customerType: 'account', createdAt: { lte: end } },
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      accountCode: true,
+      idNumber: true,
+      phone: true,
+    },
+    orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+  })
+
+  const customerIds = customers.map((c) => c.id)
+  const idDocs = customerIds.length > 0
+    ? await prisma.customerDocument.findMany({
+        where: { customerId: { in: customerIds }, documentType: 'id_copy' },
+        select: { customerId: true },
+      })
+    : []
+  const hasIdDocument = new Set(idDocs.map((d) => d.customerId))
+
+  const rows: ReportRow[] = customers.map((c) => ({
+    cells: {
+      name: `${c.firstName} ${c.lastName}`,
+      accountCode: c.accountCode ?? null,
+      idNumber: c.idNumber ?? null,
+      phone: c.phone ?? null,
+      idUploaded: hasIdDocument.has(c.id) ? 'Yes' : 'No',
+    },
+  }))
+
+  const uploadedCount = rows.filter((r) => r.cells.idUploaded === 'Yes').length
+  const missingCount = rows.length - uploadedCount
+
+  return {
+    reportId: 'account-id-status',
+    title: 'Account ID Upload Status',
+    subtitle: `As at ${params.to}`,
+    params: { from: params.from, to: params.to },
+    columns: [
+      { key: 'name', label: 'Name', width: 0.26, format: 'text', excelWidth: 24 },
+      { key: 'accountCode', label: 'Account Code', width: 0.18, format: 'text', excelWidth: 16 },
+      { key: 'idNumber', label: 'ID Number', width: 0.2, format: 'text', excelWidth: 18 },
+      { key: 'phone', label: 'Phone', width: 0.16, format: 'text', excelWidth: 14 },
+      { key: 'idUploaded', label: 'ID Uploaded', width: 0.2, align: 'center', format: 'text', excelWidth: 12 },
+    ],
+    groups: [{ level: 0, label: 'ACCOUNTS', rows }],
+    summary: [
+      { label: 'Total accounts', value: String(rows.length) },
+      { label: 'ID uploaded', value: String(uploadedCount) },
+      { label: 'ID missing', value: String(missingCount), emphasis: missingCount > 0 },
+    ],
+    meta: { ...meta, rowCount: rows.length },
+  }
+}
+
 /** Casual (walk-in) sellers as at the "to" date. */
 export async function buildCasualList(
   params: BaseReportParams,

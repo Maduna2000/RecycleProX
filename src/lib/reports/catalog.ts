@@ -291,6 +291,14 @@ export const REPORT_CATALOG: ReportCatalogEntry[] = [
     filters: [],
   },
   {
+    id: 'account-id-status',
+    label: 'Account ID Upload Status',
+    description:
+      'Every account (dealer) customer as at the selected date, with Yes/No showing whether an ID photo or document is on file.',
+    area: 'accounts',
+    filters: [],
+  },
+  {
     id: 'casual-list',
     label: 'Casual List',
     description:
