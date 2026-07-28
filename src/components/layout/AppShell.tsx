@@ -65,7 +65,10 @@ function useToolbarButtons(pathname: string, role: string): ToolbarButton[] {
     return []
 
   if (pathname === '/app/payments' || pathname.startsWith('/app/payments/'))
-    return [
+    // Don't show the link to Balances while already on Balances — it's a
+    // plain navigation shortcut, not a route-switcher, so pointing at the
+    // current page is dead weight rather than a highlighted "you are here".
+    return pathname === '/app/payments/balances' ? [] : [
       { label: 'Account Balances', icon: Users, href: '/app/payments/balances', variant: 'secondary' },
     ]
 
@@ -121,9 +124,14 @@ function useToolbarButtons(pathname: string, role: string): ToolbarButton[] {
     ] : []
 
   if (pathname === '/app/settings' || pathname.startsWith('/app/settings/'))
+    // "Add User" stays even on the Users page itself (it drives ?create=1,
+    // opening the modal — genuinely useful there). "Users" is a plain
+    // navigation shortcut and shouldn't point at the page you're already on.
     return !isAdmin ? [] : [
       { label: 'Add User', icon: UserPlus, href: '/app/settings/users?create=1', variant: 'primary' },
-      { label: 'Users',    icon: Users,    href: '/app/settings/users',           variant: 'secondary' },
+      ...(pathname === '/app/settings/users' ? [] : [
+        { label: 'Users', icon: Users, href: '/app/settings/users', variant: 'secondary' as const },
+      ]),
     ]
 
   if (pathname === '/app/support' || pathname.startsWith('/app/support/'))

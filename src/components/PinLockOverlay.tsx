@@ -4,7 +4,9 @@ import { useEffect, useCallback, useState } from 'react'
 import { signOut, useSession } from 'next-auth/react'
 import { usePinLockStore } from '@/stores/pinLockStore'
 import { Lock, Delete } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { Dialog } from '@/components/ui/dialog'
+import { colors } from '@/lib/design-tokens'
+import { Btn, RpxDialogContent, RpxDialogHeader, RpxDialogBody } from '@/components/rpx'
 
 const INACTIVITY_MS = 5 * 60 * 1000 // 5 minutes
 
@@ -52,33 +54,45 @@ export function PinLockOverlay({ children }: { children: React.ReactNode }) {
     }
   }
 
-  if (!isLocked) return <>{children}</>
-
   const attemptsLeft = 3 - failedPinAttempts
 
   return (
     <>
       {children}
-      <div className="fixed inset-0 z-[9999] bg-gray-900/95 backdrop-blur flex items-center justify-center">
-        <div className="bg-white rounded-2xl shadow-2xl p-8 w-80 text-center">
-          <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <div className="w-10 h-10 rounded-full bg-green-600 flex items-center justify-center text-white font-bold text-lg">
-              {session?.user?.fullName?.charAt(0) ?? '?'}
+      {/* Controlled + no-op onOpenChange: this dialog must not be dismissable
+       * via Escape/outside-click — it only closes via a correct PIN (unlock()).
+       * Using the real Dialog primitive still gets us role="dialog", aria-modal,
+       * and a real focus trap for free, which the old hand-rolled fixed div did not. */}
+      <Dialog open={isLocked} modal onOpenChange={() => {}}>
+        <RpxDialogContent maxWidth={320} style={{ textAlign: 'center' }}>
+          <RpxDialogHeader title="Session Locked" icon={Lock} />
+          <RpxDialogBody>
+            <div
+              className="rounded-full mx-auto mb-3 flex items-center justify-center"
+              style={{ width: 48, height: 48, background: colors.actionBg }}
+            >
+              <div
+                className="rounded-full flex items-center justify-center text-white font-bold"
+                style={{ width: 34, height: 34, background: colors.action, fontSize: 15 }}
+              >
+                {session?.user?.fullName?.charAt(0) ?? '?'}
+              </div>
             </div>
-          </div>
-          <p className="font-semibold text-gray-900">{session?.user?.fullName}</p>
-          <div className="flex items-center justify-center gap-1.5 mt-1 mb-6">
-            <Lock className="w-3.5 h-3.5 text-gray-400" />
-            <p className="text-sm text-gray-500">Session locked</p>
-          </div>
+            <p style={{ fontSize: 13, fontWeight: 600, color: colors.textPrimary }}>{session?.user?.fullName}</p>
+            <p style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2, marginBottom: 16 }}>
+              Enter your PIN to continue
+            </p>
 
-          {attemptsLeft < 3 && (
-            <p className="text-xs text-red-500 mb-3">{attemptsLeft} attempt{attemptsLeft !== 1 ? 's' : ''} remaining</p>
-          )}
+            {attemptsLeft < 3 && (
+              <p style={{ fontSize: 11, color: colors.danger, marginBottom: 10 }}>
+                {attemptsLeft} attempt{attemptsLeft !== 1 ? 's' : ''} remaining
+              </p>
+            )}
 
-          <PinPad onSubmit={handlePin} />
-        </div>
-      </div>
+            <PinPad onSubmit={handlePin} />
+          </RpxDialogBody>
+        </RpxDialogContent>
+      </Dialog>
     </>
   )
 }
@@ -103,23 +117,32 @@ function PinPad({ onSubmit }: { onSubmit: (pin: string) => void }) {
 
   return (
     <div>
-      <div className="flex justify-center gap-3 mb-6">
+      <div className="flex justify-center gap-3 mb-4" role="status" aria-label={`${localPin.length} of 4 digits entered`}>
         {[0, 1, 2, 3].map((i) => (
-          <div key={i} className={`w-3 h-3 rounded-full border-2 ${i < localPin.length ? 'bg-green-600 border-green-600' : 'border-gray-300'}`} />
+          <div
+            key={i}
+            aria-hidden="true"
+            style={{
+              width: 12, height: 12, borderRadius: '50%',
+              border: `2px solid ${i < localPin.length ? colors.action : '#D0D0D0'}`,
+              background: i < localPin.length ? colors.action : 'transparent',
+            }}
+          />
         ))}
       </div>
       <div className="grid grid-cols-3 gap-2">
         {digits.map((d, i) => {
           if (d === '') return <div key={i} />
           if (d === 'del') return (
-            <Button key={i} variant="ghost" className="h-12 text-gray-600" onClick={backspace}>
-              <Delete className="w-4 h-4" />
-            </Button>
+            <Btn key={i} onClick={backspace} title="Backspace" style={{ height: 44, justifyContent: 'center' }}>
+              <Delete className="w-4 h-4" aria-hidden="true" />
+              <span className="sr-only">Backspace</span>
+            </Btn>
           )
           return (
-            <Button key={i} variant="outline" className="h-12 text-lg font-semibold" onClick={() => press(d)}>
+            <Btn key={i} onClick={() => press(d)} style={{ height: 44, fontSize: 15, fontWeight: 700, justifyContent: 'center' }}>
               {d}
-            </Button>
+            </Btn>
           )
         })}
       </div>

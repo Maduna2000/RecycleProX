@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import { AlertTriangle, ShieldAlert, WifiOff, X } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { Dialog } from '@/components/ui/dialog'
+import { colors } from '@/lib/design-tokens'
+import { Btn, RpxDialogContent, RpxDialogHeader, RpxDialogBody } from '@/components/rpx'
 
 // Polls electron/licenseManager.js's getAccessState() (via preload.js's
 // IPC bridge) and surfaces the three offline-grace UI states the SaaS plan
@@ -15,6 +17,7 @@ const POLL_INTERVAL_MS = 60_000
 export function LicenseGate({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<LicenseStatus | null>(null)
   const [bannerDismissed, setBannerDismissed] = useState(false)
+  const [retrying, setRetrying] = useState(false)
 
   useEffect(() => {
     // `window` itself is safe to touch here (effects only run client-side),
@@ -65,46 +68,58 @@ export function LicenseGate({ children }: { children: React.ReactNode }) {
         </div>
       )}
 
-      {blocking && (
-        <div className="fixed inset-0 z-[9999] bg-gray-900/95 backdrop-blur flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm text-center">
-            <div className="w-14 h-14 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+      {/* Controlled + no-op onOpenChange: this gate must not be dismissable via
+       * Escape/outside-click — it only closes once a Retry confirms the license
+       * is valid again. Using the real Dialog primitive still gets us
+       * role="dialog", aria-modal, and a real focus trap for free. */}
+      <Dialog open={blocking} modal onOpenChange={() => {}}>
+        <RpxDialogContent maxWidth={360} style={{ textAlign: 'center' }}>
+          <RpxDialogHeader
+            title={status.state === 'blocked' ? 'Access Blocked' : 'Read-Only Mode'}
+            icon={status.state === 'blocked' ? ShieldAlert : WifiOff}
+          />
+          <RpxDialogBody>
+            <div
+              className="rounded-full mx-auto mb-3 flex items-center justify-center"
+              style={{ width: 48, height: 48, background: colors.dangerBg }}
+            >
               {status.state === 'blocked'
-                ? <ShieldAlert className="w-7 h-7 text-red-600" />
-                : <WifiOff className="w-7 h-7 text-red-600" />}
+                ? <ShieldAlert style={{ width: 22, height: 22, color: colors.danger }} />
+                : <WifiOff style={{ width: 22, height: 22, color: colors.danger }} />}
             </div>
 
             {status.state === 'blocked' ? (
-              <>
-                <p className="font-semibold text-gray-900">Access blocked</p>
-                <p className="text-sm text-gray-500 mt-1 mb-6">
-                  {status.reason ?? 'Your subscription or company account is not currently active.'}
-                  {' '}Contact your administrator to resolve this.
-                </p>
-              </>
+              <p style={{ fontSize: 12, color: colors.textSecondary, marginBottom: 16 }}>
+                {status.reason ?? 'Your subscription or company account is not currently active.'}
+                {' '}Contact your administrator to resolve this.
+              </p>
             ) : (
-              <>
-                <p className="font-semibold text-gray-900">Read-only mode</p>
-                <p className="text-sm text-gray-500 mt-1 mb-6">
-                  Renovo Pro has been offline for over {status.offlineGraceDays ?? 7} days and can no longer
-                  verify your license. Reconnect to the internet to resume normal operation.
-                </p>
-              </>
+              <p style={{ fontSize: 12, color: colors.textSecondary, marginBottom: 16 }}>
+                Renovo Pro has been offline for over {status.offlineGraceDays ?? 7} days and can no longer
+                verify your license. Reconnect to the internet to resume normal operation.
+              </p>
             )}
 
-            <Button
-              className="w-full"
+            <Btn
+              variant="primary"
+              loading={retrying}
+              style={{ width: '100%', justifyContent: 'center' }}
               onClick={async () => {
                 if (!window.electronAPI?.getLicenseStatus) return
-                const result = await window.electronAPI.getLicenseStatus()
-                setStatus(result)
+                setRetrying(true)
+                try {
+                  const result = await window.electronAPI.getLicenseStatus()
+                  setStatus(result)
+                } finally {
+                  setRetrying(false)
+                }
               }}
             >
               Retry
-            </Button>
-          </div>
-        </div>
-      )}
+            </Btn>
+          </RpxDialogBody>
+        </RpxDialogContent>
+      </Dialog>
     </>
   )
 }

@@ -4,7 +4,7 @@ Read-only audit. No code was changed in the production of this report. Companion
 
 **Coverage:** every route under `src/app` and every file under `src/components` was read by at least one of four parallel research passes plus direct review of the shared shell/token files. Every finding below is a source-code claim with a file:line citation; true rendered contrast ratios and pixel-level layout breakage were not independently visually verified and are called out as such where it matters.
 
-**Execution status:** [`BACKLOG.md`](./BACKLOG.md) BATCH-1 (Tokens & gradients) and BATCH-2 (Controls: buttons, form inputs, radii, heights) have both been executed — see the **STATUS: FIXED**/**STATUS: PARTIALLY FIXED** annotations inline on the affected findings below, plus "Additional BATCH-1/BATCH-2 fixes" notes for drift that was fixed without its own numbered finding. Verified via `tsc --noEmit` and `next lint` after each batch (both clean — 3 pre-existing warnings unrelated to either batch). BATCH-3 through BATCH-6 remain open.
+**Execution status:** [`BACKLOG.md`](./BACKLOG.md) BATCH-1 (Tokens & gradients), BATCH-2 (Controls), and BATCH-3 (Shell, address bar & navigation) have all been executed — see the **STATUS: FIXED**/**STATUS: PARTIALLY FIXED** annotations inline on the affected findings below, plus "Additional fixes" notes per batch for drift fixed without its own numbered finding. Verified via `tsc --noEmit` and `next lint` after each batch (all clean — 3 pre-existing warnings unrelated to any of the three batches). BATCH-4 through BATCH-6 remain open.
 
 ---
 
@@ -148,6 +148,8 @@ Columns: **Shell** (AppShell/kiosk-consistent chrome) · **Cmd** (command/toolba
 **Effort:** M   **Risk:** Low (visual-only, same click handlers)   **Blast radius:** ~16 files
 
 ### [SEV-1] FND-002 · The PIN lock screen and license gate are the app's biggest aesthetic outliers and its least accessible surfaces
+
+**STATUS: FIXED (BATCH-3).** Both `PinLockOverlay.tsx` and `LicenseGate.tsx` were rebuilt on the real `Dialog` primitive + `RpxDialogContent`/`RpxDialogHeader`/`RpxDialogBody` — house 3px radius, `CARD_BORDER`, `BAR_GRAD` header, instead of `rounded-2xl`/`shadow-2xl`. Both dialogs are controlled (`open={isLocked}` / `open={blocking}`) with a no-op `onOpenChange`, so they get `role="dialog"`, `aria-modal`, and a real focus trap for free from Base UI, while remaining non-dismissable via Escape/outside-click (preserving the existing, correct product behavior — these are security gates, not ordinary confirms). `PinLockOverlay`'s backspace button now has an accessible label (`sr-only` text) instead of being an unlabeled icon button; the PIN-progress dots gained a `role="status"`/`aria-label`. `LicenseGate`'s Retry button now shows a loading state (`Btn`'s `loading` prop) instead of allowing repeated clicks with no feedback while the async check is in flight.
 **Pages:** Global (rendered from `(modules)/layout.tsx` and `(portal)/layout.tsx` — every route).
 **Evidence:** `PinLockOverlay.tsx:62-67,115,120` (`rounded-2xl`, `shadow-2xl`, `bg-gray-900/95 backdrop-blur`, `h-12` keypad buttons); `LicenseGate.tsx:69-71,95-104` (identical recipe; Retry button has no loading state).
 **Problem:** both are raw `fixed inset-0` divs, not the `Dialog` primitive — no `role="dialog"`, no `aria-modal`, no focus trap, and `PinLockOverlay`'s icon-only backspace button has no `aria-label`.
@@ -270,6 +272,8 @@ Columns: **Shell** (AppShell/kiosk-consistent chrome) · **Cmd** (command/toolba
 **Effort:** L   **Blast radius:** structural, spans 3 modules
 
 ### [SEV-2] FND-020 · A fully-built, never-imported second printer-setup wizard exists as dead code and disagrees with the shipped version's colors
+
+**STATUS: FIXED (BATCH-3).** Re-confirmed zero references (grep) immediately before deleting; the entire `scale/components/printer/` directory (`PrinterSetupWizard.tsx` + `StepConnectionType.tsx`, `StepDeviceSelection.tsx`, `StepConfiguration.tsx`, `StepTestPrint.tsx`, `index.ts`) has been removed.
 **Evidence:** `scale/components/printer/PrinterSetupWizard.tsx` + 4 step files, exported via `printer/index.ts`, confirmed zero imports anywhere (grep-verified). Shipped `PrinterSetup.tsx` (wired at `ScaleClientLayout.tsx:8,177`) is emerald-only; the dead wizard mixes blue and emerald.
 **Fix:** delete the dead tree, or wire it in and delete the shipped single-screen version instead — maintaining both in parallel is pure risk with zero upside.
 **Effort:** S (deletion)   **Risk:** none (confirmed unreferenced)   **Blast radius:** 5 files removed
@@ -292,6 +296,8 @@ Columns: **Shell** (AppShell/kiosk-consistent chrome) · **Cmd** (command/toolba
 **Effort:** S   **Blast radius:** 1 file
 
 ### [SEV-3] FND-023 · Self-referential toolbar links
+
+**STATUS: FIXED (BATCH-3).** Payments' "Account Balances" toolbar button no longer renders while already on `/app/payments/balances`; Settings' "Users" button no longer renders while already on `/app/settings/users`. Fixed at the two specific call sites in `useToolbarButtons()` rather than a blanket `href === pathname` filter — Stock's 3-button route-switcher (`Stock On Hand`/`Movements`/`Grid`) deliberately keeps showing the current page's own button highlighted `primary`, since that's an intentional "which view am I on" tab pattern, not a dead link; a generic filter would have broken it. Settings' "Add User" button also stays visible on the Users page itself, since it drives `?create=1` and remains genuinely actionable there.
 **Evidence:** `AppShell.tsx`'s route matching uses `pathname.startsWith()`, so Payments' "Account Balances" button still renders (pointing at itself) while already on `/app/payments/balances`; same issue for Settings/Users' "Users" link.
 **Fix:** add an exact-route exclusion in `ToolbarBtn`/`useToolbarButtons`.
 **Effort:** S   **Blast radius:** 1 file (`AppShell.tsx`)
@@ -302,6 +308,8 @@ Columns: **Shell** (AppShell/kiosk-consistent chrome) · **Cmd** (command/toolba
 **Effort:** S   **Blast radius:** 1 file
 
 ### [SEV-3] FND-025 · `AppSidebar.tsx` is dead code
+
+**STATUS: FIXED (BATCH-3).** Re-confirmed zero references immediately before deleting; the file is gone.
 **Evidence:** grep for `AppSidebar` returns only its own definition — never imported.
 **Fix:** delete. It also happens to contain its own 3rd button/color drift, so removing it is a small net simplification, not just cleanup.
 **Effort:** S   **Risk:** none   **Blast radius:** 1 file removed
@@ -320,6 +328,10 @@ Columns: **Shell** (AppShell/kiosk-consistent chrome) · **Cmd** (command/toolba
 **Evidence:** `globals.css:68-96` (`.dark` OKLCH overrides) — no `dark` class toggle exists anywhere in the app (grep-confirmed), despite `next-themes` being an installed dependency.
 **Fix:** delete if dark mode isn't planned, or wire up `next-themes` if it is. Dead weight either way, and not a Win7-relevant question either way.
 **Effort:** S   **Blast radius:** 1 file
+
+### Additional BATCH-3 fix (not individually numbered above)
+
+**`BannerBar` absent from `(portal)/layout.tsx`** (INVENTORY.md §6, no dedicated FND number) — **STATUS: FIXED.** Wired `<BannerBar banners={banners} />` into the dashboard's layout, fetching via the same `fetchActiveBanners(session.user.tenantSlug)` call `(modules)/layout.tsx` already uses — its absence looked like an unremarked gap (platform subscription/maintenance banners are exactly as relevant on the dashboard as anywhere else), unlike `WindowedContent`'s dashboard exemption, which is provably deliberate (`WindowedContent.tsx:18` hard-codes `if (pathname === '/app/dashboard') return`). **Deliberately not changed:** the dashboard still doesn't get `LicenseGate` or `WindowedContent` — extending license enforcement to a route it doesn't currently cover is a business-logic scope decision beyond what this UI audit's backlog asked for, not a styling fix, and is flagged here rather than silently done.
 
 ---
 
