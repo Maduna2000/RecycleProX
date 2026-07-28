@@ -20,6 +20,14 @@ export interface FilterSpec {
   required?: boolean
   /** For type 'select'. */
   options?: { value: string; label: string }[]
+  /**
+   * For type 'customer' — restricts the search-as-you-type picker to this
+   * customerType, for reports that are explicitly about one or the other
+   * (e.g. "Purchases by Casual ID"). Omit for reports where either type is a
+   * legitimate match (a "Supplier"/"Customer" filter spans both, since
+   * primaryFunction — not customerType — decides who can buy/sell).
+   */
+  customerType?: 'account' | 'casual'
 }
 
 export interface ReportCatalogEntry {
@@ -291,6 +299,14 @@ export const REPORT_CATALOG: ReportCatalogEntry[] = [
     filters: [],
   },
   {
+    id: 'account-id-status',
+    label: 'Account ID Upload Status',
+    description:
+      'Every account (dealer) customer as at the selected date, with Yes/No showing whether an ID photo or document is on file.',
+    area: 'accounts',
+    filters: [],
+  },
+  {
     id: 'casual-list',
     label: 'Casual List',
     description:
@@ -308,7 +324,7 @@ export const REPORT_CATALOG: ReportCatalogEntry[] = [
     filters: [
       { key: 'idNumber', label: 'ID Number (partial)', type: 'text' },
       { key: 'refNumber', label: 'Transaction No. (partial)', type: 'text' },
-      { key: 'customerId', label: 'Casual Seller', type: 'customer' },
+      { key: 'customerId', label: 'Casual Seller', type: 'customer', customerType: 'casual' },
     ],
   },
   {
@@ -320,7 +336,7 @@ export const REPORT_CATALOG: ReportCatalogEntry[] = [
     filters: [
       { key: 'idNumber', label: 'ID Number (partial)', type: 'text' },
       { key: 'refNumber', label: 'Transaction No. (partial)', type: 'text' },
-      { key: 'customerId', label: 'Account', type: 'customer' },
+      { key: 'customerId', label: 'Account', type: 'customer', customerType: 'account' },
     ],
   },
   {
