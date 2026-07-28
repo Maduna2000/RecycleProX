@@ -5,12 +5,13 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import {
   Search, X, RefreshCw, Images, CheckCircle2, EyeOff,
-  UserPlus, Eye, Loader2, ShieldCheck, Info, LogOut,
+  UserPlus, Eye, ShieldCheck, Info, LogOut,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { DataTable, StatusBadge, type Column, type RowAction } from '@/components/ui/DataTable'
 import { InlineDetailPanel } from '@/components/ui/InlineDetailPanel'
 import { PhotoViewerModal } from '@/components/ui/PhotoViewerModal'
+import { ToggleSwitch } from '@/components/ui/ToggleSwitch'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
 import { Btn, Field, FilterBar, PortalPage, inp } from '@/components/rpx'
 
@@ -360,7 +361,12 @@ function EntriesTab() {
         </Field>
         <Field label={' '}>
           <label className="flex items-center gap-1.5" style={{ height: 30, fontSize: 12, color: colors.textSecondary, whiteSpace: 'nowrap' }}>
-            <input type="checkbox" checked={onSiteOnly} onChange={e => { setOnSiteOnly(e.target.checked); setPage(1) }} />
+            <input
+              type="checkbox"
+              checked={onSiteOnly}
+              onChange={e => { setOnSiteOnly(e.target.checked); setPage(1) }}
+              style={{ accentColor: colors.primary, cursor: 'pointer', width: 14, height: 14 }}
+            />
             On site only
           </label>
         </Field>
@@ -564,23 +570,36 @@ function ConfigTab() {
     }
   }
 
-  if (loading) {
-    return <div className="flex items-center justify-center py-12"><Loader2 className="w-6 h-6 animate-spin" style={{ color: colors.process }} /></div>
-  }
-  if (error) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12 gap-3">
-        <p style={{ fontSize: fontSize.sm, color: colors.danger }}>{error}</p>
-        <button onClick={fetchConfigs} className="flex items-center gap-1.5 px-3 py-1.5 text-xs border" style={{ borderColor: colors.border, borderRadius: 2 }}>
-          <RefreshCw className="w-3.5 h-3.5" /> Retry
-        </button>
-      </div>
-    )
-  }
+  const columns: Column<PurposeConfig>[] = [
+    {
+      key: 'purpose', header: 'Purpose',
+      render: (c) => (
+        <span style={{ fontSize: fontSize.sm, fontWeight: fontWeight.semibold, color: colors.textPrimary }}>
+          {PURPOSE_LABELS[c.purpose] ?? c.purpose}
+        </span>
+      ),
+    },
+    {
+      key: 'requireIdPhoto', header: 'ID Photo', width: '100px',
+      render: (c) => (
+        <div className="flex justify-center">
+          <ToggleSwitch checked={c.requireIdPhoto} disabled={saving === c.purpose} onChange={(v) => handleToggle(c.purpose, 'requireIdPhoto', v)} />
+        </div>
+      ),
+    },
+    {
+      key: 'requireVehiclePhoto', header: 'Vehicle', width: '100px',
+      render: (c) => (
+        <div className="flex justify-center">
+          <ToggleSwitch checked={c.requireVehiclePhoto} disabled={saving === c.purpose} onChange={(v) => handleToggle(c.purpose, 'requireVehiclePhoto', v)} />
+        </div>
+      ),
+    },
+  ]
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-start gap-3 p-3" style={{ background: colors.processBg, border: `1px solid ${colors.process}20`, borderRadius: 2 }}>
+    <div className="flex flex-col flex-1 min-h-0 gap-3">
+      <div className="flex items-start gap-3 p-3 shrink-0" style={{ background: colors.processBg, border: `1px solid ${colors.process}`, borderRadius: 2 }}>
         <Info className="w-4 h-4 shrink-0 mt-0.5" style={{ color: colors.process }} />
         <div style={{ fontSize: fontSize.xs, color: colors.textPrimary }}>
           <p className="font-medium">Configure Required Photos</p>
@@ -591,41 +610,17 @@ function ConfigTab() {
         </div>
       </div>
 
-      <div className="bg-white border" style={{ borderColor: colors.border, borderRadius: 2 }}>
-        <div className="grid items-center px-4 py-2 border-b" style={{ gridTemplateColumns: '1fr 100px 100px', borderColor: colors.border, background: colors.bg }}>
-          <span style={{ fontSize: fontSize.xs, fontWeight: fontWeight.semibold, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Purpose</span>
-          <span className="text-center" style={{ fontSize: fontSize.xs, fontWeight: fontWeight.semibold, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.05em' }}>ID Photo</span>
-          <span className="text-center" style={{ fontSize: fontSize.xs, fontWeight: fontWeight.semibold, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Vehicle</span>
-        </div>
-
-        {configs.map((config) => (
-          <div key={config.purpose} className="grid items-center px-4 py-2.5 border-b last:border-b-0" style={{ gridTemplateColumns: '1fr 100px 100px', borderColor: colors.border, background: saving === config.purpose ? colors.bg : 'transparent' }}>
-            <span style={{ fontSize: fontSize.sm, fontWeight: fontWeight.semibold, color: colors.textPrimary }}>{PURPOSE_LABELS[config.purpose] ?? config.purpose}</span>
-            <div className="flex justify-center">
-              <ToggleSwitch checked={config.requireIdPhoto} disabled={saving === config.purpose} onChange={(v) => handleToggle(config.purpose, 'requireIdPhoto', v)} />
-            </div>
-            <div className="flex justify-center">
-              <ToggleSwitch checked={config.requireVehiclePhoto} disabled={saving === config.purpose} onChange={(v) => handleToggle(config.purpose, 'requireVehiclePhoto', v)} />
-            </div>
-          </div>
-        ))}
+      <div className="flex-1 min-h-0" style={{ padding: 10 }}>
+        <DataTable
+          columns={columns}
+          rows={configs}
+          rowKey={c => c.purpose}
+          loading={loading}
+          error={error ?? undefined}
+          emptyMessage="No purpose configurations found"
+        />
       </div>
     </div>
-  )
-}
-
-function ToggleSwitch({ checked, disabled, onChange }: { checked: boolean; disabled: boolean; onChange: (value: boolean) => void }) {
-  return (
-    <button
-      onClick={() => onChange(!checked)}
-      disabled={disabled}
-      className="relative inline-flex items-center h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-      style={{ background: checked ? colors.action : colors.border }}
-      role="switch"
-      aria-checked={checked}
-    >
-      <span className="inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform" style={{ transform: checked ? 'translateX(18px)' : 'translateX(3px)' }} />
-    </button>
   )
 }
 

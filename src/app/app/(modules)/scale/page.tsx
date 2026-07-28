@@ -14,6 +14,7 @@ import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from 'pdf
 import { DataTable, StatusBadge, type Column, type RowAction } from '@/components/ui/DataTable'
 import { InlineDetailPanel } from '@/components/ui/InlineDetailPanel'
 import { PhotoViewerModal } from '@/components/ui/PhotoViewerModal'
+import { ToggleSwitch } from '@/components/ui/ToggleSwitch'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
 import { Btn, BtnMenu, Field, FilterBar, PortalPage, inp, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
 import { Dialog } from '@/components/ui/dialog'
@@ -761,7 +762,7 @@ function OrdersTab() {
           </Field>
         )}
         <Field label={' '}>
-          <Btn size="sm" icon={RefreshCw} onClick={() => fetchOrders(page)}>Refresh</Btn>
+          <Btn size="sm" icon={RefreshCw} onClick={() => fetchOrders(page)} title="Refresh" />
         </Field>
         <Field label={' '}>
           <BtnMenu
@@ -782,7 +783,7 @@ function OrdersTab() {
 
       {/* Table + photo panel stacked */}
       <div className="flex flex-col flex-1 min-h-0">
-        <div className="flex-1 min-h-0">
+        <div className="flex-1 min-h-0" style={{ padding: 10 }}>
           <DataTable
             columns={columns}
             rows={orders}
@@ -951,7 +952,7 @@ function OperatorsTab() {
       </FilterBar>
 
       <div className="flex flex-col flex-1 min-h-0">
-        <div className="flex-1 min-h-0">
+        <div className="flex-1 min-h-0" style={{ padding: 10 }}>
           <DataTable
             columns={columns}
             rows={operators}
@@ -1032,7 +1033,9 @@ function ConfigTab() {
     }
   }
 
-  // Separate parent and child categories for hierarchical display
+  // Flatten parent categories followed by their own children (in order) so
+  // the hierarchy still reads top-to-bottom in a single DataTable — each
+  // child row indents itself off its own (already-present) parentId.
   const parents = configs.filter(c => !c.parentId)
   const childrenMap = new Map<string, StepConfig[]>()
   configs.filter(c => c.parentId).forEach(c => {
@@ -1040,37 +1043,57 @@ function ConfigTab() {
     arr.push(c)
     childrenMap.set(c.parentId!, arr)
   })
+  const rows = parents.flatMap(parent => [parent, ...(childrenMap.get(parent.categoryId) ?? [])])
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-6 h-6 animate-spin" style={{ color: colors.process }} />
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12 gap-3">
-        <p style={{ fontSize: fontSize.sm, color: colors.danger }}>{error}</p>
-        <button
-          onClick={fetchConfigs}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs border"
-          style={{ borderColor: colors.border, borderRadius: 2 }}
-        >
-          <RefreshCw className="w-3.5 h-3.5" /> Retry
-        </button>
-      </div>
-    )
-  }
+  const columns: Column<StepConfig>[] = [
+    {
+      key: 'categoryName', header: 'Category',
+      render: (c) => (
+        <div className="flex items-center gap-2">
+          {c.parentId && <span style={{ color: colors.textMuted, marginLeft: 8 }}>↳</span>}
+          <span style={{ fontSize: fontSize.sm, fontWeight: c.parentId ? fontWeight.regular : fontWeight.semibold, color: colors.textPrimary }}>
+            {c.categoryName}
+          </span>
+          {c.isInherited && (
+            <span className="px-1.5 py-0.5 text-[10px]" style={{ background: colors.neutralBg, color: colors.textMuted, borderRadius: 2 }}>
+              inherited
+            </span>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'requireWeight', header: 'Weight', width: '100px',
+      render: (c) => (
+        <div className="flex justify-center">
+          <ToggleSwitch checked={c.requireWeight} disabled={saving === c.categoryId} onChange={(v) => handleToggle(c.categoryId, 'requireWeight', v)} />
+        </div>
+      ),
+    },
+    {
+      key: 'requirePhotos', header: 'Photos', width: '100px',
+      render: (c) => (
+        <div className="flex justify-center">
+          <ToggleSwitch checked={c.requirePhotos} disabled={saving === c.categoryId} onChange={(v) => handleToggle(c.categoryId, 'requirePhotos', v)} />
+        </div>
+      ),
+    },
+    {
+      key: 'updatedAt', header: 'Updated', width: '120px', align: 'right',
+      render: (c) => saving === c.categoryId ? (
+        <Loader2 className="w-3.5 h-3.5 animate-spin inline" style={{ color: colors.process }} />
+      ) : (
+        <span style={{ fontSize: fontSize.xs, color: colors.textMuted }}>
+          {c.updatedAt ? new Date(c.updatedAt).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short' }) : '—'}
+        </span>
+      ),
+    },
+  ]
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col flex-1 min-h-0 gap-3">
       {/* Info banner */}
-      <div
-        className="flex items-start gap-3 p-3"
-        style={{ background: colors.processBg, border: `1px solid ${colors.process}20`, borderRadius: 2 }}
-      >
+      <div className="flex items-start gap-3 p-3 shrink-0" style={{ background: colors.processBg, border: `1px solid ${colors.process}`, borderRadius: 2 }}>
         <Info className="w-4 h-4 shrink-0 mt-0.5" style={{ color: colors.process }} />
         <div style={{ fontSize: fontSize.xs, color: colors.textPrimary }}>
           <p className="font-medium">Configure Scale Station Steps</p>
@@ -1082,165 +1105,17 @@ function ConfigTab() {
         </div>
       </div>
 
-      {/* Config table */}
-      <div className="bg-white border" style={{ borderColor: colors.border, borderRadius: 2 }}>
-        {/* Header */}
-        <div
-          className="grid items-center px-4 py-2 border-b"
-          style={{
-            gridTemplateColumns: '1fr 100px 100px 120px',
-            borderColor: colors.border,
-            background: colors.bg,
-          }}
-        >
-          <span style={{ fontSize: fontSize.xs, fontWeight: fontWeight.semibold, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Category
-          </span>
-          <span className="text-center" style={{ fontSize: fontSize.xs, fontWeight: fontWeight.semibold, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Weight
-          </span>
-          <span className="text-center" style={{ fontSize: fontSize.xs, fontWeight: fontWeight.semibold, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Photos
-          </span>
-          <span className="text-right" style={{ fontSize: fontSize.xs, fontWeight: fontWeight.semibold, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Updated
-          </span>
-        </div>
-
-        {/* Rows */}
-        {parents.length === 0 ? (
-          <div className="px-4 py-8 text-center" style={{ fontSize: fontSize.sm, color: colors.textSecondary }}>
-            No categories found. Create categories first.
-          </div>
-        ) : (
-          parents.map(parent => (
-            <div key={parent.categoryId}>
-              {/* Parent row */}
-              <ConfigRow config={parent} saving={saving} onToggle={handleToggle} isChild={false} />
-
-              {/* Child rows */}
-              {childrenMap.get(parent.categoryId)?.map(child => (
-                <ConfigRow key={child.categoryId} config={child} saving={saving} onToggle={handleToggle} isChild={true} />
-              ))}
-            </div>
-          ))
-        )}
-      </div>
-    </div>
-  )
-}
-
-function ConfigRow({
-  config,
-  saving,
-  onToggle,
-  isChild,
-}: {
-  config:   StepConfig
-  saving:   string | null
-  onToggle: (id: string, field: 'requireWeight' | 'requirePhotos', value: boolean) => void
-  isChild:  boolean
-}) {
-  const isSaving = saving === config.categoryId
-
-  return (
-    <div
-      className="grid items-center px-4 py-2.5 border-b last:border-b-0 transition-colors"
-      style={{
-        gridTemplateColumns: '1fr 100px 100px 120px',
-        borderColor: colors.border,
-        background: isSaving ? colors.bg : 'transparent',
-      }}
-    >
-      {/* Category name */}
-      <div className="flex items-center gap-2">
-        {isChild && (
-          <span style={{ color: colors.textMuted, marginLeft: 8 }}>↳</span>
-        )}
-        <span
-          style={{
-            fontSize: fontSize.sm,
-            fontWeight: isChild ? fontWeight.regular : fontWeight.semibold,
-            color: colors.textPrimary,
-          }}
-        >
-          {config.categoryName}
-        </span>
-        {config.isInherited && (
-          <span
-            className="px-1.5 py-0.5 text-[10px]"
-            style={{
-              background: colors.neutralBg,
-              color: colors.textMuted,
-              borderRadius: 2,
-            }}
-          >
-            inherited
-          </span>
-        )}
-      </div>
-
-      {/* Weight toggle */}
-      <div className="flex justify-center">
-        <ToggleSwitch
-          checked={config.requireWeight}
-          disabled={isSaving}
-          onChange={(v) => onToggle(config.categoryId, 'requireWeight', v)}
+      <div className="flex-1 min-h-0" style={{ padding: 10 }}>
+        <DataTable
+          columns={columns}
+          rows={rows}
+          rowKey={c => c.categoryId}
+          loading={loading}
+          error={error ?? undefined}
+          emptyMessage="No categories found. Create categories first."
         />
       </div>
-
-      {/* Photos toggle */}
-      <div className="flex justify-center">
-        <ToggleSwitch
-          checked={config.requirePhotos}
-          disabled={isSaving}
-          onChange={(v) => onToggle(config.categoryId, 'requirePhotos', v)}
-        />
-      </div>
-
-      {/* Updated timestamp */}
-      <div className="text-right">
-        {isSaving ? (
-          <Loader2 className="w-3.5 h-3.5 animate-spin inline" style={{ color: colors.process }} />
-        ) : (
-          <span style={{ fontSize: fontSize.xs, color: colors.textMuted }}>
-            {config.updatedAt
-              ? new Date(config.updatedAt).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short' })
-              : '—'}
-          </span>
-        )}
-      </div>
     </div>
-  )
-}
-
-function ToggleSwitch({
-  checked,
-  disabled,
-  onChange,
-}: {
-  checked:  boolean
-  disabled: boolean
-  onChange: (value: boolean) => void
-}) {
-  return (
-    <button
-      onClick={() => onChange(!checked)}
-      disabled={disabled}
-      className="relative inline-flex items-center h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-      style={{
-        background: checked ? colors.action : colors.border,
-      }}
-      role="switch"
-      aria-checked={checked}
-    >
-      <span
-        className="inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform"
-        style={{
-          transform: checked ? 'translateX(18px)' : 'translateX(3px)',
-        }}
-      />
-    </button>
   )
 }
 
