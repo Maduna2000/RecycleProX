@@ -6,9 +6,12 @@ import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { LoginSchema, type LoginInput } from '@/lib/schemas/auth'
-import { ShieldCheck, Loader2, Eye, EyeOff, AlertCircle } from 'lucide-react'
+import { ShieldCheck, Loader2, Eye, EyeOff } from 'lucide-react'
+import { colors } from '@/lib/design-tokens'
+import { AuthShell } from '@/components/auth/AuthShell'
 
 const GATE_ROLES = ['security_guard', 'admin', 'manager']
+const ACCENT = colors.process
 
 export default function GateLoginPage() {
   const router  = useRouter()
@@ -62,101 +65,97 @@ export default function GateLoginPage() {
     router.refresh()
   }
 
-  if (status === 'loading') {
-    return (
-      <div className="min-h-dvh flex items-center justify-center" style={{ background: 'radial-gradient(ellipse at 50% 0%, #1B3A63 0%, #0F203A 60%)' }}>
-        <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
-      </div>
-    )
-  }
-
   return (
-    <div
-      className="min-h-dvh flex items-center justify-center p-4 sm:p-6"
-      style={{ background: 'radial-gradient(ellipse at 50% 0%, #1B3A63 0%, #0F203A 60%)' }}
-    >
-      <div className="w-full max-w-sm sm:max-w-md">
-        <div className="bg-white rounded-2xl shadow-2xl p-6 sm:p-10">
-          <div className="flex flex-col items-center mb-7 sm:mb-8">
-            <div
-              className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-[#0F203A] flex items-center justify-center mb-4 shadow-lg ring-4 ring-blue-500/15"
-            >
-              <ShieldCheck className="w-9 h-9 sm:w-11 sm:h-11 text-blue-300" />
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-slate-800 tracking-tight">Guard Station</h1>
-            <p className="text-sm text-slate-400 mt-1">Renovo Pro</p>
-          </div>
-
-          {error && (
-            <div className="mb-5 p-3 rounded-xl text-sm bg-red-50 border border-red-200 text-red-700 flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-              <span>{error}</span>
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 sm:space-y-5">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                Username
-              </label>
-              <input
-                autoComplete="username"
-                {...register('username')}
-                disabled={loading}
-                className="w-full h-12 border border-slate-300 rounded-xl px-4 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 transition-shadow"
-              />
-              {errors.username && (
-                <p className="text-xs text-red-600 mt-1">{errors.username.message}</p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                Password
-              </label>
-              <div className="relative">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  autoComplete="current-password"
-                  {...register('password')}
-                  disabled={loading}
-                  className="w-full h-12 border border-slate-300 rounded-xl px-4 pr-12 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 transition-shadow"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  disabled={loading}
-                  className="absolute right-1 top-1/2 -translate-y-1/2 w-11 h-11 flex items-center justify-center text-slate-400 hover:text-slate-600 disabled:opacity-50 transition-colors"
-                  aria-label={showPassword ? "Hide password" : "Show password"}
-                >
-                  {showPassword ? (
-                    <EyeOff className="w-5 h-5" />
-                  ) : (
-                    <Eye className="w-5 h-5" />
-                  )}
-                </button>
-              </div>
-              {errors.password && (
-                <p className="text-xs text-red-600 mt-1">{errors.password.message}</p>
-              )}
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full h-14 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:opacity-50 text-white text-lg font-semibold rounded-xl transition-colors flex items-center justify-center gap-2 mt-2 shadow-md shadow-blue-600/20"
-            >
-              {loading
-                ? <><Loader2 className="w-5 h-5 animate-spin" /> Signing in…</>
-                : 'Sign In'}
-            </button>
-          </form>
-
-          <p className="text-center text-xs text-slate-400 mt-6">
-            Accounts are created by an administrator
-          </p>
+    <AuthShell
+      accentColor={ACCENT}
+      icon={
+        <div style={{ width: '100%', height: '100%', background: ACCENT, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <ShieldCheck style={{ width: 32, height: 32, color: '#fff' }} />
         </div>
-      </div>
-    </div>
+      }
+      title="Guard Station"
+      subtitle="Renovo Pro"
+      errorMessage={error}
+      isSessionLoading={status === 'loading'}
+    >
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <div>
+          <label htmlFor="username" style={{ display: 'block', fontSize: 13, fontWeight: 600, color: colors.textPrimary, marginBottom: 6 }}>
+            Username
+          </label>
+          <input
+            id="username"
+            autoComplete="username"
+            {...register('username')}
+            disabled={loading}
+            className="disabled:opacity-50"
+            style={touchInput}
+            onFocus={(e) => { e.currentTarget.style.borderColor = ACCENT; e.currentTarget.style.boxShadow = `0 0 0 3px ${ACCENT}33` }}
+            onBlur={(e) => { e.currentTarget.style.borderColor = '#ABABAB'; e.currentTarget.style.boxShadow = 'none' }}
+          />
+          {errors.username && (
+            <p className="text-xs mt-1" style={{ color: colors.danger }}>{errors.username.message}</p>
+          )}
+        </div>
+
+        <div>
+          <label htmlFor="password" style={{ display: 'block', fontSize: 13, fontWeight: 600, color: colors.textPrimary, marginBottom: 6 }}>
+            Password
+          </label>
+          <div className="relative">
+            <input
+              id="password"
+              type={showPassword ? 'text' : 'password'}
+              autoComplete="current-password"
+              {...register('password')}
+              disabled={loading}
+              className="disabled:opacity-50"
+              style={{ ...touchInput, paddingRight: 48 }}
+              onFocus={(e) => { e.currentTarget.style.borderColor = ACCENT; e.currentTarget.style.boxShadow = `0 0 0 3px ${ACCENT}33` }}
+              onBlur={(e) => { e.currentTarget.style.borderColor = '#ABABAB'; e.currentTarget.style.boxShadow = 'none' }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              disabled={loading}
+              className="absolute right-1 top-1/2 -translate-y-1/2 w-11 h-11 flex items-center justify-center disabled:opacity-50 transition-colors"
+              style={{ color: colors.textMuted }}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+            >
+              {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+            </button>
+          </div>
+          {errors.password && (
+            <p className="text-xs mt-1" style={{ color: colors.danger }}>{errors.password.message}</p>
+          )}
+        </div>
+
+        <button
+          type="submit"
+          disabled={loading}
+          style={{ ...submitBtn(ACCENT), ...(loading ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
+          onMouseEnter={(e) => { if (!loading) e.currentTarget.style.filter = 'brightness(0.92)' }}
+          onMouseLeave={(e) => { e.currentTarget.style.filter = 'none' }}
+        >
+          {loading
+            ? <><Loader2 className="w-5 h-5 animate-spin" /> Signing in…</>
+            : 'Sign In'}
+        </button>
+      </form>
+    </AuthShell>
   )
+}
+
+const touchInput: React.CSSProperties = {
+  width: '100%', height: 48, border: '1px solid #ABABAB', borderRadius: 3,
+  padding: '0 14px', fontSize: 15, outline: 'none', boxSizing: 'border-box',
+}
+
+function submitBtn(accent: string): React.CSSProperties {
+  return {
+    width: '100%', height: 56, marginTop: 8, border: 'none', borderRadius: 3,
+    background: accent, color: '#fff', fontSize: 16, fontWeight: 600,
+    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+    cursor: 'pointer', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.25), 0 2px 6px rgba(0,0,0,0.25)',
+  }
 }
