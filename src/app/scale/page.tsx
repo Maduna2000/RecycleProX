@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useMemo, useCallback } from 'react'
-import { ChevronLeft } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { offlineDB } from '@/lib/offline/db'
 import Step1Customer, { type SelectedCustomer } from './components/Step1Customer'
@@ -10,6 +9,8 @@ import Step3Weight  from './components/Step3Weight'
 import Step4Photos  from './components/Step4Photos'
 import Step5LineAdded, { type CartLine } from './components/Step5LineAdded'
 import Step6Review  from './components/Step5Review'
+import { KioskShell } from '@/components/kiosk/KioskShell'
+import { colors } from '@/lib/design-tokens'
 
 // Step config type
 interface StepConfig {
@@ -255,61 +256,21 @@ export default function ScalePage() {
     : 'animate-in slide-in-from-left  duration-[220ms]'
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
-
-      {/* Progress bar */}
-      <div className="bg-white border-b border-slate-200 px-4 py-3 shrink-0">
-        <div className="flex items-center gap-2 max-w-lg mx-auto lg:max-w-none">
-
-          {step > 1 && (
-            <button
-              onClick={handleBack}
-              className="flex items-center gap-1 text-slate-500 text-sm min-h-[44px] px-2 rounded-lg hover:text-slate-800 hover:bg-slate-100 transition-colors shrink-0"
-            >
-              <ChevronLeft className="w-4 h-4" />
-              <span className="hidden sm:inline">Back</span>
-            </button>
-          )}
-
-          {/* Cart badge — shown once at least 1 item in cart */}
-          {cart.length > 0 && step < 6 && (
-            <span className="hidden sm:inline-flex items-center gap-1 text-xs font-medium bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-full shrink-0">
-              {cart.length} item{cart.length !== 1 ? 's' : ''} in order
-            </span>
-          )}
-
-          <div className="flex justify-between items-center flex-1 lg:hidden">
-            {enabledSteps.map((label, i) => {
-              const num    = i + 1
-              const active = displayStep === num
-              const done   = displayStep > num
-              return (
-                <div key={label} className="flex flex-col items-center gap-1 flex-1">
-                  <div className={cn(
-                    'w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-colors',
-                    done   ? 'bg-emerald-500 text-white'                         : '',
-                    active ? 'bg-emerald-600 text-white ring-4 ring-emerald-100' : '',
-                    !done && !active ? 'bg-slate-200 text-slate-400'             : '',
-                  )}>
-                    {done ? '✓' : num}
-                  </div>
-                  <span className={cn(
-                    'text-xs hidden sm:block',
-                    active ? 'text-emerald-700 font-semibold' : 'text-slate-400',
-                  )}>
-                    {label}
-                  </span>
-                </div>
-              )
-            })}
-          </div>
-
-          <span className="hidden lg:inline text-sm text-slate-500 font-medium">
-            Step {displayStep} of {enabledSteps.length} — {enabledSteps[displayStep - 1]}
+    <KioskShell
+      current={displayStep}
+      total={enabledSteps.length}
+      stepLabel={enabledSteps[displayStep - 1]!}
+      canGoBack={step > 1}
+      onBack={handleBack}
+      accentColor={colors.action}
+      rightSlot={
+        cart.length > 0 && step < 6 ? (
+          <span className="inline-flex items-center gap-1 text-xs font-medium bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-full">
+            {cart.length} item{cart.length !== 1 ? 's' : ''} in order
           </span>
-        </div>
-      </div>
-
+        ) : undefined
+      }
+    >
       {/* Body */}
       <div className="flex-1 flex overflow-hidden">
 
@@ -403,6 +364,6 @@ export default function ScalePage() {
           )}
         </div>
       </div>
-    </div>
+    </KioskShell>
   )
 }
