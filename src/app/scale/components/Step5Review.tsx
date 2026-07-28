@@ -71,7 +71,7 @@ export default function Step5Review({ customer, cart, onRemoveLine, onUpdateLine
         }))
 
         const payload = customer.id
-          ? { customerId: customer.id, lines }
+          ? { customerId: customer.id, lines, gateEntryId: customer.gateEntryId }
           : {
               casualFirstName: customer.firstName,
               casualLastName:  customer.lastName,
@@ -79,6 +79,7 @@ export default function Step5Review({ customer, cart, onRemoveLine, onUpdateLine
               casualIdNumber:  customer.idNumber,
               casualAddress:   customer.address,
               lines,
+              gateEntryId:     customer.gateEntryId,
             }
 
         const res = await fetch('/api/scale/orders', {
@@ -95,6 +96,11 @@ export default function Step5Review({ customer, cart, onRemoveLine, onUpdateLine
         finalOrderNumber = order.orderNumber
       } else {
         // ── Offline: Create locally ─────────────────────────────────────────
+        // customer.gateEntryId (if any) isn't threaded through here — the
+        // queue-number lookup itself already requires network, so reaching
+        // this branch with one set is a rare edge case (went offline after
+        // resolving a queue number, before submitting). The queue number
+        // just stays open in that case; nothing else is affected.
         const result = await createOfflineScaleOrder({
           customerId: customer.id,
           casualFirstName: customer.id ? null : customer.firstName,

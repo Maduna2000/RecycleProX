@@ -920,10 +920,14 @@ model ScaleOrder {
   casualPhone     String?
   lineCount       Int              @default(1)
   casualIdNumber  String?
+  // Traceability back to the Gate visit this order was started from, when the
+  // operator resolved the customer via a queue number rather than ID/search.
+  gateEntryId     String?
   customer        Customer?        @relation(fields: [customerId], references: [id])
   operator        User             @relation("ScaleOrderOperator", fields: [operatorId], references: [id])
   product         Product          @relation("ScaleOrderProduct", fields: [productId], references: [id])
   voidedBy        User?            @relation("ScaleOrderVoidedBy", fields: [voidedById], references: [id])
+  gateEntry       GateEntry?       @relation(fields: [gateEntryId], references: [id])
   lines           ScaleOrderLine[]
   purchase        Purchase?
 
@@ -934,6 +938,7 @@ model ScaleOrder {
   @@index([tenantId, operatorId])
   @@index([tenantId, status])
   @@index([tenantId, createdAt])
+  @@index([tenantId, gateEntryId])
 }
 
 model ScaleOrderLine {
@@ -979,9 +984,18 @@ model GateEntry {
   exitedAt          DateTime?
   exitedById        String?
   createdAt         DateTime         @default(now())
+  // Queue number for the Scale Station — only set for purpose === 'sell'
+  // (the only visits that actually go weigh something in). Sequential per
+  // tenant per day, generated the same way entryNumber is (counted inside
+  // the same create transaction). queueNumberUsedAt is set atomically by
+  // createScaleOrder() when a scale order is actually created from it —
+  // a lookup alone never consumes it, only a submitted order does.
+  queueNumber       Int?
+  queueNumberUsedAt DateTime?
   customer          Customer?        @relation(fields: [customerId], references: [id])
   operator          User             @relation("GateEntryOperator", fields: [operatorId], references: [id])
   exitedBy          User?            @relation("GateEntryExitedBy", fields: [exitedById], references: [id])
+  scaleOrders       ScaleOrder[]
 
   @@unique([tenantId, entryNumber])
   @@index([tenantId])

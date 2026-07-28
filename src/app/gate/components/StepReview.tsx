@@ -24,7 +24,7 @@ const PURPOSE_LABELS: Record<Purpose, string> = {
 export default function StepReview({ visitor, purpose, categoryNames, vehicleReg, photoKeys, notes, onSubmitted }: Props) {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [done, setDone] = useState<{ entryNumber: string } | null>(null)
+  const [done, setDone] = useState<{ entryNumber: string; queueNumber: number | null } | null>(null)
 
   async function handleSubmit() {
     setSubmitting(true)
@@ -50,7 +50,7 @@ export default function StepReview({ visitor, purpose, categoryNames, vehicleReg
         throw new Error(d.error ?? 'Failed to register entry')
       }
       const entry = await res.json()
-      setDone({ entryNumber: entry.entryNumber })
+      setDone({ entryNumber: entry.entryNumber, queueNumber: entry.queueNumber ?? null })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to register entry')
     } finally {
@@ -65,7 +65,13 @@ export default function StepReview({ visitor, purpose, categoryNames, vehicleReg
           <CheckCircle2 className="w-12 h-12 sm:w-14 sm:h-14 text-emerald-600" />
         </div>
         <h2 className="text-2xl sm:text-3xl font-bold text-slate-800">Entry Registered</h2>
-        <p className="font-mono text-base sm:text-lg font-semibold text-blue-700 bg-blue-50 px-4 py-1.5 rounded-full">{done.entryNumber}</p>
+        {done.queueNumber !== null && (
+          <div className="flex flex-col items-center gap-1">
+            <span className="text-slate-500 text-sm font-medium uppercase tracking-wide">Queue Number</span>
+            <span className="text-5xl sm:text-6xl font-bold text-blue-700">{done.queueNumber}</span>
+          </div>
+        )}
+        <p className="font-mono text-sm text-slate-400">{done.entryNumber}</p>
         <button
           onClick={onSubmitted}
           className="mt-4 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-lg font-semibold h-14 px-8 rounded-xl transition-colors shadow-md shadow-blue-600/20"

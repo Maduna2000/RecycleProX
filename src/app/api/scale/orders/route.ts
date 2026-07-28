@@ -5,7 +5,7 @@ import { runWithRequestTenant } from '@/lib/db/tenantContext'
 import { CreateScaleOrderSchema } from '@/lib/schemas/scale'
 import {
   listScaleOrders, createScaleOrder,
-  ScaleCustomerNotFoundError, ScaleProductInactiveError,
+  ScaleCustomerNotFoundError, ScaleProductInactiveError, GateQueueNumberAlreadyUsedError,
 } from '@/lib/services/scaleService'
 
 export async function GET(req: NextRequest) {
@@ -54,8 +54,9 @@ export async function POST(req: NextRequest) {
     const order = await runWithRequestTenant(req, () => createScaleOrder(parsed.data, session.user.id))
     return NextResponse.json(order, { status: 201 })
   } catch (err) {
-    if (err instanceof ScaleCustomerNotFoundError)  return NextResponse.json({ error: err.message }, { status: 404 })
-    if (err instanceof ScaleProductInactiveError)   return NextResponse.json({ error: err.message }, { status: 422 })
+    if (err instanceof ScaleCustomerNotFoundError)      return NextResponse.json({ error: err.message }, { status: 404 })
+    if (err instanceof ScaleProductInactiveError)       return NextResponse.json({ error: err.message }, { status: 422 })
+    if (err instanceof GateQueueNumberAlreadyUsedError) return NextResponse.json({ error: err.message }, { status: 409 })
     logger.error({ err }, 'POST /api/scale/orders failed')
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }

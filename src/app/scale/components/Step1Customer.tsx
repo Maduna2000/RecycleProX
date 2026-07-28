@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Search, UserPlus, Users, ArrowRight, Loader2, AlertCircle, WifiOff, CheckCircle } from 'lucide-react'
+import { Search, UserPlus, Users, ArrowRight, Loader2, AlertCircle, WifiOff, CheckCircle, Hash, Clock } from 'lucide-react'
 import { useScaleCache } from '@/hooks/useScaleCache'
 
 const CasualSchema = z.object({
@@ -25,6 +25,15 @@ export interface SelectedCustomer {
   idNumber?: string
   address?:  string
   isNew?:    boolean
+  /** Set when resolved via a Gate Station queue number — carried through to order creation so it gets marked consumed. */
+  gateEntryId?: string
+}
+
+interface QueueWaiting {
+  gateEntryId:     string
+  queueNumber:     number
+  name:            string
+  isAccountHolder: boolean
 }
 
 interface Props {
@@ -50,7 +59,64 @@ export default function Step1Customer({ onSelect }: Props) {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const { isOnline, searchCustomers } = useScaleCache()
 
+  // ── Gate Station queue number: an alternative to typing the ID number.
+  // Either field, whichever is used, auto-fills the same way.
+  const [queueNumber, setQueueNumber] = useState('')
+  const [queueGateEntryId, setQueueGateEntryId] = useState<string | undefined>(undefined)
+  const [queueLookingUp, setQueueLookingUp] = useState(false)
+  const [queueError, setQueueError] = useState<string | null>(null)
+  const [queueWaiting, setQueueWaiting] = useState<QueueWaiting[]>([])
+
   const form = useForm<CasualForm>({ resolver: zodResolver(CasualSchema) })
+
+  useEffect(() => {
+    fetch('/api/scale/queue')
+      .then((r) => r.json())
+      .then((d) => setQueueWaiting(d.queue ?? []))
+      .catch(() => setQueueWaiting([]))
+  }, [])
+
+  async function resolveQueueNumber(raw: string) {
+    const n = Number(raw)
+    if (!raw || !Number.isInteger(n) || n <= 0) return
+
+    setQueueLookingUp(true)
+    setQueueError(null)
+    try {
+      const res = await fetch(`/api/scale/queue-lookup?queueNumber=${n}`)
+      const data = await res.json()
+      if (!res.ok) {
+        setQueueError(data.error ?? 'Queue number not found')
+        return
+      }
+
+      if (data.customer.id) {
+        // Resolves straight to the real account customer — same outcome as
+        // picking them from the account-search list.
+        onSelect({
+          id:          data.customer.id,
+          firstName:   data.customer.firstName,
+          lastName:    data.customer.lastName,
+          phone:       data.customer.phone,
+          gateEntryId: data.gateEntryId,
+        })
+        return
+      }
+
+      // Walk-in captured at the gate — pre-fill the casual form, operator
+      // still reviews and hits Continue, same as the ID-number lookup below.
+      setMode('casual')
+      setQueueGateEntryId(data.gateEntryId)
+      form.setValue('firstName', data.customer.firstName, { shouldValidate: true })
+      form.setValue('lastName', data.customer.lastName, { shouldValidate: true })
+      form.setValue('phone', data.customer.phone || '')
+      if (data.customer.idNumber) form.setValue('idNumber', data.customer.idNumber, { shouldValidate: true })
+    } catch {
+      setQueueError('Queue lookup failed')
+    } finally {
+      setQueueLookingUp(false)
+    }
+  }
 
   async function runSearch(query: string) {
     setSearching(true)
@@ -134,7 +200,8 @@ export default function Step1Customer({ onSelect }: Props) {
       phone: data.phone,
       idNumber: data.idNumber || undefined,
       address: data.address || undefined,
-      isNew: true
+      isNew: true,
+      gateEntryId: queueGateEntryId,
     })
   }
 
@@ -144,6 +211,33 @@ export default function Step1Customer({ onSelect }: Props) {
       <div className="flex-1 flex flex-col items-center justify-center p-6 gap-5">
         <h2 className="text-2xl font-bold text-slate-800 text-center">Customer Type</h2>
         <p className="text-slate-500 text-center">Select how to identify this customer</p>
+
+        {queueWaiting.length > 0 && (
+          <div className="w-full max-w-sm bg-white rounded-2xl shadow-sm p-3">
+            <div className="flex items-center gap-1.5 text-slate-500 text-xs font-semibold uppercase tracking-wide mb-2 px-1">
+              <Clock className="w-3.5 h-3.5" /> Waiting
+            </div>
+            <div className="flex flex-col gap-1.5 max-h-48 overflow-y-auto">
+              {queueWaiting.map((q) => (
+                <button
+                  key={q.gateEntryId}
+                  onClick={() => resolveQueueNumber(String(q.queueNumber))}
+                  disabled={queueLookingUp}
+                  className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-slate-50 active:bg-slate-100 transition-colors text-left disabled:opacity-50"
+                >
+                  <span className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 font-bold text-sm flex items-center justify-center shrink-0">
+                    {q.queueNumber}
+                  </span>
+                  <span className="text-slate-700 text-sm font-medium truncate">{q.name}</span>
+                  {q.isAccountHolder && (
+                    <span className="ml-auto text-[10px] font-semibold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full shrink-0">Account</span>
+                  )}
+                </button>
+              ))}
+            </div>
+            {queueError && <p className="text-red-500 text-xs mt-1.5 px-1">{queueError}</p>}
+          </div>
+        )}
 
         <div className="w-full max-w-sm flex flex-col gap-4 mt-2">
           <button
@@ -187,6 +281,37 @@ export default function Step1Customer({ onSelect }: Props) {
         <p className="text-slate-500 mb-6">Enter the walk-in customer&apos;s information</p>
 
         <form onSubmit={form.handleSubmit(handleCasualSubmit)} className="flex flex-col gap-4">
+          {/* 0. Queue Number - alternative to typing the ID number below; either one auto-fills */}
+          <div>
+            <label className="text-sm font-medium text-slate-700 block mb-1">Queue Number</label>
+            <div className="relative">
+              <Hash className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+              <input
+                value={queueNumber}
+                onChange={(e) => { setQueueNumber(e.target.value); setQueueError(null) }}
+                onBlur={(e) => resolveQueueNumber(e.target.value)}
+                inputMode="numeric"
+                autoComplete="off"
+                className="w-full border border-slate-300 rounded-xl pl-11 pr-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                placeholder="Given at the gate, e.g. 5"
+              />
+              {queueLookingUp && (
+                <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 animate-spin" />
+              )}
+            </div>
+            {queueError && (
+              <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+                <AlertCircle className="w-3.5 h-3.5" /> {queueError}
+              </p>
+            )}
+            {queueGateEntryId && !queueError && (
+              <p className="text-emerald-600 text-xs mt-1 flex items-center gap-1">
+                <CheckCircle className="w-3 h-3" /> Details filled in from the gate
+              </p>
+            )}
+            <p className="text-slate-400 text-xs mt-1">Or enter the National ID below — either one works</p>
+          </div>
+
           {/* 1. National ID - FIRST FIELD */}
           <div>
             <label className="text-sm font-medium text-slate-700 block mb-1">National ID / Passport *</label>

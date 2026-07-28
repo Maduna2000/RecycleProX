@@ -53,6 +53,15 @@ async function generateEntryNumber(tx: TxClient, date: Date): Promise<string> {
   return `${prefix}-${String(count + 1).padStart(4, '0')}`
 }
 
+// Queue number for the Scale Station — a short, callable-out-loud sequence
+// (1, 2, 3...) that resets each day, counted only against today's other
+// "sell" entries so it stays meaningful (only sell visits go to the scale).
+async function generateQueueNumber(tx: TxClient, date: Date): Promise<number> {
+  const startOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+  const count = await tx.gateEntry.count({ where: { createdAt: { gte: startOfDay }, purpose: 'sell' } })
+  return count + 1
+}
+
 // ─── Repeat-visit lookup ──────────────────────────────────────────────────────
 // Matches on visitorIdNumber against this table's own history, independent of
 // whether the visitor has ever become a real Customer — so it works for both.
@@ -91,11 +100,14 @@ export async function createGateEntry(data: CreateGateEntryInput, operatorId: st
   }
 
   const entry = await prisma.$transaction(async (tx) => {
-    const entryNumber = await generateEntryNumber(tx, new Date())
+    const now = new Date()
+    const entryNumber = await generateEntryNumber(tx, now)
+    const queueNumber  = data.purpose === 'sell' ? await generateQueueNumber(tx, now) : null
     return tx.gateEntry.create({
       data: {
         tenantId,
         entryNumber,
+        queueNumber,
         purpose:           data.purpose,
         categoryNames:     data.purpose === 'sell' ? (data.categoryNames ?? []) : [],
         customerId:        customer?.id ?? null,
@@ -201,6 +213,56 @@ export async function getGateEntryById(id: string) {
   })
   if (!entry) throw new GateEntryNotFoundError(id)
   return entry
+}
+
+// ─── Scale Station queue (queueNumber -> customer/casual auto-fill) ──────────
+// A queue number only ever resolves TODAY's own entries — a same-day
+// convenience, not a permanent lookup key the way entryNumber is.
+
+export class QueueNumberNotFoundError extends Error {
+  constructor(queueNumber: number) {
+    super(`No open queue number ${queueNumber} found for today`)
+    this.name = 'QueueNumberNotFoundError'
+  }
+}
+
+export class QueueNumberAlreadyUsedError extends Error {
+  constructor(queueNumber: number) {
+    super(`Queue number ${queueNumber} has already been used`)
+    this.name = 'QueueNumberAlreadyUsedError'
+  }
+}
+
+function startOfToday(): Date {
+  const now = new Date()
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate())
+}
+
+export async function getGateEntryByQueueNumber(queueNumber: number) {
+  const entry = await prisma.gateEntry.findFirst({
+    where: { queueNumber, purpose: 'sell', createdAt: { gte: startOfToday() } },
+    include: {
+      customer: { select: { id: true, firstName: true, lastName: true, phone: true, blacklisted: true, blacklistReason: true } },
+    },
+  })
+  if (!entry) throw new QueueNumberNotFoundError(queueNumber)
+  if (entry.customer?.blacklisted) throw new GateVisitorBlacklistedError(entry.customer.blacklistReason)
+  if (entry.queueNumberUsedAt) throw new QueueNumberAlreadyUsedError(queueNumber)
+  return entry
+}
+
+// Today's still-waiting queue — shown at the Scale Station so the operator
+// can see who's next and jump straight to them instead of typing a number.
+export async function listOpenQueue() {
+  return prisma.gateEntry.findMany({
+    where: { purpose: 'sell', queueNumber: { not: null }, queueNumberUsedAt: null, createdAt: { gte: startOfToday() } },
+    select: {
+      id: true, queueNumber: true, entryNumber: true, createdAt: true,
+      visitorFirstName: true, visitorLastName: true,
+      customer: { select: { id: true, firstName: true, lastName: true } },
+    },
+    orderBy: { queueNumber: 'asc' },
+  })
 }
 
 // ─── On-site stats (dashboard tile) ───────────────────────────────────────────

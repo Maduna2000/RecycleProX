@@ -30,6 +30,10 @@ export class ScaleProductInactiveError extends Error {
   constructor() { super('Selected product is inactive'); this.name = 'ScaleProductInactiveError' }
 }
 
+export class GateQueueNumberAlreadyUsedError extends Error {
+  constructor() { super('This gate visit has already been used to start an order'); this.name = 'GateQueueNumberAlreadyUsedError' }
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
@@ -124,6 +128,17 @@ export async function createScaleOrder(data: CreateScaleOrderInput, operatorId: 
 
   const order = await prisma.$transaction(async (tx) => {
     const tenantId = requireTenantId()
+
+    // Consuming a queue number is atomic with the order it produces — a
+    // lookup alone (getGateEntryByQueueNumber) never marks anything used;
+    // only an order that actually gets created here does. Re-checked here
+    // (not just at lookup time) so two operators can't race the same number.
+    if (data.gateEntryId) {
+      const gateEntry = await tx.gateEntry.findUnique({ where: { id: data.gateEntryId } })
+      if (gateEntry?.queueNumberUsedAt) throw new GateQueueNumberAlreadyUsedError()
+      await tx.gateEntry.update({ where: { id: data.gateEntryId }, data: { queueNumberUsedAt: new Date() } })
+    }
+
     const orderNumber = await generateOrderNumber(tx, new Date())
     const created = await tx.scaleOrder.create({
       data: {
@@ -141,6 +156,7 @@ export async function createScaleOrder(data: CreateScaleOrderInput, operatorId: 
         status:          'pending',
         operatorId,
         notes:           data.notes,
+        gateEntryId:     data.gateEntryId ?? null,
       },
     })
 

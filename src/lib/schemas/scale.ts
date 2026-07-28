@@ -22,6 +22,8 @@ export const CreateScaleOrderSchema = z.object({
   casualAddress:   z.string().optional(),
   lines:           z.array(FlexibleLineInputSchema).min(1).max(20),
   notes:           z.string().max(500).optional(),
+  /** Set when the operator resolved the customer via a Scale Station queue-number lookup. */
+  gateEntryId:     z.string().uuid().optional(),
 }).refine(
   d => d.customerId || (d.casualFirstName && d.casualLastName && d.casualPhone),
   { message: 'Either customerId or casual customer details (firstName, lastName, phone) are required' },
@@ -30,6 +32,10 @@ export const CreateScaleOrderSchema = z.object({
 export const VoidScaleOrderSchema = z.object({
   voidReason: z.string().min(3, 'Void reason must be at least 3 characters'),
 })
+
+// ─── Gate queue-number lookup (Scale Station) ────────────────────────────────
+
+export const QueueNumberSchema = z.coerce.number().int().positive()
 
 // ─── Step Config Schemas ──────────────────────────────────────────────────────
 
