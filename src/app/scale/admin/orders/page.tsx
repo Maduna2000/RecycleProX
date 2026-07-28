@@ -191,7 +191,7 @@ export default function ScaleOrdersPage() {
           {data?.total !== undefined && (
             <span style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>{data.total} total</span>
           )}
-          <Btn size="sm" icon={RefreshCw} loading={isFetching} onClick={() => refetch()} title="Refresh orders" />
+          <Btn size="sm" icon={RefreshCw} loading={isFetching} onClick={() => refetch()} title="Refresh orders">Refresh</Btn>
           <Btn size="sm" icon={Download} onClick={() => exportOrders('csv')}>CSV</Btn>
           <Btn size="sm" icon={Download} onClick={() => exportOrders('xlsx')}>Excel</Btn>
         </>

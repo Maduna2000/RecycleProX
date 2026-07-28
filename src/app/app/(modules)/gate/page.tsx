@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import {
   Search, X, RefreshCw, Images, CheckCircle2, EyeOff,
-  UserPlus, Eye, ShieldCheck, Info, LogOut, Package, Plus, Pencil, Trash2,
+  UserPlus, Eye, Info, LogOut, Package, Plus, Pencil, Trash2,
 } from 'lucide-react'
 import * as LucideIcons from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -847,11 +847,6 @@ function GateManagementInner() {
       tabs={[...TABS]}
       active={activeTab}
       onChange={changeTab}
-      actions={
-        <Btn size="sm" icon={ShieldCheck} href="/gate" target="_blank">
-          Open Guard Station
-        </Btn>
-      }
     >
       {activeTab === 'entries' && <EntriesTab />}
       {activeTab === 'guards'  && <GuardsTab />}
