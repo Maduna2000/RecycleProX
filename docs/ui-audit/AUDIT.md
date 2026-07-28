@@ -4,7 +4,7 @@ Read-only audit. No code was changed in the production of this report. Companion
 
 **Coverage:** every route under `src/app` and every file under `src/components` was read by at least one of four parallel research passes plus direct review of the shared shell/token files. Every finding below is a source-code claim with a file:line citation; true rendered contrast ratios and pixel-level layout breakage were not independently visually verified and are called out as such where it matters.
 
-**Execution status:** [`BACKLOG.md`](./BACKLOG.md) BATCH-1 (Tokens & gradients) has been executed — see the **STATUS: FIXED**/**STATUS: PARTIALLY FIXED** annotations inline on the affected findings below, plus an "Additional BATCH-1 fixes" note after FND-025 for drift that was fixed without its own numbered finding. Verified via `tsc --noEmit` and `next lint` (both clean — 3 pre-existing warnings unrelated to this batch). BATCH-2 through BATCH-6 remain open.
+**Execution status:** [`BACKLOG.md`](./BACKLOG.md) BATCH-1 (Tokens & gradients) and BATCH-2 (Controls: buttons, form inputs, radii, heights) have both been executed — see the **STATUS: FIXED**/**STATUS: PARTIALLY FIXED** annotations inline on the affected findings below, plus "Additional BATCH-1/BATCH-2 fixes" notes for drift that was fixed without its own numbered finding. Verified via `tsc --noEmit` and `next lint` after each batch (both clean — 3 pre-existing warnings unrelated to either batch). BATCH-3 through BATCH-6 remain open.
 
 ---
 
@@ -136,6 +136,10 @@ Columns: **Shell** (AppShell/kiosk-consistent chrome) · **Cmd** (command/toolba
 ## Findings
 
 ### [SEV-1] FND-001 · Four independent button implementations collide on the same screens
+
+**STATUS: FIXED (BATCH-2), with one documented deviation from the original plan.** `rpx/Btn`'s own radius inconsistency was fixed first (`btnSecondary`/`btnDanger` moved from 2px to 3px, matching `btnPrimary`), and an inner-highlight bevel (`inset 0 1px 0 rgba(255,255,255,0.6)`) was added to all three variants (`rpx/styles.ts`). `ui/button.tsx` (the shadcn/base-ui Button rendered directly inside `ui/dialog.tsx`, `ui/alert-dialog.tsx`, `ui/sheet.tsx`, and 9 other files) was restyled — not replaced — to match: `rounded-lg` → `rounded-[3px]`, the `active:translate-y-px` press effect removed, `default`/`secondary` variants now render the same `BAR_GRAD` fill + bevel as `Btn`, `destructive` keeps the grey fill with `colors.danger` red text (matching the house "signal severity by text color, not a solid block" convention), and — the highest-impact single change here — `outline` (the variant rendered in every ordinary Dialog/AlertDialog Close/Cancel slot, confirmed the most frequent call site of the 9) now renders white/bordered/`#212529` instead of the oklch `bg-background`/`border-border` theme classes. Restyling one shared component rather than touching 12 call sites was the deliberate lower-risk choice. Both `legacyBtn` copies (`AccountSelectorPanel.tsx`, `CasualSelectorPanel.tsx` — previously 32px vs. 28px, disagreeing with each other) were deleted and replaced with `Btn`.
+
+**Deviation from the original BACKLOG plan:** converting the `LoansTab`/`BusinessLoanTab` ad hoc gradient CTA buttons to `<Btn variant="primary">` was **not** done — `Btn`'s variants are all the same flat grey, and forcing these through it would have erased the green-vs-violet accent that's intentionally distinct per this project's own established "differentiate mirrored features" convention (Business Loan must not look identical to Loan). Instead, these buttons were brought in line with `Btn`'s *structural* spec (3px radius, matching bevel) while keeping their own `ACTION_GRAD`/`VIOLET_GRAD` accent colors.
 **Pages:** Virtually every dialog-heavy page — customers, purchases, sales, stock, stocktake, cashup, expenses, payments, police-register, photos, support (any page whose toolbar/body uses `Btn` but which also opens a `Dialog`/`Sheet`/`AlertDialog`, since those primitives themselves import the shadcn button).
 **Evidence:** `src/components/rpx/Btn.tsx` (house, flat-grey `BAR_GRAD`, 63 importers) vs. `src/components/ui/button.tsx:1-61` (shadcn/base-ui, `rounded-lg`, heights 24/28/32/36px, `active:translate-y-px`, used directly by `ui/dialog.tsx:7`, `ui/alert-dialog.tsx`, `ui/sheet.tsx`, and 9 other files) vs. `components/customers/AccountSelectorPanel.tsx:9-15` (`legacyBtn`, 32px) vs. `components/customers/CasualSelectorPanel.tsx:10-16` (`legacyBtn`, 28px — doesn't match the first copy) vs. `components/customers/LoansTab.tsx:162,202` and `BusinessLoanTab.tsx:195,217` (ad hoc gradient `<button>`, bypassing every button component for the tab's primary CTA).
 **Problem:** four visually distinct button languages render across the app, including on the same screen (a page's flat-grey toolbar button beside a dialog's rounded shadcn footer button).
@@ -162,6 +166,8 @@ Columns: **Shell** (AppShell/kiosk-consistent chrome) · **Cmd** (command/toolba
 **Effort:** S (mechanical half) + M (judgment-call half)   **Risk:** Low   **Blast radius:** ~20 files
 
 ### [SEV-1] FND-004 · Two parallel design-token systems produce visible height/radius mismatches within a single screen
+
+**STATUS: FIXED (BATCH-2).** All 4 payment modals (`SplitPaymentModal.tsx`, `ProcessPaymentModal.tsx`, `SaleSplitPaymentModal.tsx`, `RecordPaymentModal.tsx`) now use `inp`-styled native `<input>`/`<select>` instead of shadcn `Input`/`Select`. `stock/page.tsx`'s `AdjustmentModal` now uses `Field`+`inp` throughout (previously mixed shadcn `Input`/`Label` with an `inp`-styled native select). `reports/_components/DateRangeFilter.tsx` — the single clearest in-frame instance of this finding (its `h-9`/`rounded-md` inputs sat directly beside 30px/2px rpx filters in the same row) — now uses `Field`+`inp` for From/To and a house-radius (2px) container for the Quick Range segmented control. `products/page.tsx`'s Create/Edit/Bulk-Price modals (8 Label+Input pairs, 4 Select instances) now use `Field`+`inp` throughout, including the category `<select>`s (previously shadcn `Select` with `React.Fragment`-grouped `SelectItem`s, now the equivalent native `<option>` structure).
 **Pages:** Reports (`DateRangeFilter` `h-9`/`rounded-md` beside 30px/2px rpx filters in the same row — the single clearest in-frame instance), Stock (`AdjustmentModal` mixes shadcn `Input`/`Label` with an `inp`-styled native select), all 4 purchases/sales payment modals (shadcn `Input`/`Select` inside rpx `Dialog` chrome), Products (Create/Edit modals 100% shadcn beside a 100% rpx filter bar in the same file).
 **Evidence:** `reports/_components/ReportViewer.tsx:332-341`, `DateRangeFilter.tsx:34,38,43`; `stock/page.tsx` `AdjustmentModal`; `SplitPaymentModal.tsx`/`ProcessPaymentModal.tsx`/`RecordPaymentModal.tsx`/`SaleSplitPaymentModal.tsx`; `products/page.tsx:183-213` vs. `:291-729`.
 **Problem:** two input-control skins (30px/2px vs. Tailwind's ~36px/6-10px) appear side-by-side or inside the same modal repeatedly.
@@ -226,6 +232,8 @@ Columns: **Shell** (AppShell/kiosk-consistent chrome) · **Cmd** (command/toolba
 **Effort:** S (trivial)   **Blast radius:** 1 file
 
 ### [SEV-2] FND-014 · Button order is reversed on the app's one full-page form
+
+**STATUS: FIXED (BATCH-2).** `customers/new/page.tsx`'s bottom action bar now renders Cancel then Save (left to right), matching every dialog footer in the app. While in this file, its one-off action-bar gradient literal (`linear-gradient(180deg,#F5F5F5 0%,#E8E8E8 100%)` — flagged in TOKENS.md's mapping table for BATCH-1 but missed in that pass) was also caught and fixed to import `HEADER_GRAD`.
 **Evidence:** `customers/new/page.tsx:380-381` renders Save (primary) then Cancel; every dialog footer sampled elsewhere (Blacklist/Delete/Convert/Create-Customer/Void, across purchases/sales/customers) places Cancel first, primary/danger rightmost.
 **Fix:** swap the order on this one action bar.
 **Effort:** S   **Blast radius:** 1 file
@@ -238,6 +246,8 @@ Columns: **Shell** (AppShell/kiosk-consistent chrome) · **Cmd** (command/toolba
 **Effort:** M   **Risk:** Low   **Blast radius:** ~15 files
 
 ### [SEV-2] FND-016 · Money/reference columns are monospace but left-aligned everywhere `DataTable` renders them
+
+**STATUS: FIXED (BATCH-2).** `DataTable.tsx`'s `Column<T>` interface gained an `align?: 'left' | 'right'` option, applied to both the header `<th>` (including flipping the sort-icon's flex justification) and body `<td>`. Applied to the money column in `purchases/page.tsx` and `sales/page.tsx` (Total), all quantity columns in `stock/page.tsx` (Opening/In/Out/On Hand — including fixing the "On Hand" cell's icon+value `flex` wrapper to `justify-end`, since `text-align` doesn't affect block-level flex children) and `stock/grid/page.tsx` (all 6 columns), Buy/Sell/Margin in `products/page.tsx`, and Amount/VAT in `expenses/page.tsx` and Amount in `payments/page.tsx`. **Not touched:** `price-groups/page.tsx` — its outer list has no money column (prices live only in the "Manage" modal's bespoke non-`DataTable` table, a different fix outside this finding's scope as written).
 **Evidence:** `DataTable.tsx` has no alignment prop (grep-confirmed); every DataTable-rendered money column (purchases, sales, products, price-groups) is left-aligned, while hand-built summary/tfoot rows on the detail pages (`purchases/[id]/page.tsx:196,205-227`, `sales/[id]/page.tsx`) correctly right-align via explicit `textAlign`.
 **Why it matters:** the brief specifically calls for right-aligned tabular figures as a Win7 baseline; this is the single most consistent gap in the "lists and data" category.
 **Fix:** add an `align?: 'left'|'right'` column option to `DataTable` and set it for every money/ID/date column across the ~8 lists that use it.
@@ -263,6 +273,14 @@ Columns: **Shell** (AppShell/kiosk-consistent chrome) · **Cmd** (command/toolba
 **Evidence:** `scale/components/printer/PrinterSetupWizard.tsx` + 4 step files, exported via `printer/index.ts`, confirmed zero imports anywhere (grep-verified). Shipped `PrinterSetup.tsx` (wired at `ScaleClientLayout.tsx:8,177`) is emerald-only; the dead wizard mixes blue and emerald.
 **Fix:** delete the dead tree, or wire it in and delete the shipped single-screen version instead — maintaining both in parallel is pure risk with zero upside.
 **Effort:** S (deletion)   **Risk:** none (confirmed unreferenced)   **Blast radius:** 5 files removed
+
+### Additional BATCH-2 fixes (not individually numbered above)
+
+**`RpxDialogContent`'s 10px radius** ([TOKENS.md §5](./TOKENS.md#5-radii-currently-4-competing-values--2px--3px--8px--10px)) — **STATUS: FIXED.** `rpx/Dialog.tsx` now uses 3px, matching every other panel/dialog in the house style. While in this file, its close-button hover color (`'#C0392B'` hardcoded) was also repointed to `colors.danger`.
+
+**Stocktake detail's panel radius** (2px hardcoded vs. `PANEL`'s 3px, [TOKENS.md §5](./TOKENS.md#5-radii-currently-4-competing-values--2px--3px--8px--10px)) — **STATUS: FIXED.** The two content-panel containers (Add Count Entry, Count Entries) in `stocktake/[id]/page.tsx` now spread the imported `PANEL` constant instead of hand-rolling `background`/`border`/`borderRadius`/`overflow` inline — this also changes their border color from `colors.border` (`#E0E0E0`) to `CARD_BORDER`'s `#B0B0B0`, consistent with every other panel in the app. The many small status-badge/pill `borderRadius: 2` values elsewhere in the same file were left as-is — those already correctly match `layout.inputRadius`, this finding was specifically about the panel containers.
+
+**`layout.toolbarH` vs. `AppShell`'s actual rendered height** ([TOKENS.md §7](./TOKENS.md#7-control-heights)) — **STATUS: FIXED.** Token changed from 36 to 32 to match what `AppShell.tsx:706`'s `var(--rpx-toolbar-h, 32px)` actually renders. Confirmed this token is not consumed anywhere in the codebase (`AppShell` hardcodes its own CSS variable rather than importing it) — like `styles.moneyPositive` in BATCH-1, this is a correctness fix for a currently-dead value, not a rendered-output change.
 
 ### [SEV-3] FND-021 · Toast usage is pervasive with no Win7 equivalent
 **Evidence:** 112+ confirmed `toast.*` calls in the back-office batch alone, ~57+ app-wide.

@@ -90,6 +90,7 @@ export default function StockGridPage() {
       key: 'openingQty',
       header: 'Opening',
       width: '88px',
+      align: 'right',
       render: (r) => (
         <span className="font-mono text-xs" style={{ color: colors.textSecondary }}>{r.openingQty}</span>
       ),
@@ -98,6 +99,7 @@ export default function StockGridPage() {
       key: 'purchasedQty',
       header: 'Purchased',
       width: '90px',
+      align: 'right',
       render: (r) => (
         <span className="font-mono text-xs" style={{ color: colors.action }}>{r.purchasedQty}</span>
       ),
@@ -106,6 +108,7 @@ export default function StockGridPage() {
       key: 'soldQty',
       header: 'Sold',
       width: '80px',
+      align: 'right',
       render: (r) => (
         <span className="font-mono text-xs" style={{ color: colors.danger }}>{r.soldQty}</span>
       ),
@@ -114,6 +117,7 @@ export default function StockGridPage() {
       key: 'adjustedQty',
       header: 'Adjusted',
       width: '84px',
+      align: 'right',
       render: (r) => (
         <span className="font-mono text-xs" style={{ color: colors.process }}>{r.adjustedQty}</span>
       ),
@@ -122,6 +126,7 @@ export default function StockGridPage() {
       key: 'closingQty',
       header: 'Closing',
       width: '84px',
+      align: 'right',
       render: (r) => {
         const isNeg = new Decimal(r.closingQty).isNegative()
         return (
@@ -138,6 +143,7 @@ export default function StockGridPage() {
       key: 'closingValue',
       header: 'Value (R)',
       width: '96px',
+      align: 'right',
       render: (r) => (
         <span className="font-mono text-xs" style={{ color: colors.textPrimary }}>R {r.closingValue}</span>
       ),

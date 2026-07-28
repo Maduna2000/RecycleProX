@@ -233,8 +233,10 @@ export const layout = {
   tableRowH:     30,
   /** Top nav zone height */
   navbarH:       48,
-  /** Contextual toolbar zone height */
-  toolbarH:      36,
+  /** Contextual toolbar zone height — matches AppShell's actual rendered
+   * `var(--rpx-toolbar-h, 32px)` (previously declared as 36 here, disagreeing
+   * with what the shell actually renders). */
+  toolbarH:      32,
   /** Zone 3 content padding (all sides) */
   contentPadding: 24,
 } as const

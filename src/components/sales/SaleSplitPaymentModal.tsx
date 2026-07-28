@@ -5,9 +5,8 @@ import { Coins, CreditCard, Wallet, Lock, Split } from 'lucide-react'
 import { toast } from 'sonner'
 import Decimal from 'decimal.js'
 import { Dialog } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
 import { colors } from '@/lib/design-tokens'
-import { Btn, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
+import { Btn, inp, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
 import { AdminPinUnlockModal, type BusinessLoanFullSummary } from '@/components/business-loans/AdminPinUnlockModal'
 
 export type SaleSplitPayTarget = {
@@ -52,23 +51,29 @@ function PaymentInput({
           <button
             type="button"
             onClick={onUnlockClick}
-            className="w-full h-8 text-xs rounded border text-left px-2"
-            style={{ background: '#F5F5F5', borderColor: colors.alertBorder, color: colors.alertIcon }}
+            className="w-full text-xs border text-left px-2"
+            style={{ height: 30, borderRadius: 2, background: '#F5F5F5', borderColor: colors.alertBorder, color: colors.alertIcon }}
           >
             Enter admin PIN to unlock
           </button>
         ) : (
           <>
             <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs" style={{ color: '#6C757D' }}>R</span>
-            <Input
+            <input
               type="text"
               inputMode="decimal"
               placeholder="0.00"
               value={value}
               onChange={(e) => onChange(e.target.value)}
               disabled={disabled || locked}
-              className="h-8 text-xs font-mono pl-6"
-              style={{ borderColor: highlight ? colors.alertBorder : undefined, background: locked ? '#F5F5F5' : undefined }}
+              style={{
+                ...inp,
+                fontFamily: 'monospace',
+                fontSize: 12,
+                paddingLeft: 22,
+                borderColor: highlight ? colors.alertBorder : undefined,
+                background: locked ? '#F5F5F5' : '#fff',
+              }}
             />
           </>
         )}

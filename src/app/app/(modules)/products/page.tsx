@@ -4,9 +4,6 @@ import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSearchParams } from 'next/navigation'
 import useSWR, { mutate } from 'swr'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog } from '@/components/ui/dialog'
 import { Search, Pencil, Eye, EyeOff, Trash2, X, Package } from 'lucide-react'
 import * as LucideIcons from 'lucide-react'
@@ -154,10 +151,10 @@ export default function ProductsPage() {
       },
     },
     { key: 'unit', header: 'Unit', width: '64px', render: (p) => <span style={{ textTransform: 'uppercase', color: '#6C757D', fontSize: 11 }}>{p.unit}</span> },
-    { key: 'buyPrice', header: 'Buy Price', width: '90px', render: (p) => <span style={{ fontFamily: 'monospace', color: colors.action }}>R {new Decimal(p.defaultBuyPrice).toFixed(2)}</span> },
-    { key: 'sellPrice', header: 'Sell Price', width: '90px', render: (p) => <span style={{ fontFamily: 'monospace', color: colors.process }}>R {new Decimal(p.defaultSellPrice).toFixed(2)}</span> },
+    { key: 'buyPrice', header: 'Buy Price', width: '90px', align: 'right', render: (p) => <span style={{ fontFamily: 'monospace', color: colors.action }}>R {new Decimal(p.defaultBuyPrice).toFixed(2)}</span> },
+    { key: 'sellPrice', header: 'Sell Price', width: '90px', align: 'right', render: (p) => <span style={{ fontFamily: 'monospace', color: colors.process }}>R {new Decimal(p.defaultSellPrice).toFixed(2)}</span> },
     {
-      key: 'margin', header: 'Margin', width: '70px',
+      key: 'margin', header: 'Margin', width: '70px', align: 'right',
       render: (p) => { const m = calcMargin(p.defaultBuyPrice, p.defaultSellPrice); return <span style={{ fontFamily: 'monospace', fontWeight: 600, color: m.color }}>{m.pct}</span> },
     },
     {
@@ -312,58 +309,47 @@ function CreateProductModal({ categories, onClose, onSuccess }: { categories: Ca
         <RpxDialogBody>
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label>Product Code</Label>
-              <Input {...register('code')} className="mt-1 uppercase" placeholder="e.g. CU-WIRE" disabled={loading} />
+            <Field label="Product Code">
+              <input {...register('code')} style={{ ...inp, marginTop: 4, textTransform: 'uppercase' }} placeholder="e.g. CU-WIRE" disabled={loading} />
               {errors.code && <p className="text-xs text-red-600 mt-1">{errors.code.message}</p>}
-            </div>
-            <div>
-              <Label>Unit</Label>
-              <Select onValueChange={(v) => setValue('unit', v as 'kg' | 'ton' | 'each' | 'litre')} defaultValue="kg">
-                <SelectTrigger className="mt-1 w-full"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="kg">kg</SelectItem>
-                  <SelectItem value="ton">ton</SelectItem>
-                  <SelectItem value="each">each</SelectItem>
-                  <SelectItem value="litre">litre</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            </Field>
+            <Field label="Unit">
+              <select style={{ ...inp, marginTop: 4 }} onChange={(e) => setValue('unit', e.target.value as 'kg' | 'ton' | 'each' | 'litre')} defaultValue="kg">
+                <option value="kg">kg</option>
+                <option value="ton">ton</option>
+                <option value="each">each</option>
+                <option value="litre">litre</option>
+              </select>
+            </Field>
           </div>
-          <div>
-            <Label>Product Name</Label>
-            <Input {...register('name')} className="mt-1" placeholder="e.g. Bright Copper Wire" disabled={loading} />
+          <Field label="Product Name">
+            <input {...register('name')} style={{ ...inp, marginTop: 4 }} placeholder="e.g. Bright Copper Wire" disabled={loading} />
             {errors.name && <p className="text-xs text-red-600 mt-1">{errors.name.message}</p>}
-          </div>
-          <div>
-            <Label>Category</Label>
-            <Select onValueChange={(v) => setValue('category', v as string)}>
-              <SelectTrigger className="mt-1 w-full"><SelectValue placeholder="Select category" /></SelectTrigger>
-              <SelectContent>
-                {categories.map((c) => (
-                  <React.Fragment key={c.id}>
-                    {c.children.length === 0
-                      ? <SelectItem value={c.name}>{c.name}</SelectItem>
-                      : <SelectItem value={c.name} disabled className="font-semibold opacity-60">{c.name}</SelectItem>
-                    }
-                    {c.children.map(s => <SelectItem key={s.id} value={s.name}>&nbsp;&nbsp;↳ {s.name}</SelectItem>)}
-                  </React.Fragment>
-                ))}
-              </SelectContent>
-            </Select>
+          </Field>
+          <Field label="Category">
+            <select style={{ ...inp, marginTop: 4 }} onChange={(e) => setValue('category', e.target.value)} defaultValue="">
+              <option value="" disabled>Select category</option>
+              {categories.map((c) => (
+                <React.Fragment key={c.id}>
+                  {c.children.length === 0
+                    ? <option value={c.name}>{c.name}</option>
+                    : <option value={c.name} disabled>{c.name}</option>
+                  }
+                  {c.children.map(s => <option key={s.id} value={s.name}>&nbsp;&nbsp;↳ {s.name}</option>)}
+                </React.Fragment>
+              ))}
+            </select>
             {errors.category && <p className="text-xs text-red-600 mt-1">{errors.category.message}</p>}
-          </div>
+          </Field>
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label>Buy Price (R)</Label>
-              <Input {...register('defaultBuyPrice')} className="mt-1" placeholder="0.00" disabled={loading} />
+            <Field label="Buy Price (R)">
+              <input {...register('defaultBuyPrice')} style={{ ...inp, marginTop: 4 }} placeholder="0.00" disabled={loading} />
               {errors.defaultBuyPrice && <p className="text-xs text-red-600 mt-1">{errors.defaultBuyPrice.message}</p>}
-            </div>
-            <div>
-              <Label>Sell Price (R)</Label>
-              <Input {...register('defaultSellPrice')} className="mt-1" placeholder="0.00" disabled={loading} />
+            </Field>
+            <Field label="Sell Price (R)">
+              <input {...register('defaultSellPrice')} style={{ ...inp, marginTop: 4 }} placeholder="0.00" disabled={loading} />
               {errors.defaultSellPrice && <p className="text-xs text-red-600 mt-1">{errors.defaultSellPrice.message}</p>}
-            </div>
+            </Field>
           </div>
         </div>
         </RpxDialogBody>
@@ -408,53 +394,42 @@ function EditProductModal({ product, categories, onClose, onSuccess }: { product
         <form id="edit-product-form" onSubmit={handleSubmit(onSubmit)}>
         <RpxDialogBody>
         <div className="space-y-4">
-          <div>
-            <Label>Product Name</Label>
-            <Input {...register('name')} className="mt-1" disabled={loading} />
+          <Field label="Product Name">
+            <input {...register('name')} style={{ ...inp, marginTop: 4 }} disabled={loading} />
             {errors.name && <p className="text-xs text-red-600 mt-1">{errors.name.message}</p>}
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Category">
+              <select style={{ ...inp, marginTop: 4 }} onChange={(e) => setValue('category', e.target.value)} defaultValue={product.category}>
+                {categories.map((c) => (
+                  <React.Fragment key={c.id}>
+                    {c.children.length === 0
+                      ? <option value={c.name}>{c.name}</option>
+                      : <option value={c.name} disabled>{c.name}</option>
+                    }
+                    {c.children.map(s => <option key={s.id} value={s.name}>&nbsp;&nbsp;↳ {s.name}</option>)}
+                  </React.Fragment>
+                ))}
+              </select>
+            </Field>
+            <Field label="Unit">
+              <select style={{ ...inp, marginTop: 4 }} onChange={(e) => setValue('unit', e.target.value as 'kg' | 'ton' | 'each' | 'litre')} defaultValue={product.unit}>
+                <option value="kg">kg</option>
+                <option value="ton">ton</option>
+                <option value="each">each</option>
+                <option value="litre">litre</option>
+              </select>
+            </Field>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label>Category</Label>
-              <Select onValueChange={(v) => setValue('category', v as string)} defaultValue={product.category}>
-                <SelectTrigger className="mt-1 w-full"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {categories.map((c) => (
-                    <React.Fragment key={c.id}>
-                      {c.children.length === 0
-                        ? <SelectItem value={c.name}>{c.name}</SelectItem>
-                        : <SelectItem value={c.name} disabled className="font-semibold opacity-60">{c.name}</SelectItem>
-                      }
-                      {c.children.map(s => <SelectItem key={s.id} value={s.name}>&nbsp;&nbsp;↳ {s.name}</SelectItem>)}
-                    </React.Fragment>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Unit</Label>
-              <Select onValueChange={(v) => setValue('unit', v as 'kg' | 'ton' | 'each' | 'litre')} defaultValue={product.unit}>
-                <SelectTrigger className="mt-1 w-full"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="kg">kg</SelectItem>
-                  <SelectItem value="ton">ton</SelectItem>
-                  <SelectItem value="each">each</SelectItem>
-                  <SelectItem value="litre">litre</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label>Buy Price (R)</Label>
-              <Input {...register('defaultBuyPrice')} className="mt-1" disabled={loading} />
+            <Field label="Buy Price (R)">
+              <input {...register('defaultBuyPrice')} style={{ ...inp, marginTop: 4 }} disabled={loading} />
               {errors.defaultBuyPrice && <p className="text-xs text-red-600 mt-1">{errors.defaultBuyPrice.message}</p>}
-            </div>
-            <div>
-              <Label>Sell Price (R)</Label>
-              <Input {...register('defaultSellPrice')} className="mt-1" disabled={loading} />
+            </Field>
+            <Field label="Sell Price (R)">
+              <input {...register('defaultSellPrice')} style={{ ...inp, marginTop: 4 }} disabled={loading} />
               {errors.defaultSellPrice && <p className="text-xs text-red-600 mt-1">{errors.defaultSellPrice.message}</p>}
-            </div>
+            </Field>
           </div>
           <label className="flex items-center gap-2 text-xs cursor-pointer" style={{ color: colors.textSecondary }}>
             <input type="checkbox" defaultChecked={product.isActive} onChange={(e) => setValue('isActive', e.target.checked)} className="rounded" />
@@ -589,19 +564,18 @@ function BulkPriceModal({ products, onClose, onSuccess }: { products: Product[];
                       <p className="font-mono" style={{ fontSize: fontSize.xs, color: colors.textMuted }}>{p.code}</p>
                     </td>
                     <td className="px-2 py-2">
-                      <Input value={prices[p.id]?.buy ?? ''} onChange={(e) => setPrices((prev) => ({ ...prev, [p.id]: { ...prev[p.id]!, buy: e.target.value } }))} className="w-28 h-8 text-sm font-mono" />
+                      <input value={prices[p.id]?.buy ?? ''} onChange={(e) => setPrices((prev) => ({ ...prev, [p.id]: { ...prev[p.id]!, buy: e.target.value } }))} style={{ ...inp, width: 112, fontFamily: 'monospace' }} />
                     </td>
                     <td className="px-2 py-2">
-                      <Input value={prices[p.id]?.sell ?? ''} onChange={(e) => setPrices((prev) => ({ ...prev, [p.id]: { ...prev[p.id]!, sell: e.target.value } }))} className="w-28 h-8 text-sm font-mono" />
+                      <input value={prices[p.id]?.sell ?? ''} onChange={(e) => setPrices((prev) => ({ ...prev, [p.id]: { ...prev[p.id]!, sell: e.target.value } }))} style={{ ...inp, width: 112, fontFamily: 'monospace' }} />
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            <div>
-              <Label>Reason for update <span style={{ fontWeight: 400, color: colors.textMuted }}>(optional)</span></Label>
-              <Input value={reason} onChange={(e) => setReason(e.target.value)} className="mt-1" placeholder="e.g. Market price adjustment" />
-            </div>
+            <Field label="Reason for update (optional)">
+              <input value={reason} onChange={(e) => setReason(e.target.value)} style={{ ...inp, marginTop: 4 }} placeholder="e.g. Market price adjustment" />
+            </Field>
             <div className="flex justify-between items-center pt-2">
               <p style={{ fontSize: 12, color: colors.textSecondary }}>{changed.length} product{changed.length !== 1 ? 's' : ''} changed</p>
               <div className="flex gap-2">

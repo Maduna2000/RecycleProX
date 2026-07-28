@@ -195,10 +195,11 @@ export function BusinessLoanTab({ customerId, customerName, userRole }: Business
           style={{
             fontSize: 11,
             padding: '4px 12px',
-            borderRadius: 2,
+            borderRadius: 3,
             cursor: 'pointer',
             background: VIOLET_GRAD,
             border: `1px solid ${colors.violet}`,
+            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.35)',
             color: '#fff',
             fontWeight: 600,
           }}
@@ -217,10 +218,11 @@ export function BusinessLoanTab({ customerId, customerName, userRole }: Business
             style={{
               fontSize: 11,
               padding: '4px 12px',
-              borderRadius: 2,
+              borderRadius: 3,
               cursor: 'pointer',
               background: VIOLET_GRAD,
               border: `1px solid ${colors.violet}`,
+              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.35)',
               color: '#fff',
               fontWeight: 600,
             }}

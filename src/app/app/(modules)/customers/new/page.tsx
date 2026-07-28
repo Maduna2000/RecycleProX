@@ -10,7 +10,7 @@ import { toast } from 'sonner'
 import { CreateCustomerSchema, type CreateCustomerFormInput, type CreateCustomerInput } from '@/lib/schemas/customer'
 import { TradeCommoditiesSelect } from '@/components/customers/TradeCommoditiesSelect'
 import { colors } from '@/lib/design-tokens'
-import { Btn, Field, inp, lbl, PortalPage, SectionLabel } from '@/components/rpx'
+import { Btn, Field, HEADER_GRAD, inp, lbl, PortalPage, SectionLabel } from '@/components/rpx'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -375,10 +375,10 @@ export default function NewAccountPage() {
         {/* ── Action bar ──────────────────────────────────── */}
         <div
           className="shrink-0 flex items-center gap-3 px-4 py-2 border-t"
-          style={{ borderColor: '#B0B0B0', background: 'linear-gradient(180deg,#F5F5F5 0%,#E8E8E8 100%)' }}
+          style={{ borderColor: '#B0B0B0', background: HEADER_GRAD }}
         >
-          <Btn variant="primary" loading={loading} onClick={handleSubmit(onSubmit)}>Save</Btn>
           <Btn disabled={loading} onClick={() => router.push(returnTo ?? '/app/customers')}>Cancel</Btn>
+          <Btn variant="primary" loading={loading} onClick={handleSubmit(onSubmit)}>Save</Btn>
 
           <div className="h-4 w-px mx-1" style={{ background: '#C0C0C0' }} />
 

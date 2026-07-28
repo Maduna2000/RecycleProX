@@ -138,6 +138,7 @@ export default function PurchasesPage() {
       header: 'Total',
       width: '110px',
       sortable: true,
+      align: 'right',
       render: (row) => (
         <span className="font-mono font-semibold" style={{ color: colors.textPrimary }}>
           R {new Decimal(row.totalAmount).toFixed(2)}

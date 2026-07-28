@@ -6,9 +6,8 @@
  * current from/to (no separate selected-state to fall out of sync) and
  * rendered filled, so it's obvious at a glance which range is applied.
  */
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
+import { Field, inp } from '@/components/rpx'
 
 interface DateRangeFilterProps {
   from: string
@@ -29,18 +28,15 @@ export function DateRangeFilter({ from, to, onChange }: DateRangeFilterProps) {
 
   return (
     <div className="flex flex-wrap items-end gap-4">
-      <div>
-        <Label className="text-xs mb-1 block" style={{ color: colors.textSecondary }}>From</Label>
-        <Input type="date" value={from} max={to} onChange={(e) => onChange(e.target.value, to)} className="w-40 h-9 text-sm" />
-      </div>
-      <div>
-        <Label className="text-xs mb-1 block" style={{ color: colors.textSecondary }}>To</Label>
-        <Input type="date" value={to} min={from} max={today} onChange={(e) => onChange(from, e.target.value)} className="w-40 h-9 text-sm" />
-      </div>
+      <Field label="From">
+        <input type="date" value={from} max={to} onChange={(e) => onChange(e.target.value, to)} style={{ ...inp, width: 160 }} />
+      </Field>
+      <Field label="To">
+        <input type="date" value={to} min={from} max={today} onChange={(e) => onChange(from, e.target.value)} style={{ ...inp, width: 160 }} />
+      </Field>
 
-      <div>
-        <Label className="text-xs mb-1 block" style={{ color: colors.textSecondary }}>Quick range</Label>
-        <div className="inline-flex h-9 rounded-md border overflow-hidden" style={{ borderColor: colors.border }}>
+      <Field label="Quick range">
+        <div className="inline-flex overflow-hidden" style={{ height: 30, border: `1px solid ${colors.border}`, borderRadius: 2 }}>
           {presets.map((p, i) => {
             const active = from === p.from && to === p.to
             return (
@@ -67,7 +63,7 @@ export function DateRangeFilter({ from, to, onChange }: DateRangeFilterProps) {
             )
           })}
         </div>
-      </div>
+      </Field>
     </div>
   )
 }

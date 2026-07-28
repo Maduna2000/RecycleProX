@@ -15,6 +15,8 @@ export interface Column<T> {
   header:    string
   width?:    string
   sortable?: boolean
+  /** Right-align for money/ID/date columns — tabular figures should never be left-aligned. */
+  align?:    'left' | 'right'
   render:    (row: T, index: number) => React.ReactNode
 }
 
@@ -247,7 +249,7 @@ export function DataTable<T>({
                   <th
                     key={col.key}
                     className={cn(
-                      'text-left px-3',
+                      'px-3',
                       col.sortable && 'cursor-pointer select-none hover:bg-[#D6E8FF]/60',
                     )}
                     style={{
@@ -258,11 +260,12 @@ export function DataTable<T>({
                       textTransform: 'uppercase',
                       height:        30,
                       width:         col.width,
+                      textAlign:     col.align === 'right' ? 'right' : 'left',
                       borderRight:   colBorder(isLastData),
                     }}
                     onClick={() => col.sortable && handleSort(col.key)}
                   >
-                    <span className="flex items-center gap-1">
+                    <span className={cn('flex items-center gap-1', col.align === 'right' && 'justify-end')}>
                       {col.header}
                       {col.sortable && (
                         sortKey === col.key
@@ -374,6 +377,7 @@ export function DataTable<T>({
                             padding:     '4px 10px',
                             fontSize:    12,
                             color:       isSelected || isChecked ? '#00205B' : '#212529',
+                            textAlign:   col.align === 'right' ? 'right' : 'left',
                             borderRight: colBorder(isLastData),
                           }}
                         >

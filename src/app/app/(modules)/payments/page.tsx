@@ -136,6 +136,7 @@ export default function PaymentsPage() {
       key: 'amount',
       header: 'Amount',
       width: '110px',
+      align: 'right',
       render: (r) => (
         <span className="font-mono font-semibold" style={{ color: colors.textPrimary }}>
           R {new Decimal(r.amount).toFixed(2)}

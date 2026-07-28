@@ -156,6 +156,7 @@ export default function ExpensesPage() {
       key: 'amount',
       header: 'Amount',
       width: '100px',
+      align: 'right',
       render: (r) => (
         <span className="font-mono font-semibold" style={{ color: colors.textPrimary }}>
           R {new Decimal(r.amount).toFixed(2)}
@@ -166,6 +167,7 @@ export default function ExpensesPage() {
       key: 'vatAmount',
       header: 'VAT',
       width: '90px',
+      align: 'right',
       render: (r) => (
         <span className="font-mono" style={{ fontSize: fontSize.sm, color: colors.textSecondary }}>
           {r.includesVat ? `R ${new Decimal(r.vatAmount).toFixed(2)}` : '—'}

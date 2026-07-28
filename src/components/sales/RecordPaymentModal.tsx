@@ -5,11 +5,9 @@ import { HandCoins, AlertCircle, Split } from 'lucide-react'
 import { toast } from 'sonner'
 import Decimal from 'decimal.js'
 import { Dialog } from '@/components/ui/dialog'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Input } from '@/components/ui/input'
 import { SaleSplitPaymentModal } from './SaleSplitPaymentModal'
 import { colors } from '@/lib/design-tokens'
-import { Btn, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
+import { Btn, inp, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
 
 export type PayTarget = {
   id: string
@@ -137,13 +135,13 @@ export function RecordPaymentModal({
                     Pay full balance
                   </button>
                 </div>
-                <Input
+                <input
                   type="text"
                   inputMode="decimal"
                   placeholder="0.00"
                   value={amount}
                   onChange={(e) => { setAmount(e.target.value); setAmountError(null) }}
-                  className="h-8 text-[12px] font-mono"
+                  style={{ ...inp, fontFamily: 'monospace', fontSize: 12 }}
                 />
                 {amountError && (
                   <p className="text-xs mt-1" style={{ color: colors.danger }}>{amountError}</p>
@@ -152,15 +150,14 @@ export function RecordPaymentModal({
 
               <div>
                 <label className="block mb-1 text-xs font-medium" style={{ color: '#6C757D' }}>Payment Method</label>
-                <Select onValueChange={(v) => setMethod(v as typeof method)} defaultValue="cash">
-                  <SelectTrigger className="h-8 w-full text-xs border-[#E0E0E0]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="cash">Cash</SelectItem>
-                    <SelectItem value="eft">EFT</SelectItem>
-                  </SelectContent>
-                </Select>
+                <select
+                  value={method}
+                  onChange={(e) => setMethod(e.target.value as typeof method)}
+                  style={inp}
+                >
+                  <option value="cash">Cash</option>
+                  <option value="eft">EFT</option>
+                </select>
               </div>
             </>
           )}

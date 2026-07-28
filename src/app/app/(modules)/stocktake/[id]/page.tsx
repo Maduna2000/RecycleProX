@@ -15,7 +15,7 @@ import Decimal from 'decimal.js'
 import { format } from '@/lib/utils/format'
 import { colors } from '@/lib/design-tokens'
 import {
-  Btn, PortalPage, BAR_GRAD,
+  Btn, PortalPage, BAR_GRAD, PANEL,
   RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter,
 } from '@/components/rpx'
 import { DataTable, type Column } from '@/components/ui/DataTable'
@@ -431,7 +431,7 @@ export default function StocktakeDetailPage() {
 
           {/* Add entry form */}
           {isOpen && (
-            <div style={{ background: '#fff', border: `1px solid ${colors.border}`, borderRadius: 2, marginBottom: 16, overflow: 'hidden' }}>
+            <div style={{ ...PANEL, marginBottom: 16 }}>
               <div style={{ padding: '6px 10px', borderBottom: `1px solid ${colors.border}`, background: BAR_GRAD }}>
                 <span style={{ fontSize: 11, fontWeight: 700, color: colors.primary }}>Add Count Entry</span>
               </div>
@@ -523,7 +523,7 @@ export default function StocktakeDetailPage() {
           )}
 
           {/* Entries table */}
-          <div style={{ background: '#fff', border: `1px solid ${colors.border}`, borderRadius: 2, overflow: 'hidden' }}>
+          <div style={PANEL}>
             <div style={{ padding: '6px 10px', borderBottom: `1px solid ${colors.border}`, background: BAR_GRAD }}>
               <span style={{ fontSize: 11, fontWeight: 700, color: colors.primary }}>Count Entries</span>
               <span style={{ fontSize: 10, color: colors.textSecondary, marginLeft: 8 }}>({entries.length})</span>
