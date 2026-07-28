@@ -1,9 +1,10 @@
 import { Suspense } from 'react'
+import Link from 'next/link'
 import { ClipboardList, TrendingUp, Clock, CheckCircle2, XCircle } from 'lucide-react'
 import { getScaleStats, listScaleOrders } from '@/lib/services/scaleService'
 import { StatusBadge } from '@/components/ui/DataTable'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
-import { Btn, PANEL, PANEL_HEAD, HEADER_GRAD, TH, TD } from '@/components/rpx'
+import { PANEL, PANEL_HEAD, HEADER_GRAD, TH, TD, btnPrimary } from '@/components/rpx'
 
 async function StatsCards() {
   const stats = await getScaleStats()
@@ -78,7 +79,10 @@ export default function ScaleAdminDashboard() {
   return (
     <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-        <Btn icon={ClipboardList} href="/scale/admin/orders">View All Orders</Btn>
+        <Link href="/scale/admin/orders" style={{ ...btnPrimary, textDecoration: 'none' }}>
+          <ClipboardList style={{ width: 13, height: 13 }} />
+          View All Orders
+        </Link>
       </div>
 
       <Suspense fallback={<div className="grid grid-cols-2 lg:grid-cols-5 gap-3">{Array(5).fill(0).map((_, i) => <div key={i} style={{ ...PANEL, height: 76 }} />)}</div>}>
