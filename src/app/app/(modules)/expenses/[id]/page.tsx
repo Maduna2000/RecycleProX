@@ -13,6 +13,7 @@ import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { colors } from '@/lib/design-tokens'
 import { Btn, PortalPage } from '@/components/rpx'
 import { StatusBadge } from '@/components/ui/DataTable'
+import { DocumentViewerModal } from '@/components/ui/DocumentViewerModal'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -23,8 +24,10 @@ type ExpenseDetail = {
   status: string; cashUpId?: string | null
   createdAt: string; approvedAt?: string | null; approvedById?: string | null
   expenseType: { name: string }
-  attachments: { id: string; fileName: string; r2Key: string; notes?: string | null; uploadedAt: string }[]
+  attachments: Attachment[]
 }
+
+type Attachment = { id: string; fileName: string; r2Key: string; notes?: string | null; uploadedAt: string }
 
 export default function ExpenseDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -42,6 +45,8 @@ export default function ExpenseDetailPage() {
   const [approving, setApproving] = useState(false)
   const [voiding, setVoiding] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [viewingAttachment, setViewingAttachment] = useState<{ attachment: Attachment; url: string } | null>(null)
+  const [viewLoadingId, setViewLoadingId] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   async function handleApprove() {
@@ -101,9 +106,11 @@ export default function ExpenseDetailPage() {
     }
   }
 
-  async function handleView(r2Key: string) {
-    const res = await fetch(`/api/r2/view-url?key=${encodeURIComponent(r2Key)}`)
-    if (res.ok) { const { url } = await res.json(); window.open(url, '_blank') }
+  async function handleView(attachment: Attachment) {
+    setViewLoadingId(attachment.id)
+    const res = await fetch(`/api/r2/view-url?key=${encodeURIComponent(attachment.r2Key)}`)
+    setViewLoadingId(null)
+    if (res.ok) { const { url } = await res.json(); setViewingAttachment({ attachment, url }) }
     else toast.error('Failed to get view URL')
   }
 
@@ -274,7 +281,7 @@ export default function ExpenseDetailPage() {
                         </div>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, marginLeft: 12 }}>
-                        <Btn size="sm" icon={Eye} onClick={() => handleView(a.r2Key)}>View</Btn>
+                        <Btn size="sm" icon={Eye} loading={viewLoadingId === a.id} onClick={() => handleView(a)}>View</Btn>
                         {isMgr && (
                           <Btn size="sm" variant="danger" icon={X} onClick={() => handleDelete(a.id)} />
                         )}
@@ -287,6 +294,16 @@ export default function ExpenseDetailPage() {
           </div>
         </div>
       </div>
+
+      {viewingAttachment && (
+        <DocumentViewerModal
+          title="Attachment"
+          subtitle={new Date(viewingAttachment.attachment.uploadedAt).toLocaleDateString('en-ZA')}
+          url={viewingAttachment.url}
+          fileName={viewingAttachment.attachment.fileName}
+          onClose={() => setViewingAttachment(null)}
+        />
+      )}
     </PortalPage>
   )
 }
