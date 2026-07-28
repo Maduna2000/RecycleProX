@@ -59,11 +59,11 @@ type CustomerDoc = {
 }
 
 const DOCUMENT_TYPE_LABELS: Record<string, string> = {
-  trading_licence:      'Trading Licence',
-  sars_certificate:     'SARS Certificate',
+  id_copy:              'ID',
+  passport:             'Passport',
+  trading_licence:      'Trading License',
   company_registration: 'Company Registration',
-  id_copy:              'ID Copy',
-  other:                'Other',
+  eea_license:          'EEA License',
 }
 
 const TABS_ACCOUNT = ['Overview', 'Transactions', 'Loans', 'Business Loan', 'Documents', 'Blacklist'] as const
@@ -590,7 +590,7 @@ function DocumentsTab({ customer, onPhotoSaved }: { customer: Customer; onPhotoS
   const { data: session } = useSession()
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
   const [justUploaded, setJustUploaded] = useState(false)
-  const [docType, setDocType]           = useState<string>('trading_licence')
+  const [docType, setDocType]           = useState<string>('id_copy')
   const [uploading, setUploading]       = useState(false)
   const { data: docs, mutate: mutateDocs } = useSWR<CustomerDoc[]>(`/api/customers/${customer.id}/documents`, fetcher)
 

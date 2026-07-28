@@ -371,11 +371,15 @@ export async function listCustomerDocuments(customerId: string) {
   })
 }
 
-// Mirrors the CustomerDocumentType enum in prisma/schema.prisma — defined
-// locally rather than imported from @prisma/client because SQLite's Prisma
-// connector has no enum support (see scripts/generate-sqlite-schema.ts), so
-// the enum becomes a plain `string` on the Desktop client.
-type CustomerDocumentType = 'trading_licence' | 'sars_certificate' | 'company_registration' | 'id_copy' | 'other'
+// Mirrors UploadCustomerDocumentSchema's documentType enum (src/lib/schemas/
+// customer.ts) — the write-path's allowed values, a subset of the full
+// CustomerDocumentType enum in prisma/schema.prisma (which keeps legacy
+// values like sars_certificate/other for rows uploaded before this list was
+// narrowed). Defined locally rather than imported from @prisma/client
+// because SQLite's Prisma connector has no enum support (see
+// scripts/generate-sqlite-schema.ts), so the enum becomes a plain `string`
+// on the Desktop client.
+type CustomerDocumentType = 'id_copy' | 'passport' | 'trading_licence' | 'company_registration' | 'eea_license'
 
 export async function addCustomerDocument(
   customerId: string,

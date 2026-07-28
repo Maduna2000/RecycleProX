@@ -1105,6 +1105,8 @@ enum CustomerDocumentType {
   company_registration
   id_copy
   other
+  passport
+  eea_license
 }
 
 enum FloatMovementType {

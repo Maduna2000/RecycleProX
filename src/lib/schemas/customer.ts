@@ -124,7 +124,7 @@ export const UpdateCustomerSchema = CreateCustomerSchema.partial().omit({ idNumb
 })
 
 export const UploadCustomerDocumentSchema = z.object({
-  documentType: z.enum(['trading_licence', 'sars_certificate', 'company_registration', 'id_copy', 'other']),
+  documentType: z.enum(['id_copy', 'passport', 'trading_licence', 'company_registration', 'eea_license']),
   fileName:     z.string().min(1).max(255),
   r2Key:        z.string().min(1),
   notes:        z.string().max(500).optional(),
