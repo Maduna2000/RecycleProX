@@ -149,15 +149,19 @@ function StatsStrip() {
   ]
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 shrink-0">
-      {cards.map((c) => (
-        <div key={c.label} className="bg-white border border-[#E0E0E0] rounded-sm px-4 py-3">
-          <p style={{ fontSize: fontSize.xs, color: colors.textSecondary, fontWeight: fontWeight.medium, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+    <div className="flex flex-wrap items-stretch bg-white border shrink-0" style={{ borderColor: colors.border, borderRadius: 2 }}>
+      {cards.map((c, i) => (
+        <div
+          key={c.label}
+          className="flex items-center gap-2 px-4"
+          style={{ height: 32, borderRight: i < cards.length - 1 ? `1px solid ${colors.border}` : undefined }}
+        >
+          <span style={{ fontSize: 10, color: colors.textSecondary, fontWeight: fontWeight.semibold, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
             {c.label}
-          </p>
-          <p style={{ fontSize: 22, fontWeight: fontWeight.bold, color: c.color, lineHeight: 1.2, marginTop: 4 }}>
+          </span>
+          <span style={{ fontSize: fontSize.sm, fontWeight: fontWeight.bold, color: c.color }}>
             {c.value}
-          </p>
+          </span>
         </div>
       ))}
     </div>
@@ -702,7 +706,7 @@ function OrdersTab() {
   ]
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 gap-3">
+    <div className="flex flex-col flex-1 min-h-0 gap-2">
       <StatsStrip />
 
       {/* Filter bar */}
