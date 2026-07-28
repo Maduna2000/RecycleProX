@@ -604,30 +604,34 @@ function ConfigTab() {
   ]
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 gap-4 overflow-y-auto">
-      <div className="flex items-start gap-3 p-3 shrink-0" style={{ background: colors.processBg, border: `1px solid ${colors.process}`, borderRadius: 2 }}>
-        <Info className="w-4 h-4 shrink-0 mt-0.5" style={{ color: colors.process }} />
-        <div style={{ fontSize: fontSize.xs, color: colors.textPrimary }}>
-          <p className="font-medium">Configure Required Photos</p>
-          <p style={{ color: colors.textSecondary, marginTop: 2 }}>
-            Enable or disable which photos a guard must capture for each entry purpose.
-            Both photo types are always available to capture — only the required ones block Continue.
-          </p>
+    <div className="flex flex-col flex-1 min-h-0">
+      <div className="flex-1 min-h-0 overflow-y-auto" style={{ padding: 10 }}>
+        <div className="flex flex-col gap-4" style={{ paddingBottom: 16 }}>
+          <div className="flex items-start gap-3 p-3" style={{ background: colors.processBg, border: `1px solid ${colors.process}`, borderRadius: 2 }}>
+            <Info className="w-4 h-4 shrink-0 mt-0.5" style={{ color: colors.process }} />
+            <div style={{ fontSize: fontSize.xs, color: colors.textPrimary }}>
+              <p className="font-medium">Configure Required Photos</p>
+              <p style={{ color: colors.textSecondary, marginTop: 2 }}>
+                Enable or disable which photos a guard must capture for each entry purpose.
+                Both photo types are always available to capture — only the required ones block Continue.
+              </p>
+            </div>
+          </div>
+
+          <div style={{ height: 190 }}>
+            <DataTable
+              columns={columns}
+              rows={configs}
+              rowKey={c => c.purpose}
+              loading={loading}
+              error={error ?? undefined}
+              emptyMessage="No purpose configurations found"
+            />
+          </div>
+
+          <SellCategoriesSection />
         </div>
       </div>
-
-      <div className="shrink-0" style={{ height: 190, padding: 10 }}>
-        <DataTable
-          columns={columns}
-          rows={configs}
-          rowKey={c => c.purpose}
-          loading={loading}
-          error={error ?? undefined}
-          emptyMessage="No purpose configurations found"
-        />
-      </div>
-
-      <SellCategoriesSection />
     </div>
   )
 }
