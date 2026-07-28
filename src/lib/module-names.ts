@@ -37,6 +37,8 @@ export const MODULE_NAMES: Record<string, string> = {
   '/app/scale':            'Scale Station',
   '/app/gate':             'Guard Station',
   '/app/support':          'Support',
+  '/scale/admin':          'Scale Admin',
+  '/scale/admin/orders':   'Scale Orders',
 }
 
 export function getModuleName(pathname: string): string {
@@ -67,6 +69,7 @@ export const HREF_TO_ICON: Record<string, LucideIcon> = {
   '/app/settings':         Settings,
   '/app/scale':            Scale,
   '/app/gate':             ShieldCheck,
+  '/scale/admin':          Scale,
 }
 
 export function getModuleIcon(pathname: string): LucideIcon {
