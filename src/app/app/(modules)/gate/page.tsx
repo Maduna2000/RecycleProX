@@ -382,7 +382,7 @@ function EntriesTab() {
           </Field>
         )}
         <Field label={' '}>
-          <Btn size="sm" icon={RefreshCw} onClick={() => fetchEntries(page)} title="Refresh" />
+          <Btn size="sm" icon={RefreshCw} onClick={() => fetchEntries(page)} title="Refresh">Refresh</Btn>
         </Field>
         <span style={{ fontSize: 11, color: '#6C757D', marginLeft: 'auto', paddingBottom: 8 }}>
           {total} entr{total !== 1 ? 'ies' : 'y'}

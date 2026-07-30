@@ -27,6 +27,17 @@ export const VIOLET_GRAD = `linear-gradient(180deg,${colors.violet} 0%,#6B21A8 1
 /** Outer border of content cards and dialogs. */
 export const CARD_BORDER = '1px solid #B0B0B0'
 
+/**
+ * Glossy Win7/Aero navy chrome — the same light-to-base sheen used for the
+ * dashboard's tile treatment, applied to the app's title bar and footer so
+ * every page (they all share one AppShell) gets the same lacquered look.
+ */
+export const NAVY_GLOSS_GRAD = 'linear-gradient(180deg,#1e4a8a 0%,#1B3A6B 100%)'
+export const NAVY_GLOSS_BEVEL = 'inset 0 1px 0 rgba(255,255,255,0.22), inset 0 -2px 3px rgba(0,0,0,0.22)'
+/** Same bevel shape as NAVY_GLOSS_BEVEL, tuned for light grey/white chrome
+ * (buttons, dialog/panel title bars, table headers) rather than dark navy. */
+export const GLOSS_BEVEL = 'inset 0 1px 0 rgba(255,255,255,0.85), inset 0 -2px 4px rgba(0,0,0,0.10)'
+
 /** Standard 30px input / select / textarea skin. */
 export const inp: React.CSSProperties = {
   height: 30, width: '100%', borderRadius: 2,
@@ -91,4 +102,4 @@ export const btnDanger: React.CSSProperties = {
  * it can be reused as one of several independently-sized tiles in a grid.
  */
 export const PANEL: React.CSSProperties = { border: CARD_BORDER, borderRadius: 3, overflow: 'hidden', background: '#fff' }
-export const PANEL_HEAD: React.CSSProperties = { padding: '5px 10px', borderBottom: CARD_BORDER, background: BAR_GRAD }
+export const PANEL_HEAD: React.CSSProperties = { padding: '5px 10px', borderBottom: CARD_BORDER, background: BAR_GRAD, boxShadow: GLOSS_BEVEL }

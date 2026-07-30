@@ -1,5 +1,6 @@
 export {
   NAVY, HEADER_GRAD, BAR_GRAD, ACTION_GRAD, VIOLET_GRAD, CARD_BORDER,
+  NAVY_GLOSS_GRAD, NAVY_GLOSS_BEVEL, GLOSS_BEVEL,
   inp, lbl, TH, TD,
   btnPrimary, btnSecondary, btnDanger,
   PANEL, PANEL_HEAD,

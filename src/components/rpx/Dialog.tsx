@@ -21,7 +21,7 @@
 import { X } from 'lucide-react'
 import { DialogContent } from '@/components/ui/dialog'
 import { colors } from '@/lib/design-tokens'
-import { NAVY, BAR_GRAD } from './styles'
+import { NAVY, BAR_GRAD, GLOSS_BEVEL } from './styles'
 
 export function RpxDialogContent({
   maxWidth = 480,
@@ -70,6 +70,7 @@ export function RpxDialogHeader({
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         height: 34, padding: '0 8px 0 14px', flexShrink: 0,
         background: BAR_GRAD, borderBottom: '2px solid #B0B0B0',
+        boxShadow: GLOSS_BEVEL,
       }}
     >
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 700, color: NAVY }}>

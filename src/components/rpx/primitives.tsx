@@ -6,7 +6,7 @@
  */
 
 import { colors } from '@/lib/design-tokens'
-import { NAVY, CARD_BORDER, lbl } from './styles'
+import { NAVY, CARD_BORDER, GLOSS_BEVEL, lbl } from './styles'
 
 // ─── Field / FormLabel ────────────────────────────────────────────────────────
 
@@ -96,7 +96,10 @@ export function TabStrip({
               padding: '7px 16px', fontSize: 12, fontWeight: 600,
               border: '1px solid #B0B0B0', borderBottom: 'none',
               borderRadius: '4px 4px 0 0', cursor: 'pointer',
-              background: isActive ? '#fff' : '#DDD',
+              background: isActive
+                ? 'linear-gradient(180deg,#FFFFFF 0%,#F2F2F2 100%)'
+                : 'linear-gradient(180deg,#E8E8E8 0%,#D0D0D0 100%)',
+              boxShadow: GLOSS_BEVEL,
               color: isActive ? NAVY : '#6C757D',
             }}
           >
