@@ -18,16 +18,23 @@ import { CARD_BORDER } from '@/components/rpx'
 export interface AuthShellProps {
   /** Per-kiosk accent — badge fill, focus ring, spinner color. */
   accentColor: string
-  /** Ready-made badge content (colored div + Lucide icon, or the brand mark image) — sized to fill the 64×64 wrapper. */
-  icon: React.ReactNode
-  title: string
+  /** Ready-made badge content (colored div + Lucide icon, or the brand mark image) — sized to fill the 64×64 wrapper. Ignored when `logo` is given. */
+  icon?: React.ReactNode
+  title?: string
+  /**
+   * Full wordmark lockup (icon + "RENOVO PRO" + slogan) — when given, this
+   * replaces the icon badge + title entirely instead of being squeezed into
+   * the 64×64 icon slot. Used by the main login; the gate/scale kiosk
+   * logins keep the plain icon+title so their per-kiosk accent still shows.
+   */
+  logo?: React.ReactNode
   subtitle?: string
   errorMessage?: string | null
   isSessionLoading?: boolean
   children: React.ReactNode
 }
 
-export function AuthShell({ accentColor, icon, title, subtitle, errorMessage, isSessionLoading, children }: AuthShellProps) {
+export function AuthShell({ accentColor, icon, title, logo, subtitle, errorMessage, isSessionLoading, children }: AuthShellProps) {
   const background = `radial-gradient(ellipse at 50% 0%, ${accentColor}59 0%, #0F203A 60%)`
 
   if (isSessionLoading) {
@@ -51,15 +58,19 @@ export function AuthShell({ accentColor, icon, title, subtitle, errorMessage, is
           }}
         >
           <div className="flex flex-col items-center mb-7">
-            <div
-              style={{
-                width: 64, height: 64, borderRadius: 12, overflow: 'hidden', flexShrink: 0,
-                marginBottom: 14, boxShadow: '0 4px 14px rgba(0,0,0,0.3)',
-              }}
-            >
-              {icon}
-            </div>
-            <h1 style={{ fontSize: 24, fontWeight: 700, color: colors.mainInstruction, textAlign: 'center' }}>{title}</h1>
+            {logo ?? (
+              <>
+                <div
+                  style={{
+                    width: 64, height: 64, borderRadius: 12, overflow: 'hidden', flexShrink: 0,
+                    marginBottom: 14, boxShadow: '0 4px 14px rgba(0,0,0,0.3)',
+                  }}
+                >
+                  {icon}
+                </div>
+                <h1 style={{ fontSize: 24, fontWeight: 700, color: colors.mainInstruction, textAlign: 'center' }}>{title}</h1>
+              </>
+            )}
             {subtitle && <p style={{ fontSize: 13, color: colors.textSecondary, marginTop: 4 }}>{subtitle}</p>}
           </div>
 
