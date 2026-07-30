@@ -306,11 +306,11 @@ export default function FloatPage() {
                   <div className="p-3 space-y-2" style={{ background: colors.actionBg, border: `1px solid ${colors.action}30`, borderRadius: 3 }}>
                     <div className="flex items-center gap-1.5">
                       <PlusCircle className="w-3.5 h-3.5" style={{ color: colors.action }} />
-                      <p className="text-sm font-semibold" style={{ color: colors.action }}>Add Top-Up</p>
+                      <p className="text-sm font-semibold" style={{ color: colors.action }}>Add Float</p>
                     </div>
                     <form onSubmit={topUpForm.handleSubmit(onTopUp)} className="space-y-2">
                       <div>
-                        <Label className="text-xs" style={{ color: colors.textSecondary }}>Additional Amount (R)</Label>
+                        <Label className="text-xs" style={{ color: colors.textSecondary }}>Amount (R)</Label>
                         <Input
                           {...topUpForm.register('amount')}
                           type="number"
