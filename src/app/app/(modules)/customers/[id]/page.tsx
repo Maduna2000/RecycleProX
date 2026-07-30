@@ -66,9 +66,12 @@ const DOCUMENT_TYPE_LABELS: Record<string, string> = {
   eea_license:          'EEA License',
 }
 
-const TABS_ACCOUNT = ['Overview', 'Transactions', 'Loans', 'Business Loan', 'Documents', 'Blacklist'] as const
-const TABS_CASUAL = ['Overview', 'Transactions', 'Documents', 'Blacklist'] as const
-const SECTION_TABS = ['Personal', 'Business', 'Banking', 'Compliance', 'Notes'] as const
+// Flat, single-level tab row — Personal/Business/Banking/Compliance/Notes
+// used to be a second, nested tab strip inside an "Overview" wrapper tab;
+// now they're just the first five tabs alongside everything else, since
+// "Overview" never rendered anything of its own beyond hosting them.
+const TABS_ACCOUNT = ['Personal', 'Business', 'Banking', 'Compliance', 'Notes', 'Transactions', 'Loans', 'Business Loan', 'Documents', 'Blacklist'] as const
+const TABS_CASUAL = ['Personal', 'Business', 'Banking', 'Compliance', 'Notes', 'Transactions', 'Documents', 'Blacklist'] as const
 
 function SHdr({ title }: { title: string }) {
   return (
@@ -88,8 +91,7 @@ export default function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>()
   const { data: session } = useSession()
   const isAdmin = session?.user?.role === 'admin'
-  const [tab, setTab] = useState<string>('Overview')
-  const [sectionTab, setSectionTab] = useState<typeof SECTION_TABS[number]>('Personal')
+  const [tab, setTab] = useState<string>('Personal')
   const [isEditing, setIsEditing] = useState(false)
   const [saving, setSaving] = useState(false)
   const [blacklistOpen, setBlacklistOpen] = useState(false)
@@ -161,10 +163,10 @@ export default function CustomerDetailPage() {
 
   // Guard: if Notes tab selected but no notes (and not editing), reset to Personal
   useEffect(() => {
-    if (sectionTab === 'Notes' && !customer?.customerNotes && !isEditing) {
-      setSectionTab('Personal')
+    if (tab === 'Notes' && !customer?.customerNotes && !isEditing) {
+      setTab('Personal')
     }
-  }, [customer?.customerNotes, sectionTab, isEditing])
+  }, [customer?.customerNotes, tab, isEditing])
 
   if (isLoading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: '#9CA3AF', fontSize: 13 }}>
@@ -216,12 +218,14 @@ export default function CustomerDetailPage() {
           tabs={(customer.customerType === 'account'
             ? TABS_ACCOUNT.filter((t) => t !== 'Business Loan' || customer.dealerCategory === 'dealer_3')
             : TABS_CASUAL
-          ).map((t) => ({ value: t, label: t }))}
+          )
+            .filter((t) => t !== 'Notes' || customer.customerNotes || isEditing)
+            .map((t) => ({ value: t, label: t }))}
           active={tab}
           onChange={setTab}
         />
         <div style={{ flex: 1 }} />
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingBottom: 5 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingBottom: 5, flexShrink: 0 }}>
           {!isEditing ? (
             <Btn size="sm" icon={Pencil} onClick={() => setIsEditing(true)}>Edit</Btn>
           ) : (
@@ -241,235 +245,220 @@ export default function CustomerDetailPage() {
         {/* Main content */}
         <div style={{ flex: 1, borderRight: '1px solid #D0D0D0', background: '#fff' }}>
 
-          {tab === 'Overview' && (
+          {/* Section Content - Personal */}
+          {tab === 'Personal' && (
             <div>
-              {/* Secondary Tab Strip for sections */}
-              <TabStrip
-                tabs={(customer.customerNotes || isEditing
-                  ? SECTION_TABS
-                  : SECTION_TABS.filter(t => t !== 'Notes')
-                ).map((t) => ({ value: t, label: t }))}
-                active={sectionTab}
-                onChange={(v) => setSectionTab(v as typeof SECTION_TABS[number])}
-                style={{ padding: '8px 10px 0', background: '#EFEFEF' }}
-              />
-
-              {/* Section Content - Personal */}
-              {sectionTab === 'Personal' && (
+              <SHdr title="Personal Details" />
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px 16px', padding: '10px 12px' }}>
                 <div>
-                  <SHdr title="Personal Details" />
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px 16px', padding: '10px 12px' }}>
-                    <div>
-                      <span style={lbl}>First Name <span style={{ color: colors.danger }}>*</span></span>
-                      <input {...register('firstName')} disabled={!isEditing || saving} style={isEditing ? inp : inpDisabled} />
-                      {errors.firstName && <span style={{ fontSize: 10, color: '#DC2626' }}>{errors.firstName.message}</span>}
-                    </div>
-                    <div>
-                      <span style={lbl}>Last Name <span style={{ color: colors.danger }}>*</span></span>
-                      <input {...register('lastName')} disabled={!isEditing || saving} style={isEditing ? inp : inpDisabled} />
-                      {errors.lastName && <span style={{ fontSize: 10, color: '#DC2626' }}>{errors.lastName.message}</span>}
-                    </div>
-                    <div>
-                      <span style={lbl}>ID Number</span>
-                      <input value={customer.idNumber} disabled style={inpDisabled} />
-                      <span style={{ fontSize: 10, color: colors.textMuted }}>Cannot be changed once a record exists</span>
-                    </div>
-                    <div>
-                      <span style={lbl}>Date of Birth</span>
-                      <input {...register('dateOfBirth')} type="date" disabled={!isEditing || saving} style={isEditing ? inp : inpDisabled} />
-                    </div>
-                    <div>
-                      <span style={lbl}>Gender</span>
-                      <select {...register('gender')} disabled={!isEditing || saving} style={isEditing ? selectStyle : selectDisabled}>
-                        <option value="">—</option>
-                        <option value="male">Male</option>
-                        <option value="female">Female</option>
-                        <option value="other">Other</option>
-                      </select>
-                    </div>
-                    <div>
-                      <span style={lbl}>Nationality</span>
-                      <input {...register('nationality')} disabled={!isEditing || saving} style={isEditing ? inp : inpDisabled} />
-                    </div>
-                    <div>
-                      <span style={lbl}>Phone (Mobile) <span style={{ color: colors.danger }}>*</span></span>
-                      <input {...register('phone')} disabled={!isEditing || saving} style={{ ...(isEditing ? inp : inpDisabled), fontFamily: 'monospace' }} />
-                      {errors.phone && <span style={{ fontSize: 10, color: '#DC2626' }}>{errors.phone.message}</span>}
-                    </div>
-                    <div>
-                      <span style={lbl}>Landline</span>
-                      <input {...register('landline')} disabled={!isEditing || saving} style={{ ...(isEditing ? inp : inpDisabled), fontFamily: 'monospace' }} />
-                    </div>
-                    <div>
-                      <span style={lbl}>Email</span>
-                      <input {...register('email')} type="email" disabled={!isEditing || saving} style={isEditing ? inp : inpDisabled} />
-                    </div>
-                    <div style={{ gridColumn: 'span 2' }}>
-                      <span style={lbl}>Physical Address</span>
-                      <input {...register('physicalAddress')} disabled={!isEditing || saving} style={isEditing ? inp : inpDisabled} />
-                    </div>
-                    <div style={{ gridColumn: 'span 2' }}>
-                      <span style={lbl}>Postal Address</span>
-                      <input {...register('postalAddress')} disabled={!isEditing || saving} style={isEditing ? inp : inpDisabled} />
-                    </div>
+                  <span style={lbl}>First Name <span style={{ color: colors.danger }}>*</span></span>
+                  <input {...register('firstName')} disabled={!isEditing || saving} style={isEditing ? inp : inpDisabled} />
+                  {errors.firstName && <span style={{ fontSize: 10, color: '#DC2626' }}>{errors.firstName.message}</span>}
+                </div>
+                <div>
+                  <span style={lbl}>Last Name <span style={{ color: colors.danger }}>*</span></span>
+                  <input {...register('lastName')} disabled={!isEditing || saving} style={isEditing ? inp : inpDisabled} />
+                  {errors.lastName && <span style={{ fontSize: 10, color: '#DC2626' }}>{errors.lastName.message}</span>}
+                </div>
+                <div>
+                  <span style={lbl}>ID Number</span>
+                  <input value={customer.idNumber} disabled style={inpDisabled} />
+                  <span style={{ fontSize: 10, color: colors.textMuted }}>Cannot be changed once a record exists</span>
+                </div>
+                <div>
+                  <span style={lbl}>Date of Birth</span>
+                  <input {...register('dateOfBirth')} type="date" disabled={!isEditing || saving} style={isEditing ? inp : inpDisabled} />
+                </div>
+                <div>
+                  <span style={lbl}>Gender</span>
+                  <select {...register('gender')} disabled={!isEditing || saving} style={isEditing ? selectStyle : selectDisabled}>
+                    <option value="">—</option>
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+                <div>
+                  <span style={lbl}>Nationality</span>
+                  <input {...register('nationality')} disabled={!isEditing || saving} style={isEditing ? inp : inpDisabled} />
+                </div>
+                <div>
+                  <span style={lbl}>Phone (Mobile) <span style={{ color: colors.danger }}>*</span></span>
+                  <input {...register('phone')} disabled={!isEditing || saving} style={{ ...(isEditing ? inp : inpDisabled), fontFamily: 'monospace' }} />
+                  {errors.phone && <span style={{ fontSize: 10, color: '#DC2626' }}>{errors.phone.message}</span>}
+                </div>
+                <div>
+                  <span style={lbl}>Landline</span>
+                  <input {...register('landline')} disabled={!isEditing || saving} style={{ ...(isEditing ? inp : inpDisabled), fontFamily: 'monospace' }} />
+                </div>
+                <div>
+                  <span style={lbl}>Email</span>
+                  <input {...register('email')} type="email" disabled={!isEditing || saving} style={isEditing ? inp : inpDisabled} />
+                </div>
+                <div style={{ gridColumn: 'span 2' }}>
+                  <span style={lbl}>Physical Address</span>
+                  <input {...register('physicalAddress')} disabled={!isEditing || saving} style={isEditing ? inp : inpDisabled} />
+                </div>
+                <div style={{ gridColumn: 'span 2' }}>
+                  <span style={lbl}>Postal Address</span>
+                  <input {...register('postalAddress')} disabled={!isEditing || saving} style={isEditing ? inp : inpDisabled} />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Section Content - Business */}
+          {tab === 'Business' && (
+            <div>
+              <SHdr title="Business Details" />
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px 16px', padding: '10px 12px' }}>
+                <div>
+                  <span style={lbl}>Customer Type</span>
+                  <select {...register('customerType')} disabled={!isEditing || saving} style={isEditing ? selectStyle : selectDisabled}>
+                    <option value="casual">Casual</option>
+                    <option value="account">Account</option>
+                  </select>
+                </div>
+                <div>
+                  <span style={lbl}>Primary Function</span>
+                  <select {...register('primaryFunction')} disabled={!isEditing || saving} style={isEditing ? selectStyle : selectDisabled}>
+                    <option value="supplier">Supplier (sells to us)</option>
+                    <option value="customer">Customer (buys from us)</option>
+                    <option value="both">Both</option>
+                  </select>
+                </div>
+                <div>
+                  <span style={lbl}>Market Sector</span>
+                  <select value={watch('marketSector') ?? ''} onChange={(e) => setValue('marketSector', e.target.value === '' ? undefined : e.target.value as 'formal' | 'informal')} disabled={!isEditing || saving} style={isEditing ? selectStyle : selectDisabled}>
+                    <option value="">—</option>
+                    <option value="formal">Formal (scrap yard)</option>
+                    <option value="informal">Informal (street seller)</option>
+                  </select>
+                </div>
+                <div>
+                  <span style={lbl}>Dealer Category{!isAdmin ? ' (admin only)' : ''}</span>
+                  <select value={watch('dealerCategory') ?? ''} onChange={(e) => setValue('dealerCategory', e.target.value === '' ? undefined : e.target.value as 'casual' | 'dealer_1' | 'dealer_2' | 'dealer_3')} disabled={!isEditing || saving || !isAdmin} style={isEditing && isAdmin ? selectStyle : selectDisabled}>
+                    <option value="">—</option>
+                    <option value="casual">Casual</option>
+                    <option value="dealer_1">Dealer 1</option>
+                    <option value="dealer_2">Dealer 2</option>
+                    <option value="dealer_3">Dealer 3</option>
+                  </select>
+                </div>
+                <div>
+                  <span style={lbl}>VAT Status</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, height: 26 }}>
+                    <input type="checkbox" checked={!(watch('zeroRated') ?? false)} onChange={(e) => setValue('zeroRated', !e.target.checked)} disabled={!isEditing || saving} style={{ width: 14, height: 14, cursor: isEditing ? 'pointer' : 'default' }} />
+                    <span style={{ fontSize: 12, color: '#212529' }}>Apply VAT</span>
                   </div>
                 </div>
-              )}
-
-              {/* Section Content - Business */}
-              {sectionTab === 'Business' && (
                 <div>
-                  <SHdr title="Business Details" />
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px 16px', padding: '10px 12px' }}>
-                    <div>
-                      <span style={lbl}>Customer Type</span>
-                      <select {...register('customerType')} disabled={!isEditing || saving} style={isEditing ? selectStyle : selectDisabled}>
-                        <option value="casual">Casual</option>
-                        <option value="account">Account</option>
-                      </select>
-                    </div>
-                    <div>
-                      <span style={lbl}>Primary Function</span>
-                      <select {...register('primaryFunction')} disabled={!isEditing || saving} style={isEditing ? selectStyle : selectDisabled}>
-                        <option value="supplier">Supplier (sells to us)</option>
-                        <option value="customer">Customer (buys from us)</option>
-                        <option value="both">Both</option>
-                      </select>
-                    </div>
-                    <div>
-                      <span style={lbl}>Market Sector</span>
-                      <select value={watch('marketSector') ?? ''} onChange={(e) => setValue('marketSector', e.target.value === '' ? undefined : e.target.value as 'formal' | 'informal')} disabled={!isEditing || saving} style={isEditing ? selectStyle : selectDisabled}>
-                        <option value="">—</option>
-                        <option value="formal">Formal (scrap yard)</option>
-                        <option value="informal">Informal (street seller)</option>
-                      </select>
-                    </div>
-                    <div>
-                      <span style={lbl}>Dealer Category{!isAdmin ? ' (admin only)' : ''}</span>
-                      <select value={watch('dealerCategory') ?? ''} onChange={(e) => setValue('dealerCategory', e.target.value === '' ? undefined : e.target.value as 'casual' | 'dealer_1' | 'dealer_2' | 'dealer_3')} disabled={!isEditing || saving || !isAdmin} style={isEditing && isAdmin ? selectStyle : selectDisabled}>
-                        <option value="">—</option>
-                        <option value="casual">Casual</option>
-                        <option value="dealer_1">Dealer 1</option>
-                        <option value="dealer_2">Dealer 2</option>
-                        <option value="dealer_3">Dealer 3</option>
-                      </select>
-                    </div>
-                    <div>
-                      <span style={lbl}>VAT Status</span>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, height: 26 }}>
-                        <input type="checkbox" checked={!(watch('zeroRated') ?? false)} onChange={(e) => setValue('zeroRated', !e.target.checked)} disabled={!isEditing || saving} style={{ width: 14, height: 14, cursor: isEditing ? 'pointer' : 'default' }} />
-                        <span style={{ fontSize: 12, color: '#212529' }}>Apply VAT</span>
-                      </div>
-                    </div>
-                    <div>
-                      <span style={lbl}>Price Group</span>
-                      <select value={watch('priceGroupId') ?? ''} onChange={(e) => setValue('priceGroupId', e.target.value === '' ? undefined : e.target.value)} disabled={!isEditing || saving} style={isEditing ? selectStyle : selectDisabled}>
-                        <option value="">—</option>
-                        {priceGroups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <span style={lbl}>Company Name</span>
-                      <input {...register('companyName')} disabled={!isEditing || saving} style={isEditing ? inp : inpDisabled} />
-                    </div>
-                    <div>
-                      <span style={lbl}>Company Reg No</span>
-                      <input {...register('companyRegNumber')} disabled={!isEditing || saving} style={{ ...(isEditing ? inp : inpDisabled), fontFamily: 'monospace' }} />
-                    </div>
-                    <div>
-                      <span style={lbl}>Contact Person</span>
-                      <input {...register('contactPerson')} disabled={!isEditing || saving} style={isEditing ? inp : inpDisabled} />
-                    </div>
-                    <div>
-                      <span style={lbl}>VAT Number</span>
-                      <input {...register('vatNumber')} disabled={!isEditing || saving} style={{ ...(isEditing ? inp : inpDisabled), fontFamily: 'monospace' }} />
-                      {errors.vatNumber && <span style={{ fontSize: 10, color: '#DC2626' }}>{errors.vatNumber.message}</span>}
-                    </div>
-                    <div>
-                      <span style={lbl}>Trade Commodities</span>
-                      <TradeCommoditiesSelect
-                        options={commodityOptions}
-                        value={tradeCommodities}
-                        onChange={(next) => setValue('tradeCommodities', next)}
-                        disabled={!isEditing || saving}
-                      />
-                    </div>
-                    <div>
-                      <span style={lbl}>Credit Limit (R)</span>
-                      <input {...register('creditLimit')} type="number" step="0.01" min="0" disabled={!isEditing || saving} style={isEditing ? inp : inpDisabled} />
-                    </div>
-                  </div>
+                  <span style={lbl}>Price Group</span>
+                  <select value={watch('priceGroupId') ?? ''} onChange={(e) => setValue('priceGroupId', e.target.value === '' ? undefined : e.target.value)} disabled={!isEditing || saving} style={isEditing ? selectStyle : selectDisabled}>
+                    <option value="">—</option>
+                    {priceGroups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+                  </select>
                 </div>
-              )}
-
-              {/* Section Content - Banking */}
-              {sectionTab === 'Banking' && (
                 <div>
-                  <SHdr title="Banking Details" />
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px 16px', padding: '10px 12px' }}>
-                    <div>
-                      <span style={lbl}>Bank Name</span>
-                      <input {...register('bankName')} disabled={!isEditing || saving} style={isEditing ? inp : inpDisabled} placeholder={isEditing ? 'e.g. ABSA, FNB, Standard Bank' : ''} />
-                    </div>
-                    <div>
-                      <span style={lbl}>Account Number</span>
-                      <input {...register('bankAccountNo')} disabled={!isEditing || saving} style={{ ...(isEditing ? inp : inpDisabled), fontFamily: 'monospace' }} />
-                    </div>
-                    <div>
-                      <span style={lbl}>Branch Code</span>
-                      <input {...register('bankBranchCode')} disabled={!isEditing || saving} style={{ ...(isEditing ? inp : inpDisabled), fontFamily: 'monospace' }} placeholder={isEditing ? '6-digit code' : ''} />
-                    </div>
-                  </div>
+                  <span style={lbl}>Company Name</span>
+                  <input {...register('companyName')} disabled={!isEditing || saving} style={isEditing ? inp : inpDisabled} />
                 </div>
-              )}
-
-              {/* Section Content - Compliance */}
-              {sectionTab === 'Compliance' && (
                 <div>
-                  <SHdr title="Compliance" />
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px 16px', padding: '10px 12px' }}>
-                    <div>
-                      <span style={lbl}>Police Register No.</span>
-                      <input {...register('policeRegisterNo')} disabled={!isEditing || saving} style={{ ...(isEditing ? inp : inpDisabled), fontFamily: 'monospace' }} />
-                    </div>
-                    <div>
-                      <span style={lbl}>License Number</span>
-                      <input {...register('licenseNumber')} disabled={!isEditing || saving} style={{ ...(isEditing ? inp : inpDisabled), fontFamily: 'monospace' }} />
-                    </div>
-                    <div>
-                      <span style={lbl}>License Expiry</span>
-                      <input {...register('licenseExpiry')} type="date" disabled={!isEditing || saving} style={isEditing ? inp : inpDisabled} />
-                    </div>
-                    <div>
-                      <span style={lbl}>Registered</span>
-                      <input value={fmtDate(customer.createdAt)} disabled style={inpDisabled} />
-                    </div>
-                  </div>
+                  <span style={lbl}>Company Reg No</span>
+                  <input {...register('companyRegNumber')} disabled={!isEditing || saving} style={{ ...(isEditing ? inp : inpDisabled), fontFamily: 'monospace' }} />
                 </div>
-              )}
-
-              {/* Section Content - Notes */}
-              {sectionTab === 'Notes' && (
                 <div>
-                  <SHdr title="Notes" />
-                  <div style={{ padding: '10px 12px' }}>
-                    <textarea
-                      {...register('customerNotes')}
-                      disabled={!isEditing || saving}
-                      rows={5}
-                      style={{
-                        width: '100%', borderRadius: 2, border: '1px solid #ABABAB',
-                        padding: '7px', fontSize: 12, resize: 'vertical', minHeight: 80,
-                        background: isEditing ? '#fff' : '#F5F5F5',
-                        color: isEditing ? '#212529' : '#6C757D',
-                        cursor: isEditing ? 'text' : 'default',
-                        outline: 'none',
-                      }}
-                      placeholder={isEditing ? 'Add notes about this customer...' : ''}
-                    />
-                  </div>
+                  <span style={lbl}>Contact Person</span>
+                  <input {...register('contactPerson')} disabled={!isEditing || saving} style={isEditing ? inp : inpDisabled} />
                 </div>
-              )}
+                <div>
+                  <span style={lbl}>VAT Number</span>
+                  <input {...register('vatNumber')} disabled={!isEditing || saving} style={{ ...(isEditing ? inp : inpDisabled), fontFamily: 'monospace' }} />
+                  {errors.vatNumber && <span style={{ fontSize: 10, color: '#DC2626' }}>{errors.vatNumber.message}</span>}
+                </div>
+                <div>
+                  <span style={lbl}>Trade Commodities</span>
+                  <TradeCommoditiesSelect
+                    options={commodityOptions}
+                    value={tradeCommodities}
+                    onChange={(next) => setValue('tradeCommodities', next)}
+                    disabled={!isEditing || saving}
+                  />
+                </div>
+                <div>
+                  <span style={lbl}>Credit Limit (R)</span>
+                  <input {...register('creditLimit')} type="number" step="0.01" min="0" disabled={!isEditing || saving} style={isEditing ? inp : inpDisabled} />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Section Content - Banking */}
+          {tab === 'Banking' && (
+            <div>
+              <SHdr title="Banking Details" />
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px 16px', padding: '10px 12px' }}>
+                <div>
+                  <span style={lbl}>Bank Name</span>
+                  <input {...register('bankName')} disabled={!isEditing || saving} style={isEditing ? inp : inpDisabled} placeholder={isEditing ? 'e.g. ABSA, FNB, Standard Bank' : ''} />
+                </div>
+                <div>
+                  <span style={lbl}>Account Number</span>
+                  <input {...register('bankAccountNo')} disabled={!isEditing || saving} style={{ ...(isEditing ? inp : inpDisabled), fontFamily: 'monospace' }} />
+                </div>
+                <div>
+                  <span style={lbl}>Branch Code</span>
+                  <input {...register('bankBranchCode')} disabled={!isEditing || saving} style={{ ...(isEditing ? inp : inpDisabled), fontFamily: 'monospace' }} placeholder={isEditing ? '6-digit code' : ''} />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Section Content - Compliance */}
+          {tab === 'Compliance' && (
+            <div>
+              <SHdr title="Compliance" />
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px 16px', padding: '10px 12px' }}>
+                <div>
+                  <span style={lbl}>Police Register No.</span>
+                  <input {...register('policeRegisterNo')} disabled={!isEditing || saving} style={{ ...(isEditing ? inp : inpDisabled), fontFamily: 'monospace' }} />
+                </div>
+                <div>
+                  <span style={lbl}>License Number</span>
+                  <input {...register('licenseNumber')} disabled={!isEditing || saving} style={{ ...(isEditing ? inp : inpDisabled), fontFamily: 'monospace' }} />
+                </div>
+                <div>
+                  <span style={lbl}>License Expiry</span>
+                  <input {...register('licenseExpiry')} type="date" disabled={!isEditing || saving} style={isEditing ? inp : inpDisabled} />
+                </div>
+                <div>
+                  <span style={lbl}>Registered</span>
+                  <input value={fmtDate(customer.createdAt)} disabled style={inpDisabled} />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Section Content - Notes */}
+          {tab === 'Notes' && (
+            <div>
+              <SHdr title="Notes" />
+              <div style={{ padding: '10px 12px' }}>
+                <textarea
+                  {...register('customerNotes')}
+                  disabled={!isEditing || saving}
+                  rows={5}
+                  style={{
+                    width: '100%', borderRadius: 2, border: '1px solid #ABABAB',
+                    padding: '7px', fontSize: 12, resize: 'vertical', minHeight: 80,
+                    background: isEditing ? '#fff' : '#F5F5F5',
+                    color: isEditing ? '#212529' : '#6C757D',
+                    cursor: isEditing ? 'text' : 'default',
+                    outline: 'none',
+                  }}
+                  placeholder={isEditing ? 'Add notes about this customer...' : ''}
+                />
+              </div>
             </div>
           )}
 

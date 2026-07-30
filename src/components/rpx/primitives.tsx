@@ -60,6 +60,14 @@ export interface RpxTab {
  * right border, so the row reads as one continuous strip rather than
  * separate floating chips. The active tab renders above its neighbours
  * (higher z-index) so its own borders stay crisp at the shared edges.
+ *
+ * The strip scrolls horizontally rather than wrapping or squeezing tab text
+ * when there isn't room for every tab (e.g. an account customer's full
+ * 10-tab row on a narrower screen) — each tab keeps its natural width
+ * (flexShrink: 0) and the outer row is allowed to shrink within its own
+ * flex parent, so overflow becomes a scrollbar instead of silently
+ * clipping tabs (and whatever sits after the strip, like an Edit button)
+ * off the edge of the screen with no way to reach them.
  */
 export function TabStrip({
   tabs,
@@ -73,7 +81,7 @@ export function TabStrip({
   style?: React.CSSProperties
 }) {
   return (
-    <div style={{ display: 'flex', flexShrink: 0, ...style }}>
+    <div style={{ display: 'flex', minWidth: 0, overflowX: 'auto', ...style }}>
       {tabs.map((t, i) => {
         const isActive = t.value === active
         return (
@@ -81,6 +89,7 @@ export function TabStrip({
             key={t.value}
             onClick={() => onChange(t.value)}
             style={{
+              flexShrink: 0,
               position: 'relative', zIndex: isActive ? 2 : 1,
               marginLeft: i === 0 ? 0 : -1,
               display: 'inline-flex', alignItems: 'center', gap: 6,
