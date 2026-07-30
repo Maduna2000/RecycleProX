@@ -298,85 +298,92 @@ function PhotoGrid({
   const onNext     = viewerIdx < photos.length - 1 ? () => setViewer(photos[viewerIdx + 1]!) : null
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col h-full min-h-0">
 
-      <FilterBar>
-        <Field label="Search" width={220}>
-          <div style={{ position: 'relative' }}>
-            <Search style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', width: 12, height: 12, color: colors.textSecondary }} />
-            <input
-              value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(1) }}
-              placeholder="Name, ID no, ref, product…"
-              style={{ ...inp, paddingLeft: 24 }}
-            />
-          </div>
-        </Field>
-        <Field label="From" width={145}>
-          <input type="date" value={from} onChange={(e) => { setFrom(e.target.value); setPage(1) }} style={inp} />
-        </Field>
-        <Field label="To" width={145}>
-          <input type="date" value={to} onChange={(e) => { setTo(e.target.value); setPage(1) }} style={inp} />
-        </Field>
-        {hasFilters && (
-          <Btn size="sm" icon={X} onClick={clearFilters}>Clear</Btn>
-        )}
-        {total > 0 && (
-          <span style={{ marginLeft: 'auto', fontSize: 11, color: colors.textSecondary, paddingBottom: 8 }}>
-            {total} file{total !== 1 ? 's' : ''}
-          </span>
-        )}
-      </FilterBar>
-
-      {/* Loading */}
-      {isLoading && (
-        <div className="flex items-center justify-center py-20 gap-2" style={{ color: colors.textSecondary }}>
-          <Loader2 className="w-5 h-5 animate-spin" />
-          <span className="text-sm">Loading…</span>
-        </div>
-      )}
-
-      {/* Error state */}
-      {!isLoading && error && (
-        <div className="flex flex-col items-center justify-center py-20 gap-2" style={{ color: colors.danger }}>
-          <p className="text-sm">Failed to load photos. Please try again.</p>
-        </div>
-      )}
-
-      {/* Empty state */}
-      {!isLoading && !error && photos.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-20 gap-3" style={{ color: colors.textSecondary }}>
-          <Images className="w-12 h-12 opacity-20" />
-          <p className="text-sm">{emptyMsg}</p>
+      {/* Filter bar — fixed above the scroll area, never moves when the
+          grid below is scrolled (outer sizes / inner scrolls pattern). */}
+      <div style={{ padding: '10px 10px 0' }}>
+        <FilterBar>
+          <Field label="Search" width={220}>
+            <div style={{ position: 'relative' }}>
+              <Search style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', width: 12, height: 12, color: colors.textSecondary }} />
+              <input
+                value={search}
+                onChange={(e) => { setSearch(e.target.value); setPage(1) }}
+                placeholder="Name, ID no, ref, product…"
+                style={{ ...inp, paddingLeft: 24 }}
+              />
+            </div>
+          </Field>
+          <Field label="From" width={145}>
+            <input type="date" value={from} onChange={(e) => { setFrom(e.target.value); setPage(1) }} style={inp} />
+          </Field>
+          <Field label="To" width={145}>
+            <input type="date" value={to} onChange={(e) => { setTo(e.target.value); setPage(1) }} style={inp} />
+          </Field>
           {hasFilters && (
-            <Btn size="sm" onClick={clearFilters}>Clear filters</Btn>
+            <Btn size="sm" icon={X} onClick={clearFilters}>Clear</Btn>
           )}
-        </div>
-      )}
+          {total > 0 && (
+            <span style={{ marginLeft: 'auto', fontSize: 11, color: colors.textSecondary, paddingBottom: 8 }}>
+              {total} file{total !== 1 ? 's' : ''}
+            </span>
+          )}
+        </FilterBar>
+      </div>
 
-      {/* Grid */}
-      {!error && photos.length > 0 && (
-        <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-          {photos.map((photo, i) => (
-            <PhotoCard
-              key={`${photo.r2Key}-${i}`}
-              photo={photo}
-              onClick={() => setViewer(photo)}
-            />
-          ))}
-        </div>
-      )}
+      <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-3" style={{ padding: 10 }}>
 
-      {/* Pagination */}
-      {pageCount > 1 && (
-        <div className="flex items-center justify-center gap-3 pt-1">
-          <Btn size="sm" icon={ChevronLeft} disabled={page <= 1} onClick={() => setPage((p) => p - 1)} />
-          <span className="text-xs" style={{ color: colors.textSecondary }}>
-            Page {page} of {pageCount}
-          </span>
-          <Btn size="sm" icon={ChevronRight} disabled={page >= pageCount} onClick={() => setPage((p) => p + 1)} />
-        </div>
-      )}
+        {/* Loading */}
+        {isLoading && (
+          <div className="flex items-center justify-center py-20 gap-2" style={{ color: colors.textSecondary }}>
+            <Loader2 className="w-5 h-5 animate-spin" />
+            <span className="text-sm">Loading…</span>
+          </div>
+        )}
+
+        {/* Error state */}
+        {!isLoading && error && (
+          <div className="flex flex-col items-center justify-center py-20 gap-2" style={{ color: colors.danger }}>
+            <p className="text-sm">Failed to load photos. Please try again.</p>
+          </div>
+        )}
+
+        {/* Empty state */}
+        {!isLoading && !error && photos.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-20 gap-3" style={{ color: colors.textSecondary }}>
+            <Images className="w-12 h-12 opacity-20" />
+            <p className="text-sm">{emptyMsg}</p>
+            {hasFilters && (
+              <Btn size="sm" onClick={clearFilters}>Clear filters</Btn>
+            )}
+          </div>
+        )}
+
+        {/* Grid */}
+        {!error && photos.length > 0 && (
+          <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+            {photos.map((photo, i) => (
+              <PhotoCard
+                key={`${photo.r2Key}-${i}`}
+                photo={photo}
+                onClick={() => setViewer(photo)}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Pagination */}
+        {pageCount > 1 && (
+          <div className="flex items-center justify-center gap-3 pt-1">
+            <Btn size="sm" icon={ChevronLeft} disabled={page <= 1} onClick={() => setPage((p) => p - 1)} />
+            <span className="text-xs" style={{ color: colors.textSecondary }}>
+              Page {page} of {pageCount}
+            </span>
+            <Btn size="sm" icon={ChevronRight} disabled={page >= pageCount} onClick={() => setPage((p) => p + 1)} />
+          </div>
+        )}
+      </div>
 
       {/* Viewer */}
       {viewer && (
@@ -412,7 +419,7 @@ export default function PhotosPage() {
           </Btn>
         ))}
       </div>
-      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 10 }}>
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
         <PhotoGrid queryType={activeTab === 'all' ? undefined : activeTab} />
       </div>
     </PortalPage>
