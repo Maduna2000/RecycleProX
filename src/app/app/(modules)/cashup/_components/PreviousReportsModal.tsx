@@ -10,7 +10,14 @@ import Decimal from 'decimal.js'
 import { CASHUP_REPORT_LABELS, type CashupReportType, CURRENCY_SYMBOLS } from '@/lib/schemas/cashup'
 import { Btn, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json())
+async function fetcher(url: string) {
+  const res = await fetch(url)
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body.error ?? `Failed to load sessions (${res.status})`)
+  }
+  return res.json()
+}
 
 interface SessionRecord {
   id: string
@@ -43,7 +50,7 @@ const AVAILABLE_REPORT_TYPES: CashupReportType[] = [
 ]
 
 export function PreviousReportsModal({ onClose }: PreviousReportsModalProps) {
-  const { data, isLoading, error } = useSWR<{ sessions: SessionRecord[]; total: number }>(
+  const { data, isLoading, error, mutate } = useSWR<{ sessions: SessionRecord[]; total: number }>(
     '/api/cashup/history?take=50',
     fetcher
   )
@@ -132,8 +139,15 @@ export function PreviousReportsModal({ onClose }: PreviousReportsModalProps) {
           )}
 
           {error && (
-            <div className="text-center py-8 text-sm" style={{ color: colors.danger }}>
-              Failed to load sessions
+            <div className="flex flex-col items-center gap-2 py-8 text-sm" style={{ color: colors.danger }}>
+              <span>{error instanceof Error ? error.message : 'Failed to load sessions'}</span>
+              <button
+                onClick={() => mutate()}
+                className="text-xs underline"
+                style={{ color: colors.process, cursor: 'pointer' }}
+              >
+                Retry
+              </button>
             </div>
           )}
 
