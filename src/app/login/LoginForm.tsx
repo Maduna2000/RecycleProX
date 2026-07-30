@@ -91,8 +91,7 @@ export function LoginForm({ tenantSlug }: { tenantSlug?: string }) {
   return (
     <AuthShell
       accentColor={ACCENT}
-      icon={<Image src="/brand/renovo-icon.png" alt="Renovo Pro" width={64} height={64} priority />}
-      title="Renovo Pro"
+      logo={<Image src="/brand/renovo-logo.png" alt="Renovo Pro — Buy. Sell. Track." width={280} height={76} priority style={{ height: 'auto' }} />}
       subtitle={tenantSlug}
       errorMessage={error}
     >

@@ -23,8 +23,11 @@ type Customer = {
   customerNotes?: string
 }
 
-const TABS = ['Overview', 'Transactions'] as const
-const SECTION_TABS = ['Personal', 'Notes'] as const
+// Flat, single-level tab row — Personal/Notes used to be a second, nested
+// tab strip inside an "Overview" wrapper tab; now they're just the first
+// two tabs alongside Transactions, since "Overview" never rendered
+// anything of its own beyond hosting them.
+const TABS = ['Personal', 'Notes', 'Transactions'] as const
 
 // ─── Schema for casual customer edit ──────────────────────────────────────────
 const EditCasualSchema = z.object({
@@ -57,8 +60,7 @@ function Pill({ text, bg, color }: { text: string; bg: string; color: string }) 
 // ─── Main page ─────────────────────────────────────────────────────────────────
 export default function CasualCustomerDetailPage() {
   const { id } = useParams<{ id: string }>()
-  const [tab, setTab] = useState<typeof TABS[number]>('Overview')
-  const [sectionTab, setSectionTab] = useState<typeof SECTION_TABS[number]>('Personal')
+  const [tab, setTab] = useState<typeof TABS[number]>('Personal')
   const [isEditing, setIsEditing] = useState(false)
   const [saving, setSaving] = useState(false)
 
@@ -92,10 +94,10 @@ export default function CasualCustomerDetailPage() {
 
   // Guard: if Notes tab selected but no notes (and not editing), reset to Personal
   useEffect(() => {
-    if (sectionTab === 'Notes' && !customer?.customerNotes && !isEditing) {
-      setSectionTab('Personal')
+    if (tab === 'Notes' && !customer?.customerNotes && !isEditing) {
+      setTab('Personal')
     }
-  }, [customer?.customerNotes, sectionTab, isEditing])
+  }, [customer?.customerNotes, tab, isEditing])
 
   if (isLoading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: '#9CA3AF', fontSize: 13 }}>
@@ -124,12 +126,14 @@ export default function CasualCustomerDetailPage() {
       {/* ── Tab strip + Edit/Save controls (same row) ─────────────────────────── */}
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, padding: '8px 10px 0', background: '#F5F5F5' }}>
         <TabStrip
-          tabs={TABS.map((t) => ({ value: t, label: t }))}
+          tabs={TABS
+            .filter((t) => t !== 'Notes' || customer.customerNotes || isEditing)
+            .map((t) => ({ value: t, label: t }))}
           active={tab}
           onChange={(v) => setTab(v as typeof TABS[number])}
         />
         <div style={{ flex: 1 }} />
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingBottom: 5 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingBottom: 5, flexShrink: 0 }}>
           {!isEditing ? (
             <Btn size="sm" icon={Pencil} onClick={() => setIsEditing(true)}>Edit</Btn>
           ) : (
@@ -149,73 +153,58 @@ export default function CasualCustomerDetailPage() {
         {/* Main content */}
         <div style={{ flex: 1, borderRight: '1px solid #D0D0D0', background: '#fff' }}>
 
-          {tab === 'Overview' && (
+          {/* Section Content - Personal */}
+          {tab === 'Personal' && (
             <div>
-              {/* Secondary Tab Strip for sections */}
-              <TabStrip
-                tabs={(customer.customerNotes || isEditing
-                  ? SECTION_TABS
-                  : SECTION_TABS.filter(t => t !== 'Notes')
-                ).map((t) => ({ value: t, label: t }))}
-                active={sectionTab}
-                onChange={(v) => setSectionTab(v as typeof SECTION_TABS[number])}
-                style={{ padding: '8px 10px 0', background: '#EFEFEF' }}
-              />
-
-              {/* Section Content - Personal */}
-              {sectionTab === 'Personal' && (
+              <SHdr title="Personal Details" />
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px 16px', padding: '10px 12px' }}>
                 <div>
-                  <SHdr title="Personal Details" />
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px 16px', padding: '10px 12px' }}>
-                    <div>
-                      <span style={lbl}>First Name</span>
-                      <input {...register('firstName')} disabled={!isEditing || saving} style={isEditing ? inp : inpDisabled} />
-                      {errors.firstName && <span style={{ fontSize: 10, color: '#DC2626' }}>{errors.firstName.message}</span>}
-                    </div>
-                    <div>
-                      <span style={lbl}>Last Name</span>
-                      <input {...register('lastName')} disabled={!isEditing || saving} style={isEditing ? inp : inpDisabled} />
-                      {errors.lastName && <span style={{ fontSize: 10, color: '#DC2626' }}>{errors.lastName.message}</span>}
-                    </div>
-                    <div>
-                      <span style={lbl}>ID Number</span>
-                      <input value={customer.idNumber} disabled style={inpDisabled} />
-                    </div>
-                    <div>
-                      <span style={lbl}>Phone (Mobile)</span>
-                      <input {...register('phone')} disabled={!isEditing || saving} style={{ ...(isEditing ? inp : inpDisabled), fontFamily: 'monospace' }} />
-                      {errors.phone && <span style={{ fontSize: 10, color: '#DC2626' }}>{errors.phone.message}</span>}
-                    </div>
-                    <div style={{ gridColumn: 'span 2' }}>
-                      <span style={lbl}>Physical Address</span>
-                      <input {...register('physicalAddress')} disabled={!isEditing || saving} style={isEditing ? inp : inpDisabled} />
-                    </div>
-                  </div>
+                  <span style={lbl}>First Name</span>
+                  <input {...register('firstName')} disabled={!isEditing || saving} style={isEditing ? inp : inpDisabled} />
+                  {errors.firstName && <span style={{ fontSize: 10, color: '#DC2626' }}>{errors.firstName.message}</span>}
                 </div>
-              )}
-
-              {/* Section Content - Notes */}
-              {sectionTab === 'Notes' && (
                 <div>
-                  <SHdr title="Notes" />
-                  <div style={{ padding: '10px 12px' }}>
-                    <textarea
-                      {...register('customerNotes')}
-                      disabled={!isEditing || saving}
-                      rows={5}
-                      style={{
-                        width: '100%', borderRadius: 2, border: '1px solid #ABABAB',
-                        padding: '7px', fontSize: 12, resize: 'vertical', minHeight: 80,
-                        background: isEditing ? '#fff' : '#F5F5F5',
-                        color: isEditing ? '#212529' : '#6C757D',
-                        cursor: isEditing ? 'text' : 'default',
-                        outline: 'none',
-                      }}
-                      placeholder={isEditing ? 'Add notes about this customer...' : ''}
-                    />
-                  </div>
+                  <span style={lbl}>Last Name</span>
+                  <input {...register('lastName')} disabled={!isEditing || saving} style={isEditing ? inp : inpDisabled} />
+                  {errors.lastName && <span style={{ fontSize: 10, color: '#DC2626' }}>{errors.lastName.message}</span>}
                 </div>
-              )}
+                <div>
+                  <span style={lbl}>ID Number</span>
+                  <input value={customer.idNumber} disabled style={inpDisabled} />
+                </div>
+                <div>
+                  <span style={lbl}>Phone (Mobile)</span>
+                  <input {...register('phone')} disabled={!isEditing || saving} style={{ ...(isEditing ? inp : inpDisabled), fontFamily: 'monospace' }} />
+                  {errors.phone && <span style={{ fontSize: 10, color: '#DC2626' }}>{errors.phone.message}</span>}
+                </div>
+                <div style={{ gridColumn: 'span 2' }}>
+                  <span style={lbl}>Physical Address</span>
+                  <input {...register('physicalAddress')} disabled={!isEditing || saving} style={isEditing ? inp : inpDisabled} />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Section Content - Notes */}
+          {tab === 'Notes' && (
+            <div>
+              <SHdr title="Notes" />
+              <div style={{ padding: '10px 12px' }}>
+                <textarea
+                  {...register('customerNotes')}
+                  disabled={!isEditing || saving}
+                  rows={5}
+                  style={{
+                    width: '100%', borderRadius: 2, border: '1px solid #ABABAB',
+                    padding: '7px', fontSize: 12, resize: 'vertical', minHeight: 80,
+                    background: isEditing ? '#fff' : '#F5F5F5',
+                    color: isEditing ? '#212529' : '#6C757D',
+                    cursor: isEditing ? 'text' : 'default',
+                    outline: 'none',
+                  }}
+                  placeholder={isEditing ? 'Add notes about this customer...' : ''}
+                />
+              </div>
             </div>
           )}
 
