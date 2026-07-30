@@ -4,7 +4,7 @@ import { useState, useRef } from 'react'
 import { ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight, MoreHorizontal, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { colors, statusStyle } from '@/lib/design-tokens'
-import { Btn, HEADER_GRAD } from '@/components/rpx'
+import { Btn, HEADER_GRAD, GLOSS_BEVEL } from '@/components/rpx'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -200,6 +200,7 @@ export function DataTable<T>({
             <tr style={{
               background: HEADER_GRAD,
               borderBottom: '2px solid #B0B0B0',
+              boxShadow: GLOSS_BEVEL,
             }}>
               {multiSelect && (
                 <th style={{ width: 36, height: 30, padding: '0 10px', borderRight: '1px solid #D0D0D0' }}>

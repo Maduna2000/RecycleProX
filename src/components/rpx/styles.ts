@@ -34,6 +34,9 @@ export const CARD_BORDER = '1px solid #B0B0B0'
  */
 export const NAVY_GLOSS_GRAD = 'linear-gradient(180deg,#1e4a8a 0%,#1B3A6B 100%)'
 export const NAVY_GLOSS_BEVEL = 'inset 0 1px 0 rgba(255,255,255,0.22), inset 0 -2px 3px rgba(0,0,0,0.22)'
+/** Same bevel shape as NAVY_GLOSS_BEVEL, tuned for light grey/white chrome
+ * (buttons, dialog/panel title bars, table headers) rather than dark navy. */
+export const GLOSS_BEVEL = 'inset 0 1px 0 rgba(255,255,255,0.85), inset 0 -2px 4px rgba(0,0,0,0.10)'
 
 /** Standard 30px input / select / textarea skin. */
 export const inp: React.CSSProperties = {
@@ -73,7 +76,7 @@ export const btnPrimary: React.CSSProperties = {
   fontSize: 12, fontWeight: 700, padding: '7px 16px',
   background: BAR_GRAD, color: colors.textPrimary, border: CARD_BORDER,
   borderRadius: 3, cursor: 'pointer',
-  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.6)',
+  boxShadow: GLOSS_BEVEL,
 }
 
 /** Grey secondary button — pairs with the (also grey) primary. Same 3px
@@ -83,7 +86,7 @@ export const btnSecondary: React.CSSProperties = {
   fontSize: 11, fontWeight: 600, padding: '5px 12px',
   background: BAR_GRAD, color: colors.textPrimary, border: CARD_BORDER,
   borderRadius: 3, cursor: 'pointer',
-  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.6)',
+  boxShadow: GLOSS_BEVEL,
 }
 
 /** Destructive button — same grey fill, red label instead of a solid red block. */
@@ -99,4 +102,4 @@ export const btnDanger: React.CSSProperties = {
  * it can be reused as one of several independently-sized tiles in a grid.
  */
 export const PANEL: React.CSSProperties = { border: CARD_BORDER, borderRadius: 3, overflow: 'hidden', background: '#fff' }
-export const PANEL_HEAD: React.CSSProperties = { padding: '5px 10px', borderBottom: CARD_BORDER, background: BAR_GRAD }
+export const PANEL_HEAD: React.CSSProperties = { padding: '5px 10px', borderBottom: CARD_BORDER, background: BAR_GRAD, boxShadow: GLOSS_BEVEL }
