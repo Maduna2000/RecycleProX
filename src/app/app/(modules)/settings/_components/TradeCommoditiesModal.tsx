@@ -65,11 +65,15 @@ export function TradeCommoditiesModal({ onClose }: { onClose: () => void }) {
           </p>
         </div>
 
-        {/* Table — explicit maxHeight (not just flex:1) so this scrolls even
-            if the fixed-position dialog's own height ends up content-sized
-            rather than clamped, which some browsers do when a flex column's
-            height comes only from max-height rather than a definite value. */}
-        <div style={{ flex: '1 1 auto', minHeight: 0, maxHeight: 'calc(80vh - 70px)', overflowY: 'auto' }}>
+        {/* Table — flex:1 + minHeight:0 lets this shrink to the outer
+            dialog's own maxHeight and scroll internally, matching the
+            proven pattern in CustomerProfileModal. An earlier explicit
+            maxHeight calc here (calc(80vh - 70px)) didn't actually match
+            the header+help-text height, so the scroll region ended up
+            taller than the dialog's own clamped viewport — content past
+            the visible area was clipped by the outer overflow:hidden
+            instead of being reachable via scroll. */}
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
           {isLoading ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 24, color: colors.textSecondary }}>
               <Loader2 className="w-4 h-4 animate-spin" /> Loading…
