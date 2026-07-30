@@ -53,7 +53,14 @@ export interface RpxTab {
   count?: number
 }
 
-/** Folder-style tabs — white active, gray inactive, attached to the card below. */
+/**
+ * Folder-style tabs — white active, gray inactive, attached to the card
+ * below. Classic legacy-Windows property-sheet look: tabs sit directly
+ * adjacent (no gaps), each sharing its left border with the previous tab's
+ * right border, so the row reads as one continuous strip rather than
+ * separate floating chips. The active tab renders above its neighbours
+ * (higher z-index) so its own borders stay crisp at the shared edges.
+ */
 export function TabStrip({
   tabs,
   active,
@@ -66,14 +73,16 @@ export function TabStrip({
   style?: React.CSSProperties
 }) {
   return (
-    <div style={{ display: 'flex', gap: 2, flexShrink: 0, ...style }}>
-      {tabs.map((t) => {
+    <div style={{ display: 'flex', flexShrink: 0, ...style }}>
+      {tabs.map((t, i) => {
         const isActive = t.value === active
         return (
           <button
             key={t.value}
             onClick={() => onChange(t.value)}
             style={{
+              position: 'relative', zIndex: isActive ? 2 : 1,
+              marginLeft: i === 0 ? 0 : -1,
               display: 'inline-flex', alignItems: 'center', gap: 6,
               padding: '7px 16px', fontSize: 12, fontWeight: 600,
               border: '1px solid #B0B0B0', borderBottom: 'none',
