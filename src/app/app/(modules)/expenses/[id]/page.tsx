@@ -1,12 +1,12 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams } from 'next/navigation'
 import useSWR from 'swr'
 import { useSession } from 'next-auth/react'
 import Decimal from 'decimal.js'
 import {
-  CheckCircle, Trash2, Paperclip, Eye, Loader2, Upload, X,
+  CheckCircle, Paperclip, Eye, Loader2, Upload, X,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
@@ -31,7 +31,6 @@ type Attachment = { id: string; fileName: string; r2Key: string; notes?: string 
 
 export default function ExpenseDetailPage() {
   const { id } = useParams<{ id: string }>()
-  const router = useRouter()
   const { data: session } = useSession()
   const { confirm } = useConfirm()
   const isMgr = ['admin', 'manager'].includes(session?.user?.role ?? '')
@@ -43,7 +42,6 @@ export default function ExpenseDetailPage() {
     useSWR<ExpenseDetail['attachments']>(`/api/expenses/${id}/attachments`, fetcher)
 
   const [approving, setApproving] = useState(false)
-  const [voiding, setVoiding] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [viewingAttachment, setViewingAttachment] = useState<{ attachment: Attachment; url: string } | null>(null)
   const [viewLoadingId, setViewLoadingId] = useState<string | null>(null)
@@ -55,22 +53,6 @@ export default function ExpenseDetailPage() {
     setApproving(false)
     if (res.ok) { toast.success('Expense approved'); mutateExpense() }
     else { const j = await res.json(); toast.error(j.error ?? 'Failed to approve') }
-  }
-
-  async function handleVoid() {
-    const confirmed = await confirm({
-      title: 'Void Expense',
-      message: 'Are you sure you want to void this expense? This action cannot be undone.',
-      variant: 'danger',
-      confirmLabel: 'Void Expense',
-      cancelLabel: 'Cancel',
-    })
-    if (!confirmed) return
-    setVoiding(true)
-    const res = await fetch(`/api/expenses/${id}`, { method: 'DELETE' })
-    setVoiding(false)
-    if (res.ok) { toast.success('Expense voided'); router.push('/app/expenses') }
-    else { const j = await res.json(); toast.error(j.error ?? 'Failed to void') }
   }
 
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -155,9 +137,6 @@ export default function ExpenseDetailPage() {
         <>
           {isMgr && isPending && (
             <Btn variant="primary" size="sm" icon={CheckCircle} loading={approving} onClick={handleApprove}>Approve</Btn>
-          )}
-          {isMgr && !isVoided && (
-            <Btn variant="danger" size="sm" icon={Trash2} loading={voiding} onClick={handleVoid}>Void</Btn>
           )}
         </>
       }
