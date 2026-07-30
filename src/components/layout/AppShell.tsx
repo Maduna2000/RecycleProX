@@ -64,13 +64,10 @@ function useToolbarButtons(pathname: string, role: string): ToolbarButton[] {
   if (pathname === '/app/sales' || pathname.startsWith('/app/sales/'))
     return []
 
+  // "Account Balances" now lives only inside the Pending Purchases panel on
+  // the new-purchase page itself, not the top nav bar — was a duplicate entry point.
   if (pathname === '/app/payments' || pathname.startsWith('/app/payments/'))
-    // Don't show the link to Balances while already on Balances — it's a
-    // plain navigation shortcut, not a route-switcher, so pointing at the
-    // current page is dead weight rather than a highlighted "you are here".
-    return pathname === '/app/payments/balances' ? [] : [
-      { label: 'Account Balances', icon: Users, href: '/app/payments/balances', variant: 'secondary' },
-    ]
+    return []
 
   if (pathname === '/app/expenses' || pathname.startsWith('/app/expenses/'))
     return [
