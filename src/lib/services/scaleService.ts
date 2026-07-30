@@ -192,10 +192,19 @@ export async function voidScaleOrder(id: string, data: VoidScaleOrderInput, void
   if (!order) throw new ScaleOrderNotFoundError(id)
   if (order.status === 'voided') throw new ScaleOrderAlreadyVoidedError(order.orderNumber)
 
-  const updated = await prisma.scaleOrder.update({
-    where: { id },
-    data: { status: 'voided', voidedAt: new Date(), voidedById, voidReason: data.voidReason },
-    include: { customer: true, product: true, operator: true },
+  const updated = await prisma.$transaction(async (tx) => {
+    const voided = await tx.scaleOrder.update({
+      where: { id },
+      data: { status: 'voided', voidedAt: new Date(), voidedById, voidReason: data.voidReason },
+      include: { customer: true, product: true, operator: true },
+    })
+    // Voiding a queue-number order was never a real completed weigh-in —
+    // release the queue number so the operator can redo it under the same
+    // number, instead of it staying stuck as "used" forever.
+    if (voided.gateEntryId) {
+      await tx.gateEntry.update({ where: { id: voided.gateEntryId }, data: { queueNumberUsedAt: null } })
+    }
+    return voided
   })
   logger.info({ orderId: id, voidedById }, 'scaleOrder.voided')
   return updated
