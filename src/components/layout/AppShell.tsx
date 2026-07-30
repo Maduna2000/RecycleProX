@@ -70,9 +70,9 @@ function useToolbarButtons(pathname: string, role: string): ToolbarButton[] {
     return []
 
   if (pathname === '/app/expenses' || pathname.startsWith('/app/expenses/'))
-    return [
+    return pathname === '/app/expenses' ? [
       { label: 'Add Expense', icon: Plus, href: '/app/expenses?add=1', variant: 'primary' },
-    ]
+    ] : []
 
   if (pathname === '/app/cashup' || pathname.startsWith('/app/cashup/'))
     return []
