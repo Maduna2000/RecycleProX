@@ -30,9 +30,14 @@ export function TradeCommoditiesModal({ onClose }: { onClose: () => void }) {
   const categories = data?.categories ?? []
 
   // Parent categories first (in their existing Products sort order), each
-  // immediately followed by its children, so the tree reads naturally.
-  const parents = categories.filter((c) => !c.parentId)
-  const rows = parents.flatMap((p) => [p, ...categories.filter((c) => c.parentId === p.id)])
+  // immediately followed by its children, so the tree reads naturally. A
+  // category counts as "top-level" here if it has no parent OR its parent
+  // isn't in this active list (the parent category itself was deactivated
+  // in Products) — otherwise an active child would silently vanish from the
+  // list instead of showing, since it would never get attached to any row.
+  const categoryIds = new Set(categories.map((c) => c.id))
+  const topLevel = categories.filter((c) => !c.parentId || !categoryIds.has(c.parentId))
+  const rows = topLevel.flatMap((p) => [p, ...categories.filter((c) => c.parentId === p.id)])
 
   async function handleToggle(category: TradeCommodityOption) {
     setToggling(category.id)
