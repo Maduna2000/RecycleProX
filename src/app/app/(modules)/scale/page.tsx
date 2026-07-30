@@ -762,7 +762,7 @@ function OrdersTab() {
           </Field>
         )}
         <Field label={' '}>
-          <Btn size="sm" icon={RefreshCw} onClick={() => fetchOrders(page)} title="Refresh" />
+          <Btn size="sm" icon={RefreshCw} onClick={() => fetchOrders(page)} title="Refresh">Refresh</Btn>
         </Field>
         <Field label={' '}>
           <BtnMenu
