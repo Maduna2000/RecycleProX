@@ -23,7 +23,7 @@ import { getModuleName } from '@/lib/module-names'
 import { WindowTaskbar } from '@/components/ui/WindowTaskbar'
 import { useRecordTitle } from '@/hooks/useRecordTitle'
 import { useFeatureFlag } from '@/hooks/useFeatureFlags'
-import { Btn, BtnMenu, type BtnVariant, type BtnMenuItem } from '@/components/rpx'
+import { Btn, BtnMenu, type BtnVariant, type BtnMenuItem, NAVY_GLOSS_GRAD, NAVY_GLOSS_BEVEL } from '@/components/rpx'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -450,7 +450,7 @@ function Taskbar() {
   return (
     <div
       className="flex items-center px-3 shrink-0 border-t border-white/10"
-      style={{ height: 28, background: 'rgba(27,58,107,0.95)' }}
+      style={{ height: 28, background: NAVY_GLOSS_GRAD, boxShadow: NAVY_GLOSS_BEVEL }}
     >
       <span className="flex-1 text-center text-[10px] text-white/50 font-medium tracking-wide select-none whitespace-nowrap">
         Renovo Pro Management Software &nbsp;·&nbsp; V1.0
@@ -646,7 +646,7 @@ export function AppShell({
       {/* ── ZONE 1: Title Bar ─────────────────────────────────── */}
       <header
         className="flex items-center shrink-0 px-3 gap-0 border-b border-white/[0.08]"
-        style={{ height: 40, background: 'var(--rpx-navy, #1B3A6B)' }}
+        style={{ height: 40, background: NAVY_GLOSS_GRAD, boxShadow: NAVY_GLOSS_BEVEL }}
       >
         {/* Logo mark */}
         <div className="flex items-center gap-2 pr-3 border-r border-white/15 shrink-0">
