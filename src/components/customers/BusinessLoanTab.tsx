@@ -13,8 +13,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { format } from '@/lib/utils/format'
 import { colors } from '@/lib/design-tokens'
 import { HEADER_GRAD, VIOLET_GRAD, lbl, Btn, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
+import { fetcher } from '@/lib/swrFetcher'
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 // This tab is the mirror image of the "Loans" tab: Loans is money the
 // business advances TO this customer (a receivable — the customer owes us).
@@ -101,7 +101,7 @@ export function BusinessLoanTab({ customerId, customerName, userRole }: Business
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
 
-  const { data, isLoading } = useSWR<BusinessLoanSummaryResponse>(
+  const { data, isLoading, error } = useSWR<BusinessLoanSummaryResponse>(
     `/api/customers/${customerId}/business-loans`, fetcher)
 
   const isAdmin = userRole === 'admin'
@@ -128,6 +128,20 @@ export function BusinessLoanTab({ customerId, customerName, userRole }: Business
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 0', color: '#9CA3AF', fontSize: 12, gap: 8 }}>
           <Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} />
           Loading...
+        </div>
+      </div>
+    )
+  }
+
+  // Balances shown below default to zero/no-outstanding when data is
+  // missing — never let that silently stand in for a real fetch failure on
+  // a money figure.
+  if (error) {
+    return (
+      <div>
+        <SHdr title="Business Loan" subtitle="Money the business borrowed from this dealer" />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 0', color: colors.danger, fontSize: 12 }}>
+          {error instanceof Error ? error.message : 'Failed to load business loan data'}
         </div>
       </div>
     )

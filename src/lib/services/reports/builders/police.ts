@@ -95,7 +95,7 @@ async function queryCopperPurchases(from: string, to: string, idNumber?: string)
   const copperPurchasesArgs = {
     where: {
       purchase: {
-        status: 'completed',
+        status: { in: ['completed', 'pending'] },
         createdAt: { gte: start, lte: end },
         ...(idNumber ? { customer: { idNumber: ciContains(idNumber) } } : {}),
       },

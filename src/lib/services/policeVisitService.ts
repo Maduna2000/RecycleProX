@@ -253,7 +253,7 @@ export async function searchRegisterByDate(
 
   const purchases = await prisma.$transaction(async (tx) => {
     const found = await tx.purchase.findMany({
-      where:   { status: 'completed', createdAt: { gte: start, lte: end } },
+      where:   { status: { in: ['completed', 'pending'] }, createdAt: { gte: start, lte: end } },
       include: { customer: true, lines: { include: { product: true } } },
       orderBy: { createdAt: 'asc' },
     })
@@ -324,8 +324,8 @@ export async function searchPersons(visitId: string, q: string): Promise<{ rows:
       take:    50,
       orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
       include: {
-        _count:    { select: { purchases: { where: { status: 'completed' } } } },
-        purchases: { where: { status: 'completed' }, orderBy: { createdAt: 'desc' }, take: 1, select: { createdAt: true } },
+        _count:    { select: { purchases: { where: { status: { in: ['completed', 'pending'] } } } } },
+        purchases: { where: { status: { in: ['completed', 'pending'] } }, orderBy: { createdAt: 'desc' }, take: 1, select: { createdAt: true } },
       },
     })
     await tx.policeSearchLog.create({
@@ -386,7 +386,7 @@ export async function getPersonDetail(visitId: string, customerId: string): Prom
       where:   { id: customerId },
       include: {
         purchases: {
-          where:   { status: 'completed' },
+          where:   { status: { in: ['completed', 'pending'] } },
           orderBy: { createdAt: 'desc' },
           take:    100,
           include: { lines: { include: { product: true } } },
@@ -476,7 +476,7 @@ export async function searchGoods(
       where: {
         productId: opts.productId,
         ...(opts.minQuantity ? { quantity: { gte: opts.minQuantity } } : {}),
-        purchase: { status: 'completed', ...(createdAt ? { createdAt } : {}) },
+        purchase: { status: { in: ['completed', 'pending'] }, ...(createdAt ? { createdAt } : {}) },
       },
       include: { purchase: { include: { customer: true } }, product: true },
       orderBy: { createdAt: 'desc' },
@@ -526,7 +526,7 @@ export async function getPersonRecordReport(visitId: string, customerId: string)
       where:   { id: customerId },
       include: {
         purchases: {
-          where:   { status: 'completed' },
+          where:   { status: { in: ['completed', 'pending'] } },
           orderBy: { createdAt: 'desc' },
           take:    200,
           include: { lines: { include: { product: true } } },
@@ -591,7 +591,7 @@ export async function getGoodsTraceReport(
       where: {
         productId: opts.productId,
         ...(opts.minQuantity ? { quantity: { gte: opts.minQuantity } } : {}),
-        purchase: { status: 'completed', ...(createdAt ? { createdAt } : {}) },
+        purchase: { status: { in: ['completed', 'pending'] }, ...(createdAt ? { createdAt } : {}) },
       },
       include: { purchase: { include: { customer: true } }, product: true },
       orderBy: { createdAt: 'desc' },
@@ -650,7 +650,7 @@ export async function getPurchasesForRegisterRange(start: Date, end: Date): Prom
 }> {
   const [purchases, settingsRows] = await Promise.all([
     prisma.purchase.findMany({
-      where:   { status: 'completed', createdAt: { gte: start, lte: end } },
+      where:   { status: { in: ['completed', 'pending'] }, createdAt: { gte: start, lte: end } },
       include: { customer: true, lines: { include: { product: true } } },
       orderBy: { createdAt: 'asc' },
     }),

@@ -11,10 +11,10 @@ import { z } from 'zod'
 import { inp, lbl, HEADER_GRAD, NAVY, Btn, TabStrip, PortalPage } from '@/components/rpx'
 import { colors } from '@/lib/design-tokens'
 import { TransactionsTab } from '@/components/customers/TransactionsTab'
+import { fetcher } from '@/lib/swrFetcher'
 
 const inpDisabled: React.CSSProperties = { ...inp, background: '#F5F5F5', color: '#6C757D', cursor: 'default' }
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 type Customer = {
   id: string; firstName: string; lastName: string; idNumber: string
@@ -64,7 +64,7 @@ export default function CasualCustomerDetailPage() {
   const [isEditing, setIsEditing] = useState(false)
   const [saving, setSaving] = useState(false)
 
-  const { data: customer, isLoading } = useSWR<Customer>(`/api/customers/${id}`, fetcher)
+  const { data: customer, isLoading, error } = useSWR<Customer>(`/api/customers/${id}`, fetcher)
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<EditCasualInput>({
     resolver: zodResolver(EditCasualSchema),
@@ -102,6 +102,11 @@ export default function CasualCustomerDetailPage() {
   if (isLoading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: '#9CA3AF', fontSize: 13 }}>
       Loading…
+    </div>
+  )
+  if (error) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: '#DC2626', fontSize: 13 }}>
+      {error instanceof Error ? error.message : 'Failed to load customer'}
     </div>
   )
   if (!customer) return (

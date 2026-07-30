@@ -7,8 +7,8 @@ import Decimal from 'decimal.js'
 import { DataTable, Avatar, type Column } from '@/components/ui/DataTable'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
 import { PortalPage } from '@/components/rpx'
+import { fetcher } from '@/lib/swrFetcher'
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 type AccountBalance = {
   id: string
@@ -22,7 +22,7 @@ type AccountBalance = {
 }
 
 export default function AccountBalancesPage() {
-  const { data: balancesData, isLoading: balancesLoading } = useSWR<{ balances: AccountBalance[] }>(
+  const { data: balancesData, isLoading: balancesLoading, error: balancesError } = useSWR<{ balances: AccountBalance[] }>(
     '/api/payments/balances',
     fetcher,
   )
@@ -107,6 +107,7 @@ export default function AccountBalancesPage() {
           rows={pagedBalances}
           rowKey={(r) => r.id}
           loading={balancesLoading}
+          error={balancesError instanceof Error ? balancesError.message : !!balancesError}
           total={balances.length}
           page={safePage}
           pageSize={PAGE_SIZE}

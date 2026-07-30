@@ -8,8 +8,8 @@ import { toast } from 'sonner'
 import { ChevronLeft, ChevronRight, ChevronDown, Loader2, X } from 'lucide-react'
 import { colors, fontSize, fontWeight, badgeStyle } from '@/lib/design-tokens'
 import { inp, Btn, Field, PortalPage, FilterBar, TH, HEADER_GRAD } from '@/components/rpx'
+import { fetcher } from '@/lib/swrFetcher'
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 type AuditEntry = {
   id:             string
@@ -70,7 +70,7 @@ export default function AuditLogPage() {
     ...(to     && { to }),
   }).toString()
 
-  const { data, isLoading } = useSWR<AuditResponse>(
+  const { data, isLoading, error } = useSWR<AuditResponse>(
     isAdmin ? `/api/audit-log?${qs}` : null,
     fetcher
   )
@@ -197,7 +197,10 @@ export default function AuditLogPage() {
                 </tr>
               </thead>
               <tbody>
-                {(!data?.items.length) && (
+                {error && (
+                  <tr><td colSpan={7} className="text-center py-12 text-sm" style={{ color: colors.danger }}>{error instanceof Error ? error.message : 'Failed to load audit log'}</td></tr>
+                )}
+                {!error && (!data?.items.length) && (
                   <tr><td colSpan={7} className="text-center py-12 text-sm" style={{ color: colors.textSecondary }}>No entries found</td></tr>
                 )}
                 {data?.items.map((entry, idx) => (

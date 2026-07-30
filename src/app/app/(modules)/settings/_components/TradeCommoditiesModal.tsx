@@ -6,13 +6,13 @@ import { Loader2, ToggleLeft, ToggleRight } from 'lucide-react'
 import { toast } from 'sonner'
 import { Dialog } from '@/components/ui/dialog'
 import { colors } from '@/lib/design-tokens'
+import { fetcher } from '@/lib/swrFetcher'
 import {
   TH, TD, HEADER_GRAD,
   EmptyHint,
   RpxDialogContent, RpxDialogHeader,
 } from '@/components/rpx'
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 type TradeCommodityOption = {
   id: string
@@ -26,7 +26,7 @@ const QUERY = '/api/settings/trade-commodities'
 export function TradeCommoditiesModal({ onClose }: { onClose: () => void }) {
   const [toggling, setToggling] = useState<string | null>(null)
 
-  const { data, isLoading } = useSWR<{ categories: TradeCommodityOption[] }>(QUERY, fetcher)
+  const { data, isLoading, error } = useSWR<{ categories: TradeCommodityOption[] }>(QUERY, fetcher)
   const categories = data?.categories ?? []
 
   // Parent categories first (in their existing Products sort order), each
@@ -78,6 +78,8 @@ export function TradeCommoditiesModal({ onClose }: { onClose: () => void }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 24, color: colors.textSecondary }}>
               <Loader2 className="w-4 h-4 animate-spin" /> Loading…
             </div>
+          ) : error ? (
+            <EmptyHint text={error instanceof Error ? error.message : 'Failed to load categories'} height={100} />
           ) : rows.length === 0 ? (
             <EmptyHint text="No product categories yet. Create some in Products → Manage Categories first." height={100} />
           ) : (

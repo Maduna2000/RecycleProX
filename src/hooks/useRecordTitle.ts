@@ -1,6 +1,7 @@
 'use client'
 
 import useSWR from 'swr'
+import { fetcher } from '@/lib/swrFetcher'
 
 /**
  * Hook to fetch the actual record title for dynamic routes.
@@ -12,7 +13,6 @@ import useSWR from 'swr'
  *   /app/sales/def456 → "SAL-2025-000789"
  */
 
-const fetcher = (url: string) => fetch(url).then(r => r.json())
 
 type RoutePattern = {
   prefix: string

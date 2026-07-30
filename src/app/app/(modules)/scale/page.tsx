@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
+import { fetcher } from '@/lib/swrFetcher'
 import {
   Search, X, Download, RefreshCw,
   FileText, Images, CheckCircle2, XCircle,
@@ -122,7 +123,6 @@ const TABS = [
   { value: 'config',    label: 'Step Config' },
 ] as const
 
-const fetcher = (url: string) => fetch(url).then(r => { if (!r.ok) throw new Error('Fetch failed'); return r.json() })
 
 function useDebounce<T>(value: T, ms = 300): T {
   const [debounced, setDebounced] = useState(value)

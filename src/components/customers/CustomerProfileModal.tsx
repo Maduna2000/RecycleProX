@@ -13,6 +13,7 @@ import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { fetcher } from '@/lib/swrFetcher'
 import {
   UpdateCustomerSchema,
   BlacklistSchema,
@@ -23,7 +24,6 @@ import {
 import { colors, badgeStyle } from '@/lib/design-tokens'
 import { Btn, HEADER_GRAD, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 type Customer = {
   id: string; firstName: string; lastName: string; idNumber: string

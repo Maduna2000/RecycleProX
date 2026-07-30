@@ -9,6 +9,7 @@ import { toast } from 'sonner'
 import { colors } from '@/lib/design-tokens'
 import { DEFAULT_POLICE_SERVICE_NAME, DEFAULT_POLICE_LEGAL_NOTE } from '@/lib/police-defaults'
 import { StatusBadge as SharedStatusBadge } from '@/components/ui/DataTable'
+import { fetcher } from '@/lib/swrFetcher'
 import {
   inp, lbl, TH, TD, HEADER_GRAD, NAVY,
   Btn, Field, EmptyHint, PortalPage,
@@ -16,7 +17,6 @@ import {
 } from '@/components/rpx'
 import { useSignatureCanvas } from '@/hooks/useSignatureCanvas'
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 type SearchLog = {
   id: string

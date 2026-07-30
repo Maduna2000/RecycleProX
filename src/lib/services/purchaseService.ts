@@ -334,47 +334,50 @@ export async function createPurchase(data: CreatePurchaseInput, createdByUserId?
 // ─── Void Purchase ────────────────────────────────────────────────────────────
 
 export async function voidPurchase(id: string, data: VoidPurchaseInput, voidedById?: string) {
-  const purchase = await prisma.purchase.findUnique({
-    where: { id },
-    include: { lines: true },
-  })
-  if (!purchase) throw new PurchaseNotFoundError(id)
-  if (purchase.status === 'voided') throw new PurchaseAlreadyVoidedError(purchase.refNumber)
+  const updated = await withSerializableRetry(() =>
+    prisma.$transaction(async (tx) => {
+      // Re-read inside the transaction (not just before it) — under
+      // Serializable isolation, a second concurrent void racing this one
+      // gets a serialization failure on commit and retries here, seeing the
+      // fresh 'voided' status instead of both requests reversing stock.
+      const purchase = await tx.purchase.findUnique({ where: { id }, include: { lines: true } })
+      if (!purchase) throw new PurchaseNotFoundError(id)
+      if (purchase.status === 'voided') throw new PurchaseAlreadyVoidedError(purchase.refNumber)
 
-  // If this completed purchase's day already has an approved cash-up, voiding
-  // it still goes ahead — recalculateApprovedCashUpForDate below corrects that
-  // cash-up's totals (and every later approved day's finPeriodCumulative) in
-  // the same transaction, rather than blocking the void until a manager
-  // reconciles it by hand.
-  const sessionDate = sastDateLabelToUTCDate(sastDayLabelOfInstant(purchase.createdAt))
-  const wasCompleted = purchase.status === 'completed'
+      // If this completed purchase's day already has an approved cash-up,
+      // voiding it still goes ahead — recalculateApprovedCashUpForDate below
+      // corrects that cash-up's totals (and every later approved day's
+      // finPeriodCumulative) in the same transaction, rather than blocking
+      // the void until a manager reconciles it by hand.
+      const sessionDate = sastDateLabelToUTCDate(sastDayLabelOfInstant(purchase.createdAt))
+      const wasCompleted = purchase.status === 'completed'
 
-  const updated = await prisma.$transaction(async (tx) => {
-    const p = await tx.purchase.update({
-      where: { id },
-      data: { status: 'voided', voidedAt: new Date(), voidedById, voidReason: data.reason },
-      include: { lines: { include: { product: true } }, customer: true },
-    })
+      const p = await tx.purchase.update({
+        where: { id },
+        data: { status: 'voided', voidedAt: new Date(), voidedById, voidReason: data.reason },
+        include: { lines: { include: { product: true } }, customer: true },
+      })
 
-    // Reverse stock: remove the IN movements that came from this purchase
-    await recordVoidReversal(tx, {
-      originalMovements: purchase.lines.map((l) => ({
-        productId: l.productId,
-        direction: 'in' as const,
-        quantity: new Decimal(l.quantity.toString()),
-      })),
-      sourceId: id,
-      createdByUserId: voidedById,
-    })
+      // Reverse stock: remove the IN movements that came from this purchase
+      await recordVoidReversal(tx, {
+        originalMovements: purchase.lines.map((l) => ({
+          productId: l.productId,
+          direction: 'in' as const,
+          quantity: new Decimal(l.quantity.toString()),
+        })),
+        sourceId: id,
+        createdByUserId: voidedById,
+      })
 
-    if (wasCompleted) {
-      await recalculateApprovedCashUpForDate(tx, sessionDate, purchase.createdAt, 'purchases')
-    }
+      if (wasCompleted) {
+        await recalculateApprovedCashUpForDate(tx, sessionDate, purchase.createdAt, 'purchases')
+      }
 
-    return p
-  })
+      return p
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+  )
 
-  logger.info({ purchaseId: id, refNumber: purchase.refNumber, voidedById }, 'purchase.voided')
+  logger.info({ purchaseId: id, refNumber: updated.refNumber, voidedById }, 'purchase.voided')
   return updated
 }
 

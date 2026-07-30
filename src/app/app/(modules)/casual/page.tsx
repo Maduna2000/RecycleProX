@@ -10,12 +10,12 @@ import { toast } from 'sonner'
 import { useSession } from 'next-auth/react'
 import { DataTable, StatusBadge, Column, RowAction } from '@/components/ui/DataTable'
 import { colors, fontSize } from '@/lib/design-tokens'
+import { fetcher } from '@/lib/swrFetcher'
 import {
   inp, Btn, BtnMenu, Field, FilterBar, PortalPage,
   RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter,
 } from '@/components/rpx'
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 type Customer = {
   id: string; firstName: string; lastName: string; idNumber: string
@@ -54,7 +54,7 @@ export default function CasualsPage() {
   if (showBlacklisted) params.set('blacklisted', showBlacklisted)
   if (dealerCategory) params.set('dealerCategory', dealerCategory)
   if (primaryFunction) params.set('primaryFunction', primaryFunction)
-  const { data, isLoading } = useSWR<{ customers: Customer[]; total: number }>(
+  const { data, isLoading, error } = useSWR<{ customers: Customer[]; total: number }>(
     `/api/customers?${params}`,
     fetcher,
   )
@@ -314,6 +314,7 @@ export default function CasualsPage() {
             rowKey={(r) => r.id}
             rowActions={rowActions}
             loading={isLoading}
+            error={error instanceof Error ? error.message : !!error}
             total={customers.length}
             page={safePage}
             pageSize={PAGE_SIZE}

@@ -10,12 +10,12 @@ import type { SupportTicket } from '@/lib/services/supportTicketClient'
 import { colors, fontSize, fontWeight, statusStyle } from '@/lib/design-tokens'
 import { format } from '@/lib/utils/format'
 import { Dialog } from '@/components/ui/dialog'
+import { fetcher } from '@/lib/swrFetcher'
 import {
   Btn, PortalPage, inp, lbl,
   RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter,
 } from '@/components/rpx'
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 const PRIORITIES = ['low', 'medium', 'high', 'urgent'] as const
 type Priority = typeof PRIORITIES[number]
@@ -257,7 +257,7 @@ export default function SupportPage() {
   const searchParams = useSearchParams()
   const isAdmin = session?.user?.role === 'admin'
 
-  const { data, isLoading, mutate } = useSWR<{ tickets: SupportTicket[] }>('/api/support-tickets', fetcher)
+  const { data, isLoading, error, mutate } = useSWR<{ tickets: SupportTicket[] }>('/api/support-tickets', fetcher)
   const [newOpen,  setNewOpen]  = useState(false)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
@@ -290,6 +290,10 @@ export default function SupportPage() {
         {isLoading ? (
           <div className="flex items-center justify-center gap-2" style={{ padding: 40, color: colors.textSecondary }}>
             <Loader2 className="w-4 h-4 animate-spin" /> Loading tickets…
+          </div>
+        ) : error ? (
+          <div className="flex items-center justify-center gap-2" style={{ padding: 40, color: colors.danger }}>
+            {error instanceof Error ? error.message : 'Failed to load support tickets'}
           </div>
         ) : tickets.length === 0 ? (
           <div className="flex flex-col items-center gap-2" style={{ padding: 48 }}>

@@ -10,8 +10,8 @@
  * (server-side filters expand via productService.expandCategoryNames).
  */
 import useSWR from 'swr'
+import { fetcher } from '@/lib/swrFetcher'
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 interface CategoryNode {
   id: string

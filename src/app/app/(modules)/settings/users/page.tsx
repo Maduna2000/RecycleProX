@@ -13,8 +13,8 @@ import { toast } from 'sonner'
 import { colors, badgeStyle } from '@/lib/design-tokens'
 import { inp, Field, PortalPage, FilterBar } from '@/components/rpx'
 import { DataTable, type Column, type RowAction, StatusBadge as SharedStatusBadge } from '@/components/ui/DataTable'
+import { fetcher } from '@/lib/swrFetcher'
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 type User = {
   id: string; fullName: string; username: string; role: string
@@ -73,7 +73,7 @@ export default function UsersPage() {
 
   const isAdmin = session?.user?.role === 'admin'
   const query = new URLSearchParams({ ...(search && { search }), ...(roleFilter && { role: roleFilter }) })
-  const { data } = useSWR<{ users: User[] }>(isAdmin ? `/api/users?${query}` : null, fetcher)
+  const { data, error } = useSWR<{ users: User[] }>(isAdmin ? `/api/users?${query}` : null, fetcher)
 
   if (!isAdmin) {
     router.replace('/app/dashboard')
@@ -162,6 +162,7 @@ export default function UsersPage() {
             rows={users}
             rowKey={(user) => user.id}
             rowActions={rowActions}
+            error={error instanceof Error ? error.message : !!error}
             emptyMessage="No users found"
           />
         </div>

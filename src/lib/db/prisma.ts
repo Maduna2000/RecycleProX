@@ -42,7 +42,7 @@ if (process.env.NODE_ENV !== 'production') globalForPrisma.rawPrisma = rawClient
 const TENANT_SCOPED_MODELS = new Set([
   'user', 'userModuleAccess', 'auditLog', 'systemSettings', 'customer',
   'customerDocument', 'product', 'priceGroup', 'priceGroupProductOverride',
-  'priceHistory', 'productCategory', 'tradeCommodityCategory', 'categoryStepConfig',
+  'priceHistory', 'productCategory', 'categoryStepConfig',
   'purchase', 'purchaseLine', 'sale', 'saleLine', 'stockMovement', 'payment',
   'expenseType', 'expense', 'expenseAttachment', 'cashFloat', 'stocktake',
   'stocktakeEntry', 'cashUp', 'loan', 'loanRepayment', 'policeVisit',

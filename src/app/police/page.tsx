@@ -13,6 +13,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import useSWR from 'swr'
+import { fetcher } from '@/lib/swrFetcher'
 import {
   ShieldCheck, Loader2, Search, FileDown, Pen, CheckCircle, RotateCcw,
   ArrowLeft, Clock, AlertTriangle, User as UserIcon, Package, CalendarDays,
@@ -28,7 +29,6 @@ import {
 import { Dialog } from '@/components/ui/dialog'
 import { useSignatureCanvas } from '@/hooks/useSignatureCanvas'
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 // ─── Types (mirror service layer outputs) ─────────────────────────────────────
 

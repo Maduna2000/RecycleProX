@@ -12,8 +12,8 @@ import { runSeeder } from '@/lib/offline/seeder'
 import { DEFAULT_POLICE_SERVICE_NAME, DEFAULT_POLICE_LEGAL_NOTE } from '@/lib/police-defaults'
 import { inp, HEADER_GRAD, NAVY, Btn, Field, PortalPage } from '@/components/rpx'
 import { TradeCommoditiesModal } from './_components/TradeCommoditiesModal'
+import { fetcher } from '@/lib/swrFetcher'
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 type ScaleType   = 'none' | 'tcp' | 'serial'
 type PrinterType = 'none' | 'serial' | 'tcp'

@@ -7,8 +7,8 @@ import { DataTable, type Column } from '@/components/ui/DataTable'
 import { format } from '@/lib/utils/format'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
 import { inp, Btn, Field, PortalPage, FilterBar } from '@/components/rpx'
+import { fetcher } from '@/lib/swrFetcher'
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 type Movement = {
   id: string

@@ -9,12 +9,12 @@ import { Dialog } from '@/components/ui/dialog'
 import { colors, badgeStyle } from '@/lib/design-tokens'
 import { toast } from 'sonner'
 import { useSession } from 'next-auth/react'
+import { fetcher } from '@/lib/swrFetcher'
 import {
   inp, lbl, Btn, Field, FilterBar, PortalPage,
   RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter,
 } from '@/components/rpx'
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 type Customer = {
   id: string; firstName: string; lastName: string; idNumber: string

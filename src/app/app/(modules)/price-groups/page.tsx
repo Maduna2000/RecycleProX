@@ -14,6 +14,7 @@ import { CreatePriceGroupSchema, type CreatePriceGroupInput, type CreatePriceGro
 import { useSession } from 'next-auth/react'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { colors } from '@/lib/design-tokens'
+import { fetcher } from '@/lib/swrFetcher'
 import {
   TH, TD, HEADER_GRAD,
   Btn, PortalPage,
@@ -21,7 +22,6 @@ import {
 } from '@/components/rpx'
 import { DataTable, StatusBadge, type Column, type RowAction } from '@/components/ui/DataTable'
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 type PriceGroup = {
   id: string; name: string; description?: string

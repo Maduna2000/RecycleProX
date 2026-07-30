@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
+import { fetcher } from '@/lib/swrFetcher'
 import {
   Search, X, RefreshCw, Images, CheckCircle2, EyeOff,
   UserPlus, Eye, Info, LogOut, Package, Plus, Pencil, Trash2,
@@ -65,7 +66,6 @@ const TABS = [
   { value: 'config',  label: 'Purpose Config' },
 ] as const
 
-const fetcher = (url: string) => fetch(url).then(r => { if (!r.ok) throw new Error('Fetch failed'); return r.json() })
 
 function useDebounce<T>(value: T, ms = 300): T {
   const [debounced, setDebounced] = useState(value)

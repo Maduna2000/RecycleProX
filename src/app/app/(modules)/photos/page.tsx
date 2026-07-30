@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import useSWR from 'swr'
 import { Dialog } from '@/components/ui/dialog'
+import { fetcher } from '@/lib/swrFetcher'
 import {
   Search, Download, Images, X, ChevronLeft, ChevronRight,
   Loader2, FileText, IdCard, Scale, ShoppingCart, Receipt,
@@ -11,7 +12,6 @@ import { colors, fontSize } from '@/lib/design-tokens'
 import type { PhotoRecord } from '@/app/api/photos/search/route'
 import { inp, Btn, Field, PortalPage, FilterBar, RpxDialogContent, RpxDialogFooter } from '@/components/rpx'
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 type PhotosResponse = {
   photos: PhotoRecord[]

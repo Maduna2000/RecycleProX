@@ -18,12 +18,12 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { colors, fontSize } from '@/lib/design-tokens'
+import { fetcher } from '@/lib/swrFetcher'
 import {
   inp, Btn, Field, PortalPage, FilterBar,
   RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter,
 } from '@/components/rpx'
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 type ExpenseType = { id: string; name: string; parentId?: string | null }
 type Expense = {

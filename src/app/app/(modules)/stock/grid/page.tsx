@@ -9,8 +9,8 @@ import { DataTable, type Column } from '@/components/ui/DataTable'
 import { CategoryFilterSelect } from '@/components/products/CategoryFilterSelect'
 import { colors, fontSize } from '@/lib/design-tokens'
 import { inp, BtnMenu, Field, PortalPage, FilterBar } from '@/components/rpx'
+import { fetcher } from '@/lib/swrFetcher'
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 type GridRow = {
   productId: string

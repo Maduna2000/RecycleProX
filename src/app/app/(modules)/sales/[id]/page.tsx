@@ -11,13 +11,13 @@ import { format } from '@/lib/utils/format'
 import Decimal from 'decimal.js'
 import { PhotoViewer } from '@/components/PhotoUploader'
 import { colors } from '@/lib/design-tokens'
+import { fetcher } from '@/lib/swrFetcher'
 import {
   inp, lbl, TH, TD, HEADER_GRAD, NAVY,
   Btn, PortalPage,
   RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter,
 } from '@/components/rpx'
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 type SaleLine = {
   id: string
@@ -67,13 +67,20 @@ export default function SaleDetailPage() {
   const { data: session } = useSession()
   const [voidOpen, setVoidOpen] = useState(false)
 
-  const { data: sale, isLoading } = useSWR<Sale>(`/api/sales/${id}`, fetcher)
+  const { data: sale, isLoading, error } = useSWR<Sale>(`/api/sales/${id}`, fetcher)
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
 
   if (isLoading) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 256, color: colors.textSecondary }}>
         <Loader2 style={{ width: 20, height: 20, animation: 'spin 1s linear infinite' }} />
+      </div>
+    )
+  }
+  if (error) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 256, color: colors.danger, fontSize: 13 }}>
+        {error instanceof Error ? error.message : 'Failed to load sale'}
       </div>
     )
   }

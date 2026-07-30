@@ -10,12 +10,12 @@ import { DataTable, type Column } from '@/components/ui/DataTable'
 import { Dialog } from '@/components/ui/dialog'
 import { CategoryFilterSelect, useProductCategories } from '@/components/products/CategoryFilterSelect'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
+import { fetcher } from '@/lib/swrFetcher'
 import {
   inp, Btn, Field, PortalPage, FilterBar,
   RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter,
 } from '@/components/rpx'
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 type StockEntry = {
   product: { id: string; code: string; name: string; category: string; unit: string; minStockLevel?: string | null }

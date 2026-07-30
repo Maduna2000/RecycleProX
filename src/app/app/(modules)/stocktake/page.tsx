@@ -9,8 +9,8 @@ import { format } from '@/lib/utils/format'
 import { colors } from '@/lib/design-tokens'
 import { PortalPage } from '@/components/rpx'
 import { DataTable, StatusBadge, type Column } from '@/components/ui/DataTable'
+import { fetcher } from '@/lib/swrFetcher'
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 type StocktakeItem = {
   id: string

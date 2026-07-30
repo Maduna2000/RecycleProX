@@ -11,12 +11,12 @@ import { Dialog } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { format } from '@/lib/utils/format'
 import { colors, fontSize, fontWeight, badgeStyle } from '@/lib/design-tokens'
+import { fetcher } from '@/lib/swrFetcher'
 import {
   inp, Btn, Field, PortalPage, FilterBar,
   RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter,
 } from '@/components/rpx'
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 type Payment = {
   id: string
@@ -69,7 +69,7 @@ export default function PaymentsPage() {
     pageSize: '100',
   })
 
-  const { data: paymentsData, isLoading: paymentsLoading } = useSWR<{
+  const { data: paymentsData, isLoading: paymentsLoading, error: paymentsError } = useSWR<{
     payments: Payment[]; total: number; totalReceived: string; totalPaidOut: string
   }>(
     `/api/payments?${query}`,
@@ -243,6 +243,7 @@ export default function PaymentsPage() {
           rowKey={(r) => r.id}
           rowActions={paymentActions}
           loading={paymentsLoading}
+          error={paymentsError instanceof Error ? paymentsError.message : !!paymentsError}
           emptyMessage="No payments found"
           total={paymentsData?.total}
           pageSize={100}

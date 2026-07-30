@@ -16,6 +16,7 @@ import { CreateProductSchema, UpdateProductSchema, BulkPriceUpdateSchema, type C
 import { useSession } from 'next-auth/react'
 import Decimal from 'decimal.js'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
+import { fetcher } from '@/lib/swrFetcher'
 import {
   inp,
   Btn, Field, PortalPage, FilterBar,
@@ -23,7 +24,6 @@ import {
 } from '@/components/rpx'
 import { DataTable, type Column, type RowAction } from '@/components/ui/DataTable'
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 function calcMargin(buy: string, sell: string): { pct: string; color: string } {
   const b = new Decimal(buy  || '0')

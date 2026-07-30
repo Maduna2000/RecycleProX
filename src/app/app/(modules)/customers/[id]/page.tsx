@@ -15,6 +15,7 @@ import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { fetcher } from '@/lib/swrFetcher'
 import {
   UpdateCustomerSchema,
   BlacklistSchema,
@@ -32,7 +33,6 @@ const selectStyle = inp
 const inpDisabled: React.CSSProperties = { ...inp, background: '#F5F5F5', color: '#6C757D', cursor: 'default' }
 const selectDisabled = inpDisabled
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 type Customer = {
   id: string; firstName: string; lastName: string; idNumber: string

@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation'
 import useSWR from 'swr'
 import { useSession } from 'next-auth/react'
 import Decimal from 'decimal.js'
+import { fetcher } from '@/lib/swrFetcher'
 import {
   CheckCircle, Paperclip, Eye, Loader2, Upload, X,
 } from 'lucide-react'
@@ -15,7 +16,6 @@ import { Btn, PortalPage } from '@/components/rpx'
 import { StatusBadge } from '@/components/ui/DataTable'
 import { DocumentViewerModal } from '@/components/ui/DocumentViewerModal'
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 type ExpenseDetail = {
   id: string; refNumber: string; description: string

@@ -13,8 +13,8 @@ import { toast } from 'sonner'
 import { validateSaId } from '@/lib/utils/saId'
 import Link from 'next/link'
 import { Btn, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
+import { fetcher } from '@/lib/swrFetcher'
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 type CreatedCustomerSummary = {
   id: string; firstName: string; lastName: string; idNumber: string

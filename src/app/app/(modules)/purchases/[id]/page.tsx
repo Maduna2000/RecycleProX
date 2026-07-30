@@ -10,13 +10,13 @@ import { useSession } from 'next-auth/react'
 import { format } from '@/lib/utils/format'
 import { PhotoUploader, PhotoViewer } from '@/components/PhotoUploader'
 import { colors } from '@/lib/design-tokens'
+import { fetcher } from '@/lib/swrFetcher'
 import {
   inp, lbl, TH, TD, HEADER_GRAD, NAVY,
   Btn, PortalPage,
   RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter,
 } from '@/components/rpx'
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 type PurchaseLine = {
   id: string
@@ -71,13 +71,20 @@ export default function PurchaseDetailPage() {
   const { data: session } = useSession()
   const [voidOpen, setVoidOpen] = useState(false)
 
-  const { data: purchase, isLoading } = useSWR<Purchase>(`/api/purchases/${id}`, fetcher)
+  const { data: purchase, isLoading, error } = useSWR<Purchase>(`/api/purchases/${id}`, fetcher)
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
 
   if (isLoading) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 256, color: colors.textSecondary }}>
         <Loader2 style={{ width: 20, height: 20, animation: 'spin 1s linear infinite' }} />
+      </div>
+    )
+  }
+  if (error) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 256, color: colors.danger, fontSize: 13 }}>
+        {error instanceof Error ? error.message : 'Failed to load purchase'}
       </div>
     )
   }

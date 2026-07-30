@@ -11,8 +11,8 @@ import { CreateCustomerSchema, type CreateCustomerFormInput, type CreateCustomer
 import { TradeCommoditiesSelect } from '@/components/customers/TradeCommoditiesSelect'
 import { colors } from '@/lib/design-tokens'
 import { Btn, Field, HEADER_GRAD, inp, lbl, PortalPage, SectionLabel } from '@/components/rpx'
+import { fetcher } from '@/lib/swrFetcher'
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 const TITLE_OPTIONS = ['—', 'Mr', 'Mrs', 'Ms', 'Dr', 'Prof', 'Rev', 'Other']
 

@@ -13,8 +13,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { format } from '@/lib/utils/format'
 import { colors } from '@/lib/design-tokens'
 import { HEADER_GRAD, ACTION_GRAD, NAVY, lbl, Btn, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
+import { fetcher } from '@/lib/swrFetcher'
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 type Loan = {
   id: string
@@ -96,7 +96,7 @@ export function LoansTab({ customerId, customerName, userRole, userAllowedModule
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
 
-  const { data, isLoading } = useSWR<LoansResponse>(`/api/customers/${customerId}/loans`, fetcher)
+  const { data, isLoading, error } = useSWR<LoansResponse>(`/api/customers/${customerId}/loans`, fetcher)
   const loans = data?.loans ?? []
   const summary = data?.summary
 
@@ -187,6 +187,10 @@ export function LoansTab({ customerId, customerName, userRole, userAllowedModule
         >
           <Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} />
           Loading...
+        </div>
+      ) : error ? (
+        <div style={{ padding: '40px 0', textAlign: 'center', color: colors.danger, fontSize: 12 }}>
+          {error instanceof Error ? error.message : 'Failed to load loans'}
         </div>
       ) : loans.length === 0 ? (
         <div style={{ padding: '40px 0', textAlign: 'center' }}>

@@ -214,44 +214,50 @@ export async function createSale(data: CreateSaleInput, createdByUserId?: string
 // ─── Void Sale ────────────────────────────────────────────────────────────────
 
 export async function voidSale(id: string, data: VoidSaleInput, voidedById?: string) {
-  const sale = await prisma.sale.findUnique({ where: { id }, include: { lines: true } })
-  if (!sale) throw new SaleNotFoundError(id)
-  if (sale.status === 'voided') throw new SaleAlreadyVoidedError(sale.refNumber)
+  const updated = await withSerializableRetry(() =>
+    prisma.$transaction(async (tx) => {
+      // Re-read inside the transaction (not just before it) — under
+      // Serializable isolation, a second concurrent void racing this one
+      // gets a serialization failure on commit and retries here, seeing the
+      // fresh 'voided' status instead of both requests reversing stock.
+      const sale = await tx.sale.findUnique({ where: { id }, include: { lines: true } })
+      if (!sale) throw new SaleNotFoundError(id)
+      if (sale.status === 'voided') throw new SaleAlreadyVoidedError(sale.refNumber)
 
-  // If this completed sale's day already has an approved cash-up, voiding it
-  // still goes ahead — recalculateApprovedCashUpForDate below corrects that
-  // cash-up's totals (and every later approved day's finPeriodCumulative) in
-  // the same transaction, rather than blocking the void until a manager
-  // reconciles it by hand.
-  const sessionDate = sastDateLabelToUTCDate(sastDayLabelOfInstant(sale.createdAt))
-  const wasCompleted = sale.status === 'completed'
+      // If this completed sale's day already has an approved cash-up, voiding
+      // it still goes ahead — recalculateApprovedCashUpForDate below corrects
+      // that cash-up's totals (and every later approved day's
+      // finPeriodCumulative) in the same transaction, rather than blocking
+      // the void until a manager reconciles it by hand.
+      const sessionDate = sastDateLabelToUTCDate(sastDayLabelOfInstant(sale.createdAt))
+      const wasCompleted = sale.status === 'completed'
 
-  const updated = await prisma.$transaction(async (tx) => {
-    const s = await tx.sale.update({
-      where: { id },
-      data: { status: 'voided', voidedAt: new Date(), voidedById, voidReason: data.reason },
-      include: { lines: { include: { product: true } } },
-    })
+      const s = await tx.sale.update({
+        where: { id },
+        data: { status: 'voided', voidedAt: new Date(), voidedById, voidReason: data.reason },
+        include: { lines: { include: { product: true } } },
+      })
 
-    // Reverse the stock OUT movements from this sale
-    await recordVoidReversal(tx, {
-      originalMovements: sale.lines.map((l) => ({
-        productId: l.productId,
-        direction: 'out' as const,
-        quantity:  new Decimal(l.quantity.toString()),
-      })),
-      sourceId:       id,
-      createdByUserId: voidedById,
-    })
+      // Reverse the stock OUT movements from this sale
+      await recordVoidReversal(tx, {
+        originalMovements: sale.lines.map((l) => ({
+          productId: l.productId,
+          direction: 'out' as const,
+          quantity:  new Decimal(l.quantity.toString()),
+        })),
+        sourceId:       id,
+        createdByUserId: voidedById,
+      })
 
-    if (wasCompleted) {
-      await recalculateApprovedCashUpForDate(tx, sessionDate, sale.createdAt, 'sales')
-    }
+      if (wasCompleted) {
+        await recalculateApprovedCashUpForDate(tx, sessionDate, sale.createdAt, 'sales')
+      }
 
-    return s
-  })
+      return s
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+  )
 
-  logger.info({ saleId: id, refNumber: sale.refNumber, voidedById }, 'sale.voided')
+  logger.info({ saleId: id, refNumber: updated.refNumber, voidedById }, 'sale.voided')
   return updated
 }
 

@@ -14,13 +14,13 @@ import { toast } from 'sonner'
 import Decimal from 'decimal.js'
 import { format } from '@/lib/utils/format'
 import { colors } from '@/lib/design-tokens'
+import { fetcher } from '@/lib/swrFetcher'
 import {
   Btn, PortalPage, BAR_GRAD, PANEL,
   RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter,
 } from '@/components/rpx'
 import { DataTable, type Column, StatusBadge } from '@/components/ui/DataTable'
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 type Product = { id: string; code: string; name: string; unit: string; category: string }
 type StocktakeEntry = {

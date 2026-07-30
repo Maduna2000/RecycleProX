@@ -15,8 +15,8 @@ import { colors } from '@/lib/design-tokens'
 import { z } from 'zod'
 import { Btn, PortalPage, PANEL, PANEL_HEAD } from '@/components/rpx'
 import { DataTable, type Column } from '@/components/ui/DataTable'
+import { fetcher } from '@/lib/swrFetcher'
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 const TopUpFormSchema = z.object({
   amount: z.string().min(1, 'Amount required').regex(/^\d+(\.\d{1,2})?$/, 'Invalid amount'),
