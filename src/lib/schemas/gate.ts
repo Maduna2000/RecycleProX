@@ -18,6 +18,11 @@ export const CreateGateEntrySchema = z.object({
   idPhotoR2Key:      z.string().optional(),
   vehiclePhotoR2Key: z.string().optional(),
   facePhotoR2Key:    z.string().optional(),
+  // Guard-asserted "walked in, no vehicle" exemption for the vehicle photo
+  // slot — distinct from the account-holder exemption (which the server
+  // re-derives itself from the matched customer, never trusts the client
+  // for). See createGateEntry's server-side enforcement.
+  vehicleExempt:     z.boolean().optional(),
   notes:             z.string().max(500).optional(),
 }).refine(
   (d) => d.purpose !== 'sell' || (d.categoryNames && d.categoryNames.length > 0),

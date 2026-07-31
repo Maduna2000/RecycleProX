@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
-import { reverseFloatMovement, FloatMovementReversalError } from '@/lib/services/floatService'
+import { reverseFloatMovement, FloatMovementReversalError, FloatMovementLockedError } from '@/lib/services/floatService'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
 import logger from '@/lib/logger'
 
@@ -26,6 +26,9 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     if (err instanceof FloatMovementReversalError) {
       const statusCode = err.code === 'NOT_FOUND' ? 404 : 409
       return NextResponse.json({ error: err.message, code: err.code }, { status: statusCode })
+    }
+    if (err instanceof FloatMovementLockedError) {
+      return NextResponse.json({ error: err.message, code: err.code }, { status: 409 })
     }
     logger.error({ err, movementId }, 'DELETE /api/float/movement/[id]/reverse failed')
     return NextResponse.json({ error: 'Failed to reverse movement' }, { status: 500 })

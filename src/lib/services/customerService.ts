@@ -52,21 +52,17 @@ async function generateAccountCode(lastName: string): Promise<string> {
   return `${prefix}${String(next).padStart(3, '0')}`
 }
 
-const DEALER_PRICE_GROUP_NAMES: Record<string, string> = {
-  dealer_1: 'Dealer 1',
-  dealer_2: 'Dealer 2',
-  dealer_3: 'Dealer 3',
-}
-
 async function resolvePriceGroupId(
   dealerCategory: string | undefined,
   explicitPriceGroupId: string | undefined,
 ): Promise<string | undefined> {
   if (dealerCategory === 'casual') return undefined
-  if (dealerCategory && DEALER_PRICE_GROUP_NAMES[dealerCategory]) {
-    const group = await prisma.priceGroup.findFirst({
-      where: { name: DEALER_PRICE_GROUP_NAMES[dealerCategory] },
-    })
+  // Resolved by the stable dealerTier tag, not the group's display name —
+  // renaming "Dealer 1" (or any other display-name edit) can no longer
+  // silently break this (see project memory: 269 Dealer-1 customers
+  // mispriced when this used to match on name).
+  if (dealerCategory === 'dealer_1' || dealerCategory === 'dealer_2' || dealerCategory === 'dealer_3') {
+    const group = await prisma.priceGroup.findFirst({ where: { dealerTier: dealerCategory } })
     if (group) return group.id
   }
   return explicitPriceGroupId

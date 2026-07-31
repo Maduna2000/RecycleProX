@@ -23,6 +23,7 @@ type ExpenseDetail = {
   paymentMethod: string; chequeNo?: string | null
   status: string; cashUpId?: string | null
   createdAt: string; approvedAt?: string | null; approvedById?: string | null
+  voidedAt?: string | null; voidReason?: string | null
   expenseType: { name: string }
   attachments: Attachment[]
 }
@@ -156,6 +157,7 @@ export default function ExpenseDetailPage() {
         {isVoided && (
           <div style={{ padding: '8px 12px', background: colors.dangerBg, borderBottom: `1px solid ${colors.danger}`, flexShrink: 0 }}>
             <p style={{ fontSize: 12, fontWeight: 600, color: colors.danger }}>This expense has been voided</p>
+            {expense.voidReason && <p style={{ fontSize: 11, color: colors.danger, marginTop: 2 }}>Reason: {expense.voidReason}</p>}
           </div>
         )}
 

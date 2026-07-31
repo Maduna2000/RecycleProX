@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/db/prisma'
 import { requireTenantId } from '@/lib/db/tenantContext'
+import { Prisma } from '@prisma/client'
 import logger from '@/lib/logger'
 import Decimal from 'decimal.js'
 import type { CreatePaymentInput, VoidPaymentInput } from '@/lib/schemas/payment'
@@ -18,14 +19,35 @@ export class CustomerNotFoundError extends Error {
   constructor(id: string) { super(`Customer "${id}" not found`); this.name = 'CustomerNotFoundError' }
 }
 
+export class PaymentExceedsBalanceError extends Error {
+  constructor(amount: string, balance: string) { super(`Payment amount (R ${amount}) exceeds outstanding balance (R ${balance})`); this.name = 'PaymentExceedsBalanceError' }
+}
+
 // ─── Reference generator ─────────────────────────────────────────────────────
 
-async function generateRefNumber(): Promise<string> {
+type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
+
+// Generated inside the transaction so it's atomic with the insert
+async function generateRefNumber(tx: TxClient): Promise<string> {
   const today = new Date()
   const prefix = `PAY-${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`
   const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate())
-  const count = await prisma.payment.count({ where: { createdAt: { gte: startOfDay } } })
+  const count = await tx.payment.count({ where: { createdAt: { gte: startOfDay } } })
   return `${prefix}-${String(count + 1).padStart(4, '0')}`
+}
+
+// Retries on PostgreSQL serialization failures (P2034 / 40001)
+async function withSerializableRetry<T>(fn: () => Promise<T>): Promise<T> {
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      return await fn()
+    } catch (e: unknown) {
+      const code = (e as { code?: string })?.code
+      if (attempt < 3 && (code === 'P2034' || code === '40001')) continue
+      throw e
+    }
+  }
+  throw new Error('unreachable')
 }
 
 // ─── Customer Balance ─────────────────────────────────────────────────────────
@@ -67,33 +89,61 @@ export async function getCustomerBalance(customerId: string) {
 // ─── Create Payment ───────────────────────────────────────────────────────────
 
 export async function createPayment(data: CreatePaymentInput, createdByUserId?: string) {
-  const customer = await prisma.customer.findUnique({
-    where: { id: data.customerId },
-    select: { id: true, customerType: true, blacklisted: true, isActive: true },
-  })
-  if (!customer) throw new CustomerNotFoundError(data.customerId)
+  const tenantId = requireTenantId()
+  const amount = new Decimal(data.amount)
 
-  const refNumber = await generateRefNumber()
+  const payment = await withSerializableRetry(() =>
+    prisma.$transaction(async (tx) => {
+      const customer = await tx.customer.findUnique({
+        where: { id: data.customerId },
+        select: { id: true, customerType: true, blacklisted: true, isActive: true },
+      })
+      if (!customer) throw new CustomerNotFoundError(data.customerId)
 
-  const payment = await prisma.payment.create({
-    data: {
-      tenantId: requireTenantId(),
-      refNumber,
-      customerId: data.customerId,
-      amount: new Decimal(data.amount),
-      paymentMethod: data.paymentMethod ?? 'cash',
-      notes: data.notes,
-      // Manual "Record Payment" always settles what the yard owes a
-      // customer from purchases — see the Payment.source field comment.
-      source: 'purchase',
-      createdByUserId,
-    },
-    include: {
-      customer: { select: { id: true, firstName: true, lastName: true, idNumber: true } },
-    },
-  })
+      // Balance check re-read inside the Serializable transaction — mirrors
+      // getCustomerBalance()'s aggregate logic, scoped to tx so a concurrent
+      // payment can't both pass the check against stale totals.
+      const [purchaseAgg, paymentAgg] = await Promise.all([
+        tx.purchase.aggregate({
+          where: { customerId: data.customerId, status: 'completed' },
+          _sum: { totalAmount: true },
+        }),
+        tx.payment.aggregate({
+          where: { customerId: data.customerId, voidedAt: null },
+          _sum: { amount: true },
+        }),
+      ])
+      const totalPurchases = new Decimal(purchaseAgg._sum.totalAmount?.toString() ?? '0')
+      const totalPaid = new Decimal(paymentAgg._sum.amount?.toString() ?? '0')
+      const balance = totalPurchases.minus(totalPaid)
 
-  logger.info({ paymentId: payment.id, refNumber, customerId: data.customerId, amount: data.amount, createdByUserId }, 'payment.created')
+      if (amount.greaterThan(balance)) {
+        throw new PaymentExceedsBalanceError(amount.toFixed(2), balance.toFixed(2))
+      }
+
+      const refNumber = await generateRefNumber(tx)
+
+      return tx.payment.create({
+        data: {
+          tenantId,
+          refNumber,
+          customerId: data.customerId,
+          amount,
+          paymentMethod: data.paymentMethod ?? 'cash',
+          notes: data.notes,
+          // Manual "Record Payment" always settles what the yard owes a
+          // customer from purchases — see the Payment.source field comment.
+          source: 'purchase',
+          createdByUserId,
+        },
+        include: {
+          customer: { select: { id: true, firstName: true, lastName: true, idNumber: true } },
+        },
+      })
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+  )
+
+  logger.info({ paymentId: payment.id, refNumber: payment.refNumber, customerId: data.customerId, amount: data.amount, createdByUserId }, 'payment.created')
   return payment
 }
 

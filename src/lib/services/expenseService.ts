@@ -266,13 +266,13 @@ export async function approveExpense(id: string, userId: string) {
   return expense
 }
 
-export async function voidExpense(id: string, userId: string) {
+export async function voidExpense(id: string, userId: string, reason: string) {
   const expense = await prisma.expense.update({
     where: { id },
-    data: { status: 'voided' },
+    data: { status: 'voided', voidedById: userId, voidedAt: new Date(), voidReason: reason },
     include: { expenseType: true },
   })
-  logger.info({ expenseId: id, userId }, 'Expense voided')
+  logger.info({ expenseId: id, userId, reason }, 'Expense voided')
   return expense
 }
 

@@ -5,6 +5,7 @@ import { CreatePaymentSchema } from '@/lib/schemas/payment'
 import {
   createPayment, listPayments,
   CustomerNotFoundError,
+  PaymentExceedsBalanceError,
 } from '@/lib/services/paymentService'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
@@ -46,6 +47,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(payment, { status: 201 })
   } catch (err) {
     if (err instanceof CustomerNotFoundError) return NextResponse.json({ error: err.message }, { status: 404 })
+    if (err instanceof PaymentExceedsBalanceError) return NextResponse.json({ error: err.message }, { status: 422 })
     logger.error({ err }, 'POST /api/payments failed')
     return NextResponse.json({ error: 'Failed to create payment' }, { status: 500 })
   }

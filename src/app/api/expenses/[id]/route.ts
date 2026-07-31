@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getExpense, voidExpense, updateExpense } from '@/lib/services/expenseService'
-import { UpdateExpenseSchema } from '@/lib/schemas/expense'
+import { UpdateExpenseSchema, VoidExpenseSchema } from '@/lib/schemas/expense'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
 import logger from '@/lib/logger'
 
@@ -57,8 +57,14 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
+  const body = await req.json().catch(() => ({}))
+  const parsed = VoidExpenseSchema.safeParse(body)
+  if (!parsed.success) {
+    return NextResponse.json({ error: 'Validation failed', issues: parsed.error.issues }, { status: 400 })
+  }
+
   try {
-    const expense = await runWithRequestTenant(req, () => voidExpense(params.id, session.user.id))
+    const expense = await runWithRequestTenant(req, () => voidExpense(params.id, session.user.id, parsed.data.reason))
     return NextResponse.json(expense)
   } catch (err) {
     logger.error({ err }, 'DELETE /api/expenses/[id] failed')

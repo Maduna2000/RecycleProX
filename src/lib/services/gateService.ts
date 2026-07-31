@@ -25,6 +25,13 @@ export class GateEntryAlreadyExitedError extends Error {
   }
 }
 
+export class GateRequiredPhotoMissingError extends Error {
+  constructor(slot: 'ID' | 'vehicle') {
+    super(`${slot} photo is required for this visit purpose`)
+    this.name = 'GateRequiredPhotoMissingError'
+  }
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
@@ -93,10 +100,26 @@ export async function createGateEntry(data: CreateGateEntryInput, operatorId: st
 
   const customer = await prisma.customer.findUnique({
     where: { tenantId_idNumber: { tenantId, idNumber: data.visitorIdNumber } },
-    select: { id: true, blacklisted: true, blacklistReason: true },
+    select: { id: true, blacklisted: true, blacklistReason: true, customerType: true },
   })
   if (customer?.blacklisted) {
     throw new GateVisitorBlacklistedError(customer.blacklistReason)
+  }
+
+  // Re-derive account-holder status server-side (never trust the client's
+  // own isAccountHolder flag) and re-check the required-photo config —
+  // StepPhotos.tsx's exemption gating is real UX, but without this check a
+  // raw POST could skip a required photo for anyone. Account holders and a
+  // guard-asserted "no vehicle" claim remain exempt exactly as the client
+  // already models them; this only blocks the case where neither exemption
+  // applies and the photo is simply missing.
+  const isAccountHolder = customer?.customerType === 'account'
+  const purposeConfig = await getPurposeConfig(data.purpose)
+  if (purposeConfig.requireIdPhoto && !isAccountHolder && !data.idPhotoR2Key) {
+    throw new GateRequiredPhotoMissingError('ID')
+  }
+  if (purposeConfig.requireVehiclePhoto && !isAccountHolder && !data.vehicleExempt && !data.vehiclePhotoR2Key) {
+    throw new GateRequiredPhotoMissingError('vehicle')
   }
 
   const entry = await prisma.$transaction(async (tx) => {

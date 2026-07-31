@@ -17,9 +17,14 @@ export type PhotoRecord = {
   product?: { id: string; name: string }
 }
 
+const PHOTO_VIEWER_ROLES = ['admin', 'manager', 'cashier']
+
 export async function GET(req: NextRequest) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!PHOTO_VIEWER_ROLES.includes(session.user.role)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
 
   const { searchParams } = req.nextUrl
   const type       = searchParams.get('type')        // 'purchase' | 'sale' | 'weighbridge' | 'casual'

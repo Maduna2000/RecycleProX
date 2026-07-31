@@ -26,6 +26,7 @@ const MODULE_KEYS = [
   '/app/reports',
   '/app/police-register',
   '/app/audit-log',
+  '/app/photos',
   '/app/settings',
 ]
 

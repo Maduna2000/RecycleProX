@@ -27,12 +27,13 @@ const MODULE_OPTIONS = [
   { key: '/app/loans', label: 'Loans' },
   { key: '/app/police-register', label: 'Police Register' },
   { key: '/app/audit-log', label: 'Audit Log' },
+  { key: '/app/photos', label: 'Photos' },
   { key: '/app/settings', label: 'Settings' },
 ]
 
 const EditSchema = z.object({
   fullName: z.string().min(2),
-  role: z.enum(['admin', 'manager', 'cashier', 'scale_operator']),
+  role: z.enum(['admin', 'manager', 'cashier', 'scale_operator', 'security_guard']),
   isActive: z.boolean(),
 })
 type EditInput = z.infer<typeof EditSchema>
@@ -168,6 +169,7 @@ export function EditUserModal({ user, onClose, onSuccess }: { user: User; onClos
               <option value="manager">Manager</option>
               <option value="cashier">Cashier</option>
               <option value="scale_operator">Scale Operator</option>
+              <option value="security_guard">Security Guard</option>
             </select>
             {isSelf && <span style={{ fontSize: 10, color: '#9CA3AF', marginTop: 2, display: 'block' }}>Cannot change your own role</span>}
           </div>
@@ -240,6 +242,11 @@ export function EditUserModal({ user, onClose, onSuccess }: { user: User; onClos
           {selectedRole === 'scale_operator' && (
             <p style={{ fontSize: 10, color: '#666', fontStyle: 'italic' }}>
               Scale operators can only access the Scale Station app.
+            </p>
+          )}
+          {selectedRole === 'security_guard' && (
+            <p style={{ fontSize: 10, color: '#666', fontStyle: 'italic' }}>
+              Security guards can only access the Gate Station app.
             </p>
           )}
 

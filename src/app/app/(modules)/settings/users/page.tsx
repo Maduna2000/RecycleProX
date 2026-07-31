@@ -41,11 +41,12 @@ const ROLE_STYLES: Record<string, { background: string; color: string }> = {
   manager:        { background: colors.processBg, color: colors.process },
   cashier:        { background: colors.neutralBg, color: colors.textSecondary },
   scale_operator: { background: colors.actionBg, color: colors.action },
+  security_guard: { background: colors.warningBg, color: colors.warning },
 }
 
 function RoleBadge({ role }: { role: string }) {
   const style = ROLE_STYLES[role] ?? { background: colors.neutralBg, color: colors.textSecondary }
-  const displayName = role === 'scale_operator' ? 'Scale Op' : role
+  const displayName = role === 'scale_operator' ? 'Scale Op' : role === 'security_guard' ? 'Guard' : role
   return (
     <span style={{ ...badgeStyle(style.color, style.background), textTransform: 'capitalize' }}>
       {displayName}
@@ -151,6 +152,7 @@ export default function UsersPage() {
               <option value="manager">Manager</option>
               <option value="cashier">Cashier</option>
               <option value="scale_operator">Scale Operator</option>
+              <option value="security_guard">Security Guard</option>
             </select>
           </Field>
         </FilterBar>

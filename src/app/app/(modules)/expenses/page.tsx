@@ -8,7 +8,6 @@ import useSWR, { mutate } from 'swr'
 import { useSession } from 'next-auth/react'
 import { CheckCircle, Trash2, Receipt, Search, X, Paperclip, Upload, Eye, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
-import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { CreateExpenseSchema, type CreateExpenseFormInput, type CreateExpenseInput } from '@/lib/schemas/expense'
@@ -20,7 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { colors, fontSize } from '@/lib/design-tokens'
 import { fetcher } from '@/lib/swrFetcher'
 import {
-  inp, Btn, Field, PortalPage, FilterBar,
+  inp, lbl, Btn, Field, PortalPage, FilterBar,
   RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter,
 } from '@/components/rpx'
 
@@ -43,13 +42,13 @@ export default function ExpensesPage() {
   const router        = useRouter()
   const searchParams  = useSearchParams()
   const { data: session } = useSession()
-  const { confirm }   = useConfirm()
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
 
   const [tab,              setTab]              = useState<PageTab>('Pending')
   const [addOpen,          setAddOpen]          = useState(false)
   const [addTypeOpen,      setAddTypeOpen]      = useState(false)
   const [settlingExpense,  setSettlingExpense]  = useState<Expense | null>(null)
+  const [voidingExpense,   setVoidingExpense]   = useState<Expense | null>(null)
   const [search,         setSearch]         = useState('')
   const [from,           setFrom]           = useState('')
   const [to,             setTo]             = useState('')
@@ -96,19 +95,6 @@ export default function ExpensesPage() {
     else { const j = await res.json(); toast.error(j.error ?? 'Failed to approve') }
   }
 
-  async function handleVoid(id: string) {
-    const confirmed = await confirm({
-      title: 'Void Expense',
-      message: 'Are you sure you want to void this expense? This action cannot be undone.',
-      variant: 'danger',
-      confirmLabel: 'Void Expense',
-      cancelLabel: 'Cancel',
-    })
-    if (!confirmed) return
-    const res = await fetch(`/api/expenses/${id}`, { method: 'DELETE' })
-    if (res.ok) { toast.success('Expense voided'); mutate(key) }
-    else { const j = await res.json(); toast.error(j.error ?? 'Failed to void') }
-  }
 
   const columns: Column<Expense>[] = [
     {
@@ -246,7 +232,7 @@ export default function ExpensesPage() {
       icon:    Trash2,
       danger:  true,
       hidden:  (r) => !isManager || r.status === 'voided',
-      onClick: (r) => handleVoid(r.id),
+      onClick: (r) => setVoidingExpense(r),
     },
   ]
 
@@ -334,6 +320,14 @@ export default function ExpensesPage() {
           expense={settlingExpense}
           onClose={() => setSettlingExpense(null)}
           onSuccess={() => { mutate(key); setSettlingExpense(null) }}
+        />
+      )}
+
+      {voidingExpense && (
+        <VoidExpenseModal
+          expense={voidingExpense}
+          onClose={() => setVoidingExpense(null)}
+          onSuccess={() => { mutate(key); setVoidingExpense(null) }}
         />
       )}
 
@@ -840,6 +834,54 @@ function UpdatePendingExpenseModal({ expense, onClose, onSuccess }: UpdatePendin
             disabled={!isValidChange || loading}
           >
             Update & Approve
+          </Btn>
+        </RpxDialogFooter>
+      </RpxDialogContent>
+    </Dialog>
+  )
+}
+
+// ─── Void Expense Modal ────────────────────────────────────────────────────────
+
+function VoidExpenseModal({ expense, onClose, onSuccess }: { expense: Expense; onClose: () => void; onSuccess: () => void }) {
+  const [reason, setReason] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  async function onConfirm() {
+    if (reason.trim().length < 5) { toast.error('Reason must be at least 5 characters'); return }
+    setLoading(true)
+    const res = await fetch(`/api/expenses/${expense.id}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason }),
+    })
+    setLoading(false)
+    if (res.ok) { toast.success('Expense voided'); onSuccess() }
+    else { const j = await res.json(); toast.error(j.error ?? 'Failed to void expense') }
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
+      <RpxDialogContent maxWidth={440}>
+        <RpxDialogHeader title="Void Expense" onClose={onClose} />
+        <RpxDialogBody>
+          <p style={{ fontSize: 12.5, color: colors.textSecondary, margin: '0 0 12px' }}>
+            You are about to void <span style={{ fontWeight: 600, color: colors.textPrimary }}>{expense.refNumber}</span> (R {Number(expense.amount).toFixed(2)}).
+            This action cannot be undone.
+          </p>
+          <span style={lbl}>Reason for void</span>
+          <input
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="Enter reason (min 5 characters)"
+            style={inp}
+            disabled={loading}
+          />
+        </RpxDialogBody>
+        <RpxDialogFooter>
+          <Btn onClick={onClose} disabled={loading}>Cancel</Btn>
+          <Btn variant="danger" onClick={onConfirm} disabled={reason.trim().length < 5} loading={loading}>
+            Confirm Void
           </Btn>
         </RpxDialogFooter>
       </RpxDialogContent>

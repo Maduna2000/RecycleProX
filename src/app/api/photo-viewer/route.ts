@@ -8,12 +8,17 @@ import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 class PhotoRecordNotFoundError extends Error {}
 
+const PHOTO_VIEWER_ROLES = ['admin', 'manager', 'cashier']
+
 // GET /api/photo-viewer?model=purchase&id=xxx
 // Returns presigned view URLs for all photos attached to a record.
 // Supported models: purchase, customer
 export async function GET(req: NextRequest) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!PHOTO_VIEWER_ROLES.includes(session.user.role)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
 
   const model = req.nextUrl.searchParams.get('model')?.toLowerCase()
   const id    = req.nextUrl.searchParams.get('id')

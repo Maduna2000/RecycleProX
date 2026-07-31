@@ -14,6 +14,8 @@ interface Props {
   photoKeys:     PhotoKeys
   /** Set when StepPhotos exempted a required slot (account holder / no-vehicle walk-in) — carried straight through as the entry's notes. */
   notes?:        string
+  /** Guard-asserted "no vehicle" claim — re-verified server-side, not trusted alone. */
+  vehicleExempt?: boolean
   onSubmitted:   () => void
 }
 
@@ -21,7 +23,7 @@ const PURPOSE_LABELS: Record<Purpose, string> = {
   sell: 'To Sell', buy: 'To Buy', visitor: 'Visitor', other: 'Other',
 }
 
-export default function StepReview({ visitor, purpose, categoryNames, vehicleReg, photoKeys, notes, onSubmitted }: Props) {
+export default function StepReview({ visitor, purpose, categoryNames, vehicleReg, photoKeys, notes, vehicleExempt, onSubmitted }: Props) {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState<{ entryNumber: string; queueNumber: number | null } | null>(null)
@@ -42,6 +44,7 @@ export default function StepReview({ visitor, purpose, categoryNames, vehicleReg
           visitorPhone:     visitor.phone,
           vehicleReg:       vehicleReg || undefined,
           notes,
+          vehicleExempt,
           ...photoKeys,
         }),
       })

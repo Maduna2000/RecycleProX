@@ -34,9 +34,51 @@ export class GateQueueNumberAlreadyUsedError extends Error {
   constructor() { super('This gate visit has already been used to start an order'); this.name = 'GateQueueNumberAlreadyUsedError' }
 }
 
+export class ScaleCustomerBlacklistedError extends Error {
+  constructor(reason?: string | null) {
+    super(`This customer is blacklisted${reason ? `: ${reason}` : ''} — order cannot be created`)
+    this.name = 'ScaleCustomerBlacklistedError'
+  }
+}
+
+export class ScaleRequiredFieldMissingError extends Error {
+  constructor(field: 'weight' | 'photos') {
+    super(`${field === 'weight' ? 'Weight' : 'Photos'} required for this product's category`)
+    this.name = 'ScaleRequiredFieldMissingError'
+  }
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
+
+// ─── Step config resolution (own config, else parent's, else default true/true) ─
+// Same 3-tier inheritance already used by /api/scale/step-config for display —
+// this is the single source of truth both that route and createScaleOrder's
+// server-side enforcement resolve against.
+
+export async function resolveStepConfigForCategory(
+  categoryId: string | null,
+): Promise<{ requireWeight: boolean; requirePhotos: boolean }> {
+  if (!categoryId) return { requireWeight: true, requirePhotos: true }
+
+  const category = await prisma.productCategory.findUnique({
+    where: { id: categoryId },
+    include: {
+      stepConfig: true,
+      parent: { include: { stepConfig: true } },
+    },
+  })
+  if (!category) return { requireWeight: true, requirePhotos: true }
+
+  if (category.stepConfig) {
+    return { requireWeight: category.stepConfig.requireWeight, requirePhotos: category.stepConfig.requirePhotos }
+  }
+  if (category.parent?.stepConfig) {
+    return { requireWeight: category.parent.stepConfig.requireWeight, requirePhotos: category.parent.stepConfig.requirePhotos }
+  }
+  return { requireWeight: true, requirePhotos: true }
+}
 
 export interface ScaleOrderFilters {
   dateFrom?:     string
@@ -115,11 +157,26 @@ export async function createScaleOrder(data: CreateScaleOrderInput, operatorId: 
   if (data.customerId) {
     const customer = await prisma.customer.findUnique({ where: { id: data.customerId } })
     if (!customer) throw new ScaleCustomerNotFoundError()
+    // Gate blocks a blacklisted visitor at check-in, but an existing account
+    // customer can reach the Scale Station directly (e.g. via queue-number
+    // auto-fill) without passing through Gate at all for this visit — the
+    // actual weigh-in transaction needs its own check, not just entry.
+    if (customer.blacklisted) throw new ScaleCustomerBlacklistedError(customer.blacklistReason)
   }
 
   for (const line of data.lines) {
     const product = await prisma.product.findUnique({ where: { id: line.productId } })
     if (!product || !product.isActive) throw new ScaleProductInactiveError()
+
+    // The "required" toggle an admin sets in Scale's Config tab was UI-only
+    // until now — FlexibleLineInputSchema allows weight/photos to be
+    // omitted, so re-check each line against its category's actual
+    // (inherited) config before creating anything.
+    const stepConfig = await resolveStepConfigForCategory(product.categoryId)
+    if (stepConfig.requireWeight && !line.weight) throw new ScaleRequiredFieldMissingError('weight')
+    if (stepConfig.requirePhotos && (!line.photoR2Keys || line.photoR2Keys.length === 0)) {
+      throw new ScaleRequiredFieldMissingError('photos')
+    }
   }
 
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion

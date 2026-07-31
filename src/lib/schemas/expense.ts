@@ -34,6 +34,10 @@ export const ApproveExpenseSchema = z.object({
   notes: z.string().optional(),
 })
 
+export const VoidExpenseSchema = z.object({
+  reason: z.string().min(5, 'Void reason must be at least 5 characters'),
+})
+
 export const SettlePendingExpenseSchema = z.object({
   changeReceived: z.preprocess(
     (v) => (v === '' || v === undefined || v === null ? 0 : parseFloat(String(v))),
@@ -46,6 +50,7 @@ export type CreateExpenseTypeInput      = z.infer<typeof CreateExpenseTypeSchema
 export type CreateExpenseInput          = z.infer<typeof CreateExpenseSchema>
 export type CreateExpenseFormInput      = z.input<typeof CreateExpenseSchema>
 export type ApproveExpenseInput         = z.infer<typeof ApproveExpenseSchema>
+export type VoidExpenseInput            = z.infer<typeof VoidExpenseSchema>
 export type UpdateExpenseInput          = z.infer<typeof UpdateExpenseSchema>
 export type SettlePendingExpenseInput   = z.infer<typeof SettlePendingExpenseSchema>
 

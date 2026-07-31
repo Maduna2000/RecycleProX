@@ -3,7 +3,7 @@ import { auth } from '@/auth'
 import { CreateGateEntrySchema } from '@/lib/schemas/gate'
 import {
   createGateEntry, listGateEntries,
-  GateVisitorBlacklistedError,
+  GateVisitorBlacklistedError, GateRequiredPhotoMissingError,
   type GateEntryFilters,
 } from '@/lib/services/gateService'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
@@ -52,6 +52,9 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     if (err instanceof GateVisitorBlacklistedError) {
       return NextResponse.json({ error: err.message }, { status: 403 })
+    }
+    if (err instanceof GateRequiredPhotoMissingError) {
+      return NextResponse.json({ error: err.message }, { status: 422 })
     }
     logger.error({ err }, 'POST /api/gate/entries failed')
     return NextResponse.json({ error: 'Failed to create gate entry' }, { status: 500 })

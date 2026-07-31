@@ -27,7 +27,7 @@ interface Props {
   config:          PhotoConfig
   /** Matched an existing account-type Customer at step 1 — both photo slots are skipped automatically. */
   isAccountHolder: boolean
-  onConfirm:       (keys: PhotoKeys, exemptionNote?: string) => void
+  onConfirm:       (keys: PhotoKeys, exemptionNote?: string, vehicleExempt?: boolean) => void
 }
 
 // Compress to JPEG via Canvas, max 1280px on the longest side, 82% quality —
@@ -121,6 +121,7 @@ export default function StepPhotos({ entryTempId, config, isAccountHolder, onCon
         vehiclePhotoR2Key: slots[1]!.r2Key ?? undefined,
       },
       notes.length > 0 ? notes.join('\n') : undefined,
+      noVehicle && slots[1]!.required ? true : undefined,
     )
   }
 

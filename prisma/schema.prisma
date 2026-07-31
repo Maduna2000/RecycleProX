@@ -238,6 +238,12 @@ model PriceGroup {
   description String?
   isDefault   Boolean                     @default(false)
   isActive    Boolean                     @default(true)
+  // Stable link for dealer-tier auto-pricing (customerService.resolvePriceGroupId) —
+  // set once on the seeded Dealer 1/2/3 groups so renaming the group's display
+  // name can never silently break price resolution the way it did before
+  // (see project memory: 269 Dealer-1 customers mispriced). Never set for
+  // non-dealer-tier groups.
+  dealerTier  DealerCategory?
   createdAt   DateTime                    @default(now())
   updatedAt   DateTime                    @updatedAt
   customers   Customer[]
@@ -245,6 +251,7 @@ model PriceGroup {
 
   @@unique([tenantId, name])
   @@index([tenantId])
+  @@index([tenantId, dealerTier])
 }
 
 model PriceGroupProductOverride {
@@ -540,6 +547,9 @@ model Expense {
   status          ExpenseStatus       @default(pending)
   approvedById    String?
   approvedAt      DateTime?
+  voidedById      String?
+  voidedAt        DateTime?
+  voidReason      String?
   cashUpId        String?
   createdByUserId String?
   createdAt       DateTime            @default(now())

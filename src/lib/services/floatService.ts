@@ -303,6 +303,24 @@ export async function reverseFloatMovement(
     throw new FloatMovementReversalError('NOT_FOUND', 'Movement not found')
   }
 
+  // Same lock addFloatMovement already enforces on the way in — once the
+  // movement's own day has a submitted/approved cash-up, its
+  // drawingsReceived figure is frozen, so deleting a movement baked into
+  // that total would silently invalidate the reconciliation with nothing
+  // recalculated afterward. Scoped to the movement's own floatDate (not
+  // hardcoded "today") so reversing a stale prior-day movement is judged
+  // against the cash-up for that day, not whatever day it happens to be now.
+  const floatDayCashUp = await prisma.cashUp.findFirst({
+    where:   { sessionDate: movement.cashFloat.floatDate },
+    orderBy: { openedAt: 'desc' },
+    select:  { status: true },
+  })
+  if (floatDayCashUp && (floatDayCashUp.status === 'submitted' || floatDayCashUp.status === 'approved')) {
+    throw new FloatMovementLockedError(
+      "That day's cash-up has already been submitted — this movement can no longer be reversed"
+    )
+  }
+
   // Check if this is the last movement for this float
   const newerMovement = await prisma.floatMovement.findFirst({
     where: {

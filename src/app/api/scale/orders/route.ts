@@ -6,6 +6,7 @@ import { CreateScaleOrderSchema } from '@/lib/schemas/scale'
 import {
   listScaleOrders, createScaleOrder,
   ScaleCustomerNotFoundError, ScaleProductInactiveError, GateQueueNumberAlreadyUsedError,
+  ScaleCustomerBlacklistedError, ScaleRequiredFieldMissingError,
 } from '@/lib/services/scaleService'
 
 export async function GET(req: NextRequest) {
@@ -57,6 +58,8 @@ export async function POST(req: NextRequest) {
     if (err instanceof ScaleCustomerNotFoundError)      return NextResponse.json({ error: err.message }, { status: 404 })
     if (err instanceof ScaleProductInactiveError)       return NextResponse.json({ error: err.message }, { status: 422 })
     if (err instanceof GateQueueNumberAlreadyUsedError) return NextResponse.json({ error: err.message }, { status: 409 })
+    if (err instanceof ScaleCustomerBlacklistedError)   return NextResponse.json({ error: err.message }, { status: 403 })
+    if (err instanceof ScaleRequiredFieldMissingError)  return NextResponse.json({ error: err.message }, { status: 422 })
     logger.error({ err }, 'POST /api/scale/orders failed')
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
