@@ -22,6 +22,7 @@ export async function GET(req: NextRequest) {
   const sp      = req.nextUrl.searchParams
   const table   = sp.get('table')  ?? undefined
   const action  = sp.get('action') ?? undefined
+  const userId  = sp.get('userId') ?? undefined
   const fromStr = sp.get('from')   ?? undefined
   const toStr   = sp.get('to')     ?? undefined
 
@@ -33,6 +34,7 @@ export async function GET(req: NextRequest) {
       const { items } = await listAuditLogs({
         table,
         action: action as 'INSERT' | 'UPDATE' | 'DELETE' | 'VOID' | 'LOGIN' | 'LOGOUT' | undefined,
+        userId,
         from,
         to,
         page: 1,

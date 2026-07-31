@@ -154,7 +154,7 @@ model Customer {
   createdByUserId        String?
   dealerCategory         DealerCategory?
   marketSector           MarketSector?
-  zeroRated              Boolean                 @default(false)
+  zeroRated              Boolean                 @default(true)
   accountCode            String?
   companyRegNumber       String?
   landline               String?

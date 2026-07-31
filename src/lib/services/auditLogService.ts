@@ -15,7 +15,7 @@ export async function listAuditLogs(filter: AuditLogFilter = {}) {
   const { table, action, recordId, userId, from, to, page = 1, pageSize = 50 } = filter
 
   const where = {
-    ...(table    && { tableName:   table }),
+    ...(table    && { tableName:   { equals: table, mode: 'insensitive' as const } }),
     ...(action   && { action }),
     ...(recordId && { recordId }),
     ...(userId   && { changedById: userId }),

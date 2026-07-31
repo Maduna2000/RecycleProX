@@ -9,8 +9,9 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   const session = await auth()
   if (!session) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
-  // Cashier can only view themselves
-  if (session.user.role === 'cashier' && session.user.id !== params.id) {
+  // Only admin/manager can view other users' records — everyone else can
+  // only view themselves, matching the list endpoint's ['admin','manager'] gate.
+  if (!['admin', 'manager'].includes(session.user.role) && session.user.id !== params.id) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 

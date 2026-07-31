@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { reverseFloatMovement, FloatMovementReversalError, FloatMovementLockedError } from '@/lib/services/floatService'
+import { ReverseFloatMovementSchema } from '@/lib/schemas/float'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
 import logger from '@/lib/logger'
 
@@ -16,8 +17,14 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 
   const { id: movementId } = await params
 
+  const body = await req.json().catch(() => ({}))
+  const parsed = ReverseFloatMovementSchema.safeParse(body)
+  if (!parsed.success) {
+    return NextResponse.json({ error: 'Validation failed', issues: parsed.error.issues }, { status: 400 })
+  }
+
   try {
-    const result = await runWithRequestTenant(req, () => reverseFloatMovement(movementId, session.user.id))
+    const result = await runWithRequestTenant(req, () => reverseFloatMovement(movementId, session.user.id, parsed.data.reason))
     return NextResponse.json({
       success: true,
       reversedMovementId: result.reversedMovementId,

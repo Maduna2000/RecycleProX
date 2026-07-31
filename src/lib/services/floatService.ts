@@ -85,15 +85,18 @@ export async function listFloats(limit = 30) {
   })
 }
 
+type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
+
 /**
  * Returns the most recent CashFloat record strictly before the given date.
  * Used to carry forward the previous day's closing amount when no float is
- * manually set for today.
+ * manually set for today. Accepts an optional tx client so callers (e.g.
+ * cashUpService.approveCashUp) can run this as part of their own transaction.
  */
-export async function getMostRecentFloatBefore(date: Date) {
+export async function getMostRecentFloatBefore(date: Date, tx: TxClient | typeof prisma = prisma) {
   const d = normalizeToDateLabel(date)
 
-  return prisma.cashFloat.findFirst({
+  return tx.cashFloat.findFirst({
     where: { floatDate: { lt: d } },
     orderBy: { floatDate: 'desc' },
   })
@@ -103,19 +106,20 @@ export async function getMostRecentFloatBefore(date: Date) {
  * Write the closing amount on the CashFloat record for the given date.
  * Called by cashUpService.approveCashUp to record the declared cash as the closing balance.
  * Creates the record if it doesn't exist (e.g. no manual float was set that day) so the
- * carry-forward chain is never broken.
+ * carry-forward chain is never broken. Accepts an optional tx client so the caller can
+ * make this write atomic with its own (e.g. the CashUp status update it happens alongside).
  */
-export async function updateClosingAmount(date: Date, amount: Decimal) {
+export async function updateClosingAmount(date: Date, amount: Decimal, tx: TxClient | typeof prisma = prisma) {
   const tenantId = requireTenantId()
   const d = normalizeToDateLabel(date)
 
-  const existing = await prisma.cashFloat.findUnique({ where: { tenantId_floatDate: { tenantId, floatDate: d } } })
+  const existing = await tx.cashFloat.findUnique({ where: { tenantId_floatDate: { tenantId, floatDate: d } } })
   if (existing) {
-    await prisma.cashFloat.update({ where: { tenantId_floatDate: { tenantId, floatDate: d } }, data: { closingAmount: amount } })
+    await tx.cashFloat.update({ where: { tenantId_floatDate: { tenantId, floatDate: d } }, data: { closingAmount: amount } })
   } else {
-    const prev = await getMostRecentFloatBefore(d)
+    const prev = await getMostRecentFloatBefore(d, tx)
     const opening = new Decimal((prev?.closingAmount ?? prev?.openingAmount ?? 0).toString())
-    await prisma.cashFloat.create({
+    await tx.cashFloat.create({
       data: { tenantId, floatDate: d, openingAmount: opening, closingAmount: amount },
     })
   }
@@ -292,7 +296,8 @@ export class FloatMovementReversalError extends Error {
  */
 export async function reverseFloatMovement(
   movementId: string,
-  userId: string
+  userId: string,
+  reason: string
 ): Promise<{ reversedMovementId: string }> {
   const movement = await prisma.floatMovement.findUnique({
     where: { id: movementId },
@@ -347,6 +352,7 @@ export async function reverseFloatMovement(
       movementType: movement.movementType,
       amount: movement.amount.toString(),
       reversedByUserId: userId,
+      reason,
     },
     'float.movement.reversed'
   )

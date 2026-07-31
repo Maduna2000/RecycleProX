@@ -37,6 +37,7 @@ export async function GET(
     if (format === 'thermal') {
       const { buildSaleReceipt } = await import('@/lib/print/thermal')
       const buf = await buildSaleReceipt({
+        companyName:    settings.yardName,
         refNumber:      sale.refNumber,
         buyerName:      sale.buyerName ?? undefined,
         buyerIdNumber:  sale.buyerIdNumber ?? undefined,

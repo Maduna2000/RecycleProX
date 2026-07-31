@@ -13,7 +13,8 @@ import { Loader2, Calendar, PlusCircle, Undo2 } from 'lucide-react'
 import Decimal from 'decimal.js'
 import { colors } from '@/lib/design-tokens'
 import { z } from 'zod'
-import { Btn, PortalPage, PANEL, PANEL_HEAD } from '@/components/rpx'
+import { inp, lbl, Btn, PortalPage, PANEL, PANEL_HEAD, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
+import { Dialog } from '@/components/ui/dialog'
 import { DataTable, type Column } from '@/components/ui/DataTable'
 import { fetcher } from '@/lib/swrFetcher'
 
@@ -94,6 +95,7 @@ export default function FloatPage() {
   const { data: liveStats, mutate: mutateLiveStats } = useSWR<LiveStats>(liveStatsKey, fetcher, { refreshInterval: 5000 })
   const [saving, setSaving] = useState(false)
   const [reversingMovement, setReversingMovement] = useState(false)
+  const [reversingTarget, setReversingTarget] = useState<FloatMovement | null>(null)
   const [historyPage, setHistoryPage] = useState(1)
   const HISTORY_PAGE_SIZE = 5
 
@@ -233,23 +235,25 @@ export default function FloatPage() {
     ...(isManager ? [{
       key: 'actions', header: '', width: '100px',
       render: (m: FloatMovement, i: number) => i === movements.length - 1
-        ? <Btn size="sm" icon={Undo2} loading={reversingMovement} onClick={() => handleReverseMovement(m.id)}>Reverse</Btn>
+        ? <Btn size="sm" icon={Undo2} loading={reversingMovement} onClick={() => setReversingTarget(m)}>Reverse</Btn>
         : null,
     }] : []),
   ]
 
-  async function handleReverseMovement(movementId: string) {
+  async function handleReverseMovement(movementId: string, reason: string) {
     setReversingMovement(true)
     try {
       const res = await fetch(`/api/float/movement/${movementId}/reverse`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason }),
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
         throw new Error((err as { error?: string }).error ?? 'Reversal failed')
       }
       toast.success('Movement reversed')
+      setReversingTarget(null)
       // Instantly refresh all float-related data
       await Promise.all([
         mutate('/api/float'),
@@ -390,6 +394,57 @@ export default function FloatPage() {
         </div>
       </div>
       </div>
+
+      {reversingTarget && (
+        <ReverseFloatMovementModal
+          movement={reversingTarget}
+          loading={reversingMovement}
+          onClose={() => setReversingTarget(null)}
+          onConfirm={(reason) => handleReverseMovement(reversingTarget.id, reason)}
+        />
+      )}
     </PortalPage>
+  )
+}
+
+// ─── Reverse Float Movement Modal ──────────────────────────────────────────────
+
+function ReverseFloatMovementModal({
+  movement, loading, onClose, onConfirm,
+}: {
+  movement: FloatMovement
+  loading: boolean
+  onClose: () => void
+  onConfirm: (reason: string) => void
+}) {
+  const [reason, setReason] = useState('')
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
+      <RpxDialogContent maxWidth={440}>
+        <RpxDialogHeader title="Reverse Float Movement" onClose={onClose} />
+        <RpxDialogBody>
+          <p style={{ fontSize: 12.5, color: colors.textSecondary, margin: '0 0 12px' }}>
+            You are about to reverse a <span style={{ fontWeight: 600, color: colors.textPrimary }}>{movement.movementType}</span> of{' '}
+            <span style={{ fontWeight: 600, color: colors.textPrimary }}>R {new Decimal(movement.amount).toFixed(2)}</span>.
+            This action cannot be undone.
+          </p>
+          <span style={lbl}>Reason for reversal</span>
+          <input
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="Enter reason (min 5 characters)"
+            style={inp}
+            disabled={loading}
+          />
+        </RpxDialogBody>
+        <RpxDialogFooter>
+          <Btn onClick={onClose} disabled={loading}>Cancel</Btn>
+          <Btn variant="danger" onClick={() => onConfirm(reason)} disabled={reason.trim().length < 5} loading={loading}>
+            Confirm Reversal
+          </Btn>
+        </RpxDialogFooter>
+      </RpxDialogContent>
+    </Dialog>
   )
 }

@@ -17,3 +17,9 @@ export const ReverseFloatSchema = z.object({
 })
 
 export type ReverseFloatInput = z.infer<typeof ReverseFloatSchema>
+
+export const ReverseFloatMovementSchema = z.object({
+  reason: z.string().min(5, 'Reason must be at least 5 characters'),
+})
+
+export type ReverseFloatMovementInput = z.infer<typeof ReverseFloatMovementSchema>

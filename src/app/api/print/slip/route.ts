@@ -62,6 +62,7 @@ export async function POST(req: Request) {
       }))
 
       receiptBuffer = await buildPurchaseReceipt({
+        companyName: cfg.yardName,
         refNumber: purchase.refNumber,
         customerName: `${purchase.customer.firstName} ${purchase.customer.lastName}`,
         customerIdNo: purchase.customer.idNumber ?? undefined,
@@ -94,6 +95,7 @@ export async function POST(req: Request) {
       }))
 
       receiptBuffer = await buildSaleReceipt({
+        companyName: cfg.yardName,
         refNumber: sale.refNumber,
         buyerName: sale.customer ? `${sale.customer.firstName} ${sale.customer.lastName}` : undefined,
         buyerIdNumber: sale.customer?.idNumber ?? undefined,

@@ -78,6 +78,7 @@ export async function GET(
     if (format === 'thermal') {
       const { buildPurchaseReceipt } = await import('@/lib/print/thermal')
       const buf = await buildPurchaseReceipt({
+        companyName:   settings.yardName,
         refNumber:     purchase.refNumber,
         customerName:  `${purchase.customer.firstName} ${purchase.customer.lastName}`,
         customerIdNo:  purchase.customer.idNumber ?? undefined,

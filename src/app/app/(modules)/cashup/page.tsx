@@ -31,6 +31,9 @@ type CashUp = {
   closedAt?: string
   approvedByUserId?: string
   approvedAt?: string
+  rejectedByUserId?: string
+  rejectedAt?: string
+  rejectionReason?: string
   openingBalance:      string
   systemCashSales:     string
   systemCashPurchases: string
@@ -829,6 +832,21 @@ export default function CashUpPage() {
                       (Cannot reconcile? Void to skip this session)
                     </span>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* Rejection notice — manager sent this session back for correction */}
+            {cashUp.status === 'open' && cashUp.rejectionReason && (
+              <div style={{ border: `1px solid ${colors.danger}`, borderRadius: 3, overflow: 'hidden', background: colors.dangerBg }}>
+                <div className="px-3 py-2.5">
+                  <p className="font-semibold text-sm mb-1" style={{ color: colors.danger }}>
+                    ⚠ This Session Was Rejected
+                  </p>
+                  <p className="text-sm" style={{ color: colors.textPrimary }}>
+                    Reason: {cashUp.rejectionReason}
+                    {cashUp.rejectedAt && <span style={{ color: colors.textSecondary }}> ({new Date(cashUp.rejectedAt).toLocaleString('en-ZA')})</span>}
+                  </p>
                 </div>
               </div>
             )}

@@ -23,6 +23,14 @@ export const SaleLineSchema = z.object({
   tareReason:      z.string().optional(),
   deductionQty:    optionalDecimal,
   deductionReason: z.string().optional(),
+}).superRefine((line, ctx) => {
+  if (line.deductionQty && parseFloat(line.deductionQty) > 0 && !line.deductionReason) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Deduction reason is required when a deduction amount is set',
+      path: ['deductionReason'],
+    })
+  }
 })
 
 export const CreateSaleSchema = z.object({

@@ -31,6 +31,8 @@ type AuditResponse = {
   pageSize: number
 }
 
+type UserOption = { id: string; fullName: string; username: string }
+
 const ACTION_STYLES: Record<AuditEntry['action'], { background: string; color: string }> = {
   INSERT:  { background: colors.actionBg,  color: colors.action },
   UPDATE:  { background: colors.processBg, color: colors.process },
@@ -56,16 +58,24 @@ export default function AuditLogPage() {
 
   const [table,    setTable]    = useState('')
   const [action,   setAction]   = useState('')
+  const [userId,   setUserId]   = useState('')
   const [from,     setFrom]     = useState('')
   const [to,       setTo]       = useState(today)
   const [page,     setPage]     = useState(1)
   const [expanded, setExpanded] = useState<string | null>(null)
+
+  const { data: usersData } = useSWR<{ users: UserOption[] }>(
+    isAdmin ? '/api/users?limit=200' : null,
+    fetcher
+  )
+  const users = usersData?.users ?? []
 
   const qs = new URLSearchParams({
     page:     String(page),
     pageSize: String(PAGE_SIZE),
     ...(table  && { table }),
     ...(action && { action }),
+    ...(userId && { userId }),
     ...(from   && { from }),
     ...(to     && { to }),
   }).toString()
@@ -81,6 +91,7 @@ export default function AuditLogPage() {
       const exportQs = new URLSearchParams({
         ...(table  && { table }),
         ...(action && { action }),
+        ...(userId && { userId }),
         ...(from   && { from }),
         ...(to     && { to }),
       })
@@ -120,7 +131,7 @@ export default function AuditLogPage() {
   }
 
   const totalPages = data ? Math.ceil(data.total / PAGE_SIZE) : 0
-  const hasFilters = !!(table || action || from)
+  const hasFilters = !!(table || action || userId || from)
 
   const fromIdx = (page - 1) * PAGE_SIZE + 1
   const toIdx   = Math.min(page * PAGE_SIZE, data?.total ?? 0)
@@ -128,7 +139,7 @@ export default function AuditLogPage() {
     ? `Showing ${fromIdx}–${toIdx} of ${data.total.toLocaleString()}`
     : ''
 
-  function clearFilters() { setTable(''); setAction(''); setFrom(''); setTo(today); setPage(1) }
+  function clearFilters() { setTable(''); setAction(''); setUserId(''); setFrom(''); setTo(today); setPage(1) }
 
   return (
     <PortalPage title="Audit Log">
@@ -150,6 +161,18 @@ export default function AuditLogPage() {
             <option value="">All Actions</option>
             {(['INSERT','UPDATE','DELETE','VOID','LOGIN','LOGOUT'] as const).map((a) => (
               <option key={a} value={a}>{a}</option>
+            ))}
+          </select>
+        </Field>
+        <Field label="User" width={170}>
+          <select
+            value={userId}
+            onChange={(e) => { setUserId(e.target.value); setPage(1) }}
+            style={inp}
+          >
+            <option value="">All Users</option>
+            {users.map((u) => (
+              <option key={u.id} value={u.id}>{u.fullName || u.username}</option>
             ))}
           </select>
         </Field>

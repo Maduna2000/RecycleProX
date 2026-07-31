@@ -106,36 +106,40 @@ export async function updateProduct(id: string, data: UpdateProductInput, update
     categoryId = cat.id
   }
 
-  const updated = await prisma.product.update({
-    where: { id },
-    data: {
-      ...(data.name !== undefined && { name: data.name }),
-      ...(data.category !== undefined && { category: data.category, categoryId }),
-      ...(data.unit !== undefined && { unit: data.unit }),
-      ...(data.defaultBuyPrice !== undefined && { defaultBuyPrice: new Decimal(data.defaultBuyPrice) }),
-      ...(data.defaultSellPrice !== undefined && { defaultSellPrice: new Decimal(data.defaultSellPrice) }),
-      ...(data.isActive !== undefined && { isActive: data.isActive }),
-      ...(data.sortOrder !== undefined && { sortOrder: data.sortOrder }),
-    },
-  })
-
-  // Record price history if prices changed
-  const buyChanged = data.defaultBuyPrice !== undefined &&
-    !new Decimal(data.defaultBuyPrice).equals(existing.defaultBuyPrice)
-  const sellChanged = data.defaultSellPrice !== undefined &&
-    !new Decimal(data.defaultSellPrice).equals(existing.defaultSellPrice)
-
-  if (buyChanged || sellChanged) {
-    await prisma.priceHistory.create({
+  const updated = await prisma.$transaction(async (tx) => {
+    const product = await tx.product.update({
+      where: { id },
       data: {
-        tenantId,
-        productId: id,
-        buyPrice: updated.defaultBuyPrice,
-        sellPrice: updated.defaultSellPrice,
-        changedById: updatedById,
+        ...(data.name !== undefined && { name: data.name }),
+        ...(data.category !== undefined && { category: data.category, categoryId }),
+        ...(data.unit !== undefined && { unit: data.unit }),
+        ...(data.defaultBuyPrice !== undefined && { defaultBuyPrice: new Decimal(data.defaultBuyPrice) }),
+        ...(data.defaultSellPrice !== undefined && { defaultSellPrice: new Decimal(data.defaultSellPrice) }),
+        ...(data.isActive !== undefined && { isActive: data.isActive }),
+        ...(data.sortOrder !== undefined && { sortOrder: data.sortOrder }),
       },
     })
-  }
+
+    // Record price history if prices changed
+    const buyChanged = data.defaultBuyPrice !== undefined &&
+      !new Decimal(data.defaultBuyPrice).equals(existing.defaultBuyPrice)
+    const sellChanged = data.defaultSellPrice !== undefined &&
+      !new Decimal(data.defaultSellPrice).equals(existing.defaultSellPrice)
+
+    if (buyChanged || sellChanged) {
+      await tx.priceHistory.create({
+        data: {
+          tenantId,
+          productId: id,
+          buyPrice: product.defaultBuyPrice,
+          sellPrice: product.defaultSellPrice,
+          changedById: updatedById,
+        },
+      })
+    }
+
+    return product
+  })
 
   logger.info({ productId: id, updatedById }, 'product.updated')
   return updated

@@ -495,23 +495,28 @@ export async function approveCashUp(
     throw new Error(`Cannot approve cash-up with status "${cashUp.status}"`)
   }
 
-  const updated = await prisma.cashUp.update({
-    where: { id: cashUpId },
-    data: {
-      status:          'approved',
-      approvedByUserId,
-      approvedAt:      new Date(),
-      notes:           input.notes !== undefined ? input.notes : cashUp.notes,
-    },
-  })
+  const updated = await prisma.$transaction(async (tx) => {
+    const approved = await tx.cashUp.update({
+      where: { id: cashUpId },
+      data: {
+        status:          'approved',
+        approvedByUserId,
+        approvedAt:      new Date(),
+        notes:           input.notes !== undefined ? input.notes : cashUp.notes,
+      },
+    })
 
-  // Write declaredCash as closing amount on the float record for this day
-  if (cashUp.declaredCash) {
-    await updateClosingAmount(
-      cashUp.sessionDate,
-      new Decimal(cashUp.declaredCash.toString())
-    )
-  }
+    // Write declaredCash as closing amount on the float record for this day
+    if (cashUp.declaredCash) {
+      await updateClosingAmount(
+        cashUp.sessionDate,
+        new Decimal(cashUp.declaredCash.toString()),
+        tx
+      )
+    }
+
+    return approved
+  })
 
   logger.info({ cashUpId, userId: approvedByUserId }, 'Cash-up approved')
   return updated

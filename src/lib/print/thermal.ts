@@ -16,6 +16,7 @@ export interface ReceiptLine {
 }
 
 export interface PurchaseReceiptData {
+  companyName?:  string
   refNumber:     string
   customerName:  string
   customerIdNo?: string
@@ -33,6 +34,7 @@ export interface PurchaseReceiptData {
 }
 
 export interface SaleReceiptData {
+  companyName?:  string
   refNumber:     string
   buyerName?:    string
   buyerIdNumber?: string
@@ -44,10 +46,10 @@ export interface SaleReceiptData {
 }
 
 // ─── Shared header / footer helpers ──────────────────────────────────────────
-function addHeader(printer: ThermalPrinter, title: string, refNumber: string, date: Date) {
+function addHeader(printer: ThermalPrinter, title: string, refNumber: string, date: Date, companyName?: string) {
   printer.alignCenter()
   printer.bold(true)
-  printer.println('GOLDEN KEY INVESTMENTS (PTY) LTD')
+  printer.println((companyName || 'GOLDEN KEY INVESTMENTS (PTY) LTD').toUpperCase())
   printer.bold(false)
   printer.println('Renovo Pro')
   printer.drawLine()
@@ -144,7 +146,7 @@ export async function buildPurchaseReceipt(data: PurchaseReceiptData): Promise<B
     lineCharacter: '-',
   })
 
-  addHeader(printer, 'PURCHASE RECEIPT', data.refNumber, data.createdAt)
+  addHeader(printer, 'PURCHASE RECEIPT', data.refNumber, data.createdAt, data.companyName)
 
   printer.println(`Supplier: ${data.customerName}`)
   if (data.customerIdNo) printer.println(`ID: ${data.customerIdNo}`)
@@ -172,7 +174,7 @@ export async function buildSaleReceipt(data: SaleReceiptData): Promise<Buffer> {
     lineCharacter: '-',
   })
 
-  addHeader(printer, 'SALES RECEIPT', data.refNumber, data.createdAt)
+  addHeader(printer, 'SALES RECEIPT', data.refNumber, data.createdAt, data.companyName)
 
   if (data.buyerName)     printer.println(`Buyer: ${data.buyerName}`)
   if (data.buyerIdNumber) printer.println(`ID: ${data.buyerIdNumber}`)
