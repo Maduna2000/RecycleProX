@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { prisma } from '@/lib/db/prisma'
 import { getAllSettings } from '@/lib/services/settingsService'
-import { buildPurchaseReceipt, buildSaleReceipt } from '@/lib/print/thermal'
+import { buildPurchaseReceipt, buildSaleReceipt, type PurchaseReceiptData, type SaleReceiptData } from '@/lib/print/thermal'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
 import logger from '@/lib/logger'
 import Decimal from 'decimal.js'
@@ -12,7 +12,12 @@ class SlipRecordNotFoundError extends Error {}
 /**
  * POST /api/print/slip
  * Prints a purchase or sale receipt to the configured thermal printer.
- * Body: { type: 'purchase' | 'sale', id: string }
+ * Body: { type: 'purchase' | 'sale', id: string } — looks up a synced record, OR
+ *       { type: 'purchase' | 'sale', data: {...} } — prints directly from
+ *       client-supplied data with no DB lookup, for a purchase/sale that was
+ *       just created offline and has no server id yet (src/lib/offline/).
+ *       Always marked "provisional" — the real record gets its permanent
+ *       reference number when the offline queue syncs (src/lib/offline/sync.ts).
  */
 export async function POST(req: Request) {
   const session = await auth()
@@ -20,10 +25,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   }
 
-  const { type, id } = await req.json()
+  const { type, id, data: directData } = await req.json()
 
-  if (!type || !id) {
-    return NextResponse.json({ error: 'Missing type or id' }, { status: 400 })
+  if (!type || (!id && !directData)) {
+    return NextResponse.json({ error: 'Missing type and id/data' }, { status: 400 })
   }
 
   if (type !== 'purchase' && type !== 'sale') {
@@ -39,7 +44,23 @@ export async function POST(req: Request) {
   try {
     let receiptBuffer: Buffer
 
-    if (type === 'purchase') {
+    if (directData) {
+      // Offline-queued record — no DB lookup, build straight from what the
+      // client already has in hand. companyName/cashierName/provisional
+      // always come from the server session/settings, matching the
+      // DB-lookup branches below — never trusted from the client payload.
+      // createdAt travels as a JSON string over IPC/fetch — reconstruct a
+      // real Date, since thermal.ts formats it with .toLocaleString().
+      const overrides = {
+        companyName: cfg.yardName,
+        cashierName: session.user.name ?? 'Cashier',
+        provisional: true,
+        createdAt: new Date((directData as { createdAt: string }).createdAt),
+      }
+      receiptBuffer = type === 'purchase'
+        ? await buildPurchaseReceipt({ ...(directData as PurchaseReceiptData), ...overrides })
+        : await buildSaleReceipt({ ...(directData as SaleReceiptData), ...overrides })
+    } else if (type === 'purchase') {
       // Fetch purchase with related data
       const purchase = await runWithRequestTenant(req, async () => {
         const purchase = await prisma.purchase.findUnique({

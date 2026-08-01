@@ -223,4 +223,19 @@ export const prisma = new Proxy({} as PrismaClient, {
   },
 })
 
+// A genuine "can we reach Postgres right now" check, deliberately bypassing
+// the tenant-scoping Proxy above (which requires a resolved tenant context
+// for every raw-query method) — used by /api/ping, which has no session and
+// must work as an unauthenticated liveness probe. SELECT 1 touches no table,
+// so there's nothing for RLS to restrict; this is safe to run with no
+// tenant pinned.
+export async function checkDatabaseConnection(): Promise<boolean> {
+  try {
+    await rawClient.$queryRaw`SELECT 1`
+    return true
+  } catch {
+    return false
+  }
+}
+
 export default prisma

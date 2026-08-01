@@ -1,17 +1,17 @@
 /**
  * Renovo Pro Desktop — Electron Main Process
  *
- * Turns the bundled standalone Next.js server into a real, self-contained
- * local app: resolves a local SQLite database under the OS user-data
- * directory, runs any pending migrations against it on every startup
- * (first install and upgrades both go through the same path), spawns the
- * standalone server as a child process pointed at that database, and only
- * then loads the window — gated on device activation first.
+ * Spawns the bundled standalone Next.js server as a child process pointed
+ * at the SAME shared production Postgres database the web app uses (via
+ * desktop.env under userData — see loadDesktopEnv below), then loads the
+ * window — gated on device activation first. Short internet outages are
+ * absorbed by the renderer's own offline queue (src/lib/offline/), not by
+ * this process — there is no local database here.
  */
-const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage } = require('electron')
+const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, dialog } = require('electron')
 const path = require('node:path')
 const fs = require('node:fs')
-const { execFileSync, spawn } = require('node:child_process')
+const { spawn } = require('node:child_process')
 const licenseManager = require('./licenseManager')
 
 let mainWindow = null
@@ -37,32 +37,71 @@ if (!gotLock) {
   })
 }
 
-// ─── Local database + standalone server ───────────────────────────────────────
+// ─── Production config + standalone server ─────────────────────────────────
 
-function getDatabasePath() {
-  return path.join(app.getPath('userData'), 'renovo.db')
+// Desktop deployments talk to the SAME shared production Postgres database
+// used by the web app — never an isolated local copy (Prisma's query engine
+// is provider-locked at generate time, so this process can't hot-swap
+// between Postgres and SQLite; there is no "offline database", only an
+// offline queue in the renderer — see src/lib/offline/). Credentials live in
+// a user-editable env file under userData, mirroring the exact pattern
+// already proven in scripts/local-server/local-server.env — never bundled
+// into the installer, never committed, filled in once per install from the
+// same Vercel "Sensitive" values.
+function getDesktopEnvPath() {
+  return path.join(app.getPath('userData'), 'desktop.env')
+}
+
+// Minimal KEY=VALUE parser — deliberately not a dependency on the `dotenv`
+// package (only present today as an undeclared transitive/hoisted module,
+// not a real package.json dependency); this mirrors local-server/launcher.ps1's
+// own manual line-by-line parsing rather than risking that hoisting disappearing.
+function parseEnvFile(filePath) {
+  const result = {}
+  const raw = fs.readFileSync(filePath, 'utf8')
+  for (const line of raw.split(/\r?\n/)) {
+    const trimmed = line.trim()
+    if (!trimmed || trimmed.startsWith('#')) continue
+    const eq = trimmed.indexOf('=')
+    if (eq === -1) continue
+    const key = trimmed.slice(0, eq).trim()
+    const value = trimmed.slice(eq + 1).trim()
+    if (key) result[key] = value
+  }
+  return result
+}
+
+class DesktopConfigMissingError extends Error {
+  constructor(filePath) {
+    super(`Desktop config not found at ${filePath}`)
+    this.name = 'DesktopConfigMissingError'
+    this.filePath = filePath
+  }
+}
+
+const REQUIRED_DESKTOP_ENV_KEYS = [
+  'DATABASE_URL', 'APP_RUNTIME_DATABASE_URL', 'AUTH_SECRET',
+  'RENOVO_PORTAL_BASE_URL', 'INTERNAL_API_SHARED_SECRET',
+]
+
+function loadDesktopEnv() {
+  const filePath = getDesktopEnvPath()
+  if (!fs.existsSync(filePath)) throw new DesktopConfigMissingError(filePath)
+  const parsed = parseEnvFile(filePath)
+  const missing = REQUIRED_DESKTOP_ENV_KEYS.filter((k) => !parsed[k])
+  if (missing.length > 0) {
+    throw new Error(`Desktop config at ${filePath} is missing: ${missing.join(', ')}`)
+  }
+  return parsed
 }
 
 // Bundled locations differ between dev (running from the repo) and packaged
 // (running from resources/app/, since `asar: false` — see package.json's
-// `build.files`) — resolved once at startup rather than assumed, since
-// getting this wrong means silently running migrations/the server against
-// the wrong files. electron-builder's `files` entries preserve their
-// project-relative path under resources/app/ (unlike `extraResources`,
-// which supports a `to:` override), so both branches share the same
-// relative structure and differ only in their root.
+// `build.files`) — resolved once at startup rather than assumed.
 function resolveBundlePaths() {
   const base = isDev ? path.join(__dirname, '..') : path.join(process.resourcesPath, 'app')
   return {
     standaloneServer: path.join(base, '.next', 'standalone', 'server.js'),
-    sqliteSchema: path.join(base, 'prisma', 'sqlite', 'schema.prisma'),
-    // The CLI's real JS entry point, not the node_modules/.bin/prisma shim —
-    // that shim is a .cmd/.ps1 wrapper on Windows (the same class of
-    // cross-platform shell fragility that bit prisma/seed.ts's npm script
-    // elsewhere in this project's history), and it lives outside
-    // node_modules/prisma/ anyway so package.json's `build.files` glob
-    // ("node_modules/prisma/**/*") wouldn't bundle it in a packaged build.
-    prismaCliEntry: path.join(base, 'node_modules', 'prisma', 'build', 'index.js'),
   }
 }
 
@@ -74,20 +113,7 @@ function resolveBundlePaths() {
 // bundling a separate Node.js binary just for them.
 const RUN_AS_NODE_ENV = { ELECTRON_RUN_AS_NODE: '1' }
 
-function runPendingMigrations(databaseUrl) {
-  const { sqliteSchema, prismaCliEntry } = resolveBundlePaths()
-  console.log(`[migrate] applying pending migrations to ${databaseUrl}`)
-  execFileSync(process.execPath, [
-    prismaCliEntry,
-    'migrate', 'deploy',
-    `--schema=${sqliteSchema}`,
-  ], {
-    env: { ...process.env, ...RUN_AS_NODE_ENV, DATABASE_URL: databaseUrl },
-    stdio: 'inherit',
-  })
-}
-
-function startStandaloneServer(databaseUrl) {
+function startStandaloneServer(desktopEnv) {
   const { standaloneServer } = resolveBundlePaths()
   console.log(`[server] starting standalone server: ${standaloneServer}`)
 
@@ -95,12 +121,10 @@ function startStandaloneServer(databaseUrl) {
     env: {
       ...process.env,
       ...RUN_AS_NODE_ENV,
-      DATABASE_URL: databaseUrl,
-      // Tells the service layer's query helpers (src/lib/db/queryHelpers.ts,
-      // provider.ts) it's running against SQLite, not Postgres — several
-      // query shapes (case-insensitive search, Json/array encoding) differ
-      // by provider at the value level, not just the type level.
-      DATABASE_PROVIDER: 'sqlite',
+      ...desktopEnv,
+      // DATABASE_PROVIDER must stay unset — this build's Prisma client is
+      // the standard Postgres one (plain `next build`, no client-swapping),
+      // matching scripts/local-server/assemble.ts exactly.
       PORT: String(PORT),
       HOSTNAME: '127.0.0.1',
       NODE_ENV: 'production',
@@ -201,21 +225,23 @@ async function startApp() {
     return
   }
 
-  const dbPath = getDatabasePath()
-  const databaseUrl = `file:${dbPath}`
-  fs.mkdirSync(path.dirname(dbPath), { recursive: true })
-
+  let desktopEnv
   try {
-    runPendingMigrations(databaseUrl)
+    desktopEnv = loadDesktopEnv()
   } catch (err) {
-    console.error('[migrate] failed:', err)
-    // A failed migration on a self-contained local DB is unrecoverable
-    // without intervention — surfacing it via a dialog is better than a
-    // silent broken app, but building that dialog is left as a follow-up
-    // alongside the service-layer SQLite-compatibility work noted above.
+    console.error('[config] failed to load desktop.env:', err)
+    dialog.showErrorBox(
+      'Renovo Pro — Setup Required',
+      `Configuration file not found or incomplete:\n${getDesktopEnvPath()}\n\n` +
+      'Copy electron/desktop.env.example to this location and fill in the ' +
+      'production connection details before starting the app. See ' +
+      'scripts/local-server/README.md for where to find each value.'
+    )
+    app.quit()
+    return
   }
 
-  startStandaloneServer(databaseUrl)
+  startStandaloneServer(desktopEnv)
   const ready = await waitForServerReady()
   if (!ready) {
     console.error('[server] standalone server did not become ready in time')

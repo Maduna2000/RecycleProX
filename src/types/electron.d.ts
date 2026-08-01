@@ -10,7 +10,10 @@ interface ElectronAPI {
   maximize:         () => void
   close:            () => void
   readScale:        (scaleNum: number) => Promise<{ weight: number; unit: string }>
-  printSlip:        (data: { type: 'purchase' | 'sale'; id: string }) => Promise<{ success: boolean }>
+  // `id` looks up a synced record server-side; `data` prints directly from
+  // client-supplied fields with no DB lookup, for a purchase/sale created
+  // offline that has no server id yet — see src/app/api/print/slip/route.ts.
+  printSlip:        (data: { type: 'purchase' | 'sale'; id: string } | { type: 'purchase' | 'sale'; data: Record<string, unknown> }) => Promise<{ success: boolean }>
   openCashDrawer:   () => Promise<boolean>
   activateDevice:   (activationCode: string) => Promise<unknown>
   getLicenseStatus: () => Promise<LicenseStatus>

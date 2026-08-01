@@ -8,6 +8,7 @@ import { Dialog } from '@/components/ui/dialog'
 import { SplitPaymentModal, type SplitPayTarget } from './SplitPaymentModal'
 import { colors } from '@/lib/design-tokens'
 import { Btn, inp, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
+import { useOfflineMutation } from '@/hooks/useOfflineFetch'
 
 export type PayTarget = {
   id: string
@@ -32,6 +33,7 @@ export function ProcessPaymentModal({
   const [showSplit,       setShowSplit]       = useState(false)
   const [outstandingLoan, setOutstandingLoan] = useState('0')
   const [loanLoading,     setLoanLoading]     = useState(true)
+  const { mutate: offlineMutate } = useOfflineMutation()
 
   const totalAmount   = new Decimal(purchase.totalAmount)
   const loanDeduction = new Decimal(purchase.loanDeductionAmount)
@@ -61,18 +63,23 @@ export function ProcessPaymentModal({
     // Always pay full remaining amount
     const fullAmount = remaining.toFixed(2)
     setLoading(true)
-    const res = await fetch(`/api/purchases/${purchase.id}/mark-paid`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ amount: fullAmount, paymentMethod: method }),
-    })
-    setLoading(false)
-    if (res.ok) {
-      toast.success(`Payment processed for ${purchase.ref}`)
+    try {
+      const { queued } = await offlineMutate({
+        method: 'PATCH',
+        url: `/api/purchases/${purchase.id}/mark-paid`,
+        body: { amount: fullAmount, paymentMethod: method },
+        localId: purchase.id,
+      })
+      setLoading(false)
+      if (queued) {
+        toast.success(`Payment saved offline for ${purchase.ref} — will sync when connected`)
+      } else {
+        toast.success(`Payment processed for ${purchase.ref}`)
+      }
       onSuccess()
-    } else {
-      const j = await res.json() as { error?: string }
-      toast.error(j.error ?? 'Failed to process payment')
+    } catch (err) {
+      setLoading(false)
+      toast.error(err instanceof Error ? err.message : 'Failed to process payment')
     }
   }
 

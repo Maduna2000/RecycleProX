@@ -20,6 +20,11 @@ node_modules/
 # local hardware-bridge server packaging output (scripts/local-server/assemble.ts)
 /dist/
 
+# production database credentials for local/desktop deployments — never commit
+# (the .env* pattern above doesn't match these since they lack a leading dot)
+scripts/local-server/local-server.env
+electron/desktop.env
+
 # misc
 .DS_Store
 *.pem

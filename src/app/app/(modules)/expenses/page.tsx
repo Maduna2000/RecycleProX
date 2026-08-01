@@ -18,6 +18,8 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { colors, fontSize } from '@/lib/design-tokens'
 import { fetcher } from '@/lib/swrFetcher'
+import { useOfflineMutation } from '@/hooks/useOfflineFetch'
+import { offlineDB } from '@/lib/offline/db'
 import {
   inp, lbl, Btn, Field, PortalPage, FilterBar,
   RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter,
@@ -354,6 +356,7 @@ function AddExpenseModal({ mode, expense, onClose, onSuccess }: AddExpenseModalP
   const [addTypeOpen, setAddTypeOpen] = useState(false)
   const [slipFile,    setSlipFile]    = useState<File | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  const { mutate: offlineMutate } = useOfflineMutation()
   const { data: types } = useSWR<ExpenseType[]>('/api/expense-types', fetcher)
 
   const isEdit = mode === 'edit' && expense
@@ -406,21 +409,42 @@ function AddExpenseModal({ mode, expense, onClose, onSuccess }: AddExpenseModalP
       return
     }
 
-    // Create mode - POST request
-    const res = await fetch('/api/expenses', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify(data),
-    })
-    if (!res.ok) {
+    // Create mode - POST request (offline-aware: queues locally if no connection)
+    const localId = `local_${crypto.randomUUID()}`
+    let queued: boolean
+    let created: { id: string } | undefined
+    try {
+      const result = await offlineMutate({ method: 'POST', url: '/api/expenses', body: data, localId })
+      queued = result.queued
+      created = result.data as { id: string } | undefined
+    } catch (err) {
       setLoading(false)
-      const j = await res.json()
-      toast.error(j.error ?? 'Failed to record expense')
+      toast.error(err instanceof Error ? err.message : 'Failed to record expense')
       return
     }
-    const created = await res.json()
 
-    // Upload slip attachment if one was selected
+    if (queued) {
+      await offlineDB.expenses.add({
+        id: localId,
+        refNumber: `OFF-${Date.now()}`,
+        expenseTypeId: data.expenseTypeId,
+        description: data.description,
+        amount: String(data.amount),
+        vatAmount: '0',
+        includesVat: data.includesVat ?? false,
+        paymentMethod: data.paymentMethod ?? 'cash',
+        status: data.isPending ? 'pending' : 'approved',
+        createdAt: new Date().toISOString(),
+        _offlineCreated: true,
+      })
+      setLoading(false)
+      toast.success('Expense saved offline — will sync when connected')
+      onSuccess()
+      return
+    }
+
+    // Upload slip attachment if one was selected (online path only — no
+    // server id exists yet for a queued/offline expense to attach to)
     if (slipFile && created?.id) {
       try {
         const fd = new FormData()

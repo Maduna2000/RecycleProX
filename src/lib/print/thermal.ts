@@ -25,6 +25,10 @@ export interface PurchaseReceiptData {
   paymentMethod: string
   cashierName:   string
   createdAt:     Date
+  // Set when printed from the offline queue, before the server has assigned
+  // a permanent reference number — see src/app/api/print/slip/route.ts's
+  // data-based (no DB id) branch and src/lib/offline/sync.ts's reconciliation.
+  provisional?:  boolean
   splitPayments?: {
     cash:   string
     eft:    string
@@ -43,10 +47,11 @@ export interface SaleReceiptData {
   paymentMethod: string
   cashierName:   string
   createdAt:     Date
+  provisional?:  boolean
 }
 
 // ─── Shared header / footer helpers ──────────────────────────────────────────
-function addHeader(printer: ThermalPrinter, title: string, refNumber: string, date: Date, companyName?: string) {
+function addHeader(printer: ThermalPrinter, title: string, refNumber: string, date: Date, companyName?: string, provisional?: boolean) {
   printer.alignCenter()
   printer.bold(true)
   printer.println((companyName || 'GOLDEN KEY INVESTMENTS (PTY) LTD').toUpperCase())
@@ -58,6 +63,11 @@ function addHeader(printer: ThermalPrinter, title: string, refNumber: string, da
   printer.bold(false)
   printer.println(`Ref: ${refNumber}`)
   printer.println(date.toLocaleString('en-ZA'))
+  if (provisional) {
+    printer.bold(true)
+    printer.println('*** PROVISIONAL - PENDING SYNC ***')
+    printer.bold(false)
+  }
   printer.drawLine()
   printer.alignLeft()
 }
@@ -146,7 +156,7 @@ export async function buildPurchaseReceipt(data: PurchaseReceiptData): Promise<B
     lineCharacter: '-',
   })
 
-  addHeader(printer, 'PURCHASE RECEIPT', data.refNumber, data.createdAt, data.companyName)
+  addHeader(printer, 'PURCHASE RECEIPT', data.refNumber, data.createdAt, data.companyName, data.provisional)
 
   printer.println(`Supplier: ${data.customerName}`)
   if (data.customerIdNo) printer.println(`ID: ${data.customerIdNo}`)
@@ -174,7 +184,7 @@ export async function buildSaleReceipt(data: SaleReceiptData): Promise<Buffer> {
     lineCharacter: '-',
   })
 
-  addHeader(printer, 'SALES RECEIPT', data.refNumber, data.createdAt, data.companyName)
+  addHeader(printer, 'SALES RECEIPT', data.refNumber, data.createdAt, data.companyName, data.provisional)
 
   if (data.buyerName)     printer.println(`Buyer: ${data.buyerName}`)
   if (data.buyerIdNumber) printer.println(`ID: ${data.buyerIdNumber}`)

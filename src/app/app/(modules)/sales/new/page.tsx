@@ -420,8 +420,9 @@ export default function NewSalePage() {
     try {
       const { queued, data } = await offlineMutate({ method: 'POST', url: '/api/sales', body, localId })
       if (queued) {
+        const offlineRefNumber = `OFF-${Date.now()}`
         await offlineDB.sales.add({
-          id: localId, refNumber: `OFF-${Date.now()}`, buyerName: effectiveName,
+          id: localId, refNumber: offlineRefNumber, buyerName: effectiveName,
           status: isPending ? 'pending' : 'completed', totalAmount: total.toFixed(2),
           paymentMethod: isPending ? 'cash' : paymentType,
           notes: body.notes, createdAt: new Date().toISOString(), _offlineCreated: true,
@@ -433,7 +434,38 @@ export default function NewSalePage() {
             lineTotal: new Decimal(l.quantity || '0').times(l.unitPrice || '0').toFixed(2),
           })
         }
-        toast.success('Sale saved offline — will sync when connected')
+
+        if (isPending) {
+          toast.success('Sale saved offline as unpaid — will sync when connected')
+        } else {
+          toast.success('Sale saved offline — will sync when connected')
+          if (window.electronAPI?.isElectron) {
+            try {
+              const receiptLines = validLines.map((l) => ({
+                productName: products.find((p) => p.id === l.productId)?.name ?? l.productId,
+                qty: parseFloat(l.quantity),
+                unitPrice: l.unitPrice,
+                lineTotal: new Decimal(l.quantity || '0').times(l.unitPrice || '0').toFixed(2),
+              }))
+              await window.electronAPI.printSlip({
+                type: 'sale',
+                data: {
+                  refNumber: offlineRefNumber,
+                  buyerName: effectiveName,
+                  buyerIdNumber: effectiveId || undefined,
+                  lines: receiptLines,
+                  totalAmount: total.toFixed(2),
+                  paymentMethod: isPending ? 'cash' : paymentType,
+                  cashierName: '',
+                  createdAt: new Date().toISOString(),
+                },
+              })
+              await window.electronAPI.openCashDrawer()
+            } catch {
+              toast.error('Offline print failed — receipt will be available once synced')
+            }
+          }
+        }
         router.push('/app/sales')
       } else {
         const sale = data as { id: string; refNumber: string }
@@ -460,6 +492,16 @@ export default function NewSalePage() {
         if (isPending) {
           toast.success(`Sale ${sale.refNumber} saved as unpaid`)
           router.push('/app/sales/unpaid')
+        } else if (window.electronAPI?.isElectron) {
+          try {
+            await window.electronAPI.printSlip({ type: 'sale', id: sale.id })
+            await window.electronAPI.openCashDrawer()
+            toast.success(`Receipt printed: ${sale.refNumber}`)
+            router.push('/app/dashboard')
+          } catch {
+            toast.error('Print failed — showing manual options')
+            setPrintDialog({ id: sale.id, refNumber: sale.refNumber })
+          }
         } else {
           setPrintDialog({ id: sale.id, refNumber: sale.refNumber })
         }

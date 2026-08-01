@@ -478,8 +478,9 @@ export default function NewPurchasePage() {
     try {
       const { queued, data } = await offlineMutate({ method: 'POST', url: '/api/purchases', body, localId })
       if (queued) {
+        const offlineRefNumber = `OFF-${Date.now()}`
         await offlineDB.purchases.add({
-          id: localId, refNumber: `OFF-${Date.now()}`, customerId: resolvedCustomer.id,
+          id: localId, refNumber: offlineRefNumber, customerId: resolvedCustomer.id,
           status, totalAmount: grandTotal.toFixed(2), paymentMethod,
           notes: combinedNotes, createdAt: new Date().toISOString(), _offlineCreated: true,
         })
@@ -493,7 +494,42 @@ export default function NewPurchasePage() {
             priceSource: 'default',
           })
         }
-        toast.success('Purchase saved offline — will sync when connected')
+
+        if (status === 'pending') {
+          resetForm()
+          mutatePending()
+          toast.success(`Purchase saved offline as unpaid — will sync when connected`)
+        } else {
+          toast.success('Purchase saved offline — will sync when connected')
+          // Auto-print in Electron desktop app, same as the online path —
+          // built from data already in hand since there's no server id yet.
+          if (window.electronAPI?.isElectron) {
+            try {
+              const receiptLines = validLines.map((l) => ({
+                productName: products.find((p) => p.id === l.productId)?.name ?? l.productId,
+                qty: parseFloat(l.quantity),
+                unitPrice: l.unitPrice,
+                lineTotal: new Decimal(l.quantity || '0').times(l.unitPrice || '0').toFixed(2),
+              }))
+              await window.electronAPI.printSlip({
+                type: 'purchase',
+                data: {
+                  refNumber: offlineRefNumber,
+                  customerName: `${resolvedCustomer.firstName} ${resolvedCustomer.lastName}`,
+                  customerIdNo: resolvedCustomer.idNumber ?? undefined,
+                  lines: receiptLines,
+                  totalAmount: grandTotal.toFixed(2),
+                  paymentMethod,
+                  cashierName: '',
+                  createdAt: new Date().toISOString(),
+                },
+              })
+              await window.electronAPI.openCashDrawer()
+            } catch {
+              toast.error('Offline print failed — receipt will be available once synced')
+            }
+          }
+        }
         router.push('/app/purchases')
       } else {
         const purchase = data as { id: string; refNumber: string }

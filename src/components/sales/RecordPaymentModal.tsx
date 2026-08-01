@@ -8,6 +8,7 @@ import { Dialog } from '@/components/ui/dialog'
 import { SaleSplitPaymentModal } from './SaleSplitPaymentModal'
 import { colors } from '@/lib/design-tokens'
 import { Btn, inp, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
+import { useOfflineMutation } from '@/hooks/useOfflineFetch'
 
 export type PayTarget = {
   id: string
@@ -33,6 +34,7 @@ export function RecordPaymentModal({
   const [loading,     setLoading]     = useState(false)
   const [showSplit,   setShowSplit]   = useState(false)
   const [hasOutstandingBusinessLoan, setHasOutstandingBusinessLoan] = useState(false)
+  const { mutate: offlineMutate } = useOfflineMutation()
 
   const totalAmount = new Decimal(sale.totalAmount)
   const alreadyPaid = new Decimal(sale.amountPaid)
@@ -63,18 +65,23 @@ export function RecordPaymentModal({
     if (err) { setAmountError(err); return }
     setAmountError(null)
     setLoading(true)
-    const res = await fetch(`/api/sales/${sale.id}/mark-paid`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ amount, paymentMethod: method }),
-    })
-    setLoading(false)
-    if (res.ok) {
-      toast.success(`Payment processed for ${sale.ref}`)
+    try {
+      const { queued } = await offlineMutate({
+        method: 'PATCH',
+        url: `/api/sales/${sale.id}/mark-paid`,
+        body: { amount, paymentMethod: method },
+        localId: sale.id,
+      })
+      setLoading(false)
+      if (queued) {
+        toast.success(`Payment saved offline for ${sale.ref} — will sync when connected`)
+      } else {
+        toast.success(`Payment processed for ${sale.ref}`)
+      }
       onSuccess()
-    } else {
-      const j = await res.json() as { error?: string }
-      toast.error(j.error ?? 'Failed to record payment')
+    } catch (mutateErr) {
+      setLoading(false)
+      toast.error(mutateErr instanceof Error ? mutateErr.message : 'Failed to record payment')
     }
   }
 

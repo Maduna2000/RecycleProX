@@ -16,8 +16,9 @@
     "migrate:sqlite:deploy": "prisma migrate deploy --schema=prisma/sqlite/schema.prisma",
     "electron": "electron .",
     "electron:dev": "concurrently \"next dev\" \"wait-on http://localhost:3000 && electron .\"",
-    "build:desktop": "npx ts-node scripts/build-desktop.ts",
+    "build:desktop": "npx ts-node scripts/build-desktop-postgres.ts",
     "electron:build": "npm run build:desktop && electron-builder",
+    "build:desktop:sqlite": "npx ts-node scripts/build-desktop.ts",
     "package:local-server": "npx ts-node scripts/local-server/assemble.ts"
   },
   "ts-node": {
@@ -34,10 +35,12 @@
       ".next/standalone/**/*",
       ".next/static/**/*",
       "public/**/*",
-      "prisma/sqlite/**/*",
-      "node_modules/prisma/**/*",
-      "node_modules/.prisma/sqlite-client/**/*",
+      "node_modules/.prisma/**/*",
+      "node_modules/@prisma/client/**/*",
       "node_modules/@prisma/engines/**/*",
+      "node_modules/serialport/**/*",
+      "node_modules/@serialport/**/*",
+      "node_modules/node-thermal-printer/**/*",
       "package.json"
     ],
     "extraResources": [

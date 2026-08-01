@@ -138,7 +138,9 @@ function swapDatasource(schema: string): string {
 // distinct path — see the comment above the datasource swap — because two
 // clients need to coexist during normal dev (confirmed by hand: generating
 // one to the default path silently clobbers the other, no warning). Only
-// the dedicated Electron build step (see package.json's `build:desktop`)
+// the dedicated Electron SQLite build step (see package.json's
+// `build:desktop:sqlite` / scripts/build-desktop.ts — not the default
+// `build:desktop`, which targets Postgres and never touches this file)
 // sets DESKTOP_CLIENT_TARGET=default to temporarily target the default
 // path for that one `next build` invocation, then restores the distinct
 // path immediately after so normal Web dev isn't left broken.
