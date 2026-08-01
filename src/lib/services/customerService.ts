@@ -157,6 +157,15 @@ export async function updateCustomer(id: string, data: UpdateCustomerInput, user
     updateData = { ...updateData, dealerCategory: 'casual', priceGroupId: null }
   }
 
+  // VAT is opt-in, same rule as new-customer creation — a casual being
+  // promoted to an account must not silently start incurring VAT just
+  // because promotion happened to touch the row. Only forced when the
+  // request itself doesn't explicitly set zeroRated, so an admin can still
+  // deliberately apply VAT in the same request.
+  if (isPromotion && data.zeroRated === undefined) {
+    updateData = { ...updateData, zeroRated: true }
+  }
+
   // Auto-assign account code when converting casual → account
   let newAccountCode: string | undefined
   if (data.customerType === 'account' && !current.accountCode) {
