@@ -67,6 +67,16 @@ export async function GET(
       tareReason:  l.tareReason ?? undefined,
     }))
 
+    const thermalLines = purchase.lines.map((l) => ({
+      productCode: l.product.code,
+      productName: l.product.name,
+      qty:         Number(l.quantity),
+      unitPrice:   l.unitPrice.toString(),
+      lineTotal:   l.lineTotal.toString(),
+      grossQty:    l.grossQty?.toString(),
+      tareQty:     l.tareQty?.toString(),
+    }))
+
     // Parse splitPayments from JSON if present
     const splitPayments = purchase.splitPayments as {
       cash: string
@@ -78,16 +88,25 @@ export async function GET(
     if (format === 'thermal') {
       const { buildPurchaseReceipt } = await import('@/lib/print/thermal')
       const buf = await buildPurchaseReceipt({
-        companyName:   settings.yardName,
-        refNumber:     purchase.refNumber,
-        customerName:  `${purchase.customer.firstName} ${purchase.customer.lastName}`,
-        customerIdNo:  purchase.customer.idNumber ?? undefined,
-        lines,
-        totalAmount:   purchase.totalAmount.toString(),
-        paymentMethod: purchase.paymentMethod,
-        cashierName:   session.user.name ?? 'Cashier',
-        createdAt:     purchase.createdAt,
-        splitPayments: splitPayments ?? undefined,
+        companyName:    settings.yardName,
+        companyAddress: settings.yardAddress,
+        companyPhone:   settings.yardPhone,
+        vatNumber:      settings.vatNumber,
+        refNumber:      purchase.refNumber,
+        customerCode:   purchase.customer.accountCode ?? undefined,
+        customerName:   `${purchase.customer.firstName} ${purchase.customer.lastName}`,
+        customerIdNo:   purchase.customer.idNumber ?? undefined,
+        customerVatNumber: purchase.customer.vatNumber ?? undefined,
+        lines:          thermalLines,
+        totalAmount:    purchase.totalAmount.toString(),
+        vatAmount:      purchase.vatAmount ? purchase.vatAmount.toString() : undefined,
+        paymentMethod:  purchase.paymentMethod,
+        cashierName:    session.user.name ?? 'Cashier',
+        scaleOperatorName: purchase.scaleOrder?.operator.fullName,
+        createdAt:      purchase.createdAt,
+        footerText:     settings.purchaseNoteDeclaration,
+        loanDeduction:  purchase.loanDeductionAmount ? { amount: purchase.loanDeductionAmount.toString() } : undefined,
+        splitPayments:  splitPayments ?? undefined,
       })
       return new NextResponse(buf.buffer as ArrayBuffer, {
         headers: {

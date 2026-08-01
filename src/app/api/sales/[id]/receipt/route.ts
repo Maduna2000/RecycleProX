@@ -36,16 +36,28 @@ export async function GET(
 
     if (format === 'thermal') {
       const { buildSaleReceipt } = await import('@/lib/print/thermal')
+      const thermalLines = sale.lines.map((l) => ({
+        productCode: l.product.code,
+        productName: l.product.name,
+        qty:         Number(l.quantity),
+        unitPrice:   l.unitPrice.toString(),
+        lineTotal:   l.lineTotal.toString(),
+      }))
       const buf = await buildSaleReceipt({
         companyName:    settings.yardName,
+        companyAddress: settings.yardAddress,
+        companyPhone:   settings.yardPhone,
+        vatNumber:      settings.vatNumber,
         refNumber:      sale.refNumber,
         buyerName:      sale.buyerName ?? undefined,
         buyerIdNumber:  sale.buyerIdNumber ?? undefined,
-        lines,
+        lines:          thermalLines,
         totalAmount:    sale.totalAmount.toString(),
+        vatAmount:      sale.vatAmount ? sale.vatAmount.toString() : undefined,
         paymentMethod:  sale.paymentMethod,
         cashierName:    session.user.name ?? 'Cashier',
         createdAt:      sale.createdAt,
+        footerText:     settings.saleNoteDeclaration,
       })
       return new NextResponse(buf.buffer as ArrayBuffer, {
         headers: {

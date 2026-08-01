@@ -2,6 +2,11 @@
  * Thermal receipt formatter — produces an ESC/POS-compatible text buffer.
  * Returns a Buffer that can be sent directly to a network or USB printer.
  *
+ * Layout matches the legacy paper receipt field-for-field (address/VAT
+ * block, Done By/Scale Op/Rep, Gross/Tare/Nett table, Slip No., and a
+ * settings-driven legal declaration footer) — see
+ * docs/plans/2026-08-01-desktop-hybrid-sync-design.md.
+ *
  * node-thermal-printer is used server-side only (API route / server action).
  */
 import { ThermalPrinter, PrinterTypes, CharacterSet } from 'node-thermal-printer'
@@ -9,26 +14,46 @@ import Decimal from 'decimal.js'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface ReceiptLine {
+  productCode?: string
   productName: string
-  qty:         number
-  unitPrice:   string   // Decimal string
-  lineTotal:   string   // Decimal string
+  qty:         number       // net quantity
+  unitPrice:   string       // Decimal string ("InPrice" on the legacy slip)
+  lineTotal:   string       // Decimal string
+  grossQty?:   string
+  tareQty?:    string
 }
 
-export interface PurchaseReceiptData {
-  companyName?:  string
+interface CompanyInfo {
+  companyName?:    string
+  companyAddress?: string
+  companyPhone?:   string
+  vatNumber?:      string
+}
+
+export interface PurchaseReceiptData extends CompanyInfo {
   refNumber:     string
+  slipNo?:       string | number
+  customerCode?: string
   customerName:  string
   customerIdNo?: string
+  customerVatNumber?: string
   lines:         ReceiptLine[]
   totalAmount:   string
+  vatAmount?:    string
   paymentMethod: string
   cashierName:   string
+  // Only set when this purchase came through the Scale Station queue-number
+  // flow (purchase.scaleOrderId set) — omitted entirely otherwise, never
+  // repeated from cashierName/"Done By".
+  scaleOperatorName?: string
   createdAt:     Date
   // Set when printed from the offline queue, before the server has assigned
   // a permanent reference number — see src/app/api/print/slip/route.ts's
   // data-based (no DB id) branch and src/lib/offline/sync.ts's reconciliation.
   provisional?:  boolean
+  // From SystemSettings.purchaseNoteDeclaration — never hardcoded here.
+  footerText?:   string
+  loanDeduction?: { amount: string; reference?: string }
   splitPayments?: {
     cash:   string
     eft:    string
@@ -37,107 +62,145 @@ export interface PurchaseReceiptData {
   }
 }
 
-export interface SaleReceiptData {
-  companyName?:  string
+export interface SaleReceiptData extends CompanyInfo {
   refNumber:     string
+  slipNo?:       string | number
   buyerName?:    string
   buyerIdNumber?: string
   lines:         ReceiptLine[]
   totalAmount:   string
+  vatAmount?:    string
   paymentMethod: string
   cashierName:   string
   createdAt:     Date
   provisional?:  boolean
+  // From SystemSettings.saleNoteDeclaration — never hardcoded here.
+  footerText?:   string
 }
 
 // ─── Shared header / footer helpers ──────────────────────────────────────────
-function addHeader(printer: ThermalPrinter, title: string, refNumber: string, date: Date, companyName?: string, provisional?: boolean) {
+
+// Splits a free-text address setting ("Portion 3, Lot no:443, Matsapha
+// Industrial Site, Manzini, Eswatini") onto its own line per comma-separated
+// segment, matching the legacy slip's multi-line address block.
+function printAddressLines(printer: ThermalPrinter, address?: string) {
+  if (!address) return
+  for (const segment of address.split(',').map((s) => s.trim()).filter(Boolean)) {
+    printer.println(segment)
+  }
+}
+
+function addHeader(printer: ThermalPrinter, refNumber: string, date: Date, info: CompanyInfo, provisional?: boolean) {
   printer.alignCenter()
   printer.bold(true)
-  printer.println((companyName || 'GOLDEN KEY INVESTMENTS (PTY) LTD').toUpperCase())
+  printer.println('PAID')
+  printer.println((info.companyName || 'GOLDEN KEY INVESTMENTS (PTY) LTD').toUpperCase())
   printer.bold(false)
-  printer.println('Renovo Pro')
-  printer.drawLine()
-  printer.bold(true)
-  printer.println(title)
-  printer.bold(false)
-  printer.println(`Ref: ${refNumber}`)
-  printer.println(date.toLocaleString('en-ZA'))
+  printer.alignLeft()
+  printer.println(`PN No: ${refNumber}`)
+  printer.println(`Date: ${date.toLocaleString('en-ZA')}`)
+  printer.newLine()
+  printAddressLines(printer, info.companyAddress)
+  if (info.companyPhone) printer.println(`Tel: ${info.companyPhone}`)
+  if (info.vatNumber)    printer.println(`VAT No.: ${info.vatNumber}`)
   if (provisional) {
     printer.bold(true)
     printer.println('*** PROVISIONAL - PENDING SYNC ***')
     printer.bold(false)
   }
   printer.drawLine()
-  printer.alignLeft()
+}
+
+function addPeopleLines(printer: ThermalPrinter, cashierName: string, scaleOperatorName?: string) {
+  printer.println(`Done By: ${cashierName}`)
+  if (scaleOperatorName) printer.println(`Scale Op: ${scaleOperatorName}`)
+  printer.println('Rep:')
+  printer.newLine()
+}
+
+function addPartyLines(printer: ThermalPrinter, label: string, code: string | undefined, name: string, vatNumber?: string) {
+  const custLine = code ? `${code}-${name}` : name
+  printer.println(`${label}: ${custLine}`)
+  printer.println(`${label} VAT: ${vatNumber ?? ''}`)
+  printer.newLine()
 }
 
 function addLines(printer: ThermalPrinter, lines: ReceiptLine[]) {
   printer.bold(true)
   printer.tableCustom([
-    { text: 'Item',  align: 'LEFT',  width: 0.50 },
-    { text: 'Qty',   align: 'RIGHT', width: 0.10 },
-    { text: 'Price', align: 'RIGHT', width: 0.20 },
-    { text: 'Total', align: 'RIGHT', width: 0.20 },
+    { text: 'Product', align: 'LEFT',  width: 0.22 },
+    { text: 'InPrice', align: 'RIGHT', width: 0.16 },
+    { text: 'Gross',   align: 'RIGHT', width: 0.14 },
+    { text: 'Tare',    align: 'RIGHT', width: 0.12 },
+    { text: 'Nett',    align: 'RIGHT', width: 0.14 },
+    { text: 'Total',   align: 'RIGHT', width: 0.22 },
   ])
   printer.bold(false)
 
   for (const line of lines) {
     printer.tableCustom([
-      { text: line.productName.substring(0, 22), align: 'LEFT',  width: 0.50 },
-      { text: String(line.qty),                  align: 'RIGHT', width: 0.10 },
-      { text: `R${new Decimal(line.unitPrice).toFixed(2)}`, align: 'RIGHT', width: 0.20 },
-      { text: `R${new Decimal(line.lineTotal).toFixed(2)}`, align: 'RIGHT', width: 0.20 },
+      { text: (line.productCode ?? '').substring(0, 10), align: 'LEFT',  width: 0.22 },
+      { text: new Decimal(line.unitPrice).toFixed(2),    align: 'RIGHT', width: 0.16 },
+      { text: line.grossQty ?? '',                       align: 'RIGHT', width: 0.14 },
+      { text: line.tareQty ?? '0',                        align: 'RIGHT', width: 0.12 },
+      { text: String(line.qty),                          align: 'RIGHT', width: 0.14 },
+      { text: new Decimal(line.lineTotal).toFixed(2),    align: 'RIGHT', width: 0.22 },
     ])
+    // Product name wraps to its own line below the code/numbers row,
+    // matching the legacy slip's own wrapping (e.g. "08002" / "ally o/r").
+    printer.println(` ${line.productName}`)
   }
 }
 
-function addTotal(printer: ThermalPrinter, totalAmount: string, paymentMethod: string) {
+function addTotals(printer: ThermalPrinter, lines: ReceiptLine[], totalAmount: string, vatAmount: string | undefined) {
+  const nettTotal = lines.reduce((acc, l) => acc.plus(l.qty || 0), new Decimal(0))
+  const total = new Decimal(totalAmount)
+  const vat = new Decimal(vatAmount ?? '0')
+  const grandTotal = total.plus(vat)
+
   printer.drawLine()
+  printer.leftRight('Nett Total', nettTotal.toFixed(1))
+  printer.leftRight('Total', `E ${total.toFixed(2)}`)
+  printer.leftRight('15% VAT', `E ${vat.toFixed(2)}`)
   printer.bold(true)
-  printer.leftRight('TOTAL', `R ${new Decimal(totalAmount).toFixed(2)}`)
+  printer.leftRight('Grand Total', `E ${grandTotal.toFixed(2)}`)
   printer.bold(false)
-  printer.leftRight('Payment', paymentMethod.toUpperCase())
 }
 
 function addSplitPayments(
   printer: ThermalPrinter,
-  splitPayments: { cash: string; eft: string; cheque: string; loan: string }
+  splitPayments: { cash: string; eft: string; cheque: string; loan: string },
+  loanReference?: string,
 ) {
   const cashAmt   = new Decimal(splitPayments.cash   || '0')
   const eftAmt    = new Decimal(splitPayments.eft    || '0')
   const chequeAmt = new Decimal(splitPayments.cheque || '0')
   const loanAmt   = new Decimal(splitPayments.loan   || '0')
 
-  // Only show if at least one method has an amount
   const hasAny = cashAmt.greaterThan(0) || eftAmt.greaterThan(0) ||
                  chequeAmt.greaterThan(0) || loanAmt.greaterThan(0)
   if (!hasAny) return
 
-  printer.drawLine()
+  printer.newLine()
   printer.bold(true)
-  printer.println('PAYMENT BREAKDOWN')
+  printer.println('Payment Split:')
   printer.bold(false)
 
-  if (cashAmt.greaterThan(0)) {
-    printer.leftRight('Cash', `R ${cashAmt.toFixed(2)}`)
-  }
-  if (eftAmt.greaterThan(0)) {
-    printer.leftRight('EFT', `R ${eftAmt.toFixed(2)}`)
-  }
-  if (chequeAmt.greaterThan(0)) {
-    printer.leftRight('Cheque', `R ${chequeAmt.toFixed(2)}`)
-  }
-  if (loanAmt.greaterThan(0)) {
-    printer.leftRight('Loan Deduction', `R ${loanAmt.toFixed(2)}`)
-  }
+  if (cashAmt.greaterThan(0))   printer.leftRight('Cash', `E ${cashAmt.toFixed(2)}`)
+  if (eftAmt.greaterThan(0))    printer.leftRight('EFT', `E ${eftAmt.toFixed(2)}`)
+  if (chequeAmt.greaterThan(0)) printer.leftRight('Cheque', `E ${chequeAmt.toFixed(2)}`)
+  if (loanAmt.greaterThan(0))   printer.leftRight('Loans', `E ${loanAmt.toFixed(2)}${loanReference ? ` #${loanReference}` : ''}`)
 }
 
-function addFooter(printer: ThermalPrinter, cashierName: string) {
+function addFooter(printer: ThermalPrinter, slipNo: string | number | undefined, footerText: string | undefined) {
+  if (slipNo !== undefined) {
+    printer.newLine()
+    printer.println(`Slip No. ${slipNo}`)
+  }
+  printer.newLine()
+  printer.alignLeft()
+  if (footerText) printer.println(footerText)
   printer.drawLine()
-  printer.alignCenter()
-  printer.println(`Cashier: ${cashierName}`)
-  printer.println('Thank you for your business!')
   printer.cut()
 }
 
@@ -156,18 +219,21 @@ export async function buildPurchaseReceipt(data: PurchaseReceiptData): Promise<B
     lineCharacter: '-',
   })
 
-  addHeader(printer, 'PURCHASE RECEIPT', data.refNumber, data.createdAt, data.companyName, data.provisional)
-
-  printer.println(`Supplier: ${data.customerName}`)
+  addHeader(printer, data.refNumber, data.createdAt, data, data.provisional)
+  addPeopleLines(printer, data.cashierName, data.scaleOperatorName)
+  addPartyLines(printer, 'Cust', data.customerCode, data.customerName, data.customerVatNumber)
   if (data.customerIdNo) printer.println(`ID: ${data.customerIdNo}`)
-  printer.newLine()
 
   addLines(printer, data.lines)
-  addTotal(printer, data.totalAmount, data.paymentMethod)
+  addTotals(printer, data.lines, data.totalAmount, data.vatAmount)
   if (data.splitPayments) {
-    addSplitPayments(printer, data.splitPayments)
+    addSplitPayments(printer, data.splitPayments, data.loanDeduction?.reference)
+  } else if (data.loanDeduction && new Decimal(data.loanDeduction.amount).greaterThan(0)) {
+    printer.newLine()
+    printer.println('Payment Split:')
+    printer.leftRight('Loans', `E ${new Decimal(data.loanDeduction.amount).toFixed(2)}${data.loanDeduction.reference ? ` #${data.loanDeduction.reference}` : ''}`)
   }
-  addFooter(printer, data.cashierName)
+  addFooter(printer, data.slipNo, data.footerText)
 
   return Buffer.from(printer.getBuffer())
 }
@@ -184,15 +250,16 @@ export async function buildSaleReceipt(data: SaleReceiptData): Promise<Buffer> {
     lineCharacter: '-',
   })
 
-  addHeader(printer, 'SALES RECEIPT', data.refNumber, data.createdAt, data.companyName, data.provisional)
-
+  addHeader(printer, data.refNumber, data.createdAt, data, data.provisional)
+  printer.println(`Done By: ${data.cashierName}`)
+  printer.newLine()
   if (data.buyerName)     printer.println(`Buyer: ${data.buyerName}`)
   if (data.buyerIdNumber) printer.println(`ID: ${data.buyerIdNumber}`)
   printer.newLine()
 
   addLines(printer, data.lines)
-  addTotal(printer, data.totalAmount, data.paymentMethod)
-  addFooter(printer, data.cashierName)
+  addTotals(printer, data.lines, data.totalAmount, data.vatAmount)
+  addFooter(printer, data.slipNo, data.footerText)
 
   return Buffer.from(printer.getBuffer())
 }

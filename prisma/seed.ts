@@ -124,6 +124,25 @@ async function main() {
   }
 
   console.log('Product categories seeded')
+
+  // Seed the legacy-matching receipt declaration text as a default value
+  // only — never overwrite an admin's own customization made via
+  // Settings -> Tax & Receipts (create-only, not upsert).
+  const DEFAULT_DECLARATIONS: Record<string, string> = {
+    purchaseNoteDeclaration:
+      'I hereby state that I am the lawful owner of the material listed above and have sold them to Golden Key Investments (Pty) Ltd to dispose of as they see fit.',
+    saleNoteDeclaration:
+      'Goods listed above sold and released to the buyer. Errors and omissions excepted.',
+  }
+  for (const [key, value] of Object.entries(DEFAULT_DECLARATIONS)) {
+    const existing = await asTenant(tenantId, (tx) =>
+      tx.systemSettings.findUnique({ where: { tenantId_key: { tenantId, key } } }),
+    )
+    if (!existing) {
+      await asTenant(tenantId, (tx) => tx.systemSettings.create({ data: { tenantId, key, value } }))
+      console.log(`Seeded default SystemSettings.${key}`)
+    }
+  }
 }
 
 main()

@@ -392,6 +392,9 @@ export async function getPurchase(id: string) {
         include: { product: true },
         orderBy: { createdAt: 'asc' },
       },
+      // Only set when this purchase came through the Scale Station
+      // queue-number flow — used to print "Scale Op" on the receipt.
+      scaleOrder: { include: { operator: true } },
     },
   })
   if (!purchase) throw new PurchaseNotFoundError(id)

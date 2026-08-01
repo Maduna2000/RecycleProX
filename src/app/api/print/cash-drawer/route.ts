@@ -19,6 +19,9 @@ export async function POST(req: NextRequest) {
   if (!cfg.printerType || cfg.printerType === 'none') {
     return NextResponse.json({ error: 'No printer configured' }, { status: 400 })
   }
+  if (cfg.cashDrawerAttached === 'false') {
+    return NextResponse.json({ error: 'No cash drawer configured' }, { status: 400 })
+  }
 
   try {
     const { ThermalPrinter, PrinterTypes, CharacterSet } = await import('node-thermal-printer')

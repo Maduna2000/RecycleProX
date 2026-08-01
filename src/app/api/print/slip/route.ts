@@ -68,6 +68,7 @@ export async function POST(req: Request) {
           include: {
             customer: true,
             lines: { include: { product: true } },
+            scaleOrder: { include: { operator: true } },
           },
         })
         if (!purchase) throw new SlipRecordNotFoundError('Purchase not found')
@@ -76,22 +77,39 @@ export async function POST(req: Request) {
 
       // Build receipt data
       const lines = purchase.lines.map(line => ({
+        productCode: line.product.code,
         productName: line.product.name,
         qty: Number(line.quantity),
         unitPrice: line.unitPrice.toString(),
         lineTotal: new Decimal(line.unitPrice).times(line.quantity).toString(),
+        grossQty: line.grossQty?.toString(),
+        tareQty: line.tareQty?.toString(),
       }))
+
+      const splitPayments = purchase.splitPayments as {
+        cash: string; eft: string; cheque: string; loan: string
+      } | null
 
       receiptBuffer = await buildPurchaseReceipt({
         companyName: cfg.yardName,
+        companyAddress: cfg.yardAddress,
+        companyPhone: cfg.yardPhone,
+        vatNumber: cfg.vatNumber,
         refNumber: purchase.refNumber,
+        customerCode: purchase.customer.accountCode ?? undefined,
         customerName: `${purchase.customer.firstName} ${purchase.customer.lastName}`,
         customerIdNo: purchase.customer.idNumber ?? undefined,
+        customerVatNumber: purchase.customer.vatNumber ?? undefined,
         lines,
         totalAmount: purchase.totalAmount.toString(),
+        vatAmount: purchase.vatAmount ? purchase.vatAmount.toString() : undefined,
         paymentMethod: purchase.paymentMethod,
         cashierName: session.user.name ?? 'Cashier',
+        scaleOperatorName: purchase.scaleOrder?.operator.fullName,
         createdAt: purchase.createdAt,
+        footerText: cfg.purchaseNoteDeclaration,
+        loanDeduction: purchase.loanDeductionAmount ? { amount: purchase.loanDeductionAmount.toString() } : undefined,
+        splitPayments: splitPayments ?? undefined,
       })
     } else {
       // Fetch sale with related data
@@ -109,6 +127,7 @@ export async function POST(req: Request) {
 
       // Build receipt data
       const lines = sale.lines.map(line => ({
+        productCode: line.product.code,
         productName: line.product.name,
         qty: Number(line.quantity),
         unitPrice: line.unitPrice.toString(),
@@ -117,14 +136,19 @@ export async function POST(req: Request) {
 
       receiptBuffer = await buildSaleReceipt({
         companyName: cfg.yardName,
+        companyAddress: cfg.yardAddress,
+        companyPhone: cfg.yardPhone,
+        vatNumber: cfg.vatNumber,
         refNumber: sale.refNumber,
         buyerName: sale.customer ? `${sale.customer.firstName} ${sale.customer.lastName}` : undefined,
         buyerIdNumber: sale.customer?.idNumber ?? undefined,
         lines,
         totalAmount: sale.totalAmount.toString(),
+        vatAmount: sale.vatAmount ? sale.vatAmount.toString() : undefined,
         paymentMethod: sale.paymentMethod,
         cashierName: session.user.name ?? 'Cashier',
         createdAt: sale.createdAt,
+        footerText: cfg.saleNoteDeclaration,
       })
     }
 

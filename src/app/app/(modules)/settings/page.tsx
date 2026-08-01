@@ -26,7 +26,7 @@ type SettingsMap = {
   defaultPin?: string
   police_service_name?: string; police_legal_note?: string
   printerType?: PrinterType; printerSerialPort?: string; printerBaudRate?: string
-  printerIp?: string; printerTcpPort?: string
+  printerIp?: string; printerTcpPort?: string; cashDrawerAttached?: string
   scale1Type?: ScaleType; scale1Ip?: string; scale1Port?: string; scale1SerialPort?: string; scale1BaudRate?: string
   scale2Type?: ScaleType; scale2Ip?: string; scale2Port?: string; scale2SerialPort?: string; scale2BaudRate?: string
   scale3Type?: ScaleType; scale3Ip?: string; scale3Port?: string; scale3SerialPort?: string; scale3BaudRate?: string
@@ -188,6 +188,8 @@ export default function SettingsPage() {
   const [errors, setErrors]         = useState<Record<string, string>>({})
   const [detectingPorts, setDetect] = useState(false)
   const [availablePorts, setPorts]  = useState<SerialPortInfo[]>([])
+  const [scanningNetwork, setScanNetwork] = useState(false)
+  const [foundNetworkIps, setFoundIps]    = useState<string[]>([])
   const [testingPrinter, setTest]   = useState(false)
   const [printerStatus, setPStatus] = useState<'idle' | 'ok' | 'err'>('idle')
   const [syncing, setSyncing]       = useState(false)
@@ -238,6 +240,17 @@ export default function SettingsPage() {
     if (j.cloudMode) toast.info('Port detection only works on a local install.')
     else if (j.ports.length === 0) toast.info('No serial ports detected.')
     else setPorts(j.ports)
+  }
+
+  async function detectNetworkPrinters() {
+    setScanNetwork(true)
+    const res = await fetch('/api/settings/printer-network-scan')
+    setScanNetwork(false)
+    if (!res.ok) { toast.error('Could not scan the network'); return }
+    const j = await res.json() as { cloudMode?: boolean; ips: string[] }
+    if (j.cloudMode) toast.info('Network scan only works on a local install.')
+    else if (j.ips.length === 0) toast.info('No printers found on port 9100.')
+    else setFoundIps(j.ips)
   }
 
   async function testPrint() {
@@ -461,13 +474,34 @@ export default function SettingsPage() {
               )}
 
               {form.printerType === 'tcp' && (
-                <div style={{ marginTop: 8, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                  <Field label="Printer IP">
-                    <input value={form.printerIp ?? ''} onChange={(e) => set('printerIp', e.target.value)} placeholder="192.168.1.100" style={{ ...inp, fontFamily: 'monospace' }} />
-                  </Field>
-                  <Field label="Port">
-                    <input value={form.printerTcpPort ?? '9100'} onChange={(e) => set('printerTcpPort', e.target.value)} placeholder="9100" style={{ ...inp, fontFamily: 'monospace' }} />
-                  </Field>
+                <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                    <Field label="Printer IP">
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        <input
+                          value={form.printerIp ?? ''} onChange={(e) => set('printerIp', e.target.value)}
+                          placeholder="192.168.1.100" list="detected-network-ips"
+                          style={{ ...inp, flex: 1, fontFamily: 'monospace' }}
+                        />
+                        <datalist id="detected-network-ips">
+                          {foundNetworkIps.map((ip) => <option key={ip} value={ip}>{ip}</option>)}
+                        </datalist>
+                        <button
+                          onClick={detectNetworkPrinters} disabled={scanningNetwork}
+                          style={{ height: 26, padding: '0 6px', borderRadius: 2, border: '1px solid #ABABAB', background: '#F5F5F5', color: '#6C757D', cursor: 'pointer', display: 'flex', alignItems: 'center', opacity: scanningNetwork ? 0.5 : 1 }}
+                          title="Scan network"
+                        >
+                          <RefreshCw className={`w-3 h-3 ${scanningNetwork ? 'animate-spin' : ''}`} />
+                        </button>
+                      </div>
+                    </Field>
+                    <Field label="Port">
+                      <input value={form.printerTcpPort ?? '9100'} onChange={(e) => set('printerTcpPort', e.target.value)} placeholder="9100" style={{ ...inp, fontFamily: 'monospace' }} />
+                    </Field>
+                  </div>
+                  {foundNetworkIps.length > 0 && (
+                    <p style={{ fontSize: 10, color: '#6C757D', margin: 0 }}>Found: {foundNetworkIps.join(', ')}</p>
+                  )}
                 </div>
               )}
 
@@ -488,6 +522,15 @@ export default function SettingsPage() {
                   )}
                 </div>
               )}
+
+              <label style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#212529', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={form.cashDrawerAttached !== 'false'}
+                  onChange={(e) => set('cashDrawerAttached', e.target.checked ? 'true' : 'false')}
+                />
+                Cash drawer attached
+              </label>
             </div>
 
             {/* ── Offline Sync ─── */}
