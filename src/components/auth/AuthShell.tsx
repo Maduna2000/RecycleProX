@@ -39,14 +39,14 @@ export function AuthShell({ accentColor, icon, title, logo, subtitle, errorMessa
 
   if (isSessionLoading) {
     return (
-      <div className="min-h-dvh flex items-center justify-center" style={{ background }}>
+      <div className="min-h-screen flex items-center justify-center" style={{ background }}>
         <Loader2 className="w-8 h-8 animate-spin" style={{ color: accentColor }} />
       </div>
     )
   }
 
   return (
-    <div className="min-h-dvh flex items-center justify-center p-4 sm:p-6" style={{ background }}>
+    <div className="min-h-screen flex items-center justify-center p-4 sm:p-6" style={{ background }}>
       <div className="w-full max-w-sm sm:max-w-md">
         <div
           style={{
