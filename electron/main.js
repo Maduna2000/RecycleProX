@@ -21,7 +21,12 @@ let heartbeatTimer = null
 
 const isDev = !app.isPackaged
 const PORT = process.env.PORT || 3100 // distinct from Web's 3000 so both can run side by side during dev
-const PORTAL_BASE_URL = process.env.RENOVO_PORTAL_BASE_URL || 'https://portal.renovopro.app'
+// portal.renovopro.app is a placeholder domain that was never actually
+// purchased/pointed anywhere (see project notes) — the Portal's real home
+// is its Vercel deployment. Using that as the fallback so a freshly
+// installed app (no desktop.env yet — that's only loaded post-activation,
+// see loadDesktopEnv below) can still reach the activation endpoint.
+const PORTAL_BASE_URL = process.env.RENOVO_PORTAL_BASE_URL || 'https://renovo-pro-portal.vercel.app'
 
 // ─── Prevent multiple instances ───────────────────────────────────────────────
 
