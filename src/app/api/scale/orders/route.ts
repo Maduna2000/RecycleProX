@@ -8,6 +8,7 @@ import {
   ScaleCustomerNotFoundError, ScaleProductInactiveError, GateQueueNumberAlreadyUsedError,
   ScaleCustomerBlacklistedError, ScaleRequiredFieldMissingError,
 } from '@/lib/services/scaleService'
+import { PhoneNumberConflictError } from '@/lib/services/customerService'
 
 export async function GET(req: NextRequest) {
   const session = await auth()
@@ -60,6 +61,7 @@ export async function POST(req: NextRequest) {
     if (err instanceof GateQueueNumberAlreadyUsedError) return NextResponse.json({ error: err.message }, { status: 409 })
     if (err instanceof ScaleCustomerBlacklistedError)   return NextResponse.json({ error: err.message }, { status: 403 })
     if (err instanceof ScaleRequiredFieldMissingError)  return NextResponse.json({ error: err.message }, { status: 422 })
+    if (err instanceof PhoneNumberConflictError)        return NextResponse.json({ error: err.message, conflicts: err.conflicts }, { status: 409 })
     logger.error({ err }, 'POST /api/scale/orders failed')
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }

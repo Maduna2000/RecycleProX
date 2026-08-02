@@ -20,6 +20,8 @@ const DOCUMENT_TYPE_LABELS: Record<string, string> = {
   trading_licence:      'Trading License',
   company_registration: 'Company Registration',
   eea_license:          'EEA License',
+  sars_certificate:     'VAT Certificate',
+  other:                'Other',
 }
 
 const docLinkBtn: React.CSSProperties = { fontSize: 11, cursor: 'pointer', textDecoration: 'underline', background: 'none', border: 'none', padding: 0 }
@@ -146,8 +148,8 @@ export function DocumentsTab({ customerId }: { customerId: string }) {
           <Btn size="sm" loading={uploading} onClick={() => docFileRef.current?.click()}>
             {uploading ? 'Uploading…' : '+ Upload Document'}
           </Btn>
-          <input ref={docFileRef} type="file" style={{ display: 'none' }} accept=".pdf,.jpg,.jpeg,.png" onChange={handleDocUpload} disabled={uploading} />
-          <input ref={reuploadFileRef} type="file" style={{ display: 'none' }} accept=".pdf,.jpg,.jpeg,.png" onChange={handleDocReupload} disabled={uploading} />
+          <input ref={docFileRef} type="file" style={{ display: 'none' }} accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" onChange={handleDocUpload} disabled={uploading} />
+          <input ref={reuploadFileRef} type="file" style={{ display: 'none' }} accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" onChange={handleDocReupload} disabled={uploading} />
         </div>
 
         {!docs?.length ? (

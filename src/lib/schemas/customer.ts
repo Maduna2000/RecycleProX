@@ -82,6 +82,11 @@ export const CreateCustomerSchema = z.object({
   // VAT is opt-in: a new account has no VAT applied unless explicitly ticked.
   zeroRated:        z.boolean().optional().default(true),
   isActive:         z.boolean().optional().default(true),
+  // Set by the UI only after staff has seen and dismissed a
+  // phone-number-conflict warning (see PhoneNumberConflictError in
+  // customerService.ts) — the first save attempt always omits it so the
+  // conflict, if any, actually gets shown before creation succeeds.
+  confirmDifferentPerson: z.boolean().optional(),
 })
 
 // Lenient phone for casual quick-create: normalise Eswatini numbers, accept any ≥7-digit number as-is
@@ -103,6 +108,9 @@ export const QuickCreateSchema = z.object({
   lastName:        z.string().min(1, 'Last name is required'),
   phone:           quickCreatePhoneSchema,
   physicalAddress: z.string().max(200).optional(),
+  // See CreateCustomerSchema's confirmDifferentPerson — same override, for
+  // the quick-create-a-casual-on-the-fly path (Scale/Gate/Purchases).
+  confirmDifferentPerson: z.boolean().optional(),
 })
 
 export const BlacklistSchema = z.object({
@@ -124,7 +132,7 @@ export const UpdateCustomerSchema = CreateCustomerSchema.partial().omit({ idNumb
 })
 
 export const UploadCustomerDocumentSchema = z.object({
-  documentType: z.enum(['id_copy', 'passport', 'trading_licence', 'company_registration', 'eea_license']),
+  documentType: z.enum(['id_copy', 'passport', 'trading_licence', 'company_registration', 'eea_license', 'sars_certificate', 'other']),
   fileName:     z.string().min(1).max(255),
   r2Key:        z.string().min(1),
   notes:        z.string().max(500).optional(),

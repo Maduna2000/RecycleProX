@@ -131,6 +131,8 @@ export function mimeToExt(mimeType: string): string {
     'image/webp': 'webp',
     'image/heic': 'heic',
     'application/pdf': 'pdf',
+    'application/msword': 'doc',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
   }
   return map[mimeType] ?? 'bin'
 }
@@ -142,5 +144,10 @@ export const MAX_PHOTO_BYTES = 10 * 1024 * 1024  // 10 MB
 
 // ─── Allowed document MIME types (customer documents, expense attachments) ────
 
-export const ALLOWED_DOCUMENT_TYPES = [...ALLOWED_PHOTO_TYPES, 'application/pdf']
+export const ALLOWED_DOCUMENT_TYPES = [
+  ...ALLOWED_PHOTO_TYPES,
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+]
 export const MAX_DOCUMENT_BYTES = 20 * 1024 * 1024  // 20 MB

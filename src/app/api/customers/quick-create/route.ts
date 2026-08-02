@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
-import { quickCreate } from '@/lib/services/customerService'
+import { quickCreate, PhoneNumberConflictError } from '@/lib/services/customerService'
 import { QuickCreateSchema } from '@/lib/schemas/customer'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
 import logger from '@/lib/logger'
@@ -19,6 +19,9 @@ export async function POST(req: NextRequest) {
     const customer = await runWithRequestTenant(req, () => quickCreate(parsed.data, session.user.id))
     return NextResponse.json(customer, { status: 200 })
   } catch (err) {
+    if (err instanceof PhoneNumberConflictError) {
+      return NextResponse.json({ error: err.message, conflicts: err.conflicts }, { status: 409 })
+    }
     logger.error({ err }, 'POST /api/customers/quick-create failed')
     return NextResponse.json({ error: 'Failed to create customer' }, { status: 500 })
   }

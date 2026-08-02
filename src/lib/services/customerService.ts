@@ -24,18 +24,39 @@ export class ForbiddenError extends Error {
   constructor(msg = 'Forbidden') { super(msg); this.name = 'ForbiddenError' }
 }
 
-/** A casual customer must be a regular before they can hold an account. */
-export const MIN_PURCHASES_FOR_ACCOUNT = 5
+export type PhoneConflict = {
+  id: string; firstName: string; lastName: string; idNumber: string | null
+  blacklisted: boolean; customerType: string
+}
 
-export class NotEligibleForAccountError extends Error {
-  constructor(completedPurchases: number) {
+// Someone dodging a blacklist/loan flag on one ID number by coming back
+// under a different ID number and/or name tends to reuse their own real
+// phone number — the one detail that doesn't change. Thrown by
+// createCustomer/quickCreate/updateCustomer whenever a phone number already
+// belongs to a different customer record, unless the caller has explicitly
+// set confirmDifferentPerson (staff reviewed the match and confirmed it's
+// genuinely a different person).
+export class PhoneNumberConflictError extends Error {
+  conflicts: PhoneConflict[]
+  constructor(conflicts: PhoneConflict[]) {
     super(
-      `Customer has ${completedPurchases} completed purchase${completedPurchases === 1 ? '' : 's'} — ` +
-      `more than ${MIN_PURCHASES_FOR_ACCOUNT} are required before they can become an account holder`
+      `Phone number is already registered to ${conflicts.length} other customer${conflicts.length === 1 ? '' : 's'} — ` +
+      `confirm this is a different person before continuing`
     )
-    this.name = 'NotEligibleForAccountError'
+    this.name = 'PhoneNumberConflictError'
+    this.conflicts = conflicts
   }
 }
+
+async function findPhoneConflicts(tenantId: string, phone: string, excludeCustomerId?: string): Promise<PhoneConflict[]> {
+  return prisma.customer.findMany({
+    where: { tenantId, phone, ...(excludeCustomerId ? { id: { not: excludeCustomerId } } : {}) },
+    select: { id: true, firstName: true, lastName: true, idNumber: true, blacklisted: true, customerType: true },
+  })
+}
+
+/** A casual customer must be a regular before they're silently auto-promoted. */
+export const MIN_PURCHASES_FOR_ACCOUNT = 5
 
 // ─── Service ──────────────────────────────────────────────────────────────────
 
@@ -76,6 +97,12 @@ export async function createCustomer(data: CreateCustomerInput, userId: string) 
   const existing = await prisma.customer.findUnique({ where: { tenantId_idNumber: { tenantId, idNumber: data.idNumber } } })
   if (existing) throw new DuplicateCustomerError(existing.id)
 
+  const { confirmDifferentPerson, ...rest } = data
+  if (!confirmDifferentPerson) {
+    const conflicts = await findPhoneConflicts(tenantId, data.phone)
+    if (conflicts.length > 0) throw new PhoneNumberConflictError(conflicts)
+  }
+
   const resolvedPriceGroupId = await resolvePriceGroupId(data.dealerCategory, data.priceGroupId)
 
   const accountCode = data.customerType === 'account'
@@ -88,7 +115,7 @@ export async function createCustomer(data: CreateCustomerInput, userId: string) 
     // quirk, same family as the GetPayload one documented in
     // reports/builders/police.ts) — asserting the raw-FK ("unchecked")
     // shape we actually pass sidesteps it without changing runtime behavior.
-    data: { ...data, tenantId, priceGroupId: resolvedPriceGroupId, createdByUserId: userId, accountCode } as Prisma.CustomerUncheckedCreateInput,
+    data: { ...rest, tenantId, priceGroupId: resolvedPriceGroupId, createdByUserId: userId, accountCode } as Prisma.CustomerUncheckedCreateInput,
   })
   logger.info({ customerId: customer.id, userId }, 'Customer created')
   return customer
@@ -99,11 +126,34 @@ export async function quickCreate(data: QuickCreateInput, userId: string) {
   // Return existing customer if duplicate (only when ID number is provided)
   if (data.idNumber) {
     const existing = await prisma.customer.findUnique({ where: { tenantId_idNumber: { tenantId, idNumber: data.idNumber } } })
-    if (existing) return existing
+    if (existing) {
+      // Same ID number resolving to a different name than what's on file —
+      // could be a typo, a legal name change, or someone else's ID being
+      // used. Not blocked (it IS the same legal person by ID number), but
+      // logged so it surfaces in a review of quick-create activity.
+      if (existing.firstName.trim().toLowerCase() !== data.firstName.trim().toLowerCase() ||
+          existing.lastName.trim().toLowerCase()  !== data.lastName.trim().toLowerCase()) {
+        logger.warn(
+          { customerId: existing.id, onFile: `${existing.firstName} ${existing.lastName}`, entered: `${data.firstName} ${data.lastName}`, userId },
+          'customer.quick_create_name_mismatch',
+        )
+      }
+      return existing
+    }
   }
 
+  const { confirmDifferentPerson, ...rest } = data
+  if (!confirmDifferentPerson) {
+    const conflicts = await findPhoneConflicts(tenantId, data.phone)
+    if (conflicts.length > 0) throw new PhoneNumberConflictError(conflicts)
+  }
+
+  // A walk-in casual saved this way (e.g. from the Scale Station) both
+  // sells material to us and may later buy from us — 'both', not the
+  // manual-create form's 'supplier'-leaning default, since the system has
+  // no actual signal yet about which way this person transacts.
   const customer = await prisma.customer.create({
-    data: { ...data, tenantId, idNumber: data.idNumber ?? null, customerType: 'casual', createdByUserId: userId },
+    data: { ...rest, tenantId, idNumber: rest.idNumber ?? null, customerType: 'casual', primaryFunction: 'both', createdByUserId: userId },
   })
   logger.info({ customerId: customer.id, userId }, 'Customer quick-created')
   return customer
@@ -112,22 +162,21 @@ export async function quickCreate(data: QuickCreateInput, userId: string) {
 export async function updateCustomer(id: string, data: UpdateCustomerInput, userId: string, userRole?: string) {
   const current = await prisma.customer.findUniqueOrThrow({
     where: { id },
-    select: { customerType: true, dealerCategory: true, accountCode: true, lastName: true },
+    select: { customerType: true, dealerCategory: true, accountCode: true, lastName: true, phone: true },
   })
+
+  if (data.phone !== undefined && data.phone !== current.phone && !data.confirmDifferentPerson) {
+    const conflicts = await findPhoneConflicts(requireTenantId(), data.phone, id)
+    if (conflicts.length > 0) throw new PhoneNumberConflictError(conflicts)
+  }
 
   const isPromotion = data.customerType === 'account' && current.customerType === 'casual'
 
-  // Regulars only: a casual must have brought in more than
-  // MIN_PURCHASES_FOR_ACCOUNT completed purchases before they can hold an
-  // account.
-  if (isPromotion) {
-    const completedPurchases = await prisma.purchase.count({
-      where: { customerId: id, status: 'completed' },
-    })
-    if (completedPurchases <= MIN_PURCHASES_FOR_ACCOUNT) {
-      throw new NotEligibleForAccountError(completedPurchases)
-    }
-  }
+  // The MIN_PURCHASES_FOR_ACCOUNT threshold only gates the silent
+  // auto-promotion in autoPromoteCasualIfEligible below (which checks it
+  // itself before calling this function) — a manual promotion here is a
+  // deliberate staff/admin action and must be allowed at any time,
+  // regardless of purchase history.
 
   // Dealer tiers are assigned by admins only — changing an existing
   // category to dealer_1/2/3 is never part of a routine edit or promotion.
@@ -140,14 +189,16 @@ export async function updateCustomer(id: string, data: UpdateCustomerInput, user
     throw new ForbiddenError('Only an admin can assign a dealer category')
   }
 
-  let updateData: typeof data = data
+  const { confirmDifferentPerson, ...dataWithoutConfirm } = data
+  void confirmDifferentPerson  // consumed above; excluded from the Prisma write below
+  let updateData: typeof dataWithoutConfirm = dataWithoutConfirm
 
   if (data.dealerCategory !== undefined) {
     const resolvedPriceGroupId = await resolvePriceGroupId(
       data.dealerCategory ?? undefined,
       data.priceGroupId ?? undefined,
     )
-    updateData = { ...data, priceGroupId: resolvedPriceGroupId }
+    updateData = { ...dataWithoutConfirm, priceGroupId: resolvedPriceGroupId }
   }
 
   // A promoted casual stays in the Casual category with casual pricing —
@@ -377,14 +428,12 @@ export async function listCustomerDocuments(customerId: string) {
 }
 
 // Mirrors UploadCustomerDocumentSchema's documentType enum (src/lib/schemas/
-// customer.ts) — the write-path's allowed values, a subset of the full
-// CustomerDocumentType enum in prisma/schema.prisma (which keeps legacy
-// values like sars_certificate/other for rows uploaded before this list was
-// narrowed). Defined locally rather than imported from @prisma/client
-// because SQLite's Prisma connector has no enum support (see
-// scripts/generate-sqlite-schema.ts), so the enum becomes a plain `string`
-// on the Desktop client.
-type CustomerDocumentType = 'id_copy' | 'passport' | 'trading_licence' | 'company_registration' | 'eea_license'
+// customer.ts) — the write-path's allowed values, matching the full
+// CustomerDocumentType enum in prisma/schema.prisma. Defined locally rather
+// than imported from @prisma/client because SQLite's Prisma connector has no
+// enum support (see scripts/generate-sqlite-schema.ts), so the enum becomes
+// a plain `string` on the Desktop client.
+type CustomerDocumentType = 'id_copy' | 'passport' | 'trading_licence' | 'company_registration' | 'eea_license' | 'sars_certificate' | 'other'
 
 export async function addCustomerDocument(
   customerId: string,

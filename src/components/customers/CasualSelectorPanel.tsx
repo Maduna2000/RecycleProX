@@ -28,6 +28,11 @@ type LookupCustomer = SelectedCustomer & {
 type LookupStatus = 'idle' | 'loading' | 'found' | 'not_found'
 type ScanStatus   = 'idle' | 'scanning' | 'error'
 
+type PhoneConflict = {
+  id: string; firstName: string; lastName: string; idNumber: string | null
+  blacklisted: boolean; customerType: string
+}
+
 interface CasualForm {
   idNumber:        string
   firstName:       string
@@ -92,6 +97,7 @@ export const CasualSelectorPanel = forwardRef<CasualSelectorPanelRef, Props>(
     const [isLocked,         setIsLocked]     = useState(false)
     const [confirming,       setConfirming]   = useState(false)
     const [scanR2Key,        setScanR2Key]    = useState<string | null>(null)
+    const [phoneConflicts,   setPhoneConflicts] = useState<PhoneConflict[] | null>(null)
 
     const fileInputRef = useRef<HTMLInputElement>(null)
     const debounceRef  = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -274,6 +280,61 @@ export const CasualSelectorPanel = forwardRef<CasualSelectorPanelRef, Props>(
 
     // ── Confirm Seller ────────────────────────────────────────────────────────
 
+    // Shared by the first attempt and the "confirm different person" retry
+    // after a phone-number-conflict warning — only the override flag differs.
+    async function quickCreateCustomer(confirmDifferentPerson: boolean): Promise<SelectedCustomer | null> {
+      const res = await fetch('/api/customers/quick-create', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
+          idNumber:        form.idNumber,
+          firstName:       form.firstName.trim(),
+          lastName:        form.lastName.trim(),
+          phone:           form.phone.trim(),
+          physicalAddress: form.physicalAddress.trim() || undefined,
+          ...(confirmDifferentPerson && { confirmDifferentPerson: true }),
+        }),
+      })
+      if (!res.ok) {
+        const j = await res.json() as { error?: string; issues?: { message: string }[]; conflicts?: PhoneConflict[] }
+        if (res.status === 409 && j.conflicts) {
+          setPhoneConflicts(j.conflicts)
+          return null
+        }
+        const msg = j.issues?.[0]?.message ?? j.error ?? 'Failed to register customer'
+        toast.error(msg)
+        return null
+      }
+      return await res.json() as SelectedCustomer
+    }
+
+    async function finishConfirm(customer: SelectedCustomer): Promise<SelectedCustomer> {
+      if (scanR2Key) {
+        fetch(`/api/customers/${customer.id}`, {
+          method:  'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ idPhotoR2Key: scanR2Key }),
+        }).catch(() => {
+          toast.warning('ID photo could not be linked — photo is saved but not yet attached')
+        })
+      }
+      onSelect(customer)
+      return customer
+    }
+
+    async function confirmDifferentPersonAndCreate() {
+      setPhoneConflicts(null)
+      setConfirming(true)
+      try {
+        const customer = await quickCreateCustomer(true)
+        if (customer) await finishConfirm(customer)
+      } catch {
+        toast.error('Network error — please try again')
+      } finally {
+        setConfirming(false)
+      }
+    }
+
     async function handleConfirm(): Promise<SelectedCustomer | null> {
       const idCheck = validateSaId(form.idNumber)
       if (!idCheck.valid) { toast.error(idCheck.error ?? 'Invalid ID number'); return null }
@@ -281,45 +342,12 @@ export const CasualSelectorPanel = forwardRef<CasualSelectorPanelRef, Props>(
       if (!form.lastName.trim())  { toast.error('Last name is required'); return null }
       if (!form.phone.trim())     { toast.error('Phone number is required'); return null }
 
+      setPhoneConflicts(null)
       setConfirming(true)
       try {
-        let customer: SelectedCustomer
-
-        if (existingCustomer) {
-          customer = existingCustomer
-        } else {
-          const res = await fetch('/api/customers/quick-create', {
-            method:  'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({
-              idNumber:        form.idNumber,
-              firstName:       form.firstName.trim(),
-              lastName:        form.lastName.trim(),
-              phone:           form.phone.trim(),
-              physicalAddress: form.physicalAddress.trim() || undefined,
-            }),
-          })
-          if (!res.ok) {
-            const j = await res.json() as { error?: string; issues?: { message: string }[] }
-            const msg = j.issues?.[0]?.message ?? j.error ?? 'Failed to register customer'
-            toast.error(msg)
-            return null
-          }
-          customer = await res.json() as SelectedCustomer
-        }
-
-        if (scanR2Key) {
-          fetch(`/api/customers/${customer.id}`, {
-            method:  'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ idPhotoR2Key: scanR2Key }),
-          }).catch(() => {
-            toast.warning('ID photo could not be linked — photo is saved but not yet attached')
-          })
-        }
-
-        onSelect(customer)
-        return customer
+        const customer = existingCustomer ?? await quickCreateCustomer(false)
+        if (!customer) return null
+        return await finishConfirm(customer)
       } catch {
         toast.error('Network error — please try again')
         return null
@@ -423,6 +451,42 @@ export const CasualSelectorPanel = forwardRef<CasualSelectorPanelRef, Props>(
             aria-label="Address"
           />
         </div>
+
+        {phoneConflicts && (
+          <div className="rounded border border-red-300 bg-red-50 p-2 space-y-1.5">
+            <p className="text-[11px] font-semibold text-red-700">
+              This phone number is already registered to {phoneConflicts.length === 1 ? 'another customer' : `${phoneConflicts.length} other customers`} — possible duplicate identity:
+            </p>
+            {phoneConflicts.map((c) => (
+              <div key={c.id} className="text-[11px] text-gray-700">
+                <strong>{c.firstName} {c.lastName}</strong>
+                {c.idNumber && <span className="font-mono text-gray-500"> · {c.idNumber}</span>}
+                {c.blacklisted && <span className="font-bold text-red-700"> · BLACKLISTED</span>}
+              </div>
+            ))}
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                size="sm"
+                disabled={confirming}
+                onClick={confirmDifferentPersonAndCreate}
+                className="h-6 px-2 text-[11px] bg-[#217346] hover:bg-[#1a5c38] text-white"
+              >
+                Confirm — different person
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={confirming}
+                onClick={() => setPhoneConflicts(null)}
+                className="h-6 px-2 text-[11px]"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* Row 5: Status badges + optional Confirm button */}
         <div className="flex items-center justify-between gap-2">
