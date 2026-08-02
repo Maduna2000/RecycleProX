@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { LogOut } from 'lucide-react'
 import StepVisitor, { type VisitorInfo } from './components/StepVisitor'
 import StepPurpose, { type Purpose } from './components/StepPurpose'
@@ -19,29 +19,88 @@ import { colors } from '@/lib/design-tokens'
 // renumbering the whole flow depending on purpose.
 const DEFAULT_PHOTO_CONFIG: PhotoConfig = { requireIdPhoto: false, requireVehiclePhoto: true }
 
-function useTempId() {
-  const [id] = useState(() => crypto.randomUUID())
-  return id
+// The kiosk tablet's WebView can be reloaded from scratch by Android at any
+// time under memory pressure (backgrounding the app, another app hogging
+// RAM) — this is normal WebView/Chrome behavior, not something an APK vs. a
+// plain URL avoids. photoKeys only ever holds already-uploaded R2 key
+// strings (never raw File blobs), so the whole in-progress entry is safely
+// JSON-serializable — persisting it here means a guard mid-entry never
+// loses their place to one of these reloads. DOM storage is explicitly
+// enabled in MainActivity.java's WebView config, so this survives a process
+// kill the same way it would in a real installed app.
+const WIP_STORAGE_KEY = 'gate-wip-session'
+const WIP_MAX_AGE_MS = 4 * 60 * 60 * 1000 // a shift-length window — older than this is presumed abandoned
+
+type WipState = {
+  step: number
+  visitor: VisitorInfo | null
+  purpose: Purpose | null
+  categoryNames: string[]
+  vehicleReg: string
+  photoConfig: PhotoConfig
+  photoKeys: PhotoKeys
+  photoExemptionNote: string | undefined
+  vehicleExempt: boolean | undefined
+  tempId: string
+  savedAt: number
+}
+
+function loadWip(): WipState | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = window.localStorage.getItem(WIP_STORAGE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as WipState
+    if (Date.now() - parsed.savedAt > WIP_MAX_AGE_MS) {
+      window.localStorage.removeItem(WIP_STORAGE_KEY)
+      return null
+    }
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+function clearWip() {
+  if (typeof window === 'undefined') return
+  try { window.localStorage.removeItem(WIP_STORAGE_KEY) } catch { /* ignore */ }
 }
 
 export default function GatePage() {
+  const [restored] = useState(loadWip)
   const [mode, setMode] = useState<'entry' | 'checkout'>('entry')
-  const [step, setStep] = useState(1)
-  const [visitor, setVisitor] = useState<VisitorInfo | null>(null)
-  const [purpose, setPurpose] = useState<Purpose | null>(null)
-  const [categoryNames, setCategoryNames] = useState<string[]>([])
-  const [vehicleReg, setVehicleReg] = useState('')
-  const [photoConfig, setPhotoConfig] = useState<PhotoConfig>(DEFAULT_PHOTO_CONFIG)
-  const [photoKeys, setPhotoKeys] = useState<PhotoKeys>({})
-  const [photoExemptionNote, setPhotoExemptionNote] = useState<string | undefined>(undefined)
-  const [vehicleExempt, setVehicleExempt] = useState<boolean | undefined>(undefined)
-  const tempId = useTempId()
+  const [step, setStep] = useState(() => restored?.step ?? 1)
+  const [visitor, setVisitor] = useState<VisitorInfo | null>(() => restored?.visitor ?? null)
+  const [purpose, setPurpose] = useState<Purpose | null>(() => restored?.purpose ?? null)
+  const [categoryNames, setCategoryNames] = useState<string[]>(() => restored?.categoryNames ?? [])
+  const [vehicleReg, setVehicleReg] = useState(() => restored?.vehicleReg ?? '')
+  const [photoConfig, setPhotoConfig] = useState<PhotoConfig>(() => restored?.photoConfig ?? DEFAULT_PHOTO_CONFIG)
+  const [photoKeys, setPhotoKeys] = useState<PhotoKeys>(() => restored?.photoKeys ?? {})
+  const [photoExemptionNote, setPhotoExemptionNote] = useState<string | undefined>(() => restored?.photoExemptionNote)
+  const [vehicleExempt, setVehicleExempt] = useState<boolean | undefined>(() => restored?.vehicleExempt)
+  const [tempId] = useState(() => restored?.tempId ?? crypto.randomUUID())
+
+  // Persist on every change so a mid-entry reload can resume exactly where
+  // the guard left off. Skipped while in 'checkout' mode — that's a
+  // separate, self-contained flow with its own state.
+  useEffect(() => {
+    if (mode !== 'entry') return
+    if (typeof window === 'undefined') return
+    try {
+      window.localStorage.setItem(WIP_STORAGE_KEY, JSON.stringify({
+        step, visitor, purpose, categoryNames, vehicleReg, photoConfig,
+        photoKeys, photoExemptionNote, vehicleExempt, tempId,
+        savedAt: Date.now(),
+      } satisfies WipState))
+    } catch { /* localStorage unavailable/full — WIP just won't survive a reload, not fatal */ }
+  }, [mode, step, visitor, purpose, categoryNames, vehicleReg, photoConfig, photoKeys, photoExemptionNote, vehicleExempt, tempId])
 
   const steps = purpose === 'sell'
     ? ['Visitor', 'Purpose', 'Category', 'Vehicle', 'Photos', 'Review']
     : ['Visitor', 'Purpose', 'Vehicle', 'Photos', 'Review']
 
   function reset() {
+    clearWip()
     setStep(1)
     setVisitor(null)
     setPurpose(null)

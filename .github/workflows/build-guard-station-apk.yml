@@ -35,6 +35,10 @@ jobs:
         working-directory: guard-cap
         run: npm ci
 
+      - name: Generate app icons from source artwork
+        working-directory: guard-cap
+        run: npm run gen-icons
+
       - name: Sync Capacitor native project
         working-directory: guard-cap
         run: npx cap sync android

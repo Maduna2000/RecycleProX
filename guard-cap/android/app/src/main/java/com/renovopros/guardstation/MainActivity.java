@@ -2,6 +2,8 @@ package com.renovopros.guardstation;
 
 import com.getcapacitor.BridgeActivity;
 import android.os.Bundle;
+import android.view.View;
+import android.view.WindowManager;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 
@@ -10,7 +12,36 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        // Kiosk tablet stays plugged in and on-screen all shift — never let
+        // the OS dim/sleep it away from under a guard mid-entry.
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        hideSystemBars();
         configureWebView();
+    }
+
+    // Immersive fullscreen — hides the status bar and navigation bar so the
+    // WebView owns the whole screen like a real kiosk, not a browser tab.
+    // "Sticky" so a swipe-in from the edge only shows them briefly before
+    // they auto-hide again, rather than staying revealed. Must be re-applied
+    // on every focus regain (system dialogs, app switches, etc. can bring
+    // the system bars back — this is standard Android immersive-mode
+    // behavior, not specific to this app).
+    private void hideSystemBars() {
+        View decorView = getWindow().getDecorView();
+        decorView.setSystemUiVisibility(
+            View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+            | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+            | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+            | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+            | View.SYSTEM_UI_FLAG_FULLSCREEN
+            | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+        );
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) hideSystemBars();
     }
 
     private void configureWebView() {
