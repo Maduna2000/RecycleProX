@@ -59,6 +59,8 @@ const DOCUMENT_TYPE_LABELS: Record<string, string> = {
   trading_licence:      'Trading License',
   company_registration: 'Company Registration',
   eea_license:          'EEA License',
+  sars_certificate:     'VAT Certificate',
+  other:                'Other',
 }
 
 const EDIT_TABS = ['Personal', 'Business', 'Banking', 'Compliance'] as const
@@ -496,7 +498,7 @@ function DocumentsTab({ customer, onPhotoSaved }: { customer: Customer; onPhotoS
               ref={docFileRef}
               type="file"
               style={{ display: 'none' }}
-              accept=".pdf,.jpg,.jpeg,.png"
+              accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
               onChange={handleDocUpload}
               disabled={uploading}
             />

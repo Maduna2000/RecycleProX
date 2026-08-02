@@ -6,6 +6,7 @@ import {
   deleteCustomer,
   CustomerHasRecordsError,
   ForbiddenError,
+  PhoneNumberConflictError,
 } from '@/lib/services/customerService'
 import { UpdateCustomerSchema } from '@/lib/schemas/customer'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
@@ -41,6 +42,9 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   } catch (err) {
     if (err instanceof ForbiddenError) {
       return NextResponse.json({ error: err.message }, { status: 403 })
+    }
+    if (err instanceof PhoneNumberConflictError) {
+      return NextResponse.json({ error: err.message, conflicts: err.conflicts }, { status: 409 })
     }
     logger.error({ err }, 'PUT /api/customers/[id] failed')
     return NextResponse.json({ error: 'Failed to update customer' }, { status: 500 })

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import useSWR from 'swr'
 import { useForm } from 'react-hook-form'
@@ -18,6 +18,11 @@ const TITLE_OPTIONS = ['—', 'Mr', 'Mrs', 'Ms', 'Dr', 'Prof', 'Rev', 'Other']
 
 const readOnlyInp: React.CSSProperties = { ...inp, color: '#9CA3AF', background: '#F3F4F6', cursor: 'not-allowed' }
 
+type PhoneConflict = {
+  id: string; firstName: string; lastName: string; idNumber: string | null
+  blacklisted: boolean; customerType: string
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function NewAccountPage() {
   const router      = useRouter()
@@ -25,7 +30,9 @@ export default function NewAccountPage() {
   const returnTo    = searchParams.get('returnTo')
   const [loading,      setLoading]      = useState(false)
   const [dupLink,      setDupLink]      = useState<string | null>(null)
+  const [phoneConflicts, setPhoneConflicts] = useState<PhoneConflict[] | null>(null)
   const [bankOpen,     setBankOpen]     = useState(false)
+  const lastAttemptRef = useRef<CreateCustomerInput | null>(null)
 
   const { data: pgData } = useSWR<{ priceGroups: { id: string; name: string }[] }>('/api/price-groups', fetcher)
   const priceGroups = pgData?.priceGroups ?? []
@@ -56,7 +63,7 @@ export default function NewAccountPage() {
   const marketSector    = watch('marketSector')
   const zeroRated       = watch('zeroRated') ?? false
 
-  async function onSubmit(data: CreateCustomerInput) {
+  async function submitCustomer(data: CreateCustomerInput) {
     setLoading(true)
     setDupLink(null)
     try {
@@ -67,6 +74,11 @@ export default function NewAccountPage() {
       })
       if (res.status === 409) {
         const j = await res.json()
+        if (j.conflicts) {
+          lastAttemptRef.current = data
+          setPhoneConflicts(j.conflicts)
+          return
+        }
         setDupLink(j.existingCustomerId ?? null)
         toast.error('A customer with this ID number already exists')
         return
@@ -83,6 +95,17 @@ export default function NewAccountPage() {
     }
   }
 
+  async function onSubmit(data: CreateCustomerInput) {
+    setPhoneConflicts(null)
+    await submitCustomer(data)
+  }
+
+  async function confirmDifferentPersonAndRetry() {
+    if (!lastAttemptRef.current) return
+    setPhoneConflicts(null)
+    await submitCustomer({ ...lastAttemptRef.current, confirmDifferentPerson: true })
+  }
+
   return (
     <PortalPage title="Customer / Vendor Details">
       <div className="flex flex-col flex-1 min-h-0">
@@ -91,6 +114,32 @@ export default function NewAccountPage() {
           <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '8px 12px', background: colors.dangerBg, borderBottom: `1px solid ${colors.danger}` }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: colors.danger }}>A customer with this ID number already exists</span>
             <Btn size="sm" variant="danger" onClick={() => router.push(`/app/customers/${dupLink}`)}>View existing record →</Btn>
+          </div>
+        )}
+
+        {phoneConflicts && (
+          <div style={{ flexShrink: 0, padding: '8px 12px', background: colors.dangerBg, borderBottom: `1px solid ${colors.danger}` }}>
+            <p style={{ fontSize: 12, fontWeight: 600, color: colors.danger, margin: '0 0 6px' }}>
+              This phone number is already registered to {phoneConflicts.length === 1 ? 'another customer' : `${phoneConflicts.length} other customers`} — possible duplicate identity:
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 }}>
+              {phoneConflicts.map((c) => (
+                <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11.5, color: colors.textPrimary }}>
+                  <span>
+                    <strong>{c.firstName} {c.lastName}</strong>
+                    {c.idNumber && <span style={{ fontFamily: 'monospace', color: colors.textSecondary }}> · {c.idNumber}</span>}
+                    {c.blacklisted && <span style={{ color: colors.danger, fontWeight: 700 }}> · BLACKLISTED</span>}
+                  </span>
+                  <a href={`/app/${c.customerType === 'casual' ? 'casual' : 'customers'}/${c.id}`} target="_blank" rel="noreferrer" style={{ fontSize: 11, textDecoration: 'underline', color: colors.textSecondary }}>
+                    View →
+                  </a>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <Btn size="sm" variant="primary" loading={loading} onClick={confirmDifferentPersonAndRetry}>Confirm — this is a different person</Btn>
+              <Btn size="sm" onClick={() => setPhoneConflicts(null)}>Cancel</Btn>
+            </div>
           </div>
         )}
 

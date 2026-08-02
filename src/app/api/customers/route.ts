@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
-import { createCustomer, searchCustomers, DuplicateCustomerError } from '@/lib/services/customerService'
+import { createCustomer, searchCustomers, DuplicateCustomerError, PhoneNumberConflictError } from '@/lib/services/customerService'
 import { CreateCustomerSchema } from '@/lib/schemas/customer'
 import logger from '@/lib/logger'
 
@@ -45,6 +45,9 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     if (err instanceof DuplicateCustomerError) {
       return NextResponse.json({ error: err.message, existingCustomerId: err.existingCustomerId }, { status: 409 })
+    }
+    if (err instanceof PhoneNumberConflictError) {
+      return NextResponse.json({ error: err.message, conflicts: err.conflicts }, { status: 409 })
     }
     logger.error({ err }, 'POST /api/customers failed')
     return NextResponse.json({ error: 'Failed to create customer' }, { status: 500 })
