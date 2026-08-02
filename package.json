@@ -17,7 +17,7 @@
     "electron": "electron .",
     "electron:dev": "concurrently \"next dev\" \"wait-on http://localhost:3000 && electron .\"",
     "build:desktop": "npx ts-node scripts/build-desktop-postgres.ts",
-    "electron:build": "npm run build:desktop && electron-builder",
+    "electron:build": "npm run build:desktop && electron-builder --publish=never",
     "build:desktop:sqlite": "npx ts-node scripts/build-desktop.ts",
     "package:local-server": "npx ts-node scripts/local-server/assemble.ts"
   },
