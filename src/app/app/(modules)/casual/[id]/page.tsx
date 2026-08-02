@@ -12,6 +12,7 @@ import { z } from 'zod'
 import { inp, lbl, HEADER_GRAD, NAVY, Btn, TabStrip, PortalPage } from '@/components/rpx'
 import { colors } from '@/lib/design-tokens'
 import { TransactionsTab } from '@/components/customers/TransactionsTab'
+import { DocumentsTab } from '@/components/customers/DocumentsTab'
 import { PhotoUploader, PhotoViewer } from '@/components/PhotoUploader'
 import { fetcher } from '@/lib/swrFetcher'
 
@@ -29,7 +30,7 @@ type Customer = {
 // tab strip inside an "Overview" wrapper tab; now they're just the first
 // two tabs alongside Transactions, since "Overview" never rendered
 // anything of its own beyond hosting them.
-const TABS = ['Personal', 'Notes', 'ID Photo', 'Transactions'] as const
+const TABS = ['Personal', 'Notes', 'ID Photo', 'Documents', 'Transactions'] as const
 
 // ─── Schema for casual customer edit ──────────────────────────────────────────
 const EditCasualSchema = z.object({
@@ -263,6 +264,8 @@ export default function CasualCustomerDetailPage() {
               </div>
             </div>
           )}
+
+          {tab === 'Documents' && <DocumentsTab customerId={id} />}
 
           {tab === 'Transactions' && <TransactionsTab customerId={id} />}
         </div>
