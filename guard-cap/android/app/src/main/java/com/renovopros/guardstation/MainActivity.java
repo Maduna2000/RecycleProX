@@ -13,35 +13,16 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         // Kiosk tablet stays plugged in and on-screen all shift — never let
-        // the OS dim/sleep it away from under a guard mid-entry.
+        // the OS dim/sleep it away from under a guard mid-entry. (The
+        // earlier attempt at hiding the status/nav bars via raw
+        // systemUiVisibility flags caused the WebView's viewport to render
+        // at a stale/incorrect size — half the screen blank, taps landing
+        // in the wrong place — on the actual tablet. Reverted rather than
+        // guessed at further since there's no device here to test against;
+        // revisit with WindowInsetsControllerCompat + proper edge-to-edge
+        // handling if true fullscreen is still wanted later.)
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        hideSystemBars();
         configureWebView();
-    }
-
-    // Immersive fullscreen — hides the status bar and navigation bar so the
-    // WebView owns the whole screen like a real kiosk, not a browser tab.
-    // "Sticky" so a swipe-in from the edge only shows them briefly before
-    // they auto-hide again, rather than staying revealed. Must be re-applied
-    // on every focus regain (system dialogs, app switches, etc. can bring
-    // the system bars back — this is standard Android immersive-mode
-    // behavior, not specific to this app).
-    private void hideSystemBars() {
-        View decorView = getWindow().getDecorView();
-        decorView.setSystemUiVisibility(
-            View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-            | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-            | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-            | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-            | View.SYSTEM_UI_FLAG_FULLSCREEN
-            | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-        );
-    }
-
-    @Override
-    public void onWindowFocusChanged(boolean hasFocus) {
-        super.onWindowFocusChanged(hasFocus);
-        if (hasFocus) hideSystemBars();
     }
 
     private void configureWebView() {
@@ -56,6 +37,12 @@ public class MainActivity extends BridgeActivity {
         // Huawei fix: allow mixed content & force hardware rendering
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
         webView.setLayerType(WebView.LAYER_TYPE_HARDWARE, null);
+
+        // No overscroll glow/bounce — on a kiosk tablet a mis-registered
+        // swipe near the top of the screen can otherwise look like (or
+        // trigger) a pull-to-refresh, which would explain a login attempt
+        // that visually "just refreshes and does nothing."
+        webView.setOverScrollMode(View.OVER_SCROLL_NEVER);
 
         // Viewport & zoom — prevents layout issues on tablets
         settings.setLoadWithOverviewMode(true);
