@@ -26,8 +26,29 @@ android {
         jvmTarget = '17'
     }
 
+    // Explicit, checked-in debug keystore (standard Android debug defaults:
+    // alias androiddebugkey, password "android") — without this, Gradle
+    // falls back to auto-generating ~/.android/debug.keystore on demand,
+    // which on GitHub Actions' ephemeral runners means a brand-new random
+    // signing key on every single build. Android refuses to install an
+    // update over an app signed with a different certificate (often
+    // failing silently or with a confusing error), so every CI-built APK
+    // was effectively unable to replace the previous one on a test device.
+    signingConfigs {
+        debug {
+            storeFile file('debug.keystore')
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+        }
         release {
+            signingConfig signingConfigs.debug
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
