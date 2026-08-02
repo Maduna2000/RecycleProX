@@ -12,13 +12,17 @@ import { UpdateCustomerSchema } from '@/lib/schemas/customer'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
 import logger from '@/lib/logger'
 
+// See src/app/api/customers/route.ts — same reasoning, a customer just
+// promoted/edited must never be served a cached (pre-update) response.
+export const dynamic = 'force-dynamic'
+
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
   try {
     const customer = await runWithRequestTenant(req, () => getCustomer(params.id))
-    return NextResponse.json(customer)
+    return NextResponse.json(customer, { headers: { 'Cache-Control': 'no-store, must-revalidate' } })
   } catch {
     return NextResponse.json({ error: 'Customer not found' }, { status: 404 })
   }

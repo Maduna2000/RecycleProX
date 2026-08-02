@@ -5,6 +5,13 @@ import { createCustomer, searchCustomers, DuplicateCustomerError, PhoneNumberCon
 import { CreateCustomerSchema } from '@/lib/schemas/customer'
 import logger from '@/lib/logger'
 
+// A customer promoted casual→account (or any other write here) must be
+// visible on the very next list/search request — never served a cached
+// response by Next.js or an upstream CDN (this repo deploys to both Vercel
+// and Netlify, whose Next.js runtime adapter caches GET routes more
+// aggressively than Vercel's by default).
+export const dynamic = 'force-dynamic'
+
 export async function GET(req: NextRequest) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
@@ -26,7 +33,7 @@ export async function GET(req: NextRequest) {
     page,
     limit,
   ))
-  return NextResponse.json(result)
+  return NextResponse.json(result, { headers: { 'Cache-Control': 'no-store, must-revalidate' } })
 }
 
 export async function POST(req: NextRequest) {
