@@ -5,7 +5,6 @@ import {
   updateCustomer,
   deleteCustomer,
   CustomerHasRecordsError,
-  NotEligibleForAccountError,
   ForbiddenError,
 } from '@/lib/services/customerService'
 import { UpdateCustomerSchema } from '@/lib/schemas/customer'
@@ -40,9 +39,6 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     )
     return NextResponse.json(customer)
   } catch (err) {
-    if (err instanceof NotEligibleForAccountError) {
-      return NextResponse.json({ error: err.message }, { status: 422 })
-    }
     if (err instanceof ForbiddenError) {
       return NextResponse.json({ error: err.message }, { status: 403 })
     }

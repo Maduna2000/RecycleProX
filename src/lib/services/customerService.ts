@@ -24,18 +24,8 @@ export class ForbiddenError extends Error {
   constructor(msg = 'Forbidden') { super(msg); this.name = 'ForbiddenError' }
 }
 
-/** A casual customer must be a regular before they can hold an account. */
+/** A casual customer must be a regular before they're silently auto-promoted. */
 export const MIN_PURCHASES_FOR_ACCOUNT = 5
-
-export class NotEligibleForAccountError extends Error {
-  constructor(completedPurchases: number) {
-    super(
-      `Customer has ${completedPurchases} completed purchase${completedPurchases === 1 ? '' : 's'} — ` +
-      `more than ${MIN_PURCHASES_FOR_ACCOUNT} are required before they can become an account holder`
-    )
-    this.name = 'NotEligibleForAccountError'
-  }
-}
 
 // ─── Service ──────────────────────────────────────────────────────────────────
 
@@ -102,8 +92,12 @@ export async function quickCreate(data: QuickCreateInput, userId: string) {
     if (existing) return existing
   }
 
+  // A walk-in casual saved this way (e.g. from the Scale Station) both
+  // sells material to us and may later buy from us — 'both', not the
+  // manual-create form's 'supplier'-leaning default, since the system has
+  // no actual signal yet about which way this person transacts.
   const customer = await prisma.customer.create({
-    data: { ...data, tenantId, idNumber: data.idNumber ?? null, customerType: 'casual', createdByUserId: userId },
+    data: { ...data, tenantId, idNumber: data.idNumber ?? null, customerType: 'casual', primaryFunction: 'both', createdByUserId: userId },
   })
   logger.info({ customerId: customer.id, userId }, 'Customer quick-created')
   return customer
@@ -117,17 +111,11 @@ export async function updateCustomer(id: string, data: UpdateCustomerInput, user
 
   const isPromotion = data.customerType === 'account' && current.customerType === 'casual'
 
-  // Regulars only: a casual must have brought in more than
-  // MIN_PURCHASES_FOR_ACCOUNT completed purchases before they can hold an
-  // account.
-  if (isPromotion) {
-    const completedPurchases = await prisma.purchase.count({
-      where: { customerId: id, status: 'completed' },
-    })
-    if (completedPurchases <= MIN_PURCHASES_FOR_ACCOUNT) {
-      throw new NotEligibleForAccountError(completedPurchases)
-    }
-  }
+  // The MIN_PURCHASES_FOR_ACCOUNT threshold only gates the silent
+  // auto-promotion in autoPromoteCasualIfEligible below (which checks it
+  // itself before calling this function) — a manual promotion here is a
+  // deliberate staff/admin action and must be allowed at any time,
+  // regardless of purchase history.
 
   // Dealer tiers are assigned by admins only — changing an existing
   // category to dealer_1/2/3 is never part of a routine edit or promotion.

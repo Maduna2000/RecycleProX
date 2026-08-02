@@ -448,7 +448,6 @@ function PromoteToAccountModal({ customerId, customerName, onClose, onSuccess }:
             Promoting <strong style={{ color: colors.textPrimary }}>{customerName}</strong> to an account customer. An account code will be auto-assigned.
           </p>
           <p style={{ fontSize: 12.5, color: colors.textSecondary, margin: '0 0 12px' }}>
-            Only regulars qualify — the customer must have <strong style={{ color: colors.textPrimary }}>more than 5 completed purchases</strong>.
             They will stay in the <strong style={{ color: colors.textPrimary }}>Casual</strong> dealer category; only an admin can assign a dealer category afterwards.
           </p>
 
