@@ -45,8 +45,13 @@ function main() {
   console.log('--- 2/6: next build ---')
   run('npx', ['next', 'build'])
 
-  console.log('--- 3/6: resetting the dist/local-server output folder ---')
-  fs.rmSync(DIST, { recursive: true, force: true })
+  console.log('--- 3/6: resetting the standalone build output ---')
+  // Only standalone/ — never the whole DIST folder. local-server.env lives
+  // as a DIST sibling and is operator-maintained, filled in by hand after
+  // copying from local-server.env.example; it's not build output and must
+  // survive a rebuild, unlike everything under standalone/ which really is
+  // regenerated fresh every time.
+  fs.rmSync(STANDALONE_DIR, { recursive: true, force: true })
   fs.mkdirSync(STANDALONE_DIR, { recursive: true })
 
   console.log('--- 4/6: copying the standalone server + assets not auto-traced by Next.js ---')
