@@ -10,6 +10,17 @@ import type { NextAuthConfig } from 'next-auth'
 export const authConfig: NextAuthConfig = {
   providers: [],   // Credentials provider is added in auth.ts (Node runtime only)
 
+  // Vercel deployments are auto-trusted by NextAuth regardless, but any
+  // self-hosted instance (Electron's local hardware-bridge server, and
+  // scripts/local-server/, both bound to 127.0.0.1) is not — without this,
+  // auth() throws UntrustedHost internally and returns a malformed session
+  // (truthy but with session.user undefined) instead of cleanly returning
+  // null, crashing every route that does `if (!session) ... else session.user.role`.
+  // Safe here specifically because both self-hosted modes bind to loopback
+  // only and still require a real login — this isn't opening the host check
+  // up to the public internet.
+  trustHost: true,
+
   callbacks: {
     jwt({ token, user, trigger, session }) {
       // Client-initiated session update (useSession().update(...) from the
