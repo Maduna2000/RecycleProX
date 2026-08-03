@@ -5,6 +5,7 @@ import { Dialog } from '@/components/ui/dialog'
 import { Printer, FileText, CheckCircle2, Plus, ExternalLink, Download } from 'lucide-react'
 import { toast } from 'sonner'
 import { Btn, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
+import { canAutoPrint, autoPrintReceipt } from '@/lib/print/autoPrintClient'
 
 interface PrintResultModalProps {
   type:            'purchase' | 'sale'
@@ -20,7 +21,7 @@ export function PrintResultModal({ type, id, refNumber, onClose, onViewPurchase,
   const vat264Url  = `/api/purchases/${id}/vat264`
   const label      = type === 'purchase' ? 'Purchase' : 'Sale'
   const [printing, setPrinting] = useState(false)
-  const isElectron = typeof window !== 'undefined' && window.electronAPI?.isElectron
+  const showDirectPrint = typeof window !== 'undefined' && canAutoPrint()
 
   function openPdf(url: string) { window.open(url, '_blank') }
 
@@ -38,11 +39,9 @@ export function PrintResultModal({ type, id, refNumber, onClose, onViewPurchase,
   }
 
   async function printDirect() {
-    if (!window.electronAPI) return
     setPrinting(true)
     try {
-      await window.electronAPI.printSlip({ type, id })
-      await window.electronAPI.openCashDrawer()
+      await autoPrintReceipt({ type, id })
       toast.success('Receipt printed')
     } catch {
       toast.error('Print failed — check printer connection')
@@ -74,8 +73,8 @@ export function PrintResultModal({ type, id, refNumber, onClose, onViewPurchase,
 
           {/* Print / download actions */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-            {/* Direct print button - shown only in Electron desktop app */}
-            {isElectron && (
+            {/* Direct print button - shown in the Electron desktop app or a PWA served from the local-server deployment */}
+            {showDirectPrint && (
               <Btn icon={Printer} loading={printing} onClick={printDirect} style={{ width: '100%', justifyContent: 'center' }}>
                 {printing ? 'Printing...' : 'Print Receipt'}
               </Btn>

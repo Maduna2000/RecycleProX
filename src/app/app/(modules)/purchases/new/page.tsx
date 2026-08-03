@@ -17,6 +17,7 @@ import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { useOfflineMutation } from '@/hooks/useOfflineFetch'
 import { offlineDB } from '@/lib/offline/db'
 import { fetcher } from '@/lib/swrFetcher'
+import { canAutoPrint, autoPrintReceipt } from '@/lib/print/autoPrintClient'
 
 
 type Product = {
@@ -501,9 +502,10 @@ export default function NewPurchasePage() {
           toast.success(`Purchase saved offline as unpaid — will sync when connected`)
         } else {
           toast.success('Purchase saved offline — will sync when connected')
-          // Auto-print in Electron desktop app, same as the online path —
-          // built from data already in hand since there's no server id yet.
-          if (window.electronAPI?.isElectron) {
+          // Auto-print in Electron desktop app / local-server PWA, same as
+          // the online path — built from data already in hand since there's
+          // no server id yet.
+          if (canAutoPrint()) {
             try {
               const receiptLines = validLines.map((l) => ({
                 productName: products.find((p) => p.id === l.productId)?.name ?? l.productId,
@@ -511,7 +513,7 @@ export default function NewPurchasePage() {
                 unitPrice: l.unitPrice,
                 lineTotal: new Decimal(l.quantity || '0').times(l.unitPrice || '0').toFixed(2),
               }))
-              await window.electronAPI.printSlip({
+              await autoPrintReceipt({
                 type: 'purchase',
                 data: {
                   refNumber: offlineRefNumber,
@@ -524,7 +526,6 @@ export default function NewPurchasePage() {
                   createdAt: new Date().toISOString(),
                 },
               })
-              await window.electronAPI.openCashDrawer()
             } catch {
               toast.error('Offline print failed — receipt will be available once synced')
             }
@@ -559,11 +560,10 @@ export default function NewPurchasePage() {
           mutatePending()
           toast.success(`Purchase ${purchase.refNumber} saved as unpaid`)
         } else {
-          // Auto-print in Electron desktop app
-          if (window.electronAPI?.isElectron) {
+          // Auto-print in Electron desktop app / local-server PWA
+          if (canAutoPrint()) {
             try {
-              await window.electronAPI.printSlip({ type: 'purchase', id: purchase.id })
-              await window.electronAPI.openCashDrawer()
+              await autoPrintReceipt({ type: 'purchase', id: purchase.id })
               toast.success(`Receipt printed: ${purchase.refNumber}`)
               router.push('/app/dashboard')
             } catch {

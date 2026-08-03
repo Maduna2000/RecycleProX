@@ -19,6 +19,7 @@ import { Btn, HEADER_GRAD, RpxDialogContent, RpxDialogHeader, RpxDialogBody, Rpx
 import { useOfflineMutation } from '@/hooks/useOfflineFetch'
 import { offlineDB } from '@/lib/offline/db'
 import { fetcher } from '@/lib/swrFetcher'
+import { canAutoPrint, autoPrintReceipt } from '@/lib/print/autoPrintClient'
 
 
 type Product = {
@@ -439,7 +440,7 @@ export default function NewSalePage() {
           toast.success('Sale saved offline as unpaid — will sync when connected')
         } else {
           toast.success('Sale saved offline — will sync when connected')
-          if (window.electronAPI?.isElectron) {
+          if (canAutoPrint()) {
             try {
               const receiptLines = validLines.map((l) => ({
                 productName: products.find((p) => p.id === l.productId)?.name ?? l.productId,
@@ -447,7 +448,7 @@ export default function NewSalePage() {
                 unitPrice: l.unitPrice,
                 lineTotal: new Decimal(l.quantity || '0').times(l.unitPrice || '0').toFixed(2),
               }))
-              await window.electronAPI.printSlip({
+              await autoPrintReceipt({
                 type: 'sale',
                 data: {
                   refNumber: offlineRefNumber,
@@ -460,7 +461,6 @@ export default function NewSalePage() {
                   createdAt: new Date().toISOString(),
                 },
               })
-              await window.electronAPI.openCashDrawer()
             } catch {
               toast.error('Offline print failed — receipt will be available once synced')
             }
@@ -492,10 +492,9 @@ export default function NewSalePage() {
         if (isPending) {
           toast.success(`Sale ${sale.refNumber} saved as unpaid`)
           router.push('/app/sales/unpaid')
-        } else if (window.electronAPI?.isElectron) {
+        } else if (canAutoPrint()) {
           try {
-            await window.electronAPI.printSlip({ type: 'sale', id: sale.id })
-            await window.electronAPI.openCashDrawer()
+            await autoPrintReceipt({ type: 'sale', id: sale.id })
             toast.success(`Receipt printed: ${sale.refNumber}`)
             router.push('/app/dashboard')
           } catch {
