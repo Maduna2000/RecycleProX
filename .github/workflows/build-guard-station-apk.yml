@@ -39,18 +39,22 @@ jobs:
         working-directory: guard-station/android
         run: chmod +x gradlew
 
-      # Debug build, signed with the checked-in debug.keystore (standard
-      # Android debug defaults — never a security boundary) rather than
-      # Gradle's own auto-generated one. GitHub Actions runners are
-      # ephemeral, so without a fixed keystore every build gets a brand-new
-      # random signing key, and Android refuses to install an update over an
-      # app signed with a different certificate — this is exactly the bug
-      # that made the equivalent guard-cap CI builds appear to do nothing
-      # (see commit 855e1e0). Pinning it here from the start avoids repeating
-      # that.
-      - name: Build debug APK
+      # Release build, NOT debug — a React Native/Expo debug build
+      # deliberately does not embed the JS bundle (it expects a live Metro
+      # dev server reachable from the device); sideloaded standalone on a
+      # tablet with no Metro server in reach, it has no JS to run at all and
+      # sits on the native splash screen forever. Release embeds the JS
+      # bundle self-contained, matching mobile/'s (Scale Station's) own
+      # build-android.yml. Still signed with the checked-in debug.keystore
+      # (standard Android debug defaults — never a security boundary) via
+      # guard-station/android/app/build.gradle's release signingConfig, for
+      # the same reason as guard-cap's commit 855e1e0: GitHub Actions
+      # runners are ephemeral, so without a fixed keystore every build gets
+      # a brand-new random signing key, and Android refuses to install an
+      # update over an app signed with a different certificate.
+      - name: Build release APK
         working-directory: guard-station/android
-        run: ./gradlew assembleDebug --no-daemon
+        run: ./gradlew assembleRelease --no-daemon
         env:
           GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx3072m -XX:MaxMetaspaceSize=512m"
 
@@ -58,6 +62,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: GuardStation-${{ github.sha }}.apk
-          path: guard-station/android/app/build/outputs/apk/debug/app-debug.apk
+          path: guard-station/android/app/build/outputs/apk/release/app-release.apk
           retention-days: 14
           if-no-files-found: error
