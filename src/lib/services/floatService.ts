@@ -203,7 +203,7 @@ export async function addFloatMovement(
   })
   if (todaysCashUp && (todaysCashUp.status === 'submitted' || todaysCashUp.status === 'approved')) {
     throw new FloatMovementLockedError(
-      "Today's cash-up has already been submitted — this cannot be added until tomorrow's session opens"
+      "This session's cash-up has already been submitted — open a new session (e.g. for the next shift) before adding more float"
     )
   }
 
