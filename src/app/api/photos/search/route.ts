@@ -57,6 +57,7 @@ export async function GET(req: NextRequest) {
           { signatureR2Key: { not: null } },
           { vat264R2Key:    { not: null } },
           { photoR2Keys:    { isEmpty: false } },
+          { scaleOrder: { photoR2Keys: { isEmpty: false } } },
         ],
         status: { not: 'voided' },
       }
@@ -79,7 +80,8 @@ export async function GET(req: NextRequest) {
       const purchases = await prisma.purchase.findMany({
         where: purchaseWhere,
         include: {
-          customer: { select: { id: true, firstName: true, lastName: true, idNumber: true } },
+          customer:   { select: { id: true, firstName: true, lastName: true, idNumber: true } },
+          scaleOrder: { select: { photoR2Keys: true } },
         },
         orderBy: { createdAt: 'desc' },
         take: pageSize * 4,
@@ -108,7 +110,13 @@ export async function GET(req: NextRequest) {
             customer: p.customer ? { ...p.customer, idNumber: p.customer.idNumber ?? '' } : undefined,
           })
         }
-        for (const key of (p.photoR2Keys ?? [])) {
+        // Product photos: the purchase's own uploads, plus (deduped) whatever
+        // was taken at the scale station for the order this purchase was
+        // weighed from — that's the actual proof-of-match for what got
+        // bought, so it belongs in the purchase's photo set, not off on its
+        // own under Weighbridge.
+        const productPhotoKeys = Array.from(new Set([...(p.photoR2Keys ?? []), ...(p.scaleOrder?.photoR2Keys ?? [])]))
+        for (const key of productPhotoKeys) {
           records.push({
             type: 'purchase_photo',
             transactionId: p.id,
@@ -208,43 +216,45 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // ── Casual ID photos ───────────────────────────────────────────────────────
+    // ── ID photos (account + casual) ──────────────────────────────────────────
+    // Sourced from the customer profile's Documents tab (CustomerDocument,
+    // documentType 'id_copy') — the same source of truth as the Account/Casual
+    // ID Upload Status reports — not the older idPhotoR2Key field.
     if (!type || type === 'casual') {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const customerWhere: any = {
-        idPhotoR2Key: { not: null },
-        ...(customerId && { id: customerId }),
+      const docWhere: any = {
+        documentType: 'id_copy',
+        ...(customerId && { customerId }),
       }
 
       if (search) {
-        customerWhere.OR = [
-          { firstName: { contains: search, mode: 'insensitive' } },
-          { lastName:  { contains: search, mode: 'insensitive' } },
-          { idNumber:  { contains: search, mode: 'insensitive' } },
-        ]
+        docWhere.customer = {
+          OR: [
+            { firstName: { contains: search, mode: 'insensitive' } },
+            { lastName:  { contains: search, mode: 'insensitive' } },
+            { idNumber:  { contains: search, mode: 'insensitive' } },
+          ],
+        }
       }
 
-      const customers = await prisma.customer.findMany({
-        where: customerWhere,
-        select: {
-          id: true, firstName: true, lastName: true,
-          idNumber: true, idPhotoR2Key: true, createdAt: true,
+      const idDocs = await prisma.customerDocument.findMany({
+        where: docWhere,
+        include: {
+          customer: { select: { id: true, firstName: true, lastName: true, idNumber: true } },
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { uploadedAt: 'desc' },
         take: pageSize * 2,
       })
 
-      for (const c of customers) {
-        if (c.idPhotoR2Key) {
-          records.push({
-            type: 'casual_id',
-            transactionId: c.id,
-            r2Key: c.idPhotoR2Key,
-            viewUrl: await getViewUrl(c.idPhotoR2Key),
-            createdAt: c.createdAt.toISOString(),
-            customer: { id: c.id, firstName: c.firstName, lastName: c.lastName, idNumber: c.idNumber ?? '' },
-          })
-        }
+      for (const d of idDocs) {
+        records.push({
+          type: 'casual_id',
+          transactionId: d.customerId,
+          r2Key: d.r2Key,
+          viewUrl: await getViewUrl(d.r2Key),
+          createdAt: d.uploadedAt.toISOString(),
+          customer: { id: d.customer.id, firstName: d.customer.firstName, lastName: d.customer.lastName, idNumber: d.customer.idNumber ?? '' },
+        })
       }
     }
 
