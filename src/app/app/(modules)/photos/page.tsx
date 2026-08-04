@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import useSWR from 'swr'
 import { Dialog } from '@/components/ui/dialog'
 import { fetcher } from '@/lib/swrFetcher'
@@ -42,7 +42,7 @@ const TABS = [
 
 const EMPTY_MESSAGES: Record<string, string> = {
   all:          'No photos or documents found',
-  purchase:     'No purchase signatures or VAT264 documents',
+  purchase:     'No purchase product photos, signatures, or VAT264 documents',
   sale:         'No sale photos',
   weighbridge:  'No weighbridge photos',
   casual:       'No ID photos',
@@ -270,21 +270,29 @@ function PhotoGrid({
     { keepPreviousData: true }
   )
 
-  const photos    = data?.photos    ?? []
+  const photos    = useMemo(() => data?.photos ?? [], [data])
   const pageCount = data?.pageCount ?? 1
   const total     = data?.total     ?? 0
+
+  // Photos from the same transaction as the one currently open — prev/next
+  // steps through the other photos on that purchase/sale/etc, not the whole
+  // (unrelated) filtered grid.
+  const relatedPhotos = useMemo(
+    () => (viewer ? photos.filter((p) => p.transactionId === viewer.transactionId) : []),
+    [viewer, photos]
+  )
 
   // Keyboard navigation in viewer
   useEffect(() => {
     if (!viewer) return
     function onKey(e: KeyboardEvent) {
-      const idx = photos.findIndex((p) => p.r2Key === viewer!.r2Key)
-      if (e.key === 'ArrowRight' && idx < photos.length - 1) setViewer(photos[idx + 1]!)
-      if (e.key === 'ArrowLeft'  && idx > 0)                 setViewer(photos[idx - 1]!)
+      const idx = relatedPhotos.findIndex((p) => p.r2Key === viewer!.r2Key)
+      if (e.key === 'ArrowRight' && idx < relatedPhotos.length - 1) setViewer(relatedPhotos[idx + 1]!)
+      if (e.key === 'ArrowLeft'  && idx > 0)                        setViewer(relatedPhotos[idx - 1]!)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [viewer, photos])
+  }, [viewer, relatedPhotos])
 
   function clearFilters() {
     setSearch(''); setFrom(''); setTo(''); setPage(1)
@@ -293,9 +301,9 @@ function PhotoGrid({
   const hasFilters = !!(search || from || to)
   const emptyMsg   = EMPTY_MESSAGES[queryType ?? 'all'] ?? 'No photos found'
 
-  const viewerIdx  = viewer ? photos.findIndex((p) => p.r2Key === viewer.r2Key) : -1
-  const onPrev     = viewerIdx > 0                 ? () => setViewer(photos[viewerIdx - 1]!) : null
-  const onNext     = viewerIdx < photos.length - 1 ? () => setViewer(photos[viewerIdx + 1]!) : null
+  const viewerIdx  = viewer ? relatedPhotos.findIndex((p) => p.r2Key === viewer.r2Key) : -1
+  const onPrev     = viewerIdx > 0                        ? () => setViewer(relatedPhotos[viewerIdx - 1]!) : null
+  const onNext     = viewerIdx < relatedPhotos.length - 1 ? () => setViewer(relatedPhotos[viewerIdx + 1]!) : null
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -389,7 +397,7 @@ function PhotoGrid({
       {viewer && (
         <ViewerDialog
           viewer={viewer}
-          photos={photos}
+          photos={relatedPhotos}
           onClose={() => setViewer(null)}
           onPrev={onPrev}
           onNext={onNext}
