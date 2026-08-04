@@ -233,6 +233,72 @@ export async function buildAccountIdUploadStatus(
   }
 }
 
+/**
+ * Casual (walk-in) sellers as at the "to" date, with whether an "ID"
+ * document has been uploaded via the customer profile's Documents tab
+ * (CustomerDocument, documentType 'id_copy') — same rule as the account
+ * version, deliberately not counting the older idPhotoR2Key field.
+ */
+export async function buildCasualIdUploadStatus(
+  params: BaseReportParams,
+  meta: MetaBase
+): Promise<ReportDocument> {
+  const { end } = getRangeBoundsSAST(params.from, params.to)
+
+  const customers = await prisma.customer.findMany({
+    where: { customerType: 'casual', createdAt: { lte: end } },
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      idNumber: true,
+      phone: true,
+    },
+    orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+  })
+
+  const customerIds = customers.map((c) => c.id)
+  const idDocs = customerIds.length > 0
+    ? await prisma.customerDocument.findMany({
+        where: { customerId: { in: customerIds }, documentType: 'id_copy' },
+        select: { customerId: true },
+      })
+    : []
+  const hasIdDocument = new Set(idDocs.map((d) => d.customerId))
+
+  const rows: ReportRow[] = customers.map((c) => ({
+    cells: {
+      name: `${c.firstName} ${c.lastName}`,
+      idNumber: c.idNumber ?? null,
+      phone: c.phone ?? null,
+      idUploaded: hasIdDocument.has(c.id) ? 'Yes' : 'No',
+    },
+  }))
+
+  const uploadedCount = rows.filter((r) => r.cells.idUploaded === 'Yes').length
+  const missingCount = rows.length - uploadedCount
+
+  return {
+    reportId: 'casual-id-status',
+    title: 'Casual ID Upload Status',
+    subtitle: `As at ${params.to}`,
+    params: { from: params.from, to: params.to },
+    columns: [
+      { key: 'name', label: 'Name', width: 0.32, format: 'text', excelWidth: 24 },
+      { key: 'idNumber', label: 'ID Number', width: 0.24, format: 'text', excelWidth: 18 },
+      { key: 'phone', label: 'Phone', width: 0.2, format: 'text', excelWidth: 16 },
+      { key: 'idUploaded', label: 'ID Uploaded', width: 0.24, align: 'center', format: 'text', excelWidth: 12 },
+    ],
+    groups: [{ level: 0, label: 'CASUAL SELLERS', rows }],
+    summary: [
+      { label: 'Total casual sellers', value: String(rows.length) },
+      { label: 'ID uploaded', value: String(uploadedCount) },
+      { label: 'ID missing', value: String(missingCount), emphasis: missingCount > 0 },
+    ],
+    meta: { ...meta, rowCount: rows.length },
+  }
+}
+
 /** Casual (walk-in) sellers as at the "to" date. */
 export async function buildCasualList(
   params: BaseReportParams,

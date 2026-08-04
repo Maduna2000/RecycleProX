@@ -314,6 +314,14 @@ export const REPORT_CATALOG: ReportCatalogEntry[] = [
     area: 'accounts',
     filters: [],
   },
+  {
+    id: 'casual-id-status',
+    label: 'Casual ID Upload Status',
+    description:
+      'Every casual (walk-in) seller as at the selected date, with Yes/No showing whether an ID photo or document is on file.',
+    area: 'accounts',
+    filters: [],
+  },
   // ── Purchases: seller lookups ──────────────────────────────────────────────
   {
     id: 'purchases-by-casual-id',
