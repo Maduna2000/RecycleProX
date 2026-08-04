@@ -13,6 +13,8 @@
  * history (see prisma/seed.ts's npm script and its `ts-node` config block).
  */
 import { execFileSync } from 'node:child_process'
+import fs from 'node:fs'
+import path from 'node:path'
 
 // process.cwd() rather than __dirname — this file runs under Node's native
 // TS type-stripping in some environments (Node 22+), which executes it as
@@ -31,19 +33,44 @@ function run(command: string, args: string[], extraEnv: Record<string, string> =
   })
 }
 
+/** Recursive copy that skips a source that doesn't exist, rather than throwing. */
+function copyIfExists(src: string, dest: string) {
+  if (!fs.existsSync(src)) {
+    console.log(`  (skip — not found) ${src}`)
+    return
+  }
+  fs.mkdirSync(path.dirname(dest), { recursive: true })
+  fs.cpSync(src, dest, { recursive: true })
+  console.log(`  copied ${path.relative(ROOT, src)} -> ${path.relative(ROOT, dest)}`)
+}
+
 function main() {
   console.log('--- 1/4: generating SQLite schema targeting the default client path ---')
   run('npx', ['ts-node', 'scripts/generate-sqlite-schema.ts'], { DESKTOP_CLIENT_TARGET: 'default' })
   run('npx', ['prisma', 'generate', '--schema=prisma/sqlite/schema.prisma'])
 
-  console.log('--- 2/4: next build (bakes the SQLite client into .next/standalone) ---')
+  console.log('--- 2/5: next build (bakes the SQLite client into .next/standalone) ---')
   run('npx', ['next', 'build'])
 
-  console.log('--- 3/4: restoring the distinct sqlite-client path for normal dev ---')
+  console.log('--- 3/5: copying static assets Next.js standalone output does not include ---')
+  // Next.js's own docs call this out explicitly: `output: 'standalone'`
+  // traces server-side dependencies but does NOT copy .next/static or
+  // public/ into .next/standalone — the server that runs from there won't
+  // find them unless something copies them in first. Without this step the
+  // packaged app's server.js looks for static assets at
+  // .next/standalone/.next/static (relative to itself), which never
+  // exists — every CSS/JS request 404s silently and the app renders as
+  // unstyled raw HTML. Mirrors scripts/local-server/assemble.ts's identical
+  // copy step for the other standalone deployment target.
+  const standaloneDir = path.join(ROOT, '.next', 'standalone')
+  copyIfExists(path.join(ROOT, '.next', 'static'), path.join(standaloneDir, '.next', 'static'))
+  copyIfExists(path.join(ROOT, 'public'), path.join(standaloneDir, 'public'))
+
+  console.log('--- 4/5: restoring the distinct sqlite-client path for normal dev ---')
   run('npx', ['ts-node', 'scripts/generate-sqlite-schema.ts'])
   run('npx', ['prisma', 'generate', '--schema=prisma/sqlite/schema.prisma'])
 
-  console.log('--- 4/4: restoring the default Postgres client Web dev/build expects ---')
+  console.log('--- 5/5: restoring the default Postgres client Web dev/build expects ---')
   run('npx', ['prisma', 'generate'])
 
   console.log('Desktop build ready — run electron-builder next.')
