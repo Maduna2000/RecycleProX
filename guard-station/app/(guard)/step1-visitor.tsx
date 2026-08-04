@@ -10,9 +10,10 @@ import { useEntryStore } from '@/stores/entryStore';
 import { lookupCustomer, getRepeatVisitInfo, type RepeatVisitInfo } from '@/services/gateService';
 import { StepProgressBar } from '@/components/StepProgressBar';
 import { OfflineBanner } from '@/components/OfflineBanner';
+import { stepLabelsFor } from '@/constants/steps';
 import { COLORS } from '@/constants/theme';
 
-const STEPS = ['Visitor', 'Purpose', 'Vehicle', 'Photos', 'Review'];
+const STEPS = stepLabelsFor(null);
 
 export default function Step1Visitor() {
   const { setVisitor } = useEntryStore();

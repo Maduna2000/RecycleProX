@@ -7,15 +7,14 @@ import { Truck } from 'lucide-react-native';
 import { useEntryStore } from '@/stores/entryStore';
 import { StepProgressBar } from '@/components/StepProgressBar';
 import { OfflineBanner } from '@/components/OfflineBanner';
+import { StepBackButton } from '@/components/StepBackButton';
+import { stepLabelsFor, routeForDisplayStep } from '@/constants/steps';
 import { COLORS } from '@/constants/theme';
 
-const STEPS_SELL = ['Visitor', 'Purpose', 'Category', 'Vehicle', 'Photos', 'Review'];
-const STEPS_OTHER = ['Visitor', 'Purpose', 'Vehicle', 'Photos', 'Review'];
-
 export default function Step4Vehicle() {
-  const { purpose, setVehicleReg } = useEntryStore();
-  const [reg, setReg] = useState('');
-  const steps = purpose === 'sell' ? STEPS_SELL : STEPS_OTHER;
+  const { purpose, vehicleReg: savedReg, setVehicleReg } = useEntryStore();
+  const [reg, setReg] = useState(savedReg);
+  const steps = stepLabelsFor(purpose);
   const currentStep = purpose === 'sell' ? 4 : 3;
 
   function handleNext() {
@@ -26,8 +25,13 @@ export default function Step4Vehicle() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StepProgressBar currentStep={currentStep} steps={steps} />
+      <StepProgressBar
+        currentStep={currentStep}
+        steps={steps}
+        onStepPress={(step) => router.dismissTo(routeForDisplayStep(step, purpose))}
+      />
       <OfflineBanner />
+      <StepBackButton />
       <View style={styles.body}>
         <View style={styles.iconCircle}>
           <Truck color={COLORS.blue} size={32} />
