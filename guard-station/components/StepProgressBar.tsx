@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, TouchableOpacity } from 'react-native';
 import { COLORS } from '@/constants/theme';
 
 type StepProgressBarProps = {
@@ -8,10 +8,14 @@ type StepProgressBarProps = {
   // varies by purpose — 'sell' shows Category, other purposes skip it (see
   // entryStore's displaySteps, mirroring gate/page.tsx's displayStepIndex
   // mapping on the web) — so the label set is passed in, not hardcoded here.
-  steps: string[];
+  steps: readonly string[];
+  // Only completed steps (step < currentStep) are tappable — jumping ahead
+  // to an unfilled step would leave required fields for the skipped steps
+  // unset, and the in-progress step itself is where the guard already is.
+  onStepPress?: (step: number) => void;
 };
 
-export function StepProgressBar({ currentStep, steps }: StepProgressBarProps) {
+export function StepProgressBar({ currentStep, steps, onStepPress }: StepProgressBarProps) {
   return (
     <View
       style={{
@@ -30,7 +34,12 @@ export function StepProgressBar({ currentStep, steps }: StepProgressBarProps) {
 
         return (
           <React.Fragment key={step}>
-            <View style={{ alignItems: 'center', flex: 1 }}>
+            <TouchableOpacity
+              style={{ alignItems: 'center', flex: 1 }}
+              disabled={!isCompleted || !onStepPress}
+              onPress={() => onStepPress?.(step)}
+              hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+            >
               <View
                 style={{
                   width: 28,
@@ -76,7 +85,7 @@ export function StepProgressBar({ currentStep, steps }: StepProgressBarProps) {
               >
                 {label}
               </Text>
-            </View>
+            </TouchableOpacity>
             {index < steps.length - 1 && (
               <View
                 style={{

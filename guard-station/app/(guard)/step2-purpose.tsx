@@ -8,9 +8,11 @@ import { useEntryStore } from '@/stores/entryStore';
 import { getPurposeConfig, type Purpose } from '@/services/gateService';
 import { StepProgressBar } from '@/components/StepProgressBar';
 import { OfflineBanner } from '@/components/OfflineBanner';
+import { StepBackButton } from '@/components/StepBackButton';
+import { stepLabelsFor, routeForDisplayStep } from '@/constants/steps';
 import { COLORS } from '@/constants/theme';
 
-const STEPS = ['Visitor', 'Purpose', 'Vehicle', 'Photos', 'Review'];
+const STEPS = stepLabelsFor(null);
 
 const DEFAULT_CONFIG = { requireIdPhoto: false, requireVehiclePhoto: true };
 
@@ -42,8 +44,13 @@ export default function Step2Purpose() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StepProgressBar currentStep={2} steps={STEPS} />
+      <StepProgressBar
+        currentStep={2}
+        steps={STEPS}
+        onStepPress={(step) => router.dismissTo(routeForDisplayStep(step, null))}
+      />
       <OfflineBanner />
+      <StepBackButton />
       <View style={styles.body}>
         <View style={styles.header}>
           <Text style={styles.title}>Reason for Entry</Text>

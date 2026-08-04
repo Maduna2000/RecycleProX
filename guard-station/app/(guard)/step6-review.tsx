@@ -8,10 +8,9 @@ import { useEntryStore } from '@/stores/entryStore';
 import { createGateEntry, type Purpose } from '@/services/gateService';
 import { StepProgressBar } from '@/components/StepProgressBar';
 import { OfflineBanner } from '@/components/OfflineBanner';
+import { StepBackButton } from '@/components/StepBackButton';
+import { stepLabelsFor, routeForDisplayStep } from '@/constants/steps';
 import { COLORS } from '@/constants/theme';
-
-const STEPS_SELL = ['Visitor', 'Purpose', 'Category', 'Vehicle', 'Photos', 'Review'];
-const STEPS_OTHER = ['Visitor', 'Purpose', 'Vehicle', 'Photos', 'Review'];
 
 const PURPOSE_LABELS: Record<Purpose, string> = {
   sell: 'To Sell', buy: 'To Buy', visitor: 'Visitor', other: 'Other',
@@ -25,7 +24,7 @@ export default function Step6Review() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const steps = purpose === 'sell' ? STEPS_SELL : STEPS_OTHER;
+  const steps = stepLabelsFor(purpose);
   const currentStep = steps.length;
 
   async function handleSubmit() {
@@ -65,8 +64,13 @@ export default function Step6Review() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StepProgressBar currentStep={currentStep} steps={steps} />
+      <StepProgressBar
+        currentStep={currentStep}
+        steps={steps}
+        onStepPress={(step) => router.dismissTo(routeForDisplayStep(step, purpose))}
+      />
       <OfflineBanner />
+      <StepBackButton />
       <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
         <View style={styles.header}>
           <View style={styles.headerRow}>

@@ -12,21 +12,31 @@ import { useEntryStore } from '@/stores/entryStore';
 import { uploadGatePhoto } from '@/services/gateService';
 import { StepProgressBar } from '@/components/StepProgressBar';
 import { OfflineBanner } from '@/components/OfflineBanner';
+import { StepBackButton } from '@/components/StepBackButton';
+import { stepLabelsFor, routeForDisplayStep } from '@/constants/steps';
 import { COLORS } from '@/constants/theme';
-
-const STEPS_SELL = ['Visitor', 'Purpose', 'Category', 'Vehicle', 'Photos', 'Review'];
-const STEPS_OTHER = ['Visitor', 'Purpose', 'Vehicle', 'Photos', 'Review'];
 
 type Slot = { uri: string; r2Key: string } | null;
 
+// Already-uploaded photos (R2 keys, from a previous pass through this step)
+// have no local file URI to re-display — only that the slot is done. A
+// generic "uploaded" placeholder avoids re-uploading (and re-capturing) a
+// photo that's already on the entry just because the guard tapped back.
+const UPLOADED_SLOT_URI = 'uploaded';
+
 export default function Step5Photos() {
-  const { visitor, requireIdPhoto, requireVehiclePhoto, tempId, purpose, setPhotoKeys } = useEntryStore();
-  const [slots, setSlots] = useState<[Slot, Slot]>([null, null]);
+  const {
+    visitor, requireIdPhoto, requireVehiclePhoto, tempId, purpose, photoKeys, setPhotoKeys,
+  } = useEntryStore();
+  const [slots, setSlots] = useState<[Slot, Slot]>([
+    photoKeys.idPhotoR2Key ? { uri: UPLOADED_SLOT_URI, r2Key: photoKeys.idPhotoR2Key } : null,
+    photoKeys.vehiclePhotoR2Key ? { uri: UPLOADED_SLOT_URI, r2Key: photoKeys.vehiclePhotoR2Key } : null,
+  ]);
   const [uploading, setUploading] = useState<[boolean, boolean]>([false, false]);
   const [noVehicle, setNoVehicle] = useState(false);
 
   const isAccountHolder = visitor?.isAccountHolder ?? false;
-  const steps = purpose === 'sell' ? STEPS_SELL : STEPS_OTHER;
+  const steps = stepLabelsFor(purpose);
   const currentStep = purpose === 'sell' ? 5 : 4;
 
   const required: [boolean, boolean] = [requireIdPhoto, requireVehiclePhoto];
@@ -86,8 +96,13 @@ export default function Step5Photos() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StepProgressBar currentStep={currentStep} steps={steps} />
+      <StepProgressBar
+        currentStep={currentStep}
+        steps={steps}
+        onStepPress={(step) => router.dismissTo(routeForDisplayStep(step, purpose))}
+      />
       <OfflineBanner />
+      <StepBackButton />
       <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
         <View style={styles.header}>
           <View style={styles.headerRow}>
@@ -119,6 +134,14 @@ export default function Step5Photos() {
                 {exempt ? (
                   <View style={styles.exemptBox}>
                     <Text style={styles.exemptText}>Skipped</Text>
+                  </View>
+                ) : slots[idx]?.uri === UPLOADED_SLOT_URI ? (
+                  <View style={[styles.exemptBox, { position: 'relative' }]}>
+                    <CheckCircle2 color={COLORS.green} size={22} />
+                    <Text style={styles.exemptText}>Already uploaded</Text>
+                    <TouchableOpacity style={styles.retakeBtn} onPress={() => captureSlot(idx)}>
+                      <RefreshCw color={COLORS.gray600} size={16} />
+                    </TouchableOpacity>
                   </View>
                 ) : slots[idx] ? (
                   <View style={{ position: 'relative' }}>

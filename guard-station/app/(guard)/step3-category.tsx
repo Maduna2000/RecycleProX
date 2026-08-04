@@ -9,10 +9,12 @@ import { useEntryStore } from '@/stores/entryStore';
 import { listSellOptions, type SellOption } from '@/services/gateService';
 import { StepProgressBar } from '@/components/StepProgressBar';
 import { OfflineBanner } from '@/components/OfflineBanner';
+import { StepBackButton } from '@/components/StepBackButton';
 import { SkeletonGrid } from '@/components/ui/SkeletonList';
+import { stepLabelsFor, routeForDisplayStep } from '@/constants/steps';
 import { COLORS } from '@/constants/theme';
 
-const STEPS = ['Visitor', 'Purpose', 'Category', 'Vehicle', 'Photos', 'Review'];
+const STEPS = stepLabelsFor('sell');
 
 function CatIcon({ name, color }: { name: string | null; color: string }) {
   if (!name) return <Package color={color} size={24} />;
@@ -61,8 +63,13 @@ export default function Step3Category() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StepProgressBar currentStep={3} steps={STEPS} />
+      <StepProgressBar
+        currentStep={3}
+        steps={STEPS}
+        onStepPress={(step) => router.dismissTo(routeForDisplayStep(step, 'sell'))}
+      />
       <OfflineBanner />
+      <StepBackButton />
       <View style={styles.body}>
         <View style={styles.header}>
           <View style={styles.headerRow}>
