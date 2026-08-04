@@ -10,6 +10,7 @@ import { useEntryStore } from '@/stores/entryStore';
 import { lookupCustomer, getRepeatVisitInfo, type RepeatVisitInfo } from '@/services/gateService';
 import { StepProgressBar } from '@/components/StepProgressBar';
 import { OfflineBanner } from '@/components/OfflineBanner';
+import { StepBackButton } from '@/components/StepBackButton';
 import { stepLabelsFor } from '@/constants/steps';
 import { COLORS } from '@/constants/theme';
 
@@ -81,6 +82,7 @@ export default function Step1Visitor() {
     <SafeAreaView style={styles.safe}>
       <StepProgressBar currentStep={1} steps={STEPS} />
       <OfflineBanner />
+      <StepBackButton />
       <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
           <View style={styles.headerRow}>
