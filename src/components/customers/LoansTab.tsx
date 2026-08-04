@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import useSWR, { mutate } from 'swr'
-import { Loader2, MoreHorizontal } from 'lucide-react'
+import { Loader2, MoreHorizontal, Banknote } from 'lucide-react'
 import { toast } from 'sonner'
 import Decimal from 'decimal.js'
 import { Dialog } from '@/components/ui/dialog'
@@ -93,6 +93,7 @@ function StatusBadge({ status }: { status: 'active' | 'settled' | 'voided' }) {
 export function LoansTab({ customerId, customerName, userRole, userAllowedModules }: LoansTabProps) {
   const [createOpen, setCreateOpen] = useState(false)
   const [voidTarget, setVoidTarget] = useState<Loan | null>(null)
+  const [repayTarget, setRepayTarget] = useState<Loan | null>(null)
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
 
@@ -118,6 +119,10 @@ export function LoansTab({ customerId, customerName, userRole, userAllowedModule
       loan.status === 'active' &&
       (loan._count?.repayments ?? 0) === 0
     )
+  }
+
+  function canRecordPayment(loan: Loan): boolean {
+    return canCreateLoan && loan.status === 'active' && new Decimal(loan.balanceAmount).gt(0)
   }
 
   const outstanding = summary?.outstanding
@@ -280,7 +285,7 @@ export function LoansTab({ customerId, customerName, userRole, userAllowedModule
                     })}
                   </td>
                   <td style={{ padding: '5px 10px', width: 40, position: 'relative' }}>
-                    {canVoidLoan(loan) && (
+                    {(canRecordPayment(loan) || canVoidLoan(loan)) && (
                       <button
                         onClick={(e) => {
                           if (menuOpenId === loan.id) { setMenuOpenId(null); setMenuPos(null); return }
@@ -322,30 +327,61 @@ export function LoansTab({ customerId, customerName, userRole, userAllowedModule
               border: '1px solid #E0E0E0',
               borderRadius: 4,
               boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-              minWidth: 100,
+              minWidth: 130,
             }}
           >
-            <button
-              onClick={() => {
-                const loan = loans.find((l) => l.id === menuOpenId)
-                if (loan) setVoidTarget(loan)
-                setMenuOpenId(null)
-                setMenuPos(null)
-              }}
-              style={{
-                display: 'block',
-                width: '100%',
-                padding: '6px 12px',
-                fontSize: 11,
-                textAlign: 'left',
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                color: '#DC2626',
-              }}
-            >
-              Void Loan
-            </button>
+            {(() => {
+              const loan = loans.find((l) => l.id === menuOpenId)
+              if (!loan) return null
+              return (
+                <>
+                  {canRecordPayment(loan) && (
+                    <button
+                      onClick={() => {
+                        setRepayTarget(loan)
+                        setMenuOpenId(null)
+                        setMenuPos(null)
+                      }}
+                      style={{
+                        display: 'block',
+                        width: '100%',
+                        padding: '6px 12px',
+                        fontSize: 11,
+                        textAlign: 'left',
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        color: colors.action,
+                      }}
+                    >
+                      Record Payment
+                    </button>
+                  )}
+                  {canVoidLoan(loan) && (
+                    <button
+                      onClick={() => {
+                        setVoidTarget(loan)
+                        setMenuOpenId(null)
+                        setMenuPos(null)
+                      }}
+                      style={{
+                        display: 'block',
+                        width: '100%',
+                        padding: '6px 12px',
+                        fontSize: 11,
+                        textAlign: 'left',
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        color: '#DC2626',
+                      }}
+                    >
+                      Void Loan
+                    </button>
+                  )}
+                </>
+              )
+            })()}
           </div>
         </>
       )}
@@ -372,6 +408,19 @@ export function LoansTab({ customerId, customerName, userRole, userAllowedModule
           onSuccess={() => {
             revalidate()
             setVoidTarget(null)
+          }}
+        />
+      )}
+
+      {/* Record Payment Dialog */}
+      {repayTarget && (
+        <RecordLoanRepaymentDialog
+          loan={repayTarget}
+          customerName={customerName}
+          onClose={() => setRepayTarget(null)}
+          onSuccess={() => {
+            revalidate()
+            setRepayTarget(null)
           }}
         />
       )}
@@ -549,6 +598,138 @@ function VoidLoanDialog({
           <Btn onClick={onClose} disabled={loading}>Cancel</Btn>
           <Btn variant="danger" onClick={onSubmit} disabled={reason.length < 5} loading={loading}>
             Void Loan
+          </Btn>
+        </RpxDialogFooter>
+      </RpxDialogContent>
+    </Dialog>
+  )
+}
+
+// ─── Record Loan Repayment Dialog ───────────────────────────────────────────
+function RecordLoanRepaymentDialog({
+  loan,
+  customerName,
+  onClose,
+  onSuccess,
+}: {
+  loan: Loan
+  customerName: string
+  onClose: () => void
+  onSuccess: () => void
+}) {
+  const [amount, setAmount] = useState('')
+  const [method, setMethod] = useState('cash')
+  const [notes, setNotes] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const balance = new Decimal(loan.balanceAmount)
+  const payAmount = new Decimal(amount || '0')
+  const remaining = balance.minus(payAmount)
+
+  function validate(): string | null {
+    if (payAmount.lessThanOrEqualTo(0)) return 'Enter a payment amount'
+    if (payAmount.greaterThan(balance)) return 'Amount exceeds the outstanding balance'
+    return null
+  }
+
+  async function onSubmit() {
+    const validationError = validate()
+    if (validationError) {
+      setError(validationError)
+      return
+    }
+    setError(null)
+    setLoading(true)
+    const res = await fetch(`/api/loans/${loan.id}/repay`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        amount,
+        paymentMethod: method,
+        notes: notes || undefined,
+      }),
+    })
+    setLoading(false)
+    if (res.ok) {
+      toast.success(remaining.isZero() ? `Loan settled in full — ${loan.refNumber}` : `Payment recorded for ${loan.refNumber}`)
+      onSuccess()
+    } else {
+      const j = (await res.json()) as { error?: string | { formErrors?: string[] } }
+      const msg =
+        typeof j.error === 'string'
+          ? j.error
+          : (j.error as { formErrors?: string[] })?.formErrors?.[0] ?? 'Failed to record payment'
+      toast.error(msg)
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
+      <RpxDialogContent maxWidth={440}>
+        <RpxDialogHeader title={`Record Payment From ${customerName}`} icon={Banknote} onClose={onClose} />
+        <RpxDialogBody>
+          <div className="space-y-4">
+            <div className="px-3 py-2.5 rounded-lg" style={{ background: colors.actionBg, border: `1px solid ${colors.action}` }}>
+              <div className="flex justify-between items-center">
+                <span className="text-xs font-medium" style={{ color: colors.action }}>
+                  {loan.refNumber} — Outstanding
+                </span>
+                <span className="font-mono font-bold" style={{ fontSize: 16, color: colors.action }}>
+                  R {balance.toFixed(2)}
+                </span>
+              </div>
+            </div>
+
+            <div>
+              <Label>Amount (R) *</Label>
+              <Input
+                placeholder="0.00"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                className="mt-1"
+                type="number"
+                step="0.01"
+                min="0"
+                disabled={loading}
+              />
+            </div>
+
+            <div>
+              <Label>Payment Method *</Label>
+              <Select value={method} onValueChange={(v) => setMethod(v ?? 'cash')}>
+                <SelectTrigger className="mt-1 w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PAYMENT_METHODS.map((m) => (
+                    <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {amount && (
+              <div className="border-t pt-3">
+                <div className="flex justify-between text-xs font-medium" style={{ color: remaining.isZero() ? '#217346' : '#6C757D' }}>
+                  <span>{remaining.isZero() ? 'Loan Fully Settled' : 'Balance Remaining After This Payment'}</span>
+                  <span className="font-mono">{remaining.isZero() ? '✓' : `R ${remaining.toFixed(2)}`}</span>
+                </div>
+              </div>
+            )}
+
+            <div>
+              <Label>Notes <span className="font-normal text-gray-400">(optional)</span></Label>
+              <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="mt-1" maxLength={500} />
+            </div>
+
+            {error && <p className="text-xs" style={{ color: '#DC3545' }}>{error}</p>}
+          </div>
+        </RpxDialogBody>
+        <RpxDialogFooter>
+          <Btn onClick={onClose} disabled={loading}>Cancel</Btn>
+          <Btn variant="primary" onClick={onSubmit} disabled={payAmount.lessThanOrEqualTo(0) || payAmount.greaterThan(balance)} loading={loading}>
+            Record Payment
           </Btn>
         </RpxDialogFooter>
       </RpxDialogContent>
