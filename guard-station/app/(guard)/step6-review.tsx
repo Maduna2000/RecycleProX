@@ -50,7 +50,12 @@ export default function Step6Review() {
       router.replace('/(guard)/success');
     } catch (err) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      setError(err instanceof Error ? err.message : 'Failed to register entry');
+      const axiosErr = err as { response?: { status?: number; data?: { error?: string } } };
+      setError(
+        axiosErr?.response?.status === 401
+          ? 'Session expired — sign out and back in to refresh it.'
+          : (axiosErr?.response?.data?.error ?? 'Failed to register entry')
+      );
     } finally {
       setSubmitting(false);
     }

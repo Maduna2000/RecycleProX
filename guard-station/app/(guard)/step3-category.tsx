@@ -24,14 +24,28 @@ export default function Step3Category() {
   const { setCategoryNames } = useEntryStore();
   const [options, setOptions] = useState<SellOption[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
 
-  useEffect(() => {
+  function load() {
+    setLoading(true);
+    setError(null);
     listSellOptions()
       .then(setOptions)
-      .catch(() => setOptions([]))
+      .catch((err) => {
+        setOptions([]);
+        // Surfaced rather than silently swallowed into an empty list —
+        // an empty list here used to be indistinguishable from "nothing
+        // configured yet" vs. "the request actually failed" (e.g. a 401),
+        // which made this exact failure mode hard to diagnose.
+        setError(err?.response?.status === 401
+          ? 'Session expired — sign out and back in to refresh it.'
+          : (err?.response?.data?.error ?? err?.message ?? 'Could not load categories.'));
+      })
       .finally(() => setLoading(false));
-  }, []);
+  }
+
+  useEffect(load, []);
 
   function toggle(label: string) {
     Haptics.selectionAsync();
@@ -60,6 +74,13 @@ export default function Step3Category() {
 
         {loading ? (
           <SkeletonGrid cols={2} rows={3} itemHeight={100} />
+        ) : error ? (
+          <View style={styles.errorBox}>
+            <Text style={styles.errorText}>{error}</Text>
+            <TouchableOpacity style={styles.retryBtn} onPress={load}>
+              <Text style={styles.retryBtnText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
         ) : (
           <FlatList
             data={options}
@@ -114,6 +135,10 @@ const styles = StyleSheet.create({
   title: { color: COLORS.navy, fontSize: 20, fontWeight: '800' },
   sub: { color: COLORS.gray500, fontSize: 14 },
   empty: { color: COLORS.gray400, textAlign: 'center', paddingVertical: 32 },
+  errorBox: { alignItems: 'center', gap: 12, paddingVertical: 32 },
+  errorText: { color: COLORS.red, fontSize: 13, textAlign: 'center', paddingHorizontal: 20 },
+  retryBtn: { backgroundColor: COLORS.gray100, borderRadius: 10, paddingVertical: 8, paddingHorizontal: 20 },
+  retryBtnText: { color: COLORS.gray700, fontSize: 13, fontWeight: '600' },
   card: {
     flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8,
     backgroundColor: COLORS.white, borderRadius: 16, padding: 14, minHeight: 100,

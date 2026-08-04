@@ -24,14 +24,17 @@ api.interceptors.request.use(async (config) => {
   return config;
 });
 
+// Deliberately does NOT delete the stored token on a 401 here. A single
+// transient failure (backend cold-start, brief network blip) on any one
+// request would otherwise wipe an otherwise-valid token, cascading into
+// every subsequent request in the session also failing with 401 — turning
+// one hiccup into "nothing works until you log out and back in." Token
+// invalidation is handled explicitly instead: authStore.restoreSession()
+// already treats a failed /api/mobile/session check as "not logged in"
+// without needing this to have pre-deleted anything.
 api.interceptors.response.use(
   (response) => response,
-  async (error) => {
-    if (error.response?.status === 401) {
-      await SecureStore.deleteItemAsync(TOKEN_KEY);
-    }
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
 export default api;
