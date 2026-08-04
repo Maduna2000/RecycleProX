@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
-import { useSession } from 'next-auth/react'
 import useSWR, { mutate } from 'swr'
 import { Save, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
@@ -13,7 +12,6 @@ import { inp, lbl, HEADER_GRAD, NAVY, Btn, TabStrip, PortalPage } from '@/compon
 import { colors } from '@/lib/design-tokens'
 import { TransactionsTab } from '@/components/customers/TransactionsTab'
 import { DocumentsTab } from '@/components/customers/DocumentsTab'
-import { PhotoUploader, PhotoViewer } from '@/components/PhotoUploader'
 import { fetcher } from '@/lib/swrFetcher'
 
 const inpDisabled: React.CSSProperties = { ...inp, background: '#F5F5F5', color: '#6C757D', cursor: 'default' }
@@ -23,14 +21,15 @@ type Customer = {
   id: string; firstName: string; lastName: string; idNumber: string
   phone: string; physicalAddress?: string
   isActive: boolean; blacklisted: boolean; createdAt: string
-  customerNotes?: string; idPhotoR2Key?: string
+  customerNotes?: string
 }
 
 // Flat, single-level tab row — Personal/Notes used to be a second, nested
 // tab strip inside an "Overview" wrapper tab; now they're just the first
 // two tabs alongside Transactions, since "Overview" never rendered
-// anything of its own beyond hosting them.
-const TABS = ['Personal', 'Notes', 'ID Photo', 'Documents', 'Transactions'] as const
+// anything of its own beyond hosting them. No separate "ID Photo" tab —
+// ID documents are uploaded via the Documents tab, which already covers it.
+const TABS = ['Personal', 'Notes', 'Documents', 'Transactions'] as const
 
 // ─── Schema for casual customer edit ──────────────────────────────────────────
 const EditCasualSchema = z.object({
@@ -63,33 +62,11 @@ function Pill({ text, bg, color }: { text: string; bg: string; color: string }) 
 // ─── Main page ─────────────────────────────────────────────────────────────────
 export default function CasualCustomerDetailPage() {
   const { id } = useParams<{ id: string }>()
-  const { data: session } = useSession()
-  const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
   const [tab, setTab] = useState<typeof TABS[number]>('Personal')
   const [isEditing, setIsEditing] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [justUploadedPhoto, setJustUploadedPhoto] = useState(false)
 
   const { data: customer, isLoading, error } = useSWR<Customer>(`/api/customers/${id}`, fetcher)
-
-  async function savePhotoKey(key: string) {
-    const res = await fetch(`/api/customers/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ idPhotoR2Key: key }),
-    })
-    if (res.ok) { setJustUploadedPhoto(true); mutate(`/api/customers/${id}`) }
-    else { const j = await res.json(); toast.error(j.error ?? 'Failed to save photo reference') }
-  }
-
-  async function handlePhotoDeleted() {
-    const res = await fetch(`/api/customers/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ idPhotoR2Key: null }),
-    })
-    if (res.ok) mutate(`/api/customers/${id}`)
-  }
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<EditCasualInput>({
     resolver: zodResolver(EditCasualSchema),
@@ -234,33 +211,6 @@ export default function CasualCustomerDetailPage() {
                   }}
                   placeholder={isEditing ? 'Add notes about this customer...' : ''}
                 />
-              </div>
-            </div>
-          )}
-
-          {tab === 'ID Photo' && (
-            <div>
-              <SHdr title="ID Photo" />
-              <div style={{ padding: '10px 12px', maxWidth: 420 }}>
-                {customer.idPhotoR2Key ? (
-                  <PhotoViewer
-                    r2Key={customer.idPhotoR2Key}
-                    alt={`${customer.firstName} ${customer.lastName} ID`}
-                    canDelete={isManager}
-                    onDelete={handlePhotoDeleted}
-                    autoLoad={justUploadedPhoto}
-                  />
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <p style={{ fontSize: 11, color: '#9CA3AF', margin: 0 }}>No ID photo uploaded yet</p>
-                    <PhotoUploader
-                      context="customer_id"
-                      referenceId={customer.id}
-                      label="Upload ID Photo"
-                      onUploaded={savePhotoKey}
-                    />
-                  </div>
-                )}
               </div>
             </div>
           )}
