@@ -3,11 +3,53 @@
  * Route protection and redirect logic only — no DB calls.
  */
 import NextAuth from 'next-auth'
+import { decode } from '@auth/core/jwt'
 import { authConfig } from '@/auth.config'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 const { auth } = NextAuth(authConfig)
+
+// Must match src/app/api/mobile/session/route.ts's identical function —
+// see that file's own comment for why this reads the request's protocol
+// rather than NODE_ENV.
+function sessionSalt(req: NextRequest): string {
+  return req.nextUrl.protocol === 'https:'
+    ? '__Secure-authjs.session-token'
+    : 'authjs.session-token'
+}
+
+// NextAuth's own `auth()` wrapper (req.auth below) only ever resolves a
+// session from the standard browser cookie flow — it has no concept of the
+// Bearer-token mobile auth path (see src/app/api/mobile/signin+session/
+// route.ts). Guard Station and Scale Station both send an Authorization
+// header instead of relying on cookie propagation, so without this
+// fallback every gate/scale API call 401s here at the edge, before ever
+// reaching the route handler's own auth() call — regardless of how valid
+// the mobile token actually is.
+async function resolveMobileSession(req: NextRequest): Promise<{ user: SessionUser } | null> {
+  const authHeader = req.headers.get('authorization')
+  const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null
+  if (!token) return null
+
+  try {
+    const decoded = await decode({ token, secret: process.env.AUTH_SECRET!, salt: sessionSalt(req) })
+    if (!decoded?.id || typeof decoded.id !== 'string') return null
+    return {
+      user: {
+        role: (decoded.role as string) ?? '',
+        forcePasswordChange: (decoded.forcePasswordChange as boolean) ?? false,
+        allowedModules: (decoded.allowedModules as string[]) ?? [],
+        tenantId: (decoded.tenantId as string | undefined) ?? undefined,
+        schemaName: (decoded.schemaName as string | undefined) ?? undefined,
+        tenantSlug: (decoded.tenantSlug as string | undefined) ?? undefined,
+        featureFlags: (decoded.featureFlags as Record<string, boolean> | undefined) ?? undefined,
+      },
+    }
+  } catch {
+    return null
+  }
+}
 
 // Module keys that can be controlled via permissions
 const MODULE_KEYS = [
@@ -70,9 +112,9 @@ function deriveTenantSlugFromHost(hostname: string): string | null {
   return slug
 }
 
-export default auth((req: NextRequest & { auth: { user?: SessionUser } | null }) => {
+export default auth(async (req: NextRequest & { auth: { user?: SessionUser } | null }) => {
   const { pathname } = req.nextUrl
-  const session = req.auth
+  const session = req.auth ?? await resolveMobileSession(req)
 
   // Dev-only override so subdomain-based tenant login is testable on
   // localhost without wildcard DNS: ?tenant=<slug> on the /login page.
