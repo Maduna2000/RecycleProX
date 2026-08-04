@@ -49,30 +49,40 @@ export default function Step5Photos() {
   }
 
   async function captureSlot(idx: 0 | 1) {
-    const perm = await ImagePicker.requestCameraPermissionsAsync();
-    if (!perm.granted) {
-      Alert.alert('Permission needed', 'Camera access is required to take photos.');
-      return;
-    }
-    const result = await ImagePicker.launchCameraAsync({ quality: 0.9, base64: false });
-    if (result.canceled || !result.assets[0]) return;
-
-    const raw = result.assets[0];
-    setUploading((prev) => { const n = [...prev] as [boolean, boolean]; n[idx] = true; return n; });
+    // The permission request and camera launch used to sit outside any
+    // try/catch — if either threw (a native module issue, a permission API
+    // quirk on a specific Android build), it became an unhandled promise
+    // rejection that's silently swallowed in a release build: no crash, no
+    // alert, nothing visibly happens on tap. Wrapping the whole function
+    // means any such failure now surfaces instead of failing invisibly.
     try {
-      const compressed = await ImageManipulator.manipulateAsync(
-        raw.uri,
-        [{ resize: { width: 1280 } }],
-        { compress: 0.82, format: ImageManipulator.SaveFormat.JPEG }
-      );
-      const r2Key = await uploadGatePhoto(tempId, idx, compressed.uri);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setSlots((prev) => { const n = [...prev] as [Slot, Slot]; n[idx] = { uri: compressed.uri, r2Key }; return n; });
-    } catch {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert('Upload failed', 'Could not upload photo. Check your connection and try again.');
-    } finally {
-      setUploading((prev) => { const n = [...prev] as [boolean, boolean]; n[idx] = false; return n; });
+      const perm = await ImagePicker.requestCameraPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert('Permission needed', 'Camera access is required to take photos.');
+        return;
+      }
+      const result = await ImagePicker.launchCameraAsync({ quality: 0.9, base64: false });
+      if (result.canceled || !result.assets[0]) return;
+
+      const raw = result.assets[0];
+      setUploading((prev) => { const n = [...prev] as [boolean, boolean]; n[idx] = true; return n; });
+      try {
+        const compressed = await ImageManipulator.manipulateAsync(
+          raw.uri,
+          [{ resize: { width: 1280 } }],
+          { compress: 0.82, format: ImageManipulator.SaveFormat.JPEG }
+        );
+        const r2Key = await uploadGatePhoto(tempId, idx, compressed.uri);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        setSlots((prev) => { const n = [...prev] as [Slot, Slot]; n[idx] = { uri: compressed.uri, r2Key }; return n; });
+      } catch {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        Alert.alert('Upload failed', 'Could not upload photo. Check your connection and try again.');
+      } finally {
+        setUploading((prev) => { const n = [...prev] as [boolean, boolean]; n[idx] = false; return n; });
+      }
+    } catch (err) {
+      Alert.alert('Camera error', err instanceof Error ? err.message : 'Could not open the camera.');
     }
   }
 
