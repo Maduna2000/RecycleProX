@@ -7,6 +7,7 @@ import { Plus, Trash2, Loader2, Scale, RefreshCw, Camera, ClipboardList, Wallet,
 import { toast } from 'sonner'
 import useSWR from 'swr'
 import { AccountSelectorPanel } from '@/components/customers/AccountSelectorPanel'
+import { ProductCategoryPicker } from '@/components/products/ProductCategoryPicker'
 import { PrintResultModal } from '@/components/PrintResultModal'
 import { RecordPaymentModal, type PayTarget } from '@/components/sales/RecordPaymentModal'
 import { AdminPinUnlockModal, type BusinessLoanFullSummary } from '@/components/business-loans/AdminPinUnlockModal'
@@ -172,12 +173,6 @@ export default function NewSalePage() {
 
   const products = productsData?.products ?? []
   const stockMap = new Map((stockData?.stock ?? []).map((r) => [r.product.id, new Decimal(r.onHand ?? '0')]))
-
-  const productsByCategory = products.reduce<Record<string, Product[]>>((acc, p) => {
-    acc[p.category] = acc[p.category] ?? []
-    acc[p.category]!.push(p)
-    return acc
-  }, {})
 
   // ── Derived calculations ──────────────────────────────────────────────────
   // Zero-rated only for an account buyer explicitly flagged zero-rated; walk-in
@@ -747,20 +742,11 @@ export default function NewSalePage() {
                       }}
                     >
                       {/* Product */}
-                      <select
-                        style={{ height: 24, width: '100%', borderRadius: 2, border: '1px solid #ABABAB', padding: '0 4px', fontSize: 11, color: '#212529', background: '#fff', outline: 'none' }}
+                      <ProductCategoryPicker
+                        products={products}
                         value={line.productId}
-                        onChange={(e) => onProductSelect(line.key, e.target.value)}
-                      >
-                        <option value="">Select…</option>
-                        {Object.entries(productsByCategory).map(([cat, prods]) => (
-                          <optgroup key={cat} label={cat}>
-                            {prods.map((p) => (
-                              <option key={p.id} value={p.id}>{p.name} ({p.unit})</option>
-                            ))}
-                          </optgroup>
-                        ))}
-                      </select>
+                        onChange={(productId) => onProductSelect(line.key, productId)}
+                      />
 
                       {/* Qty */}
                       <input
