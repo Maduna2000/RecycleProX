@@ -7,7 +7,7 @@ import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 // Photo record shape returned to the client
 export type PhotoRecord = {
-  type: 'purchase_signature' | 'purchase_vat264' | 'purchase_photo' | 'sale_photo' | 'weighbridge' | 'casual_id'
+  type: 'purchase_signature' | 'purchase_photo' | 'sale_photo' | 'weighbridge' | 'casual_id'
   transactionId: string
   refNumber?: string
   r2Key: string
@@ -47,7 +47,9 @@ export async function GET(req: NextRequest) {
       },
     } : {}
 
-    // ── Purchase photos (signatures + VAT264) ──────────────────────────────────
+    // ── Purchase photos (signatures + scale-station product photos) ────────────
+    // VAT264 is deliberately not surfaced here — it's downloaded from the
+    // purchase record itself, not the Photo Viewer.
     if (!type || type === 'purchase') {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const purchaseWhere: any = {
@@ -55,7 +57,6 @@ export async function GET(req: NextRequest) {
         ...(customerId && { customerId }),
         OR: [
           { signatureR2Key: { not: null } },
-          { vat264R2Key:    { not: null } },
           {
             status: 'completed',
             hasOutstandingBalance: false,
@@ -98,17 +99,6 @@ export async function GET(req: NextRequest) {
             refNumber: p.refNumber,
             r2Key: p.signatureR2Key,
             viewUrl: await getViewUrl(p.signatureR2Key),
-            createdAt: p.createdAt.toISOString(),
-            customer: p.customer ? { ...p.customer, idNumber: p.customer.idNumber ?? '' } : undefined,
-          })
-        }
-        if (p.vat264R2Key) {
-          records.push({
-            type: 'purchase_vat264',
-            transactionId: p.id,
-            refNumber: p.refNumber,
-            r2Key: p.vat264R2Key,
-            viewUrl: await getViewUrl(p.vat264R2Key),
             createdAt: p.createdAt.toISOString(),
             customer: p.customer ? { ...p.customer, idNumber: p.customer.idNumber ?? '' } : undefined,
           })

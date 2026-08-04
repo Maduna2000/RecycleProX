@@ -25,7 +25,6 @@ type PhotosResponse = {
 
 const TYPE_META: Record<PhotoRecord['type'], { label: string; color: string; bg: string; icon: React.ElementType }> = {
   purchase_signature: { label: 'Signature',    color: colors.action,   bg: colors.actionBg,  icon: FileText    },
-  purchase_vat264:    { label: 'VAT264 / SHG', color: colors.process,  bg: colors.processBg, icon: FileText    },
   purchase_photo:     { label: 'Stock Photo',  color: colors.netWeightText, bg: colors.netWeightBg, icon: ShoppingCart },
   sale_photo:         { label: 'Sale Photo',   color: colors.violet,   bg: colors.violetBg,  icon: ShoppingCart },
   weighbridge:        { label: 'Scale Photo',  color: colors.warning,  bg: colors.warningBg, icon: Scale       },
@@ -42,7 +41,7 @@ const TABS = [
 
 const EMPTY_MESSAGES: Record<string, string> = {
   all:          'No photos or documents found',
-  purchase:     'No purchase product photos, signatures, or VAT264 documents',
+  purchase:     'No purchase product photos or signatures',
   sale:         'No sale photos',
   weighbridge:  'No weighbridge photos',
   casual:       'No ID photos',
@@ -51,7 +50,7 @@ const EMPTY_MESSAGES: Record<string, string> = {
 // ─── Photo card ───────────────────────────────────────────────────────────────
 
 function PhotoCard({ photo, onClick }: { photo: PhotoRecord; onClick: () => void }) {
-  const isPdf = photo.r2Key.toLowerCase().includes('.pdf') || photo.type === 'purchase_vat264'
+  const isPdf = photo.r2Key.toLowerCase().includes('.pdf')
   const meta  = TYPE_META[photo.type]
   const Icon  = meta?.icon ?? Images
 
@@ -130,7 +129,7 @@ function ViewerDialog({
   onPrev:  (() => void) | null
   onNext:  (() => void) | null
 }) {
-  const isPdf = viewer.r2Key.toLowerCase().includes('.pdf') || viewer.type === 'purchase_vat264'
+  const isPdf = viewer.r2Key.toLowerCase().includes('.pdf')
   const meta  = TYPE_META[viewer.type]
   const idx   = photos.findIndex((p) => p.r2Key === viewer.r2Key)
 
@@ -143,15 +142,11 @@ function ViewerDialog({
   }
 
   function openReceiptPdf() {
-    if (viewer.type === 'purchase_signature' || viewer.type === 'purchase_vat264') {
+    if (viewer.type === 'purchase_signature') {
       window.open(`/api/purchases/${viewer.transactionId}/receipt`, '_blank')
     } else if (viewer.type === 'sale_photo') {
       window.open(`/api/sales/${viewer.transactionId}/receipt`, '_blank')
     }
-  }
-
-  function openVat264() {
-    window.open(`/api/purchases/${viewer.transactionId}/vat264`, '_blank')
   }
 
   const customerName = viewer.customer
@@ -228,12 +223,8 @@ function ViewerDialog({
 
             <Btn size="sm" icon={Download} onClick={download}>Download</Btn>
 
-            {(viewer.type === 'purchase_signature' || viewer.type === 'purchase_vat264' || viewer.type === 'sale_photo') && (
+            {(viewer.type === 'purchase_signature' || viewer.type === 'sale_photo') && (
               <Btn size="sm" icon={Receipt} onClick={openReceiptPdf}>Reprint Receipt</Btn>
-            )}
-
-            {(viewer.type === 'purchase_signature' || viewer.type === 'purchase_vat264') && (
-              <Btn size="sm" icon={FileText} onClick={openVat264}>VAT264 / SHG Act</Btn>
             )}
           </RpxDialogFooter>
         </div>
