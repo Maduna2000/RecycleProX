@@ -56,8 +56,11 @@ export async function GET(req: NextRequest) {
         OR: [
           { signatureR2Key: { not: null } },
           { vat264R2Key:    { not: null } },
-          { photoR2Keys:    { isEmpty: false } },
-          { scaleOrder: { photoR2Keys: { isEmpty: false } } },
+          {
+            status: 'completed',
+            hasOutstandingBalance: false,
+            scaleOrder: { photoR2Keys: { isEmpty: false } },
+          },
         ],
         status: { not: 'voided' },
       }
@@ -110,12 +113,13 @@ export async function GET(req: NextRequest) {
             customer: p.customer ? { ...p.customer, idNumber: p.customer.idNumber ?? '' } : undefined,
           })
         }
-        // Product photos: the purchase's own uploads, plus (deduped) whatever
-        // was taken at the scale station for the order this purchase was
-        // weighed from — that's the actual proof-of-match for what got
-        // bought, so it belongs in the purchase's photo set, not off on its
-        // own under Weighbridge.
-        const productPhotoKeys = Array.from(new Set([...(p.photoR2Keys ?? []), ...(p.scaleOrder?.photoR2Keys ?? [])]))
+        // Product photos come exclusively from the scale-station order this
+        // purchase was weighed from — not the purchase module's own ad-hoc
+        // "add photo" upload — and only once the purchase is completed and
+        // fully paid, since that's the confirmation this scale order really
+        // did become this purchase (matched by customer, products, weight).
+        const isPaidPurchase  = p.status === 'completed' && !p.hasOutstandingBalance
+        const productPhotoKeys = isPaidPurchase ? (p.scaleOrder?.photoR2Keys ?? []) : []
         for (const key of productPhotoKeys) {
           records.push({
             type: 'purchase_photo',
