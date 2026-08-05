@@ -1,0 +1,68 @@
+name: Build Scale Station APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+    paths:
+      - mobile-cap/**
+      - .github/workflows/build-scale-station-apk.yml
+
+jobs:
+  build:
+    name: Build Scale Station APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: mobile-cap/package-lock.json
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install dependencies
+        working-directory: mobile-cap
+        run: npm ci
+
+      # Copies capacitor.config.ts's settings (including the remote server.url
+      # this app actually loads at runtime) and any Capacitor plugin wiring
+      # into the native android/ project. www/ itself is just a placeholder —
+      # server.url means the app always loads the live site, never local
+      # bundled assets, but Capacitor's tooling still requires webDir to exist.
+      - name: Sync Capacitor Android project
+        working-directory: mobile-cap
+        run: npx cap sync android
+
+      - name: Make Gradle wrapper executable
+        working-directory: mobile-cap/android
+        run: chmod +x gradlew
+
+      # Release build, signed with the checked-in debug.keystore (see
+      # mobile-cap/android/app/build.gradle's own comment) — GitHub Actions
+      # runners are ephemeral, so without a fixed keystore every build gets a
+      # brand-new random signing key, and Android refuses to install an
+      # update over an app signed with a different certificate.
+      - name: Build release APK
+        working-directory: mobile-cap/android
+        run: ./gradlew assembleRelease --no-daemon
+        env:
+          GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx3072m -XX:MaxMetaspaceSize=512m"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ScaleStation-${{ github.sha }}.apk
+          path: mobile-cap/android/app/build/outputs/apk/release/app-release.apk
+          retention-days: 14
+          if-no-files-found: error
