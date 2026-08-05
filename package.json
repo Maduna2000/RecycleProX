@@ -47,6 +47,10 @@
       {
         "from": "assets/",
         "to": "assets/"
+      },
+      {
+        "from": ".next/standalone/node_modules/.prisma",
+        "to": "app/.next/standalone/node_modules/.prisma"
       }
     ],
     "win": {
