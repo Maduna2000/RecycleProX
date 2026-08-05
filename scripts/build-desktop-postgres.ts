@@ -86,7 +86,22 @@ function main() {
   // reason. serialport/node-thermal-printer ride along too — they resolve
   // prebuilt binaries dynamically at runtime (not statically analyzable),
   // so Next's own output tracing has nothing to follow for them either.
-  for (const mod of ['.prisma', '@prisma/client', 'serialport', '@serialport', 'node-thermal-printer']) {
+  //
+  // `next` itself belongs here too — confirmed the SAME way, by actually
+  // running the packaged server.js a second time after fixing the .prisma
+  // gap: it then failed on "Cannot find module
+  // './future/route-matcher-providers/helpers/manifest-loaders/
+  // server-manifest-loader'", a file that exists in a normal `npm install`
+  // but was silently missing from BOTH .next/standalone/node_modules/next
+  // (Next's own trace) and the top-level node_modules/next this app ships
+  // (electron-builder has no files-array entry for next at all — it was
+  // only ever present via Next's own, evidently incomplete, standalone
+  // tracing). Rather than chase every individual dynamically-required file
+  // Next's tracer might miss, copy the whole package — cpSync merges into
+  // whatever partial copy already exists at the destination rather than
+  // replacing it, so this only ever adds files, never removes ones Next's
+  // own trace got right.
+  for (const mod of ['.prisma', '@prisma/client', 'serialport', '@serialport', 'node-thermal-printer', 'next']) {
     copyIfExists(path.join(ROOT, 'node_modules', mod), path.join(standaloneDir, 'node_modules', mod))
   }
 
