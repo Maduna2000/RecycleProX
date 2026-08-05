@@ -49,13 +49,13 @@ function main() {
     )
   }
 
-  console.log('--- 1/3: regenerating the Postgres Prisma client (defends against a stale SQLite-build client swap) ---')
+  console.log('--- 1/4: regenerating the Postgres Prisma client (defends against a stale SQLite-build client swap) ---')
   run('npx', ['prisma', 'generate'])
 
-  console.log('--- 2/3: next build ---')
+  console.log('--- 2/4: next build ---')
   run('npx', ['next', 'build'])
 
-  console.log('--- 3/3: copying static assets Next.js standalone output does not include ---')
+  console.log('--- 3/4: copying static assets Next.js standalone output does not include ---')
   // This is the script npm run build:desktop / electron:build actually
   // invokes (see package.json) — build-desktop.ts (SQLite variant) is not
   // currently wired up to anything. Next.js's own docs call this out
