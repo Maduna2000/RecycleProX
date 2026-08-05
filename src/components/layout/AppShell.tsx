@@ -21,7 +21,6 @@ import { cn } from '@/lib/utils'
 import { useOfflineStore } from '@/stores/offlineStore'
 import { getModuleName } from '@/lib/module-names'
 import { WindowTaskbar } from '@/components/ui/WindowTaskbar'
-import { WindowControls } from '@/components/layout/WindowControls'
 import { useRecordTitle } from '@/hooks/useRecordTitle'
 import { useFeatureFlag } from '@/hooks/useFeatureFlags'
 import { Btn, BtnMenu, type BtnVariant, type BtnMenuItem, NAVY_GLOSS_GRAD, NAVY_GLOSS_BEVEL } from '@/components/rpx'
@@ -646,13 +645,12 @@ export function AppShell({
     >
       {/* ── ZONE 1: Title Bar ─────────────────────────────────── */}
       {/*
-        Electron's window is frame:false (see electron/main.js) — this bar
-        IS the OS title bar. WebkitAppRegion 'drag' on the header lets the
-        window be moved by dragging its empty space; every interactive
-        child below overrides back to 'no-drag' so clicks still work.
-        Double-clicking empty space toggles maximize, matching native
-        Windows title-bar behavior. Both are inert (and harmless) on the
-        Vercel web app, where window.electronAPI is undefined.
+        Electron's window uses its native OS frame (see electron/main.js) —
+        minimize/maximize/close are handled by Windows itself, not this bar.
+        Per docs/superpowers/specs/2026-05-24-legacy-window-management-design.md
+        (Approved), Zone 1 deliberately has no window controls of its own —
+        that's the legacy MDI system's job (PageTitleBar / WindowTaskbar),
+        one per open module page, not a single global set here.
       */}
       <header
         className="flex items-center shrink-0 px-3 gap-0 border-b border-white/[0.08]"
@@ -660,15 +658,10 @@ export function AppShell({
           height: 40,
           background: NAVY_GLOSS_GRAD,
           boxShadow: NAVY_GLOSS_BEVEL,
-          WebkitAppRegion: 'drag',
-        } as React.CSSProperties}
-        onDoubleClick={() => window.electronAPI?.maximize()}
+        }}
       >
         {/* Logo mark */}
-        <div
-          className="flex items-center gap-2 pr-3 border-r border-white/15 shrink-0"
-          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-        >
+        <div className="flex items-center gap-2 pr-3 border-r border-white/15 shrink-0">
           <Image src="/brand/renovo-icon.png" alt="" width={22} height={22} className="rounded shrink-0" />
           <div className="flex flex-col leading-none select-none whitespace-nowrap">
             <span className="text-[13px] font-bold tracking-wide">
@@ -684,7 +677,6 @@ export function AppShell({
         <nav
           className="flex items-center gap-1.5 px-3 flex-1 min-w-0"
           aria-label="Breadcrumb"
-          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         >
           <Link
             href="/app/dashboard"
@@ -715,13 +707,9 @@ export function AppShell({
         </nav>
 
         {/* Right side */}
-        <div
-          className="flex items-center gap-1 pl-2 shrink-0"
-          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-        >
+        <div className="flex items-center gap-1 pl-2 shrink-0">
           <OfflineChip />
           <UserMenu role={role} fullName={fullName} />
-          <WindowControls />
         </div>
       </header>
 

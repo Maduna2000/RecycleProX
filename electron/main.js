@@ -218,8 +218,6 @@ function createActivationWindow() {
     width: 480,
     height: 420,
     resizable: false,
-    frame: false,
-    titleBarStyle: 'hidden',
     backgroundColor: '#1B3A6B',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -237,8 +235,6 @@ function createMainWindow() {
     height: 800,
     minWidth: 1024,
     minHeight: 600,
-    frame: false,
-    titleBarStyle: 'hidden',
     backgroundColor: '#1B3A6B',
     show: false,
     webPreferences: {
@@ -258,14 +254,6 @@ function createMainWindow() {
   })
 
   mainWindow.on('closed', () => { mainWindow = null })
-
-  // Renderer has no native title bar to reflect maximize state (frame:
-  // false, custom title bar — see WindowControls.tsx), so it needs to be
-  // told explicitly whenever the OS-level state changes, including via
-  // means the renderer's own button never triggered (double-click on the
-  // Windows taskbar icon, Aero Snap, etc.).
-  mainWindow.on('maximize', () => mainWindow?.webContents.send('window-state-changed', true))
-  mainWindow.on('unmaximize', () => mainWindow?.webContents.send('window-state-changed', false))
 }
 
 function createTray() {
@@ -360,15 +348,6 @@ app.on('window-all-closed', () => {
   if (serverProcess) serverProcess.kill()
   if (process.platform !== 'darwin') app.quit()
 })
-
-// ─── IPC: Window controls (custom title bar) ─────────────────────────────────
-
-ipcMain.on('window-minimize', () => mainWindow?.minimize())
-ipcMain.on('window-maximize', () => {
-  if (mainWindow?.isMaximized()) mainWindow.unmaximize()
-  else mainWindow?.maximize()
-})
-ipcMain.on('window-close', () => mainWindow?.close())
 
 // ─── IPC: Licensing ───────────────────────────────────────────────────────────
 

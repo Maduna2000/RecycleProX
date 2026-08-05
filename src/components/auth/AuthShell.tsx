@@ -14,25 +14,6 @@
 import { Loader2, AlertCircle } from 'lucide-react'
 import { colors } from '@/lib/design-tokens'
 import { CARD_BORDER } from '@/components/rpx'
-import { WindowControls } from '@/components/layout/WindowControls'
-
-// Electron's window is frame:false (see electron/main.js) — none of the
-// three login screens (/login, /gate/login, /scale/login) go through
-// AppShell.tsx (that only wraps post-login /app/* pages), so without this
-// top bar the window would be undraggable and uncloseable from the very
-// first screen a user sees. WindowControls itself renders nothing on the
-// Vercel web app.
-function DesktopTitleBar() {
-  return (
-    <div
-      className="flex items-center justify-end h-8 px-2 shrink-0"
-      style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
-      onDoubleClick={() => window.electronAPI?.maximize()}
-    >
-      <WindowControls />
-    </div>
-  )
-}
 
 export interface AuthShellProps {
   /** Per-kiosk accent — badge fill, focus ring, spinner color. */
@@ -59,7 +40,6 @@ export function AuthShell({ accentColor, icon, title, logo, subtitle, errorMessa
   if (isSessionLoading) {
     return (
       <div className="min-h-screen flex flex-col" style={{ background }}>
-        <DesktopTitleBar />
         <div className="flex-1 flex items-center justify-center">
           <Loader2 className="w-8 h-8 animate-spin" style={{ color: accentColor }} />
         </div>
@@ -69,7 +49,6 @@ export function AuthShell({ accentColor, icon, title, logo, subtitle, errorMessa
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background }}>
-      <DesktopTitleBar />
       <div className="flex-1 flex items-center justify-center p-4 sm:p-6">
         <div className="w-full max-w-sm sm:max-w-md">
           <div
