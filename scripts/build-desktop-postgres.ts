@@ -58,6 +58,24 @@ function main() {
   copyIfExists(path.join(ROOT, '.next', 'static'), path.join(standaloneDir, '.next', 'static'))
   copyIfExists(path.join(ROOT, 'public'), path.join(standaloneDir, 'public'))
 
+  console.log('--- 4/4: defensively re-copying native/dynamically-resolved modules ---')
+  // Confirmed by actually running the packaged app's server.js: login 500'd
+  // with "Cannot find module '.prisma/client/default'" — node_modules/.prisma
+  // was completely absent from the installed app, even though
+  // package.json's electron-builder `files` array explicitly lists
+  // "node_modules/.prisma/**/*". electron-builder's glob matching does not
+  // include dot-prefixed path segments (like .prisma) by default, so that
+  // entry silently matched nothing — @prisma/client itself (no leading dot)
+  // got bundled fine, but the actual generated client output never did.
+  // Copying it directly here bypasses electron-builder's glob entirely, the
+  // same way scripts/local-server/assemble.ts already does for this exact
+  // reason. serialport/node-thermal-printer ride along too — they resolve
+  // prebuilt binaries dynamically at runtime (not statically analyzable),
+  // so Next's own output tracing has nothing to follow for them either.
+  for (const mod of ['.prisma', '@prisma/client', 'serialport', '@serialport', 'node-thermal-printer']) {
+    copyIfExists(path.join(ROOT, 'node_modules', mod), path.join(standaloneDir, 'node_modules', mod))
+  }
+
   console.log('Desktop build ready — run electron-builder next.')
 }
 
