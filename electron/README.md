@@ -30,15 +30,21 @@ expected path if this file is missing or incomplete.
 
 The installer ships **unsigned** today — Windows SmartScreen will show an
 "unrecognized publisher" warning on first run, but the app still installs
-and runs. `electron-builder` already supports Authenticode signing natively;
-once a real code-signing certificate is purchased under Golden Key
-Investments (Pty) Ltd's name (an OV or EV certificate from a CA such as
-DigiCert or Sectigo), set these two environment variables on the build
-machine before running `npm run electron:build` — no code changes needed:
+and runs. `electron-builder` already supports Authenticode signing natively,
+and `.github/workflows/build-desktop.yml` already forwards `CSC_LINK` /
+`CSC_KEY_PASSWORD` through to the build step — so once a real code-signing
+certificate is purchased under Golden Key Investments (Pty) Ltd's name (an
+OV or EV certificate from a CA such as DigiCert or Sectigo), turning signing
+on is purely a matter of adding two **GitHub Actions repository secrets**
+(Settings → Secrets and variables → Actions) — no code or workflow changes
+needed:
 
 ```
-CSC_LINK=<path to the .pfx file, or a URL>
+CSC_LINK=<base64-encoded .pfx, or a URL to it>
 CSC_KEY_PASSWORD=<the certificate's password>
 ```
+
+(Building locally instead of via CI works the same way — set the same two
+environment variables before running `npm run electron:build`.)
 
 See <https://www.electron.build/code-signing> for the full reference.

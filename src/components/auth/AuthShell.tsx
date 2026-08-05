@@ -14,6 +14,25 @@
 import { Loader2, AlertCircle } from 'lucide-react'
 import { colors } from '@/lib/design-tokens'
 import { CARD_BORDER } from '@/components/rpx'
+import { WindowControls } from '@/components/layout/WindowControls'
+
+// Electron's window is frame:false (see electron/main.js) — none of the
+// three login screens (/login, /gate/login, /scale/login) go through
+// AppShell.tsx (that only wraps post-login /app/* pages), so without this
+// top bar the window would be undraggable and uncloseable from the very
+// first screen a user sees. WindowControls itself renders nothing on the
+// Vercel web app.
+function DesktopTitleBar() {
+  return (
+    <div
+      className="flex items-center justify-end h-8 px-2 shrink-0"
+      style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+      onDoubleClick={() => window.electronAPI?.maximize()}
+    >
+      <WindowControls />
+    </div>
+  )
+}
 
 export interface AuthShellProps {
   /** Per-kiosk accent — badge fill, focus ring, spinner color. */
@@ -39,59 +58,65 @@ export function AuthShell({ accentColor, icon, title, logo, subtitle, errorMessa
 
   if (isSessionLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background }}>
-        <Loader2 className="w-8 h-8 animate-spin" style={{ color: accentColor }} />
+      <div className="min-h-screen flex flex-col" style={{ background }}>
+        <DesktopTitleBar />
+        <div className="flex-1 flex items-center justify-center">
+          <Loader2 className="w-8 h-8 animate-spin" style={{ color: accentColor }} />
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 sm:p-6" style={{ background }}>
-      <div className="w-full max-w-sm sm:max-w-md">
-        <div
-          style={{
-            background: '#fff',
-            border: CARD_BORDER,
-            borderRadius: 3,
-            boxShadow: '0 8px 28px rgba(0,0,0,0.3)',
-            padding: '32px 28px',
-          }}
-        >
-          <div className="flex flex-col items-center mb-7">
-            {logo ?? (
-              <>
-                <div
-                  style={{
-                    width: 64, height: 64, borderRadius: 12, overflow: 'hidden', flexShrink: 0,
-                    marginBottom: 14, boxShadow: '0 4px 14px rgba(0,0,0,0.3)',
-                  }}
-                >
-                  {icon}
-                </div>
-                <h1 style={{ fontSize: 24, fontWeight: 700, color: colors.mainInstruction, textAlign: 'center' }}>{title}</h1>
-              </>
-            )}
-            {subtitle && <p style={{ fontSize: 13, color: colors.textSecondary, marginTop: 4 }}>{subtitle}</p>}
-          </div>
-
-          {errorMessage && (
-            <div
-              style={{
-                marginBottom: 18, padding: '10px 12px', borderRadius: 3, fontSize: 13,
-                background: colors.dangerBg, border: `1px solid ${colors.danger}`, color: colors.danger,
-                display: 'flex', alignItems: 'flex-start', gap: 8,
-              }}
-            >
-              <AlertCircle style={{ width: 15, height: 15, flexShrink: 0, marginTop: 1 }} />
-              <span>{errorMessage}</span>
+    <div className="min-h-screen flex flex-col" style={{ background }}>
+      <DesktopTitleBar />
+      <div className="flex-1 flex items-center justify-center p-4 sm:p-6">
+        <div className="w-full max-w-sm sm:max-w-md">
+          <div
+            style={{
+              background: '#fff',
+              border: CARD_BORDER,
+              borderRadius: 3,
+              boxShadow: '0 8px 28px rgba(0,0,0,0.3)',
+              padding: '32px 28px',
+            }}
+          >
+            <div className="flex flex-col items-center mb-7">
+              {logo ?? (
+                <>
+                  <div
+                    style={{
+                      width: 64, height: 64, borderRadius: 12, overflow: 'hidden', flexShrink: 0,
+                      marginBottom: 14, boxShadow: '0 4px 14px rgba(0,0,0,0.3)',
+                    }}
+                  >
+                    {icon}
+                  </div>
+                  <h1 style={{ fontSize: 24, fontWeight: 700, color: colors.mainInstruction, textAlign: 'center' }}>{title}</h1>
+                </>
+              )}
+              {subtitle && <p style={{ fontSize: 13, color: colors.textSecondary, marginTop: 4 }}>{subtitle}</p>}
             </div>
-          )}
 
-          {children}
+            {errorMessage && (
+              <div
+                style={{
+                  marginBottom: 18, padding: '10px 12px', borderRadius: 3, fontSize: 13,
+                  background: colors.dangerBg, border: `1px solid ${colors.danger}`, color: colors.danger,
+                  display: 'flex', alignItems: 'flex-start', gap: 8,
+                }}
+              >
+                <AlertCircle style={{ width: 15, height: 15, flexShrink: 0, marginTop: 1 }} />
+                <span>{errorMessage}</span>
+              </div>
+            )}
 
-          <p className="text-center" style={{ fontSize: 11, color: colors.textMuted, marginTop: 22 }}>
-            Accounts are created by an administrator
-          </p>
+            {children}
+
+            <p className="text-center" style={{ fontSize: 11, color: colors.textMuted, marginTop: 22 }}>
+              Accounts are created by an administrator
+            </p>
+          </div>
         </div>
       </div>
     </div>

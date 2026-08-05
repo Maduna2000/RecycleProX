@@ -40,6 +40,13 @@ jobs:
           INTERNAL_API_SHARED_SECRET: ${{ secrets.INTERNAL_API_SHARED_SECRET }}
           RENOVO_PORTAL_BASE_URL: ${{ secrets.RENOVO_PORTAL_BASE_URL }}
           TENANT_BASE_DOMAIN: ${{ secrets.TENANT_BASE_DOMAIN }}
+          # electron-builder signs automatically once these are present —
+          # see electron/README.md's "Code signing" section. Unset repo
+          # secrets resolve to empty strings, so this is a no-op (installer
+          # stays unsigned) until a real certificate is purchased and these
+          # two secrets are added — no further workflow changes needed then.
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4

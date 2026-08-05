@@ -9,6 +9,8 @@ interface ElectronAPI {
   minimize:         () => void
   maximize:         () => void
   close:            () => void
+  /** Subscribes to native maximize/unmaximize state changes; returns an unsubscribe function. */
+  onWindowStateChange: (callback: (isMaximized: boolean) => void) => () => void
   readScale:        (scaleNum: number) => Promise<{ weight: number; unit: string }>
   // `id` looks up a synced record server-side; `data` prints directly from
   // client-supplied fields with no DB lookup, for a purchase/sale created

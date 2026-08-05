@@ -8,11 +8,38 @@
     margin: 0;
     height: 100vh;
     display: flex;
-    align-items: center;
-    justify-content: center;
+    flex-direction: column;
     background: #1B3A6B;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     -webkit-app-region: drag;
+  }
+  .titlebar {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    height: 32px;
+    flex-shrink: 0;
+    -webkit-app-region: no-drag;
+  }
+  .titlebar button {
+    width: 32px;
+    height: 28px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+    border-radius: 4px;
+  }
+  .titlebar button:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
+  .titlebar button.close:hover { background: #dc2626; color: #fff; }
+  .content {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
   .card {
     width: 360px;
@@ -47,18 +74,31 @@
 </style>
 </head>
 <body>
-  <div class="card">
-    <h1>Activate Renovo Pro</h1>
-    <p>Enter the activation code your platform administrator gave you.</p>
-    <input id="code" type="text" placeholder="rpt_..." autofocus />
-    <button id="activateBtn">Activate</button>
-    <div id="error" class="error"></div>
+  <div class="titlebar">
+    <button id="minimizeBtn" title="Minimise" aria-label="Minimise window">&#x2212;</button>
+    <button id="closeBtn" class="close" title="Close" aria-label="Close window">&#x2715;</button>
+  </div>
+
+  <div class="content">
+    <div class="card">
+      <h1>Activate Renovo Pro</h1>
+      <p>Enter the activation code your platform administrator gave you.</p>
+      <input id="code" type="text" placeholder="rpt_..." autofocus />
+      <button id="activateBtn">Activate</button>
+      <div id="error" class="error"></div>
+    </div>
   </div>
 
   <script>
     const btn = document.getElementById('activateBtn')
     const input = document.getElementById('code')
     const errorEl = document.getElementById('error')
+
+    // This is the first screen a fresh install shows — with frame:false
+    // and no controls at all, a user without an activation code on hand
+    // had no way to close the app short of Task Manager.
+    document.getElementById('minimizeBtn').addEventListener('click', () => window.electronAPI.minimize())
+    document.getElementById('closeBtn').addEventListener('click', () => window.electronAPI.close())
 
     btn.addEventListener('click', async () => {
       errorEl.textContent = ''
