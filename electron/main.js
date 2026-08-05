@@ -247,9 +247,28 @@ async function startApp() {
   }
 
   startStandaloneServer(desktopEnv)
-  const ready = await waitForServerReady()
-  if (!ready) {
-    console.error('[server] standalone server did not become ready in time')
+  let ready = await waitForServerReady()
+  // A cold first run (disk cache empty, Prisma engine loading) can
+  // legitimately take longer than the initial 30s wait. Proceeding
+  // straight to createMainWindow() here used to load a URL nothing was
+  // listening on yet, showing Chromium's generic "site can't be reached"
+  // page with no indication of what actually went wrong or what to do
+  // about it — this offers a real choice instead of a dead end.
+  while (!ready) {
+    const { response } = await dialog.showMessageBox({
+      type: 'warning',
+      title: 'Renovo Pro — Still Starting',
+      message: 'The local server is taking longer than expected to start.',
+      detail: 'This can happen on a slow first run. Choose Retry to keep waiting, or Quit to close the app.',
+      buttons: ['Retry', 'Quit'],
+      defaultId: 0,
+      cancelId: 1,
+    })
+    if (response !== 0) {
+      app.quit()
+      return
+    }
+    ready = await waitForServerReady()
   }
 
   createMainWindow()
