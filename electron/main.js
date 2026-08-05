@@ -8,7 +8,7 @@
  * absorbed by the renderer's own offline queue (src/lib/offline/), not by
  * this process — there is no local database here.
  */
-const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, dialog } = require('electron')
+const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, dialog, shell } = require('electron')
 const path = require('node:path')
 const fs = require('node:fs')
 const { spawn } = require('node:child_process')
@@ -21,6 +21,52 @@ let heartbeatTimer = null
 
 const isDev = !app.isPackaged
 const PORT = process.env.PORT || 3100 // distinct from Web's 3000 so both can run side by side during dev
+
+// ─── Diagnostics ────────────────────────────────────────────────────────────
+//
+// A packaged Windows app built with the default `win` subsystem has no
+// attached console — `stdio: 'inherit'` on the spawned server and every
+// `console.*` call in this file go to a console that doesn't exist, so
+// whatever actually causes a failure (Prisma engine mismatch, unreachable
+// DB, a bad desktop.env value, ...) was being logged correctly and then
+// silently discarded. Everything below routes that same output to a real
+// file instead, so a support request can be answered from evidence instead
+// of "it says error 500".
+const LOG_DIR = path.join(app.getPath('userData'), 'logs')
+const LOG_FILE = path.join(LOG_DIR, 'main.log')
+
+function logToFile(line) {
+  try {
+    fs.mkdirSync(LOG_DIR, { recursive: true })
+    fs.appendFileSync(LOG_FILE, `[${new Date().toISOString()}] ${line}\n`)
+  } catch {
+    // Disk full / permissions issue — nothing more we can do about logging
+    // the fact that logging itself failed.
+  }
+}
+
+function formatForLog(args) {
+  return args.map((a) => (a instanceof Error ? (a.stack || a.message) : typeof a === 'string' ? a : JSON.stringify(a))).join(' ')
+}
+
+for (const level of ['log', 'warn', 'error']) {
+  const original = console[level].bind(console)
+  console[level] = (...args) => {
+    original(...args)
+    logToFile(`[${level}] ${formatForLog(args)}`)
+  }
+}
+
+process.on('uncaughtException', (err) => {
+  logToFile(`[uncaughtException] ${err.stack || err.message}`)
+  dialog.showErrorBox('Renovo Pro — Unexpected Error', `${err.message}\n\nDetails were written to:\n${LOG_FILE}`)
+})
+
+process.on('unhandledRejection', (reason) => {
+  const message = reason instanceof Error ? (reason.stack || reason.message) : String(reason)
+  logToFile(`[unhandledRejection] ${message}`)
+})
+
 // portal.renovopro.app is a placeholder domain that was never actually
 // purchased/pointed anywhere (see project notes) — the Portal's real home
 // is its Vercel deployment. Using that as the fallback so a freshly
@@ -134,8 +180,17 @@ function startStandaloneServer(desktopEnv) {
       HOSTNAME: '127.0.0.1',
       NODE_ENV: 'production',
     },
-    stdio: 'inherit',
+    // 'inherit' would previously pipe this straight into a console window
+    // that doesn't exist in a packaged GUI app (see LOG_FILE above) —
+    // including every pino log line the Next.js server writes, e.g. the
+    // `logger.error({ err }, 'authorize() failed')` call in src/auth.ts.
+    // Piping it into the same log file is the only way that ever reaches
+    // disk on an installed copy of the app.
+    stdio: ['ignore', 'pipe', 'pipe'],
   })
+
+  serverProcess.stdout.on('data', (chunk) => logToFile(`[server:stdout] ${chunk.toString().trimEnd()}`))
+  serverProcess.stderr.on('data', (chunk) => logToFile(`[server:stderr] ${chunk.toString().trimEnd()}`))
 
   serverProcess.on('exit', (code) => {
     console.error(`[server] standalone server exited unexpectedly (code ${code})`)
@@ -203,6 +258,14 @@ function createMainWindow() {
   })
 
   mainWindow.on('closed', () => { mainWindow = null })
+
+  // Renderer has no native title bar to reflect maximize state (frame:
+  // false, custom title bar — see WindowControls.tsx), so it needs to be
+  // told explicitly whenever the OS-level state changes, including via
+  // means the renderer's own button never triggered (double-click on the
+  // Windows taskbar icon, Aero Snap, etc.).
+  mainWindow.on('maximize', () => mainWindow?.webContents.send('window-state-changed', true))
+  mainWindow.on('unmaximize', () => mainWindow?.webContents.send('window-state-changed', false))
 }
 
 function createTray() {
@@ -213,6 +276,10 @@ function createTray() {
     tray.setToolTip('Renovo Pro')
     tray.setContextMenu(Menu.buildFromTemplate([
       { label: 'Open', click: () => mainWindow?.show() },
+      { type: 'separator' },
+      // Lets a user hand over real diagnostics for a support request
+      // instead of just "it says error 500" — see LOG_FILE above.
+      { label: 'View Logs', click: () => shell.openPath(LOG_DIR) },
       { type: 'separator' },
       { label: 'Quit', click: () => app.quit() },
     ]))

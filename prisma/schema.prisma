@@ -1,6 +1,12 @@
 generator client {
   provider      = "prisma-client-js"
-  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+  // "windows" is explicit (not left to "native") because the desktop build
+  // (electron/main.js) spawns this same client inside a packaged Windows
+  // app — "native" only resolves correctly when `prisma generate` itself
+  // runs on Windows, which is fragile to depend on: a build produced from
+  // any other OS would silently ship a query engine the target PC can't
+  // load, and every DB-touching route (including login) would 500.
+  binaryTargets = ["native", "windows", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
