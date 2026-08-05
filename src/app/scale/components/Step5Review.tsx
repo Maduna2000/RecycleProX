@@ -7,7 +7,7 @@ import type { CartLine } from './Step5LineAdded'
 import { buildReceipt }         from '@/lib/scale/thermalReceipt'
 import {
   waitForCapacitor,
-  getSavedPrinterAddress,
+  hasSavedPrinter,
   printBytes,
 } from '@/lib/scale/capacitorPrint'
 import { usePrinterSetup } from '../PrinterContext'
@@ -131,7 +131,7 @@ export default function Step5Review({ customer, cart, onRemoveLine, onUpdateLine
 
       // ── Print path ────────────────────────────────────────────────────────
       if (inCapacitor) {
-        if (!getSavedPrinterAddress()) {
+        if (!hasSavedPrinter()) {
           setStatus('no-printer')
           return
         }

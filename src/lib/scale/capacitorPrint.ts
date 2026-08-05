@@ -5,8 +5,7 @@
 // print functions will throw / return empty results.
 
 import { ConnectionType, PaperWidth, PAPER_WIDTH_COLUMNS } from '@/lib/schemas/printer'
-
-const STORAGE_KEY = 'scale_thermal_printer_address'
+import { usePrinterStore } from '@/stores/printerStore'
 
 export interface Printer {
   name:    string
@@ -141,34 +140,39 @@ export async function getPairedPrinters(): Promise<Printer[]> {
   }
 }
 
-// ── Printer address persistence (localStorage) ───────────────────────────────
+// ── Configured printer check ──────────────────────────────────────────────────
+// Backed by printerStore.ts (Zustand, persisted) — the same store
+// PrinterSetup.tsx's save/test-print flow already writes to. This used to be
+// a separate, never-written localStorage key that nothing but this file's
+// own printBytes() ever read — PrinterSetup.tsx saving a printer never
+// touched it, so an operator who'd successfully configured and test-printed
+// still got "printer not configured" the moment they tried a real order.
 
-export function getSavedPrinterAddress(): string | null {
-  try { return localStorage.getItem(STORAGE_KEY) } catch { return null }
-}
-
-export function savePrinterAddress(address: string): void {
-  try { localStorage.setItem(STORAGE_KEY, address) } catch { /* ignore */ }
-}
-
-export function clearSavedPrinterAddress(): void {
-  try { localStorage.removeItem(STORAGE_KEY) } catch { /* ignore */ }
+export function hasSavedPrinter(): boolean {
+  return usePrinterStore.getState().getActivePrinter() !== null
 }
 
 // ── Print ─────────────────────────────────────────────────────────────────────
 
 /**
- * Sends ESC/POS bytes to the saved printer.
- * Throws if not in Capacitor, no printer is configured, or the plugin returns an error.
+ * Sends ESC/POS bytes to the active printer from printerStore.ts.
+ * Throws if not in Capacitor, no printer is configured, or the plugin/network call fails.
  */
 export async function printBytes(bytes: Uint8Array): Promise<void> {
   const p = plugin()
   if (!p) throw new Error('Thermal printer is only available in the mobile app')
 
-  const address = getSavedPrinterAddress()
-  if (!address) throw new Error('No printer configured — tap the printer icon to set one up')
+  const printer = usePrinterStore.getState().getActivePrinter()
+  if (!printer) throw new Error('No printer configured — tap the printer icon to set one up')
 
-  await p.print({ address, data: Array.from(bytes) })
+  if (printer.connectionType === 'network') {
+    const parts = printer.address.includes(':') ? printer.address.split(':') : [printer.address, '9100']
+    const ip = parts[0] ?? printer.address
+    const port = parts[1] ?? '9100'
+    await printToNetwork(ip, parseInt(port, 10), bytes)
+  } else {
+    await p.print({ address: printer.address, data: Array.from(bytes) })
+  }
 }
 
 // ── Bluetooth Scanning ───────────────────────────────────────────────────────
