@@ -207,6 +207,57 @@ export interface OfflinePhoto {
   createdAt: string
 }
 
+// ─── In-progress scale order draft (survives a reload before submission) ────
+// Distinct from OfflineScaleOrder above, which represents an order that was
+// already fully created while offline and is queued for sync — this table
+// holds the CURRENT, not-yet-submitted step flow (src/app/scale/page.tsx's
+// useState tree), so a network drop or page refresh mid-order doesn't force
+// the operator to redo customer/product/weight/photos from scratch. Photo
+// captures live here as real Blobs (IndexedDB, unlike localStorage, stores
+// Blobs natively) until the order is actually submitted.
+
+export interface OfflineScaleDraftCustomer {
+  id: string | null
+  firstName: string
+  lastName: string
+  phone: string
+  idNumber?: string
+  address?: string
+  isNew?: boolean
+  gateEntryId?: string
+}
+
+export interface OfflineScaleDraftProduct {
+  id: string
+  name: string
+  unit: string
+  categoryName: string
+  categoryId: string
+}
+
+export interface OfflineScaleDraftCartLine {
+  productId: string
+  productName: string
+  categoryName: string
+  unit: string
+  weight: string | null
+  photoR2Keys: string[]
+  photoBlobs?: Blob[]
+}
+
+export interface OfflineScaleDraft {
+  id: 'current'                       // single-row table — only one in-progress order per device
+  step: number
+  customer: OfflineScaleDraftCustomer | null
+  product: OfflineScaleDraftProduct | null
+  productQueue: OfflineScaleDraftProduct[]
+  weight: string | null
+  cart: OfflineScaleDraftCartLine[]
+  justAdded: OfflineScaleDraftCartLine | null
+  stepConfig: { requireWeight: boolean; requirePhotos: boolean }
+  savedAt: number                     // used to discard a stale draft — see scaleDraftService.ts
+}
+
 // ─── Metadata (seed timestamps, etc.) ────────────────────────────────────────
 
 export interface OfflineMeta {
@@ -233,6 +284,7 @@ class RecycleProXDB extends Dexie {
 
   scaleOrders!: Table<OfflineScaleOrder>
   photoCache!: Table<OfflinePhoto>
+  scaleDraft!: Table<OfflineScaleDraft>
 
   syncQueue!: Table<SyncQueueItem>
   meta!: Table<OfflineMeta>
@@ -296,6 +348,30 @@ class RecycleProXDB extends Dexie {
 
       scaleOrders:    '++seq, id, syncStatus, createdAt',
       photoCache:     'id, orderId, syncStatus',
+
+      syncQueue:      '++seq, id, status, createdAt',
+      meta:           'key',
+    })
+
+    // Version 4: Add in-progress scale order draft (survives a reload)
+    this.version(4).stores({
+      products:       'id, category, isActive',
+      customers:      'id, idNumber, lastName, customerType, isActive',
+      priceGroups:    'id, isDefault',
+      priceOverrides: 'id, priceGroupId, productId, [priceGroupId+productId]',
+      categories:     'id, parentId, name',
+      stepConfigs:    'categoryId',
+
+      purchases:      'id, customerId, status, createdAt',
+      purchaseLines:  'id, purchaseId, productId',
+      sales:          'id, customerId, status, createdAt',
+      saleLines:      'id, saleId, productId',
+      cashFloats:     'id, floatDate',
+      expenses:       'id, status, createdAt',
+
+      scaleOrders:    '++seq, id, syncStatus, createdAt',
+      photoCache:     'id, orderId, syncStatus',
+      scaleDraft:     'id',
 
       syncQueue:      '++seq, id, status, createdAt',
       meta:           'key',

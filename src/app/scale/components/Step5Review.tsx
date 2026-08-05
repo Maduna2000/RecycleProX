@@ -21,11 +21,13 @@ interface Props {
   onRemoveLine: (index: number) => void
   onUpdateLine: (index: number, updates: Partial<CartLine>) => void
   onNewOrder:   () => void
+  /** Called once the order is actually created (before New Order is clicked) — clears the persisted draft so a refresh on this success/print screen doesn't try to restore an already-submitted order. */
+  onOrderSubmitted?: () => void
 }
 
 type Status = 'idle' | 'creating' | 'printing' | 'done' | 'error' | 'no-printer'
 
-export default function Step5Review({ customer, cart, onRemoveLine, onUpdateLine, onNewOrder }: Props) {
+export default function Step5Review({ customer, cart, onRemoveLine, onUpdateLine, onNewOrder, onOrderSubmitted }: Props) {
   const { openPrinterSetup } = usePrinterSetup()
   const { isOnline } = useOfflineStore()
   const { data: session } = useSession()
@@ -125,6 +127,7 @@ export default function Step5Review({ customer, cart, onRemoveLine, onUpdateLine
 
       setOrderId(finalOrderId)
       setOrderNumber(finalOrderNumber)
+      onOrderSubmitted?.()
 
       // ── Print path ────────────────────────────────────────────────────────
       if (inCapacitor) {

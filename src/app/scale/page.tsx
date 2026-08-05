@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { cn } from '@/lib/utils'
 import { offlineDB } from '@/lib/offline/db'
+import { saveDraft, loadDraft, clearDraft } from '@/lib/offline/scaleDraftService'
 import Step1Customer, { type SelectedCustomer } from './components/Step1Customer'
 import Step2Product,  { type SelectedProduct }  from './components/Step2Product'
 import Step3Weight  from './components/Step3Weight'
@@ -37,6 +38,43 @@ export default function ScalePage() {
   const [justAdded, setJustAdded]   = useState<CartLine | null>(null)
   const [stepConfig, setStepConfig] = useState<StepConfig>(DEFAULT_CONFIG)
   const tempId = useTempId()
+
+  // ── Draft persistence ─────────────────────────────────────────────────
+  // A network drop or reload used to wipe the whole in-progress order —
+  // customer, confirmed cart lines, everything — forcing the operator to
+  // start over. Restored once on mount from IndexedDB (see
+  // scaleDraftService.ts); saved again on every change to the fields
+  // below once that restore attempt has finished, so the empty initial
+  // state doesn't overwrite a real draft before it's had a chance to load.
+  const draftRestored = useRef(false)
+
+  useEffect(() => {
+    let cancelled = false
+    loadDraft().then(draft => {
+      if (cancelled || !draft) { draftRestored.current = true; return }
+      setStep(draft.step)
+      setCustomer(draft.customer)
+      setProduct(draft.product)
+      setProductQueue(draft.productQueue)
+      setWeight(draft.weight)
+      setCart(draft.cart)
+      setJustAdded(draft.justAdded)
+      setStepConfig(draft.stepConfig)
+      draftRestored.current = true
+    })
+    return () => { cancelled = true }
+  }, [])
+
+  useEffect(() => {
+    if (!draftRestored.current) return
+    if (step === 1 && !customer && cart.length === 0) {
+      // Nothing worth saving yet (fresh/just-reset state) — avoid writing
+      // an empty draft row on every mount.
+      void clearDraft()
+      return
+    }
+    void saveDraft({ step, customer, product, productQueue, weight, cart, justAdded, stepConfig, savedAt: Date.now() })
+  }, [step, customer, product, productQueue, weight, cart, justAdded, stepConfig])
 
   // Compute enabled steps based on current config
   const enabledSteps = useMemo(() => {
@@ -97,6 +135,7 @@ export default function ScalePage() {
     setCart([])
     setJustAdded(null)
     setStepConfig(DEFAULT_CONFIG)
+    void clearDraft()
   }
 
   function handleBack() {
@@ -360,6 +399,7 @@ export default function ScalePage() {
               onRemoveLine={handleRemoveLine}
               onUpdateLine={handleUpdateLine}
               onNewOrder={reset}
+              onOrderSubmitted={clearDraft}
             />
           )}
         </div>
