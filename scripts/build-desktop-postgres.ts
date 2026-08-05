@@ -35,6 +35,20 @@ function copyIfExists(src: string, dest: string) {
 }
 
 function main() {
+  // binaryTargets in prisma/schema.prisma now explicitly includes
+  // "windows" (not just "native"), so a build produced here should still
+  // ship a working Windows query engine either way — this is a
+  // belt-and-suspenders warning, not a hard requirement, in case that
+  // target list ever regresses back to relying on "native" alone.
+  if (process.platform !== 'win32') {
+    console.warn(
+      `WARNING: building the desktop installer from ${process.platform}, not Windows. ` +
+      'The production pipeline for this build is .github/workflows/build-desktop.yml ' +
+      '(runs on windows-latest) — prefer that over a local build when producing an ' +
+      'installer for real users.'
+    )
+  }
+
   console.log('--- 1/3: regenerating the Postgres Prisma client (defends against a stale SQLite-build client swap) ---')
   run('npx', ['prisma', 'generate'])
 
