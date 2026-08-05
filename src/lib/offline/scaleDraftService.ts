@@ -22,8 +22,17 @@ export async function loadDraft(): Promise<ScaleDraft | null> {
       await clearDraft()
       return null
     }
-    const { id: _id, ...rest } = draft
-    return rest
+    return {
+      step: draft.step,
+      customer: draft.customer,
+      product: draft.product,
+      productQueue: draft.productQueue,
+      weight: draft.weight,
+      cart: draft.cart,
+      justAdded: draft.justAdded,
+      stepConfig: draft.stepConfig,
+      savedAt: draft.savedAt,
+    }
   } catch {
     return null
   }
