@@ -56,6 +56,12 @@ async function seedCustomers() {
         blacklisted: Boolean(c.blacklisted),
         isActive: Boolean(c.isActive),
         priceGroupId: c.priceGroupId as string | undefined,
+        accountCode: c.accountCode as string | null | undefined,
+        blacklistReason: c.blacklistReason as string | null | undefined,
+        tradeCommodities: c.tradeCommodities as string[] | null | undefined,
+        zeroRated: Boolean(c.zeroRated),
+        contactPerson: c.contactPerson as string | null | undefined,
+        physicalAddress: c.physicalAddress as string | null | undefined,
       }))
     )
 
@@ -154,6 +160,16 @@ async function seedCategories() {
   await offlineDB.categories.bulkPut(flat)
 }
 
+async function seedExpenseTypes() {
+  const res = await fetch('/api/expense-types')
+  if (!res.ok) return
+  const data = await res.json() as Array<{ id: string; name: string; parentId?: string | null }>
+
+  await offlineDB.expenseTypes.bulkPut(
+    data.map((t) => ({ id: t.id, name: t.name, parentId: t.parentId ?? null }))
+  )
+}
+
 /** Run full seed if stale or forced */
 export async function runSeeder(force = false): Promise<void> {
   const lastSeeded = await getLastSeededAt()
@@ -166,6 +182,7 @@ export async function runSeeder(force = false): Promise<void> {
     seedCustomers(),
     seedPriceGroups(),
     seedCategories(),
+    seedExpenseTypes(),
   ])
 
   await setLastSeededAt()

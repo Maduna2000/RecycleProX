@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Btn } from '@/components/rpx'
 import { Loader2, UserPlus, Search } from 'lucide-react'
+import { useOfflineLookup } from '@/hooks/useOfflineLookup'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -33,6 +34,7 @@ interface Props {
 export function AccountSelectorPanel({ onSelect }: Props) {
   const router    = useRouter()
   const pathname  = usePathname()
+  const { searchAccountCustomers } = useOfflineLookup()
   const [query,    setQuery]   = useState('')
   const [results,  setResults] = useState<AccountCustomer[]>([])
   const [loading,  setLoading] = useState(false)
@@ -47,10 +49,14 @@ export function AccountSelectorPanel({ onSelect }: Props) {
   async function performSearch(q: string) {
     setLoading(true)
     try {
-      const res = await fetch(`/api/customers?search=${encodeURIComponent(q)}&type=account&limit=8`)
-      if (!res.ok) { setResults([]); return }
-      const data = await res.json() as { customers: AccountCustomer[] }
-      setResults(data.customers ?? [])
+      const found = await searchAccountCustomers(q)
+      setResults(found.map((c): AccountCustomer => ({
+        id: c.id, firstName: c.firstName, lastName: c.lastName, idNumber: c.idNumber,
+        phone: c.phone, accountCode: c.accountCode ?? null, blacklisted: c.blacklisted,
+        blacklistReason: c.blacklistReason ?? null, priceGroupId: c.priceGroupId ?? null,
+        tradeCommodities: c.tradeCommodities ?? null, zeroRated: c.zeroRated ?? false,
+        companyName: c.companyName ?? null, contactPerson: c.contactPerson ?? null,
+      })))
       setSearched(true)
     } catch {
       setResults([])

@@ -26,6 +26,15 @@ export interface OfflineCustomer {
   blacklisted: boolean
   isActive: boolean
   priceGroupId?: string
+  // Only needed for account-customer lookup fidelity (VAT/trade-commodity
+  // filtering, receipt display) — see useOfflineLookup.ts. Not indexed,
+  // so no schema version bump needed to add them.
+  accountCode?: string | null
+  blacklistReason?: string | null
+  tradeCommodities?: string[] | null
+  zeroRated?: boolean
+  contactPerson?: string | null
+  physicalAddress?: string | null
 }
 
 export interface OfflinePriceGroup {
@@ -126,6 +135,12 @@ export interface OfflineExpense {
   createdAt: string
   _offlineCreated?: boolean
   _cloudId?: string
+}
+
+export interface OfflineExpenseType {
+  id: string
+  name: string
+  parentId?: string | null
 }
 
 // ─── Sync queue ───────────────────────────────────────────────────────────────
@@ -281,6 +296,7 @@ class RecycleProXDB extends Dexie {
   saleLines!: Table<OfflineSaleLine>
   cashFloats!: Table<OfflineCashFloat>
   expenses!: Table<OfflineExpense>
+  expenseTypes!: Table<OfflineExpenseType>
 
   scaleOrders!: Table<OfflineScaleOrder>
   photoCache!: Table<OfflinePhoto>
@@ -368,6 +384,31 @@ class RecycleProXDB extends Dexie {
       saleLines:      'id, saleId, productId',
       cashFloats:     'id, floatDate',
       expenses:       'id, status, createdAt',
+
+      scaleOrders:    '++seq, id, syncStatus, createdAt',
+      photoCache:     'id, orderId, syncStatus',
+      scaleDraft:     'id',
+
+      syncQueue:      '++seq, id, status, createdAt',
+      meta:           'key',
+    })
+
+    // Version 5: Add expense types (for offline Expenses form support)
+    this.version(5).stores({
+      products:       'id, category, isActive',
+      customers:      'id, idNumber, lastName, customerType, isActive',
+      priceGroups:    'id, isDefault',
+      priceOverrides: 'id, priceGroupId, productId, [priceGroupId+productId]',
+      categories:     'id, parentId, name',
+      stepConfigs:    'categoryId',
+
+      purchases:      'id, customerId, status, createdAt',
+      purchaseLines:  'id, purchaseId, productId',
+      sales:          'id, customerId, status, createdAt',
+      saleLines:      'id, saleId, productId',
+      cashFloats:     'id, floatDate',
+      expenses:       'id, status, createdAt',
+      expenseTypes:   'id, parentId',
 
       scaleOrders:    '++seq, id, syncStatus, createdAt',
       photoCache:     'id, orderId, syncStatus',

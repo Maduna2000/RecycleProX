@@ -15,6 +15,7 @@ import { colors } from '@/lib/design-tokens'
 import { HEADER_GRAD, BAR_GRAD, CARD_BORDER, Btn } from '@/components/rpx'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { useOfflineMutation } from '@/hooks/useOfflineFetch'
+import { useOfflineLookup } from '@/hooks/useOfflineLookup'
 import { offlineDB } from '@/lib/offline/db'
 import { fetcher } from '@/lib/swrFetcher'
 import { canAutoPrint, autoPrintReceipt } from '@/lib/print/autoPrintClient'
@@ -97,6 +98,7 @@ export default function NewPurchasePage() {
   const router    = useRouter()
   const readScale = useScaleRead()
   const { mutate: offlineMutate } = useOfflineMutation()
+  const { getActiveProducts, resolveProductPrice } = useOfflineLookup()
   const { confirm } = useConfirm()
 
   // ── Core purchase state ──────────────────────────────────────────────────
@@ -142,8 +144,8 @@ export default function NewPurchasePage() {
   const casualPanelRef = useRef<CasualSelectorPanelRef>(null)
 
   // ── Data fetching ────────────────────────────────────────────────────────
-  const { data: productsData } = useSWR<{ products: Product[] }>('/api/products?active=true', fetcher)
-  const products = productsData?.products ?? []
+  const { data: productsData } = useSWR<Product[]>('/api/products?active=true', () => getActiveProducts())
+  const products = productsData ?? []
 
   // A customer's trade commodities are product category names (Settings ->
   // Trade Commodities toggles real categories on/off). Selecting a parent
@@ -270,13 +272,8 @@ export default function NewPurchasePage() {
     const product = products.find((p) => p.id === productId) ?? null
     let unitPrice = product ? new Decimal(product.defaultBuyPrice).toFixed(2) : ''
     if (product && customer?.priceGroupId) {
-      try {
-        const res = await fetch(`/api/products/${productId}?priceGroupId=${customer.priceGroupId}`)
-        if (res.ok) {
-          const data = await res.json() as { defaultBuyPrice: string }
-          unitPrice = new Decimal(data.defaultBuyPrice).toFixed(2)
-        }
-      } catch { /* use default */ }
+      const resolved = await resolveProductPrice(productId, customer.priceGroupId, 'buy')
+      if (resolved) unitPrice = new Decimal(resolved).toFixed(2)
     }
     patchLine(key, { productId, product, unitPrice })
   }
@@ -410,13 +407,8 @@ export default function NewPurchasePage() {
         const product = products.find((p) => p.id === productId) ?? null
         let unitPrice = product ? new Decimal(product.defaultBuyPrice).toFixed(2) : ''
         if (product && fullCustomer.priceGroupId) {
-          try {
-            const priceRes = await fetch(`/api/products/${productId}?priceGroupId=${fullCustomer.priceGroupId}`)
-            if (priceRes.ok) {
-              const d = await priceRes.json() as { defaultBuyPrice: string }
-              unitPrice = new Decimal(d.defaultBuyPrice).toFixed(2)
-            }
-          } catch { /* use default */ }
+          const resolved = await resolveProductPrice(productId, fullCustomer.priceGroupId, 'buy')
+          if (resolved) unitPrice = new Decimal(resolved).toFixed(2)
         }
         newLines.push({
           ...emptyLine(nextKey, vatApplied),

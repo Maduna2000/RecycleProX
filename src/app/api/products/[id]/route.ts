@@ -2,15 +2,26 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { UpdateProductSchema } from '@/lib/schemas/product'
-import { getProduct, updateProduct, deleteProduct, ProductNotFoundError, ProductInUseError } from '@/lib/services/productService'
+import { getProduct, updateProduct, deleteProduct, resolvePrice, ProductNotFoundError, ProductInUseError } from '@/lib/services/productService'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  // ?priceGroupId= is how Purchases-new/Sales-new ask "what should this
+  // customer actually pay for this product" — until this fix, that param
+  // was silently ignored and every caller got the product's plain default
+  // price back, never a price-group override.
+  const priceGroupId = req.nextUrl.searchParams.get('priceGroupId') ?? undefined
+
   try {
-    const product = await runWithRequestTenant(req, () => getProduct(params.id))
+    const product = await runWithRequestTenant(req, async () => {
+      const p = await getProduct(params.id)
+      if (!priceGroupId) return p
+      const resolved = await resolvePrice(params.id, priceGroupId)
+      return { ...p, defaultBuyPrice: resolved.buyPrice, defaultSellPrice: resolved.sellPrice, priceSource: resolved.source }
+    })
     return NextResponse.json(product)
   } catch (err) {
     if (err instanceof ProductNotFoundError) return NextResponse.json({ error: err.message }, { status: 404 })

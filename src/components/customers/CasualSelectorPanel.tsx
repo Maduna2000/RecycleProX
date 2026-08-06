@@ -10,6 +10,7 @@ import { validateSaId } from '@/lib/utils/saId'
 import { useOfflineStore } from '@/stores/offlineStore'
 import { offlineDB } from '@/lib/offline/db'
 import { enqueueMutation } from '@/lib/offline/sync'
+import { useOfflineLookup } from '@/hooks/useOfflineLookup'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -90,6 +91,7 @@ async function compressImage(file: File, maxPx = 1600, quality = 0.85): Promise<
 export const CasualSelectorPanel = forwardRef<CasualSelectorPanelRef, Props>(
   function CasualSelectorPanel({ onSelect, onAccountMatch, hideConfirmButton = false }, ref) {
     const isOnline = useOfflineStore((s) => s.isOnline)
+    const { lookupCustomerByIdNumber } = useOfflineLookup()
     const [form, setForm] = useState<CasualForm>({
       idNumber: '', firstName: '', lastName: '', phone: '', physicalAddress: '',
     })
@@ -115,9 +117,22 @@ export const CasualSelectorPanel = forwardRef<CasualSelectorPanelRef, Props>(
     const performLookup = useCallback(async (idNumber: string) => {
       setLookupStatus('loading')
       try {
-        const res = await fetch(`/api/customers/lookup?idNumber=${encodeURIComponent(idNumber)}`)
-        if (!res.ok) { setLookupStatus('idle'); return }
-        const data = await res.json() as LookupCustomer | null
+        const found = await lookupCustomerByIdNumber(idNumber)
+        const data: LookupCustomer | null = found && {
+          id:               found.id,
+          idNumber:         found.idNumber,
+          firstName:        found.firstName,
+          lastName:         found.lastName,
+          phone:            found.phone,
+          blacklisted:      found.blacklisted,
+          priceGroupId:     found.priceGroupId ?? null,
+          tradeCommodities: found.tradeCommodities ?? null,
+          zeroRated:        found.zeroRated ?? false,
+          physicalAddress:  found.physicalAddress ?? null,
+          customerType:     found.customerType as 'casual' | 'account' | undefined,
+          companyName:      found.companyName ?? null,
+          contactPerson:    found.contactPerson ?? null,
+        }
         if (data) {
           // This ID belongs to a registered Account customer, not a Casual
           // one — hand off to the host page's Account tab instead of
@@ -149,7 +164,7 @@ export const CasualSelectorPanel = forwardRef<CasualSelectorPanelRef, Props>(
       } catch {
         setLookupStatus('idle')
       }
-    }, [onAccountMatch])
+    }, [onAccountMatch, lookupCustomerByIdNumber])
 
     function handleIdChange(value: string) {
       setForm((f) => ({ ...f, idNumber: value }))

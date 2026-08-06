@@ -19,6 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { colors, fontSize } from '@/lib/design-tokens'
 import { fetcher } from '@/lib/swrFetcher'
 import { useOfflineMutation } from '@/hooks/useOfflineFetch'
+import { useOfflineLookup } from '@/hooks/useOfflineLookup'
 import { offlineDB } from '@/lib/offline/db'
 import {
   inp, lbl, Btn, Field, PortalPage, FilterBar,
@@ -357,7 +358,8 @@ function AddExpenseModal({ mode, expense, onClose, onSuccess }: AddExpenseModalP
   const [slipFile,    setSlipFile]    = useState<File | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const { mutate: offlineMutate } = useOfflineMutation()
-  const { data: types } = useSWR<ExpenseType[]>('/api/expense-types', fetcher)
+  const { getExpenseTypes } = useOfflineLookup()
+  const { data: types } = useSWR<ExpenseType[]>('/api/expense-types', () => getExpenseTypes())
 
   const isEdit = mode === 'edit' && expense
 

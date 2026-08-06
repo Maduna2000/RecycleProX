@@ -18,6 +18,7 @@ import { Dialog } from '@/components/ui/dialog'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { Btn, HEADER_GRAD, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
 import { useOfflineMutation } from '@/hooks/useOfflineFetch'
+import { useOfflineLookup } from '@/hooks/useOfflineLookup'
 import { offlineDB } from '@/lib/offline/db'
 import { fetcher } from '@/lib/swrFetcher'
 import { canAutoPrint, autoPrintReceipt } from '@/lib/print/autoPrintClient'
@@ -97,6 +98,7 @@ export default function NewSalePage() {
   const router    = useRouter()
   const readScale = useScaleRead()
   const { mutate: offlineMutate } = useOfflineMutation()
+  const { getActiveProducts, resolveProductPrice } = useOfflineLookup()
   const { confirm } = useConfirm()
 
   // ── Buyer state ───────────────────────────────────────────────────────────
@@ -142,7 +144,7 @@ export default function NewSalePage() {
   const [readingScale2, setReadingScale2] = useState(false)
 
   // ── Data fetching ─────────────────────────────────────────────────────────
-  const { data: productsData } = useSWR<{ products: Product[] }>('/api/products?active=true', fetcher)
+  const { data: productsData } = useSWR<Product[]>('/api/products?active=true', () => getActiveProducts())
   const { data: stockData }    = useSWR<{ stock: StockRow[] }>('/api/stock/on-hand', fetcher)
 
   const buyerKey = buyerMode === 'account' && customer
@@ -171,7 +173,7 @@ export default function NewSalePage() {
     setBusinessLoanSummary(null)
   }, [customer?.id])
 
-  const products = productsData?.products ?? []
+  const products = productsData ?? []
   const stockMap = new Map((stockData?.stock ?? []).map((r) => [r.product.id, new Decimal(r.onHand ?? '0')]))
 
   // ── Derived calculations ──────────────────────────────────────────────────
@@ -267,13 +269,8 @@ export default function NewSalePage() {
     const product = products.find((p) => p.id === productId) ?? null
     let unitPrice = product ? new Decimal(product.defaultSellPrice).toFixed(2) : ''
     if (product && customer?.priceGroupId) {
-      try {
-        const res = await fetch(`/api/products/${productId}?priceGroupId=${customer.priceGroupId}`)
-        if (res.ok) {
-          const data = await res.json() as { defaultSellPrice: string }
-          if (data.defaultSellPrice) unitPrice = new Decimal(data.defaultSellPrice).toFixed(2)
-        }
-      } catch { /* use default */ }
+      const resolved = await resolveProductPrice(productId, customer.priceGroupId, 'sell')
+      if (resolved) unitPrice = new Decimal(resolved).toFixed(2)
     }
     patchLine(key, { productId, product, unitPrice })
   }
