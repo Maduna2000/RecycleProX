@@ -394,25 +394,39 @@ export default function NewPurchasePage() {
       setScaleOrderLink({ id: match.id, orderNumber: match.orderNumber })
       setScaleOrderSearch('')
 
-      // Prefill the first product line from the scale order's first line
-      const firstLine = match.lines?.[0]
-      const productId = firstLine?.product?.id ?? match.product.id
-      const weight = firstLine?.weight ?? match.weight
-      const product = products.find((p) => p.id === productId) ?? null
-      let unitPrice = product ? new Decimal(product.defaultBuyPrice).toFixed(2) : ''
-      if (product && fullCustomer.priceGroupId) {
-        try {
-          const priceRes = await fetch(`/api/products/${productId}?priceGroupId=${fullCustomer.priceGroupId}`)
-          if (priceRes.ok) {
-            const d = await priceRes.json() as { defaultBuyPrice: string }
-            unitPrice = new Decimal(d.defaultBuyPrice).toFixed(2)
-          }
-        } catch { /* use default */ }
+      // Prefill one product line per line on the scale order (orders can
+      // carry multiple products); legacy orders without line rows fall
+      // back to the single header product/weight.
+      const orderLines = match.lines && match.lines.length > 0
+        ? match.lines
+        : [{ weight: match.weight, product: match.product }]
+
+      const vatApplied = !fullCustomer.zeroRated
+      const newLines: LineItem[] = []
+      let nextKey = keyCounter
+      for (const ol of orderLines) {
+        const productId = ol.product?.id ?? match.product.id
+        const weight = ol.weight ?? match.weight
+        const product = products.find((p) => p.id === productId) ?? null
+        let unitPrice = product ? new Decimal(product.defaultBuyPrice).toFixed(2) : ''
+        if (product && fullCustomer.priceGroupId) {
+          try {
+            const priceRes = await fetch(`/api/products/${productId}?priceGroupId=${fullCustomer.priceGroupId}`)
+            if (priceRes.ok) {
+              const d = await priceRes.json() as { defaultBuyPrice: string }
+              unitPrice = new Decimal(d.defaultBuyPrice).toFixed(2)
+            }
+          } catch { /* use default */ }
+        }
+        newLines.push({
+          ...emptyLine(nextKey, vatApplied),
+          productId, product, unitPrice,
+          quantity: weight ? new Decimal(weight).toFixed(3) : '',
+        })
+        nextKey += 1
       }
-      patchLine(lines[0]!.key, {
-        productId, product, unitPrice,
-        quantity: weight ? new Decimal(weight).toFixed(3) : lines[0]!.quantity,
-      })
+      setLines(newLines)
+      setKeyCounter(nextKey)
 
       toast.success(`Loaded scale order ${match.orderNumber}`)
     } catch {
