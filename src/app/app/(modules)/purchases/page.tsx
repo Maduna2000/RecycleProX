@@ -86,7 +86,7 @@ export default function PurchasesPage() {
     pageSize: '50',
   })
 
-  const { data, isLoading, error } = useSWR<{ purchases: Purchase[]; total: number }>(
+  const { data, isLoading, error } = useSWR<{ purchases: Purchase[]; total: number; todayTotal: string }>(
     `/api/purchases?${query}`,
     fetcher,
   )
@@ -253,6 +253,18 @@ export default function PurchasesPage() {
           <Btn size="sm" icon={X} onClick={clearFilters}>Clear</Btn>
         )}
       </FilterBar>
+
+      <div className="flex items-center gap-3" style={{ padding: '0 10px' }}>
+        <div
+          className="flex-1 rounded-lg px-3 py-2"
+          style={{ background: colors.processBg, border: `1px solid ${colors.border}` }}
+        >
+          <p style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>Today&apos;s Purchases Total</p>
+          <p className="font-mono font-semibold" style={{ fontSize: fontSize.md, color: colors.process }}>
+            R {new Decimal(data?.todayTotal ?? '0').toFixed(2)}
+          </p>
+        </div>
+      </div>
 
       {/* Table — grows to fill available height */}
       <div className="flex-1 min-h-0" style={{ padding: 10 }}>

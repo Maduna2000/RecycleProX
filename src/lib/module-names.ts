@@ -16,7 +16,7 @@ export const MODULE_NAMES: Record<string, string> = {
   '/app/sales':            'Sales',
   '/app/sales/new':        'New Sale',
   '/app/sales/unpaid':     'Unpaid Sales',
-  '/app/payments':         'Payments',
+  '/app/payments':         'Sales Payments',
   '/app/payments/balances': 'Account Balances',
   '/app/expenses':         'Expenses',
   '/app/cashup':           'Cash Up',

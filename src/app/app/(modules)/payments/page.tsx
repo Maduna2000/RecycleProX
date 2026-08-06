@@ -10,7 +10,7 @@ import { DataTable, Avatar, StatusBadge, type Column, type RowAction } from '@/c
 import { Dialog } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { format } from '@/lib/utils/format'
-import { colors, fontSize, fontWeight, badgeStyle } from '@/lib/design-tokens'
+import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
 import { fetcher } from '@/lib/swrFetcher'
 import {
   inp, Btn, Field, PortalPage, FilterBar,
@@ -32,37 +32,29 @@ type Payment = {
   purchase: { refNumber: string } | null
 }
 
-function DirectionBadge({ source }: { source: 'sale' | 'purchase' }) {
-  const isReceived = source === 'sale'
-  return (
-    <span style={badgeStyle(isReceived ? colors.action : colors.process, isReceived ? colors.actionBg : colors.processBg)}>
-      {isReceived ? 'Received' : 'Paid Out'}
-    </span>
-  )
-}
-
 export default function PaymentsPage() {
   const { data: session } = useSession()
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
 
   const [search,         setSearch]         = useState('')
   const [paymentMethod,  setPaymentMethod]  = useState('')
-  const [source,         setSource]         = useState('')
   const [from,           setFrom]           = useState('')
   const [to,             setTo]             = useState('')
   const [includeVoided,  setIncludeVoided]  = useState(false)
   const [voidTarget,     setVoidTarget]     = useState<Payment | null>(null)
 
-  const hasFilters = !!(search || paymentMethod || source || from || to)
+  const hasFilters = !!(search || paymentMethod || from || to)
 
   function clearFilters() {
-    setSearch(''); setPaymentMethod(''); setSource(''); setFrom(''); setTo('')
+    setSearch(''); setPaymentMethod(''); setFrom(''); setTo('')
   }
 
+  // Sales payments only — purchase-direction settlements are handled from
+  // the Purchases module (edit transaction / process payment) instead.
   const query = new URLSearchParams({
+    source: 'sale',
     ...(search        && { search }),
     ...(paymentMethod && { paymentMethod }),
-    ...(source        && { source }),
     ...(from          && { from }),
     ...(to            && { to }),
     ...(includeVoided && { includeVoided: 'true' }),
@@ -106,12 +98,6 @@ export default function PaymentsPage() {
           </div>
         </div>
       ),
-    },
-    {
-      key: 'source',
-      header: 'Direction',
-      width: '96px',
-      render: (r) => <DirectionBadge source={r.source} />,
     },
     {
       key: 'reference',
@@ -167,7 +153,7 @@ export default function PaymentsPage() {
   ]
 
   return (
-    <PortalPage title="Payments">
+    <PortalPage title="Sales Payments">
       <FilterBar>
         <Field label="Search" width={200}>
           <div style={{ position: 'relative' }}>
@@ -185,13 +171,6 @@ export default function PaymentsPage() {
             <option value="">All Methods</option>
             <option value="cash">Cash</option>
             <option value="eft">EFT</option>
-          </select>
-        </Field>
-        <Field label="Type" width={150}>
-          <select value={source} onChange={(e) => setSource(e.target.value)} style={inp}>
-            <option value="">All Payments</option>
-            <option value="sale">Received (Sales)</option>
-            <option value="purchase">Paid Out (Purchases)</option>
           </select>
         </Field>
         <Field label="From" width={145}>
@@ -221,18 +200,9 @@ export default function PaymentsPage() {
           className="flex-1 rounded-lg px-3 py-2"
           style={{ background: colors.actionBg, border: `1px solid ${colors.border}` }}
         >
-          <p style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>Total Received (Sales)</p>
+          <p style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>Total Received</p>
           <p className="font-mono font-semibold" style={{ fontSize: fontSize.md, color: colors.action }}>
             R {new Decimal(paymentsData?.totalReceived ?? '0').toFixed(2)}
-          </p>
-        </div>
-        <div
-          className="flex-1 rounded-lg px-3 py-2"
-          style={{ background: colors.processBg, border: `1px solid ${colors.border}` }}
-        >
-          <p style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>Total Paid Out (Purchases)</p>
-          <p className="font-mono font-semibold" style={{ fontSize: fontSize.md, color: colors.process }}>
-            R {new Decimal(paymentsData?.totalPaidOut ?? '0').toFixed(2)}
           </p>
         </div>
       </div>
