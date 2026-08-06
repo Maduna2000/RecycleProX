@@ -33,9 +33,13 @@ interface CompanyInfo {
 export interface PurchaseReceiptData extends CompanyInfo {
   refNumber:     string
   slipNo?:       string | number
+  // Drives the "PAID"/"UNPAID" banner at the top — a pending (not yet
+  // settled) purchase must never print as PAID.
+  status:        'completed' | 'pending' | 'voided'
   customerCode?: string
   customerName:  string
   customerIdNo?: string
+  customerPhone?: string
   customerVatNumber?: string
   lines:         ReceiptLine[]
   totalAmount:   string
@@ -90,10 +94,10 @@ function printAddressLines(printer: ThermalPrinter, address?: string) {
   }
 }
 
-function addHeader(printer: ThermalPrinter, refNumber: string, date: Date, info: CompanyInfo, provisional?: boolean) {
+function addHeader(printer: ThermalPrinter, refNumber: string, date: Date, info: CompanyInfo, provisional?: boolean, statusLabel = 'PAID') {
   printer.alignCenter()
   printer.bold(true)
-  printer.println('PAID')
+  printer.println(statusLabel)
   printer.println((info.companyName || 'GOLDEN KEY INVESTMENTS (PTY) LTD').toUpperCase())
   printer.bold(false)
   printer.alignLeft()
@@ -219,10 +223,11 @@ export async function buildPurchaseReceipt(data: PurchaseReceiptData): Promise<B
     lineCharacter: '-',
   })
 
-  addHeader(printer, data.refNumber, data.createdAt, data, data.provisional)
+  addHeader(printer, data.refNumber, data.createdAt, data, data.provisional, data.status === 'completed' ? 'PAID' : 'UNPAID')
   addPeopleLines(printer, data.cashierName, data.scaleOperatorName)
   addPartyLines(printer, 'Cust', data.customerCode, data.customerName, data.customerVatNumber)
   if (data.customerIdNo) printer.println(`ID: ${data.customerIdNo}`)
+  if (data.customerPhone) printer.println(`Phone: ${data.customerPhone}`)
 
   addLines(printer, data.lines)
   addTotals(printer, data.lines, data.totalAmount, data.vatAmount)

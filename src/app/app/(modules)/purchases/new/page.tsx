@@ -517,8 +517,10 @@ export default function NewPurchasePage() {
                 type: 'purchase',
                 data: {
                   refNumber: offlineRefNumber,
+                  status,
                   customerName: `${resolvedCustomer.firstName} ${resolvedCustomer.lastName}`,
                   customerIdNo: resolvedCustomer.idNumber ?? undefined,
+                  customerPhone: resolvedCustomer.phone ?? undefined,
                   lines: receiptLines,
                   totalAmount: grandTotal.toFixed(2),
                   paymentMethod,

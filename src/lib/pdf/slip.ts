@@ -455,6 +455,9 @@ export interface PurchaseSlipData {
   vatNumber?:      string
   refNumber:    string
   slipNo?:      string | number
+  // Drives the "PAID"/"UNPAID" banner at the top — a pending (not yet
+  // settled) purchase must never print as PAID.
+  status:       'completed' | 'pending' | 'voided'
   customerCode?: string
   customerName:  string
   customerIdNo?: string
@@ -618,7 +621,7 @@ export async function generatePurchaseReceiptPdf(data: PurchaseSlipData): Promis
   const nextLine = (size = NORMAL, gap = 2) => { cursor -= (size + gap) }
 
   // ── Header ─────────────────────────────────────────────────────────────
-  center(page, 'PAID', cursor, NORMAL, bold, BLACK)
+  center(page, data.status === 'completed' ? 'PAID' : 'UNPAID', cursor, NORMAL, bold, BLACK)
   nextLine(NORMAL, 2)
   center(page, (data.companyName || 'Golden Key Investments (Pty) Ltd').toUpperCase(), cursor, NORMAL, bold, BLACK)
   nextLine(NORMAL, 2)

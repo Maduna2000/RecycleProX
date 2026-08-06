@@ -156,6 +156,7 @@ async function generateAndStorePurchasePdfs(purchase: PurchaseWithCustomerAndLin
       // system, this is the closest existing equivalent to the legacy
       // paper receipt's "Slip No."
       slipNo:         Number(purchase.refNumber.split('-').pop()),
+      status:         purchase.status,
       customerCode:   purchase.customer.accountCode ?? undefined,
       customerName:   `${purchase.customer.firstName} ${purchase.customer.lastName}`,
       customerIdNo:   purchase.customer.idNumber ?? undefined,

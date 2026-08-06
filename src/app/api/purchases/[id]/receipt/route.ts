@@ -58,9 +58,11 @@ export async function GET(
         companyPhone:   settings.yardPhone,
         vatNumber:      settings.vatNumber,
         refNumber:      purchase.refNumber,
+        status:         purchase.status,
         customerCode:   purchase.customer.accountCode ?? undefined,
         customerName:   `${purchase.customer.firstName} ${purchase.customer.lastName}`,
         customerIdNo:   purchase.customer.idNumber ?? undefined,
+        customerPhone:  purchase.customer.phone ?? undefined,
         customerVatNumber: purchase.customer.vatNumber ?? undefined,
         lines:          thermalLines,
         totalAmount:    purchase.totalAmount.toString(),
@@ -89,6 +91,7 @@ export async function GET(
       // (PUR-YYYYMMDD-NNNN) — see generatePurchaseReceiptPdf's own caller
       // in purchaseService.ts for why this is used as "Slip No."
       slipNo:         Number(purchase.refNumber.split('-').pop()),
+      status:         purchase.status,
       customerCode:   purchase.customer.accountCode ?? undefined,
       customerName:   `${purchase.customer.firstName} ${purchase.customer.lastName}`,
       customerIdNo:   purchase.customer.idNumber ?? undefined,
