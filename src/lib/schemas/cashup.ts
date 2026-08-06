@@ -1,7 +1,10 @@
 import { z } from 'zod'
 
-// SA banknote/coin denominations in cents (to avoid float keys)
-export const DENOMINATIONS = [20000, 10000, 5000, 2000, 1000, 500, 200, 100, 50] as const
+// SA banknote/coin denominations in cents (to avoid float keys). Includes 1c
+// so any odd-cents total (e.g. from a digital/EFT-funded transaction mixed
+// into the drawer) can still be counted exactly as a whole number of coins,
+// without needing decimal input anywhere in the count fields.
+export const DENOMINATIONS = [20000, 10000, 5000, 2000, 1000, 500, 200, 100, 50, 1] as const
 export type Denomination = (typeof DENOMINATIONS)[number]
 
 // Human-readable labels
@@ -15,6 +18,7 @@ export const DENOMINATION_LABELS: Record<Denomination, string> = {
   200:   'R2',
   100:   'R1',
   50:    '50c',
+  1:     '1c',
 }
 
 // Denomination map: { "20000": 3, "10000": 5, ... }
