@@ -59,11 +59,13 @@ export default function PurchasesPage() {
   const { data: session } = useSession()
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
 
+  const today = new Date().toISOString().split('T')[0]!
+
   const [search,        setSearch]        = useState('')
   const [status,        setStatus]        = useState('')
   const [paymentMethod, setPaymentMethod] = useState('')
-  const [from,          setFrom]          = useState('')
-  const [to,            setTo]            = useState('')
+  const [from,          setFrom]          = useState(today)
+  const [to,            setTo]            = useState(today)
   const [page,          setPage]          = useState(1)
   const [sortKey,       setSortKey]       = useState<string | null>(null)
   const [sortDir,       setSortDir]       = useState<SortDir>(null)
@@ -87,11 +89,16 @@ export default function PurchasesPage() {
     pageSize: '50',
   })
 
-  const { data, isLoading, error } = useSWR<{ purchases: Purchase[]; total: number; todayTotal: string }>(
+  const { data, isLoading, error } = useSWR<{ purchases: Purchase[]; total: number; totalSum: string }>(
     `/api/purchases?${query}`,
     fetcher,
   )
   const purchases = data?.purchases ?? []
+
+  const rangeLabel =
+    from && to && from === today && to === today ? 'Today'
+    : from && to ? (from === to ? from : `${from} – ${to}`)
+    : 'All time'
 
   const { data: detail, isLoading: detailLoading } = useSWR<PurchaseDetail>(
     selectedId ? `/api/purchases/${selectedId}` : null,
@@ -271,19 +278,16 @@ export default function PurchasesPage() {
         {hasFilters && (
           <Btn size="sm" icon={X} onClick={clearFilters}>Clear</Btn>
         )}
-      </FilterBar>
 
-      <div className="flex items-center gap-3" style={{ padding: '0 10px' }}>
-        <div
-          className="flex-1 rounded-lg px-3 py-2"
-          style={{ background: colors.processBg, border: `1px solid ${colors.border}` }}
-        >
-          <p style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>Today&apos;s Purchases Total</p>
-          <p className="font-mono font-semibold" style={{ fontSize: fontSize.md, color: colors.process }}>
-            R {new Decimal(data?.todayTotal ?? '0').toFixed(2)}
+        <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
+          <p className="uppercase tracking-wide font-semibold" style={{ fontSize: 10, color: colors.textSecondary }}>
+            Total Purchases &middot; {rangeLabel}
+          </p>
+          <p className="font-mono font-bold" style={{ fontSize: 16, color: colors.textPrimary }}>
+            R {new Decimal(data?.totalSum ?? '0').toFixed(2)}
           </p>
         </div>
-      </div>
+      </FilterBar>
 
       {/* Table — grows to fill available height */}
       <div className="flex-1 min-h-0" style={{ padding: 10 }}>

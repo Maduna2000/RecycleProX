@@ -8,7 +8,7 @@ import { recordMovement, recordVoidReversal } from '@/lib/services/stockService'
 import { applyRepaymentTx, reverseRepaymentsForPurchase } from '@/lib/services/loanService'
 import { recalculateApprovedCashUpForDate } from '@/lib/services/cashUpService'
 import { autoPromoteCasualIfEligible } from '@/lib/services/customerService'
-import { sastDayLabelOfInstant, sastDateLabelToUTCDate, getDayBoundsSAST, todaySASTDate } from '@/lib/utils/dayBounds'
+import { sastDayLabelOfInstant, sastDateLabelToUTCDate } from '@/lib/utils/dayBounds'
 import { getAllSettings } from '@/lib/services/settingsService'
 import { generateVat264 } from '@/lib/pdf/vat264'
 import { generatePurchaseReceiptPdf } from '@/lib/pdf/slip'
@@ -702,12 +702,11 @@ export async function listPurchases(opts?: {
     }),
   }
 
-  // Today's total is independent of whatever filters the list itself has
-  // applied (search/status/date range) — a small fixed "how much came in
-  // today" stat, not a total of the current filtered view.
-  const { start: todayStart, end: todayEnd } = getDayBoundsSAST(todaySASTDate())
+  // Voided purchases represent reversed spend, not real money paid out — exclude
+  // them from the total unless the caller explicitly filtered for that status.
+  const totalWhere = opts?.status ? where : { ...where, status: { not: 'voided' as const } }
 
-  const [rawPurchases, total, todayAgg] = await Promise.all([
+  const [rawPurchases, total, totalAgg] = await Promise.all([
     prisma.purchase.findMany({
       where,
       include: {
@@ -719,10 +718,7 @@ export async function listPurchases(opts?: {
       take: pageSize,
     }),
     prisma.purchase.count({ where }),
-    prisma.purchase.aggregate({
-      _sum: { totalAmount: true },
-      where: { status: { not: 'voided' }, createdAt: { gte: todayStart, lte: todayEnd } },
-    }),
+    prisma.purchase.aggregate({ where: totalWhere, _sum: { totalAmount: true } }),
   ])
 
   const purchases = rawPurchases.map((p) => {
@@ -733,7 +729,7 @@ export async function listPurchases(opts?: {
     return { ...p, subTotal: subTotal.toFixed(2), vatAmount: vatAmount.toFixed(2) }
   })
 
-  const todayTotal = new Decimal(todayAgg._sum.totalAmount?.toString() ?? '0').toFixed(2)
+  const totalSum = new Decimal(totalAgg._sum.totalAmount?.toString() ?? '0').toFixed(2)
 
-  return { purchases, total, page, pageSize, pageCount: Math.ceil(total / pageSize), todayTotal }
+  return { purchases, total, totalSum, page, pageSize, pageCount: Math.ceil(total / pageSize) }
 }
