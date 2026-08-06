@@ -505,11 +505,21 @@ export async function buildLoanPayments(
     if (!byCustomer.has(r.customerId)) {
       byCustomer.set(r.customerId, { name: customerName(r.customer), entries: [] })
     }
+    // A reverseRepaymentsForPurchase() reversal entry (purchase voided after
+    // it was settled) deliberately has no purchaseId, same as a genuine
+    // manual repayment — but it's always a negative amount, which a real
+    // repayment never is. Distinguish on that rather than mislabeling it
+    // "Manual".
+    const isReversal = !r.purchase && D(r.amount).isNegative()
     byCustomer.get(r.customerId)!.entries.push({
       date: r.createdAt,
       ref: r.refNumber,
-      purchaseRef: r.purchase?.refNumber ?? 'Manual',
-      description: r.purchase ? 'Loan Repayment - Purchase Deduction' : 'Loan Repayment - Manual',
+      purchaseRef: r.purchase?.refNumber ?? (isReversal ? 'Voided' : 'Manual'),
+      description: r.purchase
+        ? 'Loan Repayment - Purchase Deduction'
+        : isReversal
+          ? 'Loan Repayment - Reversal (Purchase Voided)'
+          : 'Loan Repayment - Manual',
       advance: null,
       repayment: D(r.amount),
     })

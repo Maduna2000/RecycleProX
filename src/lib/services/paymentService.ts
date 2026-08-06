@@ -66,8 +66,12 @@ export async function getCustomerBalance(customerId: string) {
       where: { customerId, status: 'completed' },
       _sum: { totalAmount: true },
     }),
+    // source: 'purchase' only — a customer who is also a buyer (has Sales)
+    // can have source:'sale' Payment rows too (money they paid IN to settle
+    // a sale). Those are the opposite direction and must not net against
+    // "what the yard owes this customer for purchases".
     prisma.payment.aggregate({
-      where: { customerId, voidedAt: null },
+      where: { customerId, voidedAt: null, source: 'purchase' },
       _sum: { amount: true },
     }),
   ])
@@ -101,15 +105,16 @@ export async function createPayment(data: CreatePaymentInput, createdByUserId?: 
       if (!customer) throw new CustomerNotFoundError(data.customerId)
 
       // Balance check re-read inside the Serializable transaction — mirrors
-      // getCustomerBalance()'s aggregate logic, scoped to tx so a concurrent
-      // payment can't both pass the check against stale totals.
+      // getCustomerBalance()'s aggregate logic (including the source:
+      // 'purchase' filter — see its own comment), scoped to tx so a
+      // concurrent payment can't both pass the check against stale totals.
       const [purchaseAgg, paymentAgg] = await Promise.all([
         tx.purchase.aggregate({
           where: { customerId: data.customerId, status: 'completed' },
           _sum: { totalAmount: true },
         }),
         tx.payment.aggregate({
-          where: { customerId: data.customerId, voidedAt: null },
+          where: { customerId: data.customerId, voidedAt: null, source: 'purchase' },
           _sum: { amount: true },
         }),
       ])
@@ -261,8 +266,9 @@ export async function listCustomerBalances() {
           where: { customerId: c.id, status: 'completed' },
           _sum: { totalAmount: true },
         }),
+        // source: 'purchase' only — see getCustomerBalance's identical comment.
         prisma.payment.aggregate({
-          where: { customerId: c.id, voidedAt: null },
+          where: { customerId: c.id, voidedAt: null, source: 'purchase' },
           _sum: { amount: true },
         }),
       ])

@@ -64,7 +64,13 @@ export async function buildPoliceRegisterReport(
       { key: 'policeRegNo', label: 'Police Reg No.', width: 0.12, format: 'text', excelWidth: 16 },
       { key: 'address', label: 'Address', width: 0.16, format: 'text', excelWidth: 20 },
       { key: 'items', label: 'Items', width: 0.12, format: 'text', excelWidth: 24 },
-      { key: 'totalAmount', label: 'Amount Paid', width: 0.08, align: 'right', format: 'money', excelWidth: 12 },
+      // "Amount (R)" — the transaction/goods value, not a payment-status
+      // figure; matches src/lib/pdf/policeRegister.ts's own original label.
+      // A purchase can appear here while still pending (not yet paid) or
+      // partly loan-funded — this column intentionally doesn't distinguish
+      // that, since the register exists to track goods provenance, not cash
+      // reconciliation.
+      { key: 'totalAmount', label: 'Amount (R)', width: 0.08, align: 'right', format: 'money', excelWidth: 12 },
     ],
     groups: [{ level: 0, label: 'REGISTER', rows }],
     grandTotal: { totalAmount: grandTotal.toFixed(2) },

@@ -28,16 +28,27 @@ function customerBandName(c: { firstName: string; lastName: string; companyName?
   return (c.companyName?.trim() || `${c.firstName} ${c.lastName}`).toUpperCase()
 }
 
-function purchaseStatusLabel(p: { status: string; amountPaid: unknown }): string {
+function purchaseStatusLabel(p: { status: string; amountPaid: unknown; loanDeductionAmount?: unknown }): string {
   if (p.status === 'completed') return 'PAID'
   if (p.status === 'pending') {
-    return new Decimal(String(p.amountPaid ?? 0)).greaterThan(0) ? 'PARTIAL' : 'UNPAID'
+    // A pending purchase can be partially settled via a loan deduction
+    // alone (no amountPaid yet) — amountPaid-only ignores that and shows
+    // UNPAID even though part of the balance is already accounted for.
+    const settled = new Decimal(String(p.amountPaid ?? 0)).plus(String(p.loanDeductionAmount ?? 0))
+    return settled.greaterThan(0) ? 'PARTIAL' : 'UNPAID'
   }
   return p.status.toUpperCase()
 }
 
-function paymentMethodLabel(p: { paymentMethod: string; splitPayments: unknown }): string {
-  return p.splitPayments ? 'Split' : p.paymentMethod.toUpperCase()
+function paymentMethodLabel(p: { paymentMethod: string; splitPayments: unknown; loanDeductionAmount?: unknown }): string {
+  if (p.splitPayments) return 'Split'
+  // A directly-completed purchase can still carry a partial loan deduction
+  // (createPurchase accepts one independent of status) — paymentMethod
+  // alone would then silently hide that part of it was never cash/EFT.
+  if (new Decimal(String(p.loanDeductionAmount ?? 0)).greaterThan(0)) {
+    return `${p.paymentMethod.toUpperCase()} + LOAN`
+  }
+  return p.paymentMethod.toUpperCase()
 }
 
 interface PurchaseSplitLegs {
@@ -225,6 +236,7 @@ export async function buildPurchasesDaily(
           createdAt: true,
           status: true,
           amountPaid: true,
+          loanDeductionAmount: true,
           paymentMethod: true,
           splitPayments: true,
           customer: {
@@ -618,20 +630,38 @@ export async function buildPurchasesSplitPayments(
     where: {
       createdAt: { gte: start, lte: end },
       splitPayments: { not: Prisma.DbNull },
+      // voidPurchase never clears splitPayments on void — a voided purchase
+      // still has this JSON populated, so it must be excluded explicitly.
+      status: { not: 'voided' },
       ...(params.customerId ? { customerId: params.customerId } : {}),
     },
     select: {
       refNumber: true,
       createdAt: true,
       splitPayments: true,
+      // Only the legs from the split-payment call itself are in
+      // splitPayments — a loan deduction already applied at creation
+      // (before this purchase was ever settled) isn't in that JSON at all.
+      // totalAmount is the ground truth; loan is derived as whatever's left
+      // after cash+eft rather than trusted from the JSON.
+      totalAmount: true,
       customer: { select: { firstName: true, lastName: true, companyName: true } },
     },
   } satisfies Prisma.PurchaseFindManyArgs
 
   const purchases = await prisma.purchase.findMany(splitPaymentArgs)
 
-  const totalOf = (legs: PurchaseSplitLegs) =>
-    new Decimal(legs.cash || '0').plus(legs.eft || '0').plus(legs.loan || '0')
+  const legsOf = (p: (typeof purchases)[number]) => {
+    const legs = purchaseSplitLegs(p.splitPayments)
+    const cash = new Decimal(legs.cash || '0')
+    const eft = new Decimal(legs.eft || '0')
+    const total = new Decimal(p.totalAmount.toString())
+    // Loan = whatever the cash/eft legs don't cover, so a loan deduction
+    // applied before this settlement (not present in the JSON) still shows
+    // up and the row always reconciles to the purchase's real total.
+    const loan = total.minus(cash).minus(eft)
+    return { cash, eft, loan, total }
+  }
 
   const { groups, grandTotal } = groupRows(purchases, {
     groups: [{ label: (p) => customerBandName(p.customer) }],
@@ -639,23 +669,23 @@ export async function buildPurchasesSplitPayments(
       key: (p) => p.refNumber,
       build: (items) => {
         const p = items[0]!
-        const legs = purchaseSplitLegs(p.splitPayments)
+        const legs = legsOf(p)
         return {
           ticket: p.refNumber,
           date: p.createdAt.toISOString(),
-          cash: new Decimal(legs.cash || '0').toFixed(2),
-          eft: new Decimal(legs.eft || '0').toFixed(2),
-          loan: new Decimal(legs.loan || '0').toFixed(2),
-          total: totalOf(legs).toFixed(2),
+          cash: legs.cash.toFixed(2),
+          eft: legs.eft.toFixed(2),
+          loan: legs.loan.toFixed(2),
+          total: legs.total.toFixed(2),
         }
       },
       sortBy: (items) => items[0]!.createdAt.toISOString(),
     },
     measures: {
-      cash: (p) => new Decimal(purchaseSplitLegs(p.splitPayments).cash || '0'),
-      eft: (p) => new Decimal(purchaseSplitLegs(p.splitPayments).eft || '0'),
-      loan: (p) => new Decimal(purchaseSplitLegs(p.splitPayments).loan || '0'),
-      total: (p) => totalOf(purchaseSplitLegs(p.splitPayments)),
+      cash: (p) => legsOf(p).cash,
+      eft: (p) => legsOf(p).eft,
+      loan: (p) => legsOf(p).loan,
+      total: (p) => legsOf(p).total,
     },
     formatTotals: (t) => ({
       cash: t.cash!.toFixed(2),
@@ -727,6 +757,7 @@ async function buildPurchasesByIdSearchCore(
           createdAt: true,
           status: true,
           amountPaid: true,
+          loanDeductionAmount: true,
           paymentMethod: true,
           splitPayments: true,
           customer: {

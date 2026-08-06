@@ -200,9 +200,16 @@ function CountCashModal({ counts, setCounts, notes, setNotes, submitting, handle
           {DENOMINATION_LABELS[d]}
         </span>
         <Input
-          type="number" min={0}
+          type="number" min={0} step={1} inputMode="numeric"
           value={(counts[d] ?? 0) === 0 ? '' : counts[d]}
-          onChange={(e) => setCounts((prev) => ({ ...prev, [d]: Math.max(0, parseInt(e.target.value || '0', 10)) }))}
+          // This counts physical notes/coins, never a money amount — a
+          // decimal point makes no sense here. Blocked at keydown (not just
+          // cleaned up in onChange) because a type="number" input that types
+          // "10." then re-renders with the same parsed value (10) never gets
+          // its stale DOM text corrected — React skips the DOM write since
+          // the value prop didn't change, leaving "10." stuck on screen.
+          onKeyDown={(e) => { if (['.', ',', 'e', 'E', '+', '-'].includes(e.key)) e.preventDefault() }}
+          onChange={(e) => setCounts((prev) => ({ ...prev, [d]: Math.max(0, parseInt(e.target.value.replace(/\D/g, '') || '0', 10)) }))}
           className="w-12 text-center font-mono h-6 text-xs border-[#E0E0E0] px-1"
           disabled={submitting} placeholder="0"
         />

@@ -694,9 +694,17 @@ export async function getLiveStats(
     }),
     // Transferred (EFT) purchases — matches the "Transferred Purchases" report's filter,
     // exposed here so that report button can be greyed out when there's nothing to show.
+    // Deliberately NOT excluding purchases with a linked Payment (unlike the
+    // cash-purchases aggregate above): that exclusion exists there to avoid
+    // double-counting against systemCashPayments, which only ever sums
+    // paymentMethod:'cash' Payments. An eft-settled purchase (created
+    // pending, later paid via markPurchasePaid/processSplitPayment with an
+    // eft Payment) is never counted by any cash-side bucket, so excluding it
+    // here too made it invisible everywhere — money that genuinely left the
+    // bank account, tracked nowhere.
     prisma.purchase.aggregate({
       _sum: { totalAmount: true },
-      where: { paymentMethod: 'eft', status: 'completed', payments: { none: {} }, createdAt: { gte: start, lte: end } },
+      where: { paymentMethod: 'eft', status: 'completed', createdAt: { gte: start, lte: end } },
     }),
     // source: 'purchase' only — see calcSystemTotals for why a source:'sale'
     // payment (cash received, not paid out) must not be pooled in here.
@@ -1048,8 +1056,11 @@ export async function getTransferredPurchasesForDate(window: DateWindow): Promis
   const { start, end } = window
 
   const purchases = await prisma.purchase.findMany({
-    // See calcSystemTotals — excludes purchases settled via a Payment record.
-    where: { paymentMethod: 'eft', status: 'completed', payments: { none: {} }, createdAt: { gte: start, lte: end } },
+    // Deliberately NOT excluding Payment-linked purchases — see the matching
+    // comment on getLiveStats' transferredPurchasesAgg. An eft-settled
+    // purchase is never counted by any cash-side bucket, so it must be
+    // captured here instead, not dropped.
+    where: { paymentMethod: 'eft', status: 'completed', createdAt: { gte: start, lte: end } },
     include: { customer: { select: { firstName: true, lastName: true } } },
     orderBy: { createdAt: 'asc' },
   })
