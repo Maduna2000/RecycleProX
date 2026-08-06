@@ -116,7 +116,15 @@ function parseEnvFile(filePath) {
     const eq = trimmed.indexOf('=')
     if (eq === -1) continue
     const key = trimmed.slice(0, eq).trim()
-    const value = trimmed.slice(eq + 1).trim()
+    let value = trimmed.slice(eq + 1).trim()
+    // Strip one layer of surrounding quotes — a value copied straight out of
+    // Vercel's env-var UI (e.g. DATABASE_URL) comes wrapped in "..." and,
+    // unlike a real dotenv parser, this minimal one otherwise passes that
+    // literal quote character through, which breaks Prisma's datasource URL
+    // validation (it checks the string starts with "postgresql://", not '"').
+    if (value.length >= 2 && ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'")))) {
+      value = value.slice(1, -1)
+    }
     if (key) result[key] = value
   }
   return result

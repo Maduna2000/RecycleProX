@@ -427,3 +427,317 @@ export async function generateTransactionSlip(data: TransactionSlipData): Promis
 
   return doc.save()
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Purchase receipt — legacy-format PDF. Mirrors src/lib/print/thermal.ts's
+// buildPurchaseReceipt field-for-field and line-for-line (same content, same
+// order, same computed values) so the PDF and the thermal printout of the
+// same purchase are the same receipt, just on different paper. Kept as a
+// separate function from generateTransactionSlip above rather than a branch
+// of it — that one is still used for sales/packing-lists, which keep their
+// existing layout; only purchases move to this format.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface PurchaseSlipLine {
+  productCode?: string
+  productName:  string
+  qty:          number     // net quantity ("Nett" on the slip)
+  unitPrice:    string     // Decimal string ("InPrice" on the slip)
+  lineTotal:    string     // Decimal string
+  grossQty?:    string
+  tareQty?:     string
+}
+
+export interface PurchaseSlipData {
+  companyName?:    string
+  companyAddress?: string
+  companyPhone?:   string
+  vatNumber?:      string
+  refNumber:    string
+  slipNo?:      string | number
+  customerCode?: string
+  customerName:  string
+  customerIdNo?: string
+  customerVatNumber?: string
+  lines:        PurchaseSlipLine[]
+  totalAmount:  string
+  vatAmount?:   string
+  paymentMethod: string
+  cashierName:   string
+  scaleOperatorName?: string
+  createdAt:    Date
+  provisional?: boolean
+  footerText?:  string
+  loanDeduction?: { amount: string; reference?: string }
+  splitPayments?: {
+    cash:   string
+    eft:    string
+    cheque: string
+    loan:   string
+  }
+}
+
+type Font = Awaited<ReturnType<PDFDocument['embedFont']>>
+type Page = ReturnType<PDFDocument['addPage']>
+
+// The legacy slip's dividers are solid printed rules, not the dashed
+// separator used by generateTransactionSlip's own different visual style.
+function solidLine(page: Page, y: number) {
+  page.drawLine({ start: { x: MARGIN, y }, end: { x: W - MARGIN, y }, thickness: 0.75, color: GRAY })
+}
+
+// A thermal printer's firmware wraps long text at the paper's character
+// width for free; pdf-lib draws exact pixel widths and does none of that —
+// the footer declaration needs manual word-wrapping to fit the same 80mm.
+function wrapText(text: string, size: number, font: Font, maxWidth: number): string[] {
+  const words = text.split(/\s+/).filter(Boolean)
+  const lines: string[] = []
+  let current = ''
+  for (const word of words) {
+    const candidate = current ? `${current} ${word}` : word
+    if (current && font.widthOfTextAtSize(candidate, size) > maxWidth) {
+      lines.push(current)
+      current = word
+    } else {
+      current = candidate
+    }
+  }
+  if (current) lines.push(current)
+  return lines
+}
+
+function pLeftRight(page: Page, left: string, right: string, y: number, size: number, font: Font, color = BLACK) {
+  page.drawText(left, { x: MARGIN, y, size, font, color })
+  const rw = font.widthOfTextAtSize(right, size)
+  page.drawText(right, { x: W - MARGIN - rw, y, size, font, color })
+}
+
+const PURCHASE_COLS: { align: 'LEFT' | 'RIGHT'; width: number }[] = [
+  { align: 'LEFT',  width: 0.22 }, // Product
+  { align: 'RIGHT', width: 0.16 }, // InPrice
+  { align: 'RIGHT', width: 0.14 }, // Gross
+  { align: 'RIGHT', width: 0.12 }, // Tare
+  { align: 'RIGHT', width: 0.14 }, // Nett
+  { align: 'RIGHT', width: 0.22 }, // Total
+]
+
+function pRow(page: Page, y: number, size: number, font: Font, color: ReturnType<typeof rgb>, texts: string[]) {
+  let x = MARGIN
+  for (let i = 0; i < PURCHASE_COLS.length; i++) {
+    const col = PURCHASE_COLS[i]!
+    const colW = BODY_W * col.width
+    const text = texts[i] ?? ''
+    if (col.align === 'RIGHT') {
+      const tw = font.widthOfTextAtSize(text, size)
+      page.drawText(text, { x: x + colW - tw, y, size, font, color })
+    } else {
+      page.drawText(text, { x, y, size, font, color })
+    }
+    x += colW
+  }
+}
+
+function formatSlipDate(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+}
+
+function estimatePurchaseHeight(data: PurchaseSlipData, footerLineCount: number): number {
+  let h = 14                                     // top margin
+  h += LINE_H * 2                                // PAID + company name
+  h += LINE_H                                    // PN No
+  h += LINE_H                                    // Date
+  h += LINE_H                                    // blank
+  const addressSegments = (data.companyAddress ?? '').split(',').map((s) => s.trim()).filter(Boolean)
+  h += addressSegments.length * LINE_H
+  if (data.companyPhone) h += LINE_H
+  if (data.vatNumber)    h += LINE_H
+  if (data.provisional)  h += LINE_H
+  h += 10                                         // divider
+
+  h += LINE_H                                    // Done By
+  if (data.scaleOperatorName) h += LINE_H
+  h += LINE_H                                    // Rep
+  h += LINE_H                                    // blank
+
+  h += LINE_H                                    // Cust
+  h += LINE_H                                    // Cust VAT
+  h += LINE_H                                    // blank
+  if (data.customerIdNo) h += LINE_H
+
+  h += LINE_H                                    // table header
+  h += data.lines.length * LINE_H * 2             // code/price row + name row per line
+  h += 10                                         // divider
+
+  h += (LINE_H + 2) * 4                           // Nett Total, Total, 15% VAT, Grand Total
+
+  const cashAmt   = new Decimal(data.splitPayments?.cash   ?? '0')
+  const eftAmt    = new Decimal(data.splitPayments?.eft    ?? '0')
+  const chequeAmt = new Decimal(data.splitPayments?.cheque ?? '0')
+  const loanAmt   = new Decimal(data.splitPayments?.loan   ?? data.loanDeduction?.amount ?? '0')
+  const hasSplit  = cashAmt.gt(0) || eftAmt.gt(0) || chequeAmt.gt(0) || loanAmt.gt(0)
+  if (hasSplit) {
+    h += LINE_H                                   // blank
+    h += LINE_H                                   // "Payment Split:"
+    if (cashAmt.gt(0))   h += LINE_H
+    if (eftAmt.gt(0))    h += LINE_H
+    if (chequeAmt.gt(0)) h += LINE_H
+    if (loanAmt.gt(0))   h += LINE_H
+  }
+
+  if (data.slipNo !== undefined) h += LINE_H * 2  // blank + Slip No.
+  h += LINE_H                                     // blank before footer
+  h += footerLineCount * LINE_H
+  h += 10                                          // final divider
+  h += 16                                          // bottom margin
+  return Math.max(h, 300)
+}
+
+export async function generatePurchaseReceiptPdf(data: PurchaseSlipData): Promise<Uint8Array> {
+  const doc  = await PDFDocument.create()
+  const bold = await doc.embedFont(StandardFonts.HelveticaBold)
+  const reg  = await doc.embedFont(StandardFonts.Helvetica)
+
+  const footerLines = data.footerText ? wrapText(data.footerText, SMALL, reg, BODY_W) : []
+  const docHeight = estimatePurchaseHeight(data, footerLines.length)
+  const page = doc.addPage([W, docHeight])
+
+  let cursor = docHeight - 14
+  const nextLine = (size = NORMAL, gap = 2) => { cursor -= (size + gap) }
+
+  // ── Header ─────────────────────────────────────────────────────────────
+  center(page, 'PAID', cursor, NORMAL, bold, BLACK)
+  nextLine(NORMAL, 2)
+  center(page, (data.companyName || 'Golden Key Investments (Pty) Ltd').toUpperCase(), cursor, NORMAL, bold, BLACK)
+  nextLine(NORMAL, 2)
+
+  page.drawText(`PN No: ${data.refNumber}`, { x: MARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
+  nextLine(NORMAL)
+  page.drawText(`Date: ${formatSlipDate(data.createdAt)}`, { x: MARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
+  nextLine(NORMAL, 6)
+
+  const addressSegments = (data.companyAddress ?? '').split(',').map((s) => s.trim()).filter(Boolean)
+  for (const segment of addressSegments) {
+    page.drawText(segment, { x: MARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
+    nextLine(NORMAL)
+  }
+  if (data.companyPhone) {
+    page.drawText(`Tel: ${data.companyPhone}`, { x: MARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
+    nextLine(NORMAL)
+  }
+  if (data.vatNumber) {
+    page.drawText(`VAT No.: ${data.vatNumber}`, { x: MARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
+    nextLine(NORMAL)
+  }
+  if (data.provisional) {
+    page.drawText('*** PROVISIONAL - PENDING SYNC ***', { x: MARGIN, y: cursor, size: NORMAL, font: bold, color: BLACK })
+    nextLine(NORMAL)
+  }
+
+  cursor -= 2
+  solidLine(page, cursor)
+  cursor -= 10
+
+  // ── People ─────────────────────────────────────────────────────────────
+  page.drawText(`Done By: ${data.cashierName}`, { x: MARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
+  nextLine(NORMAL)
+  if (data.scaleOperatorName) {
+    page.drawText(`Scale Op: ${data.scaleOperatorName}`, { x: MARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
+    nextLine(NORMAL)
+  }
+  page.drawText('Rep:', { x: MARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
+  nextLine(NORMAL, 6)
+
+  // ── Party ──────────────────────────────────────────────────────────────
+  const custLine = data.customerCode ? `${data.customerCode}-${data.customerName}` : data.customerName
+  page.drawText(`Cust: ${custLine}`, { x: MARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
+  nextLine(NORMAL)
+  page.drawText(`Cust VAT: ${data.customerVatNumber ?? ''}`, { x: MARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
+  nextLine(NORMAL, 6)
+  if (data.customerIdNo) {
+    page.drawText(`ID: ${data.customerIdNo}`, { x: MARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
+    nextLine(NORMAL)
+  }
+
+  // ── Line items ─────────────────────────────────────────────────────────
+  pRow(page, cursor, SMALL, bold, DGRAY, ['Product', 'InPrice', 'Gross', 'Tare', 'Nett', 'Total'])
+  nextLine(SMALL, 4)
+
+  for (const line of data.lines) {
+    pRow(page, cursor, NORMAL, reg, BLACK, [
+      (line.productCode ?? '').substring(0, 10),
+      new Decimal(line.unitPrice).toFixed(2),
+      line.grossQty ?? '',
+      line.tareQty ?? '0',
+      String(line.qty),
+      new Decimal(line.lineTotal).toFixed(2),
+    ])
+    nextLine(NORMAL)
+    page.drawText(` ${line.productName}`, { x: MARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
+    nextLine(NORMAL)
+  }
+
+  cursor -= 2
+  solidLine(page, cursor)
+  cursor -= 10
+
+  // ── Totals ─────────────────────────────────────────────────────────────
+  const nettTotal  = data.lines.reduce((acc, l) => acc.plus(l.qty || 0), new Decimal(0))
+  const total      = new Decimal(data.totalAmount)
+  const vat        = new Decimal(data.vatAmount ?? '0')
+  const grandTotal = total.plus(vat)
+
+  pLeftRight(page, 'Nett Total', nettTotal.toFixed(1), cursor, NORMAL, reg, BLACK)
+  nextLine(NORMAL, 2)
+  pLeftRight(page, 'Total', `E ${total.toFixed(2)}`, cursor, NORMAL, reg, BLACK)
+  nextLine(NORMAL, 2)
+  pLeftRight(page, '15% VAT', `E ${vat.toFixed(2)}`, cursor, NORMAL, reg, BLACK)
+  nextLine(NORMAL, 2)
+  pLeftRight(page, 'Grand Total', `E ${grandTotal.toFixed(2)}`, cursor, NORMAL, bold, BLACK)
+  nextLine(NORMAL, 3)
+
+  // ── Payment split ──────────────────────────────────────────────────────
+  const cashAmt   = new Decimal(data.splitPayments?.cash   ?? '0')
+  const eftAmt    = new Decimal(data.splitPayments?.eft    ?? '0')
+  const chequeAmt = new Decimal(data.splitPayments?.cheque ?? '0')
+  const loanAmt   = new Decimal(data.splitPayments?.loan   ?? data.loanDeduction?.amount ?? '0')
+  const loanRef   = data.splitPayments ? data.loanDeduction?.reference : data.loanDeduction?.reference
+
+  if (cashAmt.gt(0) || eftAmt.gt(0) || chequeAmt.gt(0) || loanAmt.gt(0)) {
+    nextLine(NORMAL, 0)
+    page.drawText('Payment Split:', { x: MARGIN, y: cursor, size: NORMAL, font: bold, color: BLACK })
+    nextLine(NORMAL, 2)
+    if (cashAmt.gt(0)) {
+      pLeftRight(page, 'Cash', `E ${cashAmt.toFixed(2)}`, cursor, NORMAL, reg, BLACK)
+      nextLine(NORMAL)
+    }
+    if (eftAmt.gt(0)) {
+      pLeftRight(page, 'EFT', `E ${eftAmt.toFixed(2)}`, cursor, NORMAL, reg, BLACK)
+      nextLine(NORMAL)
+    }
+    if (chequeAmt.gt(0)) {
+      pLeftRight(page, 'Cheque', `E ${chequeAmt.toFixed(2)}`, cursor, NORMAL, reg, BLACK)
+      nextLine(NORMAL)
+    }
+    if (loanAmt.gt(0)) {
+      pLeftRight(page, 'Loans', `E ${loanAmt.toFixed(2)}${loanRef ? ` #${loanRef}` : ''}`, cursor, NORMAL, reg, BLACK)
+      nextLine(NORMAL)
+    }
+  }
+
+  // ── Footer ─────────────────────────────────────────────────────────────
+  if (data.slipNo !== undefined) {
+    nextLine(NORMAL, 0)
+    page.drawText(`Slip No. ${data.slipNo}`, { x: MARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
+    nextLine(NORMAL)
+  }
+  nextLine(NORMAL, 0)
+  for (const fLine of footerLines) {
+    page.drawText(fLine, { x: MARGIN, y: cursor, size: SMALL, font: reg, color: GRAY })
+    nextLine(SMALL)
+  }
+  cursor -= 2
+  solidLine(page, cursor)
+
+  return doc.save()
+}

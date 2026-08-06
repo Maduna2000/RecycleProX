@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
-import Decimal from 'decimal.js'
 import { getPurchase } from '@/lib/services/purchaseService'
 import { getAllSettings } from '@/lib/services/settingsService'
-import { getCustomerLoanSummary } from '@/lib/services/loanService'
-import { generateTransactionSlip } from '@/lib/pdf/slip'
+import { generatePurchaseReceiptPdf } from '@/lib/pdf/slip'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 /**
@@ -26,46 +24,13 @@ export async function GET(
   const format = req.nextUrl.searchParams.get('format') ?? 'pdf'
 
   try {
-    const { purchase, settings, remainingLoanBalance } = await runWithRequestTenant(req, async () => {
+    const { purchase, settings } = await runWithRequestTenant(req, async () => {
       const [purchase, settings] = await Promise.all([
         getPurchase(id),
         getAllSettings(),
       ])
-
-      const loanDec = purchase.loanDeductionAmount
-        ? new Decimal(purchase.loanDeductionAmount.toString())
-        : new Decimal(0)
-
-      // Remaining loan balance (current outstanding after applied deduction)
-      let remainingLoanBalance: string | undefined
-      if (loanDec.greaterThan(0)) {
-        const loanSummary = await getCustomerLoanSummary(purchase.customerId)
-        if (new Decimal(loanSummary.outstanding).greaterThan(0)) {
-          remainingLoanBalance = loanSummary.outstanding
-        }
-      }
-
-      return { purchase, settings, remainingLoanBalance }
+      return { purchase, settings }
     })
-
-    const amountPaidDec = new Decimal(purchase.amountPaid.toString())
-
-    const slipStatus: 'completed' | 'pending' | 'partial' =
-      purchase.status === 'completed'            ? 'completed'
-      : amountPaidDec.greaterThan(0)             ? 'partial'
-      : 'pending'
-
-    const slipAmountPaid = amountPaidDec.greaterThan(0) ? amountPaidDec.toFixed(2) : undefined
-
-    const lines = purchase.lines.map((l) => ({
-      productName: l.product.name,
-      qty:         Number(l.quantity),
-      unitPrice:   l.unitPrice.toString(),
-      lineTotal:   l.lineTotal.toString(),
-      grossQty:    l.grossQty ? Number(l.grossQty) : undefined,
-      tareQty:     l.tareQty  ? Number(l.tareQty)  : undefined,
-      tareReason:  l.tareReason ?? undefined,
-    }))
 
     const thermalLines = purchase.lines.map((l) => ({
       productCode: l.product.code,
@@ -116,34 +81,28 @@ export async function GET(
       })
     }
 
-    // Thermal-style PDF receipt
-    const pdfBytes = await generateTransactionSlip({
-      type:           'PURCHASE',
+    // Legacy-format PDF receipt — same layout as the thermal printout, see
+    // generatePurchaseReceiptPdf's own header comment.
+    const pdfBytes = await generatePurchaseReceiptPdf({
       refNumber:      purchase.refNumber,
-      date:           purchase.createdAt,
-      partyLabel:     'Supplier',
-      partyName:      `${purchase.customer.firstName} ${purchase.customer.lastName}`,
-      partyIdNumber:  purchase.customer.idNumber ?? undefined,
-      partyPhone:     purchase.customer.phone ?? undefined,
-      lines,
+      customerCode:   purchase.customer.accountCode ?? undefined,
+      customerName:   `${purchase.customer.firstName} ${purchase.customer.lastName}`,
+      customerIdNo:   purchase.customer.idNumber ?? undefined,
+      customerVatNumber: purchase.customer.vatNumber ?? undefined,
+      lines:          thermalLines,
       totalAmount:    purchase.totalAmount.toString(),
-      ...(purchase.vatAmount && new Decimal(purchase.vatAmount.toString()).greaterThan(0) ? {
-        vatAmount:      new Decimal(purchase.vatAmount.toString()).toFixed(2),
-        subtotalAmount: new Decimal(purchase.totalAmount.toString()).minus(purchase.vatAmount.toString()).toFixed(2),
-      } : {}),
-      loanDeduction:  purchase.loanDeductionAmount?.toString(),
+      vatAmount:      purchase.vatAmount ? purchase.vatAmount.toString() : undefined,
       paymentMethod:  purchase.paymentMethod,
       cashierName:    session.user.name ?? 'Cashier',
-      notes:          purchase.notes ?? undefined,
-      status:              slipStatus,
-      amountPaid:          slipAmountPaid,
-      remainingLoanBalance,
+      scaleOperatorName: purchase.scaleOrder?.operator.fullName,
+      createdAt:      purchase.createdAt,
+      footerText:     settings.purchaseNoteDeclaration,
+      loanDeduction:  purchase.loanDeductionAmount ? { amount: purchase.loanDeductionAmount.toString() } : undefined,
       splitPayments:  splitPayments ?? undefined,
       companyName:    settings.yardName,
       companyAddress: settings.yardAddress,
       companyPhone:   settings.yardPhone,
       vatNumber:      settings.vatNumber,
-      receiptFooter:  settings.receiptFooter,
     })
 
     return new NextResponse(pdfBytes.buffer as ArrayBuffer, {

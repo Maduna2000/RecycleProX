@@ -11,7 +11,7 @@ import { autoPromoteCasualIfEligible } from '@/lib/services/customerService'
 import { sastDayLabelOfInstant, sastDateLabelToUTCDate } from '@/lib/utils/dayBounds'
 import { getAllSettings } from '@/lib/services/settingsService'
 import { generateVat264 } from '@/lib/pdf/vat264'
-import { generateTransactionSlip } from '@/lib/pdf/slip'
+import { generatePurchaseReceiptPdf } from '@/lib/pdf/slip'
 import { uploadBytes, purchaseVat264Key, purchaseNoteKey } from '@/lib/r2'
 import { CURRENCY_SYMBOLS } from '@/lib/schemas/cashup'
 import { VAT_RATE, purchaseHeaderVat } from '@/lib/utils/vat'
@@ -137,35 +137,32 @@ async function generateAndStorePurchasePdfs(purchase: PurchaseWithCustomerAndLin
     logger.error({ err, purchaseId: purchase.id }, 'purchase.vat264.generation.failed')
   }
 
-  // Purchase note (slip)
+  // Purchase note (slip) — same legacy layout as the thermal printout, see
+  // generatePurchaseReceiptPdf's own header comment.
   try {
     const slipLines = purchase.lines.map((l) => ({
+      productCode: l.product.code,
       productName: l.product.name,
       qty:         Number(l.quantity),
       unitPrice:   l.unitPrice.toString(),
       lineTotal:   l.lineTotal.toString(),
-      grossQty:    l.grossQty  ? Number(l.grossQty)  : undefined,
-      tareQty:     l.tareQty   ? Number(l.tareQty)   : undefined,
-      tareReason:  l.tareReason ?? undefined,
+      grossQty:    l.grossQty ? l.grossQty.toString() : undefined,
+      tareQty:     l.tareQty  ? l.tareQty.toString()  : undefined,
     }))
-    const bytes = await generateTransactionSlip({
-      type:           'PURCHASE',
+    const bytes = await generatePurchaseReceiptPdf({
       refNumber:      purchase.refNumber,
-      date:           new Date(purchase.createdAt),
-      partyLabel:     'Supplier',
-      partyName:      `${purchase.customer.firstName} ${purchase.customer.lastName}`,
-      partyIdNumber:  purchase.customer.idNumber ?? undefined,
-      partyPhone:     purchase.customer.phone ?? undefined,
+      customerCode:   purchase.customer.accountCode ?? undefined,
+      customerName:   `${purchase.customer.firstName} ${purchase.customer.lastName}`,
+      customerIdNo:   purchase.customer.idNumber ?? undefined,
+      customerVatNumber: purchase.customer.vatNumber ?? undefined,
       lines:          slipLines,
       totalAmount:    purchase.totalAmount.toString(),
-      ...(purchase.vatAmount && new Decimal(purchase.vatAmount.toString()).greaterThan(0) ? {
-        vatAmount:      new Decimal(purchase.vatAmount.toString()).toFixed(2),
-        subtotalAmount: new Decimal(purchase.totalAmount.toString()).minus(purchase.vatAmount.toString()).toFixed(2),
-      } : {}),
-      loanDeduction:  purchase.loanDeductionAmount?.toString(),
+      vatAmount:      purchase.vatAmount ? purchase.vatAmount.toString() : undefined,
+      loanDeduction:  purchase.loanDeductionAmount ? { amount: purchase.loanDeductionAmount.toString() } : undefined,
       paymentMethod:  purchase.paymentMethod,
       cashierName:    'System',
-      notes:          purchase.notes ?? undefined,
+      createdAt:      new Date(purchase.createdAt),
+      footerText:     settings.purchaseNoteDeclaration,
       companyName:    settings.yardName,
       companyAddress: settings.yardAddress,
       companyPhone:   settings.yardPhone,
