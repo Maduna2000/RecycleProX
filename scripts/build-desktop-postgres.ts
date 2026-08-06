@@ -73,35 +73,22 @@ function main() {
   copyIfExists(path.join(ROOT, 'public'), path.join(standaloneDir, 'public'))
 
   console.log('--- 4/4: defensively re-copying native/dynamically-resolved modules ---')
-  // Confirmed by actually running the packaged app's server.js: login 500'd
-  // with "Cannot find module '.prisma/client/default'" — node_modules/.prisma
-  // was completely absent from the installed app, even though
-  // package.json's electron-builder `files` array explicitly lists
-  // "node_modules/.prisma/**/*". electron-builder's glob matching does not
-  // include dot-prefixed path segments (like .prisma) by default, so that
-  // entry silently matched nothing — @prisma/client itself (no leading dot)
-  // got bundled fine, but the actual generated client output never did.
-  // Copying it directly here bypasses electron-builder's glob entirely, the
-  // same way scripts/local-server/assemble.ts already does for this exact
-  // reason. serialport/node-thermal-printer ride along too — they resolve
-  // prebuilt binaries dynamically at runtime (not statically analyzable),
-  // so Next's own output tracing has nothing to follow for them either.
-  //
-  // `next` itself belongs here too — confirmed the SAME way, by actually
-  // running the packaged server.js a second time after fixing the .prisma
-  // gap: it then failed on "Cannot find module
-  // './future/route-matcher-providers/helpers/manifest-loaders/
-  // server-manifest-loader'", a file that exists in a normal `npm install`
-  // but was silently missing from BOTH .next/standalone/node_modules/next
-  // (Next's own trace) and the top-level node_modules/next this app ships
-  // (electron-builder has no files-array entry for next at all — it was
-  // only ever present via Next's own, evidently incomplete, standalone
-  // tracing). Rather than chase every individual dynamically-required file
-  // Next's tracer might miss, copy the whole package — cpSync merges into
-  // whatever partial copy already exists at the destination rather than
-  // replacing it, so this only ever adds files, never removes ones Next's
-  // own trace got right.
-  for (const mod of ['.prisma', '@prisma/client', 'serialport', '@serialport', 'node-thermal-printer', 'next']) {
+  // Populates .next/standalone/node_modules/ with modules Next's own
+  // standalone tracing gets wrong or misses — confirmed by actually running
+  // the packaged server.js repeatedly, not by inspecting file lists.
+  // IMPORTANT: this copy step alone is not sufficient. electron-builder's
+  // `files`-array packaging strips these nested node_modules copies back
+  // out again during its own packaging pass — confirmed by extracting a
+  // real built installer (7z on the NSIS payload) and finding every one of
+  // these modules present right here in .next/standalone/node_modules/ at
+  // the end of this script, but absent from the same path inside the
+  // actual installed app. Only .prisma survived, because (see package.json)
+  // it alone was *also* staged via `extraResources`, a separate mechanism
+  // electron-builder does not apply the same pruning to. Every module in
+  // the loop below needs its own matching extraResources entry in
+  // package.json — this copy step just makes sure something real exists at
+  // .next/standalone/node_modules/<mod> for that entry's `from` to pick up.
+  for (const mod of ['.prisma', '@prisma/client', '@prisma/engines', 'serialport', '@serialport', 'node-thermal-printer', 'next']) {
     copyIfExists(path.join(ROOT, 'node_modules', mod), path.join(standaloneDir, 'node_modules', mod))
   }
 
