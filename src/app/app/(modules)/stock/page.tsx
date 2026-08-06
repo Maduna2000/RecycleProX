@@ -12,7 +12,7 @@ import { CategoryFilterSelect, useProductCategories } from '@/components/product
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
 import { fetcher } from '@/lib/swrFetcher'
 import {
-  inp, Btn, Field, PortalPage, FilterBar,
+  inp, Btn, Field, PortalPage, FilterBar, BAR_GRAD, GLOSS_BEVEL,
   RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter,
 } from '@/components/rpx'
 
@@ -299,7 +299,7 @@ export default function StockPage() {
 
       {adjustOpen && (
         <AdjustmentModal
-          products={allStock.map((s) => s.product)}
+          stock={allStock}
           onClose={() => setAdjustOpen(false)}
           onSuccess={() => {
             mutate(stockKey)
@@ -313,33 +313,94 @@ export default function StockPage() {
 }
 
 // ─── Manual Adjustment Modal ──────────────────────────────────────────────────
+
+/** Two-way legacy segmented toggle — same GLOSS_BEVEL chrome as the "Quick
+ * range" control on the Reports date filter, not a modern pill/switch. */
+function ModeToggle<T extends string>({
+  value,
+  onChange,
+  options,
+  disabled,
+}: {
+  value: T
+  onChange: (v: T) => void
+  options: { value: T; label: string }[]
+  disabled?: boolean
+}) {
+  return (
+    <div className="inline-flex overflow-hidden" style={{ height: 28, border: `1px solid ${colors.border}`, borderRadius: 2, width: '100%' }}>
+      {options.map((o, i) => {
+        const active = o.value === value
+        return (
+          <button
+            key={o.value}
+            type="button"
+            aria-pressed={active}
+            disabled={disabled}
+            onClick={() => onChange(o.value)}
+            style={{
+              flex: 1,
+              fontSize: 11,
+              fontWeight: active ? 700 : 400,
+              padding: '0 8px',
+              background: active ? BAR_GRAD : colors.surface,
+              color: active ? colors.textPrimary : colors.textSecondary,
+              borderLeft: i === 0 ? 'none' : `1px solid ${colors.border}`,
+              boxShadow: active ? GLOSS_BEVEL : undefined,
+              cursor: disabled ? 'default' : 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {o.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 function AdjustmentModal({
-  products,
+  stock,
   onClose,
   onSuccess,
 }: {
-  products:  StockEntry['product'][]
+  stock:     StockEntry[]
   onClose:   () => void
   onSuccess: () => void
 }) {
+  const [mode,       setMode]       = useState<'delta' | 'count'>('delta')
   const [productId,  setProductId]  = useState('')
   const [direction,  setDirection]  = useState<'in' | 'out'>('in')
   const [quantity,   setQuantity]   = useState('')
+  const [countedQty, setCountedQty] = useState('')
   const [notes,      setNotes]      = useState('')
   const [loading,    setLoading]    = useState(false)
 
-  const selectedProduct = products.find((p) => p.id === productId)
+  const selectedEntry   = stock.find((s) => s.product.id === productId)
+  const selectedProduct = selectedEntry?.product
+  const onHand           = selectedEntry ? parseFloat(selectedEntry.onHand) : null
+  const counted           = countedQty ? parseFloat(countedQty) : null
+  const diff               = onHand !== null && counted !== null && !isNaN(counted) ? counted - onHand : null
 
   async function onSubmit() {
-    if (!productId)                    { toast.error('Select a product'); return }
-    if (!quantity || parseFloat(quantity) <= 0) { toast.error('Enter a valid quantity'); return }
-    if (notes.trim().length < 3)       { toast.error('Notes required (min 3 characters)'); return }
+    if (!productId) { toast.error('Select a product'); return }
+    if (notes.trim().length < 3) { toast.error('Notes required (min 3 characters)'); return }
+
+    let body: Record<string, unknown>
+    if (mode === 'delta') {
+      if (!quantity || parseFloat(quantity) <= 0) { toast.error('Enter a valid quantity'); return }
+      body = { mode: 'delta', productId, direction, quantity, notes }
+    } else {
+      if (!countedQty || parseFloat(countedQty) < 0) { toast.error('Enter a valid counted quantity'); return }
+      if (diff === 0) { toast.error('Counted quantity matches on hand — nothing to adjust'); return }
+      body = { mode: 'count', productId, countedQty, notes }
+    }
 
     setLoading(true)
     const res = await fetch('/api/stock/adjust', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ productId, direction, quantity, notes }),
+      body:    JSON.stringify(body),
     })
     setLoading(false)
     if (res.ok) { toast.success('Stock adjustment recorded'); onSuccess() }
@@ -359,29 +420,77 @@ function AdjustmentModal({
               onChange={(e) => setProductId(e.target.value)}
             >
               <option value="">Select product…</option>
-              {products.map((p) => (
-                <option key={p.id} value={p.id}>{p.name} ({p.code})</option>
+              {stock.map((s) => (
+                <option key={s.product.id} value={s.product.id}>{s.product.name} ({s.product.code})</option>
               ))}
             </select>
           </Field>
 
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Direction">
-              <select style={{ ...inp, marginTop: 4 }} value={direction} onChange={(e) => setDirection(e.target.value as 'in' | 'out')}>
-                <option value="in">Stock IN (add)</option>
-                <option value="out">Stock OUT (remove)</option>
-              </select>
-            </Field>
-            <Field label={`Quantity${selectedProduct ? ` (${selectedProduct.unit})` : ''}`}>
-              <input
-                value={quantity}
-                onChange={(e) => setQuantity(e.target.value)}
-                placeholder="0.000"
-                style={{ ...inp, marginTop: 4, fontFamily: 'monospace' }}
-                disabled={loading}
-              />
-            </Field>
-          </div>
+          <Field label="Adjustment Type">
+            <ModeToggle
+              value={mode}
+              onChange={setMode}
+              disabled={loading}
+              options={[
+                { value: 'delta', label: 'By Amount (In / Out)' },
+                { value: 'count', label: 'By Physical Count' },
+              ]}
+            />
+          </Field>
+
+          {mode === 'delta' ? (
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Direction">
+                <select style={{ ...inp, marginTop: 4 }} value={direction} onChange={(e) => setDirection(e.target.value as 'in' | 'out')}>
+                  <option value="in">Stock IN (add)</option>
+                  <option value="out">Stock OUT (remove)</option>
+                </select>
+              </Field>
+              <Field label={`Quantity${selectedProduct ? ` (${selectedProduct.unit})` : ''}`}>
+                <input
+                  value={quantity}
+                  onChange={(e) => setQuantity(e.target.value)}
+                  placeholder="0.000"
+                  style={{ ...inp, marginTop: 4, fontFamily: 'monospace' }}
+                  disabled={loading}
+                />
+              </Field>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="System On Hand" hint={selectedProduct ? selectedProduct.unit : undefined}>
+                  <div style={{ ...inp, marginTop: 4, fontFamily: 'monospace', background: colors.neutralBg, display: 'flex', alignItems: 'center' }}>
+                    {onHand !== null ? onHand.toFixed(3) : '—'}
+                  </div>
+                </Field>
+                <Field label={`Counted Quantity${selectedProduct ? ` (${selectedProduct.unit})` : ''}`}>
+                  <input
+                    value={countedQty}
+                    onChange={(e) => setCountedQty(e.target.value)}
+                    placeholder="0.000"
+                    style={{ ...inp, marginTop: 4, fontFamily: 'monospace' }}
+                    disabled={loading || !productId}
+                  />
+                </Field>
+              </div>
+              <div
+                className="flex justify-between items-center px-3 py-2"
+                style={{
+                  background: diff === null ? colors.neutralBg : diff === 0 ? colors.neutralBg : diff > 0 ? colors.actionBg : colors.dangerBg,
+                  border: `1px solid ${diff === null || diff === 0 ? colors.border : diff > 0 ? colors.action : colors.danger}`,
+                  borderRadius: 3,
+                }}
+              >
+                <span className="text-xs font-semibold uppercase" style={{ color: diff === null || diff === 0 ? colors.textSecondary : diff > 0 ? colors.action : colors.danger }}>
+                  {diff === null ? 'Adjustment' : diff === 0 ? 'No change' : diff > 0 ? 'Stock IN (found more)' : 'Stock OUT (found less)'}
+                </span>
+                <span className="font-mono font-bold text-sm" style={{ color: diff === null || diff === 0 ? colors.textSecondary : diff > 0 ? colors.action : colors.danger }}>
+                  {diff === null ? 'Enter a count above' : `${diff > 0 ? '+' : ''}${diff.toFixed(3)} ${selectedProduct?.unit ?? ''}`}
+                </span>
+              </div>
+            </>
+          )}
 
           <Field label="Reason / Notes">
             <input
