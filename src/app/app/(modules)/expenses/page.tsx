@@ -47,14 +47,16 @@ export default function ExpensesPage() {
   const { data: session } = useSession()
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
 
-  const [tab,              setTab]              = useState<PageTab>('Pending')
+  const today = new Date().toISOString().split('T')[0]!
+
+  const [tab,              setTab]              = useState<PageTab>('All')
   const [addOpen,          setAddOpen]          = useState(false)
   const [addTypeOpen,      setAddTypeOpen]      = useState(false)
   const [settlingExpense,  setSettlingExpense]  = useState<Expense | null>(null)
   const [voidingExpense,   setVoidingExpense]   = useState<Expense | null>(null)
   const [search,         setSearch]         = useState('')
-  const [from,           setFrom]           = useState('')
-  const [to,             setTo]             = useState('')
+  const [from,           setFrom]           = useState(today)
+  const [to,             setTo]             = useState(today)
 
   // Open modal from toolbar query params
   useEffect(() => {

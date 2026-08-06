@@ -98,14 +98,9 @@ export interface ScaleOrderFilters {
 
 // ─── Order number generator (atomic inside transaction) ───────────────────────
 
-async function generateOrderNumber(tx: TxClient, date: Date): Promise<string> {
-  const y  = date.getFullYear()
-  const m  = String(date.getMonth() + 1).padStart(2, '0')
-  const d  = String(date.getDate()).padStart(2, '0')
-  const prefix = `SCL-${y}${m}${d}`
-  const startOfDay = new Date(y, date.getMonth(), date.getDate())
-  const count = await tx.scaleOrder.count({ where: { createdAt: { gte: startOfDay } } })
-  return `${prefix}-${String(count + 1).padStart(4, '0')}`
+async function generateOrderNumber(tx: TxClient): Promise<string> {
+  const count = await tx.scaleOrder.count()
+  return `S${String(count + 1).padStart(5, '0')}`
 }
 
 // ─── Customer display helpers ─────────────────────────────────────────────────
@@ -196,7 +191,7 @@ export async function createScaleOrder(data: CreateScaleOrderInput, operatorId: 
       await tx.gateEntry.update({ where: { id: data.gateEntryId }, data: { queueNumberUsedAt: new Date() } })
     }
 
-    const orderNumber = await generateOrderNumber(tx, new Date())
+    const orderNumber = await generateOrderNumber(tx)
     const created = await tx.scaleOrder.create({
       data: {
         tenantId,

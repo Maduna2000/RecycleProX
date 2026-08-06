@@ -14,9 +14,11 @@ export async function GET(req: NextRequest) {
   const search = searchParams.get('search') ?? undefined
   const from   = searchParams.get('from') ? new Date(searchParams.get('from')!) : undefined
   const to     = searchParams.get('to')   ? new Date(searchParams.get('to')!)   : undefined
+  if (to) to.setHours(23, 59, 59, 999)
   const page   = parseInt(searchParams.get('page') ?? '1')
+  const limit  = searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : undefined
 
-  const result = await runWithRequestTenant(req, () => listExpenses({ status, search, from, to, page }))
+  const result = await runWithRequestTenant(req, () => listExpenses({ status, search, from, to, page, limit }))
   return NextResponse.json(result)
 }
 

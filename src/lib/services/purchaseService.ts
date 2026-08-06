@@ -66,11 +66,8 @@ type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
 
 // Generated inside the transaction so it's atomic with the insert
 async function generateRefNumber(tx: TxClient): Promise<string> {
-  const today = new Date()
-  const prefix = `PUR-${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`
-  const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate())
-  const count = await tx.purchase.count({ where: { createdAt: { gte: startOfDay } } })
-  return `${prefix}-${String(count + 1).padStart(4, '0')}`
+  const count = await tx.purchase.count()
+  return `P${String(count + 1).padStart(5, '0')}`
 }
 
 // Retries on PostgreSQL serialization failures (P2034 / 40001)
@@ -151,11 +148,11 @@ async function generateAndStorePurchasePdfs(purchase: PurchaseWithCustomerAndLin
     }))
     const bytes = await generatePurchaseReceiptPdf({
       refNumber:      purchase.refNumber,
-      // The daily sequence number already embedded in the ref number
-      // (PUR-YYYYMMDD-NNNN) — there's no separate slip-book counter in the
-      // system, this is the closest existing equivalent to the legacy
-      // paper receipt's "Slip No."
-      slipNo:         Number(purchase.refNumber.split('-').pop()),
+      // The sequence number already embedded in the ref number (PNNNNN, or
+      // PUR-YYYYMMDD-NNNN for purchases predating the short format) — there's
+      // no separate slip-book counter in the system, this is the closest
+      // existing equivalent to the legacy paper receipt's "Slip No."
+      slipNo:         Number(purchase.refNumber.match(/\d+$/)?.[0] ?? 0),
       status:         purchase.status,
       customerCode:   purchase.customer.accountCode ?? undefined,
       customerName:   `${purchase.customer.firstName} ${purchase.customer.lastName}`,
