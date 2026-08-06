@@ -82,7 +82,23 @@ export async function GET(req: NextRequest) {
         .reduce((acc, m) => acc.plus(new Decimal(m.quantity.toString())), new Decimal(0))
       const adjustedQty = adjustedIn.minus(adjustedOut)
 
-      const closingQty = openingQty.plus(purchasedQty).minus(soldQty).plus(adjustedQty)
+      // Net effect of voided-transaction reversals within the period — a
+      // voided purchase gives stock back (out), a voided sale takes it back
+      // (in). Shown as its own bucket rather than folded silently into
+      // purchasedQty/soldQty so the breakdown stays honest; previously this
+      // was left out of closingQty entirely, overstating stock by the full
+      // amount of any purchase voided within the period (confirmed live:
+      // PROCESSED HEAVY STEEL was overstated by 605kg from one voided
+      // purchase before this fix).
+      const voidedIn = periodMvt
+        .filter((m) => m.direction === 'in' && m.source === 'void_reversal')
+        .reduce((acc, m) => acc.plus(new Decimal(m.quantity.toString())), new Decimal(0))
+      const voidedOut = periodMvt
+        .filter((m) => m.direction === 'out' && m.source === 'void_reversal')
+        .reduce((acc, m) => acc.plus(new Decimal(m.quantity.toString())), new Decimal(0))
+      const voidedQty = voidedIn.minus(voidedOut)
+
+      const closingQty = openingQty.plus(purchasedQty).minus(soldQty).plus(adjustedQty).plus(voidedQty)
       const closingValue = closingQty.times(new Decimal(p.defaultBuyPrice.toString()))
 
       return {
@@ -95,6 +111,7 @@ export async function GET(req: NextRequest) {
         purchasedQty: purchasedQty.toFixed(2),
         soldQty:      soldQty.toFixed(2),
         adjustedQty:  adjustedQty.toFixed(2),
+        voidedQty:    voidedQty.toFixed(2),
         closingQty:   closingQty.toFixed(2),
         closingValue: closingValue.toFixed(2),
         buyPrice:     p.defaultBuyPrice.toString(),

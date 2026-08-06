@@ -43,35 +43,50 @@ export async function recordMovement(
  * On-hand levels from the movement ledger. `asAt` cuts the ledger off at
  * that instant — "what was on hand as at that date" — omit it for live
  * levels.
+ *
+ * totalIn/totalOut shown here are purchase-only / sale-only — "how much
+ * came in by buying it, how much left by selling it" — not the full
+ * movement ledger. onHand is still the true, complete running total
+ * (includes manual/stocktake adjustments and void reversals), since those
+ * genuinely change what's physically on the shelf; they just don't belong
+ * in the purchase/sale narrative these two columns are meant to tell.
  */
 export async function getStockOnHand(productId?: string, asAt?: Date) {
-  // Aggregate IN movements
-  const inAgg = await prisma.stockMovement.groupBy({
-    by: ['productId'],
-    where: {
-      direction: 'in',
-      ...(productId && { productId }),
-      ...(asAt && { createdAt: { lte: asAt } }),
-    },
-    _sum: { quantity: true },
-  })
+  // Grouping by source (not just productId) in the same two queries this
+  // always needed — one per direction — gets both the true all-sources sum
+  // and the purchase-only/sale-only sum without extra DB round trips.
+  const byProductAndSource = (direction: 'in' | 'out') =>
+    prisma.stockMovement.groupBy({
+      by: ['productId', 'source'],
+      where: {
+        direction,
+        ...(productId && { productId }),
+        ...(asAt && { createdAt: { lte: asAt } }),
+      },
+      _sum: { quantity: true },
+    })
 
-  // Aggregate OUT movements
-  const outAgg = await prisma.stockMovement.groupBy({
-    by: ['productId'],
-    where: {
-      direction: 'out',
-      ...(productId && { productId }),
-      ...(asAt && { createdAt: { lte: asAt } }),
-    },
-    _sum: { quantity: true },
-  })
+  const [inRows, outRows] = await Promise.all([byProductAndSource('in'), byProductAndSource('out')])
 
-  const inMap = new Map(inAgg.map((r) => [r.productId, new Decimal(r._sum.quantity?.toString() ?? '0')]))
-  const outMap = new Map(outAgg.map((r) => [r.productId, new Decimal(r._sum.quantity?.toString() ?? '0')]))
-
-  // All product IDs that have any movement
-  const allIds = new Set([...Array.from(inMap.keys()), ...Array.from(outMap.keys())])
+  const zero = new Decimal(0)
+  const totals = new Map<string, { allIn: Decimal; allOut: Decimal; purchaseIn: Decimal; saleOut: Decimal }>()
+  const get = (id: string) => {
+    let t = totals.get(id)
+    if (!t) { t = { allIn: zero, allOut: zero, purchaseIn: zero, saleOut: zero }; totals.set(id, t) }
+    return t
+  }
+  for (const r of inRows) {
+    const qty = new Decimal(r._sum.quantity?.toString() ?? '0')
+    const t = get(r.productId)
+    t.allIn = t.allIn.plus(qty)
+    if (r.source === 'purchase') t.purchaseIn = t.purchaseIn.plus(qty)
+  }
+  for (const r of outRows) {
+    const qty = new Decimal(r._sum.quantity?.toString() ?? '0')
+    const t = get(r.productId)
+    t.allOut = t.allOut.plus(qty)
+    if (r.source === 'sale') t.saleOut = t.saleOut.plus(qty)
+  }
 
   const products = await prisma.product.findMany({
     where: {
@@ -82,15 +97,14 @@ export async function getStockOnHand(productId?: string, asAt?: Date) {
   })
 
   return products.map((p) => {
-    const totalIn = inMap.get(p.id) ?? new Decimal(0)
-    const totalOut = outMap.get(p.id) ?? new Decimal(0)
-    const onHand = totalIn.minus(totalOut)
+    const t = totals.get(p.id)
+    const onHand = (t?.allIn ?? zero).minus(t?.allOut ?? zero)
     return {
       product: p,
-      totalIn: totalIn.toFixed(2),
-      totalOut: totalOut.toFixed(2),
+      totalIn: (t?.purchaseIn ?? zero).toFixed(2),
+      totalOut: (t?.saleOut ?? zero).toFixed(2),
       onHand: onHand.toFixed(2),
-      hasMovements: allIds.has(p.id),
+      hasMovements: totals.has(p.id),
     }
   })
 }
@@ -101,20 +115,38 @@ export async function getStockOnHand(productId?: string, asAt?: Date) {
  * Period-scoped stock tracking: opening balance before `start`, in/out
  * within [start, end], closing = opening + in − out. Drives the Day/Week/
  * Month/Year filter on the Stock On Hand page.
+ *
+ * The displayed totalIn/totalOut are purchase-only / sale-only (see
+ * getStockOnHand's comment for why) — onHand/closing is still computed from
+ * every movement in the period, including adjustments and void reversals,
+ * so it stays the true physical figure even though it won't always equal
+ * opening + displayed-in − displayed-out.
  */
 export async function getStockOnHandForPeriod(start: Date, end: Date, productId?: string) {
-  const sum = (direction: 'in' | 'out', createdAt: { lt?: Date; gte?: Date; lte?: Date }) =>
+  // Opening balance (before start) needs only the true all-sources sum, so
+  // it stays grouped by productId alone. The in-period sums are grouped by
+  // source too, the same way getStockOnHand does it, so the purchase-only/
+  // sale-only display figures come out of the same query as the true sums
+  // feeding onHand — no extra round trips per breakdown.
+  const openSum = (direction: 'in' | 'out') =>
     prisma.stockMovement.groupBy({
       by: ['productId'],
-      where: { direction, createdAt, ...(productId && { productId }) },
+      where: { direction, createdAt: { lt: start }, ...(productId && { productId }) },
       _sum: { quantity: true },
     }).then((rows) => new Map(rows.map((r) => [r.productId, new Decimal(r._sum.quantity?.toString() ?? '0')])))
 
-  const [openIn, openOut, periodIn, periodOut, products] = await Promise.all([
-    sum('in', { lt: start }),
-    sum('out', { lt: start }),
-    sum('in', { gte: start, lte: end }),
-    sum('out', { gte: start, lte: end }),
+  const periodSum = (direction: 'in' | 'out') =>
+    prisma.stockMovement.groupBy({
+      by: ['productId', 'source'],
+      where: { direction, createdAt: { gte: start, lte: end }, ...(productId && { productId }) },
+      _sum: { quantity: true },
+    })
+
+  const [openIn, openOut, periodInRows, periodOutRows, products] = await Promise.all([
+    openSum('in'),
+    openSum('out'),
+    periodSum('in'),
+    periodSum('out'),
     prisma.product.findMany({
       where: { isActive: true, ...(productId ? { id: productId } : {}) },
       orderBy: [{ category: 'asc' }, { name: 'asc' }],
@@ -122,18 +154,36 @@ export async function getStockOnHandForPeriod(start: Date, end: Date, productId?
   ])
 
   const zero = new Decimal(0)
+  const periodTotals = new Map<string, { allIn: Decimal; allOut: Decimal; purchaseIn: Decimal; saleOut: Decimal }>()
+  const get = (id: string) => {
+    let t = periodTotals.get(id)
+    if (!t) { t = { allIn: zero, allOut: zero, purchaseIn: zero, saleOut: zero }; periodTotals.set(id, t) }
+    return t
+  }
+  for (const r of periodInRows) {
+    const qty = new Decimal(r._sum.quantity?.toString() ?? '0')
+    const t = get(r.productId)
+    t.allIn = t.allIn.plus(qty)
+    if (r.source === 'purchase') t.purchaseIn = t.purchaseIn.plus(qty)
+  }
+  for (const r of periodOutRows) {
+    const qty = new Decimal(r._sum.quantity?.toString() ?? '0')
+    const t = get(r.productId)
+    t.allOut = t.allOut.plus(qty)
+    if (r.source === 'sale') t.saleOut = t.saleOut.plus(qty)
+  }
+
   return products.map((p) => {
     const opening = (openIn.get(p.id) ?? zero).minus(openOut.get(p.id) ?? zero)
-    const totalIn = periodIn.get(p.id) ?? zero
-    const totalOut = periodOut.get(p.id) ?? zero
-    const onHand = opening.plus(totalIn).minus(totalOut)
+    const t = periodTotals.get(p.id)
+    const onHand = opening.plus(t?.allIn ?? zero).minus(t?.allOut ?? zero)
     return {
       product: p,
       opening: opening.toFixed(2),
-      totalIn: totalIn.toFixed(2),
-      totalOut: totalOut.toFixed(2),
+      totalIn: (t?.purchaseIn ?? zero).toFixed(2),
+      totalOut: (t?.saleOut ?? zero).toFixed(2),
       onHand: onHand.toFixed(2),
-      hasMovements: openIn.has(p.id) || openOut.has(p.id) || periodIn.has(p.id) || periodOut.has(p.id),
+      hasMovements: openIn.has(p.id) || openOut.has(p.id) || periodTotals.has(p.id),
     }
   })
 }

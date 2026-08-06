@@ -72,8 +72,14 @@ export async function GET(req: NextRequest) {
       const adjIn        = period_mvt.filter((m) => m.direction === 'in' && m.source === 'manual_adjustment').reduce((a, m) => a.plus(new Decimal(m.quantity.toString())), new Decimal(0))
       const adjOut       = period_mvt.filter((m) => m.direction === 'out' && m.source === 'manual_adjustment').reduce((a, m) => a.plus(new Decimal(m.quantity.toString())), new Decimal(0))
       const adjustedQty  = adjIn.minus(adjOut)
+      // Net effect of voided-transaction reversals — see the matching
+      // comment in src/app/api/stock/grid/route.ts for why this can't be
+      // left out of closingQty.
+      const voidIn       = period_mvt.filter((m) => m.direction === 'in' && m.source === 'void_reversal').reduce((a, m) => a.plus(new Decimal(m.quantity.toString())), new Decimal(0))
+      const voidOut      = period_mvt.filter((m) => m.direction === 'out' && m.source === 'void_reversal').reduce((a, m) => a.plus(new Decimal(m.quantity.toString())), new Decimal(0))
+      const voidedQty    = voidIn.minus(voidOut)
 
-      const closingQty   = openingQty.plus(purchasedQty).minus(soldQty).plus(adjustedQty)
+      const closingQty   = openingQty.plus(purchasedQty).minus(soldQty).plus(adjustedQty).plus(voidedQty)
       const closingValue = closingQty.times(new Decimal(p.defaultBuyPrice.toString()))
 
       return {
@@ -85,6 +91,7 @@ export async function GET(req: NextRequest) {
         purchased: purchasedQty.toFixed(2),
         sold:      soldQty.toFixed(2),
         adjusted:  adjustedQty.toFixed(2),
+        voided:    voidedQty.toFixed(2),
         closing:   closingQty.toFixed(2),
         buyPrice:  new Decimal(p.defaultBuyPrice.toString()),
         value:     closingValue,
@@ -116,6 +123,7 @@ export async function GET(req: NextRequest) {
             purchased: row.purchased,
             sold:      row.sold,
             adjusted:  row.adjusted,
+            voided:    row.voided,
             closing:   row.closing,
             value:     row.value.toFixed(2),
           },
@@ -130,14 +138,15 @@ export async function GET(req: NextRequest) {
         subtitle: category ? `Category: ${category}` : undefined,
         params: { from: periodStart.toISOString(), to: periodEnd.toISOString() },
         columns: [
-          { key: 'code',      label: 'Code',      width: 0.09 },
-          { key: 'name',      label: 'Product',   width: 0.25 },
-          { key: 'unit',      label: 'Unit',      width: 0.06 },
-          { key: 'opening',   label: 'Opening',   width: 0.10, align: 'right', format: 'qty' },
-          { key: 'purchased', label: 'Purchased', width: 0.10, align: 'right', format: 'qty' },
-          { key: 'sold',      label: 'Sold',      width: 0.09, align: 'right', format: 'qty' },
-          { key: 'adjusted',  label: 'Adjusted',  width: 0.09, align: 'right', format: 'qty' },
-          { key: 'closing',   label: 'Closing',   width: 0.10, align: 'right', format: 'qty' },
+          { key: 'code',      label: 'Code',      width: 0.08 },
+          { key: 'name',      label: 'Product',   width: 0.21 },
+          { key: 'unit',      label: 'Unit',      width: 0.05 },
+          { key: 'opening',   label: 'Opening',   width: 0.09, align: 'right', format: 'qty' },
+          { key: 'purchased', label: 'Purchased', width: 0.09, align: 'right', format: 'qty' },
+          { key: 'sold',      label: 'Sold',      width: 0.08, align: 'right', format: 'qty' },
+          { key: 'adjusted',  label: 'Adjusted',  width: 0.08, align: 'right', format: 'qty' },
+          { key: 'voided',    label: 'Voided',    width: 0.08, align: 'right', format: 'qty' },
+          { key: 'closing',   label: 'Closing',   width: 0.09, align: 'right', format: 'qty' },
           { key: 'value',     label: 'Value',     width: 0.12, align: 'right', format: 'money' },
         ],
         groups,
@@ -166,6 +175,7 @@ export async function GET(req: NextRequest) {
       'Purchased':    r.purchased,
       'Sold':         r.sold,
       'Adjusted':     r.adjusted,
+      'Voided':       r.voided,
       'Closing Qty':  r.closing,
       'Buy Price':    r.buyPrice.toNumber(),
       'Closing Value (R)': Number(r.value.toFixed(2)),
@@ -178,7 +188,7 @@ export async function GET(req: NextRequest) {
     ws['!cols'] = [
       { wch: 10 }, { wch: 30 }, { wch: 14 }, { wch: 8 },
       { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 },
-      { wch: 12 }, { wch: 12 }, { wch: 18 },
+      { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 18 },
     ]
 
     XLSX.utils.book_append_sheet(wb, ws, 'Stock Grid')

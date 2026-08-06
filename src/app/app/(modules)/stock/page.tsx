@@ -154,7 +154,7 @@ export default function StockPage() {
     } satisfies Column<StockEntry>] : []),
     {
       key: 'totalIn',
-      header: period ? 'In' : 'Total In',
+      header: period ? 'Purchased' : 'Total Purchased',
       width: '110px',
       align: 'right',
       render: (r) => (
@@ -165,7 +165,7 @@ export default function StockPage() {
     },
     {
       key: 'totalOut',
-      header: period ? 'Out' : 'Total Out',
+      header: period ? 'Sold' : 'Total Sold',
       width: '110px',
       align: 'right',
       render: (r) => (
@@ -279,7 +279,7 @@ export default function StockPage() {
       </FilterBar>
       {period && (
         <p style={{ margin: '8px 14px 0', fontSize: 11, color: colors.warning }}>
-          Tracking {PERIOD_HINTS[period]} ({periodDate}) — On Hand = Opening + In − Out.
+          Tracking {PERIOD_HINTS[period]} ({periodDate}) — In/Out shown are purchases/sales only; On Hand also reflects any stock adjustments and voided-transaction reversals.
         </p>
       )}
       <div className="flex-1 min-h-0" style={{ padding: 10 }}>
