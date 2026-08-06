@@ -151,9 +151,15 @@ async function generateAndStorePurchasePdfs(purchase: PurchaseWithCustomerAndLin
     }))
     const bytes = await generatePurchaseReceiptPdf({
       refNumber:      purchase.refNumber,
+      // The daily sequence number already embedded in the ref number
+      // (PUR-YYYYMMDD-NNNN) — there's no separate slip-book counter in the
+      // system, this is the closest existing equivalent to the legacy
+      // paper receipt's "Slip No."
+      slipNo:         Number(purchase.refNumber.split('-').pop()),
       customerCode:   purchase.customer.accountCode ?? undefined,
       customerName:   `${purchase.customer.firstName} ${purchase.customer.lastName}`,
       customerIdNo:   purchase.customer.idNumber ?? undefined,
+      customerPhone:  purchase.customer.phone ?? undefined,
       customerVatNumber: purchase.customer.vatNumber ?? undefined,
       lines:          slipLines,
       totalAmount:    purchase.totalAmount.toString(),

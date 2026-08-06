@@ -85,9 +85,14 @@ export async function GET(
     // generatePurchaseReceiptPdf's own header comment.
     const pdfBytes = await generatePurchaseReceiptPdf({
       refNumber:      purchase.refNumber,
+      // Daily sequence number already embedded in the ref number
+      // (PUR-YYYYMMDD-NNNN) — see generatePurchaseReceiptPdf's own caller
+      // in purchaseService.ts for why this is used as "Slip No."
+      slipNo:         Number(purchase.refNumber.split('-').pop()),
       customerCode:   purchase.customer.accountCode ?? undefined,
       customerName:   `${purchase.customer.firstName} ${purchase.customer.lastName}`,
       customerIdNo:   purchase.customer.idNumber ?? undefined,
+      customerPhone:  purchase.customer.phone ?? undefined,
       customerVatNumber: purchase.customer.vatNumber ?? undefined,
       lines:          thermalLines,
       totalAmount:    purchase.totalAmount.toString(),
