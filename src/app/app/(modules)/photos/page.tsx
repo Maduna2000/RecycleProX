@@ -32,11 +32,11 @@ const TYPE_META: Record<PhotoRecord['type'], { label: string; color: string; bg:
 }
 
 const TABS = [
+  { value: 'casual',       label: 'ID Photos',   icon: IdCard      },
   { value: 'all',          label: 'All',         icon: Images      },
   { value: 'purchase',     label: 'Purchases',   icon: ShoppingCart },
   { value: 'sale',         label: 'Sales',       icon: Receipt     },
   { value: 'weighbridge',  label: 'Weighbridge', icon: Scale       },
-  { value: 'casual',       label: 'ID Photos',   icon: IdCard      },
 ] as const
 
 const EMPTY_MESSAGES: Record<string, string> = {
@@ -401,23 +401,10 @@ function PhotoGrid({
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function PhotosPage() {
-  const [activeTab, setActiveTab] = useState('all')
+  const [activeTab, setActiveTab] = useState<typeof TABS[number]['value']>('casual')
 
   return (
-    <PortalPage title="Photo Viewer">
-      <div className="flex items-center gap-1.5 shrink-0" style={{ padding: '10px 12px 0' }}>
-        {TABS.map((t) => (
-          <Btn
-            key={t.value}
-            size="sm"
-            icon={t.icon}
-            variant={activeTab === t.value ? 'primary' : 'secondary'}
-            onClick={() => setActiveTab(t.value)}
-          >
-            {t.label}
-          </Btn>
-        ))}
-      </div>
+    <PortalPage tabs={[...TABS]} active={activeTab} onChange={(v) => setActiveTab(v as typeof activeTab)}>
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
         <PhotoGrid queryType={activeTab === 'all' ? undefined : activeTab} />
       </div>
