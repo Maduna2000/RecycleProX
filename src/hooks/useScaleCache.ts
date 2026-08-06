@@ -20,10 +20,11 @@ export function useScaleCache() {
     if (q.length < 2) return []
 
     if (!isOnline) {
-      // Search local cache
-      const all = await offlineDB.customers
-        .where('isActive').equals(1)
-        .toArray()
+      // Search local cache. isActive is a boolean field, not a valid
+      // IndexedDB key type — filter in JS rather than .where(...).equals(),
+      // which would silently match nothing (see the identical online-fetch
+      // failure fallback below, which already does this correctly).
+      const all = (await offlineDB.customers.toArray()).filter(c => c.isActive)
 
       return all.filter(c => {
         const fullName = `${c.firstName} ${c.lastName}`.toLowerCase()

@@ -6,6 +6,7 @@ import { useOnlineStatus } from '@/hooks/useOnlineStatus'
 import { useOfflineStore } from '@/stores/offlineStore'
 import { runSeeder } from '@/lib/offline/seeder'
 import { registerSyncCallbacks } from '@/lib/offline/sync'
+import { resetStuckSyncingOrders } from '@/lib/offline/scaleOrderService'
 
 export function OfflineProvider({ children }: { children: React.ReactNode }) {
   const { setPendingCount, setSyncing } = useOfflineStore()
@@ -21,6 +22,10 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
         else toast.error(msg)
       },
     })
+
+    // Recover any scale order left stuck at 'syncing' by a crash/reload
+    // mid-sync — see resetStuckSyncingOrders's own comment.
+    resetStuckSyncingOrders().catch(() => {})
 
     // Seed IndexedDB with product/customer/price data (skips if fresh)
     runSeeder().catch(() => {

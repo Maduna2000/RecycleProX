@@ -82,6 +82,27 @@ export async function triggerSync(): Promise<void> {
             cloudId,
           })
           synced++
+
+          // A record created offline (e.g. a quick-created customer) may be
+          // referenced by its local_ id inside the body of a LATER queued
+          // item (e.g. that purchase's customerId) — that reference would
+          // 404/fail server-side once replayed, since the local id was never
+          // real. Rewrite it to the real cloud id in every still-pending item
+          // now that we have one. Safe as a plain string replace: local ids
+          // are `local_<uuid>`, unique enough that a false-positive
+          // substring match elsewhere in a JSON body is not a real risk.
+          if (cloudId && cloudId !== item.localId) {
+            await substituteLocalId(item.localId, cloudId)
+          }
+        } else if (res.status === 401) {
+          // The desktop session cookie can genuinely expire during a long
+          // outage — this is not a bad payload, and marking it (and every
+          // item after it) 'failed' would silently lose real transactions.
+          // Leave this item and the rest of the queue as 'pending' and stop
+          // this sync pass; they'll retry automatically once re-authenticated
+          // (next online-event/interval-triggered triggerSync() call).
+          _showToast?.('Session expired — please log in again to sync offline transactions', 'error')
+          break
         } else if (res.status >= 400 && res.status < 500) {
           // Client error — bad payload, don't retry
           const errText = await res.text().catch(() => String(res.status))
@@ -134,6 +155,22 @@ export async function triggerSync(): Promise<void> {
   } finally {
     _syncInProgress = false
     _setSyncing?.(false)
+  }
+}
+
+// Rewrites every remaining pending queue item's body, replacing any
+// occurrence of a just-synced record's local id with its real cloud id —
+// see the call site's comment in triggerSync for why this is needed.
+async function substituteLocalId(localId: string, cloudId: string): Promise<void> {
+  const dependents = await offlineDB.syncQueue
+    .where('status').equals('pending')
+    .filter((i) => i.body.includes(localId))
+    .toArray()
+
+  for (const dep of dependents) {
+    await offlineDB.syncQueue.update(dep.seq!, {
+      body: dep.body.split(localId).join(cloudId),
+    })
   }
 }
 

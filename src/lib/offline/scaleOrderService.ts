@@ -125,6 +125,19 @@ export async function getPendingScaleOrderCount(): Promise<number> {
     .count()
 }
 
+// getPendingScaleOrders() above only ever looks at 'pending' — an order that
+// was flipped to 'syncing' (markOrderSyncing, right before photo uploads
+// start) and then never reached synced/failed/pending because the app
+// crashed or reloaded mid-sync is stuck there forever, invisible to every
+// future sync attempt. Call this once on app boot to recover any such order
+// back to 'pending' so it gets picked up again.
+export async function resetStuckSyncingOrders(): Promise<void> {
+  await offlineDB.scaleOrders
+    .where('syncStatus')
+    .equals('syncing')
+    .modify({ syncStatus: 'pending' })
+}
+
 // ─── Get photos for an order ─────────────────────────────────────────────────
 
 export async function getPhotosForOrder(orderId: string): Promise<OfflinePhoto[]> {

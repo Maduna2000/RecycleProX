@@ -7,6 +7,9 @@ import { Btn } from '@/components/rpx'
 import { Loader2, ScanLine, UserCheck, UserPlus, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
 import { validateSaId } from '@/lib/utils/saId'
+import { useOfflineStore } from '@/stores/offlineStore'
+import { offlineDB } from '@/lib/offline/db'
+import { enqueueMutation } from '@/lib/offline/sync'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -86,6 +89,7 @@ async function compressImage(file: File, maxPx = 1600, quality = 0.85): Promise<
 
 export const CasualSelectorPanel = forwardRef<CasualSelectorPanelRef, Props>(
   function CasualSelectorPanel({ onSelect, onAccountMatch, hideConfirmButton = false }, ref) {
+    const isOnline = useOfflineStore((s) => s.isOnline)
     const [form, setForm] = useState<CasualForm>({
       idNumber: '', firstName: '', lastName: '', phone: '', physicalAddress: '',
     })
@@ -283,17 +287,51 @@ export const CasualSelectorPanel = forwardRef<CasualSelectorPanelRef, Props>(
     // Shared by the first attempt and the "confirm different person" retry
     // after a phone-number-conflict warning — only the override flag differs.
     async function quickCreateCustomer(confirmDifferentPerson: boolean): Promise<SelectedCustomer | null> {
+      const payload = {
+        idNumber:        form.idNumber,
+        firstName:       form.firstName.trim(),
+        lastName:        form.lastName.trim(),
+        phone:           form.phone.trim(),
+        physicalAddress: form.physicalAddress.trim() || undefined,
+        ...(confirmDifferentPerson && { confirmDifferentPerson: true }),
+      }
+
+      if (!isOnline) {
+        // Unlike the other offline-queued forms, the caller needs a usable
+        // customer *right now* to continue the purchase — there's no "queue
+        // it and show a pending state" option here. Create a local_-id
+        // record immediately (cached so it's selectable/searchable for the
+        // rest of this offline session too), queue the real creation, and
+        // let sync.ts's local-id substitution rewrite the purchase/sale
+        // that references this id once the customer actually syncs.
+        const localId = `local_${crypto.randomUUID()}`
+        await offlineDB.customers.put({
+          id:              localId,
+          idNumber:        payload.idNumber,
+          firstName:       payload.firstName,
+          lastName:        payload.lastName,
+          phone:           payload.phone,
+          customerType:    'casual',
+          primaryFunction: 'supplier',
+          blacklisted:     false,
+          isActive:        true,
+        })
+        await enqueueMutation({ method: 'POST', url: '/api/customers/quick-create', body: payload, localId })
+        return {
+          id:              localId,
+          firstName:       payload.firstName,
+          lastName:        payload.lastName,
+          idNumber:        payload.idNumber,
+          phone:           payload.phone,
+          blacklisted:     false,
+          physicalAddress: payload.physicalAddress ?? null,
+        }
+      }
+
       const res = await fetch('/api/customers/quick-create', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({
-          idNumber:        form.idNumber,
-          firstName:       form.firstName.trim(),
-          lastName:        form.lastName.trim(),
-          phone:           form.phone.trim(),
-          physicalAddress: form.physicalAddress.trim() || undefined,
-          ...(confirmDifferentPerson && { confirmDifferentPerson: true }),
-        }),
+        body:    JSON.stringify(payload),
       })
       if (!res.ok) {
         const j = await res.json() as { error?: string; issues?: { message: string }[]; conflicts?: PhoneConflict[] }
