@@ -484,14 +484,15 @@ export interface PurchaseSlipData {
 type Font = Awaited<ReturnType<PDFDocument['embedFont']>>
 type Page = ReturnType<PDFDocument['addPage']>
 
-// A real 80mm Epson thermal printer's hardware margin is roughly 2mm each
-// side (~6pt), not the wider 10pt/3.5mm the other, generic-styled slip in
-// this file uses — kept as its own constant so it doesn't change that other
-// receipt's layout. This is downloaded and printed via a normal Windows
-// print driver rather than raw ESC/POS for now, so getting this close to
-// the real hardware margin matters for the printed page to actually line up
-// on the roll.
-const PMARGIN  = 6
+// Kept as its own constant (not the shared MARGIN above) so it doesn't
+// change the other, generic-styled slip's layout. This is downloaded and
+// printed via a normal Windows print driver rather than raw ESC/POS for
+// now, not the printer's own firmware — an initial 6pt guess at the real
+// hardware margin clipped the last digit of right-aligned totals (the
+// content sitting closest to the calculated edge), so this is deliberately
+// a bit more generous than a real 80mm Epson's printable area needs, to
+// leave headroom for print-driver rounding.
+const PMARGIN  = 12
 const PBODY_W  = W - PMARGIN * 2
 
 // The legacy slip's dividers are solid printed rules, not the dashed
