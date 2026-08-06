@@ -9,6 +9,7 @@ import { SplitPaymentModal, type SplitPayTarget } from './SplitPaymentModal'
 import { colors } from '@/lib/design-tokens'
 import { Btn, inp, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
 import { useOfflineMutation } from '@/hooks/useOfflineFetch'
+import { useOfflineStore } from '@/stores/offlineStore'
 
 export type PayTarget = {
   id: string
@@ -31,15 +32,20 @@ export function ProcessPaymentModal({
   const [method,          setMethod]          = useState<'cash' | 'eft'>('cash')
   const [loading,         setLoading]         = useState(false)
   const [showSplit,       setShowSplit]       = useState(false)
-  const [outstandingLoan, setOutstandingLoan] = useState('0')
-  const [loanLoading,     setLoanLoading]     = useState(true)
+  // null = not yet confirmed (still loading, or the fetch never succeeded —
+  // distinct from a confirmed "0", so an offline/failed check can't silently
+  // look identical to "customer has no outstanding loan".
+  const [outstandingLoan, setOutstandingLoan] = useState<string | null>(null)
+  const [checkedAt,       setCheckedAt]       = useState<Date | null>(null)
   const { mutate: offlineMutate } = useOfflineMutation()
+  const isOnline = useOfflineStore((s) => s.isOnline)
 
   const totalAmount   = new Decimal(purchase.totalAmount)
   const loanDeduction = new Decimal(purchase.loanDeductionAmount)
   const alreadyPaid   = new Decimal(purchase.amountPaid)
   const remaining     = totalAmount.minus(loanDeduction).minus(alreadyPaid)
-  const outstandingDec = new Decimal(outstandingLoan || '0')
+  const outstandingDec = new Decimal(outstandingLoan ?? '0')
+  const loanLoading = outstandingLoan === null && isOnline
 
   // Fetch customer's outstanding loan on mount
   useEffect(() => {
@@ -49,11 +55,10 @@ export function ProcessPaymentModal({
         if (res.ok) {
           const data = await res.json() as { outstanding?: string }
           setOutstandingLoan(data.outstanding ?? '0')
+          setCheckedAt(new Date())
         }
       } catch {
-        // Silently fail - loan alert just won't show
-      } finally {
-        setLoanLoading(false)
+        // Leave outstandingLoan at null — "unknown", not "confirmed zero".
       }
     }
     fetchLoan()
@@ -115,7 +120,7 @@ export function ProcessPaymentModal({
           </div>
 
           {/* Loan alert - MANDATORY */}
-          {!loanLoading && outstandingDec.greaterThan(0) && (
+          {!loanLoading && outstandingLoan !== null && outstandingDec.greaterThan(0) && (
             <div className="flex items-start gap-2 px-3 py-2 rounded-lg" style={{ background: colors.alertBg, border: `1px solid ${colors.alertBorder}` }}>
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" style={{ color: colors.alertIcon }} />
               <div>
@@ -124,6 +129,24 @@ export function ProcessPaymentModal({
                 </p>
                 <p className="text-xs" style={{ color: colors.alertText }}>
                   Use Split Payment to deduct loan from this payment.
+                  {!isOnline && checkedAt && ` (as of ${checkedAt.toLocaleTimeString()} — may be stale offline)`}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Couldn't confirm loan status at all (offline before any successful
+              check) — the alert above would otherwise just silently not show,
+              which looks identical to "confirmed no loan". */}
+          {!loanLoading && outstandingLoan === null && !isOnline && (
+            <div className="flex items-start gap-2 px-3 py-2 rounded-lg" style={{ background: colors.alertBg, border: `1px solid ${colors.alertBorder}` }}>
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" style={{ color: colors.alertIcon }} />
+              <div>
+                <p className="text-xs font-medium" style={{ color: colors.alertIcon }}>
+                  Loan status unknown — offline
+                </p>
+                <p className="text-xs" style={{ color: colors.alertText }}>
+                  Could not check for an outstanding loan. Reconnect before processing if unsure.
                 </p>
               </div>
             </div>
@@ -185,7 +208,7 @@ export function ProcessPaymentModal({
       {showSplit && (
         <SplitPaymentModal
           purchase={purchase as SplitPayTarget}
-          outstandingLoan={outstandingLoan}
+          outstandingLoan={outstandingLoan ?? '0'}
           onClose={() => setShowSplit(false)}
           onSuccess={() => {
             setShowSplit(false)

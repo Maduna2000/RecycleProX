@@ -33,7 +33,10 @@ export function RecordPaymentModal({
   const [amountError, setAmountError] = useState<string | null>(null)
   const [loading,     setLoading]     = useState(false)
   const [showSplit,   setShowSplit]   = useState(false)
-  const [hasOutstandingBusinessLoan, setHasOutstandingBusinessLoan] = useState(false)
+  // null = not yet confirmed either way — distinct from a confirmed "false",
+  // so a failed/offline check can't silently look like "no loan" and skip
+  // the mandatory Split Payment gate below.
+  const [hasOutstandingBusinessLoan, setHasOutstandingBusinessLoan] = useState<boolean | null>(null)
   const { mutate: offlineMutate } = useOfflineMutation()
 
   const totalAmount = new Decimal(sale.totalAmount)
@@ -47,9 +50,16 @@ export function RecordPaymentModal({
     fetch(`/api/customers/${sale.customerId}/business-loans`)
       .then((r) => r.json())
       .then((d: { hasOutstanding?: boolean }) => { if (!cancelled) setHasOutstandingBusinessLoan(d.hasOutstanding === true) })
-      .catch(() => {})
+      .catch(() => { if (!cancelled) setHasOutstandingBusinessLoan(null) })
     return () => { cancelled = true }
   }, [sale.customerId])
+
+  // Fail closed, not open: if we could never confirm loan status for this
+  // customer (offline, check never succeeded), treat it the same as "has an
+  // outstanding loan" for gating purposes — block plain payment rather than
+  // silently let a real business-loan deduction get skipped.
+  const loanStatusUnknown = sale.customerId != null && hasOutstandingBusinessLoan === null
+  const blockPlainPayment = hasOutstandingBusinessLoan === true || loanStatusUnknown
 
   function validateAmount(raw: string): string | null {
     if (!raw.trim()) return 'Amount is required'
@@ -112,23 +122,27 @@ export function RecordPaymentModal({
 
           {/* Business loan alert — existence-only, no figure. Mandatory: this
               sale cannot be settled via plain cash/eft while it's unpaid,
-              only through Split Payment (which PIN-gates the actual figure). */}
-          {hasOutstandingBusinessLoan && (
+              only through Split Payment (which PIN-gates the actual figure).
+              Also blocks when status is unknown (offline, check never
+              succeeded) — fail closed rather than silently skip the gate. */}
+          {blockPlainPayment && (
             <div className="flex items-start gap-2 px-3 py-2 rounded-lg" style={{ background: colors.alertBg, border: `1px solid ${colors.alertBorder}` }}>
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" style={{ color: colors.alertIcon }} />
               <div>
                 <p className="text-xs font-medium" style={{ color: colors.alertIcon }}>
-                  This customer has a pending business loan
+                  {loanStatusUnknown ? 'Business loan status unknown — offline' : 'This customer has a pending business loan'}
                 </p>
                 <p className="text-xs" style={{ color: colors.alertText }}>
-                  This sale can only be settled via Split Payment until the loan is applied.
+                  {loanStatusUnknown
+                    ? 'Could not check for an outstanding business loan while offline. Reconnect to process this payment.'
+                    : 'This sale can only be settled via Split Payment until the loan is applied.'}
                 </p>
               </div>
             </div>
           )}
 
           {/* Amount + method — only when there's no business loan to resolve first */}
-          {!hasOutstandingBusinessLoan && (
+          {!blockPlainPayment && (
             <>
               <div>
                 <div className="flex items-center justify-between mb-1">
@@ -177,9 +191,9 @@ export function RecordPaymentModal({
               disabled={loading}
               className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded text-xs font-medium"
               style={{
-                background: hasOutstandingBusinessLoan ? '#1565C0' : '#E3F2FD',
+                background: blockPlainPayment ? '#1565C0' : '#E3F2FD',
                 border: '1px solid #90CAF9',
-                color: hasOutstandingBusinessLoan ? '#fff' : '#1565C0',
+                color: blockPlainPayment ? '#fff' : '#1565C0',
                 cursor: loading ? 'not-allowed' : 'pointer',
               }}
             >
@@ -192,7 +206,7 @@ export function RecordPaymentModal({
         </RpxDialogBody>
         <RpxDialogFooter>
           <Btn onClick={onClose} disabled={loading}>Cancel</Btn>
-          {!hasOutstandingBusinessLoan && (
+          {!blockPlainPayment && (
             <Btn variant="primary" icon={CreditCard} loading={loading} onClick={handlePay}>
               Process Payment
             </Btn>
@@ -211,7 +225,7 @@ export function RecordPaymentModal({
             amountPaid:                  sale.amountPaid,
             customerId:                  sale.customerId,
           }}
-          hasOutstandingBusinessLoan={hasOutstandingBusinessLoan}
+          hasOutstandingBusinessLoan={blockPlainPayment}
           onClose={() => setShowSplit(false)}
           onSuccess={() => {
             setShowSplit(false)
