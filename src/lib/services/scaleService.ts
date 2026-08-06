@@ -366,7 +366,7 @@ export async function listScaleOrders(filters: ScaleOrderFilters) {
         customer: { select: { id: true, firstName: true, lastName: true, phone: true, customerType: true } },
         product:  { select: { id: true, name: true, unit: true, category: true } },
         operator: { select: { id: true, fullName: true } },
-        lines:    { include: { product: { select: { name: true, unit: true, category: true } } }, orderBy: { createdAt: 'asc' } },
+        lines:    { include: { product: { select: { id: true, name: true, unit: true, category: true } } }, orderBy: { createdAt: 'asc' } },
       },
       orderBy: { createdAt: 'desc' },
       skip,
