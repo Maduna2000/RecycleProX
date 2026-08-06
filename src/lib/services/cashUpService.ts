@@ -324,10 +324,15 @@ export async function rejectCashUp(cashUpId: string, rejectedByUserId: string, r
 async function calcSystemTotals(window: DateWindow, drawingsReceived = new Decimal(0), loansTotal = new Decimal(0)) {
   const { start, end } = window
 
-  const [salesCashAgg, salesEftAgg, purchasesAgg, paymentsAgg] = await Promise.all([
+  const [salesCashAgg, salesEftAgg, purchasesAgg, paymentsAgg, saleSettlementsAgg] = await Promise.all([
     prisma.sale.aggregate({
       _sum: { totalAmount: true },
-      where: { paymentMethod: 'cash', status: 'completed', createdAt: { gte: start, lte: end } },
+      // payments: { none: {} } — mirrors purchasesAgg below: a sale settled
+      // via markSalePaid/processSaleSplitPayment gets its cash inflow
+      // captured by a linked Payment row (folded into cashSales via
+      // saleSettlementsAgg) — counting its totalAmount here too would
+      // double it.
+      where: { paymentMethod: 'cash', status: 'completed', payments: { none: {} }, createdAt: { gte: start, lte: end } },
     }),
     prisma.sale.aggregate({
       _sum: { totalAmount: true },
@@ -341,16 +346,29 @@ async function calcSystemTotals(window: DateWindow, drawingsReceived = new Decim
       // totalAmount here too would double the same cash movement.
       where: { paymentMethod: 'cash', status: 'completed', payments: { none: {} }, createdAt: { gte: start, lte: end } },
     }),
+    // source: 'purchase' only — money paid OUT to settle a purchase. A
+    // source: 'sale' Payment (money paid IN by a buyer settling a sale) is
+    // the opposite direction and must never be pooled into the same
+    // subtracted bucket — see saleSettlementsAgg below, which is instead
+    // added into cashSales.
     prisma.payment.aggregate({
       _sum: { amount: true },
-      where: { paymentMethod: 'cash', voidedAt: null, createdAt: { gte: start, lte: end } },
+      where: { paymentMethod: 'cash', voidedAt: null, source: 'purchase', createdAt: { gte: start, lte: end } },
+    }),
+    prisma.payment.aggregate({
+      _sum: { amount: true },
+      where: { paymentMethod: 'cash', voidedAt: null, source: 'sale', createdAt: { gte: start, lte: end } },
     }),
   ])
 
-  const cashSales       = new Decimal(salesCashAgg._sum.totalAmount?.toString() ?? '0')
   const cardPayments    = new Decimal(salesEftAgg._sum.totalAmount?.toString() ?? '0')
   const cashPurchases   = new Decimal(purchasesAgg._sum.totalAmount?.toString() ?? '0')
   const cashPayments    = new Decimal(paymentsAgg._sum.amount?.toString() ?? '0')
+  // A sale created pending then later settled in cash (markSalePaid /
+  // processSaleSplitPayment) is a real cash inflow — fold it into cashSales
+  // rather than the (outflow-only) cashPayments bucket.
+  const cashSales       = new Decimal(salesCashAgg._sum.totalAmount?.toString() ?? '0')
+    .plus(saleSettlementsAgg._sum.amount?.toString() ?? '0')
   const expensesTotal   = await getExpenseTotalsForDate(window)
 
   // Expected in drawer = opening + drawings + cash sales - cash purchases - cash payments - expenses - loan advances + loan repayments
@@ -364,24 +382,29 @@ async function calcSystemTotals(window: DateWindow, drawingsReceived = new Decim
 // ─── Recalculate an approved cash-up after a completed sale/purchase is voided ──
 // Called from inside voidSale's/voidPurchase's own transaction — the sale or
 // purchase status change and this correction commit together, never one
-// without the other. Only the specific component that changed (cash sales or
-// cash purchases) is re-aggregated; everything else on the cash-up (expenses,
-// drawings, loans, card payments) is left untouched since voiding one sale or
-// purchase doesn't affect those. declaredCash is never touched — it's the
-// cashier's physical count from that day, a historical fact, not a derived
-// figure. No-op if there's no approved session covering the voided
-// transaction (voidSale/voidPurchase only call this once they've confirmed
-// one exists).
+// without the other. Only the specific component(s) that changed are
+// re-aggregated; everything else on the cash-up (expenses, drawings, card
+// payments) is left untouched since voiding one sale or purchase doesn't
+// affect those. declaredCash is never touched — it's the cashier's physical
+// count from that day, a historical fact, not a derived figure. No-op if
+// there's no approved session covering the voided transaction (voidSale/
+// voidPurchase only call this once they've confirmed one exists).
 //
 // transactionCreatedAt is the voided sale/purchase's own createdAt — needed
 // to pick the right session when a day has more than one approved session
 // (separate shifts), since sessionDate alone no longer identifies a single
 // row.
+//
+// 'payments' means purchase-direction settlement Payments (systemCashPayments
+// / "Account Payments") — voiding a settled purchase needs this whenever its
+// Payment gets cascade-voided. A settled SALE's Payment is instead folded
+// into cashSales (see calcSystemTotals), so recalculating 'sales' already
+// covers that case; there's no separate sale-payments bucket to recalc here.
 export async function recalculateApprovedCashUpForDate(
   tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
   sessionDate: Date,
   transactionCreatedAt: Date,
-  changed: 'sales' | 'purchases'
+  changed: Array<'sales' | 'purchases' | 'payments' | 'loans'>
 ) {
   const approvedToday = await tx.cashUp.findMany({
     where:   { sessionDate, status: 'approved' },
@@ -399,27 +422,50 @@ export async function recalculateApprovedCashUpForDate(
 
   const openingBalance   = new Decimal(cashUp.openingBalance.toString())
   const declaredCash     = new Decimal(cashUp.declaredCash?.toString() ?? '0')
-  const cashPayments     = new Decimal(cashUp.systemCashPayments.toString())
   const expensesTotal    = new Decimal(cashUp.expensesTotal.toString())
   const drawingsReceived = new Decimal(cashUp.drawingsReceived.toString())
-  const loansTotal       = new Decimal(cashUp.loansTotal.toString())
 
-  let cashSales      = new Decimal(cashUp.systemCashSales.toString())
-  let cashPurchases  = new Decimal(cashUp.systemCashPurchases.toString())
+  let cashSales     = new Decimal(cashUp.systemCashSales.toString())
+  let cashPurchases = new Decimal(cashUp.systemCashPurchases.toString())
+  let cashPayments  = new Decimal(cashUp.systemCashPayments.toString())
+  let loansTotal    = new Decimal(cashUp.loansTotal.toString())
 
-  if (changed === 'sales') {
-    const agg = await tx.sale.aggregate({
-      _sum: { totalAmount: true },
-      where: { paymentMethod: 'cash', status: 'completed', createdAt: { gte: start, lte: end } },
-    })
-    cashSales = new Decimal(agg._sum.totalAmount?.toString() ?? '0')
-  } else {
+  if (changed.includes('sales')) {
+    const [directAgg, settledAgg] = await Promise.all([
+      tx.sale.aggregate({
+        _sum: { totalAmount: true },
+        // See calcSystemTotals — excludes sales settled via a Payment record.
+        where: { paymentMethod: 'cash', status: 'completed', payments: { none: {} }, createdAt: { gte: start, lte: end } },
+      }),
+      tx.payment.aggregate({
+        _sum: { amount: true },
+        where: { paymentMethod: 'cash', voidedAt: null, source: 'sale', createdAt: { gte: start, lte: end } },
+      }),
+    ])
+    cashSales = new Decimal(directAgg._sum.totalAmount?.toString() ?? '0')
+      .plus(settledAgg._sum.amount?.toString() ?? '0')
+  }
+
+  if (changed.includes('purchases')) {
     const agg = await tx.purchase.aggregate({
       _sum: { totalAmount: true },
       // See calcSystemTotals — excludes purchases settled via a Payment record.
       where: { paymentMethod: 'cash', status: 'completed', payments: { none: {} }, createdAt: { gte: start, lte: end } },
     })
     cashPurchases = new Decimal(agg._sum.totalAmount?.toString() ?? '0')
+  }
+
+  if (changed.includes('payments')) {
+    const agg = await tx.payment.aggregate({
+      _sum: { amount: true },
+      where: { paymentMethod: 'cash', voidedAt: null, source: 'purchase', createdAt: { gte: start, lte: end } },
+    })
+    cashPayments = new Decimal(agg._sum.amount?.toString() ?? '0')
+  }
+
+  if (changed.includes('loans')) {
+    const loanTotals = await getLoanTotalsForDate({ start, end })
+    loansTotal = new Decimal(loanTotals.repaid).minus(loanTotals.advanced)
   }
 
   const cashExpected = cashSales.minus(cashPurchases).minus(cashPayments).minus(expensesTotal).plus(drawingsReceived).plus(loansTotal)
@@ -431,6 +477,8 @@ export async function recalculateApprovedCashUpForDate(
     data: {
       systemCashSales:     cashSales,
       systemCashPurchases: cashPurchases,
+      systemCashPayments:  cashPayments,
+      loansTotal,
       systemCashExpected:  fullExpected,
       variance,
     },
@@ -613,6 +661,7 @@ export async function getLiveStats(
     purchasesAgg,
     transferredPurchasesAgg,
     paymentsAgg,
+    saleSettlementsAgg,
     loanTotals,
     expenses,
     unpaidTodayAgg,
@@ -622,7 +671,9 @@ export async function getLiveStats(
   ] = await Promise.all([
     prisma.sale.aggregate({
       _sum: { totalAmount: true },
-      where: { paymentMethod: 'cash', status: 'completed', createdAt: { gte: start, lte: end } },
+      // See calcSystemTotals — excludes sales settled via a Payment record
+      // (folded into cashSales via saleSettlementsAgg below instead).
+      where: { paymentMethod: 'cash', status: 'completed', payments: { none: {} }, createdAt: { gte: start, lte: end } },
     }),
     prisma.sale.aggregate({
       _sum: { totalAmount: true },
@@ -647,9 +698,15 @@ export async function getLiveStats(
       _sum: { totalAmount: true },
       where: { paymentMethod: 'eft', status: 'completed', payments: { none: {} }, createdAt: { gte: start, lte: end } },
     }),
+    // source: 'purchase' only — see calcSystemTotals for why a source:'sale'
+    // payment (cash received, not paid out) must not be pooled in here.
     prisma.payment.aggregate({
       _sum: { amount: true },
-      where: { paymentMethod: 'cash', voidedAt: null, createdAt: { gte: start, lte: end } },
+      where: { paymentMethod: 'cash', voidedAt: null, source: 'purchase', createdAt: { gte: start, lte: end } },
+    }),
+    prisma.payment.aggregate({
+      _sum: { amount: true },
+      where: { paymentMethod: 'cash', voidedAt: null, source: 'sale', createdAt: { gte: start, lte: end } },
     }),
     getLoanTotalsForDate({ start, end }),
     getExpenseTotalsForDate({ start, end }),
@@ -678,7 +735,11 @@ export async function getLiveStats(
   ])
 
   return {
-    cashSales:     new Decimal(salesCashAgg._sum.totalAmount?.toString()  ?? '0').toFixed(2),
+    // A sale settled in cash after starting pending (markSalePaid /
+    // processSaleSplitPayment) is a real cash inflow — folded in here
+    // rather than the (outflow-only) cashPayments bucket below.
+    cashSales:     new Decimal(salesCashAgg._sum.totalAmount?.toString()  ?? '0')
+      .plus(saleSettlementsAgg._sum.amount?.toString() ?? '0').toFixed(2),
     cardSales:     new Decimal(salesCardAgg._sum.totalAmount?.toString()  ?? '0').toFixed(2),
     cardOnlySales: new Decimal(salesCardOnlyAgg._sum.totalAmount?.toString() ?? '0').toFixed(2),
     cashPurchases: new Decimal(purchasesAgg._sum.totalAmount?.toString()  ?? '0').toFixed(2),
@@ -799,8 +860,11 @@ export interface AccountPaymentRecord {
 export async function getAccountPaymentsForDate(window: DateWindow): Promise<AccountPaymentRecord[]> {
   const { start, end } = window
 
+  // source: 'purchase' — "Account Payments" specifically means money paid
+  // OUT to settle a purchase (see calcSystemTotals); a source:'sale'
+  // payment (cash received) belongs in the Cash Sales report instead.
   const payments = await prisma.payment.findMany({
-    where: { paymentMethod: 'cash', voidedAt: null, createdAt: { gte: start, lte: end } },
+    where: { paymentMethod: 'cash', voidedAt: null, source: 'purchase', createdAt: { gte: start, lte: end } },
     include: { customer: { select: { firstName: true, lastName: true } } },
     orderBy: { createdAt: 'asc' },
   })

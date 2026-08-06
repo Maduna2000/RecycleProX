@@ -115,6 +115,49 @@ export async function applyBusinessLoanRepaymentTx(
   }
 }
 
+// ─── Reverse repayments tied to a voided sale ─────────────────────────────────
+// Mirrors loanService.ts's reverseRepaymentsForPurchase — see its comment for
+// why this writes an offsetting negative-amount repayment rather than
+// mutating/deleting the original.
+export async function reverseRepaymentsForSale(
+  tx: Prisma.TransactionClient,
+  saleId: string,
+  saleRefNumber: string,
+  voidedById: string | undefined,
+): Promise<void> {
+  const repayments = await tx.businessLoanRepayment.findMany({ where: { saleId } })
+  if (repayments.length === 0) return
+
+  const prefix = `BRP-${todaySASTDateStr().replace(/-/g, '')}`
+  const startOfDay = todaySASTDate()
+
+  for (const r of repayments) {
+    const loan = await tx.businessLoan.findUniqueOrThrow({ where: { id: r.businessLoanId } })
+    const restoredBalance = new Decimal(loan.balanceAmount.toString()).plus(r.amount.toString())
+
+    await tx.businessLoan.update({
+      where: { id: r.businessLoanId },
+      data: { balanceAmount: restoredBalance, status: 'active' },
+    })
+
+    const count = await tx.businessLoanRepayment.count({ where: { createdAt: { gte: startOfDay } } })
+    await tx.businessLoanRepayment.create({
+      data: {
+        tenantId:        requireTenantId(),
+        refNumber:       `${prefix}-${String(count + 1).padStart(4, '0')}`,
+        businessLoanId:  r.businessLoanId,
+        customerId:      r.customerId,
+        amount:          new Decimal(r.amount.toString()).negated(),
+        paymentMethod:   r.paymentMethod,
+        notes:           `Reversal — sale ${saleRefNumber} voided`,
+        createdByUserId: voidedById,
+      },
+    })
+
+    logger.info({ businessLoanId: r.businessLoanId, reversedRepaymentId: r.id, amount: r.amount.toString(), restoredBalance: restoredBalance.toFixed(2), saleId, voidedById }, 'businessLoan.repayment.reversed')
+  }
+}
+
 // ─── Record a manual repayment ────────────────────────────────────────────────
 // The "Record Payment" action on the Business Loan tab — pays down ONE
 // specific loan directly, unlike applyBusinessLoanRepaymentTx above (which

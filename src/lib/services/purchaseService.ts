@@ -5,7 +5,7 @@ import logger from '@/lib/logger'
 import Decimal from 'decimal.js'
 import { resolvePrice } from '@/lib/services/productService'
 import { recordMovement, recordVoidReversal } from '@/lib/services/stockService'
-import { applyRepaymentTx } from '@/lib/services/loanService'
+import { applyRepaymentTx, reverseRepaymentsForPurchase } from '@/lib/services/loanService'
 import { recalculateApprovedCashUpForDate } from '@/lib/services/cashUpService'
 import { autoPromoteCasualIfEligible } from '@/lib/services/customerService'
 import { sastDayLabelOfInstant, sastDateLabelToUTCDate } from '@/lib/utils/dayBounds'
@@ -373,8 +373,27 @@ export async function voidPurchase(id: string, data: VoidPurchaseInput, voidedBy
         createdByUserId: voidedById,
       })
 
+      // A settled (formerly pending) purchase has a linked Payment row
+      // (markPurchasePaid/processSplitPayment) that voiding the purchase
+      // itself never touched — it would keep counting in systemCashPayments
+      // forever. Void it too, in the same transaction.
+      const voidedPayments = await tx.payment.updateMany({
+        where: { purchaseId: id, voidedAt: null },
+        data: { voidedAt: new Date(), voidedById, voidReason: data.reason },
+      })
+
+      // Same gap for a loan deduction applied at settlement — reverse it so
+      // the customer's loan balance and the day's loan totals both reflect
+      // that this purchase no longer happened.
+      await reverseRepaymentsForPurchase(tx, id, purchase.refNumber, voidedById)
+
       if (wasCompleted) {
-        await recalculateApprovedCashUpForDate(tx, sessionDate, purchase.createdAt, 'purchases')
+        const changed: Array<'purchases' | 'payments' | 'loans'> = ['purchases']
+        if (voidedPayments.count > 0) changed.push('payments')
+        if (purchase.loanDeductionAmount && new Decimal(purchase.loanDeductionAmount.toString()).greaterThan(0)) {
+          changed.push('loans')
+        }
+        await recalculateApprovedCashUpForDate(tx, sessionDate, purchase.createdAt, changed)
       }
 
       return p

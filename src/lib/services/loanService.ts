@@ -116,6 +116,55 @@ export async function applyRepaymentTx(
   }
 }
 
+// ─── Reverse repayments tied to a voided purchase ─────────────────────────────
+// Called from voidPurchase. A purchase's loan deduction can have paid down
+// more than one loan FIFO (applyRepaymentTx above), so every LoanRepayment
+// row carrying this purchaseId needs its own reversal. Never mutates or
+// deletes the original repayment row (matches this codebase's established
+// "never delete a financial record" convention, e.g.
+// scripts/production-clear-transaction-data.ts) — instead writes an
+// offsetting negative-amount LoanRepayment, which nets to zero in any
+// SUM-based aggregate (getLoanTotalsForDate) without losing the audit trail
+// of what was originally repaid and why it was reversed.
+export async function reverseRepaymentsForPurchase(
+  tx: Prisma.TransactionClient,
+  purchaseId: string,
+  purchaseRefNumber: string,
+  voidedById: string | undefined,
+): Promise<void> {
+  const repayments = await tx.loanRepayment.findMany({ where: { purchaseId } })
+  if (repayments.length === 0) return
+
+  const prefix = `REP-${todaySASTDateStr().replace(/-/g, '')}`
+  const startOfDay = todaySASTDate()
+
+  for (const r of repayments) {
+    const loan = await tx.loan.findUniqueOrThrow({ where: { id: r.loanId } })
+    const restoredBalance = new Decimal(loan.balanceAmount.toString()).plus(r.amount.toString())
+
+    await tx.loan.update({
+      where: { id: r.loanId },
+      data: { balanceAmount: restoredBalance, status: 'active' },
+    })
+
+    const count = await tx.loanRepayment.count({ where: { createdAt: { gte: startOfDay } } })
+    await tx.loanRepayment.create({
+      data: {
+        tenantId:        requireTenantId(),
+        refNumber:       `${prefix}-${String(count + 1).padStart(4, '0')}`,
+        loanId:          r.loanId,
+        customerId:      r.customerId,
+        amount:          new Decimal(r.amount.toString()).negated(),
+        paymentMethod:   r.paymentMethod,
+        notes:           `Reversal — purchase ${purchaseRefNumber} voided`,
+        createdByUserId: voidedById,
+      },
+    })
+
+    logger.info({ loanId: r.loanId, reversedRepaymentId: r.id, amount: r.amount.toString(), restoredBalance: restoredBalance.toFixed(2), purchaseId, voidedById }, 'loan.repayment.reversed')
+  }
+}
+
 // ─── Create Loan ──────────────────────────────────────────────────────────────
 
 export async function createLoan(data: CreateLoanInput, createdByUserId?: string) {

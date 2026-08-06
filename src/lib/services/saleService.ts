@@ -4,7 +4,7 @@ import { Prisma } from '@prisma/client'
 import logger from '@/lib/logger'
 import Decimal from 'decimal.js'
 import { recordMovement, recordVoidReversal } from '@/lib/services/stockService'
-import { applyBusinessLoanRepaymentTx } from '@/lib/services/businessLoanService'
+import { applyBusinessLoanRepaymentTx, reverseRepaymentsForSale } from '@/lib/services/businessLoanService'
 import { recalculateApprovedCashUpForDate } from '@/lib/services/cashUpService'
 import { sastDayLabelOfInstant, sastDateLabelToUTCDate } from '@/lib/utils/dayBounds'
 import type { CreateSaleInput, VoidSaleInput } from '@/lib/schemas/sale'
@@ -249,8 +249,24 @@ export async function voidSale(id: string, data: VoidSaleInput, voidedById?: str
         createdByUserId: voidedById,
       })
 
+      // A settled (formerly pending) sale has a linked Payment row
+      // (markSalePaid/processSaleSplitPayment) that voiding the sale itself
+      // never touched — it would keep counting as cash received forever.
+      // Void it too, in the same transaction.
+      await tx.payment.updateMany({
+        where: { saleId: id, voidedAt: null },
+        data: { voidedAt: new Date(), voidedById, voidReason: data.reason },
+      })
+
+      // Same gap for a business-loan deduction applied at settlement —
+      // reverse it so the customer's business-loan balance reflects that
+      // this sale no longer happened. (Business loans aren't part of the
+      // cash-up formula at all today, so this only restores the loan
+      // balance — no cashup recalculation needed for this specifically.)
+      await reverseRepaymentsForSale(tx, id, sale.refNumber, voidedById)
+
       if (wasCompleted) {
-        await recalculateApprovedCashUpForDate(tx, sessionDate, sale.createdAt, 'sales')
+        await recalculateApprovedCashUpForDate(tx, sessionDate, sale.createdAt, ['sales'])
       }
 
       return s
