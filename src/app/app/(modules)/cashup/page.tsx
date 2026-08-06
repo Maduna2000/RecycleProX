@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import useSWR, { mutate as swrMutate } from 'swr'
 import { useSession } from 'next-auth/react'
 import Decimal from 'decimal.js'
@@ -13,6 +13,8 @@ import { Dialog } from '@/components/ui/dialog'
 import { DENOMINATIONS, DENOMINATION_LABELS, type Denomination, CURRENCY_SYMBOLS, CURRENCY_LABELS, type Currency } from '@/lib/schemas/cashup'
 import { colors } from '@/lib/design-tokens'
 import { useOfflineMutation } from '@/hooks/useOfflineFetch'
+import { useOfflineStore } from '@/stores/offlineStore'
+import { offlineDB } from '@/lib/offline/db'
 import { ReportButton } from './_components/ReportButton'
 import { PreviousReportsModal } from './_components/PreviousReportsModal'
 import { CARD_BORDER } from '@/components/rpx/styles'
@@ -572,6 +574,31 @@ export default function CashUpPage() {
   const cashUp   = data?.cashUp ?? null
   const stats    = statsData
   const expenses = expensesData?.expenses ?? []
+  const isOnline = useOfflineStore((s) => s.isOnline)
+  // A session opened while offline (see handleOpen) — its id is a local_
+  // placeholder until the queued POST actually syncs. Full reconciliation
+  // (live sales/purchases/payments totals) can't be computed offline, so
+  // this session stays read-only — declare/submit — until it syncs for
+  // real and the SWR cache picks up the authoritative record.
+  const isProvisional = cashUp?.id?.startsWith('local_cashup_') ?? false
+
+  // Cache "what would opening a session look like right now" while online
+  // and no session is open, so handleOpen can safely offer a PROVISIONAL
+  // open later if the connection drops before the operator gets to it.
+  useEffect(() => {
+    if (!isOnline || cashUp) return
+    fetch(`/api/cashup/opening-balance-preview?date=${todayISO}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((preview) => {
+        if (preview) {
+          offlineDB.meta.put({
+            key: `cashupOpeningPreview:${todayISO}`,
+            value: JSON.stringify({ ...preview, cachedAt: Date.now() }),
+          })
+        }
+      })
+      .catch(() => {})
+  }, [isOnline, cashUp, todayISO])
 
   const [approvingExpense, setApprovingExpense] = useState<string | null>(null)
 
@@ -648,7 +675,42 @@ export default function CashUpPage() {
         localId: `local_cashup_${todayISO}`,
       })
       if (queued) {
-        toast.success('Cash-up session queued — will open when connected')
+        // A provisional open is only offered when we have a cached preview
+        // confirming the opening balance is safely known (not one that
+        // needs live transaction aggregation from a still-open previous
+        // session) — see previewOpeningBalance's own comment for why.
+        const cached = await offlineDB.meta.get(`cashupOpeningPreview:${todayISO}`)
+        const preview = cached
+          ? JSON.parse(cached.value) as { canOpen: boolean; reason?: string; safeOpeningBalance?: string }
+          : null
+
+        if (preview?.canOpen && preview.safeOpeningBalance) {
+          const provisional: CashUp = {
+            id: `local_cashup_${todayISO}`,
+            sessionDate: todayISO,
+            currency: 'ZAR',
+            status: 'open',
+            openedByUserId: session?.user?.id ?? '',
+            openedAt: new Date().toISOString(),
+            openingBalance: preview.safeOpeningBalance,
+            systemCashSales: '0',
+            systemCashPurchases: '0',
+            systemCashPayments: '0',
+            systemCashExpected: preview.safeOpeningBalance,
+            expensesTotal: '0',
+            cardPaymentsTotal: '0',
+            drawingsReceived: '0',
+            loansTotal: '0',
+          }
+          await swrMutate(CASHUP_KEY, { cashUp: provisional }, { revalidate: false })
+          toast.success('Session provisionally opened offline — will finalize once reconnected')
+        } else {
+          toast.success(
+            preview?.reason
+              ? `Session queued, but opening balance can't be confirmed offline: ${preview.reason}`
+              : 'Cash-up session queued — will open when connected'
+          )
+        }
       } else {
         // Seed the SWR cache straight from the POST response instead of
         // firing an unawaited re-fetch — the response already IS the
@@ -801,6 +863,22 @@ export default function CashUpPage() {
 
         {cashUp && (
           <>
+            {/* Provisional (opened offline, not yet synced) — full totals need
+                a live sync, so this session stays view-only until then. */}
+            {isProvisional && (
+              <div style={{ border: `1px solid ${colors.alertBorder}`, borderRadius: 3, overflow: 'hidden', background: colors.alertBg }}>
+                <div className="px-3 py-2.5">
+                  <p className="font-semibold text-sm mb-1" style={{ color: colors.alertIcon }}>
+                    Session provisionally opened — pending sync
+                  </p>
+                  <p className="text-sm" style={{ color: colors.alertText }}>
+                    This session was opened while offline. The opening balance shown is confirmed, but sales/purchases/payment
+                    totals can&apos;t be calculated until this device reconnects. Counting and submitting cash is disabled until then.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Previous day warning — must submit before starting new day */}
             {cashUp.status === 'open' && sessionDate !== todayISO && (
               <div style={{ border: `1px solid ${colors.danger}`, borderRadius: 3, overflow: 'hidden', background: colors.dangerBg }}>
@@ -925,7 +1003,7 @@ export default function CashUpPage() {
                         <tr style={{ borderBottom: '2px solid #B0B0B0' }}>
                           <td style={{ height: 26, padding: '2px 8px', fontSize: 12, color: colors.textSecondary }}>Currency</td>
                           <td colSpan={2} style={{ padding: '2px 8px', textAlign: 'right' }}>
-                            {isOpen ? (
+                            {isOpen && !isProvisional ? (
                               <select
                                 value={cashUp.currency ?? 'ZAR'}
                                 onChange={(e) => handleCurrencyChange(e.target.value as Currency)}
@@ -993,7 +1071,7 @@ export default function CashUpPage() {
                         <ReconRow
                           divider
                           label="Cash On Hand (Counted)" value={declared.toFixed(2)} highlight currencySymbol={currSym}
-                          action={isOpen && (
+                          action={isOpen && !isProvisional && (
                             <Btn
                               size="sm" icon={Calculator}
                               onClick={() => setCountCashOpen(true)}

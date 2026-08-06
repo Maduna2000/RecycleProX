@@ -159,6 +159,66 @@ export async function openCashUp(openedByUserId: string, sessionDateStr?: string
   return cashUp
 }
 
+// ─── Preview the opening balance a new session would get ─────────────────────
+// Read-only mirror of openCashUp's own carry-forward logic — creates
+// nothing. Exists so the client can cache "what would opening a session look
+// like right now" while online, and use it to safely offer a PROVISIONAL
+// offline session open later, without guessing. Two of openCashUp's four
+// fallback tiers are simple stored values (float.closingAmount,
+// cashUp.declaredCash, float.openingAmount) and are safe to reuse from a
+// stale cache; the "previous session still open, calculate from live
+// transactions" tier is NOT — it depends on aggregating purchases/sales/
+// payments/etc since that session opened, which is exactly what an offline
+// client can't safely reproduce. safeOpeningBalance is only set for the
+// safe tiers; its absence (with canOpen: true) means the balance can only be
+// determined online, even though opening itself isn't blocked.
+export interface OpeningBalancePreview {
+  canOpen: boolean
+  reason?: string
+  safeOpeningBalance?: string
+}
+
+export async function previewOpeningBalance(sessionDateStr?: string): Promise<OpeningBalancePreview> {
+  const dateStr = sessionDateStr ?? todayStr()
+  const sessionDate = toDate(dateStr)
+
+  const openFromPrevDay = await prisma.cashUp.findFirst({
+    where: { sessionDate: { lt: sessionDate }, status: 'open' },
+    orderBy: { sessionDate: 'desc' },
+  })
+  if (openFromPrevDay) {
+    return { canOpen: false, reason: 'A previous day\'s session is still open and must be submitted first' }
+  }
+
+  const existingOpen = await prisma.cashUp.findFirst({ where: { sessionDate, status: 'open' } })
+  if (existingOpen) {
+    return { canOpen: false, reason: 'A session is already open for this date' }
+  }
+
+  const prevCashUp = await prisma.cashUp.findFirst({
+    where:   { sessionDate: { lte: sessionDate } },
+    orderBy: [{ sessionDate: 'desc' }, { openedAt: 'desc' }],
+  })
+  const prevFloat = await getMostRecentFloatBefore(sessionDate)
+
+  if (prevFloat?.closingAmount) {
+    return { canOpen: true, safeOpeningBalance: new Decimal(prevFloat.closingAmount.toString()).toFixed(2) }
+  }
+  if (prevCashUp?.declaredCash && prevCashUp.status === 'submitted') {
+    return { canOpen: true, safeOpeningBalance: new Decimal(prevCashUp.declaredCash.toString()).toFixed(2) }
+  }
+  if (prevCashUp && prevCashUp.status === 'open') {
+    return { canOpen: true, reason: 'Opening balance depends on live totals from the still-open previous session' }
+  }
+  if (prevCashUp?.declaredCash) {
+    return { canOpen: true, safeOpeningBalance: new Decimal(prevCashUp.declaredCash.toString()).toFixed(2) }
+  }
+  if (prevFloat?.openingAmount) {
+    return { canOpen: true, safeOpeningBalance: new Decimal(prevFloat.openingAmount.toString()).toFixed(2) }
+  }
+  return { canOpen: true, safeOpeningBalance: '0.00' }
+}
+
 // ─── Get the open/submitted session for today (or a specific date) ───────────
 export async function getOpenSession(sessionDateStr?: string) {
   const dateStr = sessionDateStr ?? todayStr()
