@@ -373,6 +373,34 @@ export async function voidPurchase(id: string, data: VoidPurchaseInput, voidedBy
         createdByUserId: voidedById,
       })
 
+      // Reverse any loan repayment(s) this purchase's payout applied (FIFO
+      // deduction against the customer's active loans at creation time) —
+      // otherwise voiding the purchase would leave the loan balance
+      // permanently reduced for a payout that no longer exists.
+      const repayments = await tx.loanRepayment.findMany({ where: { purchaseId: id } })
+      for (const repayment of repayments) {
+        const loan = await tx.loan.findUniqueOrThrow({ where: { id: repayment.loanId } })
+        const restoredBalance = new Decimal(loan.balanceAmount.toString()).plus(repayment.amount.toString())
+        await tx.loan.update({
+          where: { id: loan.id },
+          data: {
+            balanceAmount: restoredBalance,
+            status: loan.status === 'settled' ? 'active' : loan.status,
+          },
+        })
+        await tx.loanRepayment.delete({ where: { id: repayment.id } })
+      }
+
+      // Void any Payment linked to this purchase — a purchase settled later
+      // via markPurchasePaid/processSplitPayment records its cash outflow
+      // there instead of on the purchase directly, so that payout would
+      // otherwise keep counting as real cash paid out after the purchase it
+      // settled no longer exists.
+      await tx.payment.updateMany({
+        where: { purchaseId: id, voidedAt: null },
+        data: { voidedAt: new Date(), voidedById, voidReason: `Linked purchase ${purchase.refNumber} voided: ${data.reason}` },
+      })
+
       if (wasCompleted) {
         await recalculateApprovedCashUpForDate(tx, sessionDate, purchase.createdAt, 'purchases')
       }

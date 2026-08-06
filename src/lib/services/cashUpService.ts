@@ -364,14 +364,19 @@ async function calcSystemTotals(window: DateWindow, drawingsReceived = new Decim
 // ─── Recalculate an approved cash-up after a completed sale/purchase is voided ──
 // Called from inside voidSale's/voidPurchase's own transaction — the sale or
 // purchase status change and this correction commit together, never one
-// without the other. Only the specific component that changed (cash sales or
-// cash purchases) is re-aggregated; everything else on the cash-up (expenses,
-// drawings, loans, card payments) is left untouched since voiding one sale or
-// purchase doesn't affect those. declaredCash is never touched — it's the
-// cashier's physical count from that day, a historical fact, not a derived
-// figure. No-op if there's no approved session covering the voided
-// transaction (voidSale/voidPurchase only call this once they've confirmed
-// one exists).
+// without the other. The `changed` component (cash sales or cash purchases)
+// drives which side voided the transaction itself, but cashPayments and
+// loansTotal are always re-aggregated too — voidPurchase can also void a
+// linked Payment (a purchase settled later via markPurchasePaid/
+// processSplitPayment) and reverse a loan repayment the purchase's payout
+// applied, both of which land on this same cash-up. Recomputing all of them
+// fresh from the tx is cheap and avoids the cash-up silently going stale on
+// exactly the components a void didn't expect to touch. expenses, drawings,
+// and card payments are still left untouched — nothing voids those. declaredCash
+// is never touched — it's the cashier's physical count from that day, a
+// historical fact, not a derived figure. No-op if there's no approved session
+// covering the voided transaction (voidSale/voidPurchase only call this once
+// they've confirmed one exists).
 //
 // transactionCreatedAt is the voided sale/purchase's own createdAt — needed
 // to pick the right session when a day has more than one approved session
@@ -399,10 +404,8 @@ export async function recalculateApprovedCashUpForDate(
 
   const openingBalance   = new Decimal(cashUp.openingBalance.toString())
   const declaredCash     = new Decimal(cashUp.declaredCash?.toString() ?? '0')
-  const cashPayments     = new Decimal(cashUp.systemCashPayments.toString())
   const expensesTotal    = new Decimal(cashUp.expensesTotal.toString())
   const drawingsReceived = new Decimal(cashUp.drawingsReceived.toString())
-  const loansTotal       = new Decimal(cashUp.loansTotal.toString())
 
   let cashSales      = new Decimal(cashUp.systemCashSales.toString())
   let cashPurchases  = new Decimal(cashUp.systemCashPurchases.toString())
@@ -422,6 +425,15 @@ export async function recalculateApprovedCashUpForDate(
     cashPurchases = new Decimal(agg._sum.totalAmount?.toString() ?? '0')
   }
 
+  const paymentsAgg = await tx.payment.aggregate({
+    _sum: { amount: true },
+    where: { paymentMethod: 'cash', voidedAt: null, createdAt: { gte: start, lte: end } },
+  })
+  const cashPayments = new Decimal(paymentsAgg._sum.amount?.toString() ?? '0')
+
+  const loanTotals = await getLoanTotalsForDate(window, tx)
+  const loansTotal = new Decimal(loanTotals.netCashOut).negated()
+
   const cashExpected = cashSales.minus(cashPurchases).minus(cashPayments).minus(expensesTotal).plus(drawingsReceived).plus(loansTotal)
   const fullExpected = openingBalance.plus(cashExpected)
   const variance = declaredCash.minus(fullExpected)
@@ -431,6 +443,8 @@ export async function recalculateApprovedCashUpForDate(
     data: {
       systemCashSales:     cashSales,
       systemCashPurchases: cashPurchases,
+      systemCashPayments:  cashPayments,
+      loansTotal,
       systemCashExpected:  fullExpected,
       variance,
     },

@@ -315,7 +315,10 @@ export async function getCustomerLoanSummary(customerId: string) {
 
 // ─── Daily loan totals (for CashUp auto-calculation) ─────────────────────────
 
-export async function getLoanTotalsForDate(window: DateWindow) {
+export async function getLoanTotalsForDate(
+  window: DateWindow,
+  tx: Prisma.TransactionClient | typeof prisma = prisma,
+) {
   const { start, end } = window
 
   // Only cash-method loans/repayments affect the drawer. Repayments are always
@@ -325,15 +328,15 @@ export async function getLoanTotalsForDate(window: DateWindow) {
   // matters there: an EFT advance never touches the physical drawer and must
   // not reduce the day's expected cash.
   const [advancedAgg, nonCashAdvancedAgg, repaidAgg] = await Promise.all([
-    prisma.loan.aggregate({
+    tx.loan.aggregate({
       where: { status: { not: 'voided' }, paymentMethod: 'cash', createdAt: { gte: start, lte: end } },
       _sum: { principalAmount: true },
     }),
-    prisma.loan.aggregate({
+    tx.loan.aggregate({
       where: { status: { not: 'voided' }, paymentMethod: { not: 'cash' }, createdAt: { gte: start, lte: end } },
       _sum: { principalAmount: true },
     }),
-    prisma.loanRepayment.aggregate({
+    tx.loanRepayment.aggregate({
       where: { paymentMethod: 'cash', createdAt: { gte: start, lte: end } },
       _sum: { amount: true },
     }),
