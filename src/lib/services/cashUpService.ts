@@ -275,7 +275,11 @@ async function calcSystemTotals(window: DateWindow, drawingsReceived = new Decim
     }),
     prisma.purchase.aggregate({
       _sum: { totalAmount: true },
-      where: { paymentMethod: 'cash', status: 'completed', createdAt: { gte: start, lte: end } },
+      // payments: { none: {} } — a purchase settled via markPurchasePaid/
+      // processSplitPayment gets its cash outflow captured by a linked
+      // Payment row instead (see systemCashPayments below); counting its
+      // totalAmount here too would double the same cash movement.
+      where: { paymentMethod: 'cash', status: 'completed', payments: { none: {} }, createdAt: { gte: start, lte: end } },
     }),
     prisma.payment.aggregate({
       _sum: { amount: true },
@@ -352,7 +356,8 @@ export async function recalculateApprovedCashUpForDate(
   } else {
     const agg = await tx.purchase.aggregate({
       _sum: { totalAmount: true },
-      where: { paymentMethod: 'cash', status: 'completed', createdAt: { gte: start, lte: end } },
+      // See calcSystemTotals — excludes purchases settled via a Payment record.
+      where: { paymentMethod: 'cash', status: 'completed', payments: { none: {} }, createdAt: { gte: start, lte: end } },
     })
     cashPurchases = new Decimal(agg._sum.totalAmount?.toString() ?? '0')
   }
@@ -573,13 +578,14 @@ export async function getLiveStats(
     }),
     prisma.purchase.aggregate({
       _sum: { totalAmount: true },
-      where: { paymentMethod: 'cash', status: 'completed', createdAt: { gte: start, lte: end } },
+      // See calcSystemTotals — excludes purchases settled via a Payment record.
+      where: { paymentMethod: 'cash', status: 'completed', payments: { none: {} }, createdAt: { gte: start, lte: end } },
     }),
     // Transferred (EFT) purchases — matches the "Transferred Purchases" report's filter,
     // exposed here so that report button can be greyed out when there's nothing to show.
     prisma.purchase.aggregate({
       _sum: { totalAmount: true },
-      where: { paymentMethod: 'eft', status: 'completed', createdAt: { gte: start, lte: end } },
+      where: { paymentMethod: 'eft', status: 'completed', payments: { none: {} }, createdAt: { gte: start, lte: end } },
     }),
     prisma.payment.aggregate({
       _sum: { amount: true },
@@ -702,7 +708,9 @@ export async function getCashPurchasesForDate(window: DateWindow): Promise<CashP
   const { start, end } = window
 
   const purchases = await prisma.purchase.findMany({
-    where: { paymentMethod: 'cash', status: 'completed', createdAt: { gte: start, lte: end } },
+    // See calcSystemTotals — excludes purchases settled via a Payment record
+    // (already listed under Account Payments) so the report matches the total.
+    where: { paymentMethod: 'cash', status: 'completed', payments: { none: {} }, createdAt: { gte: start, lte: end } },
     include: {
       customer: { select: { firstName: true, lastName: true, idNumber: true } },
       lines: { select: { product: { select: { name: true } }, quantity: true } },
@@ -916,7 +924,8 @@ export async function getTransferredPurchasesForDate(window: DateWindow): Promis
   const { start, end } = window
 
   const purchases = await prisma.purchase.findMany({
-    where: { paymentMethod: 'eft', status: 'completed', createdAt: { gte: start, lte: end } },
+    // See calcSystemTotals — excludes purchases settled via a Payment record.
+    where: { paymentMethod: 'eft', status: 'completed', payments: { none: {} }, createdAt: { gte: start, lte: end } },
     include: { customer: { select: { firstName: true, lastName: true } } },
     orderBy: { createdAt: 'asc' },
   })
