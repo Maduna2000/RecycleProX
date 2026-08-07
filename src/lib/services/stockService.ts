@@ -37,6 +37,45 @@ export async function recordMovement(
   })
 }
 
+// ─── Voided-transaction exclusion ──────────────────────────────────────────────
+// Voiding a purchase/sale never deletes or retags its original StockMovement
+// row — it only adds a separate, offsetting void_reversal row (see
+// recordVoidReversal). A query that groups by `source` alone therefore keeps
+// counting a voided purchase/sale's original quantity under "Purchased"/
+// "Sold" forever, even though the transaction never really happened. Both
+// the original and its void_reversal share the same sourceId (the
+// purchase/sale's own id), so filtering every stock query by "not tied to a
+// currently-voided source" removes both sides of the pair together — since a
+// voided pair's two entries always cancel to zero anyway, excluding both is
+// equivalent to including both for any *total*, while correctly zeroing out
+// the "Purchased"/"Sold" breakdown for the transaction that no longer counts.
+//
+// Applied uniformly (including movements dated before a reporting period's
+// start) rather than only to in-period movements — simpler and correct for
+// the overwhelmingly common case in this business of a purchase/sale being
+// voided the same day it was created. The one case this doesn't perfectly
+// capture is a transaction voided in a *later* reporting period than it was
+// created in — that period's own closing figure would show the correction a
+// touch differently than a fully time-accurate ledger would, but the
+// business's real voiding pattern (same-day, confirmed via live data) makes
+// this a non-issue in practice.
+async function getVoidedTransactionIdSets(): Promise<{ voidedPurchaseIds: string[]; voidedSaleIds: string[] }> {
+  const [purchases, sales] = await Promise.all([
+    prisma.purchase.findMany({ where: { status: 'voided' }, select: { id: true } }),
+    prisma.sale.findMany({ where: { status: 'voided' }, select: { id: true } }),
+  ])
+  return { voidedPurchaseIds: purchases.map((p) => p.id), voidedSaleIds: sales.map((s) => s.id) }
+}
+
+// `sourceId: { notIn: [...] }` alone silently drops every row where
+// sourceId is null (manual/stocktake adjustments) — SQL's `NULL NOT IN (...)`
+// evaluates to unknown, not true. Explicitly allowing null sourceIds through
+// avoids that trap (same pattern as production-clear-transaction-data.ts).
+function notVoidedFilter(voidedIds: string[]): Record<string, unknown> {
+  if (voidedIds.length === 0) return {}
+  return { OR: [{ sourceId: null }, { sourceId: { notIn: voidedIds } }] }
+}
+
 // ─── Stock on hand per product ────────────────────────────────────────────────
 
 /**
@@ -46,12 +85,15 @@ export async function recordMovement(
  *
  * totalIn/totalOut shown here are purchase-only / sale-only — "how much
  * came in by buying it, how much left by selling it" — not the full
- * movement ledger. onHand is still the true, complete running total
- * (includes manual/stocktake adjustments and void reversals), since those
- * genuinely change what's physically on the shelf; they just don't belong
- * in the purchase/sale narrative these two columns are meant to tell.
+ * movement ledger, and exclude any purchase/sale that's since been voided
+ * (see notVoidedFilter). onHand is still the true, complete running total
+ * (includes manual/stocktake adjustments), since those genuinely change
+ * what's physically on the shelf.
  */
 export async function getStockOnHand(productId?: string, asAt?: Date) {
+  const { voidedPurchaseIds, voidedSaleIds } = await getVoidedTransactionIdSets()
+  const excludeVoided = notVoidedFilter([...voidedPurchaseIds, ...voidedSaleIds])
+
   // Grouping by source (not just productId) in the same two queries this
   // always needed — one per direction — gets both the true all-sources sum
   // and the purchase-only/sale-only sum without extra DB round trips.
@@ -62,6 +104,7 @@ export async function getStockOnHand(productId?: string, asAt?: Date) {
         direction,
         ...(productId && { productId }),
         ...(asAt && { createdAt: { lte: asAt } }),
+        ...excludeVoided,
       },
       _sum: { quantity: true },
     })
@@ -117,12 +160,14 @@ export async function getStockOnHand(productId?: string, asAt?: Date) {
  * Month/Year filter on the Stock On Hand page.
  *
  * The displayed totalIn/totalOut are purchase-only / sale-only (see
- * getStockOnHand's comment for why) — onHand/closing is still computed from
- * every movement in the period, including adjustments and void reversals,
- * so it stays the true physical figure even though it won't always equal
- * opening + displayed-in − displayed-out.
+ * getStockOnHand's comment for why), excluding anything since voided —
+ * applied to both the opening and in-period sums (see notVoidedFilter's own
+ * comment on why uniformly, not just within the period).
  */
 export async function getStockOnHandForPeriod(start: Date, end: Date, productId?: string) {
+  const { voidedPurchaseIds, voidedSaleIds } = await getVoidedTransactionIdSets()
+  const excludeVoided = notVoidedFilter([...voidedPurchaseIds, ...voidedSaleIds])
+
   // Opening balance (before start) needs only the true all-sources sum, so
   // it stays grouped by productId alone. The in-period sums are grouped by
   // source too, the same way getStockOnHand does it, so the purchase-only/
@@ -131,14 +176,14 @@ export async function getStockOnHandForPeriod(start: Date, end: Date, productId?
   const openSum = (direction: 'in' | 'out') =>
     prisma.stockMovement.groupBy({
       by: ['productId'],
-      where: { direction, createdAt: { lt: start }, ...(productId && { productId }) },
+      where: { direction, createdAt: { lt: start }, ...(productId && { productId }), ...excludeVoided },
       _sum: { quantity: true },
     }).then((rows) => new Map(rows.map((r) => [r.productId, new Decimal(r._sum.quantity?.toString() ?? '0')])))
 
   const periodSum = (direction: 'in' | 'out') =>
     prisma.stockMovement.groupBy({
       by: ['productId', 'source'],
-      where: { direction, createdAt: { gte: start, lte: end }, ...(productId && { productId }) },
+      where: { direction, createdAt: { gte: start, lte: end }, ...(productId && { productId }), ...excludeVoided },
       _sum: { quantity: true },
     })
 

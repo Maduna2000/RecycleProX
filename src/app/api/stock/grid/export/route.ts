@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
   try {
     const { periodStart, periodEnd, openingCutoff } = getPeriodBounds(period, dateParam)
 
-    const [products, movements] = await runWithRequestTenant(req, async () => {
+    const [products, rawMovements, voidedPurchaseIds, voidedSaleIds] = await runWithRequestTenant(req, async () => {
       // A parent category selection covers its sub-categories too
       const productWhere: Prisma.ProductWhereInput = {
         isActive: true,
@@ -52,10 +52,19 @@ export async function GET(req: NextRequest) {
             product: productWhere,
             createdAt: { gte: openingCutoff, lte: periodEnd },
           },
-          select: { productId: true, direction: true, quantity: true, source: true, createdAt: true },
+          select: { productId: true, direction: true, quantity: true, source: true, sourceId: true, createdAt: true },
         }),
+        prisma.purchase.findMany({ where: { status: 'voided' }, select: { id: true } }).then((r) => r.map((x) => x.id)),
+        prisma.sale.findMany({ where: { status: 'voided' }, select: { id: true } }).then((r) => r.map((x) => x.id)),
       ])
     })
+
+    // See the matching comment in src/app/api/stock/grid/route.ts — a
+    // voided purchase/sale's original movement is never deleted or retagged,
+    // only offset by a separate void_reversal sharing the same sourceId.
+    // Dropping both before aggregating keeps Purchased/Sold real.
+    const voidedIds = new Set([...voidedPurchaseIds, ...voidedSaleIds])
+    const movements = rawMovements.filter((m) => !m.sourceId || !voidedIds.has(m.sourceId))
 
     // Build rows
     const rows = products.map((p) => {
@@ -72,16 +81,9 @@ export async function GET(req: NextRequest) {
       const adjIn        = period_mvt.filter((m) => m.direction === 'in' && m.source === 'manual_adjustment').reduce((a, m) => a.plus(new Decimal(m.quantity.toString())), new Decimal(0))
       const adjOut       = period_mvt.filter((m) => m.direction === 'out' && m.source === 'manual_adjustment').reduce((a, m) => a.plus(new Decimal(m.quantity.toString())), new Decimal(0))
       const adjustedQty  = adjIn.minus(adjOut)
-      // Net effect of voided-transaction reversals — folded into closingQty
-      // only, deliberately not exposed as its own column (see the matching
-      // comment in src/app/api/stock/grid/route.ts) — but it must still be
-      // accounted for in the math, or closingQty overstates stock by the
-      // full amount of any purchase voided within the period.
-      const voidIn       = period_mvt.filter((m) => m.direction === 'in' && m.source === 'void_reversal').reduce((a, m) => a.plus(new Decimal(m.quantity.toString())), new Decimal(0))
-      const voidOut      = period_mvt.filter((m) => m.direction === 'out' && m.source === 'void_reversal').reduce((a, m) => a.plus(new Decimal(m.quantity.toString())), new Decimal(0))
-      const voidedQty    = voidIn.minus(voidOut)
-
-      const closingQty   = openingQty.plus(purchasedQty).minus(soldQty).plus(adjustedQty).plus(voidedQty)
+      // No separate "voided" term needed: movements tied to a currently-
+      // voided purchase/sale were already dropped from `movements` above.
+      const closingQty   = openingQty.plus(purchasedQty).minus(soldQty).plus(adjustedQty)
       const closingValue = closingQty.times(new Decimal(p.defaultBuyPrice.toString()))
 
       return {
