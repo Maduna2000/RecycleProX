@@ -8,7 +8,7 @@ import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { CheckCircle2, Calculator, Clock, Lock, RefreshCw, FolderOpen } from 'lucide-react'
+import { CheckCircle2, Calculator, Clock, Lock, RefreshCw, FolderOpen, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Dialog } from '@/components/ui/dialog'
 import { DENOMINATIONS, DENOMINATION_LABELS, type Denomination, CURRENCY_SYMBOLS, CURRENCY_LABELS, type Currency } from '@/lib/schemas/cashup'
 import { colors } from '@/lib/design-tokens'
@@ -581,6 +581,18 @@ export default function CashUpPage() {
   const cashUp   = data?.cashUp ?? null
   const stats    = statsData
   const expenses = expensesData?.expenses ?? []
+
+  const EXPENSES_PAGE_SIZE = 3
+  const [expensePage, setExpensePage] = useState(1)
+  const expensePageCount = Math.max(1, Math.ceil(expenses.length / EXPENSES_PAGE_SIZE))
+  useEffect(() => { setExpensePage(1) }, [sessionDate])
+  useEffect(() => {
+    if (expensePage > expensePageCount) setExpensePage(expensePageCount)
+  }, [expensePage, expensePageCount])
+  const pagedExpenses = expenses.slice(
+    (expensePage - 1) * EXPENSES_PAGE_SIZE,
+    expensePage * EXPENSES_PAGE_SIZE,
+  )
   const isOnline = useOfflineStore((s) => s.isOnline)
   // A session opened while offline (see handleOpen) — its id is a local_
   // placeholder until the queued POST actually syncs. Full reconciliation
@@ -1242,11 +1254,36 @@ export default function CashUpPage() {
                     {/* Today's Expenses */}
                     {expenses.length > 0 && (
                       <div style={PANEL}>
-                        <div style={PANEL_HEAD}>
+                        <div className="flex items-center justify-between" style={PANEL_HEAD}>
                           <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: colors.textSecondary }}>Today&apos;s Expenses</span>
+                          {expensePageCount > 1 && (
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                onClick={() => setExpensePage((p) => Math.max(1, p - 1))}
+                                disabled={expensePage <= 1}
+                                className="disabled:opacity-30"
+                                style={{ color: colors.textSecondary }}
+                                aria-label="Previous expenses"
+                              >
+                                <ChevronLeft className="w-3.5 h-3.5" />
+                              </button>
+                              <span className="text-[10px] tabular-nums" style={{ color: colors.textSecondary }}>
+                                {expensePage} / {expensePageCount}
+                              </span>
+                              <button
+                                onClick={() => setExpensePage((p) => Math.min(expensePageCount, p + 1))}
+                                disabled={expensePage >= expensePageCount}
+                                className="disabled:opacity-30"
+                                style={{ color: colors.textSecondary }}
+                                aria-label="Next expenses"
+                              >
+                                <ChevronRight className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          )}
                         </div>
                         <div>
-                          {expenses.map((e, i) => (
+                          {pagedExpenses.map((e, i) => (
                             <div
                               key={e.id}
                               className="flex items-start justify-between gap-2"
