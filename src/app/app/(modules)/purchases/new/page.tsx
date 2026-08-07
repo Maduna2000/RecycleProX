@@ -248,7 +248,12 @@ export default function NewPurchasePage() {
 
   // ── Line management ──────────────────────────────────────────────────────
   function addLine() {
-    setLines((prev) => [...prev, emptyLine(keyCounter, !customer?.zeroRated)])
+    // customer is null for most of casual data entry (the casual panel only
+    // confirms/loads it at submit time) — `!customer?.zeroRated` would read
+    // undefined as "not zero-rated" and wrongly default new lines to VAT
+    // applied. Only default to VAT when a loaded customer is explicitly
+    // known not to be zero-rated.
+    setLines((prev) => [...prev, emptyLine(keyCounter, customer?.zeroRated === false)])
     setKeyCounter((k) => k + 1)
   }
 
@@ -350,6 +355,10 @@ export default function NewPurchasePage() {
     setCustomerType(type)
     setCustomer(null)
     setShowAllProducts(false)
+    // Clear any VAT flag lines picked up from a previously selected customer
+    // (e.g. an account with VAT applying) — it no longer reflects reality
+    // once that customer is deselected.
+    setLines((prev) => prev.map((l) => ({ ...l, vatApplied: false })))
   }
 
   // Fired by CasualSelectorPanel when an ID search under Casual matches a
