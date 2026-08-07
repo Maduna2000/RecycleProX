@@ -3,7 +3,7 @@ import { prisma } from '@/lib/db/prisma'
 import { requireTenantId } from '@/lib/db/tenantContext'
 import logger from '@/lib/logger'
 import { SubmitCashUpInput, ApproveCashUpInput, type Currency } from '@/lib/schemas/cashup'
-import { getMostRecentFloatBefore, updateClosingAmount, getDrawingsReceivedForDate } from './floatService'
+import { getMostRecentFloatAsOf, updateClosingAmount, getDrawingsReceivedForDate } from './floatService'
 import { getExpenseTotalsForDate } from './expenseService'
 import { getLoanTotalsForDate } from './loanService'
 import { getSessionWindow, type DateWindow } from './cashUpWindow'
@@ -80,7 +80,7 @@ export async function openCashUp(openedByUserId: string, sessionDateStr?: string
   //   2. Previous cashup's declaredCash (submitted but not approved)
   //   3. Calculate from previous cashup's transactions (open, not submitted)
   //   4. Float openingAmount (bootstrap, no prior cashup)
-  const prevFloat = await getMostRecentFloatBefore(sessionDate)
+  const prevFloat = await getMostRecentFloatAsOf(sessionDate)
 
   let openingBalance: Decimal
 
@@ -199,7 +199,7 @@ export async function previewOpeningBalance(sessionDateStr?: string): Promise<Op
     where:   { sessionDate: { lte: sessionDate } },
     orderBy: [{ sessionDate: 'desc' }, { openedAt: 'desc' }],
   })
-  const prevFloat = await getMostRecentFloatBefore(sessionDate)
+  const prevFloat = await getMostRecentFloatAsOf(sessionDate)
 
   if (prevFloat?.closingAmount) {
     return { canOpen: true, safeOpeningBalance: new Decimal(prevFloat.closingAmount.toString()).toFixed(2) }

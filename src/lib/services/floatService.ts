@@ -92,12 +92,36 @@ type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
  * Used to carry forward the previous day's closing amount when no float is
  * manually set for today. Accepts an optional tx client so callers (e.g.
  * cashUpService.approveCashUp) can run this as part of their own transaction.
+ *
+ * Only correct for bootstrapping a record that doesn't exist yet for `date`
+ * (there's nothing "today" to prefer over "before"). To find the most
+ * recent record carrying forward INTO a session opening on `date` itself
+ * (where a same-day CashFloat row may already carry a fresher
+ * closingAmount from an earlier same-day approval), use
+ * getMostRecentFloatAsOf instead.
  */
 export async function getMostRecentFloatBefore(date: Date, tx: TxClient | typeof prisma = prisma) {
   const d = normalizeToDateLabel(date)
 
   return tx.cashFloat.findFirst({
     where: { floatDate: { lt: d } },
+    orderBy: { floatDate: 'desc' },
+  })
+}
+
+/**
+ * Like getMostRecentFloatBefore, but includes `date` itself. A day can now
+ * hold more than one CashUp session (separate shifts) sharing a single
+ * CashFloat row for that day — approving an earlier session today writes
+ * its declaredCash onto TODAY's own CashFloat.closingAmount
+ * (updateClosingAmount), so opening a later same-day session must be able
+ * to see that same-day row, not just a prior day's.
+ */
+export async function getMostRecentFloatAsOf(date: Date, tx: TxClient | typeof prisma = prisma) {
+  const d = normalizeToDateLabel(date)
+
+  return tx.cashFloat.findFirst({
+    where: { floatDate: { lte: d } },
     orderBy: { floatDate: 'desc' },
   })
 }
@@ -168,11 +192,13 @@ export async function getCurrentFloat() {
 
   if (!record) return null
 
-  // Current balance = balanceAfter of last movement, or openingAmount if no movements
+  // Current balance = balanceAfter of last movement; with no movements yet
+  // today, closingAmount (set by an earlier same-day session's approval)
+  // is fresher than openingAmount and must win if present.
   const lastMovement = record.movements.at(-1)
   const currentBalance = lastMovement
     ? new Decimal(lastMovement.balanceAfter.toString())
-    : new Decimal(record.openingAmount.toString())
+    : new Decimal((record.closingAmount ?? record.openingAmount).toString())
 
   return { ...record, currentBalance: currentBalance.toFixed(2) }
 }
@@ -218,14 +244,17 @@ export async function addFloatMovement(
       })
     }
 
-    // Compute current balance from last movement's balanceAfter
+    // Compute current balance from last movement's balanceAfter; with no
+    // movements yet today, closingAmount (set by an earlier same-day
+    // session's approval — see approveCashUp/updateClosingAmount) is
+    // fresher than openingAmount and must win if present.
     const lastMovement = await tx.floatMovement.findFirst({
       where:   { cashFloatId: floatRecord.id },
       orderBy: { createdAt: 'desc' },
     })
     const currentBalance = lastMovement
       ? new Decimal(lastMovement.balanceAfter.toString())
-      : new Decimal(floatRecord.openingAmount.toString())
+      : new Decimal((floatRecord.closingAmount ?? floatRecord.openingAmount).toString())
 
     const moveAmount = new Decimal(amount)
     const balanceAfter = movementType === 'top_up' || movementType === 'opening'
