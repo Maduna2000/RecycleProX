@@ -8,6 +8,7 @@ import { Dialog } from '@/components/ui/dialog'
 import { colors } from '@/lib/design-tokens'
 import { Btn, inp, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
 import { AdminPinUnlockModal, type BusinessLoanFullSummary } from '@/components/business-loans/AdminPinUnlockModal'
+import { useOfflineMutation } from '@/hooks/useOfflineFetch'
 
 export type SaleSplitPayTarget = {
   id: string
@@ -100,6 +101,7 @@ export function SaleSplitPaymentModal({
   const [error, setError] = useState<string | null>(null)
   const [pinModalOpen, setPinModalOpen] = useState(false)
   const [unlockedSummary, setUnlockedSummary] = useState<BusinessLoanFullSummary | null>(null)
+  const { mutate: offlineMutate } = useOfflineMutation()
 
   const totalAmount        = new Decimal(sale.totalAmount)
   const existingDeduction  = new Decimal(sale.businessLoanDeductionAmount || '0')
@@ -141,25 +143,33 @@ export function SaleSplitPaymentModal({
     setError(null)
     setLoading(true)
 
-    const res = await fetch(`/api/sales/${sale.id}/split-payment`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        payments: {
-          cash:         cash || '0',
-          eft:          eft  || '0',
-          businessLoan: businessLoan || '0',
+    try {
+      // The sale already has a real server id (split payment only ever
+      // applies to an existing pending sale) — reuse it as the queue's
+      // localId, matching SplitPaymentModal's identical purchase-side logic.
+      const { queued } = await offlineMutate({
+        method: 'POST',
+        url: `/api/sales/${sale.id}/split-payment`,
+        body: {
+          payments: {
+            cash:         cash || '0',
+            eft:          eft  || '0',
+            businessLoan: businessLoan || '0',
+          },
         },
-      }),
-    })
+        localId: sale.id,
+      })
 
-    setLoading(false)
-    if (res.ok) {
-      toast.success(`Split payment processed for ${sale.ref}`)
+      setLoading(false)
+      if (queued) {
+        toast.success(`Split payment saved offline for ${sale.ref} — will sync when connected`)
+      } else {
+        toast.success(`Split payment processed for ${sale.ref}`)
+      }
       onSuccess()
-    } else {
-      const j = await res.json() as { error?: string }
-      toast.error(j.error ?? 'Failed to process payment')
+    } catch (err) {
+      setLoading(false)
+      toast.error(err instanceof Error ? err.message : 'Failed to process payment')
     }
   }
 

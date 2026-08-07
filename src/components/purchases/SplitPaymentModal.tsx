@@ -7,6 +7,7 @@ import Decimal from 'decimal.js'
 import { Dialog } from '@/components/ui/dialog'
 import { colors } from '@/lib/design-tokens'
 import { Btn, inp, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
+import { useOfflineMutation } from '@/hooks/useOfflineFetch'
 
 export type SplitPayTarget = {
   id: string
@@ -77,6 +78,7 @@ export function SplitPaymentModal({
   const [loan,    setLoan]    = useState('')
   const [loading, setLoading] = useState(false)
   const [error,   setError]   = useState<string | null>(null)
+  const { mutate: offlineMutate } = useOfflineMutation()
 
   // Calculate amounts
   const totalAmount     = new Decimal(purchase.totalAmount)
@@ -122,22 +124,34 @@ export function SplitPaymentModal({
     setError(null)
     setLoading(true)
 
-    const res = await fetch(`/api/purchases/${purchase.id}/split-payment`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        payments: {
-          cash: cash || '0',
-          eft:  eft  || '0',
-          loan: loan || '0',
+    try {
+      const { queued } = await offlineMutate({
+        method: 'POST',
+        url: `/api/purchases/${purchase.id}/split-payment`,
+        body: {
+          payments: {
+            cash: cash || '0',
+            eft:  eft  || '0',
+            loan: loan || '0',
+          },
         },
-      }),
-    })
+        // The purchase already has a real server id (split payment only
+        // ever applies to an existing pending purchase) — no local id to
+        // mint here, unlike a brand-new offline-created purchase.
+        localId: purchase.id,
+      })
 
-    if (res.ok) {
+      if (queued) {
+        toast.success(`Split payment saved offline for ${purchase.ref} — will sync when connected`)
+        setLoading(false)
+        onSuccess()
+        return
+      }
+
       toast.success(`Split payment processed for ${purchase.ref}`)
 
-      // Auto-print receipt
+      // Auto-print receipt — online only, the queued/offline path has no
+      // server-confirmed record yet for /api/print/slip to look up.
       try {
         const printRes = await fetch('/api/print/slip', {
           method: 'POST',
@@ -153,9 +167,8 @@ export function SplitPaymentModal({
 
       setLoading(false)
       onSuccess()
-    } else {
-      const j = await res.json() as { error?: string }
-      toast.error(j.error ?? 'Failed to process payment')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to process payment')
       setLoading(false)
     }
   }
