@@ -28,7 +28,7 @@ export class CashUpNotSubmittedError extends Error {
 
 export class CashUpNewerSessionOpenError extends Error {
   code = 'NEWER_SESSION_OPEN' as const
-  constructor() { super('Cannot reject — a newer session is already open. Void this session instead if it cannot be corrected.'); this.name = 'CashUpNewerSessionOpenError' }
+  constructor() { super('Cannot reject — a newer session already exists (open or submitted). Void this session instead if it cannot be corrected.'); this.name = 'CashUpNewerSessionOpenError' }
 }
 
 // ─── Open a cash-up session ───────────────────────────────────────────────────
@@ -288,10 +288,25 @@ export async function rejectCashUp(cashUpId: string, rejectedByUserId: string, r
     throw new CashUpNotSubmittedError(cashUp.status)
   }
 
-  const otherOpen = await prisma.cashUp.findFirst({
-    where: { status: 'open', id: { not: cashUpId } },
-  })
-  if (otherOpen) {
+  // Two distinct reasons a "newer session" can block this:
+  // (1) rejecting flips this session's status to 'open', and the partial
+  //     unique DB index allows only one 'open' session tenant-wide — a
+  //     different-day open session would collide with that.
+  // (2) a later SAME-DAY session (any status but voided) depends on this
+  //     session's closedAt as its own reconciliation window's start
+  //     boundary (getSessionWindow, cashUpWindow.ts) — rejecting clears
+  //     closedAt to null, which would silently widen that later session's
+  //     window back to midnight the next time it's recomputed (its own
+  //     live stats while still open, or recalculateApprovedCashUpForDate
+  //     after a later void), double-counting this session's entire
+  //     transaction history into it.
+  const [otherOpen, laterSameDay] = await Promise.all([
+    prisma.cashUp.findFirst({ where: { status: 'open', id: { not: cashUpId } } }),
+    prisma.cashUp.findFirst({
+      where: { sessionDate: cashUp.sessionDate, openedAt: { gt: cashUp.openedAt }, status: { not: 'voided' } },
+    }),
+  ])
+  if (otherOpen || laterSameDay) {
     throw new CashUpNewerSessionOpenError()
   }
 
