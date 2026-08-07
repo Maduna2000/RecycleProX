@@ -504,23 +504,44 @@ export async function recalculateApprovedCashUpForDate(
     'cashup.recalculated_after_void'
   )
 
-  // Re-propagate finPeriodCumulative through this cash-up and every later
-  // approved one — each is a running sum of variance ordered chronologically
-  // (sessionDate, then openedAt to break ties within a day), so a changed
-  // variance on an earlier session shifts every later session's total.
+  await repropagateFinPeriodCumulative(tx, sessionDate, { cashUpId: cashUp.id, variance })
+}
+
+// ─── Re-propagate finPeriodCumulative from a given date forward ──────────────
+// Recomputes every approved session's finPeriodCumulative, in true
+// chronological order (sessionDate, then openedAt to break ties within a
+// day) — each is a running sum of approved variance, so any change to one
+// session's variance, or a session newly becoming approved, shifts every
+// later approved session's total too. Two callers:
+//   - recalculateApprovedCashUpForDate, after a void changes an already-
+//     approved session's variance
+//   - approveCashUp, because approving inserts a session into the approved
+//     timeline — if sessions are approved out of chronological order (an
+//     earlier-dated session approved after a later-dated one already was),
+//     every later session's stored cumulative was computed without this
+//     session's variance and needs correcting now that it counts
+// `override`, if given, treats that one session's variance as the supplied
+// value rather than trusting what's already stored for it — needed by
+// recalculateApprovedCashUpForDate, which computes a fresh variance in the
+// same transaction as this call.
+async function repropagateFinPeriodCumulative(
+  tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
+  fromDate: Date,
+  override?: { cashUpId: string; variance: Decimal }
+) {
   const priorApproved = await tx.cashUp.aggregate({
-    where: { status: 'approved', sessionDate: { lt: sessionDate } },
+    where: { status: 'approved', sessionDate: { lt: fromDate } },
     _sum: { variance: true },
   })
   let running = new Decimal(priorApproved._sum.variance?.toString() ?? '0')
 
   const fromThisDateOnward = await tx.cashUp.findMany({
-    where:   { status: 'approved', sessionDate: { gte: sessionDate } },
+    where:   { status: 'approved', sessionDate: { gte: fromDate } },
     orderBy: [{ sessionDate: 'asc' }, { openedAt: 'asc' }],
   })
 
   for (const c of fromThisDateOnward) {
-    const v = c.id === cashUp.id ? variance : new Decimal(c.variance?.toString() ?? '0')
+    const v = override && c.id === override.cashUpId ? override.variance : new Decimal(c.variance?.toString() ?? '0')
     running = running.plus(v)
     await tx.cashUp.update({ where: { id: c.id }, data: { finPeriodCumulative: running } })
   }
@@ -642,6 +663,16 @@ export async function approveCashUp(
         tx
       )
     }
+
+    // Approving inserts this session into the approved-variance timeline —
+    // if sessions have been approved out of chronological order, this
+    // session's own finPeriodCumulative (computed back at submit time from
+    // whatever was approved then) and every later-dated approved session's
+    // cumulative can both be stale. Re-propagate from this session's date
+    // forward so every affected total reflects reality now that this
+    // session counts. No override needed — variance was already computed
+    // and stored correctly back at submission.
+    await repropagateFinPeriodCumulative(tx, cashUp.sessionDate)
 
     return approved
   })
