@@ -865,7 +865,7 @@ export default function NewPurchasePage() {
               style={{
                 ...headerBg,
                 display: 'grid',
-                gridTemplateColumns: '1fr 72px 80px 80px 92px 80px 28px 26px',
+                gridTemplateColumns: '1fr 78px 86px 96px 108px 96px 28px 26px',
                 gap: 4,
                 padding: '4px 8px',
                 flexShrink: 0,
@@ -892,7 +892,7 @@ export default function NewPurchasePage() {
                     <div
                       style={{
                         display: 'grid',
-                        gridTemplateColumns: '1fr 72px 80px 80px 92px 80px 28px 26px',
+                        gridTemplateColumns: '1fr 78px 86px 96px 108px 96px 28px 26px',
                         gap: 4,
                         padding: '4px 8px',
                         alignItems: 'center',
@@ -930,13 +930,16 @@ export default function NewPurchasePage() {
                       />
 
                       {/* Sub Total */}
-                      <span style={{ fontSize: 11, fontFamily: 'monospace', padding: '0 4px', color: isDeduction ? '#DC2626' : qty.gt(0) ? '#212529' : '#9CA3AF' }}>
+                      <span
+                        title={qty.gt(0) ? `R ${lineSub.toFixed(2)}` : undefined}
+                        style={{ fontSize: 11, fontFamily: 'monospace', padding: '0 4px', color: isDeduction ? '#DC2626' : qty.gt(0) ? '#212529' : '#9CA3AF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}
+                      >
                         {qty.gt(0) ? `R ${lineSub.toFixed(2)}` : '—'}
                       </span>
 
                       {/* VAT — read-only indicator; applicability follows the account's VAT
                           setting. Deduction lines (negative price) never carry VAT. */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, overflow: 'hidden', minWidth: 0 }}>
                         <span
                           title={isDeduction ? 'Deduction line — VAT does not apply' : line.vatApplied ? 'VAT applies to this line' : 'VAT does not apply to this line'}
                           style={{
@@ -948,14 +951,20 @@ export default function NewPurchasePage() {
                           {isDeduction ? 'Deduction' : line.vatApplied ? 'VAT' : 'No VAT'}
                         </span>
                         {qty.gt(0) && lineVat.gt(0) && (
-                          <span style={{ fontSize: 11, fontFamily: 'monospace', color: '#212529' }}>
+                          <span
+                            title={`R ${lineVat.toFixed(2)}`}
+                            style={{ fontSize: 11, fontFamily: 'monospace', color: '#212529', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}
+                          >
                             R {lineVat.toFixed(2)}
                           </span>
                         )}
                       </div>
 
                       {/* Total */}
-                      <span style={{ fontSize: 11, fontFamily: 'monospace', fontWeight: 600, padding: '0 4px', color: isDeduction ? '#DC2626' : qty.gt(0) ? colors.action : '#9CA3AF' }}>
+                      <span
+                        title={qty.gt(0) ? `R ${lineTot.toFixed(2)}` : undefined}
+                        style={{ fontSize: 11, fontFamily: 'monospace', fontWeight: 600, padding: '0 4px', color: isDeduction ? '#DC2626' : qty.gt(0) ? colors.action : '#9CA3AF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}
+                      >
                         {qty.gt(0) ? `R ${lineTot.toFixed(2)}` : '—'}
                       </span>
 
@@ -1170,7 +1179,7 @@ export default function NewPurchasePage() {
             </div>
 
             {/* Column headers */}
-            <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr 48px 80px 80px 80px 60px 28px', gap: 4, padding: '2px 8px', background: '#F8F9FA', borderBottom: '1px solid #D0D0D0', flexShrink: 0 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr 48px 92px 92px 92px 60px 28px', gap: 4, padding: '2px 8px', background: '#F8F9FA', borderBottom: '1px solid #D0D0D0', flexShrink: 0 }}>
               {['Ref #', 'Customer', 'Lines', 'Total', 'Paid', 'Balance', 'Time', ''].map((h, i) => (
                 <span key={i} style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#6C757D' }}>{h}</span>
               ))}
@@ -1190,9 +1199,9 @@ export default function NewPurchasePage() {
                     <span style={{ fontSize: 10, fontFamily: 'monospace', color: '#1B3A6B', fontWeight: 600 }}>{p.refNumber}</span>
                     <span style={{ fontSize: 11, color: '#212529', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.customer.firstName} {p.customer.lastName}</span>
                     <span style={{ fontSize: 10, color: '#6C757D', textAlign: 'center' }}>{p.lines.length}</span>
-                    <span style={{ fontSize: 10, fontFamily: 'monospace', color: colors.action, fontWeight: 600 }}>R {new Decimal(p.totalAmount).toFixed(2)}</span>
-                    {(() => { const paid = new Decimal(p.amountPaid ?? '0'); return <span style={{ fontSize: 10, fontFamily: 'monospace', color: paid.gt(0) ? colors.action : '#9CA3AF' }}>{paid.gt(0) ? `R ${paid.toFixed(2)}` : '—'}</span> })()}
-                    {(() => { const bal = new Decimal(p.totalAmount).minus(new Decimal(p.loanDeductionAmount ?? '0')).minus(new Decimal(p.amountPaid ?? '0')); const partial = new Decimal(p.amountPaid ?? '0').gt(0); return <span style={{ fontSize: 10, fontFamily: 'monospace', fontWeight: 600, color: partial ? '#C9A020' : colors.action }}>R {bal.toFixed(2)}</span> })()}
+                    <span title={`R ${new Decimal(p.totalAmount).toFixed(2)}`} style={{ fontSize: 10, fontFamily: 'monospace', color: colors.action, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>R {new Decimal(p.totalAmount).toFixed(2)}</span>
+                    {(() => { const paid = new Decimal(p.amountPaid ?? '0'); return <span title={paid.gt(0) ? `R ${paid.toFixed(2)}` : undefined} style={{ fontSize: 10, fontFamily: 'monospace', color: paid.gt(0) ? colors.action : '#9CA3AF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{paid.gt(0) ? `R ${paid.toFixed(2)}` : '—'}</span> })()}
+                    {(() => { const bal = new Decimal(p.totalAmount).minus(new Decimal(p.loanDeductionAmount ?? '0')).minus(new Decimal(p.amountPaid ?? '0')); const partial = new Decimal(p.amountPaid ?? '0').gt(0); return <span title={`R ${bal.toFixed(2)}`} style={{ fontSize: 10, fontFamily: 'monospace', fontWeight: 600, color: partial ? '#C9A020' : colors.action, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>R {bal.toFixed(2)}</span> })()}
                     <span style={{ fontSize: 10, color: '#9CA3AF' }}>{timeAgo(p.createdAt)}</span>
 
                     {/* ⋮ action menu */}

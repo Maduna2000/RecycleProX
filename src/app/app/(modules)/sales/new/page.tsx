@@ -714,7 +714,7 @@ export default function NewSalePage() {
               style={{
                 ...headerBg,
                 display: 'grid',
-                gridTemplateColumns: '1fr 60px 64px 64px 56px 64px 52px 28px 26px',
+                gridTemplateColumns: '1fr 70px 78px 86px 78px 92px 64px 28px 26px',
                 gap: 4,
                 padding: '4px 8px',
                 flexShrink: 0,
@@ -742,7 +742,7 @@ export default function NewSalePage() {
                     <div
                       style={{
                         display: 'grid',
-                        gridTemplateColumns: '1fr 60px 64px 64px 56px 64px 52px 28px 26px',
+                        gridTemplateColumns: '1fr 70px 78px 86px 78px 92px 64px 28px 26px',
                         gap: 4,
                         padding: '4px 8px',
                         alignItems: 'center',
@@ -773,22 +773,34 @@ export default function NewSalePage() {
                       />
 
                       {/* Sub Total */}
-                      <span style={{ fontSize: 11, fontFamily: 'monospace', padding: '0 4px', color: qty.gt(0) ? '#212529' : '#9CA3AF' }}>
+                      <span
+                        title={qty.gt(0) ? `R ${lineSub.toFixed(2)}` : undefined}
+                        style={{ fontSize: 11, fontFamily: 'monospace', padding: '0 4px', color: qty.gt(0) ? '#212529' : '#9CA3AF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}
+                      >
                         {qty.gt(0) ? `R ${lineSub.toFixed(2)}` : '—'}
                       </span>
 
                       {/* VAT */}
-                      <span style={{ fontSize: 11, fontFamily: 'monospace', padding: '0 4px', color: qty.gt(0) ? '#212529' : '#9CA3AF' }}>
+                      <span
+                        title={qty.gt(0) ? `R ${lineVat.toFixed(2)}` : undefined}
+                        style={{ fontSize: 11, fontFamily: 'monospace', padding: '0 4px', color: qty.gt(0) ? '#212529' : '#9CA3AF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}
+                      >
                         {qty.gt(0) ? `R ${lineVat.toFixed(2)}` : '—'}
                       </span>
 
                       {/* Total */}
-                      <span style={{ fontSize: 11, fontFamily: 'monospace', fontWeight: 600, padding: '0 4px', color: qty.gt(0) ? colors.action : '#9CA3AF' }}>
+                      <span
+                        title={qty.gt(0) ? `R ${lineTot.toFixed(2)}` : undefined}
+                        style={{ fontSize: 11, fontFamily: 'monospace', fontWeight: 600, padding: '0 4px', color: qty.gt(0) ? colors.action : '#9CA3AF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}
+                      >
                         {qty.gt(0) ? `R ${lineTot.toFixed(2)}` : '—'}
                       </span>
 
                       {/* Stock */}
-                      <span style={{ fontSize: 10, fontFamily: 'monospace', padding: '0 4px', color: overStock ? '#EF4444' : '#6C757D' }}>
+                      <span
+                        title={onHand !== null ? onHand.toFixed(2) : undefined}
+                        style={{ fontSize: 10, fontFamily: 'monospace', padding: '0 4px', color: overStock ? '#EF4444' : '#6C757D', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}
+                      >
                         {onHand !== null ? `${onHand.toFixed(2)}` : '—'}
                       </span>
 
@@ -1001,7 +1013,7 @@ export default function NewSalePage() {
             </div>
 
             {/* Column headers */}
-            <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr 48px 80px 80px 60px 28px', gap: 4, padding: '2px 8px', background: '#F8F9FA', borderBottom: '1px solid #D0D0D0', flexShrink: 0 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr 48px 92px 92px 60px 28px', gap: 4, padding: '2px 8px', background: '#F8F9FA', borderBottom: '1px solid #D0D0D0', flexShrink: 0 }}>
               {['Ref #', 'Buyer', 'Lines', 'Total', 'Balance', 'Time', ''].map((h, i) => (
                 <span key={i} style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#6C757D' }}>{h}</span>
               ))}
@@ -1021,8 +1033,8 @@ export default function NewSalePage() {
                       <span style={{ fontSize: 10, fontFamily: 'monospace', color: '#1B3A6B', fontWeight: 600 }}>{s.refNumber}</span>
                       <span style={{ fontSize: 11, color: '#212529', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.buyerName}</span>
                       <span style={{ fontSize: 10, color: '#6C757D', textAlign: 'center' }}>{s.lines.length}</span>
-                      <span style={{ fontSize: 10, fontFamily: 'monospace', color: colors.action, fontWeight: 600 }}>R {new Decimal(s.totalAmount).toFixed(2)}</span>
-                      <span style={{ fontSize: 10, fontFamily: 'monospace', fontWeight: 600, color: colors.action }}>R {bal.toFixed(2)}</span>
+                      <span title={`R ${new Decimal(s.totalAmount).toFixed(2)}`} style={{ fontSize: 10, fontFamily: 'monospace', color: colors.action, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>R {new Decimal(s.totalAmount).toFixed(2)}</span>
+                      <span title={`R ${bal.toFixed(2)}`} style={{ fontSize: 10, fontFamily: 'monospace', fontWeight: 600, color: colors.action, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>R {bal.toFixed(2)}</span>
                       <span style={{ fontSize: 10, color: '#9CA3AF' }}>{timeAgo(s.createdAt)}</span>
 
                       {/* ⋮ action menu */}
