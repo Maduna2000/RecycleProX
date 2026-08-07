@@ -88,6 +88,16 @@ export default function FloatPage() {
   const { data: currentData, mutate: mutateCurrentFloat } = useSWR<CurrentFloatResponse>('/api/float/current', fetcher, { refreshInterval: 5000 })
   const cashUpKey = '/api/cashup?today=1'
   const { data: cashUpData, mutate: mutateCashUp } = useSWR<{ cashUp: CashUp | null }>(cashUpKey, fetcher, { refreshInterval: 5000 })
+  // Between a session being approved and the next one being opened, no
+  // open/submitted session exists for /api/cashup?today=1 to return — fall
+  // back to the same carry-forward preview openCashUp itself would use
+  // (the just-approved session's declared cash), so Opening/Current
+  // Balance don't drop to R 0.00 during that gap.
+  const { data: openingPreview } = useSWR<{ canOpen: boolean; safeOpeningBalance?: string }>(
+    cashUpData && !cashUpData.cashUp ? '/api/cashup/opening-balance-preview' : null,
+    fetcher,
+    { refreshInterval: 5000 },
+  )
   // Use the cashup session date for live-stats, not today's date
   // This ensures we get stats for the actual cashup session (which may span past midnight)
   const cashUpSessionDate = cashUpData?.cashUp?.sessionDate?.split('T')[0] ?? todayISO()
@@ -101,10 +111,14 @@ export default function FloatPage() {
 
   const movements = currentData?.float?.movements ?? []
 
-  // Get opening balance from cashup (carry-forward from previous day)
+  // Get opening balance from the active session, or — between an approval
+  // and the next session opening — the same carry-forward preview a new
+  // session would get.
   const cashUpOpeningBalance = cashUpData?.cashUp?.openingBalance
     ? new Decimal(cashUpData.cashUp.openingBalance)
-    : null
+    : openingPreview?.safeOpeningBalance
+      ? new Decimal(openingPreview.safeOpeningBalance)
+      : null
 
   // Calculate Cal Float (expected cash in drawer) from live stats
   // Formula: CashUp Opening Balance + Today's Float Top-ups + Cash Sales - Cash Purchases - Cash Payments - Expenses - Loan Advance + Loan Repayment
