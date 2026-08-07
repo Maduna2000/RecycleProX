@@ -22,7 +22,6 @@ type GridRow = {
   purchasedQty: string
   soldQty: string
   adjustedQty: string
-  voidedQty: string
   closingQty: string
   closingValue: string
   buyPrice: string
@@ -121,15 +120,6 @@ export default function StockGridPage() {
       align: 'right',
       render: (r) => (
         <span className="font-mono text-xs" style={{ color: colors.process }}>{r.adjustedQty}</span>
-      ),
-    },
-    {
-      key: 'voidedQty',
-      header: 'Voided',
-      width: '84px',
-      align: 'right',
-      render: (r) => (
-        <span className="font-mono text-xs" style={{ color: colors.process }}>{r.voidedQty}</span>
       ),
     },
     {
