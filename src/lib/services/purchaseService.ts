@@ -203,8 +203,13 @@ export async function createPurchase(data: CreatePurchaseInput, createdByUserId?
       const quantity = new Decimal(line.quantity)
       const lineTotal = unitPrice.times(quantity)
 
+      // A negative unit price is a deduction line (e.g. transport/service
+      // charge netted off the payout) rather than real goods received — it
+      // never carries VAT, regardless of what was ticked.
+      const isDeduction = unitPrice.isNegative()
+
       // Server-side VAT: only lines the cashier ticked, never for zero-rated customers
-      const vatApplied = (line.vatApplied ?? false) && !customer.zeroRated
+      const vatApplied = !isDeduction && (line.vatApplied ?? false) && !customer.zeroRated
       const vatAmount = vatApplied ? lineTotal.times(VAT_RATE).toDecimalPlaces(2) : new Decimal(0)
 
       // Detect cashier override: submitted price differs from the resolved standard price
@@ -299,8 +304,10 @@ export async function createPurchase(data: CreatePurchaseInput, createdByUserId?
       await tx.scaleOrder.update({ where: { id: data.scaleOrderId }, data: { status: 'processed' } })
     }
 
-    // Stock IN: yard received material from customer
+    // Stock IN: yard received material from customer. Deduction lines
+    // (negative unit price) never move stock — no goods actually changed hands.
     for (const line of resolvedLines) {
+      if (line.unitPrice.isNegative()) continue
       await recordMovement(tx, {
         productId: line.productId,
         direction: 'in',
@@ -359,13 +366,18 @@ export async function voidPurchase(id: string, data: VoidPurchaseInput, voidedBy
         include: { lines: { include: { product: true } }, customer: true },
       })
 
-      // Reverse stock: remove the IN movements that came from this purchase
+      // Reverse stock: remove the IN movements that came from this purchase.
+      // Deduction lines (negative unit price) never posted a movement at
+      // creation time, so they're excluded here too — reversing one would
+      // fabricate a phantom OUT movement for stock that was never added.
       await recordVoidReversal(tx, {
-        originalMovements: purchase.lines.map((l) => ({
-          productId: l.productId,
-          direction: 'in' as const,
-          quantity: new Decimal(l.quantity.toString()),
-        })),
+        originalMovements: purchase.lines
+          .filter((l) => !new Decimal(l.unitPrice.toString()).isNegative())
+          .map((l) => ({
+            productId: l.productId,
+            direction: 'in' as const,
+            quantity: new Decimal(l.quantity.toString()),
+          })),
         sourceId: id,
         createdByUserId: voidedById,
       })

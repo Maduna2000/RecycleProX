@@ -113,6 +113,9 @@ export default function NewSalePage() {
   const [paymentType,  setPaymentType]  = useState<'unpaid' | 'cash' | 'eft'>('cash')
   const [notes,        setNotes]        = useState('')
   const [invoiceNo,    setInvoiceNo]    = useState('')
+  // VAT is opt-in: unticked by default, auto-filled from the account
+  // customer's VAT setting on select, always overridable by the cashier.
+  const [applyVat,     setApplyVat]     = useState(false)
   const [submitting,   setSubmitting]   = useState(false)
   const [keyCounter,   setKeyCounter]   = useState(2)
   const [printDialog,  setPrintDialog]  = useState<{ id: string; refNumber: string } | null>(null)
@@ -177,9 +180,10 @@ export default function NewSalePage() {
   const stockMap = new Map((stockData?.stock ?? []).map((r) => [r.product.id, new Decimal(r.onHand ?? '0')]))
 
   // ── Derived calculations ──────────────────────────────────────────────────
-  // Zero-rated only for an account buyer explicitly flagged zero-rated; walk-in
-  // buyers (no linked Customer) are shown standard VAT, matching the server.
-  const vatRate = buyerMode === 'account' && customer?.zeroRated ? new Decimal(0) : new Decimal('0.15')
+  // VAT is opt-in via the "Apply VAT" checkbox — never applied unless ticked,
+  // matching the server. A zero-rated account customer can never carry VAT
+  // even if the checkbox is left checked.
+  const vatRate = applyVat && !(buyerMode === 'account' && customer?.zeroRated) ? new Decimal('0.15') : new Decimal(0)
 
   const subTotal = lines.reduce((sum, l) => {
     return sum.plus(new Decimal(l.quantity || '0').times(new Decimal(l.unitPrice || '0')))
@@ -208,6 +212,7 @@ export default function NewSalePage() {
     setPaymentType('cash')
     setNotes('')
     setInvoiceNo('')
+    setApplyVat(false)
     setBusinessLoanAmount('')
     setBusinessLoanPinOpen(false)
     setBusinessLoanSummary(null)
@@ -320,6 +325,9 @@ export default function NewSalePage() {
   // ── Customer selection ────────────────────────────────────────────────────
   const handleCustomerSelect = useCallback((c: SelectedCustomer) => {
     setCustomer(c)
+    // Auto-fill "Apply VAT" from the account's VAT setting — still
+    // overridable by the cashier via the checkbox.
+    setApplyVat(!c.zeroRated)
   }, [])
 
   function switchBuyerMode(mode: 'walkin' | 'account') {
@@ -328,6 +336,7 @@ export default function NewSalePage() {
     setBuyerName('')
     setBuyerIdNumber('')
     setBuyerPhone('')
+    setApplyVat(false)
   }
 
   // ── Pending sale actions ──────────────────────────────────────────────────
@@ -395,6 +404,7 @@ export default function NewSalePage() {
       paymentMethod: isPending ? 'cash' : (paymentType as 'cash' | 'eft'),
       status:        isPending ? 'pending' : 'completed',
       notes:         notes || (invoiceNo ? `INV:${invoiceNo}` : undefined),
+      applyVat,
       ...(businessLoanDeduction ? { businessLoanDeductionAmount: businessLoanDeduction } : {}),
       lines: validLines.map((l) => ({
         productId:       l.productId,
@@ -632,7 +642,7 @@ export default function NewSalePage() {
                     {customer.zeroRated && (
                       <span style={{ fontSize: 10, padding: '1px 5px', background: '#FEF9C3', color: '#854D0E', borderRadius: 2 }}>No VAT</span>
                     )}
-                    <button onClick={() => setCustomer(null)}
+                    <button onClick={() => { setCustomer(null); setApplyVat(false) }}
                       style={{ fontSize: 10, padding: '1px 8px', border: '1px solid #ABABAB', borderRadius: 2, color: '#6C757D', background: 'none', cursor: 'pointer', marginLeft: 'auto' }}>
                       Change
                     </button>
@@ -1093,8 +1103,16 @@ export default function NewSalePage() {
                 <span style={{ color: '#6C757D' }}>Sub Total</span>
                 <span style={{ fontFamily: 'monospace', color: '#212529' }}>R {subTotal.toFixed(2)}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
-                <span style={{ color: '#6C757D' }}>VAT ({buyerMode === 'account' && customer?.zeroRated ? '0%' : '15%'})</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#6C757D', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={applyVat}
+                    onChange={(e) => setApplyVat(e.target.checked)}
+                    style={{ cursor: 'pointer' }}
+                  />
+                  Apply VAT (15%)
+                </label>
                 <span style={{ fontFamily: 'monospace', color: '#6C757D' }}>R {vatAmount.toFixed(2)}</span>
               </div>
               <div style={{ height: 1, background: '#C0C0C0', margin: '2px 0' }} />

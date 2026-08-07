@@ -82,13 +82,17 @@ async function withSerializableRetry<T>(fn: () => Promise<T>): Promise<T> {
 // ─── Create Sale ──────────────────────────────────────────────────────────────
 
 export async function createSale(data: CreateSaleInput, createdByUserId?: string) {
-  // Resolve VAT rate server-side — never trust a client-supplied VAT figure.
-  // Zero-rated only when the sale is linked to a Customer explicitly flagged zero-rated;
-  // walk-in buyers (no linked Customer) are charged standard VAT.
-  let vatRate = new Decimal('0.15')
-  if (data.customerId) {
-    const customer = await prisma.customer.findUnique({ where: { id: data.customerId }, select: { zeroRated: true } })
-    if (customer?.zeroRated) vatRate = new Decimal(0)
+  // VAT is opt-in — the cashier ticks "Apply VAT" (auto-filled client-side from
+  // an account customer's VAT setting, but always re-resolved here, never
+  // trusting a client-supplied rate). A customer explicitly flagged zero-rated
+  // can never be charged VAT even if the checkbox was left ticked.
+  let vatRate = new Decimal(0)
+  if (data.applyVat) {
+    vatRate = new Decimal('0.15')
+    if (data.customerId) {
+      const customer = await prisma.customer.findUnique({ where: { id: data.customerId }, select: { zeroRated: true } })
+      if (customer?.zeroRated) vatRate = new Decimal(0)
+    }
   }
 
   // Validate products outside transaction — read-only, no race risk

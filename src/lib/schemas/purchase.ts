@@ -19,11 +19,13 @@ export const PurchaseLineSchema = z.object({
   tareReason: z.string().max(100).optional(),
   deductionQty: optionalQty,
   deductionReason: z.string().max(100).optional(),
+  // A negative price is allowed on purpose — it records a deduction (e.g. a
+  // transport/service charge netted off the payout) against a line without
+  // ever touching stock; see purchaseService.createPurchase.
   unitPrice: z
     .string()
     .min(1, 'Required')
-    .regex(/^\d+(\.\d{1,2})?$/, 'Must be a valid price')
-    .refine((v) => parseFloat(v) >= 0, 'Price cannot be negative'),
+    .regex(/^-?\d+(\.\d{1,2})?$/, 'Must be a valid price'),
   // VAT is opt-in: a line has no VAT applied unless the cashier ticks it.
   vatApplied: z.boolean().default(false),
 }).superRefine((line, ctx) => {

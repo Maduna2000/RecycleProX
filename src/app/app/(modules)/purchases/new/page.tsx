@@ -188,10 +188,12 @@ export default function NewPurchasePage() {
   const subTotal = lines.reduce((sum, l) => {
     return sum.plus(new Decimal(l.quantity || '0').times(new Decimal(l.unitPrice || '0')))
   }, new Decimal(0))
-  // VAT only applies to lines with the per-line "Apply VAT" checkbox checked
+  // VAT only applies to lines with the per-line "Apply VAT" checkbox checked —
+  // deduction lines (negative price) never carry VAT, matching the server.
   const vatAmount = lines.reduce((sum, l) => {
-    if (!l.vatApplied) return sum
-    const lineSub = new Decimal(l.quantity || '0').times(new Decimal(l.unitPrice || '0'))
+    const price = new Decimal(l.unitPrice || '0')
+    if (!l.vatApplied || price.isNegative()) return sum
+    const lineSub = new Decimal(l.quantity || '0').times(price)
     return sum.plus(lineSub.times(vatRate))
   }, new Decimal(0))
   const grandTotal = subTotal.plus(vatAmount)
@@ -336,8 +338,12 @@ export default function NewPurchasePage() {
     setDeductLoan(false)
     setDeductionAmount('')
     setShowAllProducts(false)
-    // Apply VAT automatically based on the account's VAT setting
-    setLines((prev) => prev.map((l) => ({ ...l, vatApplied: !c.zeroRated })))
+    // Apply VAT automatically based on the account's VAT setting — deduction
+    // lines (negative price) stay excluded from VAT regardless.
+    setLines((prev) => prev.map((l) => ({
+      ...l,
+      vatApplied: parseFloat(l.unitPrice || '0') < 0 ? false : !c.zeroRated,
+    })))
   }, [])
 
   function switchCustomerType(type: 'casual' | 'account') {
@@ -448,7 +454,6 @@ export default function NewPurchasePage() {
     if (validLines.length === 0) { toast.error('Add at least one product line'); return }
     for (const l of validLines) {
       if (parseFloat(l.quantity) <= 0) { toast.error('Quantity must be greater than 0'); return }
-      if (parseFloat(l.unitPrice) < 0)  { toast.error('Unit price cannot be negative'); return }
     }
 
     const deduction = deductLoan && deductionAmount && parseFloat(deductionAmount) > 0 && !isPending
@@ -867,8 +872,9 @@ export default function NewPurchasePage() {
               {lines.map((line) => {
                 const qty      = new Decimal(line.quantity  || '0')
                 const price    = new Decimal(line.unitPrice || '0')
+                const isDeduction = price.isNegative()
                 const lineSub  = qty.times(price)
-                const lineVat  = line.vatApplied ? lineSub.times(vatRate) : new Decimal(0)
+                const lineVat  = (line.vatApplied && !isDeduction) ? lineSub.times(vatRate) : new Decimal(0)
                 const lineTot  = lineSub.plus(lineVat)
 
                 return (
@@ -899,32 +905,40 @@ export default function NewPurchasePage() {
                         className={cellInput} style={cellInputStyle}
                       />
 
-                      {/* Price */}
+                      {/* Price — a negative value records a deduction (e.g. transport/
+                          service charge) netted off the payout; it never touches stock. */}
                       <input
-                        type="number" step="0.01" min="0" placeholder="0.00"
+                        type="number" step="0.01" placeholder="0.00" title="Enter a negative amount to deduct (e.g. transport charge) — stock is not affected"
                         value={line.unitPrice}
-                        onChange={(e) => patchLine(line.key, { unitPrice: e.target.value })}
-                        className={cellInput} style={cellInputStyle}
+                        onChange={(e) => {
+                          const unitPrice = e.target.value
+                          patchLine(line.key, {
+                            unitPrice,
+                            ...(parseFloat(unitPrice) < 0 ? { vatApplied: false } : {}),
+                          })
+                        }}
+                        className={cellInput} style={{ ...cellInputStyle, ...(isDeduction ? { color: '#DC2626' } : {}) }}
                       />
 
                       {/* Sub Total */}
-                      <span style={{ fontSize: 11, fontFamily: 'monospace', padding: '0 4px', color: qty.gt(0) ? '#212529' : '#9CA3AF' }}>
+                      <span style={{ fontSize: 11, fontFamily: 'monospace', padding: '0 4px', color: isDeduction ? '#DC2626' : qty.gt(0) ? '#212529' : '#9CA3AF' }}>
                         {qty.gt(0) ? `R ${lineSub.toFixed(2)}` : '—'}
                       </span>
 
-                      {/* VAT — read-only indicator; applicability follows the account's VAT setting */}
+                      {/* VAT — read-only indicator; applicability follows the account's VAT
+                          setting. Deduction lines (negative price) never carry VAT. */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                         <span
-                          title={line.vatApplied ? 'VAT applies to this line' : 'VAT does not apply to this line'}
+                          title={isDeduction ? 'Deduction line — VAT does not apply' : line.vatApplied ? 'VAT applies to this line' : 'VAT does not apply to this line'}
                           style={{
                             fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 2, flexShrink: 0,
-                            background: line.vatApplied ? '#DBEAFE' : '#F3F4F6',
-                            color:      line.vatApplied ? '#1D4ED8' : '#9CA3AF',
+                            background: !isDeduction && line.vatApplied ? '#DBEAFE' : '#F3F4F6',
+                            color:      !isDeduction && line.vatApplied ? '#1D4ED8' : '#9CA3AF',
                           }}
                         >
-                          {line.vatApplied ? 'VAT' : 'No VAT'}
+                          {isDeduction ? 'Deduction' : line.vatApplied ? 'VAT' : 'No VAT'}
                         </span>
-                        {qty.gt(0) && line.vatApplied && (
+                        {qty.gt(0) && lineVat.gt(0) && (
                           <span style={{ fontSize: 11, fontFamily: 'monospace', color: '#212529' }}>
                             R {lineVat.toFixed(2)}
                           </span>
@@ -932,7 +946,7 @@ export default function NewPurchasePage() {
                       </div>
 
                       {/* Total */}
-                      <span style={{ fontSize: 11, fontFamily: 'monospace', fontWeight: 600, padding: '0 4px', color: qty.gt(0) ? colors.action : '#9CA3AF' }}>
+                      <span style={{ fontSize: 11, fontFamily: 'monospace', fontWeight: 600, padding: '0 4px', color: isDeduction ? '#DC2626' : qty.gt(0) ? colors.action : '#9CA3AF' }}>
                         {qty.gt(0) ? `R ${lineTot.toFixed(2)}` : '—'}
                       </span>
 

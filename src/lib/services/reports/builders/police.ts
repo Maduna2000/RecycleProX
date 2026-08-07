@@ -108,6 +108,7 @@ async function queryCopperPurchases(from: string, to: string, idNumber?: string)
     },
     select: {
       quantity: true,
+      unitPrice: true,
       product: {
         select: {
           category: true,
@@ -143,6 +144,9 @@ async function queryCopperPurchases(from: string, to: string, idNumber?: string)
   const byPurchase = new Map<string, CopperPurchase>()
   for (const l of lines) {
     if (topCategoryOf(l) !== 'COPPER') continue
+    // A negative unit price is a deduction line (e.g. a transport charge),
+    // never real goods received — exclude it from the regulated copper tally.
+    if (new Decimal(l.unitPrice.toString()).isNegative()) continue
     const p = l.purchase
     const qty = new Decimal(l.quantity.toString())
     const existing = byPurchase.get(p.id)
