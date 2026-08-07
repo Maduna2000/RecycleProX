@@ -8,6 +8,7 @@ import { Lock, Delete, Loader2 } from 'lucide-react'
 import { Dialog } from '@/components/ui/dialog'
 import { colors } from '@/lib/design-tokens'
 import { Btn, RpxDialogContent, RpxDialogHeader, RpxDialogBody } from '@/components/rpx'
+import { cacheVerifiedPin, verifyPinOffline, hasOfflinePinFallback } from '@/lib/offline/pinCache'
 
 // A hung request (dead connection, slow network) must not leave the modal
 // stuck forever with no feedback — abort and let the user retry.
@@ -57,6 +58,9 @@ export function PinLockOverlay({ children }: { children: React.ReactNode }) {
       })
 
       if (res.ok) {
+        // Refresh the offline fallback on every successful online check —
+        // best-effort, never blocks the unlock that triggered it.
+        void cacheVerifiedPin(session.user.id, pin)
         unlock()
         return
       }
@@ -75,10 +79,40 @@ export function PinLockOverlay({ children }: { children: React.ReactNode }) {
         toast.error('Could not verify PIN — please try again')
       }
     } catch (err) {
-      if (err instanceof Error && err.name === 'AbortError') {
-        toast.error('Request timed out — please try again')
+      // The request never reached the server (offline, or timed out trying)
+      // — this is exactly the scenario the offline queue exists for
+      // elsewhere in the app, so the lock screen needs the same fallback:
+      // check the PIN against the last known-good hash cached locally from
+      // a prior online verification, rather than leaving the till stuck.
+      const offlineMatch = await verifyPinOffline(session.user.id, pin)
+      if (offlineMatch) {
+        unlock()
+        toast.success('Unlocked offline — will re-verify once reconnected')
+        return
+      }
+
+      const reachable = !(err instanceof Error && err.name === 'AbortError')
+      if (hasOfflinePinFallback(session.user.id)) {
+        // A real cached PIN to compare against, and it didn't match — this
+        // is a genuine wrong guess, so it counts toward the lockout the
+        // same as a real 401 would (being offline isn't a brute-force
+        // exemption).
+        incrementFailedAttempts()
+        if (failedPinAttempts + 1 >= 3) {
+          await signOut({ callbackUrl: '/login' })
+          return
+        }
+        toast.error(
+          reachable
+            ? 'Network error, and that PIN didn\'t match the last one used offline — try again'
+            : 'Request timed out, and that PIN didn\'t match the last one used offline — try again'
+        )
       } else {
-        toast.error('Network error — please check your connection and try again')
+        // No successful online unlock has ever happened on this device, so
+        // there's nothing to compare against — don't count this toward the
+        // lockout (locking someone out with no way to unlock offline either
+        // would only strand them harder), just explain why it can't work yet.
+        toast.error('Offline with no cached PIN for this device yet — reconnect at least once before this works offline')
       }
     } finally {
       clearTimeout(timer)
