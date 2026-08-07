@@ -180,25 +180,59 @@ export async function getDrawingsReceivedForDate(window: DateWindow): Promise<De
   return new Decimal(topUpsResult._sum.amount?.toString() ?? '0')
 }
 
+/**
+ * The true current float balance: whichever is more recent between the last
+ * recorded float movement's balanceAfter and the most recently APPROVED
+ * cash-up session's declaredCash.
+ *
+ * A movement-chain balance alone goes stale the moment a cash-up gets
+ * approved after it — approval is a real physical cash count, and a whole
+ * session's worth of purchases/sales/payments/expenses happened between the
+ * movement and the approval that the float ledger itself never tracks. The
+ * declared cash from a later approval must override the movement chain;
+ * only movements strictly after that approval should still layer on top of
+ * it (chronological order via createdAt vs approvedAt, not a same-day check
+ * — a same-day-only comparison would miss a movement that landed just after
+ * local midnight but before the previous day's session was approved, the
+ * same SAST/UTC boundary case getSessionWindow's own start-of-window
+ * handling already has to account for).
+ */
+async function resolveCurrentFloatBalance(
+  tenantId: string,
+  fallback: { closingAmount: { toString(): string } | null; openingAmount: { toString(): string } },
+  lastMovement: { balanceAfter: { toString(): string }; createdAt: Date } | null,
+  tx: TxClient | typeof prisma
+): Promise<Decimal> {
+  const lastApproval = await tx.cashUp.findFirst({
+    where:   { tenantId, status: 'approved', declaredCash: { not: null } },
+    orderBy: { approvedAt: 'desc' },
+  })
+
+  if (lastApproval?.approvedAt && lastApproval.declaredCash &&
+      (!lastMovement || lastApproval.approvedAt > lastMovement.createdAt)) {
+    return new Decimal(lastApproval.declaredCash.toString())
+  }
+  if (lastMovement) {
+    return new Decimal(lastMovement.balanceAfter.toString())
+  }
+  return new Decimal((fallback.closingAmount ?? fallback.openingAmount).toString())
+}
+
 // ─── Get current float with balance and movements ─────────────────────────────
 
 export async function getCurrentFloat() {
+  const tenantId = requireTenantId()
   const today = todaySASTDate()
 
   const record = await prisma.cashFloat.findUnique({
-    where:   { tenantId_floatDate: { tenantId: requireTenantId(), floatDate: today } },
+    where:   { tenantId_floatDate: { tenantId, floatDate: today } },
     include: { movements: { orderBy: { createdAt: 'asc' } } },
   })
 
   if (!record) return null
 
-  // Current balance = balanceAfter of last movement; with no movements yet
-  // today, closingAmount (set by an earlier same-day session's approval)
-  // is fresher than openingAmount and must win if present.
-  const lastMovement = record.movements.at(-1)
-  const currentBalance = lastMovement
-    ? new Decimal(lastMovement.balanceAfter.toString())
-    : new Decimal((record.closingAmount ?? record.openingAmount).toString())
+  const lastMovement = record.movements.at(-1) ?? null
+  const currentBalance = await resolveCurrentFloatBalance(tenantId, record, lastMovement, prisma)
 
   return { ...record, currentBalance: currentBalance.toFixed(2) }
 }
@@ -244,17 +278,11 @@ export async function addFloatMovement(
       })
     }
 
-    // Compute current balance from last movement's balanceAfter; with no
-    // movements yet today, closingAmount (set by an earlier same-day
-    // session's approval — see approveCashUp/updateClosingAmount) is
-    // fresher than openingAmount and must win if present.
     const lastMovement = await tx.floatMovement.findFirst({
       where:   { cashFloatId: floatRecord.id },
       orderBy: { createdAt: 'desc' },
     })
-    const currentBalance = lastMovement
-      ? new Decimal(lastMovement.balanceAfter.toString())
-      : new Decimal((floatRecord.closingAmount ?? floatRecord.openingAmount).toString())
+    const currentBalance = await resolveCurrentFloatBalance(tenantId, floatRecord, lastMovement, tx)
 
     const moveAmount = new Decimal(amount)
     const balanceAfter = movementType === 'top_up' || movementType === 'opening'
