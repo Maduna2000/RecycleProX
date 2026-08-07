@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Coins, CreditCard, Wallet, AlertCircle, Lock, Split } from 'lucide-react'
+import { Coins, CreditCard, Wallet, AlertCircle, Split } from 'lucide-react'
 import { toast } from 'sonner'
 import Decimal from 'decimal.js'
 import { Dialog } from '@/components/ui/dialog'
@@ -23,7 +23,6 @@ function PaymentInput({
   value,
   onChange,
   disabled,
-  locked,
   highlight,
 }: {
   icon: React.ReactNode
@@ -31,7 +30,6 @@ function PaymentInput({
   value: string
   onChange: (v: string) => void
   disabled: boolean
-  locked?: boolean
   highlight?: boolean
 }) {
   return (
@@ -39,7 +37,6 @@ function PaymentInput({
       <div className="w-28 flex items-center gap-1.5" style={{ color: highlight ? colors.alertIcon : '#6C757D' }}>
         {icon}
         <span className="text-xs font-medium">{label}</span>
-        {locked && <Lock className="w-3 h-3" style={{ color: colors.alertIcon }} />}
       </div>
       <div className="flex-1 relative">
         <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs" style={{ color: '#6C757D' }}>R</span>
@@ -49,14 +46,14 @@ function PaymentInput({
           placeholder="0.00"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          disabled={disabled || locked}
+          disabled={disabled}
           style={{
             ...inp,
             fontFamily: 'monospace',
             fontSize: 12,
             paddingLeft: 22,
             borderColor: highlight ? colors.alertBorder : undefined,
-            background: locked ? '#F5F5F5' : '#fff',
+            background: '#fff',
           }}
         />
       </div>
@@ -88,10 +85,12 @@ export function SplitPaymentModal({
   const pendingAmount   = totalAmount.minus(existingLoan).minus(existingPaid)
   const outstandingDec  = new Decimal(outstandingLoan || '0')
 
-  // Auto-populate and lock loan field when there's outstanding loan (MANDATORY)
+  // Pre-fill the loan field with the full eligible amount as a convenient
+  // default when there's an outstanding loan — but it stays editable, so the
+  // cashier can reduce it for a partial repayment and make up the rest via
+  // cash/eft instead.
   useEffect(() => {
     if (outstandingDec.greaterThan(0)) {
-      // Pre-fill with minimum of outstanding loan or pending amount
       const autoLoan = Decimal.min(outstandingDec, pendingAmount)
       setLoan(autoLoan.toFixed(2))
     }
@@ -179,7 +178,7 @@ export function SplitPaymentModal({
             </div>
           </div>
 
-          {/* Loan alert - MANDATORY */}
+          {/* Loan alert */}
           {hasOutstandingLoan && (
             <div className="flex items-start gap-2 px-3 py-2 rounded-lg" style={{ background: colors.alertBg, border: `1px solid ${colors.alertBorder}` }}>
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" style={{ color: colors.alertIcon }} />
@@ -188,7 +187,7 @@ export function SplitPaymentModal({
                   Outstanding Loan: R {outstandingDec.toFixed(2)}
                 </p>
                 <p className="text-xs" style={{ color: colors.alertText }}>
-                  Loan deduction is mandatory and has been auto-filled.
+                  Pre-filled with the full amount — reduce it for a partial repayment and make up the difference with cash/EFT.
                 </p>
               </div>
             </div>
@@ -216,7 +215,6 @@ export function SplitPaymentModal({
               value={loan}
               onChange={setLoan}
               disabled={loading}
-              locked={hasOutstandingLoan}
               highlight={hasOutstandingLoan}
             />
           </div>

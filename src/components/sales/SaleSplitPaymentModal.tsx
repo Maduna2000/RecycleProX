@@ -65,14 +65,14 @@ function PaymentInput({
               placeholder="0.00"
               value={value}
               onChange={(e) => onChange(e.target.value)}
-              disabled={disabled || locked}
+              disabled={disabled}
               style={{
                 ...inp,
                 fontFamily: 'monospace',
                 fontSize: 12,
                 paddingLeft: 22,
                 borderColor: highlight ? colors.alertBorder : undefined,
-                background: locked ? '#F5F5F5' : '#fff',
+                background: '#fff',
               }}
             />
           </>
@@ -113,10 +113,9 @@ export function SaleSplitPaymentModal({
   const remaining        = pendingAmount.minus(paymentTotal)
 
   // Everyone — including an admin — must enter a PIN to reveal this leg.
-  // Once revealed it's auto-filled and LOCKED at the mandatory amount (not
-  // manually editable), mirroring the purchase module's loan-deduction
-  // field exactly — the loan can't be zeroed out or reduced, only the
-  // cash/eft split for whatever's left is up to the operator.
+  // Once revealed it's pre-filled with the full eligible amount as a
+  // convenient default, but stays editable — the operator can reduce it for
+  // a partial repayment and make up the difference with cash/eft.
   const showBusinessLoanLeg = hasOutstandingBusinessLoan && !!sale.customerId
   const pendingReveal = showBusinessLoanLeg && !unlockedSummary
   const maxLoanDeduction = unlockedSummary
