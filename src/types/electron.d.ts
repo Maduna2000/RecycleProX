@@ -14,6 +14,10 @@ interface ElectronAPI {
   openCashDrawer:   () => Promise<boolean>
   activateDevice:   (activationCode: string) => Promise<unknown>
   getLicenseStatus: () => Promise<LicenseStatus>
+  // Auto-updater — see electron/main.js's setupAutoUpdater. Returns an
+  // unsubscribe function, matching the addEventListener-style convention.
+  onUpdateStatus:   (callback: (status: UpdateStatus) => void) => () => void
+  installUpdate:    () => Promise<void>
 }
 
 declare global {
@@ -27,6 +31,13 @@ declare global {
     reason?:         string
     daysSinceCheck?: number
     offlineGraceDays?: number
+  }
+
+  // Mirrors electron/main.js's sendUpdateStatus() payload shape.
+  interface UpdateStatus {
+    status:  'available' | 'none' | 'downloading' | 'ready'
+    version?: string
+    percent?: number
   }
 
   interface Window {

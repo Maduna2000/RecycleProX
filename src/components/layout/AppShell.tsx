@@ -14,6 +14,7 @@ import {
   Users, UserPlus, ChevronRight,
   Wifi, WifiOff,
   PrinterX,
+  RefreshCw,
   Scale, ClipboardList,
   Boxes, ArrowLeftRight, Grid3X3, SlidersHorizontal,
   ShieldCheck, History, LifeBuoy, DoorOpen,
@@ -21,6 +22,7 @@ import {
 import { cn } from '@/lib/utils'
 import { useOfflineStore } from '@/stores/offlineStore'
 import { usePrinterStatusStore } from '@/stores/printerStatusStore'
+import { useUpdateStore } from '@/stores/updateStore'
 import { getModuleName } from '@/lib/module-names'
 import { WindowTaskbar } from '@/components/ui/WindowTaskbar'
 import { useRecordTitle } from '@/hooks/useRecordTitle'
@@ -447,6 +449,37 @@ function PrinterStatusChip() {
   )
 }
 
+// ─── UpdateChip ───────────────────────────────────────────────────────────────
+
+function UpdateChip() {
+  const { status, percent } = useUpdateStore()
+  if (status === 'idle' || status === 'available') return null
+
+  if (status === 'downloading') {
+    return (
+      <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium shrink-0 bg-blue-900/30 text-blue-200">
+        <RefreshCw className="w-3 h-3 animate-spin" />
+        <span className="hidden sm:inline">Updating {percent ?? 0}%</span>
+      </div>
+    )
+  }
+
+  // status === 'ready' — downloaded, waiting on the operator to pick a
+  // moment (never forced mid-shift; also installs automatically on the
+  // next full app quit either way, see autoInstallOnAppQuit in main.js).
+  return (
+    <button
+      type="button"
+      onClick={() => window.electronAPI?.installUpdate()}
+      title="A new version has downloaded — click to restart and install"
+      className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium shrink-0 bg-emerald-900/30 text-emerald-200 hover:bg-emerald-900/50 transition-colors"
+    >
+      <RefreshCw className="w-3 h-3" />
+      <span className="hidden sm:inline">Restart to update</span>
+    </button>
+  )
+}
+
 // ─── Taskbar ──────────────────────────────────────────────────────────────────
 
 function Taskbar() {
@@ -732,6 +765,7 @@ export function AppShell({
         <div className="flex items-center gap-1 pl-2 shrink-0">
           <OfflineChip />
           <PrinterStatusChip />
+          <UpdateChip />
           <UserMenu role={role} fullName={fullName} />
         </div>
       </header>

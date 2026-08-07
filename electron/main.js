@@ -12,6 +12,7 @@ const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, dialog, shell } = 
 const path = require('node:path')
 const fs = require('node:fs')
 const { spawn } = require('node:child_process')
+const { autoUpdater } = require('electron-updater')
 const licenseManager = require('./licenseManager')
 
 let mainWindow = null
@@ -285,6 +286,55 @@ function createTray() {
   }
 }
 
+// ─── Auto-updater ─────────────────────────────────────────────────────────────
+//
+// Checks the feed baked into resources/app-update.yml at build time (see
+// package.json's build.publish — a "generic" provider pointed at this app's
+// own /api/desktop/update-feed route, which serves files uploaded to R2 by
+// .github/workflows/build-desktop.yml after each build). Deliberately not
+// GitHub Releases: the repo is private, and electron-updater's GitHub
+// provider would need a repo-read token baked into every installed till —
+// a real exposure for financial software that a plain HTTPS feed avoids.
+//
+// Downloads happen automatically in the background once found (never
+// disrupts a till mid-shift), but installing/restarting always waits for an
+// explicit choice — from the renderer's "Restart to update" chip, or
+// naturally on the next full app quit. Never forced onto a till mid-shift.
+const UPDATE_CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000 // 4 hours
+let updateCheckTimer = null
+
+function sendUpdateStatus(status, extra) {
+  mainWindow?.webContents.send('update-status', { status, ...extra })
+}
+
+function setupAutoUpdater() {
+  if (!app.isPackaged) return // no app-update.yml in a dev run — nothing to check
+
+  autoUpdater.logger = console // reuses the file-logging override set up above
+  autoUpdater.autoDownload = true
+  autoUpdater.autoInstallOnAppQuit = true
+
+  autoUpdater.on('update-available', (info) => sendUpdateStatus('available', { version: info.version }))
+  autoUpdater.on('update-not-available', () => sendUpdateStatus('none'))
+  autoUpdater.on('download-progress', (p) => sendUpdateStatus('downloading', { percent: Math.round(p.percent) }))
+  autoUpdater.on('update-downloaded', (info) => sendUpdateStatus('ready', { version: info.version }))
+  autoUpdater.on('error', (err) => {
+    console.warn('[updater] check failed (offline? feed not configured yet?):', err.message)
+    sendUpdateStatus('none')
+  })
+
+  const check = () => autoUpdater.checkForUpdates().catch((err) => console.warn('[updater] checkForUpdates threw:', err.message))
+  // A short delay after the window is up — first paint and initial data
+  // fetches shouldn't compete with an update check for network/CPU.
+  setTimeout(check, 10_000)
+  if (updateCheckTimer) clearInterval(updateCheckTimer)
+  updateCheckTimer = setInterval(check, UPDATE_CHECK_INTERVAL_MS)
+}
+
+ipcMain.handle('install-update', () => {
+  autoUpdater.quitAndInstall()
+})
+
 // ─── Startup sequence ───────────────────────────────────────────────────────
 
 async function startApp() {
@@ -336,6 +386,7 @@ async function startApp() {
 
   createMainWindow()
   createTray()
+  setupAutoUpdater()
 
   heartbeatTimer = licenseManager.startHeartbeatLoop(PORTAL_BASE_URL, app.getVersion(), (err, result) => {
     if (err) console.warn('[license] heartbeat failed (offline?):', err.message)
@@ -353,6 +404,7 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   if (heartbeatTimer) clearInterval(heartbeatTimer)
+  if (updateCheckTimer) clearInterval(updateCheckTimer)
   if (serverProcess) serverProcess.kill()
   if (process.platform !== 'darwin') app.quit()
 })

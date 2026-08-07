@@ -47,6 +47,11 @@ jobs:
           # two secrets are added — no further workflow changes needed then.
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          # Baked into resources/app-update.yml so the installed app knows
+          # where to check for updates (package.json's build.publish) — see
+          # electron/README.md's "Auto-updates" section. Empty until this
+          # secret is added, same no-op-until-configured pattern as signing.
+          DESKTOP_UPDATE_FEED_BASE_URL: ${{ secrets.DESKTOP_UPDATE_FEED_BASE_URL }}
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
@@ -55,3 +60,19 @@ jobs:
           path: dist/*.exe
           retention-days: 14
           if-no-files-found: error
+
+      - name: Publish release files to the update feed
+        # No-op until DESKTOP_UPDATE_FEED_BASE_URL is added as a repo secret
+        # — see electron/README.md's "Auto-updates" section for what it
+        # needs to point at and why.
+        if: ${{ secrets.DESKTOP_UPDATE_FEED_BASE_URL != '' }}
+        shell: bash
+        run: |
+          shopt -s nullglob
+          files=(dist/*.exe dist/latest.yml dist/*.blockmap)
+          for f in "${files[@]}"; do
+            echo "Uploading $f"
+            curl -sf -X POST "${{ secrets.DESKTOP_UPDATE_FEED_BASE_URL }}/api/internal/desktop-release" \
+              -H "x-internal-secret: ${{ secrets.INTERNAL_API_SHARED_SECRET }}" \
+              -F "file=@$f"
+          done

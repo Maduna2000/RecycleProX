@@ -48,3 +48,35 @@ CSC_KEY_PASSWORD=<the certificate's password>
 environment variables before running `npm run electron:build`.)
 
 See <https://www.electron.build/code-signing> for the full reference.
+
+## Auto-updates (not yet configured)
+
+The app checks for updates via `electron-updater` (see `main.js`'s
+`setupAutoUpdater`) — not against GitHub Releases, since this repo is
+private and that method needs a repo-read token baked into every installed
+till's app, a real exposure for financial software. Instead it polls this
+app's own `GET /api/desktop/update-feed/*` route, which serves files out of
+this project's existing (otherwise-private) R2 bucket under a
+`desktop-releases/` prefix — `.github/workflows/build-desktop.yml` uploads
+the installer, its blockmap, and `latest.yml` there after each build, via
+`POST /api/internal/desktop-release` (shared-secret gated the same way as
+every other `/api/internal/*` route — see
+`src/lib/internal/authorizeInternalRequest.ts`).
+
+This is currently a no-op — like signing, it turns on purely by adding one
+more **GitHub Actions repository secret**, no code or workflow changes
+needed:
+
+```
+DESKTOP_UPDATE_FEED_BASE_URL=<this Web app's own production URL, e.g. https://your-deployment.vercel.app>
+```
+
+Until that secret exists, the build still produces a working (if
+non-self-updating) installer — updates just silently fail their feed check
+on launch and the app carries on normally, the same way an unsigned
+installer still runs fine today.
+
+Once configured: updates download automatically in the background (never
+disrupts a till mid-shift) and a "Restart to update" chip appears in the
+app header when one's ready — installing always waits for that click, or
+happens automatically on the next natural full app quit either way.

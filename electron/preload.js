@@ -17,6 +17,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   activateDevice: (activationCode) => ipcRenderer.invoke('license-activate', activationCode),
   getLicenseStatus: ()             => ipcRenderer.invoke('license-status'),
 
+  // Auto-updater — main process pushes status changes (checking / available /
+  // downloading / ready / none), renderer never polls for this itself.
+  onUpdateStatus: (callback) => {
+    const listener = (_event, status) => callback(status)
+    ipcRenderer.on('update-status', listener)
+    return () => ipcRenderer.removeListener('update-status', listener)
+  },
+  installUpdate: () => ipcRenderer.invoke('install-update'),
+
   // Detect if running inside Electron
   isElectron: true,
 })

@@ -1,6 +1,6 @@
 {
   "name": "renovopro",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "main": "electron/main.js",
   "scripts": {
@@ -30,6 +30,13 @@
     "appId": "za.co.goldenkey.renovopro",
     "productName": "Renovo Pro",
     "asar": false,
+    "publish": [
+      {
+        "provider": "generic",
+        "url": "${env.DESKTOP_UPDATE_FEED_BASE_URL}/api/desktop/update-feed",
+        "channel": "latest"
+      }
+    ],
     "files": [
       "electron/**/*",
       ".next/standalone/**/*",
@@ -107,6 +114,7 @@
     "dexie": "^4.4.2",
     "dexie-react-hooks": "^4.4.0",
     "electron-store": "^10.1.0",
+    "electron-updater": "^6.8.9",
     "lucide-react": "^1.7.0",
     "next": "14.2.35",
     "next-auth": "^5.0.0-beta.30",
