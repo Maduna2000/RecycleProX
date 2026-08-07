@@ -444,6 +444,7 @@ export default function NewSalePage() {
                 type: 'sale',
                 data: {
                   refNumber: offlineRefNumber,
+                  status: 'completed',
                   buyerName: effectiveName,
                   buyerIdNumber: effectiveId || undefined,
                   lines: receiptLines,

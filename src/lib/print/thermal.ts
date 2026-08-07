@@ -69,8 +69,14 @@ export interface PurchaseReceiptData extends CompanyInfo {
 export interface SaleReceiptData extends CompanyInfo {
   refNumber:     string
   slipNo?:       string | number
+  // Drives the "PAID"/"UNPAID" banner at the top, same as purchases — a
+  // pending (not yet settled) sale must never print as PAID.
+  status:        'completed' | 'pending' | 'voided'
+  buyerCode?:    string
   buyerName?:    string
   buyerIdNumber?: string
+  buyerPhone?:   string
+  buyerVatNumber?: string
   lines:         ReceiptLine[]
   totalAmount:   string
   vatAmount?:    string
@@ -80,6 +86,12 @@ export interface SaleReceiptData extends CompanyInfo {
   provisional?:  boolean
   // From SystemSettings.saleNoteDeclaration — never hardcoded here.
   footerText?:   string
+  businessLoanDeduction?: { amount: string }
+  splitPayments?: {
+    cash:         string
+    eft:          string
+    businessLoan: string
+  }
 }
 
 // ─── Shared header / footer helpers ──────────────────────────────────────────
@@ -173,12 +185,16 @@ function addTotals(printer: ThermalPrinter, lines: ReceiptLine[], totalAmount: s
 
 function addSplitPayments(
   printer: ThermalPrinter,
-  splitPayments: { cash: string; eft: string; cheque: string; loan: string },
+  splitPayments: { cash: string; eft: string; cheque?: string; loan: string },
+  // Sales use "Business Loan" (the reverse-direction feature, see
+  // BusinessLoan) rather than purchases' "Loans" — kept distinct per
+  // feedback_differentiate_mirrored_features rather than reusing one label.
+  loanLabel: string = 'Loans',
   loanReference?: string,
 ) {
   const cashAmt   = new Decimal(splitPayments.cash   || '0')
   const eftAmt    = new Decimal(splitPayments.eft    || '0')
-  const chequeAmt = new Decimal(splitPayments.cheque || '0')
+  const chequeAmt = new Decimal(splitPayments.cheque ?? '0')
   const loanAmt   = new Decimal(splitPayments.loan   || '0')
 
   const hasAny = cashAmt.greaterThan(0) || eftAmt.greaterThan(0) ||
@@ -193,7 +209,7 @@ function addSplitPayments(
   if (cashAmt.greaterThan(0))   printer.leftRight('Cash', `E ${cashAmt.toFixed(2)}`)
   if (eftAmt.greaterThan(0))    printer.leftRight('EFT', `E ${eftAmt.toFixed(2)}`)
   if (chequeAmt.greaterThan(0)) printer.leftRight('Cheque', `E ${chequeAmt.toFixed(2)}`)
-  if (loanAmt.greaterThan(0))   printer.leftRight('Loans', `E ${loanAmt.toFixed(2)}${loanReference ? ` #${loanReference}` : ''}`)
+  if (loanAmt.greaterThan(0))   printer.leftRight(loanLabel, `E ${loanAmt.toFixed(2)}${loanReference ? ` #${loanReference}` : ''}`)
 }
 
 function addFooter(printer: ThermalPrinter, slipNo: string | number | undefined, footerText: string | undefined) {
@@ -232,7 +248,7 @@ export async function buildPurchaseReceipt(data: PurchaseReceiptData): Promise<B
   addLines(printer, data.lines)
   addTotals(printer, data.lines, data.totalAmount, data.vatAmount)
   if (data.splitPayments) {
-    addSplitPayments(printer, data.splitPayments, data.loanDeduction?.reference)
+    addSplitPayments(printer, data.splitPayments, 'Loans', data.loanDeduction?.reference)
   } else if (data.loanDeduction && new Decimal(data.loanDeduction.amount).greaterThan(0)) {
     printer.newLine()
     printer.println('Payment Split:')
@@ -255,15 +271,21 @@ export async function buildSaleReceipt(data: SaleReceiptData): Promise<Buffer> {
     lineCharacter: '-',
   })
 
-  addHeader(printer, data.refNumber, data.createdAt, data, data.provisional)
-  printer.println(`Done By: ${data.cashierName}`)
-  printer.newLine()
-  if (data.buyerName)     printer.println(`Buyer: ${data.buyerName}`)
+  addHeader(printer, data.refNumber, data.createdAt, data, data.provisional, data.status === 'completed' ? 'PAID' : 'UNPAID')
+  addPeopleLines(printer, data.cashierName)
+  addPartyLines(printer, 'Buyer', data.buyerCode, data.buyerName ?? 'Walk-in Customer', data.buyerVatNumber)
   if (data.buyerIdNumber) printer.println(`ID: ${data.buyerIdNumber}`)
-  printer.newLine()
+  if (data.buyerPhone)    printer.println(`Phone: ${data.buyerPhone}`)
 
   addLines(printer, data.lines)
   addTotals(printer, data.lines, data.totalAmount, data.vatAmount)
+  if (data.splitPayments) {
+    addSplitPayments(printer, { cash: data.splitPayments.cash, eft: data.splitPayments.eft, loan: data.splitPayments.businessLoan }, 'Business Loan')
+  } else if (data.businessLoanDeduction && new Decimal(data.businessLoanDeduction.amount).greaterThan(0)) {
+    printer.newLine()
+    printer.println('Payment Split:')
+    printer.leftRight('Business Loan', `E ${new Decimal(data.businessLoanDeduction.amount).toFixed(2)}`)
+  }
   addFooter(printer, data.slipNo, data.footerText)
 
   return Buffer.from(printer.getBuffer())

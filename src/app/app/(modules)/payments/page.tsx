@@ -30,6 +30,10 @@ type Payment = {
   customer: { id: string; firstName: string; lastName: string; idNumber: string | null } | null
   sale: { refNumber: string } | null
   purchase: { refNumber: string } | null
+  // A sale paid in full at creation never has a separate Payment row — this
+  // row is synthesized from the Sale itself, so there's no standalone
+  // "payment" to void here; voiding has to go through the Sales module.
+  isDirectSale: boolean
 }
 
 export default function PaymentsPage() {
@@ -147,7 +151,7 @@ export default function PaymentsPage() {
       label:  'Void Payment',
       icon:   Ban,
       danger: true,
-      hidden: (r) => !isManager || !!r.voidedAt,
+      hidden: (r) => !isManager || !!r.voidedAt || r.isDirectSale,
       onClick: (r) => setVoidTarget(r),
     },
   ]

@@ -186,6 +186,24 @@ export async function getPayment(id: string) {
 
 // ─── List Payments ────────────────────────────────────────────────────────────
 
+export interface UnifiedPaymentRow {
+  id: string
+  refNumber: string
+  amount: string
+  paymentMethod: string
+  notes: string | null
+  voidedAt: string | null
+  createdAt: Date
+  source: 'sale' | 'purchase'
+  customer: { id: string; firstName: string; lastName: string; idNumber: string | null } | null
+  sale: { refNumber: string } | null
+  purchase: { refNumber: string } | null
+  // True for a sale that was paid in full at creation and never went
+  // through markSalePaid/processSaleSplitPayment — see the comment below on
+  // why these need to be synthesized rather than read off the Payment table.
+  isDirectSale: boolean
+}
+
 export async function listPayments(opts?: {
   customerId?: string
   from?: Date
@@ -222,7 +240,43 @@ export async function listPayments(opts?: {
     }),
   }
 
-  const [payments, total, receivedAgg, paidOutAgg] = await Promise.all([
+  // A sale paid in full at creation time (the common, direct-completion
+  // case) never gets a Payment row — only markSalePaid/processSaleSplitPayment
+  // (settling a sale that started 'pending') create one, see Payment.source's
+  // own comment. Querying the Payment table alone therefore silently drops
+  // most cash sales from a "sales payments" view. Union in the direct sales
+  // (status:'completed', no linked Payment) whenever this is a sales-scoped
+  // request, and merge them with the real Payment rows below.
+  const wantsDirectSales = opts?.source === 'sale' || !opts?.source
+
+  const directSaleWhere = {
+    status: 'completed' as const,
+    payments: { none: {} },
+    ...(opts?.customerId && { customerId: opts.customerId }),
+    ...(opts?.paymentMethod && { paymentMethod: opts.paymentMethod as 'cash' | 'eft' }),
+    ...(opts?.from || opts?.to ? {
+      createdAt: {
+        ...(opts?.from && { gte: opts.from }),
+        ...(opts?.to && { lte: opts.to }),
+      },
+    } : {}),
+    ...(opts?.search && {
+      OR: [
+        { refNumber: { contains: opts.search, mode: 'insensitive' as const } },
+        { customer: { firstName: { contains: opts.search, mode: 'insensitive' as const } } },
+        { customer: { lastName: { contains: opts.search, mode: 'insensitive' as const } } },
+        { customer: { idNumber: { contains: opts.search, mode: 'insensitive' as const } } },
+        { buyerName: { contains: opts.search, mode: 'insensitive' as const } },
+      ],
+    }),
+  }
+
+  // Enough rows from EACH source to guarantee the merged, sorted list's
+  // first `skip + pageSize` entries are correct, regardless of how the two
+  // sources interleave chronologically.
+  const fetchLimit = skip + pageSize
+
+  const [paymentRows, paymentTotal, directSales, directSalesTotal, receivedAgg, paidOutAgg, directReceivedAgg] = await Promise.all([
     prisma.payment.findMany({
       where,
       include: {
@@ -231,23 +285,76 @@ export async function listPayments(opts?: {
         purchase: { select: { refNumber: true } },
       },
       orderBy: { createdAt: 'desc' },
-      skip,
-      take: pageSize,
+      take: fetchLimit,
     }),
     prisma.payment.count({ where }),
+    wantsDirectSales
+      ? prisma.sale.findMany({
+          where: directSaleWhere,
+          include: { customer: { select: { id: true, firstName: true, lastName: true, idNumber: true } } },
+          orderBy: { createdAt: 'desc' },
+          take: fetchLimit,
+        })
+      : Promise.resolve([]),
+    wantsDirectSales ? prisma.sale.count({ where: directSaleWhere }) : Promise.resolve(0),
     prisma.payment.aggregate({ where: { ...where, source: 'sale' }, _sum: { amount: true } }),
     prisma.payment.aggregate({ where: { ...where, source: 'purchase' }, _sum: { amount: true } }),
+    wantsDirectSales
+      ? prisma.sale.aggregate({ where: directSaleWhere, _sum: { totalAmount: true } })
+      : Promise.resolve({ _sum: { totalAmount: null } }),
   ])
 
+  const paymentUnified: UnifiedPaymentRow[] = payments_toUnified(paymentRows)
+  const directUnified: UnifiedPaymentRow[] = directSales.map((s) => ({
+    id: s.id,
+    refNumber: s.refNumber,
+    amount: s.totalAmount.toString(),
+    paymentMethod: s.paymentMethod,
+    notes: s.notes,
+    voidedAt: null,
+    createdAt: s.createdAt,
+    source: 'sale' as const,
+    customer: s.customer ?? (s.buyerName ? { id: '', firstName: s.buyerName, lastName: '', idNumber: s.buyerIdNumber } : null),
+    sale: { refNumber: s.refNumber },
+    purchase: null,
+    isDirectSale: true,
+  }))
+
+  const merged = [...paymentUnified, ...directUnified].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+  const total = paymentTotal + directSalesTotal
+
   return {
-    payments,
+    payments: merged.slice(skip, skip + pageSize),
     total,
     page,
     pageSize,
     pageCount: Math.ceil(total / pageSize),
-    totalReceived: receivedAgg._sum.amount?.toString() ?? '0',
+    totalReceived: new Decimal(receivedAgg._sum.amount?.toString() ?? '0')
+      .plus(directReceivedAgg._sum.totalAmount?.toString() ?? '0').toFixed(2),
     totalPaidOut: paidOutAgg._sum.amount?.toString() ?? '0',
   }
+}
+
+function payments_toUnified(rows: Array<{
+  id: string; refNumber: string; amount: unknown; paymentMethod: string; notes: string | null
+  voidedAt: Date | null; createdAt: Date; source: string
+  customer: { id: string; firstName: string; lastName: string; idNumber: string | null } | null
+  sale: { refNumber: string } | null; purchase: { refNumber: string } | null
+}>): UnifiedPaymentRow[] {
+  return rows.map((p) => ({
+    id: p.id,
+    refNumber: p.refNumber,
+    amount: String(p.amount),
+    paymentMethod: p.paymentMethod,
+    notes: p.notes,
+    voidedAt: p.voidedAt?.toISOString() ?? null,
+    createdAt: p.createdAt,
+    source: p.source as 'sale' | 'purchase',
+    customer: p.customer,
+    sale: p.sale,
+    purchase: p.purchase,
+    isDirectSale: false,
+  }))
 }
 
 // ─── List Customers with Balances ────────────────────────────────────────────

@@ -761,3 +761,242 @@ export async function generatePurchaseReceiptPdf(data: PurchaseSlipData): Promis
 
   return doc.save()
 }
+
+// ─── Sale receipt — mirrors generatePurchaseReceiptPdf exactly ────────────────
+// Same 80mm legacy-slip layout as the purchase receipt above; "Buyer"
+// instead of "Cust", no Scale Op line (sales aren't linked to a scale
+// order), and "Business Loan" instead of "Loans" for the split-payment leg
+// (see thermal.ts's addSplitPayments — kept a distinct label on purpose,
+// not a copy-pasted one, per feedback_differentiate_mirrored_features).
+
+export interface SaleSlipLine {
+  productCode?: string
+  productName:  string
+  qty:          number     // net quantity ("Nett" on the slip)
+  unitPrice:    string     // Decimal string ("InPrice" on the slip)
+  lineTotal:    string     // Decimal string
+  grossQty?:    string
+  tareQty?:     string
+}
+
+export interface SaleSlipData {
+  companyName?:    string
+  companyAddress?: string
+  companyPhone?:   string
+  vatNumber?:      string
+  refNumber:    string
+  slipNo?:      string | number
+  // Drives the "PAID"/"UNPAID" banner — a pending sale must never print as PAID.
+  status:       'completed' | 'pending' | 'voided'
+  buyerCode?:    string
+  buyerName:     string
+  buyerIdNumber?: string
+  buyerPhone?:   string
+  buyerVatNumber?: string
+  lines:        SaleSlipLine[]
+  totalAmount:  string
+  vatAmount?:   string
+  paymentMethod: string
+  cashierName:   string
+  createdAt:    Date
+  provisional?: boolean
+  footerText?:  string
+  businessLoanDeduction?: { amount: string }
+  splitPayments?: {
+    cash:         string
+    eft:          string
+    businessLoan: string
+  }
+}
+
+function estimateSaleHeight(data: SaleSlipData, footerLineCount: number): number {
+  let h = 14                                     // top margin
+  h += LINE_H * 2                                // PAID + company name
+  h += LINE_H                                    // PN No
+  h += LINE_H                                    // Date
+  h += LINE_H                                    // blank
+  const addressSegments = (data.companyAddress ?? '').split(',').map((s) => s.trim()).filter(Boolean)
+  h += addressSegments.length * LINE_H
+  if (data.companyPhone) h += LINE_H
+  if (data.vatNumber)    h += LINE_H
+  if (data.provisional)  h += LINE_H
+  h += 10                                         // divider
+
+  h += LINE_H                                    // Done By
+  h += LINE_H                                    // Rep
+  h += LINE_H                                    // blank
+
+  h += LINE_H                                    // Buyer
+  h += LINE_H                                    // Buyer VAT
+  h += LINE_H                                    // blank
+  if (data.buyerIdNumber) h += LINE_H
+  if (data.buyerPhone)    h += LINE_H
+
+  h += LINE_H                                    // table header
+  h += data.lines.length * LINE_H * 2             // code/price row + name row per line
+  h += 10                                         // divider
+
+  h += (LINE_H + 2) * 4                           // Nett Total, Total, 15% VAT, Grand Total
+
+  const cashAmt = new Decimal(data.splitPayments?.cash ?? '0')
+  const eftAmt  = new Decimal(data.splitPayments?.eft  ?? '0')
+  const loanAmt = new Decimal(data.splitPayments?.businessLoan ?? data.businessLoanDeduction?.amount ?? '0')
+  const hasSplit = cashAmt.gt(0) || eftAmt.gt(0) || loanAmt.gt(0)
+  if (hasSplit) {
+    h += LINE_H                                   // blank
+    h += LINE_H                                   // "Payment Split:"
+    if (cashAmt.gt(0)) h += LINE_H
+    if (eftAmt.gt(0))  h += LINE_H
+    if (loanAmt.gt(0)) h += LINE_H
+  }
+
+  if (data.slipNo !== undefined) h += LINE_H * 2  // blank + Slip No.
+  h += LINE_H                                     // blank before footer
+  h += footerLineCount * LINE_H
+  h += 10                                          // final divider
+  h += 16                                          // bottom margin
+  return Math.max(h, 300)
+}
+
+export async function generateSaleReceiptPdf(data: SaleSlipData): Promise<Uint8Array> {
+  const doc  = await PDFDocument.create()
+  const bold = await doc.embedFont(StandardFonts.HelveticaBold)
+  const reg  = await doc.embedFont(StandardFonts.Helvetica)
+
+  const footerLines = data.footerText ? wrapText(data.footerText, SMALL, reg, PBODY_W) : []
+  const docHeight = estimateSaleHeight(data, footerLines.length)
+  const page = doc.addPage([W, docHeight])
+
+  let cursor = docHeight - 14
+  const nextLine = (size = NORMAL, gap = 2) => { cursor -= (size + gap) }
+
+  // ── Header ─────────────────────────────────────────────────────────────
+  center(page, data.status === 'completed' ? 'PAID' : 'UNPAID', cursor, NORMAL, bold, BLACK)
+  nextLine(NORMAL, 2)
+  center(page, (data.companyName || 'Golden Key Investments (Pty) Ltd').toUpperCase(), cursor, NORMAL, bold, BLACK)
+  nextLine(NORMAL, 2)
+
+  page.drawText(`PN No: ${data.refNumber}`, { x: PMARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
+  nextLine(NORMAL)
+  page.drawText(`Date: ${formatSlipDate(data.createdAt)}`, { x: PMARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
+  nextLine(NORMAL, 6)
+
+  const addressSegments = (data.companyAddress ?? '').split(',').map((s) => s.trim()).filter(Boolean)
+  for (const segment of addressSegments) {
+    page.drawText(segment, { x: PMARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
+    nextLine(NORMAL)
+  }
+  if (data.companyPhone) {
+    page.drawText(`Tel: ${data.companyPhone}`, { x: PMARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
+    nextLine(NORMAL)
+  }
+  if (data.vatNumber) {
+    page.drawText(`VAT No.: ${data.vatNumber}`, { x: PMARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
+    nextLine(NORMAL)
+  }
+  if (data.provisional) {
+    page.drawText('*** PROVISIONAL - PENDING SYNC ***', { x: PMARGIN, y: cursor, size: NORMAL, font: bold, color: BLACK })
+    nextLine(NORMAL)
+  }
+
+  cursor -= 2
+  solidLine(page, cursor)
+  cursor -= 10
+
+  // ── People ─────────────────────────────────────────────────────────────
+  page.drawText(`Done By: ${data.cashierName}`, { x: PMARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
+  nextLine(NORMAL)
+  page.drawText('Rep:', { x: PMARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
+  nextLine(NORMAL, 6)
+
+  // ── Party ──────────────────────────────────────────────────────────────
+  const buyerLine = data.buyerCode ? `${data.buyerCode}-${data.buyerName}` : data.buyerName
+  page.drawText(`Buyer: ${buyerLine}`, { x: PMARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
+  nextLine(NORMAL)
+  page.drawText(`Buyer VAT: ${data.buyerVatNumber ?? ''}`, { x: PMARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
+  nextLine(NORMAL, 6)
+  if (data.buyerIdNumber) {
+    page.drawText(`ID: ${data.buyerIdNumber}`, { x: PMARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
+    nextLine(NORMAL)
+  }
+  if (data.buyerPhone) {
+    page.drawText(`Phone: ${data.buyerPhone}`, { x: PMARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
+    nextLine(NORMAL)
+  }
+
+  // ── Line items ─────────────────────────────────────────────────────────
+  pRow(page, cursor, SMALL, bold, DGRAY, ['Product', 'InPrice', 'Gross', 'Tare', 'Nett', 'Total'])
+  nextLine(SMALL, 4)
+
+  for (const line of data.lines) {
+    pRow(page, cursor, NORMAL, reg, BLACK, [
+      (line.productCode ?? '').substring(0, 10),
+      new Decimal(line.unitPrice).toFixed(2),
+      line.grossQty ?? '',
+      line.tareQty ?? '0',
+      String(line.qty),
+      new Decimal(line.lineTotal).toFixed(2),
+    ])
+    nextLine(NORMAL)
+    page.drawText(` ${line.productName}`, { x: PMARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
+    nextLine(NORMAL)
+  }
+
+  cursor -= 2
+  solidLine(page, cursor)
+  cursor -= 10
+
+  // ── Totals ─────────────────────────────────────────────────────────────
+  const nettTotal  = data.lines.reduce((acc, l) => acc.plus(l.qty || 0), new Decimal(0))
+  const total      = new Decimal(data.totalAmount)
+  const vat        = new Decimal(data.vatAmount ?? '0')
+  const grandTotal = total.plus(vat)
+
+  pLeftRight(page, 'Nett Total', nettTotal.toFixed(1), cursor, NORMAL, reg, BLACK)
+  nextLine(NORMAL, 2)
+  pLeftRight(page, 'Total', `E ${total.toFixed(2)}`, cursor, NORMAL, reg, BLACK)
+  nextLine(NORMAL, 2)
+  pLeftRight(page, '15% VAT', `E ${vat.toFixed(2)}`, cursor, NORMAL, reg, BLACK)
+  nextLine(NORMAL, 2)
+  pLeftRight(page, 'Grand Total', `E ${grandTotal.toFixed(2)}`, cursor, NORMAL, bold, BLACK)
+  nextLine(NORMAL, 3)
+
+  // ── Payment split ──────────────────────────────────────────────────────
+  const cashAmt = new Decimal(data.splitPayments?.cash ?? '0')
+  const eftAmt  = new Decimal(data.splitPayments?.eft  ?? '0')
+  const loanAmt = new Decimal(data.splitPayments?.businessLoan ?? data.businessLoanDeduction?.amount ?? '0')
+
+  if (cashAmt.gt(0) || eftAmt.gt(0) || loanAmt.gt(0)) {
+    nextLine(NORMAL, 0)
+    page.drawText('Payment Split:', { x: PMARGIN, y: cursor, size: NORMAL, font: bold, color: BLACK })
+    nextLine(NORMAL, 2)
+    if (cashAmt.gt(0)) {
+      pLeftRight(page, 'Cash', `E ${cashAmt.toFixed(2)}`, cursor, NORMAL, reg, BLACK)
+      nextLine(NORMAL)
+    }
+    if (eftAmt.gt(0)) {
+      pLeftRight(page, 'EFT', `E ${eftAmt.toFixed(2)}`, cursor, NORMAL, reg, BLACK)
+      nextLine(NORMAL)
+    }
+    if (loanAmt.gt(0)) {
+      pLeftRight(page, 'Business Loan', `E ${loanAmt.toFixed(2)}`, cursor, NORMAL, reg, BLACK)
+      nextLine(NORMAL)
+    }
+  }
+
+  // ── Footer ─────────────────────────────────────────────────────────────
+  if (data.slipNo !== undefined) {
+    nextLine(NORMAL, 0)
+    page.drawText(`Slip No. ${data.slipNo}`, { x: PMARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
+    nextLine(NORMAL)
+  }
+  nextLine(NORMAL, 0)
+  for (const fLine of footerLines) {
+    page.drawText(fLine, { x: PMARGIN, y: cursor, size: SMALL, font: reg, color: GRAY })
+    nextLine(SMALL)
+  }
+  cursor -= 2
+  solidLine(page, cursor)
+
+  return doc.save()
+}

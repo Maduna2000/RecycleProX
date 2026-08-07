@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
-import Decimal from 'decimal.js'
 import { getSale } from '@/lib/services/saleService'
 import { getAllSettings } from '@/lib/services/settingsService'
-import { generateTransactionSlip } from '@/lib/pdf/slip'
+import { generateSaleReceiptPdf } from '@/lib/pdf/slip'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 /**
@@ -27,30 +26,34 @@ export async function GET(
       getAllSettings(),
     ]))
 
-    const lines = sale.lines.map((l) => ({
+    const thermalLines = sale.lines.map((l) => ({
+      productCode: l.product.code,
       productName: l.product.name,
       qty:         Number(l.quantity),
       unitPrice:   l.unitPrice.toString(),
       lineTotal:   l.lineTotal.toString(),
+      grossQty:    l.grossQty?.toString(),
+      tareQty:     l.tareQty?.toString(),
     }))
+
+    const splitPayments = sale.splitPayments as {
+      cash: string; eft: string; businessLoan: string
+    } | null
 
     if (format === 'thermal') {
       const { buildSaleReceipt } = await import('@/lib/print/thermal')
-      const thermalLines = sale.lines.map((l) => ({
-        productCode: l.product.code,
-        productName: l.product.name,
-        qty:         Number(l.quantity),
-        unitPrice:   l.unitPrice.toString(),
-        lineTotal:   l.lineTotal.toString(),
-      }))
       const buf = await buildSaleReceipt({
         companyName:    settings.yardName,
         companyAddress: settings.yardAddress,
         companyPhone:   settings.yardPhone,
         vatNumber:      settings.vatNumber,
         refNumber:      sale.refNumber,
-        buyerName:      sale.buyerName ?? undefined,
-        buyerIdNumber:  sale.buyerIdNumber ?? undefined,
+        status:         sale.status,
+        buyerCode:      sale.customer?.accountCode ?? undefined,
+        buyerName:      sale.customer ? `${sale.customer.firstName} ${sale.customer.lastName}` : (sale.buyerName ?? undefined),
+        buyerIdNumber:  sale.customer?.idNumber ?? sale.buyerIdNumber ?? undefined,
+        buyerPhone:     sale.customer?.phone ?? sale.buyerPhone ?? undefined,
+        buyerVatNumber: sale.customer?.vatNumber ?? undefined,
         lines:          thermalLines,
         totalAmount:    sale.totalAmount.toString(),
         vatAmount:      sale.vatAmount ? sale.vatAmount.toString() : undefined,
@@ -58,6 +61,8 @@ export async function GET(
         cashierName:    session.user.name ?? 'Cashier',
         createdAt:      sale.createdAt,
         footerText:     settings.saleNoteDeclaration,
+        businessLoanDeduction: sale.businessLoanDeductionAmount ? { amount: sale.businessLoanDeductionAmount.toString() } : undefined,
+        splitPayments:  splitPayments ?? undefined,
       })
       return new NextResponse(buf.buffer as ArrayBuffer, {
         headers: {
@@ -67,30 +72,30 @@ export async function GET(
       })
     }
 
-    // Thermal-style PDF receipt
-    const vatAmount = new Decimal(sale.vatAmount.toString())
-    const pdfBytes = await generateTransactionSlip({
-      type:           'SALE',
+    // Legacy-format PDF receipt — same layout as the thermal printout and
+    // as generatePurchaseReceiptPdf, see generateSaleReceiptPdf's own header comment.
+    const pdfBytes = await generateSaleReceiptPdf({
       refNumber:      sale.refNumber,
-      date:           sale.createdAt,
-      partyLabel:     'Buyer',
-      partyName:      sale.buyerName ?? 'Walk-in Customer',
-      partyIdNumber:  sale.buyerIdNumber ?? undefined,
-      partyPhone:     sale.buyerPhone ?? undefined,
-      lines,
+      slipNo:         Number(sale.refNumber.match(/\d+$/)?.[0] ?? 0),
+      status:         sale.status,
+      buyerCode:      sale.customer?.accountCode ?? undefined,
+      buyerName:      sale.customer ? `${sale.customer.firstName} ${sale.customer.lastName}` : (sale.buyerName ?? 'Walk-in Customer'),
+      buyerIdNumber:  sale.customer?.idNumber ?? sale.buyerIdNumber ?? undefined,
+      buyerPhone:     sale.customer?.phone ?? sale.buyerPhone ?? undefined,
+      buyerVatNumber: sale.customer?.vatNumber ?? undefined,
+      lines:          thermalLines,
       totalAmount:    sale.totalAmount.toString(),
-      ...(vatAmount.greaterThan(0) ? {
-        vatAmount:      vatAmount.toFixed(2),
-        subtotalAmount: new Decimal(sale.totalAmount.toString()).minus(vatAmount).toFixed(2),
-      } : {}),
+      vatAmount:      sale.vatAmount ? sale.vatAmount.toString() : undefined,
       paymentMethod:  sale.paymentMethod,
       cashierName:    session.user.name ?? 'Cashier',
-      notes:          sale.notes ?? undefined,
+      createdAt:      sale.createdAt,
+      footerText:     settings.saleNoteDeclaration,
+      businessLoanDeduction: sale.businessLoanDeductionAmount ? { amount: sale.businessLoanDeductionAmount.toString() } : undefined,
+      splitPayments:  splitPayments ?? undefined,
       companyName:    settings.yardName,
       companyAddress: settings.yardAddress,
       companyPhone:   settings.yardPhone,
       vatNumber:      settings.vatNumber,
-      receiptFooter:  settings.receiptFooter,
     })
 
     return new NextResponse(pdfBytes.buffer as ArrayBuffer, {

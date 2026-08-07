@@ -134,7 +134,13 @@ export async function POST(req: Request) {
         qty: Number(line.quantity),
         unitPrice: line.unitPrice.toString(),
         lineTotal: new Decimal(line.unitPrice).times(line.quantity).toString(),
+        grossQty: line.grossQty?.toString(),
+        tareQty: line.tareQty?.toString(),
       }))
+
+      const saleSplitPayments = sale.splitPayments as {
+        cash: string; eft: string; businessLoan: string
+      } | null
 
       receiptBuffer = await buildSaleReceipt({
         companyName: cfg.yardName,
@@ -142,8 +148,12 @@ export async function POST(req: Request) {
         companyPhone: cfg.yardPhone,
         vatNumber: cfg.vatNumber,
         refNumber: sale.refNumber,
-        buyerName: sale.customer ? `${sale.customer.firstName} ${sale.customer.lastName}` : undefined,
-        buyerIdNumber: sale.customer?.idNumber ?? undefined,
+        status: sale.status,
+        buyerCode: sale.customer?.accountCode ?? undefined,
+        buyerName: sale.customer ? `${sale.customer.firstName} ${sale.customer.lastName}` : (sale.buyerName ?? undefined),
+        buyerIdNumber: sale.customer?.idNumber ?? sale.buyerIdNumber ?? undefined,
+        buyerPhone: sale.customer?.phone ?? sale.buyerPhone ?? undefined,
+        buyerVatNumber: sale.customer?.vatNumber ?? undefined,
         lines,
         totalAmount: sale.totalAmount.toString(),
         vatAmount: sale.vatAmount ? sale.vatAmount.toString() : undefined,
@@ -151,6 +161,8 @@ export async function POST(req: Request) {
         cashierName: session.user.name ?? 'Cashier',
         createdAt: sale.createdAt,
         footerText: cfg.saleNoteDeclaration,
+        businessLoanDeduction: sale.businessLoanDeductionAmount ? { amount: sale.businessLoanDeductionAmount.toString() } : undefined,
+        splitPayments: saleSplitPayments ?? undefined,
       })
     }
 

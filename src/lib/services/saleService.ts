@@ -282,7 +282,10 @@ export async function voidSale(id: string, data: VoidSaleInput, voidedById?: str
 export async function getSale(id: string) {
   const sale = await prisma.sale.findUnique({
     where: { id },
-    include: { lines: { include: { product: true }, orderBy: { createdAt: 'asc' } } },
+    include: {
+      lines: { include: { product: true }, orderBy: { createdAt: 'asc' } },
+      customer: true,
+    },
   })
   if (!sale) throw new SaleNotFoundError(id)
   return sale
