@@ -524,33 +524,33 @@ export default function NewPurchasePage() {
           toast.success('Purchase saved offline — will sync when connected')
           // Auto-print in Electron desktop app / local-server PWA, same as
           // the online path — built from data already in hand since there's
-          // no server id yet.
+          // no server id yet. Fire-and-forget: the record is already saved,
+          // so navigation must not wait on hardware I/O (see the online
+          // branch below for the identical reasoning).
           if (canAutoPrint()) {
-            try {
-              const receiptLines = validLines.map((l) => ({
-                productName: products.find((p) => p.id === l.productId)?.name ?? l.productId,
-                qty: parseFloat(l.quantity),
-                unitPrice: l.unitPrice,
-                lineTotal: new Decimal(l.quantity || '0').times(l.unitPrice || '0').toFixed(2),
-              }))
-              await autoPrintReceipt({
-                type: 'purchase',
-                data: {
-                  refNumber: offlineRefNumber,
-                  status,
-                  customerName: `${resolvedCustomer.firstName} ${resolvedCustomer.lastName}`,
-                  customerIdNo: resolvedCustomer.idNumber ?? undefined,
-                  customerPhone: resolvedCustomer.phone ?? undefined,
-                  lines: receiptLines,
-                  totalAmount: grandTotal.toFixed(2),
-                  paymentMethod,
-                  cashierName: '',
-                  createdAt: new Date().toISOString(),
-                },
-              })
-            } catch {
+            const receiptLines = validLines.map((l) => ({
+              productName: products.find((p) => p.id === l.productId)?.name ?? l.productId,
+              qty: parseFloat(l.quantity),
+              unitPrice: l.unitPrice,
+              lineTotal: new Decimal(l.quantity || '0').times(l.unitPrice || '0').toFixed(2),
+            }))
+            autoPrintReceipt({
+              type: 'purchase',
+              data: {
+                refNumber: offlineRefNumber,
+                status,
+                customerName: `${resolvedCustomer.firstName} ${resolvedCustomer.lastName}`,
+                customerIdNo: resolvedCustomer.idNumber ?? undefined,
+                customerPhone: resolvedCustomer.phone ?? undefined,
+                lines: receiptLines,
+                totalAmount: grandTotal.toFixed(2),
+                paymentMethod,
+                cashierName: '',
+                createdAt: new Date().toISOString(),
+              },
+            }).catch(() => {
               toast.error('Offline print failed — receipt will be available once synced')
-            }
+            })
           }
         }
         router.push('/app/purchases')
@@ -582,17 +582,19 @@ export default function NewPurchasePage() {
           mutatePending()
           toast.success(`Purchase ${purchase.refNumber} saved as unpaid`)
         } else {
-          // Auto-print in Electron desktop app / local-server PWA
+          // The purchase is already safely recorded at this point — printing
+          // is a secondary, hardware-dependent step and must never gate "is
+          // the till free for the next customer" on it (a slow/hung printer
+          // used to leave Submit stuck on "Submitting…" long after the money
+          // had already moved). Report success and move on immediately; a
+          // failed auto-print is reported on its own and can always be
+          // retried afterward from Purchases → "Reprint to Printer".
+          toast.success(`Purchase ${purchase.refNumber} recorded`)
           if (canAutoPrint()) {
-            try {
-              await autoPrintReceipt({ type: 'purchase', id: purchase.id })
-              toast.success(`Receipt printed: ${purchase.refNumber}`)
-              router.push('/app/dashboard')
-            } catch {
-              // Fall back to showing PrintResultModal on print failure
-              toast.error('Print failed — showing manual options')
-              setPrintDialog({ id: purchase.id, refNumber: purchase.refNumber })
-            }
+            autoPrintReceipt({ type: 'purchase', id: purchase.id })
+              .then(() => toast.success(`Receipt printed: ${purchase.refNumber}`))
+              .catch(() => toast.error(`Receipt didn't print for ${purchase.refNumber} — reprint from Purchases → Reprint to Printer`))
+            router.push('/app/dashboard')
           } else {
             setPrintDialog({ id: purchase.id, refNumber: purchase.refNumber })
           }

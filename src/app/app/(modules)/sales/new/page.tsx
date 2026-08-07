@@ -442,31 +442,32 @@ export default function NewSalePage() {
           toast.success('Sale saved offline as unpaid — will sync when connected')
         } else {
           toast.success('Sale saved offline — will sync when connected')
+          // Fire-and-forget: the record is already saved, so navigation must
+          // not wait on hardware I/O (see the online branch below for the
+          // identical reasoning).
           if (canAutoPrint()) {
-            try {
-              const receiptLines = validLines.map((l) => ({
-                productName: products.find((p) => p.id === l.productId)?.name ?? l.productId,
-                qty: parseFloat(l.quantity),
-                unitPrice: l.unitPrice,
-                lineTotal: new Decimal(l.quantity || '0').times(l.unitPrice || '0').toFixed(2),
-              }))
-              await autoPrintReceipt({
-                type: 'sale',
-                data: {
-                  refNumber: offlineRefNumber,
-                  status: 'completed',
-                  buyerName: effectiveName,
-                  buyerIdNumber: effectiveId || undefined,
-                  lines: receiptLines,
-                  totalAmount: total.toFixed(2),
-                  paymentMethod: isPending ? 'cash' : paymentType,
-                  cashierName: '',
-                  createdAt: new Date().toISOString(),
-                },
-              })
-            } catch {
+            const receiptLines = validLines.map((l) => ({
+              productName: products.find((p) => p.id === l.productId)?.name ?? l.productId,
+              qty: parseFloat(l.quantity),
+              unitPrice: l.unitPrice,
+              lineTotal: new Decimal(l.quantity || '0').times(l.unitPrice || '0').toFixed(2),
+            }))
+            autoPrintReceipt({
+              type: 'sale',
+              data: {
+                refNumber: offlineRefNumber,
+                status: 'completed',
+                buyerName: effectiveName,
+                buyerIdNumber: effectiveId || undefined,
+                lines: receiptLines,
+                totalAmount: total.toFixed(2),
+                paymentMethod: isPending ? 'cash' : paymentType,
+                cashierName: '',
+                createdAt: new Date().toISOString(),
+              },
+            }).catch(() => {
               toast.error('Offline print failed — receipt will be available once synced')
-            }
+            })
           }
         }
         router.push('/app/sales')
@@ -496,14 +497,16 @@ export default function NewSalePage() {
           toast.success(`Sale ${sale.refNumber} saved as unpaid`)
           router.push('/app/sales/unpaid')
         } else if (canAutoPrint()) {
-          try {
-            await autoPrintReceipt({ type: 'sale', id: sale.id })
-            toast.success(`Receipt printed: ${sale.refNumber}`)
-            router.push('/app/dashboard')
-          } catch {
-            toast.error('Print failed — showing manual options')
-            setPrintDialog({ id: sale.id, refNumber: sale.refNumber })
-          }
+          // The sale is already safely recorded at this point — printing is
+          // a secondary, hardware-dependent step and must never gate "is the
+          // till free for the next customer" on it. Report success and move
+          // on immediately; a failed auto-print is reported on its own and
+          // can always be retried afterward from Sales → "Reprint to Printer".
+          toast.success(`Sale ${sale.refNumber} recorded`)
+          autoPrintReceipt({ type: 'sale', id: sale.id })
+            .then(() => toast.success(`Receipt printed: ${sale.refNumber}`))
+            .catch(() => toast.error(`Receipt didn't print for ${sale.refNumber} — reprint from Sales → Reprint to Printer`))
+          router.push('/app/dashboard')
         } else {
           setPrintDialog({ id: sale.id, refNumber: sale.refNumber })
         }

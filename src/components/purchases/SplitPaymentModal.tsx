@@ -8,6 +8,7 @@ import { Dialog } from '@/components/ui/dialog'
 import { colors } from '@/lib/design-tokens'
 import { Btn, inp, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
 import { useOfflineMutation } from '@/hooks/useOfflineFetch'
+import { autoPrintReceipt } from '@/lib/print/autoPrintClient'
 
 export type SplitPayTarget = {
   id: string
@@ -141,31 +142,24 @@ export function SplitPaymentModal({
         localId: purchase.id,
       })
 
+      setLoading(false)
+
       if (queued) {
         toast.success(`Split payment saved offline for ${purchase.ref} — will sync when connected`)
-        setLoading(false)
         onSuccess()
         return
       }
 
+      // The payment is already safely recorded at this point — printing is a
+      // secondary, hardware-dependent step and must never gate closing this
+      // modal / moving on (same reasoning as purchases/new and sales/new).
+      // Fire-and-forget; a failed print is reported on its own and can
+      // always be retried afterward from Purchases → "Reprint to Printer".
       toast.success(`Split payment processed for ${purchase.ref}`)
+      autoPrintReceipt({ type: 'purchase', id: purchase.id }).catch(() => {
+        toast.warning(`Payment saved but receipt didn't print for ${purchase.ref} — reprint from Purchases → Reprint to Printer`)
+      })
 
-      // Auto-print receipt — online only, the queued/offline path has no
-      // server-confirmed record yet for /api/print/slip to look up.
-      try {
-        const printRes = await fetch('/api/print/slip', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: 'purchase', id: purchase.id }),
-        })
-        if (!printRes.ok) {
-          toast.warning('Payment saved but receipt print failed')
-        }
-      } catch {
-        toast.warning('Payment saved but receipt print failed')
-      }
-
-      setLoading(false)
       onSuccess()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to process payment')
