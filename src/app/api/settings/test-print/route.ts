@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { getAllSettings } from '@/lib/services/settingsService'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
+import { resolvePrinterInterface } from '@/lib/print/printerInterface'
 
 // POST /api/settings/test-print
 // Sends a small test page to the configured thermal printer.
@@ -23,9 +24,7 @@ export async function POST(req: NextRequest) {
   try {
     const { ThermalPrinter, PrinterTypes, CharacterSet } = await import('node-thermal-printer')
 
-    const iface = cfg.printerType === 'tcp'
-      ? `tcp://${cfg.printerIp ?? '127.0.0.1'}:${cfg.printerTcpPort ?? '9100'}`
-      : cfg.printerSerialPort ?? 'COM1'
+    const iface = resolvePrinterInterface(cfg)
 
     const printer = new ThermalPrinter({
       type:         PrinterTypes.EPSON,
