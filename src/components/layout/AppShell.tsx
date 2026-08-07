@@ -13,12 +13,14 @@ import {
   Download, LogOut, Settings, Settings2, TrendingUp,
   Users, UserPlus, ChevronRight,
   Wifi, WifiOff,
+  PrinterX,
   Scale, ClipboardList,
   Boxes, ArrowLeftRight, Grid3X3, SlidersHorizontal,
   ShieldCheck, History, LifeBuoy, DoorOpen,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useOfflineStore } from '@/stores/offlineStore'
+import { usePrinterStatusStore } from '@/stores/printerStatusStore'
 import { getModuleName } from '@/lib/module-names'
 import { WindowTaskbar } from '@/components/ui/WindowTaskbar'
 import { useRecordTitle } from '@/hooks/useRecordTitle'
@@ -425,6 +427,26 @@ function OfflineChip() {
   )
 }
 
+// ─── PrinterStatusChip ────────────────────────────────────────────────────────
+
+function PrinterStatusChip() {
+  const { configured, connected, checked } = usePrinterStatusStore()
+  // Nothing to say yet (first poll hasn't landed), no printer configured, or
+  // it's connected and fine — same "only speak up when something's wrong"
+  // rule OfflineChip follows, so the header doesn't grow a permanent green
+  // pill nobody needs to see.
+  if (!checked || !configured || connected) return null
+  return (
+    <div
+      className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium shrink-0 bg-red-900/30 text-red-300"
+      title="Configured thermal printer is not reachable — check it's powered on and connected"
+    >
+      <PrinterX className="w-3 h-3" />
+      <span className="hidden sm:inline">Printer offline</span>
+    </div>
+  )
+}
+
 // ─── Taskbar ──────────────────────────────────────────────────────────────────
 
 function Taskbar() {
@@ -709,6 +731,7 @@ export function AppShell({
         {/* Right side */}
         <div className="flex items-center gap-1 pl-2 shrink-0">
           <OfflineChip />
+          <PrinterStatusChip />
           <UserMenu role={role} fullName={fullName} />
         </div>
       </header>

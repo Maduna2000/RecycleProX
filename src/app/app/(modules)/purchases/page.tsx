@@ -13,6 +13,7 @@ import { Dialog } from '@/components/ui/dialog'
 import { format } from '@/lib/utils/format'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
 import { fetcher } from '@/lib/swrFetcher'
+import { canAutoPrint, autoPrintReceipt } from '@/lib/print/autoPrintClient'
 import {
   inp, lbl, Btn, Field, PortalPage, FilterBar,
   RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter,
@@ -175,6 +176,19 @@ export default function PurchasesPage() {
       label:   'Print Slip',
       icon:    Printer,
       onClick: (row) => window.open(`/api/purchases/${row.id}/receipt?format=pdf`, '_blank'),
+    },
+    {
+      label:   'Reprint to Printer',
+      icon:    Printer,
+      // Only where a receipt printer could plausibly be attached (Electron
+      // or a local-server install) — same gate autoPrintReceipt itself
+      // relies on elsewhere. Never opens the cash drawer for a reprint.
+      hidden:  () => !canAutoPrint(),
+      onClick: (row) => {
+        autoPrintReceipt({ type: 'purchase', id: row.id }, { openDrawer: false })
+          .then(() => toast.success(`Reprinted ${row.refNumber}`))
+          .catch((err) => toast.error(err instanceof Error ? err.message : 'Reprint failed'))
+      },
     },
     {
       label:   'Purchase Note',

@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import { toast } from 'sonner'
 import { useOnlineStatus } from '@/hooks/useOnlineStatus'
+import { usePrinterStatus } from '@/hooks/usePrinterStatus'
 import { useOfflineStore } from '@/stores/offlineStore'
 import { runSeeder } from '@/lib/offline/seeder'
 import { registerSyncCallbacks } from '@/lib/offline/sync'
@@ -11,6 +12,7 @@ import { resetStuckSyncingOrders } from '@/lib/offline/scaleOrderService'
 export function OfflineProvider({ children }: { children: React.ReactNode }) {
   const { setPendingCount, setSyncing } = useOfflineStore()
   useOnlineStatus()
+  usePrinterStatus()
 
   useEffect(() => {
     // Register callbacks the sync engine needs to update UI state + show toasts

@@ -106,6 +106,11 @@ function printAddressLines(printer: ThermalPrinter, address?: string) {
   }
 }
 
+function statusLabelFor(status: 'completed' | 'pending' | 'voided'): string {
+  if (status === 'voided') return 'VOID'
+  return status === 'completed' ? 'PAID' : 'UNPAID'
+}
+
 function addHeader(printer: ThermalPrinter, refNumber: string, date: Date, info: CompanyInfo, provisional?: boolean, statusLabel = 'PAID') {
   printer.alignCenter()
   printer.bold(true)
@@ -239,7 +244,7 @@ export async function buildPurchaseReceipt(data: PurchaseReceiptData): Promise<B
     lineCharacter: '-',
   })
 
-  addHeader(printer, data.refNumber, data.createdAt, data, data.provisional, data.status === 'completed' ? 'PAID' : 'UNPAID')
+  addHeader(printer, data.refNumber, data.createdAt, data, data.provisional, statusLabelFor(data.status))
   addPeopleLines(printer, data.cashierName, data.scaleOperatorName)
   addPartyLines(printer, 'Cust', data.customerCode, data.customerName, data.customerVatNumber)
   if (data.customerIdNo) printer.println(`ID: ${data.customerIdNo}`)
@@ -271,7 +276,7 @@ export async function buildSaleReceipt(data: SaleReceiptData): Promise<Buffer> {
     lineCharacter: '-',
   })
 
-  addHeader(printer, data.refNumber, data.createdAt, data, data.provisional, data.status === 'completed' ? 'PAID' : 'UNPAID')
+  addHeader(printer, data.refNumber, data.createdAt, data, data.provisional, statusLabelFor(data.status))
   addPeopleLines(printer, data.cashierName)
   addPartyLines(printer, 'Buyer', data.buyerCode, data.buyerName ?? 'Walk-in Customer', data.buyerVatNumber)
   if (data.buyerIdNumber) printer.println(`ID: ${data.buyerIdNumber}`)

@@ -26,10 +26,15 @@ type PrintSlipPayload =
   | { type: 'purchase' | 'sale'; id: string }
   | { type: 'purchase' | 'sale'; data: Record<string, unknown> }
 
-export async function autoPrintReceipt(payload: PrintSlipPayload): Promise<void> {
+// openDrawer defaults to true for the original post-transaction print — a
+// reprint from history (a past, already-settled record) must pass
+// { openDrawer: false } so re-printing a slip doesn't pop the till open.
+export async function autoPrintReceipt(payload: PrintSlipPayload, opts?: { openDrawer?: boolean }): Promise<void> {
+  const openDrawer = opts?.openDrawer ?? true
+
   if (window.electronAPI?.isElectron) {
     await window.electronAPI.printSlip(payload)
-    await window.electronAPI.openCashDrawer()
+    if (openDrawer) await window.electronAPI.openCashDrawer()
     return
   }
 
@@ -42,5 +47,5 @@ export async function autoPrintReceipt(payload: PrintSlipPayload): Promise<void>
     const body = await res.json().catch(() => ({}))
     throw new Error(body.error ?? 'Print failed')
   }
-  await fetch('/api/print/cash-drawer', { method: 'POST' })
+  if (openDrawer) await fetch('/api/print/cash-drawer', { method: 'POST' })
 }

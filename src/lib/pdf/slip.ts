@@ -438,6 +438,11 @@ export async function generateTransactionSlip(data: TransactionSlipData): Promis
 // existing layout; only purchases move to this format.
 // ─────────────────────────────────────────────────────────────────────────────
 
+function statusBannerLabel(status: 'completed' | 'pending' | 'voided'): string {
+  if (status === 'voided') return 'VOID'
+  return status === 'completed' ? 'PAID' : 'UNPAID'
+}
+
 export interface PurchaseSlipLine {
   productCode?: string
   productName:  string
@@ -622,7 +627,7 @@ export async function generatePurchaseReceiptPdf(data: PurchaseSlipData): Promis
   const nextLine = (size = NORMAL, gap = 2) => { cursor -= (size + gap) }
 
   // ── Header ─────────────────────────────────────────────────────────────
-  center(page, data.status === 'completed' ? 'PAID' : 'UNPAID', cursor, NORMAL, bold, BLACK)
+  center(page, statusBannerLabel(data.status), cursor, NORMAL, bold, BLACK)
   nextLine(NORMAL, 2)
   center(page, (data.companyName || 'Golden Key Investments (Pty) Ltd').toUpperCase(), cursor, NORMAL, bold, BLACK)
   nextLine(NORMAL, 2)
@@ -871,7 +876,7 @@ export async function generateSaleReceiptPdf(data: SaleSlipData): Promise<Uint8A
   const nextLine = (size = NORMAL, gap = 2) => { cursor -= (size + gap) }
 
   // ── Header ─────────────────────────────────────────────────────────────
-  center(page, data.status === 'completed' ? 'PAID' : 'UNPAID', cursor, NORMAL, bold, BLACK)
+  center(page, statusBannerLabel(data.status), cursor, NORMAL, bold, BLACK)
   nextLine(NORMAL, 2)
   center(page, (data.companyName || 'Golden Key Investments (Pty) Ltd').toUpperCase(), cursor, NORMAL, bold, BLACK)
   nextLine(NORMAL, 2)

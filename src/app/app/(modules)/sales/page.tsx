@@ -13,6 +13,7 @@ import { Dialog } from '@/components/ui/dialog'
 import { format } from '@/lib/utils/format'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
 import { fetcher } from '@/lib/swrFetcher'
+import { canAutoPrint, autoPrintReceipt } from '@/lib/print/autoPrintClient'
 import {
   inp, lbl, Btn, Field, PortalPage, FilterBar,
   RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter,
@@ -181,6 +182,16 @@ export default function SalesPage() {
       label:   'Print Receipt',
       icon:    Printer,
       onClick: (row) => window.open(`/api/sales/${row.id}/receipt?format=pdf`, '_blank'),
+    },
+    {
+      label:   'Reprint to Printer',
+      icon:    Printer,
+      hidden:  () => !canAutoPrint(),
+      onClick: (row) => {
+        autoPrintReceipt({ type: 'sale', id: row.id }, { openDrawer: false })
+          .then(() => toast.success(`Reprinted ${row.refNumber}`))
+          .catch((err) => toast.error(err instanceof Error ? err.message : 'Reprint failed'))
+      },
     },
     {
       label:   'Sale Note',
