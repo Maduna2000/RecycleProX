@@ -235,8 +235,12 @@ function addFooter(printer: ThermalPrinter, slipNo: string | number | undefined,
     printer.alignCenter()
     printer.println('Signature')
     printer.alignLeft()
+    // No closing drawLine() here — the signature's own underscored line
+    // already reads as the slip's bottom edge; a second rule right under
+    // "Signature" looked like it was bracketed by two lines instead of one.
+  } else {
+    printer.drawLine()
   }
-  printer.drawLine()
   printer.cut()
 }
 
