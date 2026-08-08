@@ -78,6 +78,7 @@ export default function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>()
   const { data: session } = useSession()
   const isAdmin = session?.user?.role === 'admin'
+  const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
   const [tab, setTab] = useState<string>('Personal')
   const [isEditing, setIsEditing] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -110,6 +111,7 @@ export default function CustomerDetailPage() {
   const { register, handleSubmit, setValue, watch, reset, formState: { errors } } = useForm<UpdateCustomerFormInput, unknown, UpdateCustomerInput>({
     resolver: zodResolver(UpdateCustomerSchema),
     values: customer ? {
+      idNumber: customer.idNumber,
       firstName: customer.firstName, lastName: customer.lastName,
       phone: customer.phone, email: customer.email ?? '',
       physicalAddress: customer.physicalAddress ?? '', postalAddress: customer.postalAddress ?? '',
@@ -248,9 +250,16 @@ export default function CustomerDetailPage() {
                   {errors.lastName && <span style={{ fontSize: 10, color: '#DC2626' }}>{errors.lastName.message}</span>}
                 </div>
                 <div>
-                  <span style={lbl}>ID Number</span>
-                  <input value={customer.idNumber} disabled style={inpDisabled} />
-                  <span style={{ fontSize: 10, color: colors.textMuted }}>Cannot be changed once a record exists</span>
+                  <span style={lbl}>ID Number{!isManager ? ' (manager only)' : ''}</span>
+                  <input
+                    {...register('idNumber')}
+                    disabled={!isEditing || saving || !isManager}
+                    style={{ ...(isEditing && isManager ? inp : inpDisabled), fontFamily: 'monospace' }}
+                  />
+                  {errors.idNumber && <span style={{ fontSize: 10, color: '#DC2626' }}>{errors.idNumber.message}</span>}
+                  {isEditing && isManager && (
+                    <span style={{ fontSize: 10, color: colors.textMuted }}>Only change this to correct a data-entry mistake — it must stay the customer&apos;s real ID.</span>
+                  )}
                 </div>
                 <div>
                   <span style={lbl}>Date of Birth</span>

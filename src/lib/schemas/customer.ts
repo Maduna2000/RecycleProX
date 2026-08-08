@@ -118,6 +118,13 @@ export const BlacklistSchema = z.object({
 })
 
 export const UpdateCustomerSchema = CreateCustomerSchema.partial().omit({ idNumber: true }).extend({
+  // Editable, but manager/admin only (see updateCustomer) — correcting a
+  // data-entry typo is legitimate. Re-declared as optional rather than
+  // reusing the base schema's .default()-bearing field directly, per the
+  // same .partial()+.default() landmine noted on zeroRated/primaryFunction
+  // below — idNumberSchema itself carries no default, but matching the
+  // pattern here keeps this file consistent and safe against future edits.
+  idNumber:       idNumberSchema.optional(),
   idPhotoR2Key:   z.string().nullable().optional(),
   isActive:       z.boolean().optional(),
   dealerCategory: z.enum(['casual', 'dealer_1', 'dealer_2', 'dealer_3']).nullable().optional(),

@@ -16,10 +16,6 @@ export class DuplicateCustomerError extends Error {
   }
 }
 
-export class ImmutableFieldError extends Error {
-  constructor() { super('ID number cannot be changed'); this.name = 'ImmutableFieldError' }
-}
-
 export class ForbiddenError extends Error {
   constructor(msg = 'Forbidden') { super(msg); this.name = 'ForbiddenError' }
 }
@@ -160,14 +156,28 @@ export async function quickCreate(data: QuickCreateInput, userId: string) {
 }
 
 export async function updateCustomer(id: string, data: UpdateCustomerInput, userId: string, userRole?: string) {
+  const tenantId = requireTenantId()
   const current = await prisma.customer.findUniqueOrThrow({
     where: { id },
-    select: { customerType: true, dealerCategory: true, accountCode: true, lastName: true, phone: true },
+    select: { customerType: true, dealerCategory: true, accountCode: true, lastName: true, phone: true, idNumber: true },
   })
 
   if (data.phone !== undefined && data.phone !== current.phone && !data.confirmDifferentPerson) {
-    const conflicts = await findPhoneConflicts(requireTenantId(), data.phone, id)
+    const conflicts = await findPhoneConflicts(tenantId, data.phone, id)
     if (conflicts.length > 0) throw new PhoneNumberConflictError(conflicts)
+  }
+
+  // Correcting a mistyped ID number is a legitimate operational need, but
+  // restricted to manager/admin — same gate as blacklist/unblacklist —
+  // since the ID number is what a blacklist flag is anchored to and a
+  // front-line edit could otherwise be used to launder a flagged identity
+  // onto a clean-looking record.
+  if (data.idNumber !== undefined && data.idNumber !== current.idNumber) {
+    if (!userRole || !['manager', 'admin'].includes(userRole)) {
+      throw new ForbiddenError('Only managers and admins can change a customer\'s ID number')
+    }
+    const conflict = await prisma.customer.findUnique({ where: { tenantId_idNumber: { tenantId, idNumber: data.idNumber } } })
+    if (conflict && conflict.id !== id) throw new DuplicateCustomerError(conflict.id)
   }
 
   const isPromotion = data.customerType === 'account' && current.customerType === 'casual'
@@ -339,7 +349,12 @@ export class CustomerHasRecordsError extends Error {
 }
 
 export async function deleteCustomer(id: string, userId: string) {
-  // Check for related records that would prevent deletion
+  // Check for related records that would prevent deletion. Covers every
+  // FK relation Customer has (schema.prisma) — businessLoans/
+  // businessLoanRepayments/gateEntries were missing here previously, which
+  // let a customer with only those pass this check and hit Postgres's raw
+  // FK constraint on the delete below instead of this deliberate,
+  // informative error.
   const [
     purchaseCount,
     saleCount,
@@ -348,6 +363,9 @@ export async function deleteCustomer(id: string, userId: string) {
     loanRepaymentCount,
     transactionPaymentCount,
     scaleOrderCount,
+    businessLoanCount,
+    businessLoanRepaymentCount,
+    gateEntryCount,
   ] = await Promise.all([
     prisma.purchase.count({ where: { customerId: id } }),
     prisma.sale.count({ where: { customerId: id } }),
@@ -356,6 +374,9 @@ export async function deleteCustomer(id: string, userId: string) {
     prisma.loanRepayment.count({ where: { customerId: id } }),
     prisma.transactionPayment.count({ where: { customerId: id } }),
     prisma.scaleOrder.count({ where: { customerId: id } }),
+    prisma.businessLoan.count({ where: { customerId: id } }),
+    prisma.businessLoanRepayment.count({ where: { customerId: id } }),
+    prisma.gateEntry.count({ where: { customerId: id } }),
   ])
 
   const relatedRecords: { type: string; count: number }[] = []
@@ -366,6 +387,9 @@ export async function deleteCustomer(id: string, userId: string) {
   if (loanRepaymentCount > 0) relatedRecords.push({ type: 'loan repayments', count: loanRepaymentCount })
   if (transactionPaymentCount > 0) relatedRecords.push({ type: 'transaction payments', count: transactionPaymentCount })
   if (scaleOrderCount > 0) relatedRecords.push({ type: 'scale orders', count: scaleOrderCount })
+  if (businessLoanCount > 0) relatedRecords.push({ type: 'business loans', count: businessLoanCount })
+  if (businessLoanRepaymentCount > 0) relatedRecords.push({ type: 'business loan repayments', count: businessLoanRepaymentCount })
+  if (gateEntryCount > 0) relatedRecords.push({ type: 'gate entries', count: gateEntryCount })
 
   if (relatedRecords.length > 0) {
     throw new CustomerHasRecordsError(relatedRecords)

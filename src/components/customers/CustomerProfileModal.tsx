@@ -601,6 +601,7 @@ function EditCustomerModal({ customer, onClose, onSuccess }: {
 }) {
   const { data: session } = useSession()
   const isAdmin = session?.user?.role === 'admin'
+  const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
   const [loading, setLoading] = useState(false)
   const [editTab, setEditTab] = useState<typeof EDIT_TABS[number]>('Personal')
   const { data: pgData } = useSWR<{ groups: { id: string; name: string; isActive: boolean }[] }>('/api/price-groups', fetcher)
@@ -625,6 +626,7 @@ function EditCustomerModal({ customer, onClose, onSuccess }: {
   const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<UpdateCustomerFormInput, unknown, UpdateCustomerInput>({
     resolver: zodResolver(UpdateCustomerSchema),
     defaultValues: {
+      idNumber:         customer.idNumber,
       firstName:        customer.firstName,
       lastName:         customer.lastName,
       phone:            customer.phone,
@@ -707,6 +709,15 @@ function EditCustomerModal({ customer, onClose, onSuccess }: {
                   <Input {...register('lastName')} className="mt-1" disabled={loading} />
                   {errors.lastName && <p className="text-xs text-red-600 mt-1">{errors.lastName.message}</p>}
                 </div>
+              </div>
+
+              <div>
+                <Label>ID Number{!isManager ? ' (manager only)' : ''}</Label>
+                <Input {...register('idNumber')} className="mt-1 font-mono" disabled={loading || !isManager} />
+                {errors.idNumber && <p className="text-xs text-red-600 mt-1">{errors.idNumber.message}</p>}
+                {isManager && (
+                  <p className="text-[11px] text-gray-400 mt-1">Only change this to correct a data-entry mistake — it must stay the customer&apos;s real ID.</p>
+                )}
               </div>
 
               {/* Only show these fields for account customers */}

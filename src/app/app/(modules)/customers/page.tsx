@@ -111,6 +111,7 @@ function AccountsList() {
   const [blacklistId,     setBlacklistId]     = useState<string | null>(null)
   const [deleteId,        setDeleteId]        = useState<string | null>(null)
   const [deleteLoading,   setDeleteLoading]   = useState(false)
+  const [deleteBlocked,   setDeleteBlocked]   = useState<{ type: string; count: number }[] | null>(null)
   const [convertId,       setConvertId]       = useState<string | null>(null)
   const [convertLoading,  setConvertLoading]  = useState(false)
 
@@ -167,8 +168,27 @@ function AccountsList() {
     setDeleteLoading(true)
     const res = await fetch(`/api/customers/${id}`, { method: 'DELETE' })
     setDeleteLoading(false)
-    if (res.ok) { toast.success('Customer deleted'); setDeleteId(null); refreshList() }
-    else { const j = await res.json(); toast.error(j.error ?? 'Failed to delete customer') }
+    if (res.ok) { toast.success('Customer deleted'); setDeleteId(null); setDeleteBlocked(null); refreshList() }
+    else {
+      const j = await res.json()
+      if (res.status === 409 && Array.isArray(j.relatedRecords)) {
+        // Has real transaction history — deletion would either fail on a
+        // raw FK constraint or, if ever allowed, destroy financial/Police
+        // Register audit trail. Suspend achieves what's actually needed
+        // (hidden from active use, can't transact) without losing history.
+        setDeleteBlocked(j.relatedRecords)
+      } else {
+        toast.error(j.error ?? 'Failed to delete customer')
+      }
+    }
+  }
+
+  async function handleSuspendFromDeleteDialog(c: Customer) {
+    setDeleteLoading(true)
+    await handleSuspend(c)
+    setDeleteLoading(false)
+    setDeleteId(null)
+    setDeleteBlocked(null)
   }
 
   const blacklistTarget = customers.find((c) => c.id === blacklistId)
@@ -342,7 +362,7 @@ function AccountsList() {
       icon: Trash2,
       danger: true,
       hidden: () => !isManager,
-      onClick: (r) => setDeleteId(r.id),
+      onClick: (r) => { setDeleteId(r.id); setDeleteBlocked(null) },
     },
   ]
 
@@ -440,19 +460,37 @@ function AccountsList() {
 
       {/* Delete confirm */}
       {deleteId && deleteTarget && (
-        <Dialog open onOpenChange={(o) => { if (!o) setDeleteId(null) }}>
+        <Dialog open onOpenChange={(o) => { if (!o) { setDeleteId(null); setDeleteBlocked(null) } }}>
           <RpxDialogContent maxWidth={440}>
-            <RpxDialogHeader title="Delete Customer" onClose={() => setDeleteId(null)} />
+            <RpxDialogHeader title="Delete Customer" onClose={() => { setDeleteId(null); setDeleteBlocked(null) }} />
             <RpxDialogBody>
-              <p style={{ fontSize: 12.5, color: colors.textSecondary, margin: 0 }}>
-                Permanently delete <strong style={{ color: colors.textPrimary }}>{deleteTarget.firstName} {deleteTarget.lastName}</strong>? This cannot be undone.
-              </p>
+              {deleteBlocked ? (
+                <div className="space-y-2.5">
+                  <p style={{ fontSize: 12.5, color: colors.textSecondary, margin: 0 }}>
+                    <strong style={{ color: colors.textPrimary }}>{deleteTarget.firstName} {deleteTarget.lastName}</strong> can&apos;t be deleted — they have existing records:{' '}
+                    {deleteBlocked.map((r) => `${r.count} ${r.type}`).join(', ')}. Deleting these would erase financial and Police Register history.
+                  </p>
+                  <p style={{ fontSize: 12.5, color: colors.textSecondary, margin: 0 }}>
+                    Suspend this account instead — it&apos;ll disappear from active use and can&apos;t be used for new transactions, but its history stays intact.
+                  </p>
+                </div>
+              ) : (
+                <p style={{ fontSize: 12.5, color: colors.textSecondary, margin: 0 }}>
+                  Permanently delete <strong style={{ color: colors.textPrimary }}>{deleteTarget.firstName} {deleteTarget.lastName}</strong>? This cannot be undone.
+                </p>
+              )}
             </RpxDialogBody>
             <RpxDialogFooter>
-              <Btn onClick={() => setDeleteId(null)} disabled={deleteLoading}>Cancel</Btn>
-              <Btn variant="danger" loading={deleteLoading} onClick={() => handleDelete(deleteId)}>
-                Delete
-              </Btn>
+              <Btn onClick={() => { setDeleteId(null); setDeleteBlocked(null) }} disabled={deleteLoading}>Cancel</Btn>
+              {deleteBlocked ? (
+                <Btn variant="primary" loading={deleteLoading} onClick={() => handleSuspendFromDeleteDialog(deleteTarget)}>
+                  Suspend Instead
+                </Btn>
+              ) : (
+                <Btn variant="danger" loading={deleteLoading} onClick={() => handleDelete(deleteId)}>
+                  Delete
+                </Btn>
+              )}
             </RpxDialogFooter>
           </RpxDialogContent>
         </Dialog>
