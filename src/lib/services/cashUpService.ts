@@ -75,20 +75,28 @@ export async function openCashUp(openedByUserId: string, sessionDateStr?: string
   }
 
   // Opening balance = PREVIOUS session's closing balance (the carry-forward).
-  // Priority:
-  //   1. Float closingAmount (set after cashup approval)
-  //   2. Previous cashup's declaredCash (submitted but not approved)
-  //   3. Calculate from previous cashup's transactions (open, not submitted)
-  //   4. Float openingAmount (bootstrap, no prior cashup)
+  // Priority — gated on prevCashUp's status FIRST, not on the float row,
+  // because CashFloat.closingAmount only ever reflects whichever session was
+  // last APPROVED. It has no idea a later session has since been submitted
+  // with a fresher declared amount but is still awaiting manager approval —
+  // trusting it unconditionally before checking prevCashUp's own status let
+  // a stale approved closing win over a newer, larger, just-submitted
+  // declaredCash (confirmed live: a submitted-not-yet-approved R32,415.76
+  // session was followed by a new session opening with a days-old approved
+  // R2,415.76 float closing instead). See also commit ca527fd, which fixed
+  // the opposite-direction version of this same class of bug.
+  //   1. Previous cashup's declaredCash (submitted but not approved) — the
+  //      true latest cash position; the float row hasn't caught up yet.
+  //   2. Calculate from previous cashup's transactions (open, not submitted)
+  //   3. Float closingAmount (set after cashup approval) — trustworthy once
+  //      we know no newer unapproved session supersedes it.
+  //   4. Previous cashup's declaredCash (approved, float write missing)
+  //   5. Float openingAmount (bootstrap, no prior cashup)
   const prevFloat = await getMostRecentFloatAsOf(sessionDate)
 
   let openingBalance: Decimal
 
-  if (prevFloat?.closingAmount) {
-    // Best case: previous session was approved and float closing was recorded
-    openingBalance = new Decimal(prevFloat.closingAmount.toString())
-    logger.info({ prevDate: prevFloat.floatDate, amount: openingBalance.toFixed(2) }, 'CashUp: using previous closing as opening balance')
-  } else if (prevCashUp?.declaredCash && prevCashUp.status === 'submitted') {
+  if (prevCashUp?.declaredCash && prevCashUp.status === 'submitted') {
     // Previous session was submitted but not approved — use declaredCash
     openingBalance = new Decimal(prevCashUp.declaredCash.toString())
     logger.info(
@@ -113,6 +121,11 @@ export async function openCashUp(openedByUserId: string, sessionDateStr?: string
       { prevDate: prevCashUp.sessionDate, calcClosing: calcClosing.toFixed(2) },
       'CashUp: previous session still open — carrying forward calculated expected balance'
     )
+  } else if (prevFloat?.closingAmount) {
+    // No newer unapproved session to supersede it — previous session was
+    // approved and float closing was recorded
+    openingBalance = new Decimal(prevFloat.closingAmount.toString())
+    logger.info({ prevDate: prevFloat.floatDate, amount: openingBalance.toFixed(2) }, 'CashUp: using previous closing as opening balance')
   } else if (prevCashUp?.declaredCash) {
     // Previous session approved but float closing not found — use declaredCash
     openingBalance = new Decimal(prevCashUp.declaredCash.toString())
@@ -201,14 +214,16 @@ export async function previewOpeningBalance(sessionDateStr?: string): Promise<Op
   })
   const prevFloat = await getMostRecentFloatAsOf(sessionDate)
 
-  if (prevFloat?.closingAmount) {
-    return { canOpen: true, safeOpeningBalance: new Decimal(prevFloat.closingAmount.toString()).toFixed(2) }
-  }
+  // Mirrors openCashUp's own tier order — see the comment there for why
+  // prevCashUp's status must be checked before trusting the float row.
   if (prevCashUp?.declaredCash && prevCashUp.status === 'submitted') {
     return { canOpen: true, safeOpeningBalance: new Decimal(prevCashUp.declaredCash.toString()).toFixed(2) }
   }
   if (prevCashUp && prevCashUp.status === 'open') {
     return { canOpen: true, reason: 'Opening balance depends on live totals from the still-open previous session' }
+  }
+  if (prevFloat?.closingAmount) {
+    return { canOpen: true, safeOpeningBalance: new Decimal(prevFloat.closingAmount.toString()).toFixed(2) }
   }
   if (prevCashUp?.declaredCash) {
     return { canOpen: true, safeOpeningBalance: new Decimal(prevCashUp.declaredCash.toString()).toFixed(2) }
