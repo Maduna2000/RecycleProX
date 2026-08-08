@@ -610,8 +610,8 @@ function estimatePurchaseHeight(data: PurchaseSlipData, footerLineCount: number)
   h += LINE_H                                     // blank before footer
   h += footerLineCount * LINE_H
   h += LINE_H * 2                                  // blank space to sign
-  h += 10                                          // signature line
-  h += LINE_H                                      // "Signature" label
+  h += LINE_H                                      // gap below the signature line, then the "Signature" label
+  h += LINE_H                                      // "Signature" label's own line height
   h += 10                                          // final divider
   h += 16                                          // bottom margin
   return Math.max(h, 300)
@@ -768,9 +768,12 @@ export async function generatePurchaseReceiptPdf(data: PurchaseSlipData): Promis
   // ── Signature ──────────────────────────────────────────────────────────
   // Same rule style and blank-space-above-the-line layout as the thermal
   // printout's addFooter(..., includeSignature=true) — purchases only.
+  // The gap below the line must clear the label text's own cap-height
+  // (roughly 0.7 × SMALL for Helvetica) or its ascenders poke back up
+  // through the rule instead of sitting cleanly underneath it.
   cursor -= LINE_H * 2
   solidLine(page, cursor)
-  cursor -= 3
+  cursor -= LINE_H
   center(page, 'Signature', cursor, SMALL, reg, GRAY)
   nextLine(SMALL, 2)
 
