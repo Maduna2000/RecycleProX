@@ -228,7 +228,10 @@ function addFooter(printer: ThermalPrinter, slipNo: string | number | undefined,
   if (includeSignature) {
     printer.newLine()
     printer.newLine()               // blank space to actually pen a signature
-    printer.drawLine()               // same rule style used for every other divider on this slip
+    // An underscored blank line, not drawLine()'s solid rule — that rule is
+    // already used for every section divider on this slip, so reusing it
+    // here read as just another divider rather than somewhere to sign.
+    printer.println('_'.repeat(printer.getWidth()))
     printer.alignCenter()
     printer.println('Signature')
     printer.alignLeft()

@@ -506,6 +506,16 @@ function solidLine(page: Page, y: number) {
   page.drawLine({ start: { x: PMARGIN, y }, end: { x: W - PMARGIN, y }, thickness: 0.75, color: GRAY })
 }
 
+// An underscored blank line — deliberately NOT solidLine()'s drawn rule,
+// which is already used for every section divider on this slip and reads
+// as just another divider rather than somewhere to actually sign. Mirrors
+// the thermal printout's '_'.repeat(printer.getWidth()) for the same reason.
+function signatureLine(page: Page, y: number, font: Font) {
+  const charW = font.widthOfTextAtSize('_', NORMAL)
+  const count = Math.floor(PBODY_W / charW)
+  page.drawText('_'.repeat(count), { x: PMARGIN, y, size: NORMAL, font, color: BLACK })
+}
+
 // A thermal printer's firmware wraps long text at the paper's character
 // width for free; pdf-lib draws exact pixel widths and does none of that —
 // the footer declaration needs manual word-wrapping to fit the same 80mm.
@@ -766,13 +776,13 @@ export async function generatePurchaseReceiptPdf(data: PurchaseSlipData): Promis
   }
 
   // ── Signature ──────────────────────────────────────────────────────────
-  // Same rule style and blank-space-above-the-line layout as the thermal
-  // printout's addFooter(..., includeSignature=true) — purchases only.
-  // The gap below the line must clear the label text's own cap-height
-  // (roughly 0.7 × SMALL for Helvetica) or its ascenders poke back up
-  // through the rule instead of sitting cleanly underneath it.
+  // Same blank-space-above-the-line layout as the thermal printout's
+  // addFooter(..., includeSignature=true) — purchases only. The gap below
+  // the line must clear the label text's own cap-height (roughly 0.7 ×
+  // SMALL for Helvetica) or its ascenders poke back up through the line
+  // instead of sitting cleanly underneath it.
   cursor -= LINE_H * 2
-  solidLine(page, cursor)
+  signatureLine(page, cursor, reg)
   cursor -= LINE_H
   center(page, 'Signature', cursor, SMALL, reg, GRAY)
   nextLine(SMALL, 2)
