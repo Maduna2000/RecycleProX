@@ -13,6 +13,15 @@ import { AuthShell } from '@/components/auth/AuthShell'
 const SCALE_ROLES = ['scale_operator', 'admin', 'manager']
 const ACCENT = colors.action
 
+// A cashier explicitly granted /app/scale (via the same per-user
+// allowedModules mechanism every other module uses) gets in too, alongside
+// the roles above that always have kiosk access.
+function hasScaleAccess(user: { role?: string | null; allowedModules?: string[] } | null | undefined): boolean {
+  if (!user) return false
+  if (user.role && SCALE_ROLES.includes(user.role)) return true
+  return (user.allowedModules ?? []).includes('/app/scale')
+}
+
 export default function ScaleLoginPage() {
   const router  = useRouter()
   const { data: session, status } = useSession()
@@ -22,8 +31,7 @@ export default function ScaleLoginPage() {
 
   // Already authenticated — skip straight to the wizard
   useEffect(() => {
-    if (status === 'authenticated' && session?.user?.role &&
-        SCALE_ROLES.includes(session.user.role)) {
+    if (status === 'authenticated' && hasScaleAccess(session?.user)) {
       router.replace('/scale')
     }
   }, [session, status, router])
@@ -55,7 +63,7 @@ export default function ScaleLoginPage() {
     }
 
     const sess = await getSession()
-    if (!sess?.user?.role || !SCALE_ROLES.includes(sess.user.role)) {
+    if (!hasScaleAccess(sess?.user)) {
       setLoading(false)
       setError('This account does not have Scale Station access')
       return

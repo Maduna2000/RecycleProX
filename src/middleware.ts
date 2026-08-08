@@ -191,11 +191,20 @@ export default auth(async (req: NextRequest & { auth: { user?: SessionUser } | n
     return next()
   }
 
-  // Scale station operator routes — restricted to scale_operator + admin + manager
+  // Scale station operator routes — restricted to scale_operator + admin + manager,
+  // plus any cashier explicitly granted /app/scale via the same per-user
+  // allowedModules mechanism every other module already uses. Note: the
+  // separate /app/scale REVIEW page inside the main shell (a different
+  // surface from this kiosk) is NOT in MODULE_KEYS below, so it's already
+  // reachable by any manager/cashier regardless of allowedModules — left
+  // that way deliberately rather than newly gating it, since at least one
+  // live cashier account has a restricted module list that doesn't include
+  // it and may already rely on that page being open.
   if (pathname.startsWith('/scale') && !pathname.startsWith('/scale/admin')) {
     if (!session) return NextResponse.redirect(new URL('/scale/login', req.url))
     const role = session.user?.role
-    if (!['scale_operator', 'admin', 'manager'].includes(role ?? '')) {
+    const grantedScaleAccess = (session.user?.allowedModules ?? []).includes('/app/scale')
+    if (!['scale_operator', 'admin', 'manager'].includes(role ?? '') && !grantedScaleAccess) {
       return NextResponse.redirect(new URL('/app/dashboard', req.url))
     }
     return next()
@@ -211,11 +220,15 @@ export default auth(async (req: NextRequest & { auth: { user?: SessionUser } | n
     return next()
   }
 
-  // Gate Security kiosk routes — restricted to security_guard + admin + manager
+  // Gate Security kiosk routes — restricted to security_guard + admin + manager,
+  // plus any cashier explicitly granted /app/gate (see the matching comment
+  // on the /scale block above — same mechanism, same caveat about the
+  // separate, deliberately-ungated /app/gate review page).
   if (pathname.startsWith('/gate')) {
     if (!session) return NextResponse.redirect(new URL('/gate/login', req.url))
     const role = session.user?.role
-    if (!['security_guard', 'admin', 'manager'].includes(role ?? '')) {
+    const grantedGateAccess = (session.user?.allowedModules ?? []).includes('/app/gate')
+    if (!['security_guard', 'admin', 'manager'].includes(role ?? '') && !grantedGateAccess) {
       return NextResponse.redirect(new URL('/app/dashboard', req.url))
     }
     return next()

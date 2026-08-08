@@ -29,6 +29,8 @@ const MODULE_OPTIONS = [
   { key: '/app/audit-log', label: 'Audit Log' },
   { key: '/app/photos', label: 'Photos' },
   { key: '/app/settings', label: 'Settings' },
+  { key: '/app/scale', label: 'Scale Station' },
+  { key: '/app/gate', label: 'Guard Station' },
 ]
 
 const EditSchema = z.object({

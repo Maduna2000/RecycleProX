@@ -13,6 +13,15 @@ import { AuthShell } from '@/components/auth/AuthShell'
 const GATE_ROLES = ['security_guard', 'admin', 'manager']
 const ACCENT = colors.process
 
+// A cashier explicitly granted /app/gate (via the same per-user
+// allowedModules mechanism every other module uses) gets in too, alongside
+// the roles above that always have kiosk access.
+function hasGateAccess(user: { role?: string | null; allowedModules?: string[] } | null | undefined): boolean {
+  if (!user) return false
+  if (user.role && GATE_ROLES.includes(user.role)) return true
+  return (user.allowedModules ?? []).includes('/app/gate')
+}
+
 export default function GateLoginPage() {
   const router  = useRouter()
   const { data: session, status } = useSession()
@@ -22,8 +31,7 @@ export default function GateLoginPage() {
 
   // Already authenticated — skip straight to the kiosk
   useEffect(() => {
-    if (status === 'authenticated' && session?.user?.role &&
-        GATE_ROLES.includes(session.user.role)) {
+    if (status === 'authenticated' && hasGateAccess(session?.user)) {
       router.replace('/gate')
     }
   }, [session, status, router])
@@ -55,7 +63,7 @@ export default function GateLoginPage() {
     }
 
     const sess = await getSession()
-    if (!sess?.user?.role || !GATE_ROLES.includes(sess.user.role)) {
+    if (!hasGateAccess(sess?.user)) {
       setLoading(false)
       setError('This account does not have Guard Station access')
       return

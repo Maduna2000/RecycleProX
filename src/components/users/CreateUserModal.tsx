@@ -26,7 +26,10 @@ const MODULE_OPTIONS = [
   { key: '/app/loans', label: 'Loans' },
   { key: '/app/police-register', label: 'Police Register' },
   { key: '/app/audit-log', label: 'Audit Log' },
+  { key: '/app/photos', label: 'Photos' },
   { key: '/app/settings', label: 'Settings' },
+  { key: '/app/scale', label: 'Scale Station' },
+  { key: '/app/gate', label: 'Guard Station' },
 ]
 
 export function CreateUserModal({ open, onClose, onSuccess }: { open: boolean; onClose: () => void; onSuccess: () => void }) {
