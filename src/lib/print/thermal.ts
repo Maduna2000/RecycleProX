@@ -217,7 +217,7 @@ function addSplitPayments(
   if (loanAmt.greaterThan(0))   printer.leftRight(loanLabel, `E ${loanAmt.toFixed(2)}${loanReference ? ` #${loanReference}` : ''}`)
 }
 
-function addFooter(printer: ThermalPrinter, slipNo: string | number | undefined, footerText: string | undefined) {
+function addFooter(printer: ThermalPrinter, slipNo: string | number | undefined, footerText: string | undefined, includeSignature = false) {
   if (slipNo !== undefined) {
     printer.newLine()
     printer.println(`Slip No. ${slipNo}`)
@@ -225,6 +225,14 @@ function addFooter(printer: ThermalPrinter, slipNo: string | number | undefined,
   printer.newLine()
   printer.alignLeft()
   if (footerText) printer.println(footerText)
+  if (includeSignature) {
+    printer.newLine()
+    printer.newLine()               // blank space to actually pen a signature
+    printer.drawLine()               // same rule style used for every other divider on this slip
+    printer.alignCenter()
+    printer.println('Signature')
+    printer.alignLeft()
+  }
   printer.drawLine()
   printer.cut()
 }
@@ -259,7 +267,7 @@ export async function buildPurchaseReceipt(data: PurchaseReceiptData): Promise<B
     printer.println('Payment Split:')
     printer.leftRight('Loans', `E ${new Decimal(data.loanDeduction.amount).toFixed(2)}${data.loanDeduction.reference ? ` #${data.loanDeduction.reference}` : ''}`)
   }
-  addFooter(printer, data.slipNo, data.footerText)
+  addFooter(printer, data.slipNo, data.footerText, true)
 
   return Buffer.from(printer.getBuffer())
 }

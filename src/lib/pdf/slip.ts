@@ -609,6 +609,9 @@ function estimatePurchaseHeight(data: PurchaseSlipData, footerLineCount: number)
   if (data.slipNo !== undefined) h += LINE_H * 2  // blank + Slip No.
   h += LINE_H                                     // blank before footer
   h += footerLineCount * LINE_H
+  h += LINE_H * 2                                  // blank space to sign
+  h += 10                                          // signature line
+  h += LINE_H                                      // "Signature" label
   h += 10                                          // final divider
   h += 16                                          // bottom margin
   return Math.max(h, 300)
@@ -761,6 +764,16 @@ export async function generatePurchaseReceiptPdf(data: PurchaseSlipData): Promis
     page.drawText(fLine, { x: PMARGIN, y: cursor, size: SMALL, font: reg, color: GRAY })
     nextLine(SMALL)
   }
+
+  // ── Signature ──────────────────────────────────────────────────────────
+  // Same rule style and blank-space-above-the-line layout as the thermal
+  // printout's addFooter(..., includeSignature=true) — purchases only.
+  cursor -= LINE_H * 2
+  solidLine(page, cursor)
+  cursor -= 3
+  center(page, 'Signature', cursor, SMALL, reg, GRAY)
+  nextLine(SMALL, 2)
+
   cursor -= 2
   solidLine(page, cursor)
 
