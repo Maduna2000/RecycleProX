@@ -29,6 +29,7 @@ export default async function ModulesLayout({ children }: { children: React.Reac
             <AppShell
               role={session.user.role}
               fullName={session.user.fullName ?? session.user.username ?? 'User'}
+              allowedModules={session.user.allowedModules}
             >
               <WindowedContent>
                 {children}

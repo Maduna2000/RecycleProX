@@ -581,11 +581,17 @@ function OnSiteIndicator() {
   )
 }
 
-function DashboardStatsBar({ fullName, role }: { fullName: string; role: string }) {
+function DashboardStatsBar({ fullName, role, allowedModules }: { fullName: string; role: string; allowedModules?: string[] }) {
   const { data: stats, isLoading } = useSWR<TodayStats>('/api/reports/today', statsFetcher, {
     refreshInterval: 30_000,
   })
   const isManager = ['admin', 'manager'].includes(role)
+  // A cashier explicitly granted /app/scale or /app/gate (the same
+  // per-user allowedModules mechanism every other module uses, now also
+  // wired into middleware.ts's /scale and /gate kiosk route checks) gets
+  // the launch popup too, alongside admin/manager who always have it.
+  const hasScaleAccess = isManager || (allowedModules ?? []).includes('/app/scale')
+  const hasGateAccess  = isManager || (allowedModules ?? []).includes('/app/gate')
 
   const cashUpLabel =
     stats?.cashUpStatus === 'approved'  ? 'Approved'  :
@@ -653,8 +659,8 @@ function DashboardStatsBar({ fullName, role }: { fullName: string; role: string 
       {/* Police + Scale + Gate popups — far right */}
       <div className="flex items-center gap-1.5">
         <PolicePopup role={role} />
-        {isManager && <ScalePopup />}
-        {isManager && <GatePopup />}
+        {hasScaleAccess && <ScalePopup />}
+        {hasGateAccess && <GatePopup />}
       </div>
     </>
   )
@@ -666,10 +672,12 @@ export function AppShell({
   children,
   role,
   fullName,
+  allowedModules,
 }: {
-  children:  React.ReactNode
-  role:      string
-  fullName:  string
+  children:       React.ReactNode
+  role:           string
+  fullName:       string
+  allowedModules?: string[]
 }) {
   const pathname    = usePathname()
   const router      = useRouter()
@@ -786,7 +794,7 @@ export function AppShell({
             }}
           >
             {toolbarBtns.map((btn, i) => <ToolbarBtn key={i} btn={btn} />)}
-            {showDashBar && <DashboardStatsBar fullName={fullName} role={role} />}
+            {showDashBar && <DashboardStatsBar fullName={fullName} role={role} allowedModules={allowedModules} />}
           </div>
         )
       })()}

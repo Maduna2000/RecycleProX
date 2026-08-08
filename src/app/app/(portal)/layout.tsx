@@ -31,6 +31,7 @@ export default async function PortalLayout({ children }: { children: React.React
           <AppShell
             role={session.user.role}
             fullName={session.user.fullName ?? session.user.username ?? 'User'}
+            allowedModules={session.user.allowedModules}
           >
             {children}
           </AppShell>
