@@ -284,10 +284,19 @@ export async function voidExpense(id: string, userId: string, reason: string) {
 // session was open at creation time) is always created inside that
 // session's own window by construction, so window-based createdAt
 // filtering alone is sufficient — no separate cashUpId branch needed.
+// Cash-only — this feeds the cash-drawer reconciliation formula in
+// calcSystemTotals/getLiveStats (cashExpected = ... - expensesTotal - ...),
+// same as every sibling bucket in that formula (cashSales, cashPurchases,
+// cashPayments), all of which are already payment-method-filtered. Without
+// this filter, an EFT/cheque/card expense (rent paid by bank transfer,
+// never touching the physical drawer) got deducted from cash on hand
+// exactly like a cash expense — confirmed live: a E25,000 EFT rent payment
+// collapsed a session's cash-on-hand figure by that same amount.
 export async function getExpenseTotalsForDate(window: DateWindow): Promise<Decimal> {
   const result = await prisma.expense.aggregate({
     where: {
       status: { in: ['pending', 'approved'] },
+      paymentMethod: 'cash',
       createdAt: { gte: window.start, lte: window.end },
     },
     _sum: { amount: true },
