@@ -56,12 +56,19 @@ export default function ChangePasswordPage() {
       setError(json.error ?? 'Failed to change password')
       return
     }
-    // The session JWT still carries forcePasswordChange from login time —
-    // without refreshing it here, middleware bounces /app/dashboard right
-    // back to this page until the user logs out and in again (the DB flag
-    // is already false; only the cookie is stale). The jwt callback in
-    // auth.config.ts honors exactly this one update.
-    await update({ forcePasswordChange: false })
+    // The API route above already reissues the session cookie with
+    // forcePasswordChange cleared, so the redirect below won't get bounced
+    // back here by middleware. This client-side update just keeps
+    // useSession()'s in-memory state in sync — best-effort only, wrapped so
+    // it can never strand the user on this page if it fails (it used to be
+    // the only fix for the stale cookie, and racing it against
+    // SessionProvider's own background refetches was exactly what caused
+    // "Update password" to silently do nothing).
+    try {
+      await update({ forcePasswordChange: false })
+    } catch {
+      // Cookie is already correct server-side either way.
+    }
     router.push('/app/dashboard')
     router.refresh()
   }
