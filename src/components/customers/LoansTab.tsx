@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import useSWR, { mutate } from 'swr'
-import { Loader2, Plus, Minus, Trash2, Printer } from 'lucide-react'
+import { Plus, Minus, Trash2, Printer } from 'lucide-react'
 import { toast } from 'sonner'
 import Decimal from 'decimal.js'
 import { Dialog } from '@/components/ui/dialog'
@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { DataTable, type Column } from '@/components/ui/DataTable'
 import { format } from '@/lib/utils/format'
 import { colors } from '@/lib/design-tokens'
 import { HEADER_GRAD, NAVY, lbl, Btn, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
@@ -71,6 +72,55 @@ function currentPeriod(): string {
 // Legacy sign convention this tab replicates: negative = the customer owes
 // the business money (matches the reference tool's "Amount Due: R -198.50").
 const moneyColor = (v: string) => (new Decimal(v).isNegative() ? '#D97706' : colors.action)
+
+const ledgerColumns: Column<LedgerRow>[] = [
+  {
+    key: 'description',
+    header: 'Description',
+    render: (row) => <span style={{ fontWeight: row.id === 'opening' ? 600 : 400 }}>{row.description}</span>,
+  },
+  {
+    key: 'date',
+    header: 'Loan Date',
+    width: '110px',
+    render: (row) => (
+      <span style={{ color: '#6C757D' }}>
+        {new Date(row.date).toLocaleDateString('en-ZA', { year: 'numeric', month: '2-digit', day: '2-digit' })}
+      </span>
+    ),
+  },
+  {
+    key: 'transaction',
+    header: 'Transaction',
+    width: '120px',
+    render: (row) => <span style={{ color: '#6C757D' }}>{row.transaction}</span>,
+  },
+  {
+    key: 'advance',
+    header: 'Advance',
+    width: '110px',
+    align: 'right',
+    render: (row) => <span style={{ fontFamily: 'monospace' }}>{format.currency(row.advance ?? '0')}</span>,
+  },
+  {
+    key: 'repayment',
+    header: 'Repayment',
+    width: '110px',
+    align: 'right',
+    render: (row) => <span style={{ fontFamily: 'monospace' }}>{format.currency(row.repayment ?? '0')}</span>,
+  },
+  {
+    key: 'balance',
+    header: 'Balance',
+    width: '120px',
+    align: 'right',
+    render: (row) => (
+      <span style={{ fontFamily: 'monospace', fontWeight: 600, color: moneyColor(row.balance) }}>
+        {format.currency(row.balance)}
+      </span>
+    ),
+  },
+]
 
 // ─── LoansTab ─────────────────────────────────────────────────────────────────
 
@@ -147,68 +197,16 @@ export function LoansTab({ customerId, customerName, userRole, userAllowedModule
       </div>
 
       {/* Ledger */}
-      {isLoading ? (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 0', color: '#9CA3AF', fontSize: 12, gap: 8 }}>
-          <Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} />
-          Loading...
-        </div>
-      ) : error ? (
-        <div style={{ padding: '40px 0', textAlign: 'center', color: colors.danger, fontSize: 12 }}>
-          {error instanceof Error ? error.message : 'Failed to load loan statement'}
-        </div>
-      ) : (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-            <thead>
-              <tr style={{ background: HEADER_GRAD, borderBottom: '1px solid #C0C0C0' }}>
-                {['Description', 'Loan Date', 'Transaction', 'Advance', 'Repayment', 'Balance'].map((h, i) => (
-                  <th
-                    key={h}
-                    style={{
-                      textAlign: i >= 3 ? 'right' : 'left',
-                      padding: '5px 10px',
-                      fontSize: 10,
-                      fontWeight: 700,
-                      textTransform: 'uppercase',
-                      color: '#6C757D',
-                      letterSpacing: '0.04em',
-                    }}
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {data?.rows.map((row, i) => (
-                <tr
-                  key={row.id}
-                  style={{
-                    borderBottom: '1px solid #F0F0F0',
-                    background: row.id === 'opening' ? '#F5F5F5' : i % 2 === 0 ? '#fff' : '#FAFAFA',
-                    fontWeight: row.id === 'opening' ? 600 : 400,
-                  }}
-                >
-                  <td style={{ padding: '5px 10px' }}>{row.description}</td>
-                  <td style={{ padding: '5px 10px', color: '#6C757D' }}>
-                    {new Date(row.date).toLocaleDateString('en-ZA', { year: 'numeric', month: '2-digit', day: '2-digit' })}
-                  </td>
-                  <td style={{ padding: '5px 10px', color: '#6C757D' }}>{row.transaction}</td>
-                  <td style={{ padding: '5px 10px', textAlign: 'right', fontFamily: 'monospace' }}>
-                    {format.currency(row.advance ?? '0')}
-                  </td>
-                  <td style={{ padding: '5px 10px', textAlign: 'right', fontFamily: 'monospace' }}>
-                    {format.currency(row.repayment ?? '0')}
-                  </td>
-                  <td style={{ padding: '5px 10px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, color: moneyColor(row.balance) }}>
-                    {format.currency(row.balance)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <div style={{ padding: 10 }}>
+        <DataTable
+          columns={ledgerColumns}
+          rows={data?.rows ?? []}
+          rowKey={(row) => row.id}
+          loading={isLoading}
+          error={error instanceof Error ? error.message : !!error}
+          emptyMessage="No loan activity for this period"
+        />
+      </div>
 
       {/* Footer — Amount Due */}
       <div
