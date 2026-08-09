@@ -201,6 +201,11 @@ export default function PurchasesPage() {
       onClick: (row) => window.open(`/api/purchases/${row.id}/vat264`, '_blank'),
     },
     {
+      label:   'Tax Invoice',
+      icon:    FileText,
+      onClick: (row) => window.open(`/api/purchases/${row.id}/tax-invoice`, '_blank'),
+    },
+    {
       label:   'Void Purchase',
       icon:    Ban,
       danger:  true,

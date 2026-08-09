@@ -199,6 +199,11 @@ export default function SalesPage() {
       onClick: (row) => window.open(`/api/sales/${row.id}/note`, '_blank'),
     },
     {
+      label:   'Tax Invoice',
+      icon:    FileText,
+      onClick: (row) => window.open(`/api/sales/${row.id}/tax-invoice`, '_blank'),
+    },
+    {
       label:   'Void Sale',
       icon:    Ban,
       danger:  true,

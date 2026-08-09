@@ -10,11 +10,18 @@ import { CURRENCY_SYMBOLS } from '@/lib/schemas/cashup'
 import { generateTransactionNote, type NoteLine } from '@/lib/pdf/transactionNote'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
-class SaleNotFoundForNoteError extends Error {}
+class SaleNotFoundForTaxInvoiceError extends Error {}
 
 /**
- * GET /api/sales/[id]/note?download=1
- * A4 Sale Note PDF — inline for viewing, ?download=1 for attachment.
+ * GET /api/sales/[id]/tax-invoice?download=1
+ *
+ * A4 Tax Invoice PDF for a sale — same layout engine as Sale Note
+ * (transactionNote.ts), with the mandatory VAT-invoice particulars a Sale
+ * Note doesn't carry: the words "TAX INVOICE", both parties' VAT
+ * registration numbers, and an explicit subtotal/VAT/total breakdown at the
+ * standard SACU-region rate Eswatini's VAT Act 2011 follows. The yard is
+ * the supplier here (the normal direction for a sale); the buyer is the
+ * recipient.
  */
 export async function GET(
   req: NextRequest,
@@ -35,7 +42,7 @@ export async function GET(
           lines: { include: { product: true } },
         },
       })
-      if (!sale) throw new SaleNotFoundForNoteError()
+      if (!sale) throw new SaleNotFoundForTaxInvoiceError()
 
       const [settings, doneByUser, latestCashUp] = await Promise.all([
         getAllSettings(),
@@ -90,11 +97,12 @@ export async function GET(
       : 'WALK-IN'
 
     const pdfBytes = await generateTransactionNote({
-      type: 'SALE NOTE',
+      type: 'TAX INVOICE',
       refNumber: sale.refNumber,
       date: sale.createdAt,
       status,
       currencySymbol,
+      vatRatePercent: settings['vatRate'] ?? '15',
       company: {
         name: settings['yardName'] ?? 'Renovo Pro',
         address: settings['yardAddress'] ?? '',
@@ -113,7 +121,6 @@ export async function GET(
       doneBy: doneByUser?.fullName ?? undefined,
       comments: sale.notes ?? undefined,
       voidReason: sale.voidReason ?? undefined,
-      declaration: settings['saleNoteDeclaration'] || undefined,
       lines,
       subTotal: grand.minus(vatAmount).toFixed(2),
       vatAmount: vatAmount.toFixed(2),
@@ -128,12 +135,12 @@ export async function GET(
     return new NextResponse(buffer, {
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `${download ? 'attachment' : 'inline'}; filename="sale-note-${sale.refNumber}.pdf"`,
+        'Content-Disposition': `${download ? 'attachment' : 'inline'}; filename="tax-invoice-${sale.refNumber}.pdf"`,
       },
     })
   } catch (err) {
-    if (err instanceof SaleNotFoundForNoteError) return NextResponse.json({ error: 'Sale not found' }, { status: 404 })
-    logger.error({ err, saleId: id }, 'GET /api/sales/[id]/note failed')
-    return NextResponse.json({ error: 'Failed to generate sale note' }, { status: 500 })
+    if (err instanceof SaleNotFoundForTaxInvoiceError) return NextResponse.json({ error: 'Sale not found' }, { status: 404 })
+    logger.error({ err, saleId: id }, 'GET /api/sales/[id]/tax-invoice failed')
+    return NextResponse.json({ error: 'Failed to generate tax invoice' }, { status: 500 })
   }
 }

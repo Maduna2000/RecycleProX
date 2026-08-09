@@ -27,11 +27,13 @@ export interface NoteLine {
 }
 
 export interface TransactionNoteData {
-  type: 'PURCHASE NOTE' | 'SALE NOTE'
+  type: 'PURCHASE NOTE' | 'SALE NOTE' | 'TAX INVOICE'
   refNumber: string
   date: Date
   status: string // PAID | UNPAID | PARTIAL | VOIDED
   currencySymbol: string
+  /** Only used by TAX INVOICE — shown in the VAT breakdown, e.g. "15". */
+  vatRatePercent?: string
 
   company: { name: string; address: string; phone?: string; vat?: string }
   /** Transparent PNG bytes from Settings, boxed top-left when present. */
@@ -156,6 +158,16 @@ export async function generateTransactionNote(data: TransactionNoteData): Promis
   })
   y -= 24
 
+  // ── Company VAT registration — required on a valid tax invoice (the
+  // words "TAX INVOICE" plus the supplier's VAT number are the two
+  // non-negotiable particulars). Scoped to TAX INVOICE only, deliberately —
+  // Purchase/Sale Note's existing printed layout stays unchanged rather than
+  // gaining a line nobody asked for on documents already in active use.
+  if (data.type === 'TAX INVOICE' && data.company.vat) {
+    page.drawText(`VAT Reg No: ${sanitize(data.company.vat)}`, { x: MARGIN, y, size: 8.5, font: reg, color: DARK })
+    y -= 14
+  }
+
   // ── Two-column info block ───────────────────────────────────────────────────
   const rightX = PAGE_W / 2 + 40
 
@@ -180,7 +192,10 @@ export async function generateTransactionNote(data: TransactionNoteData): Promis
     ['Transporter / Vehicle', data.vehicleReg],
     ['Weighbridge Ticket', data.wbTicketNumber],
   ]
-  const noteNoLabel = data.type === 'PURCHASE NOTE' ? 'PN Number' : 'SN Number'
+  const noteNoLabel =
+    data.type === 'PURCHASE NOTE' ? 'PN Number' :
+    data.type === 'SALE NOTE'     ? 'SN Number' :
+    'Tax Invoice No.'
   const right: [string, string | undefined][] = [
     [noteNoLabel, data.refNumber],
     ['Payment Method', data.splitPayments ? 'Split' : data.paymentMethod.toUpperCase()],
@@ -300,7 +315,9 @@ export async function generateTransactionNote(data: TransactionNoteData): Promis
     ? data.declaration.trim()
     : data.type === 'PURCHASE NOTE'
       ? `I hereby state that I am the lawful owner of the material listed above and have sold them to ${data.company.name} to dispose of as they see fit.`
-      : `Goods listed above sold and released to ${data.partyName}. Errors and omissions excepted.`
+      : data.type === 'TAX INVOICE'
+        ? 'This is a valid tax invoice for VAT purposes in terms of the Value-Added Tax Act, 2011.'
+        : `Goods listed above sold and released to ${data.partyName}. Errors and omissions excepted.`
 
   const declMaxW = COL_W - 230
   const declLines: string[] = []
@@ -319,8 +336,16 @@ export async function generateTransactionNote(data: TransactionNoteData): Promis
     page.drawText(line, { x: MARGIN, y: y - i * 10, size: 7.5, font: reg, color: DARK })
   })
 
-  // Totals stack, right-aligned
-  const totalsRows: [string, string, boolean][] = [['Total:', money(sym, data.grandTotal), true]]
+  // Totals stack, right-aligned. A tax invoice must show the supply value,
+  // VAT amount, and VAT rate explicitly — Purchase/Sale Note only ever
+  // showed the final Total, so this breakdown is added for TAX INVOICE only.
+  const totalsRows: [string, string, boolean][] = data.type === 'TAX INVOICE'
+    ? [
+        ['Subtotal (Excl. VAT):', money(sym, data.subTotal), false],
+        [`VAT (${data.vatRatePercent ?? '15'}%):`, money(sym, data.vatAmount), false],
+        ['Total (Incl. VAT):', money(sym, data.grandTotal), true],
+      ]
+    : [['Total:', money(sym, data.grandTotal), true]]
   if (data.loanDeduction && new Decimal(data.loanDeduction).greaterThan(0)) {
     totalsRows.push(['Loan Deduction:', `-${money(sym, data.loanDeduction)}`, false])
   }

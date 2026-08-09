@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import useSWR, { mutate } from 'swr'
 import { useSession } from 'next-auth/react'
-import { Search, Ban, X } from 'lucide-react'
+import { Search, Ban, X, FileText } from 'lucide-react'
 import Decimal from 'decimal.js'
 import { toast } from 'sonner'
 import { DataTable, Avatar, StatusBadge, type Column, type RowAction } from '@/components/ui/DataTable'
@@ -28,8 +28,8 @@ type Payment = {
   createdAt: string
   source: 'sale' | 'purchase'
   customer: { id: string; firstName: string; lastName: string; idNumber: string | null } | null
-  sale: { refNumber: string } | null
-  purchase: { refNumber: string } | null
+  sale: { id: string; refNumber: string } | null
+  purchase: { id: string; refNumber: string } | null
   // A sale paid in full at creation never has a separate Payment row — this
   // row is synthesized from the Sale itself, so there's no standalone
   // "payment" to void here; voiding has to go through the Sales module.
@@ -147,6 +147,18 @@ export default function PaymentsPage() {
   ]
 
   const paymentActions: RowAction<Payment>[] = [
+    {
+      label:   'Sale Note',
+      icon:    FileText,
+      hidden:  (r) => !r.sale,
+      onClick: (r) => window.open(`/api/sales/${r.sale!.id}/note`, '_blank'),
+    },
+    {
+      label:   'Tax Invoice',
+      icon:    FileText,
+      hidden:  (r) => !r.sale,
+      onClick: (r) => window.open(`/api/sales/${r.sale!.id}/tax-invoice`, '_blank'),
+    },
     {
       label:  'Void Payment',
       icon:   Ban,

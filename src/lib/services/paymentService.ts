@@ -196,8 +196,8 @@ export interface UnifiedPaymentRow {
   createdAt: Date
   source: 'sale' | 'purchase'
   customer: { id: string; firstName: string; lastName: string; idNumber: string | null } | null
-  sale: { refNumber: string } | null
-  purchase: { refNumber: string } | null
+  sale: { id: string; refNumber: string } | null
+  purchase: { id: string; refNumber: string } | null
   // True for a sale that was paid in full at creation and never went
   // through markSalePaid/processSaleSplitPayment — see the comment below on
   // why these need to be synthesized rather than read off the Payment table.
@@ -281,8 +281,8 @@ export async function listPayments(opts?: {
       where,
       include: {
         customer: { select: { id: true, firstName: true, lastName: true, idNumber: true } },
-        sale: { select: { refNumber: true } },
-        purchase: { select: { refNumber: true } },
+        sale: { select: { id: true, refNumber: true } },
+        purchase: { select: { id: true, refNumber: true } },
       },
       orderBy: { createdAt: 'desc' },
       take: fetchLimit,
@@ -315,7 +315,7 @@ export async function listPayments(opts?: {
     createdAt: s.createdAt,
     source: 'sale' as const,
     customer: s.customer ?? (s.buyerName ? { id: '', firstName: s.buyerName, lastName: '', idNumber: s.buyerIdNumber } : null),
-    sale: { refNumber: s.refNumber },
+    sale: { id: s.id, refNumber: s.refNumber },
     purchase: null,
     isDirectSale: true,
   }))
@@ -339,7 +339,7 @@ function payments_toUnified(rows: Array<{
   id: string; refNumber: string; amount: unknown; paymentMethod: string; notes: string | null
   voidedAt: Date | null; createdAt: Date; source: string
   customer: { id: string; firstName: string; lastName: string; idNumber: string | null } | null
-  sale: { refNumber: string } | null; purchase: { refNumber: string } | null
+  sale: { id: string; refNumber: string } | null; purchase: { id: string; refNumber: string } | null
 }>): UnifiedPaymentRow[] {
   return rows.map((p) => ({
     id: p.id,

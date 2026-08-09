@@ -10,11 +10,23 @@ import { CURRENCY_SYMBOLS } from '@/lib/schemas/cashup'
 import { generateTransactionNote, type NoteLine } from '@/lib/pdf/transactionNote'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
-class PurchaseNotFoundForNoteError extends Error {}
+class PurchaseNotFoundForTaxInvoiceError extends Error {}
 
 /**
- * GET /api/purchases/[id]/note?download=1
- * A4 Purchase Note PDF — inline for viewing, ?download=1 for attachment.
+ * GET /api/purchases/[id]/tax-invoice?download=1
+ *
+ * A4 Tax Invoice PDF for a purchase — same layout engine as Purchase Note
+ * (transactionNote.ts), with the mandatory VAT-invoice particulars a
+ * Purchase Note doesn't carry: the words "TAX INVOICE", both parties' VAT
+ * registration numbers, and an explicit subtotal/VAT/total breakdown at the
+ * standard SACU-region rate Eswatini's VAT Act 2011 follows. For a
+ * purchase, the customer is the supplier of the goods (same convention
+ * Purchase Note already uses — partyLabel: 'Supplier') and the yard is the
+ * recipient. This is distinct from VAT264 (Second-Hand Goods Declaration),
+ * which stays the correct compliance document for buying from a
+ * non-VAT-registered seller — this tax invoice is a standard-format
+ * record, useful when the seller IS VAT-registered or a conventional tax
+ * invoice is simply what's wanted for the file.
  */
 export async function GET(
   req: NextRequest,
@@ -35,7 +47,7 @@ export async function GET(
           lines: { include: { product: true } },
         },
       })
-      if (!purchase) throw new PurchaseNotFoundForNoteError()
+      if (!purchase) throw new PurchaseNotFoundForTaxInvoiceError()
 
       const [settings, doneByUser, latestCashUp] = await Promise.all([
         getAllSettings(),
@@ -85,11 +97,12 @@ export async function GET(
     const customer = purchase.customer
     const accountType = (customer.dealerCategory ?? customer.customerType).replace('_', ' ').toUpperCase()
     const pdfBytes = await generateTransactionNote({
-      type: 'PURCHASE NOTE',
+      type: 'TAX INVOICE',
       refNumber: purchase.refNumber,
       date: purchase.createdAt,
       status,
       currencySymbol,
+      vatRatePercent: settings['vatRate'] ?? '15',
       company: {
         name: settings['yardName'] ?? 'Renovo Pro',
         address: settings['yardAddress'] ?? '',
@@ -110,7 +123,6 @@ export async function GET(
       doneBy: doneByUser?.fullName ?? undefined,
       comments: purchase.notes ?? undefined,
       voidReason: purchase.voidReason ?? undefined,
-      declaration: settings['purchaseNoteDeclaration'] || undefined,
       lines,
       subTotal: header.subTotal.toFixed(2),
       vatAmount: header.vat.toFixed(2),
@@ -127,12 +139,12 @@ export async function GET(
     return new NextResponse(buffer, {
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `${download ? 'attachment' : 'inline'}; filename="purchase-note-${purchase.refNumber}.pdf"`,
+        'Content-Disposition': `${download ? 'attachment' : 'inline'}; filename="tax-invoice-${purchase.refNumber}.pdf"`,
       },
     })
   } catch (err) {
-    if (err instanceof PurchaseNotFoundForNoteError) return NextResponse.json({ error: 'Purchase not found' }, { status: 404 })
-    logger.error({ err, purchaseId: id }, 'GET /api/purchases/[id]/note failed')
-    return NextResponse.json({ error: 'Failed to generate purchase note' }, { status: 500 })
+    if (err instanceof PurchaseNotFoundForTaxInvoiceError) return NextResponse.json({ error: 'Purchase not found' }, { status: 404 })
+    logger.error({ err, purchaseId: id }, 'GET /api/purchases/[id]/tax-invoice failed')
+    return NextResponse.json({ error: 'Failed to generate tax invoice' }, { status: 500 })
   }
 }
