@@ -4,8 +4,9 @@ import logger from '@/lib/logger'
 import Decimal from 'decimal.js'
 import type { Prisma } from '@prisma/client'
 import type { CreateLoanInput, CreateRepaymentInput, VoidLoanInput } from '@/lib/schemas/loan'
-import { todaySASTDate, todaySASTDateStr } from '@/lib/utils/dayBounds'
+import { todaySASTDate, todaySASTDateStr, getRangeBoundsSAST, sastDateLabelToUTCDate } from '@/lib/utils/dayBounds'
 import type { DateWindow } from '@/lib/services/cashUpWindow'
+import type { CreateManualRepaymentInput } from '@/lib/schemas/loan'
 
 // ─── Typed Errors ─────────────────────────────────────────────────────────────
 
@@ -35,6 +36,29 @@ export class CustomerBlacklistedError extends Error {
 
 export class CustomerInactiveError extends Error {
   constructor() { super('Customer account is inactive'); this.name = 'CustomerInactiveError' }
+}
+
+export class NoActiveLoansError extends Error {
+  constructor() { super('Customer has no active loans to repay'); this.name = 'NoActiveLoansError' }
+}
+
+export class RepaymentNotFoundError extends Error {
+  constructor(id: string) { super(`Repayment "${id}" not found`); this.name = 'RepaymentNotFoundError' }
+}
+
+export class RepaymentNotLastEntryError extends Error {
+  constructor() { super('Only the most recent loan or repayment entry can be reversed'); this.name = 'RepaymentNotLastEntryError' }
+}
+
+// Marks a manually-reversed repayment's notes so getCustomerLoanStatement can
+// tell it apart from reverseRepaymentsForPurchase's own reversal entries
+// (which read "Reversal — purchase X voided") — same negative-amount,
+// no-purchaseId shape, different real-world cause.
+const MANUAL_REVERSAL_PREFIX = 'Reversal (manual)'
+
+function formatTransactionMethod(method: string): string {
+  if (method === 'eft') return 'EFT'
+  return method.charAt(0).toUpperCase() + method.slice(1)
 }
 
 // ─── Reference number generators ─────────────────────────────────────────────
@@ -400,5 +424,267 @@ export async function getLoanTotalsForDate(window: DateWindow) {
     nonCashAdvanced: nonCashAdvanced.toFixed(2),
     repaid:         repaid.toFixed(2),
     netCashOut:     netCashOut.toFixed(2),
+  }
+}
+
+// ─── Manual Repayment (customer-level, FIFO) ─────────────────────────────────
+// Unlike createRepayment (targets one specific loan), this is what the Loans-
+// tab ledger's "Add Repayment" button calls — the legacy tool it mirrors has
+// no per-loan picker, it just pays down whatever the customer owes, oldest
+// loan first, same order applyRepaymentTx already uses for purchase-deducted
+// repayments.
+export async function createManualRepayment(
+  customerId: string,
+  data: CreateManualRepaymentInput,
+  createdByUserId?: string,
+) {
+  const customer = await prisma.customer.findUnique({ where: { id: customerId } })
+  if (!customer) throw new Error('Customer not found')
+
+  const activeLoans = await prisma.loan.findMany({
+    where: { customerId, status: 'active' },
+    orderBy: { createdAt: 'asc' },
+  })
+  if (activeLoans.length === 0) throw new NoActiveLoansError()
+
+  const totalOutstanding = activeLoans.reduce((sum, l) => sum.plus(l.balanceAmount.toString()), new Decimal(0))
+  const repayAmount = new Decimal(data.amount)
+  if (repayAmount.greaterThan(totalOutstanding)) {
+    throw new RepaymentExceedsBalanceError(totalOutstanding.toFixed(2))
+  }
+
+  const prefix = `REP-${todaySASTDateStr().replace(/-/g, '')}`
+  const startOfDay = todaySASTDate()
+
+  const created = await prisma.$transaction(async (tx) => {
+    const baseCount = await tx.loanRepayment.count({ where: { createdAt: { gte: startOfDay } } })
+    let remaining = repayAmount
+    let seqOffset = 0
+    const repayments = []
+
+    for (const loan of activeLoans) {
+      if (remaining.isZero()) break
+      const balance = new Decimal(loan.balanceAmount.toString())
+      const repayAmt = Decimal.min(remaining, balance)
+      const newBalance = balance.minus(repayAmt)
+      const isNowSettled = newBalance.isZero()
+      const refNumber = `${prefix}-${String(baseCount + seqOffset + 1).padStart(4, '0')}`
+      seqOffset++
+
+      const repayment = await tx.loanRepayment.create({
+        data: {
+          tenantId:        requireTenantId(),
+          refNumber,
+          loanId:          loan.id,
+          customerId,
+          amount:          repayAmt,
+          paymentMethod:   data.paymentMethod ?? 'cash',
+          notes:           data.notes,
+          createdByUserId,
+        },
+      })
+      await tx.loan.update({
+        where: { id: loan.id },
+        data: { balanceAmount: newBalance, status: isNowSettled ? 'settled' : 'active' },
+      })
+      repayments.push(repayment)
+      remaining = remaining.minus(repayAmt)
+    }
+    return repayments
+  })
+
+  logger.info(
+    { customerId, amount: repayAmount.toFixed(2), paymentMethod: data.paymentMethod, repaymentCount: created.length, createdByUserId },
+    'loan.manual_repayment.created'
+  )
+  return created
+}
+
+// ─── Reverse a Repayment ──────────────────────────────────────────────────────
+// "Delete Last" on the ledger, when the last entry is a repayment. Mirrors
+// reverseRepaymentsForPurchase's own approach exactly — never mutates or
+// deletes the original row, writes an offsetting negative-amount entry
+// instead, so the audit trail keeps both what happened and that it was
+// undone. Restricted to the customer's single most recent entry (loan or
+// repayment) — a targeted undo of a just-made mistake, not a general
+// historical edit.
+export async function reverseRepayment(repaymentId: string, reason: string, userId?: string) {
+  const repayment = await prisma.loanRepayment.findUnique({ where: { id: repaymentId } })
+  if (!repayment) throw new RepaymentNotFoundError(repaymentId)
+
+  const [laterLoan, laterRepayment] = await Promise.all([
+    prisma.loan.findFirst({ where: { customerId: repayment.customerId, createdAt: { gt: repayment.createdAt } } }),
+    prisma.loanRepayment.findFirst({ where: { customerId: repayment.customerId, createdAt: { gt: repayment.createdAt }, id: { not: repayment.id } } }),
+  ])
+  if (laterLoan || laterRepayment) throw new RepaymentNotLastEntryError()
+
+  const loan = await prisma.loan.findUniqueOrThrow({ where: { id: repayment.loanId } })
+  const restoredBalance = new Decimal(loan.balanceAmount.toString()).plus(repayment.amount.toString())
+  const refNumber = await generateRepaymentRef()
+
+  const reversal = await prisma.$transaction(async (tx) => {
+    await tx.loan.update({ where: { id: repayment.loanId }, data: { balanceAmount: restoredBalance, status: 'active' } })
+    return tx.loanRepayment.create({
+      data: {
+        tenantId:        requireTenantId(),
+        refNumber,
+        loanId:          repayment.loanId,
+        customerId:      repayment.customerId,
+        amount:          new Decimal(repayment.amount.toString()).negated(),
+        paymentMethod:   repayment.paymentMethod,
+        notes:           `${MANUAL_REVERSAL_PREFIX} — ${reason}`,
+        createdByUserId: userId,
+      },
+    })
+  })
+
+  logger.info(
+    { reversedRepaymentId: repayment.id, loanId: repayment.loanId, amount: repayment.amount.toString(), restoredBalance: restoredBalance.toFixed(2), userId },
+    'loan.repayment.manually_reversed'
+  )
+  return reversal
+}
+
+// ─── Customer Loan Statement (ledger) ────────────────────────────────────────
+// Backs the Loans-tab ledger view and the "Print Statement" PDF — one
+// chronological statement merging advances and repayments (including
+// reversals) for a single customer, scoped to a calendar month ("Fin
+// Period"), with a running balance carried forward from everything before
+// that month. Sign convention matches the legacy tool being replicated: an
+// advance makes the balance more NEGATIVE (the customer owes more), a
+// repayment brings it back toward zero — the opposite of buildLoanPayments'
+// (Reports module) accounts-receivable-style positive-outstanding
+// convention, which is a different, unrelated document.
+export interface LoanLedgerRow {
+  id:          string
+  date:        string // ISO
+  description: string
+  transaction: string
+  advance:     string | null
+  repayment:   string | null
+  balance:     string
+}
+
+function monthBounds(period: string): { from: string; to: string } {
+  const [yearStr, monthStr] = period.split('-')
+  const year  = Number(yearStr)
+  const month = Number(monthStr) // 1-indexed
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate()
+  return { from: `${period}-01`, to: `${period}-${String(lastDay).padStart(2, '0')}` }
+}
+
+export async function getCustomerLoanStatement(customerId: string, periodStr?: string) {
+  const period = periodStr ?? todaySASTDateStr().slice(0, 7)
+  const { from, to } = monthBounds(period)
+  const { start, end } = getRangeBoundsSAST(from, to)
+
+  const [openingLoans, openingRepayments, loansInPeriod, repaymentsInPeriod] = await Promise.all([
+    prisma.loan.aggregate({
+      where: { customerId, status: { not: 'voided' }, createdAt: { lt: start } },
+      _sum: { principalAmount: true },
+    }),
+    prisma.loanRepayment.aggregate({
+      where: { customerId, createdAt: { lt: start } },
+      _sum: { amount: true },
+    }),
+    prisma.loan.findMany({
+      where: { customerId, status: { not: 'voided' }, createdAt: { gte: start, lte: end } },
+      orderBy: { createdAt: 'asc' },
+    }),
+    prisma.loanRepayment.findMany({
+      where: { customerId, createdAt: { gte: start, lte: end } },
+      orderBy: { createdAt: 'asc' },
+    }),
+  ])
+
+  const advancedBefore = new Decimal(openingLoans._sum.principalAmount?.toString() ?? '0')
+  const repaidBefore   = new Decimal(openingRepayments._sum.amount?.toString() ?? '0')
+  let balance = advancedBefore.negated().plus(repaidBefore)
+  const openingBalance = balance
+
+  interface Entry {
+    id: string; createdAt: Date; description: string; transaction: string
+    advance: Decimal | null; repayment: Decimal | null
+  }
+  const entries: Entry[] = []
+
+  for (const loan of loansInPeriod) {
+    entries.push({
+      id:          loan.id,
+      createdAt:   loan.createdAt,
+      description: 'Advance - loan',
+      transaction: formatTransactionMethod(loan.paymentMethod),
+      advance:     new Decimal(loan.principalAmount.toString()),
+      repayment:   null,
+    })
+  }
+  for (const r of repaymentsInPeriod) {
+    const amount = new Decimal(r.amount.toString())
+    const isReversal = amount.isNegative()
+    const isManualReversal = isReversal && (r.notes ?? '').startsWith(MANUAL_REVERSAL_PREFIX)
+    const description = r.purchaseId
+      ? 'Loan Repayment - Purchase'
+      : isManualReversal
+        ? 'Loan Repayment - Reversal'
+        : isReversal
+          ? 'Loan Repayment - Reversal (Purchase Voided)'
+          : 'Loan Repayment - Manual'
+    entries.push({
+      id:          r.id,
+      createdAt:   r.createdAt,
+      description,
+      transaction: r.purchaseId ? 'Stock' : formatTransactionMethod(r.paymentMethod),
+      advance:     null,
+      repayment:   amount,
+    })
+  }
+
+  entries.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+
+  const rows: LoanLedgerRow[] = [{
+    id:          'opening',
+    date:        sastDateLabelToUTCDate(from).toISOString(),
+    description: 'OPEN BALANCE',
+    transaction: '',
+    advance:     null,
+    repayment:   null,
+    balance:     openingBalance.toFixed(2),
+  }]
+
+  for (const e of entries) {
+    if (e.advance)   balance = balance.minus(e.advance)
+    if (e.repayment) balance = balance.plus(e.repayment)
+    rows.push({
+      id:          e.id,
+      date:        e.createdAt.toISOString(),
+      description: e.description,
+      transaction: e.transaction,
+      advance:     e.advance   ? e.advance.toFixed(2)   : null,
+      repayment:   e.repayment ? e.repayment.toFixed(2) : null,
+      balance:     balance.toFixed(2),
+    })
+  }
+
+  // The single most recent entry across all history (not just this period) —
+  // the ledger's "Delete Last" button needs to know what it would undo even
+  // when viewing a past, already-closed period.
+  const [lastLoan, lastRepayment] = await Promise.all([
+    prisma.loan.findFirst({ where: { customerId, status: { not: 'voided' } }, orderBy: { createdAt: 'desc' } }),
+    prisma.loanRepayment.findFirst({ where: { customerId }, orderBy: { createdAt: 'desc' } }),
+  ])
+  const lastEntry = (() => {
+    if (!lastLoan && !lastRepayment) return null
+    if (!lastRepayment || (lastLoan && lastLoan.createdAt > lastRepayment.createdAt)) {
+      return { kind: 'loan' as const, id: lastLoan!.id, description: 'Advance - loan', amount: lastLoan!.principalAmount.toString(), date: lastLoan!.createdAt.toISOString() }
+    }
+    return { kind: 'repayment' as const, id: lastRepayment.id, description: 'Repayment', amount: lastRepayment.amount.toString(), date: lastRepayment.createdAt.toISOString() }
+  })()
+
+  return {
+    period,
+    openingBalance: openingBalance.toFixed(2),
+    closingBalance: balance.toFixed(2),
+    rows,
+    lastEntry,
   }
 }

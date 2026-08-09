@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import useSWR, { mutate } from 'swr'
-import { Loader2, MoreHorizontal, Banknote } from 'lucide-react'
+import { Loader2, Plus, Minus, Trash2, Printer } from 'lucide-react'
 import { toast } from 'sonner'
 import Decimal from 'decimal.js'
 import { Dialog } from '@/components/ui/dialog'
@@ -12,44 +12,41 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea'
 import { format } from '@/lib/utils/format'
 import { colors } from '@/lib/design-tokens'
-import { HEADER_GRAD, ACTION_GRAD, NAVY, lbl, Btn, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
+import { HEADER_GRAD, NAVY, lbl, Btn, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
 import { fetcher } from '@/lib/swrFetcher'
 
+// ─── Types ──────────────────────────────────────────────────────────────────
 
-type Loan = {
-  id: string
-  refNumber: string
-  principalAmount: string
-  balanceAmount: string
-  paymentMethod: string
-  notes?: string
-  status: 'active' | 'settled' | 'voided'
-  voidedAt?: string
-  voidReason?: string
-  createdAt: string
-  _count?: { repayments: number }
+type LedgerRow = {
+  id:          string
+  date:        string
+  description: string
+  transaction: string
+  advance:     string | null
+  repayment:   string | null
+  balance:     string
 }
 
-type LoanSummary = {
-  totalAdvanced: string
-  totalRepaid: string
-  outstanding: string
-  hasOutstanding: boolean
-}
+type LastEntry = {
+  kind:        'loan' | 'repayment'
+  id:          string
+  description: string
+  amount:      string
+  date:        string
+} | null
 
-type LoansResponse = {
-  loans: Loan[]
-  summary: LoanSummary
-  total: number
-  page: number
-  pageSize: number
-  pageCount: number
+type StatementResponse = {
+  period:         string
+  openingBalance: string
+  closingBalance: string
+  rows:           LedgerRow[]
+  lastEntry:      LastEntry
 }
 
 interface LoansTabProps {
-  customerId: string
-  customerName: string
-  userRole: string
+  customerId:         string
+  customerName:       string
+  userRole:           string
   userAllowedModules: string[]
 }
 
@@ -66,176 +63,109 @@ function SHdr({ title }: { title: string }) {
   )
 }
 
-function StatusBadge({ status }: { status: 'active' | 'settled' | 'voided' }) {
-  const styles: Record<typeof status, { bg: string; color: string; text: string }> = {
-    active: { bg: '#DBEAFE', color: '#1E40AF', text: 'Active' },
-    settled: { bg: '#DCFCE7', color: '#166534', text: 'Settled' },
-    voided: { bg: '#F3F4F6', color: '#6B7280', text: 'Voided' },
-  }
-  const s = styles[status]
-  return (
-    <span
-      style={{
-        display: 'inline-block',
-        fontSize: 10,
-        fontWeight: 700,
-        borderRadius: 2,
-        padding: '1px 6px',
-        background: s.bg,
-        color: s.color,
-      }}
-    >
-      {s.text}
-    </span>
-  )
+function currentPeriod(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
+// Legacy sign convention this tab replicates: negative = the customer owes
+// the business money (matches the reference tool's "Amount Due: R -198.50").
+const moneyColor = (v: string) => (new Decimal(v).isNegative() ? '#D97706' : colors.action)
+
+// ─── LoansTab ─────────────────────────────────────────────────────────────────
+
 export function LoansTab({ customerId, customerName, userRole, userAllowedModules }: LoansTabProps) {
-  const [createOpen, setCreateOpen] = useState(false)
-  const [voidTarget, setVoidTarget] = useState<Loan | null>(null)
-  const [repayTarget, setRepayTarget] = useState<Loan | null>(null)
-  const [menuOpenId, setMenuOpenId] = useState<string | null>(null)
-  const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
+  const [period,           setPeriod]           = useState(currentPeriod())
+  const [addLoanOpen,      setAddLoanOpen]      = useState(false)
+  const [addRepaymentOpen, setAddRepaymentOpen] = useState(false)
+  const [deleteLastOpen,   setDeleteLastOpen]   = useState(false)
 
-  const { data, isLoading, error } = useSWR<LoansResponse>(`/api/customers/${customerId}/loans`, fetcher)
-  const loans = data?.loans ?? []
-  const summary = data?.summary
+  const statementKey = `/api/customers/${customerId}/loans/statement?period=${period}`
+  const { data, isLoading, error } = useSWR<StatementResponse>(statementKey, fetcher)
 
-  const isManager = ['admin', 'manager'].includes(userRole)
-
-  // Permission check for creating loans
-  const canCreateLoan =
+  const canManage =
     userRole === 'admin' ||
     userAllowedModules.length === 0 || // Empty = full access
     userAllowedModules.includes('/app/loans')
 
   function revalidate() {
-    mutate(`/api/customers/${customerId}/loans`)
+    mutate(statementKey)
   }
 
-  function canVoidLoan(loan: Loan): boolean {
-    return (
-      isManager &&
-      loan.status === 'active' &&
-      (loan._count?.repayments ?? 0) === 0
-    )
-  }
-
-  function canRecordPayment(loan: Loan): boolean {
-    return canCreateLoan && loan.status === 'active' && new Decimal(loan.balanceAmount).gt(0)
-  }
-
-  const outstanding = summary?.outstanding
-    ? new Decimal(summary.outstanding)
-    : new Decimal(0)
+  const closingBalance = data ? new Decimal(data.closingBalance) : new Decimal(0)
 
   return (
     <div>
       <SHdr title="Loans" />
 
-      {/* Header row with outstanding balance and New Loan button */}
+      {/* Toolbar — mirrors the legacy "Special Loans" window: actions on the
+          left, period picker + print on the right. */}
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '10px 12px',
+          gap: 6,
+          padding: '8px 10px',
           borderBottom: '1px solid #E0E0E0',
           background: '#FAFAFA',
+          flexWrap: 'wrap',
         }}
       >
-        <div>
-          <span style={lbl}>Outstanding Balance</span>
-          <span
-            style={{
-              fontSize: 14,
-              fontWeight: 700,
-              fontFamily: 'monospace',
-              color: outstanding.gt(0) ? '#D97706' : colors.action,
-            }}
-          >
-            {format.currency(outstanding.toString())}
-          </span>
-        </div>
-        {canCreateLoan && (
-          <button
-            onClick={() => setCreateOpen(true)}
-            style={{
-              fontSize: 11,
-              padding: '4px 12px',
-              borderRadius: 3,
-              cursor: 'pointer',
-              background: ACTION_GRAD,
-              border: `1px solid ${colors.actionHover}`,
-              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.35)',
-              color: '#fff',
-              fontWeight: 600,
-            }}
-          >
-            + New Loan
-          </button>
+        {canManage && (
+          <>
+            <Btn size="sm" icon={Plus} onClick={() => setAddLoanOpen(true)}>Add Loan</Btn>
+            <Btn size="sm" icon={Plus} onClick={() => setAddRepaymentOpen(true)}>Add Repayment</Btn>
+            <Btn
+              size="sm"
+              icon={Trash2}
+              variant="danger"
+              disabled={!data?.lastEntry}
+              onClick={() => setDeleteLastOpen(true)}
+              title={data?.lastEntry ? 'Undo the most recent loan or repayment entry' : 'No loan activity to delete'}
+            >
+              Delete Last
+            </Btn>
+          </>
         )}
+        <div style={{ flex: 1 }} />
+        <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: colors.textSecondary, fontWeight: 600 }}>
+          Fin Period
+          <input
+            type="month"
+            value={period}
+            onChange={(e) => setPeriod(e.target.value)}
+            style={{ fontSize: 11, padding: '3px 6px', border: '1px solid #ABABAB', borderRadius: 3, background: '#fff' }}
+          />
+        </label>
+        <Btn
+          size="sm"
+          icon={Printer}
+          onClick={() => window.open(`/api/customers/${customerId}/loans/statement/pdf?period=${period}`, '_blank')}
+        >
+          Print Statement
+        </Btn>
       </div>
 
-      {/* Loans table */}
+      {/* Ledger */}
       {isLoading ? (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '40px 0',
-            color: '#9CA3AF',
-            fontSize: 12,
-            gap: 8,
-          }}
-        >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 0', color: '#9CA3AF', fontSize: 12, gap: 8 }}>
           <Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} />
           Loading...
         </div>
       ) : error ? (
         <div style={{ padding: '40px 0', textAlign: 'center', color: colors.danger, fontSize: 12 }}>
-          {error instanceof Error ? error.message : 'Failed to load loans'}
-        </div>
-      ) : loans.length === 0 ? (
-        <div style={{ padding: '40px 0', textAlign: 'center' }}>
-          <p style={{ color: '#9CA3AF', fontSize: 12, marginBottom: 12 }}>
-            No loans for this customer
-          </p>
-          {canCreateLoan && (
-            <button
-              onClick={() => setCreateOpen(true)}
-              style={{
-                fontSize: 11,
-                padding: '4px 12px',
-                borderRadius: 3,
-                cursor: 'pointer',
-                background: ACTION_GRAD,
-                border: `1px solid ${colors.actionHover}`,
-                boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.35)',
-                color: '#fff',
-                fontWeight: 600,
-              }}
-            >
-              + Create Loan
-            </button>
-          )}
+          {error instanceof Error ? error.message : 'Failed to load loan statement'}
         </div>
       ) : (
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead>
-              <tr
-                style={{
-                  background: HEADER_GRAD,
-                  borderBottom: '1px solid #C0C0C0',
-                }}
-              >
-                {['Reference', 'Amount', 'Balance', 'Status', 'Date', ''].map((h) => (
+              <tr style={{ background: HEADER_GRAD, borderBottom: '1px solid #C0C0C0' }}>
+                {['Description', 'Loan Date', 'Transaction', 'Advance', 'Repayment', 'Balance'].map((h, i) => (
                   <th
                     key={h}
                     style={{
-                      textAlign: 'left',
+                      textAlign: i >= 3 ? 'right' : 'left',
                       padding: '5px 10px',
                       fontSize: 10,
                       fontWeight: 700,
@@ -250,60 +180,28 @@ export function LoansTab({ customerId, customerName, userRole, userAllowedModule
               </tr>
             </thead>
             <tbody>
-              {loans.map((loan, i) => (
+              {data?.rows.map((row, i) => (
                 <tr
-                  key={loan.id}
+                  key={row.id}
                   style={{
                     borderBottom: '1px solid #F0F0F0',
-                    background: i % 2 === 0 ? '#fff' : '#FAFAFA',
-                    opacity: loan.status === 'voided' ? 0.5 : 1,
+                    background: row.id === 'opening' ? '#F5F5F5' : i % 2 === 0 ? '#fff' : '#FAFAFA',
+                    fontWeight: row.id === 'opening' ? 600 : 400,
                   }}
                 >
-                  <td style={{ padding: '5px 10px', fontFamily: 'monospace', fontSize: 11 }}>
-                    {loan.refNumber}
-                  </td>
-                  <td style={{ padding: '5px 10px', fontFamily: 'monospace' }}>
-                    {format.currency(loan.principalAmount)}
-                  </td>
-                  <td
-                    style={{
-                      padding: '5px 10px',
-                      fontFamily: 'monospace',
-                      fontWeight: 600,
-                      color: new Decimal(loan.balanceAmount).gt(0) ? '#D97706' : colors.action,
-                    }}
-                  >
-                    {format.currency(loan.balanceAmount)}
-                  </td>
-                  <td style={{ padding: '5px 10px' }}>
-                    <StatusBadge status={loan.status} />
-                  </td>
+                  <td style={{ padding: '5px 10px' }}>{row.description}</td>
                   <td style={{ padding: '5px 10px', color: '#6C757D' }}>
-                    {new Date(loan.createdAt).toLocaleDateString('en-ZA', {
-                      day: '2-digit',
-                      month: 'short',
-                    })}
+                    {new Date(row.date).toLocaleDateString('en-ZA', { year: 'numeric', month: '2-digit', day: '2-digit' })}
                   </td>
-                  <td style={{ padding: '5px 10px', width: 40, position: 'relative' }}>
-                    {(canRecordPayment(loan) || canVoidLoan(loan)) && (
-                      <button
-                        onClick={(e) => {
-                          if (menuOpenId === loan.id) { setMenuOpenId(null); setMenuPos(null); return }
-                          const rect = e.currentTarget.getBoundingClientRect()
-                          setMenuPos({ top: rect.bottom + 2, right: window.innerWidth - rect.right })
-                          setMenuOpenId(loan.id)
-                        }}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          cursor: 'pointer',
-                          padding: 4,
-                          borderRadius: 2,
-                        }}
-                      >
-                        <MoreHorizontal style={{ width: 14, height: 14, color: '#6C757D' }} />
-                      </button>
-                    )}
+                  <td style={{ padding: '5px 10px', color: '#6C757D' }}>{row.transaction}</td>
+                  <td style={{ padding: '5px 10px', textAlign: 'right', fontFamily: 'monospace' }}>
+                    {format.currency(row.advance ?? '0')}
+                  </td>
+                  <td style={{ padding: '5px 10px', textAlign: 'right', fontFamily: 'monospace' }}>
+                    {format.currency(row.repayment ?? '0')}
+                  </td>
+                  <td style={{ padding: '5px 10px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, color: moneyColor(row.balance) }}>
+                    {format.currency(row.balance)}
                   </td>
                 </tr>
               ))}
@@ -312,124 +210,58 @@ export function LoansTab({ customerId, customerName, userRole, userAllowedModule
         </div>
       )}
 
-      {/* Fixed-position row menu — rendered outside the scrollable table so it
-          never gets clipped by the tab panel's inner scroller */}
-      {menuOpenId && menuPos && (
-        <>
-          <div style={{ position: 'fixed', inset: 0, zIndex: 49 }} onClick={() => { setMenuOpenId(null); setMenuPos(null) }} />
-          <div
-            style={{
-              position: 'fixed',
-              top: menuPos.top,
-              right: menuPos.right,
-              zIndex: 50,
-              background: '#fff',
-              border: '1px solid #E0E0E0',
-              borderRadius: 4,
-              boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-              minWidth: 130,
-            }}
-          >
-            {(() => {
-              const loan = loans.find((l) => l.id === menuOpenId)
-              if (!loan) return null
-              return (
-                <>
-                  {canRecordPayment(loan) && (
-                    <button
-                      onClick={() => {
-                        setRepayTarget(loan)
-                        setMenuOpenId(null)
-                        setMenuPos(null)
-                      }}
-                      style={{
-                        display: 'block',
-                        width: '100%',
-                        padding: '6px 12px',
-                        fontSize: 11,
-                        textAlign: 'left',
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        color: colors.action,
-                      }}
-                    >
-                      Record Payment
-                    </button>
-                  )}
-                  {canVoidLoan(loan) && (
-                    <button
-                      onClick={() => {
-                        setVoidTarget(loan)
-                        setMenuOpenId(null)
-                        setMenuPos(null)
-                      }}
-                      style={{
-                        display: 'block',
-                        width: '100%',
-                        padding: '6px 12px',
-                        fontSize: 11,
-                        textAlign: 'left',
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        color: '#DC2626',
-                      }}
-                    >
-                      Void Loan
-                    </button>
-                  )}
-                </>
-              )
-            })()}
-          </div>
-        </>
-      )}
+      {/* Footer — Amount Due */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+          gap: 8,
+          padding: '8px 12px',
+          borderTop: '1px solid #E0E0E0',
+          background: '#FAFAFA',
+        }}
+      >
+        <span style={lbl}>Amount Due</span>
+        <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 14, color: moneyColor(closingBalance.toString()) }}>
+          {format.currency(closingBalance.toString())}
+        </span>
+      </div>
 
-      {/* Create Loan Dialog */}
-      {createOpen && (
-        <CreateLoanDialog
+      {/* Add Loan Dialog */}
+      {addLoanOpen && (
+        <AddLoanDialog
           customerId={customerId}
           customerName={customerName}
-          onClose={() => setCreateOpen(false)}
-          onSuccess={() => {
-            revalidate()
-            setCreateOpen(false)
-          }}
+          onClose={() => setAddLoanOpen(false)}
+          onSuccess={() => { revalidate(); setAddLoanOpen(false) }}
         />
       )}
 
-      {/* Void Loan Dialog */}
-      {voidTarget && (
-        <VoidLoanDialog
-          loan={voidTarget}
+      {/* Add Repayment Dialog */}
+      {addRepaymentOpen && (
+        <AddRepaymentDialog
+          customerId={customerId}
           customerName={customerName}
-          onClose={() => setVoidTarget(null)}
-          onSuccess={() => {
-            revalidate()
-            setVoidTarget(null)
-          }}
+          onClose={() => setAddRepaymentOpen(false)}
+          onSuccess={() => { revalidate(); setAddRepaymentOpen(false) }}
         />
       )}
 
-      {/* Record Payment Dialog */}
-      {repayTarget && (
-        <RecordLoanRepaymentDialog
-          loan={repayTarget}
-          customerName={customerName}
-          onClose={() => setRepayTarget(null)}
-          onSuccess={() => {
-            revalidate()
-            setRepayTarget(null)
-          }}
+      {/* Delete Last Dialog */}
+      {deleteLastOpen && data?.lastEntry && (
+        <DeleteLastDialog
+          lastEntry={data.lastEntry}
+          onClose={() => setDeleteLastOpen(false)}
+          onSuccess={() => { revalidate(); setDeleteLastOpen(false) }}
         />
       )}
     </div>
   )
 }
 
-// ─── Create Loan Dialog ──────────────────────────────────────────────────────
-function CreateLoanDialog({
+// ─── Add Loan Dialog ────────────────────────────────────────────────────────
+function AddLoanDialog({
   customerId,
   customerName,
   onClose,
@@ -460,7 +292,7 @@ function CreateLoanDialog({
     })
     setLoading(false)
     if (res.ok) {
-      toast.success('Loan created successfully')
+      toast.success('Loan advanced')
       onSuccess()
     } else {
       const j = (await res.json()) as { error?: string | { formErrors?: string[] } }
@@ -475,7 +307,7 @@ function CreateLoanDialog({
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
       <RpxDialogContent maxWidth={440}>
-        <RpxDialogHeader title={`Create Loan for ${customerName}`} onClose={onClose} />
+        <RpxDialogHeader title={`Add Loan for ${customerName}`} onClose={onClose} />
         <RpxDialogBody>
         <div className="space-y-4">
           <div>
@@ -522,7 +354,7 @@ function CreateLoanDialog({
         <RpxDialogFooter>
           <Btn onClick={onClose} disabled={loading}>Cancel</Btn>
           <Btn variant="primary" onClick={onSubmit} disabled={!amount} loading={loading}>
-            Create Loan
+            Add Loan
           </Btn>
         </RpxDialogFooter>
       </RpxDialogContent>
@@ -530,15 +362,113 @@ function CreateLoanDialog({
   )
 }
 
-// ─── Void Loan Dialog ────────────────────────────────────────────────────────
-function VoidLoanDialog({
-  loan,
+// ─── Add Repayment Dialog ───────────────────────────────────────────────────
+// Customer-level, not loan-level — applied FIFO across active loans server-
+// side (createManualRepayment), matching the legacy tool's own "Add
+// Repayment" button, which never asks which loan either.
+function AddRepaymentDialog({
+  customerId,
   customerName,
   onClose,
   onSuccess,
 }: {
-  loan: Loan
+  customerId: string
   customerName: string
+  onClose: () => void
+  onSuccess: () => void
+}) {
+  const [amount, setAmount] = useState('')
+  const [method, setMethod] = useState('cash')
+  const [notes, setNotes] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  async function onSubmit() {
+    if (!amount) return
+    setLoading(true)
+    const res = await fetch(`/api/customers/${customerId}/loans/repay`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        amount,
+        paymentMethod: method,
+        notes: notes || undefined,
+      }),
+    })
+    setLoading(false)
+    if (res.ok) {
+      toast.success('Repayment recorded')
+      onSuccess()
+    } else {
+      const j = (await res.json()) as { error?: string | { formErrors?: string[] } }
+      const msg =
+        typeof j.error === 'string'
+          ? j.error
+          : (j.error as { formErrors?: string[] })?.formErrors?.[0] ?? 'Failed to record repayment'
+      toast.error(msg)
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
+      <RpxDialogContent maxWidth={440}>
+        <RpxDialogHeader title={`Add Repayment From ${customerName}`} onClose={onClose} />
+        <RpxDialogBody>
+        <div className="space-y-4">
+          <p className="text-xs" style={{ color: colors.textSecondary }}>
+            Pays down the oldest outstanding loan first, then the next, until the amount is used up.
+          </p>
+          <div>
+            <Label>Amount (R) *</Label>
+            <Input
+              placeholder="0.00"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              className="mt-1"
+              type="number"
+              step="0.01"
+              min="0"
+            />
+          </div>
+          <div>
+            <Label>Payment Method *</Label>
+            <Select value={method} onValueChange={(v) => setMethod(v ?? 'cash')}>
+              <SelectTrigger className="mt-1 w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PAYMENT_METHODS.map((m) => (
+                  <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label>Notes <span className="font-normal text-gray-400">(optional)</span></Label>
+            <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="mt-1" maxLength={500} />
+          </div>
+        </div>
+        </RpxDialogBody>
+        <RpxDialogFooter>
+          <Btn onClick={onClose} disabled={loading}>Cancel</Btn>
+          <Btn variant="primary" onClick={onSubmit} disabled={!amount} loading={loading}>
+            Add Repayment
+          </Btn>
+        </RpxDialogFooter>
+      </RpxDialogContent>
+    </Dialog>
+  )
+}
+
+// ─── Delete Last Dialog ─────────────────────────────────────────────────────
+// Undoes whichever entry is actually last: void (loan advance, only legal
+// when it has zero repayments — voidLoan's own existing rule) or reverse
+// (repayment — writes an offsetting negative entry, never deletes).
+function DeleteLastDialog({
+  lastEntry,
+  onClose,
+  onSuccess,
+}: {
+  lastEntry: NonNullable<LastEntry>
   onClose: () => void
   onSuccess: () => void
 }) {
@@ -546,43 +476,45 @@ function VoidLoanDialog({
   const [loading, setLoading] = useState(false)
 
   async function onSubmit() {
-    if (reason.length < 5) return
+    if (reason.trim().length < 5) return
     setLoading(true)
-    const res = await fetch(`/api/loans/${loan.id}/void`, {
+    const url = lastEntry.kind === 'loan'
+      ? `/api/loans/${lastEntry.id}/void`
+      : `/api/loans/repayments/${lastEntry.id}/reverse`
+    const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ reason }),
     })
     setLoading(false)
     if (res.ok) {
-      toast.success('Loan voided')
+      toast.success(lastEntry.kind === 'loan' ? 'Loan advance deleted' : 'Repayment reversed')
       onSuccess()
     } else {
       const j = (await res.json()) as { error?: string }
-      toast.error(j.error ?? 'Failed to void loan')
+      toast.error(j.error ?? 'Failed to delete last entry')
     }
   }
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
       <RpxDialogContent maxWidth={440}>
-        <RpxDialogHeader title="Void Loan" onClose={onClose} />
+        <RpxDialogHeader title="Delete Last Entry" icon={Minus} onClose={onClose} />
         <RpxDialogBody>
         <div className="space-y-4">
-          <div
-            className="rounded p-3 text-sm"
-            style={{ background: '#FEF2F2', border: '1px solid #FECACA' }}
-          >
+          <div className="rounded p-3 text-sm" style={{ background: '#FEF2F2', border: '1px solid #FECACA' }}>
             <p className="font-medium" style={{ color: '#DC2626' }}>
-              {customerName} — {loan.refNumber}
+              {lastEntry.description} of {format.currency(lastEntry.amount)} on{' '}
+              {new Date(lastEntry.date).toLocaleDateString('en-ZA')}
             </p>
             <p className="text-xs mt-1" style={{ color: '#DC2626' }}>
-              This will void the loan of {format.currency(loan.principalAmount)}. This action cannot
-              be undone.
+              {lastEntry.kind === 'loan'
+                ? 'This will delete the loan advance. Only possible while nothing has been repaid against it yet.'
+                : 'This will reverse the repayment, restoring the loan balance it paid down. The original entry stays on record.'}
             </p>
           </div>
           <div>
-            <Label>Reason for Void *</Label>
+            <Label>Reason *</Label>
             <Textarea
               placeholder="Enter a reason (min 5 characters)..."
               value={reason}
@@ -596,140 +528,8 @@ function VoidLoanDialog({
         </RpxDialogBody>
         <RpxDialogFooter>
           <Btn onClick={onClose} disabled={loading}>Cancel</Btn>
-          <Btn variant="danger" onClick={onSubmit} disabled={reason.length < 5} loading={loading}>
-            Void Loan
-          </Btn>
-        </RpxDialogFooter>
-      </RpxDialogContent>
-    </Dialog>
-  )
-}
-
-// ─── Record Loan Repayment Dialog ───────────────────────────────────────────
-function RecordLoanRepaymentDialog({
-  loan,
-  customerName,
-  onClose,
-  onSuccess,
-}: {
-  loan: Loan
-  customerName: string
-  onClose: () => void
-  onSuccess: () => void
-}) {
-  const [amount, setAmount] = useState('')
-  const [method, setMethod] = useState('cash')
-  const [notes, setNotes] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  const balance = new Decimal(loan.balanceAmount)
-  const payAmount = new Decimal(amount || '0')
-  const remaining = balance.minus(payAmount)
-
-  function validate(): string | null {
-    if (payAmount.lessThanOrEqualTo(0)) return 'Enter a payment amount'
-    if (payAmount.greaterThan(balance)) return 'Amount exceeds the outstanding balance'
-    return null
-  }
-
-  async function onSubmit() {
-    const validationError = validate()
-    if (validationError) {
-      setError(validationError)
-      return
-    }
-    setError(null)
-    setLoading(true)
-    const res = await fetch(`/api/loans/${loan.id}/repay`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        amount,
-        paymentMethod: method,
-        notes: notes || undefined,
-      }),
-    })
-    setLoading(false)
-    if (res.ok) {
-      toast.success(remaining.isZero() ? `Loan settled in full — ${loan.refNumber}` : `Payment recorded for ${loan.refNumber}`)
-      onSuccess()
-    } else {
-      const j = (await res.json()) as { error?: string | { formErrors?: string[] } }
-      const msg =
-        typeof j.error === 'string'
-          ? j.error
-          : (j.error as { formErrors?: string[] })?.formErrors?.[0] ?? 'Failed to record payment'
-      toast.error(msg)
-    }
-  }
-
-  return (
-    <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <RpxDialogContent maxWidth={440}>
-        <RpxDialogHeader title={`Record Payment From ${customerName}`} icon={Banknote} onClose={onClose} />
-        <RpxDialogBody>
-          <div className="space-y-4">
-            <div className="px-3 py-2.5 rounded-lg" style={{ background: colors.actionBg, border: `1px solid ${colors.action}` }}>
-              <div className="flex justify-between items-center">
-                <span className="text-xs font-medium" style={{ color: colors.action }}>
-                  {loan.refNumber} — Outstanding
-                </span>
-                <span className="font-mono font-bold" style={{ fontSize: 16, color: colors.action }}>
-                  R {balance.toFixed(2)}
-                </span>
-              </div>
-            </div>
-
-            <div>
-              <Label>Amount (R) *</Label>
-              <Input
-                placeholder="0.00"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                className="mt-1"
-                type="number"
-                step="0.01"
-                min="0"
-                disabled={loading}
-              />
-            </div>
-
-            <div>
-              <Label>Payment Method *</Label>
-              <Select value={method} onValueChange={(v) => setMethod(v ?? 'cash')}>
-                <SelectTrigger className="mt-1 w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PAYMENT_METHODS.map((m) => (
-                    <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {amount && (
-              <div className="border-t pt-3">
-                <div className="flex justify-between text-xs font-medium" style={{ color: remaining.isZero() ? '#217346' : '#6C757D' }}>
-                  <span>{remaining.isZero() ? 'Loan Fully Settled' : 'Balance Remaining After This Payment'}</span>
-                  <span className="font-mono">{remaining.isZero() ? '✓' : `R ${remaining.toFixed(2)}`}</span>
-                </div>
-              </div>
-            )}
-
-            <div>
-              <Label>Notes <span className="font-normal text-gray-400">(optional)</span></Label>
-              <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="mt-1" maxLength={500} />
-            </div>
-
-            {error && <p className="text-xs" style={{ color: '#DC3545' }}>{error}</p>}
-          </div>
-        </RpxDialogBody>
-        <RpxDialogFooter>
-          <Btn onClick={onClose} disabled={loading}>Cancel</Btn>
-          <Btn variant="primary" onClick={onSubmit} disabled={payAmount.lessThanOrEqualTo(0) || payAmount.greaterThan(balance)} loading={loading}>
-            Record Payment
+          <Btn variant="danger" onClick={onSubmit} disabled={reason.trim().length < 5} loading={loading}>
+            Delete Last
           </Btn>
         </RpxDialogFooter>
       </RpxDialogContent>

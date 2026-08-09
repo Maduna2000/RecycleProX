@@ -8,6 +8,7 @@ import { prisma } from '@/lib/db/prisma'
 import { getRangeBoundsSAST, sastDateLabelToUTCDate, sastDayLabelOfInstant } from '@/lib/utils/dayBounds'
 import { purchaseHeaderAmounts } from '@/lib/utils/vat'
 import { getProfitSummary } from '@/lib/services/reportService'
+import { getCustomerLoanStatement } from '@/lib/services/loanService'
 import { groupRows } from '@/lib/services/reports/grouping'
 import { countDataRows } from '@/lib/reports/flatten'
 import { DENOMINATION_LABELS, DENOMINATIONS } from '@/lib/schemas/cashup'
@@ -624,6 +625,57 @@ export async function buildLoanPayments(
       balance: totalClosing.toFixed(2),
     },
     meta: { ...meta, rowCount },
+  }
+}
+
+// ─── Customer Loan Statement ("Print Statement" on the Loans-tab ledger) ──────
+// Renders getCustomerLoanStatement's already-computed rows (loanService.ts) —
+// this builder only reshapes them into a ReportDocument for
+// generateBusinessReportPdf; it does not recompute the ledger itself, so the
+// on-screen statement and the printed one can never disagree.
+
+export async function buildCustomerLoanStatement(
+  customerId: string,
+  period: string | undefined,
+  meta: MetaBase
+): Promise<ReportDocument> {
+  const [customer, statement] = await Promise.all([
+    prisma.customer.findUniqueOrThrow({
+      where: { id: customerId },
+      select: { firstName: true, lastName: true, companyName: true },
+    }),
+    getCustomerLoanStatement(customerId, period),
+  ])
+
+  const rows: ReportRow[] = statement.rows.map((r) => ({
+    cells: {
+      date: r.date,
+      description: r.description,
+      transaction: r.transaction || null,
+      advance: r.advance,
+      repayment: r.repayment,
+      balance: r.balance,
+    },
+  }))
+
+  return {
+    reportId: 'customer-loan-statement',
+    title: 'Special Loans Statement',
+    subtitle: `For ${customerName(customer)} — Period ${statement.period}`,
+    params: { from: `${statement.period}-01`, to: `${statement.period}-01` },
+    columns: [
+      { key: 'description', label: 'Description', width: 0.28, format: 'text', excelWidth: 28 },
+      { key: 'date', label: 'Loan Date', width: 0.14, format: 'date', excelWidth: 13 },
+      { key: 'transaction', label: 'Transaction', width: 0.12, format: 'text', excelWidth: 12 },
+      { key: 'advance', label: 'Advance', width: 0.15, align: 'right', format: 'money', excelWidth: 13 },
+      { key: 'repayment', label: 'Repayment', width: 0.15, align: 'right', format: 'money', excelWidth: 13 },
+      { key: 'balance', label: 'Balance', width: 0.16, align: 'right', format: 'money', excelWidth: 13 },
+    ],
+    groups: [{ level: 0, label: customerName(customer), rows }],
+    summary: [
+      { label: 'Amount Due', value: `${meta.currencySymbol}${statement.closingBalance}`, emphasis: true },
+    ],
+    meta: { ...meta, rowCount: rows.length },
   }
 }
 
