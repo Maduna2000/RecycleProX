@@ -520,6 +520,56 @@ model Payment {
   @@index([tenantId, purchaseId])
 }
 
+// A day's MoMo (mobile money) wallet statement, exported as CSV from the
+// provider's portal and uploaded by the cashier. Purely a reconciliation
+// aid — sits alongside CashUp, never feeds its formula — so a manager can
+// visually confirm "the MoMo statement's totals match what the system
+// recorded for the day" during cash-up, without the system trying to
+// auto-match individual transactions to Purchases/Sales/Payments.
+model MomoStatementImport {
+  id                String   @id @default(uuid())
+  tenantId          String
+  fileName          String
+  statementDate     DateTime @db.Date
+  totalSent         Decimal  @db.Decimal(18, 2)
+  totalReceived     Decimal  @db.Decimal(18, 2)
+  totalFees         Decimal  @db.Decimal(18, 2)
+  transactionCount  Int
+  failedCount       Int      @default(0)
+  openingBalance    Decimal? @db.Decimal(18, 2)
+  closingBalance    Decimal? @db.Decimal(18, 2)
+  r2Key             String?
+  uploadedByUserId  String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  lines             MomoStatementLine[]
+
+  @@unique([tenantId, statementDate])
+  @@index([tenantId])
+  @@index([tenantId, statementDate])
+}
+
+model MomoStatementLine {
+  id              String              @id @default(uuid())
+  tenantId        String
+  importId        String
+  externalTxnId   String?
+  transactionDate DateTime
+  status          String
+  type            String
+  fromName        String?
+  toName          String?
+  toMessage       String?
+  amount          Decimal             @db.Decimal(18, 2)
+  fee             Decimal             @default(0) @db.Decimal(18, 2)
+  balance         Decimal?            @db.Decimal(18, 2)
+  createdAt       DateTime            @default(now())
+  import          MomoStatementImport @relation(fields: [importId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, importId])
+}
+
 model ExpenseType {
   id        String        @id @default(uuid())
   tenantId  String
