@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import useSWR, { mutate as swrMutate } from 'swr'
 import { useSession } from 'next-auth/react'
 import Decimal from 'decimal.js'
@@ -8,7 +9,7 @@ import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { CheckCircle2, Calculator, Clock, Lock, RefreshCw, FolderOpen, ChevronLeft, ChevronRight } from 'lucide-react'
+import { CheckCircle2, Calculator, Clock, Lock, RefreshCw, FolderOpen, ChevronLeft, ChevronRight, Upload, Loader2 } from 'lucide-react'
 import { Dialog } from '@/components/ui/dialog'
 import { DENOMINATIONS, DENOMINATION_LABELS, type Denomination, CURRENCY_SYMBOLS, CURRENCY_LABELS, type Currency } from '@/lib/schemas/cashup'
 import { colors } from '@/lib/design-tokens'
@@ -72,6 +73,11 @@ type ExpenseItem = {
   id: string; refNumber: string; description: string
   amount: string; paymentMethod: string; status: string
   expenseType: { name: string }
+}
+
+type MomoStatementSummary = {
+  id: string; totalSent: string; totalReceived: string; totalFees: string
+  transactionCount: number; closingBalance: string | null
 }
 
 
@@ -554,6 +560,182 @@ function StatTile({ label, value, sub, valueColor, action }: {
   )
 }
 
+// ─── MoMo Statement modal ───────────────────────────────────────────────────────
+// Upload the day's MoMo CSV and see the parsed totals, without leaving Cash-Up.
+// The full history (past days, delete) still lives at /app/momo-statement —
+// this is just the "today, quickly" path.
+
+type MomoLine = {
+  id: string; transactionDate: string; status: string; type: string
+  fromName: string | null; toName: string | null; toMessage: string | null
+  amount: string; fee: string; balance: string | null
+}
+type MomoDetail = MomoStatementSummary & { fileName: string; openingBalance: string | null; failedCount: number; lines: MomoLine[] }
+
+function MomoStatementModal({
+  sessionDate, currSym, onClose, onUploaded,
+}: {
+  sessionDate: string
+  currSym: string
+  onClose: () => void
+  onUploaded: () => void
+}) {
+  const router = useRouter()
+  const { data: session } = useSession()
+  const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
+  const [uploading, setUploading] = useState(false)
+  const fileRef = React.useRef<HTMLInputElement>(null)
+
+  const BY_DATE_KEY = `/api/momo-statements/by-date?date=${sessionDate}`
+  const { data: byDate, mutate: refreshByDate } = useSWR<{ statement: MomoStatementSummary | null }>(BY_DATE_KEY, fetcher)
+  const statementId = byDate?.statement?.id ?? null
+
+  const { data: detail, isLoading: detailLoading, mutate: refreshDetail } = useSWR<MomoDetail>(
+    statementId ? `/api/momo-statements/${statementId}` : null,
+    fetcher,
+  )
+
+  async function handleFilePicked(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (fileRef.current) fileRef.current.value = ''
+    if (!file) return
+
+    setUploading(true)
+    const fd = new FormData()
+    fd.append('file', file)
+    const res = await fetch('/api/momo-statements', { method: 'POST', body: fd })
+    setUploading(false)
+
+    if (res.ok) {
+      const j = await res.json()
+      const skippedNote = j.skippedRows > 0 ? ` (${j.skippedRows} row${j.skippedRows === 1 ? '' : 's'} skipped — couldn't parse)` : ''
+      toast.success(`Statement imported${skippedNote}`)
+      refreshByDate()
+      refreshDetail()
+      onUploaded()
+    } else {
+      const j = await res.json()
+      toast.error(j.error ?? 'Failed to import statement')
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
+      <RpxDialogContent maxWidth={760} style={{ maxHeight: '85vh' }}>
+        <RpxDialogHeader title="MoMo Statement" onClose={onClose} />
+        <RpxDialogBody>
+          <div className="flex flex-col gap-3">
+            {/* Upload control */}
+            {isManager && (
+              <div className="flex items-center justify-between" style={{ padding: '8px 10px', border: `1px dashed ${colors.border}`, borderRadius: 2, background: colors.bg }}>
+                <div>
+                  <p style={{ fontSize: 12, fontWeight: 600, color: colors.textPrimary }}>
+                    {detail ? `Uploaded: ${detail.fileName}` : `No statement uploaded for ${sessionDate} yet`}
+                  </p>
+                  <p style={{ fontSize: 11, color: colors.textSecondary }}>
+                    {detail ? 'Uploading again replaces this statement.' : 'Upload the CSV the cashier prints/exports for this day.'}
+                  </p>
+                </div>
+                <input ref={fileRef} type="file" accept=".csv,text/csv" style={{ display: 'none' }} onChange={handleFilePicked} disabled={uploading} />
+                <Btn size="sm" icon={uploading ? Loader2 : Upload} onClick={() => fileRef.current?.click()} disabled={uploading}>
+                  {uploading ? 'Importing…' : detail ? 'Replace' : 'Upload'}
+                </Btn>
+              </div>
+            )}
+
+            {/* Results */}
+            {detailLoading && statementId && (
+              <div className="flex items-center gap-2" style={{ color: colors.textSecondary, fontSize: 12 }}>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading…
+              </div>
+            )}
+
+            {detail && (
+              <>
+                <div className="grid grid-cols-5 gap-2">
+                  <MomoSummaryTile label="Sent" value={`${currSym} ${new Decimal(detail.totalSent).toFixed(2)}`} color={colors.process} />
+                  <MomoSummaryTile label="Received" value={`${currSym} ${new Decimal(detail.totalReceived).toFixed(2)}`} color={colors.action} />
+                  <MomoSummaryTile label="Fees" value={`${currSym} ${new Decimal(detail.totalFees).toFixed(2)}`} color={colors.textSecondary} />
+                  <MomoSummaryTile
+                    label="Opening → Closing"
+                    value={
+                      detail.openingBalance != null && detail.closingBalance != null
+                        ? `${currSym}${new Decimal(detail.openingBalance).toFixed(2)} → ${currSym}${new Decimal(detail.closingBalance).toFixed(2)}`
+                        : '—'
+                    }
+                    color={colors.textPrimary}
+                  />
+                  <MomoSummaryTile
+                    label="Transactions"
+                    value={`${detail.transactionCount}${detail.failedCount > 0 ? ` (${detail.failedCount} failed)` : ''}`}
+                    color={colors.textPrimary}
+                  />
+                </div>
+
+                <div style={{ maxHeight: 280, overflowY: 'auto', border: `1px solid ${colors.border}`, borderRadius: 2 }}>
+                  <table className="w-full" style={{ fontSize: 12, borderCollapse: 'collapse' }}>
+                    <thead style={{ position: 'sticky', top: 0, background: colors.surface }}>
+                      <tr style={{ borderBottom: `1px solid ${colors.border}` }}>
+                        {['Time', 'Type', 'From', 'To', 'Amount', 'Fee'].map((h) => (
+                          <th key={h} className="text-left" style={{ padding: '4px 8px', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: colors.textSecondary }}>
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {detail.lines.map((line) => {
+                        const amt = new Decimal(line.amount)
+                        return (
+                          <tr key={line.id} style={{ borderTop: `1px solid ${colors.bg}`, opacity: line.status === 'Successful' ? 1 : 0.5 }}>
+                            <td style={{ padding: '4px 8px', color: colors.textSecondary, fontSize: 11 }}>
+                              {new Date(line.transactionDate).toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' })}
+                            </td>
+                            <td style={{ padding: '4px 8px', color: colors.textPrimary }}>{line.type}</td>
+                            <td style={{ padding: '4px 8px', color: colors.textPrimary }}>{line.fromName ?? '—'}</td>
+                            <td style={{ padding: '4px 8px', color: colors.textPrimary }}>
+                              {line.toName ?? '—'}{line.toMessage && <span style={{ color: colors.textSecondary }}> · {line.toMessage}</span>}
+                            </td>
+                            <td className="font-mono" style={{ padding: '4px 8px', fontWeight: 600, color: amt.isNegative() ? colors.process : colors.action }}>
+                              {amt.isNegative() ? '−' : '+'}{currSym} {amt.abs().toFixed(2)}
+                            </td>
+                            <td className="font-mono" style={{ padding: '4px 8px', color: colors.textSecondary }}>
+                              {new Decimal(line.fee).gt(0) ? `${currSym} ${new Decimal(line.fee).toFixed(2)}` : '—'}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+          </div>
+        </RpxDialogBody>
+        <RpxDialogFooter>
+          <button
+            onClick={() => { onClose(); router.push('/app/momo-statement') }}
+            className="text-xs font-medium underline"
+            style={{ color: colors.action, marginRight: 'auto' }}
+          >
+            View full history
+          </button>
+          <Btn onClick={onClose}>Close</Btn>
+        </RpxDialogFooter>
+      </RpxDialogContent>
+    </Dialog>
+  )
+}
+
+function MomoSummaryTile({ label, value, color }: { label: string; value: string; color: string }) {
+  return (
+    <div style={{ border: `1px solid ${colors.border}`, borderRadius: 2, padding: '6px 8px', background: colors.surface }}>
+      <p className="uppercase tracking-wide" style={{ fontSize: 9, fontWeight: 600, color: colors.textSecondary }}>{label}</p>
+      <p className="font-mono font-bold" style={{ fontSize: 12, color }}>{value}</p>
+    </div>
+  )
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 export default function CashUpPage() {
   const { data: session } = useSession()
@@ -574,13 +756,16 @@ export default function CashUpPage() {
 
   const STATS_KEY    = `/api/cashup/live-stats?date=${sessionDate}`
   const EXPENSES_KEY = `/api/expenses?from=${sessionDate}&to=${sessionDate}&page=1`
+  const MOMO_KEY     = `/api/momo-statements/by-date?date=${sessionDate}`
 
   const { data: statsData, mutate: refreshStats }    = useSWR<LiveStats>(STATS_KEY, fetcher)
   const { data: expensesData, mutate: refreshExpenses } = useSWR<{ expenses: ExpenseItem[] }>(EXPENSES_KEY, fetcher)
+  const { data: momoData } = useSWR<{ statement: MomoStatementSummary | null }>(MOMO_KEY, fetcher)
 
   const cashUp   = data?.cashUp ?? null
   const stats    = statsData
   const expenses = expensesData?.expenses ?? []
+  const momoStatement = momoData?.statement ?? null
 
   const EXPENSES_PAGE_SIZE = 3
   const [expensePage, setExpensePage] = useState(1)
@@ -645,6 +830,7 @@ export default function CashUpPage() {
   const [voidReasonOpen, setVoidReasonOpen] = useState(false)
   const [manageSessionsOpen, setManageSessionsOpen] = useState(false)
   const [previousReportsOpen, setPreviousReportsOpen] = useState(false)
+  const [momoModalOpen, setMomoModalOpen] = useState(false)
 
   // Fetch all open sessions to show count
   const { data: openSessionsData, mutate: refreshOpenSessions } = useSWR<{ sessions: CashUp[] }>('/api/cashup/open-sessions', fetcher)
@@ -1315,6 +1501,50 @@ export default function CashUpPage() {
                         </div>
                       </div>
                     )}
+
+                    {/* MoMo Statement — cross-check against the day's uploaded provider
+                        statement. Purely informational: never feeds the cash-up formula,
+                        just sits here for a manager to eyeball against Cash Purchases /
+                        Account Payments above. Upload + results open in a popup so the
+                        cashier never has to leave this page. */}
+                    <button
+                      onClick={() => setMomoModalOpen(true)}
+                      className="w-full text-left"
+                      style={{ ...PANEL, cursor: 'pointer', border: `1px solid ${colors.border}` }}
+                    >
+                      <div className="flex items-center justify-between" style={PANEL_HEAD}>
+                        <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: colors.textSecondary }}>MoMo Statement</span>
+                        <span className="text-[10px] font-medium underline" style={{ color: colors.action }}>
+                          {momoStatement ? 'View' : 'Upload'}
+                        </span>
+                      </div>
+                      {momoStatement ? (
+                        <div className="grid grid-cols-3 gap-2" style={{ padding: '8px 10px' }}>
+                          <div>
+                            <p style={{ fontSize: 10, color: colors.textSecondary }}>Sent</p>
+                            <p className="font-mono font-semibold text-xs" style={{ color: colors.process }}>
+                              {currSym} {new Decimal(momoStatement.totalSent).toFixed(2)}
+                            </p>
+                          </div>
+                          <div>
+                            <p style={{ fontSize: 10, color: colors.textSecondary }}>Received</p>
+                            <p className="font-mono font-semibold text-xs" style={{ color: colors.action }}>
+                              {currSym} {new Decimal(momoStatement.totalReceived).toFixed(2)}
+                            </p>
+                          </div>
+                          <div>
+                            <p style={{ fontSize: 10, color: colors.textSecondary }}>Fees</p>
+                            <p className="font-mono font-semibold text-xs" style={{ color: colors.textPrimary }}>
+                              {currSym} {new Decimal(momoStatement.totalFees).toFixed(2)}
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        <p style={{ fontSize: 11, color: colors.textSecondary, padding: '8px 10px' }}>
+                          No statement uploaded for {sessionDate} yet.
+                        </p>
+                      )}
+                    </button>
                   </div>
                 </div>
               )
@@ -1363,6 +1593,15 @@ export default function CashUpPage() {
 
       {previousReportsOpen && (
         <PreviousReportsModal onClose={() => setPreviousReportsOpen(false)} />
+      )}
+
+      {momoModalOpen && (
+        <MomoStatementModal
+          sessionDate={sessionDate}
+          currSym={CURRENCY_SYMBOLS[cashUp?.currency ?? 'ZAR']}
+          onClose={() => setMomoModalOpen(false)}
+          onUploaded={() => swrMutate(MOMO_KEY)}
+        />
       )}
 
       {voidReasonOpen && (

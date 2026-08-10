@@ -19,6 +19,7 @@ const WRITE_MODELS = [
   'CustomerDocument', 'ExpenseAttachment', 'ExpenseType', 'MediaFile',
   'TransactionPayment', 'TransactionPaymentLink',
   'PriceHistory', 'ProductCategory', 'CategoryStepConfig', 'ScaleOrderLine',
+  'MomoStatementImport', 'MomoStatementLine',
 ]
 const WRITE_ACTIONS = ['create', 'update', 'delete']
 

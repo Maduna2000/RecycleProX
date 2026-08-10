@@ -3,6 +3,7 @@ import {
   Tag, CreditCard, ImageIcon, Scale,
   Package, ClipboardList, ClipboardCheck, TrendingUp, BarChart2,
   Archive, Wallet, Landmark, Settings, LayoutGrid, Banknote, ShieldCheck,
+  Smartphone,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -19,6 +20,7 @@ export const MODULE_NAMES: Record<string, string> = {
   '/app/payments':         'Sales Payments',
   '/app/payments/balances': 'Account Balances',
   '/app/expenses':         'Expenses',
+  '/app/momo-statement':   'MoMo Statement',
   '/app/cashup':           'Cash Up',
   '/app/float':            'Float',
   '/app/stock':            'Stock On Hand',
@@ -64,6 +66,7 @@ export const HREF_TO_ICON: Record<string, LucideIcon> = {
   '/app/reports':          BarChart2,
   '/app/cashup':           Archive,
   '/app/expenses':         Wallet,
+  '/app/momo-statement':   Smartphone,
   '/app/float':            Landmark,
   '/app/loans':            Banknote,
   '/app/settings':         Settings,

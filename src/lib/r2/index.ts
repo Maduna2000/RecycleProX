@@ -64,6 +64,10 @@ export function gateEntryPhotoKey(entryId: string, index: number, ext: string): 
   return `${tenantKeyPrefix()}gate-entries/${entryId}/photo-${index}-${randomUUID()}.${ext}`
 }
 
+export function momoStatementCsvKey(importId: string): string {
+  return `${tenantKeyPrefix()}momo-statements/${importId}.csv`
+}
+
 // ─── Presigned upload URL (PUT) ───────────────────────────────────────────────
 // Client uploads directly to R2 — server never handles the binary.
 
