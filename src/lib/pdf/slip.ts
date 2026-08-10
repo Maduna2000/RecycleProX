@@ -60,16 +60,10 @@ const W        = 227   // 80 mm in pt (80 × 2.8346)
 const MARGIN   = 10
 const BODY_W   = W - MARGIN * 2
 const LINE_H   = 12    // normal text line height
-const SMALL       = 7     // small font size
-const NORMAL      = 8     // normal font size
-const LARGE       = 10    // section title size
-const HUGE        = 13    // company name size
-// Purchase/sale note footer declaration — was SMALL/GRAY, which printed so
-// faint on thermal paper it was effectively unreadable. Matches the product
-// lines' weight (BLACK, not GRAY) and goes a size above NORMAL, not just
-// even with it, since this is a legal declaration that needs to actually
-// be noticed, not a passing line item.
-const DECLARATION = 9
+const SMALL    = 7     // small font size
+const NORMAL   = 8     // normal font size
+const LARGE    = 10    // section title size
+const HUGE     = 13    // company name size
 
 const BLACK  = rgb(0,    0,    0)
 const DGRAY  = rgb(0.2,  0.2,  0.2)
@@ -637,7 +631,7 @@ export async function generatePurchaseReceiptPdf(data: PurchaseSlipData): Promis
   const bold = await doc.embedFont(StandardFonts.HelveticaBold)
   const reg  = await doc.embedFont(StandardFonts.Helvetica)
 
-  const footerLines = data.footerText ? wrapText(data.footerText, DECLARATION, reg, PBODY_W) : []
+  const footerLines = data.footerText ? wrapText(data.footerText, NORMAL, reg, PBODY_W) : []
   const docHeight = estimatePurchaseHeight(data, footerLines.length)
   const page = doc.addPage([W, docHeight])
 
@@ -776,8 +770,8 @@ export async function generatePurchaseReceiptPdf(data: PurchaseSlipData): Promis
   }
   nextLine(NORMAL, 0)
   for (const fLine of footerLines) {
-    page.drawText(fLine, { x: PMARGIN, y: cursor, size: DECLARATION, font: reg, color: BLACK })
-    nextLine(DECLARATION)
+    page.drawText(fLine, { x: PMARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
+    nextLine(NORMAL)
   }
 
   // ── Signature ──────────────────────────────────────────────────────────
@@ -895,7 +889,7 @@ export async function generateSaleReceiptPdf(data: SaleSlipData): Promise<Uint8A
   const bold = await doc.embedFont(StandardFonts.HelveticaBold)
   const reg  = await doc.embedFont(StandardFonts.Helvetica)
 
-  const footerLines = data.footerText ? wrapText(data.footerText, DECLARATION, reg, PBODY_W) : []
+  const footerLines = data.footerText ? wrapText(data.footerText, NORMAL, reg, PBODY_W) : []
   const docHeight = estimateSaleHeight(data, footerLines.length)
   const page = doc.addPage([W, docHeight])
 
@@ -1024,8 +1018,8 @@ export async function generateSaleReceiptPdf(data: SaleSlipData): Promise<Uint8A
   }
   nextLine(NORMAL, 0)
   for (const fLine of footerLines) {
-    page.drawText(fLine, { x: PMARGIN, y: cursor, size: DECLARATION, font: reg, color: BLACK })
-    nextLine(DECLARATION)
+    page.drawText(fLine, { x: PMARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
+    nextLine(NORMAL)
   }
   cursor -= 2
   solidLine(page, cursor)

@@ -44,7 +44,21 @@ export const VerifyBusinessLoanPinSchema = z.object({
   pin:        z.string().regex(/^\d{4}$/, 'PIN must be 4 digits'),
 })
 
+const finPeriodString = z
+  .string()
+  .regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Must be a valid period (YYYY-MM)')
+
+export const BusinessLoanStatementQuerySchema = z.object({
+  period: finPeriodString.optional(),
+})
+
+export const ReverseBusinessLoanRepaymentSchema = z.object({
+  reason: z.string().min(5, 'Reason must be at least 5 characters').max(500),
+})
+
 export type CreateBusinessLoanInput             = z.infer<typeof CreateBusinessLoanSchema>
 export type VoidBusinessLoanInput               = z.infer<typeof VoidBusinessLoanSchema>
 export type VerifyBusinessLoanPinInput          = z.infer<typeof VerifyBusinessLoanPinSchema>
 export type RecordBusinessLoanRepaymentInput    = z.infer<typeof RecordBusinessLoanRepaymentSchema>
+export type BusinessLoanStatementQueryInput     = z.infer<typeof BusinessLoanStatementQuerySchema>
+export type ReverseBusinessLoanRepaymentInput   = z.infer<typeof ReverseBusinessLoanRepaymentSchema>

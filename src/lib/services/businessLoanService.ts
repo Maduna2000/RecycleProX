@@ -5,7 +5,7 @@ import logger from '@/lib/logger'
 import Decimal from 'decimal.js'
 import type { Prisma } from '@prisma/client'
 import type { CreateBusinessLoanInput, VoidBusinessLoanInput } from '@/lib/schemas/businessLoan'
-import { todaySASTDate, todaySASTDateStr } from '@/lib/utils/dayBounds'
+import { todaySASTDate, todaySASTDateStr, sastDateLabelToUTCDate, getRangeBoundsSAST } from '@/lib/utils/dayBounds'
 
 // ─── Typed Errors ─────────────────────────────────────────────────────────────
 
@@ -43,6 +43,14 @@ export class CustomerNotDealerTierError extends Error {
 
 export class InvalidAdminPinError extends Error {
   constructor() { super('Incorrect admin PIN'); this.name = 'InvalidAdminPinError' }
+}
+
+export class BusinessLoanRepaymentNotFoundError extends Error {
+  constructor(id: string) { super(`Business loan repayment "${id}" not found`); this.name = 'BusinessLoanRepaymentNotFoundError' }
+}
+
+export class BusinessLoanRepaymentNotLastEntryError extends Error {
+  constructor() { super('Only the most recent loan or repayment entry can be reversed'); this.name = 'BusinessLoanRepaymentNotLastEntryError' }
 }
 
 // ─── Reference number generators ─────────────────────────────────────────────
@@ -245,6 +253,197 @@ export async function recordBusinessLoanRepayment(
     'businessLoan.repayment.recorded'
   )
   return repayments
+}
+
+// ─── Reverse a manual repayment (Delete Last, when last entry is a repayment) ──
+// Mirrors loanService.ts's reverseRepayment — see its comment for why this
+// writes an offsetting negative-amount repayment rather than mutating/
+// deleting the original. Only the single most recent entry across the
+// customer's whole business-loan history (not just the viewed period) may
+// be reversed, so the ledger's running balance never develops a gap.
+export async function reverseManualBusinessLoanRepayment(repaymentId: string, reason: string, userId?: string) {
+  const repayment = await prisma.businessLoanRepayment.findUnique({ where: { id: repaymentId } })
+  if (!repayment) throw new BusinessLoanRepaymentNotFoundError(repaymentId)
+
+  const [laterLoan, laterRepayment] = await Promise.all([
+    prisma.businessLoan.findFirst({ where: { customerId: repayment.customerId, createdAt: { gt: repayment.createdAt } } }),
+    prisma.businessLoanRepayment.findFirst({ where: { customerId: repayment.customerId, createdAt: { gt: repayment.createdAt }, id: { not: repayment.id } } }),
+  ])
+  if (laterLoan || laterRepayment) throw new BusinessLoanRepaymentNotLastEntryError()
+
+  const loan = await prisma.businessLoan.findUniqueOrThrow({ where: { id: repayment.businessLoanId } })
+  const restoredBalance = new Decimal(loan.balanceAmount.toString()).plus(repayment.amount.toString())
+
+  const prefix     = `BRP-${todaySASTDateStr().replace(/-/g, '')}`
+  const startOfDay = todaySASTDate()
+
+  const reversal = await prisma.$transaction(async (tx) => {
+    await tx.businessLoan.update({ where: { id: repayment.businessLoanId }, data: { balanceAmount: restoredBalance, status: 'active' } })
+    const count = await tx.businessLoanRepayment.count({ where: { createdAt: { gte: startOfDay } } })
+    return tx.businessLoanRepayment.create({
+      data: {
+        tenantId:        requireTenantId(),
+        refNumber:       `${prefix}-${String(count + 1).padStart(4, '0')}`,
+        businessLoanId:  repayment.businessLoanId,
+        customerId:      repayment.customerId,
+        amount:          new Decimal(repayment.amount.toString()).negated(),
+        paymentMethod:   repayment.paymentMethod,
+        notes:           `Reversal (manual) — ${reason}`,
+        createdByUserId: userId,
+      },
+    })
+  })
+
+  logger.info(
+    { reversedRepaymentId: repayment.id, businessLoanId: repayment.businessLoanId, amount: repayment.amount.toString(), restoredBalance: restoredBalance.toFixed(2), userId },
+    'businessLoan.repayment.manually_reversed'
+  )
+  return reversal
+}
+
+// ─── Customer Business Loan Statement (ledger) ─────────────────────────────────
+// Backs the Business Loan tab's ledger view and its "Print Statement" PDF —
+// mirrors loanService.ts's getCustomerLoanStatement exactly, except the sign
+// convention is inverted to match this tab's existing "You Owe" language: an
+// advance (money borrowed from the dealer) makes the balance more POSITIVE
+// (the business owes more), a repayment brings it back toward zero.
+export interface BusinessLoanLedgerRow {
+  id:          string
+  date:        string // ISO
+  description: string
+  transaction: string
+  advance:     string | null
+  repayment:   string | null
+  balance:     string
+}
+
+function formatBusinessLoanTransactionMethod(method: string): string {
+  if (method === 'eft') return 'EFT'
+  return method.charAt(0).toUpperCase() + method.slice(1)
+}
+
+function businessLoanMonthBounds(period: string): { from: string; to: string } {
+  const [yearStr, monthStr] = period.split('-')
+  const year  = Number(yearStr)
+  const month = Number(monthStr) // 1-indexed
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate()
+  return { from: `${period}-01`, to: `${period}-${String(lastDay).padStart(2, '0')}` }
+}
+
+export async function getCustomerBusinessLoanStatement(customerId: string, periodStr?: string) {
+  const period = periodStr ?? todaySASTDateStr().slice(0, 7)
+  const { from, to } = businessLoanMonthBounds(period)
+  const { start, end } = getRangeBoundsSAST(from, to)
+
+  const [openingLoans, openingRepayments, loansInPeriod, repaymentsInPeriod] = await Promise.all([
+    prisma.businessLoan.aggregate({
+      where: { customerId, status: { not: 'voided' }, createdAt: { lt: start } },
+      _sum: { principalAmount: true },
+    }),
+    prisma.businessLoanRepayment.aggregate({
+      where: { customerId, createdAt: { lt: start } },
+      _sum: { amount: true },
+    }),
+    prisma.businessLoan.findMany({
+      where: { customerId, status: { not: 'voided' }, createdAt: { gte: start, lte: end } },
+      orderBy: { createdAt: 'asc' },
+    }),
+    prisma.businessLoanRepayment.findMany({
+      where: { customerId, createdAt: { gte: start, lte: end } },
+      orderBy: { createdAt: 'asc' },
+    }),
+  ])
+
+  const advancedBefore = new Decimal(openingLoans._sum.principalAmount?.toString() ?? '0')
+  const repaidBefore   = new Decimal(openingRepayments._sum.amount?.toString() ?? '0')
+  let balance = advancedBefore.minus(repaidBefore)
+  const openingBalance = balance
+
+  interface Entry {
+    id: string; createdAt: Date; description: string; transaction: string
+    advance: Decimal | null; repayment: Decimal | null
+  }
+  const entries: Entry[] = []
+
+  for (const loan of loansInPeriod) {
+    entries.push({
+      id:          loan.id,
+      createdAt:   loan.createdAt,
+      description: 'Borrowed',
+      transaction: formatBusinessLoanTransactionMethod(loan.paymentMethod),
+      advance:     new Decimal(loan.principalAmount.toString()),
+      repayment:   null,
+    })
+  }
+  for (const r of repaymentsInPeriod) {
+    const amount = new Decimal(r.amount.toString())
+    const isReversal = amount.isNegative()
+    const isManualReversal = isReversal && (r.notes ?? '').startsWith('Reversal (manual)')
+    const description = r.saleId
+      ? 'Repayment - Sale'
+      : isManualReversal
+        ? 'Repayment - Reversal'
+        : isReversal
+          ? 'Repayment - Reversal (Sale Voided)'
+          : 'Repayment - Manual'
+    entries.push({
+      id:          r.id,
+      createdAt:   r.createdAt,
+      description,
+      transaction: r.saleId ? 'Stock' : formatBusinessLoanTransactionMethod(r.paymentMethod),
+      advance:     null,
+      repayment:   amount,
+    })
+  }
+
+  entries.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+
+  const rows: BusinessLoanLedgerRow[] = [{
+    id:          'opening',
+    date:        sastDateLabelToUTCDate(from).toISOString(),
+    description: 'OPEN BALANCE',
+    transaction: '',
+    advance:     null,
+    repayment:   null,
+    balance:     openingBalance.toFixed(2),
+  }]
+
+  for (const e of entries) {
+    if (e.advance)   balance = balance.plus(e.advance)
+    if (e.repayment) balance = balance.minus(e.repayment)
+    rows.push({
+      id:          e.id,
+      date:        e.createdAt.toISOString(),
+      description: e.description,
+      transaction: e.transaction,
+      advance:     e.advance   ? e.advance.toFixed(2)   : null,
+      repayment:   e.repayment ? e.repayment.toFixed(2) : null,
+      balance:     balance.toFixed(2),
+    })
+  }
+
+  // The single most recent entry across all history (not just this period) —
+  // the ledger's "Delete Last" button needs to know what it would undo even
+  // when viewing a past, already-closed period.
+  const [lastLoan, lastRepayment] = await Promise.all([
+    prisma.businessLoan.findFirst({ where: { customerId, status: { not: 'voided' } }, orderBy: { createdAt: 'desc' } }),
+    prisma.businessLoanRepayment.findFirst({ where: { customerId }, orderBy: { createdAt: 'desc' } }),
+  ])
+  const lastEntry = (() => {
+    if (!lastLoan && !lastRepayment) return null
+    if (!lastRepayment || (lastLoan && lastLoan.createdAt > lastRepayment.createdAt)) {
+      return { kind: 'loan' as const, id: lastLoan!.id, description: 'Borrowed', amount: lastLoan!.principalAmount.toString(), date: lastLoan!.createdAt.toISOString() }
+    }
+    return { kind: 'repayment' as const, id: lastRepayment.id, description: 'Repayment', amount: lastRepayment.amount.toString(), date: lastRepayment.createdAt.toISOString() }
+  })()
+
+  return {
+    period,
+    openingBalance: openingBalance.toFixed(2),
+    closingBalance: balance.toFixed(2),
+    rows,
+    lastEntry,
+  }
 }
 
 // ─── Create Business Loan ─────────────────────────────────────────────────────

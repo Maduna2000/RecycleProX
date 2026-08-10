@@ -9,6 +9,7 @@ import { getRangeBoundsSAST, sastDateLabelToUTCDate, sastDayLabelOfInstant } fro
 import { purchaseHeaderAmounts } from '@/lib/utils/vat'
 import { getProfitSummary } from '@/lib/services/reportService'
 import { getCustomerLoanStatement } from '@/lib/services/loanService'
+import { getCustomerBusinessLoanStatement } from '@/lib/services/businessLoanService'
 import { groupRows } from '@/lib/services/reports/grouping'
 import { countDataRows } from '@/lib/reports/flatten'
 import { DENOMINATION_LABELS, DENOMINATIONS } from '@/lib/schemas/cashup'
@@ -674,6 +675,58 @@ export async function buildCustomerLoanStatement(
     groups: [{ level: 0, label: customerName(customer), rows }],
     summary: [
       { label: 'Amount Due', value: `${meta.currencySymbol}${statement.closingBalance}`, emphasis: true },
+    ],
+    meta: { ...meta, rowCount: rows.length },
+  }
+}
+
+// ─── Customer Business Loan Statement ──────────────────────────────────────────
+// "Print Statement" on the Business Loan tab — same shape as
+// buildCustomerLoanStatement above, backed by getCustomerBusinessLoanStatement
+// (businessLoanService.ts) instead. Sign convention there is already inverted
+// to match that tab's "You Owe" language, so this builder just passes it
+// through unchanged.
+
+export async function buildCustomerBusinessLoanStatement(
+  customerId: string,
+  period: string | undefined,
+  meta: MetaBase
+): Promise<ReportDocument> {
+  const [customer, statement] = await Promise.all([
+    prisma.customer.findUniqueOrThrow({
+      where: { id: customerId },
+      select: { firstName: true, lastName: true, companyName: true },
+    }),
+    getCustomerBusinessLoanStatement(customerId, period),
+  ])
+
+  const rows: ReportRow[] = statement.rows.map((r) => ({
+    cells: {
+      date: r.date,
+      description: r.description,
+      transaction: r.transaction || null,
+      advance: r.advance,
+      repayment: r.repayment,
+      balance: r.balance,
+    },
+  }))
+
+  return {
+    reportId: 'customer-business-loan-statement',
+    title: 'Business Loan Statement',
+    subtitle: `For ${customerName(customer)} — Period ${statement.period}`,
+    params: { from: `${statement.period}-01`, to: `${statement.period}-01` },
+    columns: [
+      { key: 'description', label: 'Description', width: 0.28, format: 'text', excelWidth: 28 },
+      { key: 'date', label: 'Date', width: 0.14, format: 'date', excelWidth: 13 },
+      { key: 'transaction', label: 'Transaction', width: 0.12, format: 'text', excelWidth: 12 },
+      { key: 'advance', label: 'Borrowed', width: 0.15, align: 'right', format: 'money', excelWidth: 13 },
+      { key: 'repayment', label: 'Repayment', width: 0.15, align: 'right', format: 'money', excelWidth: 13 },
+      { key: 'balance', label: 'Balance', width: 0.16, align: 'right', format: 'money', excelWidth: 13 },
+    ],
+    groups: [{ level: 0, label: customerName(customer), rows }],
+    summary: [
+      { label: 'You Owe', value: `${meta.currencySymbol}${statement.closingBalance}`, emphasis: true },
     ],
     meta: { ...meta, rowCount: rows.length },
   }

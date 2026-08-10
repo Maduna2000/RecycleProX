@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import useSWR, { mutate } from 'swr'
-import { Loader2, MoreHorizontal, Lock, HandCoins, Coins, CreditCard, Split } from 'lucide-react'
+import { Loader2, Lock, HandCoins, Coins, CreditCard, Split, Plus, Minus, Trash2, Printer } from 'lucide-react'
 import { toast } from 'sonner'
 import Decimal from 'decimal.js'
 import { Dialog } from '@/components/ui/dialog'
@@ -10,20 +10,22 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { DataTable, type Column } from '@/components/ui/DataTable'
 import { format } from '@/lib/utils/format'
 import { colors } from '@/lib/design-tokens'
-import { HEADER_GRAD, VIOLET_GRAD, lbl, Btn, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
+import { HEADER_GRAD, lbl, Btn, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
 import { fetcher } from '@/lib/swrFetcher'
 
 
 // This tab is the mirror image of the "Loans" tab: Loans is money the
 // business advances TO this customer (a receivable — the customer owes us).
 // This tab is money the customer/dealer advanced TO the business (a
-// liability — we owe them). Same underlying pattern, opposite direction, so
-// everything here is deliberately styled and worded around "owe"/"borrowed"
-// rather than reusing Loans' "advance"/"outstanding" language, and uses
-// violet (a liability/debt color) instead of Loans' green, so the two tabs
-// are never mistaken for each other at a glance.
+// liability — we owe them). Same ledger-per-Fin-Period UI pattern as Loans
+// (SHdr, toolbar, chronological DataTable, Amount Due footer), but
+// deliberately styled and worded around "owe"/"borrowed" rather than
+// reusing Loans' "advance"/"outstanding" language, and uses violet (a
+// liability/debt color) instead of Loans' green, so the two tabs are never
+// mistaken for each other at a glance.
 
 type BusinessLoan = {
   id: string
@@ -47,6 +49,32 @@ type BusinessLoanSummaryResponse = {
   loans?: BusinessLoan[]
 }
 
+type LedgerRow = {
+  id:          string
+  date:        string
+  description: string
+  transaction: string
+  advance:     string | null
+  repayment:   string | null
+  balance:     string
+}
+
+type LastEntry = {
+  kind:        'loan' | 'repayment'
+  id:          string
+  description: string
+  amount:      string
+  date:        string
+} | null
+
+type StatementResponse = {
+  period:         string
+  openingBalance: string
+  closingBalance: string
+  rows:           LedgerRow[]
+  lastEntry:      LastEntry
+}
+
 interface BusinessLoanTabProps {
   customerId: string
   customerName: string
@@ -58,90 +86,110 @@ const PAYMENT_METHODS = [
   { value: 'eft', label: 'EFT' },
 ]
 
-function SHdr({ title, subtitle }: { title: string; subtitle: string }) {
+function SHdr({ title }: { title: string }) {
   return (
-    <div style={{ background: HEADER_GRAD, borderBottom: '1px solid #C0C0C0', padding: '5px 10px', flexShrink: 0 }}>
+    <div style={{ background: HEADER_GRAD, borderBottom: '1px solid #C0C0C0', padding: '4px 10px', flexShrink: 0 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         <HandCoins style={{ width: 12, height: 12, color: colors.violet }} />
         <span style={{ fontSize: 11, fontWeight: 700, color: colors.violet }}>{title}</span>
       </div>
-      <span style={{ fontSize: 10, color: '#6C757D' }}>{subtitle}</span>
     </div>
   )
 }
 
-function StatusBadge({ status }: { status: 'active' | 'settled' | 'voided' }) {
-  const styles: Record<typeof status, { bg: string; color: string; text: string }> = {
-    active: { bg: colors.violetBg, color: colors.violet, text: 'You Owe' },
-    settled: { bg: '#DCFCE7', color: '#166534', text: 'Settled' },
-    voided: { bg: '#F3F4F6', color: '#6B7280', text: 'Voided' },
-  }
-  const s = styles[status]
-  return (
-    <span
-      style={{
-        display: 'inline-block',
-        fontSize: 10,
-        fontWeight: 700,
-        borderRadius: 2,
-        padding: '1px 6px',
-        background: s.bg,
-        color: s.color,
-      }}
-    >
-      {s.text}
-    </span>
-  )
+function currentPeriod(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
-export function BusinessLoanTab({ customerId, customerName, userRole }: BusinessLoanTabProps) {
-  const [createOpen, setCreateOpen] = useState(false)
-  const [voidTarget, setVoidTarget] = useState<BusinessLoan | null>(null)
-  const [repayTarget, setRepayTarget] = useState<BusinessLoan | null>(null)
-  const [menuOpenId, setMenuOpenId] = useState<string | null>(null)
-  const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
+// Positive = the business owes this dealer money (mirror of Loans' negative-
+// for-customer-owes-us convention — see businessLoanService.ts's comment).
+const moneyColor = (v: string) => (new Decimal(v).gt(0) ? colors.violet : colors.action)
 
-  const { data, isLoading, error } = useSWR<BusinessLoanSummaryResponse>(
-    `/api/customers/${customerId}/business-loans`, fetcher)
+const ledgerColumns: Column<LedgerRow>[] = [
+  {
+    key: 'description',
+    header: 'Description',
+    render: (row) => <span style={{ fontWeight: row.id === 'opening' ? 600 : 400 }}>{row.description}</span>,
+  },
+  {
+    key: 'date',
+    header: 'Date',
+    width: '110px',
+    render: (row) => (
+      <span style={{ color: '#6C757D' }}>
+        {new Date(row.date).toLocaleDateString('en-ZA', { year: 'numeric', month: '2-digit', day: '2-digit' })}
+      </span>
+    ),
+  },
+  {
+    key: 'transaction',
+    header: 'Transaction',
+    width: '120px',
+    render: (row) => <span style={{ color: '#6C757D' }}>{row.transaction}</span>,
+  },
+  {
+    key: 'advance',
+    header: 'Borrowed',
+    width: '110px',
+    align: 'right',
+    render: (row) => <span style={{ fontFamily: 'monospace' }}>{format.currency(row.advance ?? '0')}</span>,
+  },
+  {
+    key: 'repayment',
+    header: 'Repayment',
+    width: '110px',
+    align: 'right',
+    render: (row) => <span style={{ fontFamily: 'monospace' }}>{format.currency(row.repayment ?? '0')}</span>,
+  },
+  {
+    key: 'balance',
+    header: 'Balance',
+    width: '120px',
+    align: 'right',
+    render: (row) => (
+      <span style={{ fontFamily: 'monospace', fontWeight: 600, color: moneyColor(row.balance) }}>
+        {format.currency(row.balance)}
+      </span>
+    ),
+  },
+]
+
+// ─── BusinessLoanTab ────────────────────────────────────────────────────────
+
+export function BusinessLoanTab({ customerId, customerName, userRole }: BusinessLoanTabProps) {
+  const [period,           setPeriod]           = useState(currentPeriod())
+  const [createOpen,       setCreateOpen]       = useState(false)
+  const [repayOpen,        setRepayOpen]        = useState(false)
+  const [deleteLastOpen,   setDeleteLastOpen]   = useState(false)
+  const [voidTarget,       setVoidTarget]       = useState<BusinessLoan | null>(null)
 
   const isAdmin = userRole === 'admin'
-  const loans = data?.loans ?? []
+
+  const statementKey = `/api/customers/${customerId}/business-loans/statement?period=${period}`
+  const { data, isLoading, error } = useSWR<StatementResponse>(isAdmin ? statementKey : null, fetcher)
+
+  // Only needed to target "Add Repayment" at a specific loan and to expose
+  // "Void" on a mistaken zero-repayment entry — the ledger above only has
+  // per-day rows, not the underlying loan objects.
+  const summaryKey = `/api/customers/${customerId}/business-loans`
+  const { data: summary } = useSWR<BusinessLoanSummaryResponse>(isAdmin ? summaryKey : null, fetcher)
+  const activeLoans = (summary?.loans ?? []).filter((l) => l.status === 'active')
 
   function revalidate() {
-    mutate(`/api/customers/${customerId}/business-loans`)
+    mutate(statementKey)
+    mutate(summaryKey)
   }
 
-  function canVoidLoan(loan: BusinessLoan): boolean {
-    return isAdmin && loan.status === 'active' && (loan._count?.repayments ?? 0) === 0
-  }
-
-  function canRecordPayment(loan: BusinessLoan): boolean {
-    return isAdmin && loan.status === 'active' && new Decimal(loan.balanceAmount).gt(0)
-  }
-
-  const owed = data?.outstanding ? new Decimal(data.outstanding) : new Decimal(0)
+  const closingBalance = data ? new Decimal(data.closingBalance) : new Decimal(0)
 
   if (isLoading) {
     return (
       <div>
-        <SHdr title="Business Loan" subtitle="Money the business borrowed from this dealer" />
+        <SHdr title="Business Loan" />
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 0', color: '#9CA3AF', fontSize: 12, gap: 8 }}>
           <Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} />
           Loading...
-        </div>
-      </div>
-    )
-  }
-
-  // Balances shown below default to zero/no-outstanding when data is
-  // missing — never let that silently stand in for a real fetch failure on
-  // a money figure.
-  if (error) {
-    return (
-      <div>
-        <SHdr title="Business Loan" subtitle="Money the business borrowed from this dealer" />
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 0', color: colors.danger, fontSize: 12 }}>
-          {error instanceof Error ? error.message : 'Failed to load business loan data'}
         </div>
       </div>
     )
@@ -151,7 +199,7 @@ export function BusinessLoanTab({ customerId, customerName, userRole }: Business
   if (!isAdmin) {
     return (
       <div>
-        <SHdr title="Business Loan" subtitle="Money the business borrowed from this dealer" />
+        <SHdr title="Business Loan" />
         <div style={{ padding: '24px 16px', textAlign: 'center' }}>
           <div
             style={{
@@ -160,18 +208,15 @@ export function BusinessLoanTab({ customerId, customerName, userRole }: Business
               gap: 8,
               padding: '8px 16px',
               borderRadius: 4,
-              background: data?.hasOutstanding ? colors.violetBg : '#F3F4F6',
-              border: `1px solid ${data?.hasOutstanding ? '#C4B5FD' : '#E5E7EB'}`,
+              background: '#F3F4F6',
+              border: '1px solid #E5E7EB',
             }}
           >
-            <Lock style={{ width: 13, height: 13, color: data?.hasOutstanding ? colors.violet : '#9CA3AF' }} />
-            <span style={{ fontSize: 12, fontWeight: 600, color: data?.hasOutstanding ? colors.violet : '#6B7280' }}>
-              {data?.hasOutstanding ? 'The business owes this dealer money' : 'The business owes this dealer nothing'}
+            <Lock style={{ width: 13, height: 13, color: '#9CA3AF' }} />
+            <span style={{ fontSize: 12, fontWeight: 600, color: '#6B7280' }}>
+              The amount owed is only visible to a system admin
             </span>
           </div>
-          <p style={{ fontSize: 11, color: '#9CA3AF', marginTop: 10 }}>
-            The amount owed is only visible to a system admin.
-          </p>
         </div>
       </div>
     )
@@ -179,197 +224,89 @@ export function BusinessLoanTab({ customerId, customerName, userRole }: Business
 
   return (
     <div>
-      <SHdr title="Business Loan" subtitle="Money the business borrowed from this dealer" />
+      <SHdr title="Business Loan" />
 
+      {/* Toolbar — mirrors the Loans tab exactly: actions on the left,
+          period picker + print on the right. */}
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '10px 12px',
+          gap: 6,
+          padding: '8px 10px',
           borderBottom: '1px solid #E0E0E0',
+          background: '#FAFAFA',
+          flexWrap: 'wrap',
+        }}
+      >
+        <Btn size="sm" icon={Plus} onClick={() => setCreateOpen(true)}>Record Money Borrowed</Btn>
+        <Btn
+          size="sm"
+          icon={Plus}
+          disabled={activeLoans.length === 0}
+          onClick={() => setRepayOpen(true)}
+          title={activeLoans.length === 0 ? 'Nothing outstanding to repay' : undefined}
+        >
+          Add Repayment
+        </Btn>
+        <Btn
+          size="sm"
+          icon={Trash2}
+          variant="danger"
+          disabled={!data?.lastEntry}
+          onClick={() => setDeleteLastOpen(true)}
+          title={data?.lastEntry ? 'Undo the most recent loan or repayment entry' : 'No loan activity to delete'}
+        >
+          Delete Last
+        </Btn>
+        <div style={{ flex: 1 }} />
+        <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: colors.textSecondary, fontWeight: 600 }}>
+          Fin Period
+          <input
+            type="month"
+            value={period}
+            onChange={(e) => setPeriod(e.target.value)}
+            style={{ fontSize: 11, padding: '3px 6px', border: '1px solid #ABABAB', borderRadius: 3, background: '#fff' }}
+          />
+        </label>
+        <Btn
+          size="sm"
+          icon={Printer}
+          onClick={() => window.open(`/api/customers/${customerId}/business-loans/statement/pdf?period=${period}`, '_blank')}
+        >
+          Print Statement
+        </Btn>
+      </div>
+
+      {/* Ledger */}
+      <div style={{ padding: 10 }}>
+        <DataTable
+          columns={ledgerColumns}
+          rows={data?.rows ?? []}
+          rowKey={(row) => row.id}
+          loading={isLoading}
+          error={error instanceof Error ? error.message : !!error}
+          emptyMessage="No loan activity for this period"
+        />
+      </div>
+
+      {/* Footer — You Owe */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+          gap: 8,
+          padding: '8px 12px',
+          borderTop: '1px solid #E0E0E0',
           background: '#FAFAFA',
         }}
       >
-        <div>
-          <span style={lbl}>You Owe {customerName}</span>
-          <span
-            style={{
-              fontSize: 14,
-              fontWeight: 700,
-              fontFamily: 'monospace',
-              color: owed.gt(0) ? colors.violet : colors.action,
-            }}
-          >
-            {format.currency(owed.toString())}
-          </span>
-        </div>
-        <button
-          onClick={() => setCreateOpen(true)}
-          style={{
-            fontSize: 11,
-            padding: '4px 12px',
-            borderRadius: 3,
-            cursor: 'pointer',
-            background: VIOLET_GRAD,
-            border: `1px solid ${colors.violet}`,
-            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.35)',
-            color: '#fff',
-            fontWeight: 600,
-          }}
-        >
-          + Record Money Borrowed
-        </button>
+        <span style={lbl}>You Owe {customerName}</span>
+        <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 14, color: moneyColor(closingBalance.toString()) }}>
+          {format.currency(closingBalance.toString())}
+        </span>
       </div>
-
-      {loans.length === 0 ? (
-        <div style={{ padding: '40px 0', textAlign: 'center' }}>
-          <p style={{ color: '#9CA3AF', fontSize: 12, marginBottom: 12 }}>
-            The business has never borrowed money from this dealer
-          </p>
-          <button
-            onClick={() => setCreateOpen(true)}
-            style={{
-              fontSize: 11,
-              padding: '4px 12px',
-              borderRadius: 3,
-              cursor: 'pointer',
-              background: VIOLET_GRAD,
-              border: `1px solid ${colors.violet}`,
-              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.35)',
-              color: '#fff',
-              fontWeight: 600,
-            }}
-          >
-            + Record Money Borrowed
-          </button>
-        </div>
-      ) : (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-            <thead>
-              <tr style={{ background: HEADER_GRAD, borderBottom: '1px solid #C0C0C0' }}>
-                {['Reference', 'Borrowed', 'Still Owed', 'Status', 'Date', ''].map((h) => (
-                  <th
-                    key={h}
-                    style={{
-                      textAlign: 'left',
-                      padding: '5px 10px',
-                      fontSize: 10,
-                      fontWeight: 700,
-                      textTransform: 'uppercase',
-                      color: '#6C757D',
-                      letterSpacing: '0.04em',
-                    }}
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {loans.map((loan, i) => (
-                <tr
-                  key={loan.id}
-                  style={{
-                    borderBottom: '1px solid #F0F0F0',
-                    background: i % 2 === 0 ? '#fff' : '#FAFAFA',
-                    opacity: loan.status === 'voided' ? 0.5 : 1,
-                  }}
-                >
-                  <td style={{ padding: '5px 10px', fontFamily: 'monospace', fontSize: 11 }}>{loan.refNumber}</td>
-                  <td style={{ padding: '5px 10px', fontFamily: 'monospace' }}>{format.currency(loan.principalAmount)}</td>
-                  <td
-                    style={{
-                      padding: '5px 10px',
-                      fontFamily: 'monospace',
-                      fontWeight: 600,
-                      color: new Decimal(loan.balanceAmount).gt(0) ? colors.violet : colors.action,
-                    }}
-                  >
-                    {format.currency(loan.balanceAmount)}
-                  </td>
-                  <td style={{ padding: '5px 10px' }}>
-                    <StatusBadge status={loan.status} />
-                  </td>
-                  <td style={{ padding: '5px 10px', color: '#6C757D' }}>
-                    {new Date(loan.createdAt).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short' })}
-                  </td>
-                  <td style={{ padding: '5px 10px', width: 40, position: 'relative' }}>
-                    {(canRecordPayment(loan) || canVoidLoan(loan)) && (
-                      <button
-                        onClick={(e) => {
-                          if (menuOpenId === loan.id) { setMenuOpenId(null); setMenuPos(null); return }
-                          const rect = e.currentTarget.getBoundingClientRect()
-                          setMenuPos({ top: rect.bottom + 2, right: window.innerWidth - rect.right })
-                          setMenuOpenId(loan.id)
-                        }}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, borderRadius: 2 }}
-                      >
-                        <MoreHorizontal style={{ width: 14, height: 14, color: '#6C757D' }} />
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* Fixed-position row menu — rendered outside the scrollable table so it
-          never gets clipped by the tab panel's inner scroller */}
-      {menuOpenId && menuPos && (
-        <>
-          <div style={{ position: 'fixed', inset: 0, zIndex: 49 }} onClick={() => { setMenuOpenId(null); setMenuPos(null) }} />
-          <div
-            style={{
-              position: 'fixed',
-              top: menuPos.top,
-              right: menuPos.right,
-              zIndex: 50,
-              background: '#fff',
-              border: '1px solid #E0E0E0',
-              borderRadius: 4,
-              boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-              minWidth: 130,
-            }}
-          >
-            {(() => {
-              const loan = loans.find((l) => l.id === menuOpenId)
-              if (!loan) return null
-              return (
-                <>
-                  {canRecordPayment(loan) && (
-                    <button
-                      onClick={() => {
-                        setRepayTarget(loan)
-                        setMenuOpenId(null)
-                        setMenuPos(null)
-                      }}
-                      style={{ display: 'block', width: '100%', padding: '6px 12px', fontSize: 11, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', color: colors.violet }}
-                    >
-                      Record Payment
-                    </button>
-                  )}
-                  {canVoidLoan(loan) && (
-                    <button
-                      onClick={() => {
-                        setVoidTarget(loan)
-                        setMenuOpenId(null)
-                        setMenuPos(null)
-                      }}
-                      style={{ display: 'block', width: '100%', padding: '6px 12px', fontSize: 11, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', color: '#DC2626' }}
-                    >
-                      Void Entry
-                    </button>
-                  )}
-                </>
-              )
-            })()}
-          </div>
-        </>
-      )}
 
       {createOpen && (
         <CreateBusinessLoanDialog
@@ -380,21 +317,29 @@ export function BusinessLoanTab({ customerId, customerName, userRole }: Business
         />
       )}
 
+      {repayOpen && activeLoans.length > 0 && (
+        <RecordBusinessLoanRepaymentDialog
+          loans={activeLoans}
+          customerName={customerName}
+          onClose={() => setRepayOpen(false)}
+          onSuccess={() => { revalidate(); setRepayOpen(false) }}
+        />
+      )}
+
+      {deleteLastOpen && data?.lastEntry && (
+        <DeleteLastDialog
+          lastEntry={data.lastEntry}
+          onClose={() => setDeleteLastOpen(false)}
+          onSuccess={() => { revalidate(); setDeleteLastOpen(false) }}
+        />
+      )}
+
       {voidTarget && (
         <VoidBusinessLoanDialog
           loan={voidTarget}
           customerName={customerName}
           onClose={() => setVoidTarget(null)}
           onSuccess={() => { revalidate(); setVoidTarget(null) }}
-        />
-      )}
-
-      {repayTarget && (
-        <RecordBusinessLoanRepaymentDialog
-          loan={repayTarget}
-          customerName={customerName}
-          onClose={() => setRepayTarget(null)}
-          onSuccess={() => { revalidate(); setRepayTarget(null) }}
         />
       )}
     </div>
@@ -496,6 +441,8 @@ function CreateBusinessLoanDialog({
 }
 
 // ─── Void Business Loan Dialog ──────────────────────────────────────────────
+// Reachable only via "Delete Last" when the last ledger entry is a loan
+// advance — voidBusinessLoan itself still enforces zero repayments.
 function VoidBusinessLoanDialog({
   loan,
   customerName,
@@ -564,12 +511,10 @@ function VoidBusinessLoanDialog({
 }
 
 // ─── Record Payment Dialog ───────────────────────────────────────────────────
-// The mirror image of the Purchases module's Split Payment modal: that one
-// pays a pending purchase balance UP to exactly zero (mandatory full
-// settlement); this one pays a business loan's balanceAmount DOWN, and a
-// partial amount is fine — the business can chip away at what it owes a
-// dealer over more than one visit. Same split-across-methods mechanic (cash
-// + EFT in one action) and the same PaymentInput row styling.
+// Loan-specific (unlike Loans tab's customer-level FIFO "Add Repayment") —
+// a business loan is a discrete debt the dealer may want tracked separately
+// from any other one, so payment always settles a named loan. When there's
+// only one active loan, the picker is skipped and it's chosen automatically.
 
 function RepayPaymentInput({
   icon,
@@ -607,22 +552,24 @@ function RepayPaymentInput({
 }
 
 function RecordBusinessLoanRepaymentDialog({
-  loan,
+  loans,
   customerName,
   onClose,
   onSuccess,
 }: {
-  loan: BusinessLoan
+  loans: BusinessLoan[]
   customerName: string
   onClose: () => void
   onSuccess: () => void
 }) {
+  const [loanId, setLoanId] = useState(loans[0]!.id)
   const [cash, setCash] = useState('')
   const [eft, setEft] = useState('')
   const [notes, setNotes] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const loan = loans.find((l) => l.id === loanId) ?? loans[0]!
   const balance = new Decimal(loan.balanceAmount)
   const cashAmt = new Decimal(cash || '0')
   const eftAmt = new Decimal(eft || '0')
@@ -671,6 +618,24 @@ function RecordBusinessLoanRepaymentDialog({
         <RpxDialogHeader title={`Record Payment To ${customerName}`} icon={Split} onClose={onClose} />
         <RpxDialogBody>
           <div className="space-y-4">
+            {loans.length > 1 && (
+              <div>
+                <Label>Which Loan? *</Label>
+                <Select value={loanId} onValueChange={(v) => v && setLoanId(v)}>
+                  <SelectTrigger className="mt-1 w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {loans.map((l) => (
+                      <SelectItem key={l.id} value={l.id}>
+                        {l.refNumber} — R {new Decimal(l.balanceAmount).toFixed(2)} outstanding
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             <div className="px-3 py-2.5 rounded-lg" style={{ background: colors.violetBg, border: `1px solid ${colors.violet}` }}>
               <div className="flex justify-between items-center">
                 <span className="text-xs font-medium" style={{ color: colors.violet }}>
@@ -710,6 +675,84 @@ function RecordBusinessLoanRepaymentDialog({
           <Btn onClick={onClose} disabled={loading}>Cancel</Btn>
           <Btn variant="primary" onClick={onSubmit} disabled={paymentTotal.isZero() || paymentTotal.greaterThan(balance)} loading={loading}>
             Record Payment
+          </Btn>
+        </RpxDialogFooter>
+      </RpxDialogContent>
+    </Dialog>
+  )
+}
+
+// ─── Delete Last Dialog ─────────────────────────────────────────────────────
+// Undoes whichever entry is actually last: void (loan advance, only legal
+// when it has zero repayments — voidBusinessLoan's own existing rule) or
+// reverse (repayment — writes an offsetting negative entry, never deletes).
+function DeleteLastDialog({
+  lastEntry,
+  onClose,
+  onSuccess,
+}: {
+  lastEntry: NonNullable<LastEntry>
+  onClose: () => void
+  onSuccess: () => void
+}) {
+  const [reason, setReason] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  async function onSubmit() {
+    if (reason.trim().length < 5) return
+    setLoading(true)
+    const url = lastEntry.kind === 'loan'
+      ? `/api/business-loans/${lastEntry.id}/void`
+      : `/api/business-loans/repayments/${lastEntry.id}/reverse`
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason }),
+    })
+    setLoading(false)
+    if (res.ok) {
+      toast.success(lastEntry.kind === 'loan' ? 'Loan advance deleted' : 'Repayment reversed')
+      onSuccess()
+    } else {
+      const j = (await res.json()) as { error?: string }
+      toast.error(j.error ?? 'Failed to delete last entry')
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
+      <RpxDialogContent maxWidth={440}>
+        <RpxDialogHeader title="Delete Last Entry" icon={Minus} onClose={onClose} />
+        <RpxDialogBody>
+          <div className="space-y-4">
+            <div className="rounded p-3 text-sm" style={{ background: '#FEF2F2', border: '1px solid #FECACA' }}>
+              <p className="font-medium" style={{ color: '#DC2626' }}>
+                {lastEntry.description} of {format.currency(lastEntry.amount)} on{' '}
+                {new Date(lastEntry.date).toLocaleDateString('en-ZA')}
+              </p>
+              <p className="text-xs mt-1" style={{ color: '#DC2626' }}>
+                {lastEntry.kind === 'loan'
+                  ? 'This will delete the loan advance. Only possible while nothing has been repaid against it yet.'
+                  : 'This will reverse the repayment, restoring the loan balance it paid down. The original entry stays on record.'}
+              </p>
+            </div>
+            <div>
+              <Label>Reason *</Label>
+              <Textarea
+                placeholder="Enter a reason (min 5 characters)..."
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                rows={2}
+                className="mt-1"
+                maxLength={500}
+              />
+            </div>
+          </div>
+        </RpxDialogBody>
+        <RpxDialogFooter>
+          <Btn onClick={onClose} disabled={loading}>Cancel</Btn>
+          <Btn variant="danger" onClick={onSubmit} disabled={reason.trim().length < 5} loading={loading}>
+            Delete Last
           </Btn>
         </RpxDialogFooter>
       </RpxDialogContent>
