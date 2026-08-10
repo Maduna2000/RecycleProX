@@ -5,7 +5,7 @@ import {
   Users, UserRound, ShoppingCart, AlertCircle,
   Tag, CreditCard, ImageIcon, Scale,
   Package, ClipboardList, TrendingUp, BarChart2,
-  Archive, Wallet, Landmark, Settings, Smartphone,
+  Archive, Wallet, Landmark, Settings,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -39,7 +39,6 @@ const TILES: Tile[] = [
   { label: 'Reports',            subtitle: 'Analytics & Exports',  icon: BarChart2,     href: '/app/reports',           group: 'green' },
   { label: 'Cash Up',            subtitle: 'Daily Reconciliation', icon: Archive,       href: '/app/cashup',            group: 'amber' },
   { label: 'Expenses',           subtitle: 'Record & Approve',     icon: Wallet,        href: '/app/expenses',          group: 'amber' },
-  { label: 'MoMo Statement',     subtitle: 'Import & Reconcile',   icon: Smartphone,    href: '/app/momo-statement',    group: 'amber' },
   { label: 'Float',              subtitle: 'Opening & Closing',    icon: Landmark,      href: '/app/float',             group: 'amber' },
   { label: 'Settings',           subtitle: 'System Configuration', icon: Settings,      href: '/app/settings',          group: 'grey'  },
 ]
