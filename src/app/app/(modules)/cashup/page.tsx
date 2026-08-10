@@ -9,7 +9,7 @@ import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { CheckCircle2, Calculator, Clock, Lock, RefreshCw, FolderOpen, ChevronLeft, ChevronRight, Upload, Loader2 } from 'lucide-react'
+import { CheckCircle2, Calculator, Clock, Lock, RefreshCw, FolderOpen, ChevronLeft, ChevronRight, Upload, Loader2, History } from 'lucide-react'
 import { Dialog } from '@/components/ui/dialog'
 import { DENOMINATIONS, DENOMINATION_LABELS, type Denomination, CURRENCY_SYMBOLS, CURRENCY_LABELS, type Currency } from '@/lib/schemas/cashup'
 import { colors } from '@/lib/design-tokens'
@@ -738,6 +738,7 @@ function MomoSummaryTile({ label, value, color }: { label: string; value: string
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 export default function CashUpPage() {
+  const router = useRouter()
   const { data: session } = useSession()
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
   const { mutate: offlineMutate } = useOfflineMutation()
@@ -1505,18 +1506,24 @@ export default function CashUpPage() {
                     {/* MoMo Statement — cross-check against the day's uploaded provider
                         statement. Purely informational: never feeds the cash-up formula,
                         just sits here for a manager to eyeball against Cash Purchases /
-                        Account Payments above. Upload + results open in a popup so the
-                        cashier never has to leave this page. */}
-                    <button
-                      onClick={() => setMomoModalOpen(true)}
-                      className="w-full text-left"
-                      style={{ ...PANEL, cursor: 'pointer', border: `1px solid ${colors.border}` }}
-                    >
+                        Account Payments above. */}
+                    <div style={PANEL}>
                       <div className="flex items-center justify-between" style={PANEL_HEAD}>
                         <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: colors.textSecondary }}>MoMo Statement</span>
-                        <span className="text-[10px] font-medium underline" style={{ color: colors.action }}>
-                          {momoStatement ? 'View' : 'Upload'}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => setMomoModalOpen(true)}
+                            style={{ fontSize: 10, padding: '1px 6px', background: '#E0E0E0', border: '1px solid #999', borderRadius: 2, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}
+                          >
+                            <Upload style={{ width: 9, height: 9 }} /> {momoStatement ? 'View Results' : 'Upload'}
+                          </button>
+                          <button
+                            onClick={() => router.push('/app/momo-statement')}
+                            style={{ fontSize: 10, padding: '1px 6px', background: '#E0E0E0', border: '1px solid #999', borderRadius: 2, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}
+                          >
+                            <History style={{ width: 9, height: 9 }} /> View Full History
+                          </button>
+                        </div>
                       </div>
                       {momoStatement ? (
                         <div className="grid grid-cols-3 gap-2" style={{ padding: '8px 10px' }}>
@@ -1544,7 +1551,7 @@ export default function CashUpPage() {
                           No statement uploaded for {sessionDate} yet.
                         </p>
                       )}
-                    </button>
+                    </div>
                   </div>
                 </div>
               )
