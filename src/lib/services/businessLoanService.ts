@@ -124,6 +124,7 @@ export async function reverseRepaymentsForSale(
   saleId: string,
   saleRefNumber: string,
   voidedById: string | undefined,
+  actionLabel: string = 'voided',
 ): Promise<void> {
   const repayments = await tx.businessLoanRepayment.findMany({ where: { saleId } })
   if (repayments.length === 0) return
@@ -149,7 +150,7 @@ export async function reverseRepaymentsForSale(
         customerId:      r.customerId,
         amount:          new Decimal(r.amount.toString()).negated(),
         paymentMethod:   r.paymentMethod,
-        notes:           `Reversal — sale ${saleRefNumber} voided`,
+        notes:           `Reversal — sale ${saleRefNumber} ${actionLabel}`,
         createdByUserId: voidedById,
       },
     })

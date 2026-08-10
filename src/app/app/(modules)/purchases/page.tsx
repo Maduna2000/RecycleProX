@@ -4,7 +4,7 @@ import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import useSWR, { mutate as swrMutate } from 'swr'
 import { useSession } from 'next-auth/react'
-import { Search, Ban, Printer, FileText, Loader2, X, AlertTriangle } from 'lucide-react'
+import { Search, Ban, Printer, FileText, Loader2, X, AlertTriangle, Undo2 } from 'lucide-react'
 import { toast } from 'sonner'
 import Decimal from 'decimal.js'
 import { DataTable, StatusBadge, Avatar, type Column, type RowAction, type SortDir } from '@/components/ui/DataTable'
@@ -71,6 +71,7 @@ export default function PurchasesPage() {
   const [sortDir,       setSortDir]       = useState<SortDir>(null)
   const [selectedId,    setSelectedId]    = useState<string | null>(null)
   const [voidTarget,    setVoidTarget]    = useState<Purchase | null>(null)
+  const [reverseTarget, setReverseTarget] = useState<Purchase | null>(null)
 
   const hasFilters = !!(search || status || paymentMethod || from || to)
 
@@ -211,6 +212,12 @@ export default function PurchasesPage() {
       label:   'Tax Invoice',
       icon:    FileText,
       onClick: (row) => window.open(`/api/purchases/${row.id}/tax-invoice`, '_blank'),
+    },
+    {
+      label:   'Reverse Payment',
+      icon:    Undo2,
+      hidden:  (row) => !isManager || row.status !== 'completed',
+      onClick: (row) => setReverseTarget(row),
     },
     {
       label:   'Void Purchase',
@@ -457,6 +464,19 @@ export default function PurchasesPage() {
           }}
         />
       )}
+
+      {/* Reverse payment dialog */}
+      {reverseTarget && (
+        <ReversePaymentDialog
+          purchase={reverseTarget}
+          onClose={() => setReverseTarget(null)}
+          onSuccess={() => {
+            swrMutate(`/api/purchases?${query}`)
+            if (selectedId === reverseTarget.id) setSelectedId(null)
+            setReverseTarget(null)
+          }}
+        />
+      )}
     </PortalPage>
   )
 }
@@ -516,6 +536,73 @@ function VoidDialog({
           <Btn onClick={onClose} disabled={loading}>Cancel</Btn>
           <Btn variant="danger" onClick={onConfirm} disabled={reason.trim().length < 5} loading={loading}>
             Confirm Void
+          </Btn>
+        </RpxDialogFooter>
+      </RpxDialogContent>
+    </Dialog>
+  )
+}
+
+// ─── Reverse Payment Dialog ─────────────────────────────────────────────────────
+// Sends a completed purchase back to "pending" (unpaid) without touching
+// stock or the goods already received — unlike Void, which undoes the whole
+// transaction. Use this when the purchase itself is correct but it was
+// wrongly marked as paid.
+
+function ReversePaymentDialog({
+  purchase,
+  onClose,
+  onSuccess,
+}: {
+  purchase: Purchase
+  onClose:  () => void
+  onSuccess: () => void
+}) {
+  const [reason,  setReason]  = useState('')
+  const [loading, setLoading] = useState(false)
+
+  async function onConfirm() {
+    if (reason.trim().length < 5) { toast.error('Reason must be at least 5 characters'); return }
+    setLoading(true)
+    const res = await fetch(`/api/purchases/${purchase.id}/reverse-payment`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ reason }),
+    })
+    setLoading(false)
+    if (res.ok) {
+      toast.success('Payment reversed — purchase sent back to unpaid')
+      onSuccess()
+    } else {
+      const j = await res.json()
+      toast.error(j.error ?? 'Failed to reverse payment')
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
+      <RpxDialogContent maxWidth={440}>
+        <RpxDialogHeader title="Reverse Payment" onClose={onClose} />
+        <RpxDialogBody>
+          <p style={{ fontSize: 12.5, color: colors.textSecondary, margin: '0 0 12px' }}>
+            Send{' '}
+            <span style={{ fontWeight: 600, color: colors.textPrimary }}>{purchase.refNumber}</span>
+            {' '}(R {new Decimal(purchase.totalAmount).toFixed(2)}) back to unpaid. The purchase and its stock stay
+            as-is — only the payment is undone, and it will need to be settled again.
+          </p>
+          <span style={lbl}>Reason for reversal</span>
+          <input
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="Enter reason (min 5 characters)"
+            style={inp}
+            disabled={loading}
+          />
+        </RpxDialogBody>
+        <RpxDialogFooter>
+          <Btn onClick={onClose} disabled={loading}>Cancel</Btn>
+          <Btn variant="danger" onClick={onConfirm} disabled={reason.trim().length < 5} loading={loading}>
+            Confirm Reversal
           </Btn>
         </RpxDialogFooter>
       </RpxDialogContent>

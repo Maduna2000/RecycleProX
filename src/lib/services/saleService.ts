@@ -7,7 +7,7 @@ import { recordMovement, recordVoidReversal } from '@/lib/services/stockService'
 import { applyBusinessLoanRepaymentTx, reverseRepaymentsForSale } from '@/lib/services/businessLoanService'
 import { recalculateApprovedCashUpForDate } from '@/lib/services/cashUpService'
 import { sastDayLabelOfInstant, sastDateLabelToUTCDate } from '@/lib/utils/dayBounds'
-import type { CreateSaleInput, VoidSaleInput } from '@/lib/schemas/sale'
+import type { CreateSaleInput, VoidSaleInput, ReverseSalePaymentInput } from '@/lib/schemas/sale'
 import type { ProcessSaleSplitPaymentInput } from '@/lib/schemas/splitPayment'
 import { encodeJsonField } from '@/lib/db/queryHelpers'
 import { encodePhotoKeys, decodePhotoKeys } from '@/lib/offline/photoKeysCodec'
@@ -20,6 +20,10 @@ export class SaleNotFoundError extends Error {
 
 export class SaleAlreadyVoidedError extends Error {
   constructor(ref: string) { super(`Sale "${ref}" is already voided`); this.name = 'SaleAlreadyVoidedError' }
+}
+
+export class SaleNotCompletedError extends Error {
+  constructor(status: string) { super(`Sale is not completed (status: ${status}) — only a completed sale's payment can be reversed`); this.name = 'SaleNotCompletedError' }
 }
 
 export class SaleNotPendingError extends Error {
@@ -278,6 +282,59 @@ export async function voidSale(id: string, data: VoidSaleInput, voidedById?: str
   )
 
   logger.info({ saleId: id, refNumber: updated.refNumber, voidedById }, 'sale.voided')
+  return updated
+}
+
+// ─── Reverse Sale Payment ───────────────────────────────────────────────────────
+// Undoes a completed sale's payment — sends it back to 'pending' so it
+// re-appears in the unpaid queue to be settled again — without touching
+// stock. That's what makes this different from voidSale: the goods were
+// physically handed over and stay sold; only the "this has been paid" fact
+// is wrong and gets corrected. Use void instead when the sale itself
+// (goods and all) needs to be undone.
+
+export async function reverseSalePayment(id: string, data: ReverseSalePaymentInput, userId?: string) {
+  const updated = await withSerializableRetry(() =>
+    prisma.$transaction(async (tx) => {
+      const sale = await tx.sale.findUnique({ where: { id } })
+      if (!sale) throw new SaleNotFoundError(id)
+      if (sale.status !== 'completed') throw new SaleNotCompletedError(sale.status)
+
+      const sessionDate = sastDateLabelToUTCDate(sastDayLabelOfInstant(sale.createdAt))
+
+      const s = await tx.sale.update({
+        where: { id },
+        data: {
+          status:                      'pending',
+          amountPaid:                  0,
+          businessLoanDeductionAmount: null,
+          hasOutstandingBalance:       true,
+        },
+        include: { lines: { include: { product: true } } },
+      })
+
+      // Void whatever settlement Payment row(s) recorded this collection
+      // (markSalePaid/processSaleSplitPayment) — mirrors voidSale's handling
+      // of the same gap.
+      await tx.payment.updateMany({
+        where: { saleId: id, voidedAt: null },
+        data: { voidedAt: new Date(), voidedById: userId, voidReason: data.reason },
+      })
+
+      // Reverse any business-loan deduction tied to this sale, whether it was
+      // applied at creation or at settlement — the customer's business-loan
+      // balance must reflect that nothing has actually been paid toward it.
+      // (Business loans aren't part of the cash-up formula at all — nothing
+      // further to recalculate for that part, same as voidSale.)
+      await reverseRepaymentsForSale(tx, id, sale.refNumber, userId, 'payment reversed')
+
+      await recalculateApprovedCashUpForDate(tx, sessionDate, sale.createdAt, ['sales'])
+
+      return s
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+  )
+
+  logger.info({ saleId: id, refNumber: updated.refNumber, userId }, 'sale.payment.reversed')
   return updated
 }
 
