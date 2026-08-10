@@ -1,12 +1,18 @@
 import { prisma } from '@/lib/db/prisma'
 import { requireTenantId } from '@/lib/db/tenantContext'
+import { Prisma } from '@prisma/client'
 import logger from '@/lib/logger'
 import Decimal from 'decimal.js'
+import { withSerializableRetry } from '@/lib/db/withSerializableRetry'
 
 // ─── Typed Errors ─────────────────────────────────────────────────────────────
 
 export class ProductNotFoundError extends Error {
   constructor(id: string) { super(`Product "${id}" not found`); this.name = 'ProductNotFoundError' }
+}
+
+export class NoAdjustmentNeededError extends Error {
+  constructor() { super('Counted quantity matches system on hand — no adjustment needed'); this.name = 'NoAdjustmentNeededError' }
 }
 
 // ─── Record a stock movement (called inside transactions) ─────────────────────
@@ -263,6 +269,58 @@ export async function manualAdjustment(opts: {
     quantity: opts.quantity,
     createdByUserId: opts.createdByUserId,
   }, 'stock.manualAdjustment')
+
+  return movement
+}
+
+// ─── Manual stock adjustment by physical count ─────────────────────────────────
+
+/**
+ * Takes a counted total instead of a direction/quantity delta — the on-hand
+ * figure to diff against is recomputed live from the ledger inside the same
+ * Serializable transaction that writes the resulting movement (never taken
+ * from a client-supplied "before" value), so a purchase/sale landing on this
+ * product between the count and the submit can't produce a wrong delta.
+ */
+export async function manualCountAdjustment(opts: {
+  productId: string
+  countedQty: string
+  notes: string
+  createdByUserId?: string
+}) {
+  const product = await prisma.product.findUnique({ where: { id: opts.productId } })
+  if (!product) throw new ProductNotFoundError(opts.productId)
+
+  const movement = await withSerializableRetry(() => prisma.$transaction(async (tx) => {
+    const [inAgg, outAgg] = await Promise.all([
+      tx.stockMovement.aggregate({ where: { productId: opts.productId, direction: 'in' }, _sum: { quantity: true } }),
+      tx.stockMovement.aggregate({ where: { productId: opts.productId, direction: 'out' }, _sum: { quantity: true } }),
+    ])
+    const onHand = new Decimal(inAgg._sum.quantity?.toString() ?? '0').minus(new Decimal(outAgg._sum.quantity?.toString() ?? '0'))
+    const counted = new Decimal(opts.countedQty)
+    const diff = counted.minus(onHand)
+    if (diff.isZero()) throw new NoAdjustmentNeededError()
+
+    const direction = diff.isPositive() ? 'in' as const : 'out' as const
+    const quantity = diff.abs()
+    const notes = `Physical count: system ${onHand.toFixed(3)}, counted ${counted.toFixed(3)}, diff ${diff.isPositive() ? '+' : '-'}${quantity.toFixed(3)}. ${opts.notes.trim()}`
+
+    return recordMovement(tx, {
+      productId: opts.productId,
+      direction,
+      quantity,
+      source: 'manual_adjustment',
+      notes,
+      createdByUserId: opts.createdByUserId,
+    })
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }))
+
+  logger.info({
+    movementId: movement.id,
+    productId: opts.productId,
+    countedQty: opts.countedQty,
+    createdByUserId: opts.createdByUserId,
+  }, 'stock.manualCountAdjustment')
 
   return movement
 }

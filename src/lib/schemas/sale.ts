@@ -60,7 +60,12 @@ export const VoidSaleSchema = z.object({
   reason: z.string().min(5, 'Void reason must be at least 5 characters'),
 })
 
+export const ReverseSalePaymentSchema = z.object({
+  reason: z.string().min(5, 'Reason must be at least 5 characters'),
+})
+
 export type SaleLineInput    = z.infer<typeof SaleLineSchema>
 export type CreateSaleInput  = z.infer<typeof CreateSaleSchema>
 export type CreateSaleFormInput = z.input<typeof CreateSaleSchema>
 export type VoidSaleInput    = z.infer<typeof VoidSaleSchema>
+export type ReverseSalePaymentInput = z.infer<typeof ReverseSalePaymentSchema>

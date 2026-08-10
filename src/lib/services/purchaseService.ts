@@ -8,7 +8,7 @@ import { recordMovement, recordVoidReversal } from '@/lib/services/stockService'
 import { applyRepaymentTx, reverseRepaymentsForPurchase } from '@/lib/services/loanService'
 import { recalculateApprovedCashUpForDate } from '@/lib/services/cashUpService'
 import { autoPromoteCasualIfEligible } from '@/lib/services/customerService'
-import { sastDayLabelOfInstant, sastDateLabelToUTCDate, getDayBoundsSAST, todaySASTDate } from '@/lib/utils/dayBounds'
+import { sastDayLabelOfInstant, sastDateLabelToUTCDate } from '@/lib/utils/dayBounds'
 import { getAllSettings } from '@/lib/services/settingsService'
 import { generateVat264 } from '@/lib/pdf/vat264'
 import { generatePurchaseReceiptPdf } from '@/lib/pdf/slip'
@@ -16,7 +16,7 @@ import { uploadBytes, purchaseVat264Key, purchaseNoteKey } from '@/lib/r2'
 import { CURRENCY_SYMBOLS } from '@/lib/schemas/cashup'
 import { VAT_RATE, purchaseHeaderVat } from '@/lib/utils/vat'
 import { ScaleOrderNotFoundError, ScaleOrderAlreadyVoidedError } from '@/lib/services/scaleService'
-import type { CreatePurchaseInput, VoidPurchaseInput } from '@/lib/schemas/purchase'
+import type { CreatePurchaseInput, VoidPurchaseInput, ReversePurchasePaymentInput } from '@/lib/schemas/purchase'
 import type { ProcessSplitPaymentInput } from '@/lib/schemas/splitPayment'
 import { encodeJsonField } from '@/lib/db/queryHelpers'
 import { encodePhotoKeys, decodePhotoKeys } from '@/lib/offline/photoKeysCodec'
@@ -29,6 +29,10 @@ export class PurchaseNotFoundError extends Error {
 
 export class PurchaseAlreadyVoidedError extends Error {
   constructor(ref: string) { super(`Purchase "${ref}" is already voided`); this.name = 'PurchaseAlreadyVoidedError' }
+}
+
+export class PurchaseNotCompletedError extends Error {
+  constructor(status: string) { super(`Purchase is not completed (status: ${status}) — only a completed purchase's payment can be reversed`); this.name = 'PurchaseNotCompletedError' }
 }
 
 export class CustomerBlacklistedError extends Error {
@@ -413,6 +417,60 @@ export async function voidPurchase(id: string, data: VoidPurchaseInput, voidedBy
   return updated
 }
 
+// ─── Reverse Purchase Payment ──────────────────────────────────────────────────
+// Undoes a completed purchase's payment — sends it back to 'pending' so it
+// re-appears in the unpaid queue to be settled again — without touching
+// stock. That's what makes this different from voidPurchase: the goods were
+// physically received and stay received; only the "this has been paid"
+// fact is wrong and gets corrected. Use void instead when the purchase
+// itself (goods and all) needs to be undone.
+
+export async function reversePurchasePayment(id: string, data: ReversePurchasePaymentInput, userId?: string) {
+  const updated = await withSerializableRetry(() =>
+    prisma.$transaction(async (tx) => {
+      const purchase = await tx.purchase.findUnique({ where: { id } })
+      if (!purchase) throw new PurchaseNotFoundError(id)
+      if (purchase.status !== 'completed') throw new PurchaseNotCompletedError(purchase.status)
+
+      const sessionDate = sastDateLabelToUTCDate(sastDayLabelOfInstant(purchase.createdAt))
+      const hadLoanDeduction = purchase.loanDeductionAmount && new Decimal(purchase.loanDeductionAmount.toString()).greaterThan(0)
+
+      const p = await tx.purchase.update({
+        where: { id },
+        data: {
+          status:               'pending',
+          amountPaid:           0,
+          loanDeductionAmount:  null,
+          hasOutstandingBalance: true,
+        },
+        include: { lines: { include: { product: true } }, customer: true },
+      })
+
+      // Void whatever settlement Payment row(s) recorded this payout (markPurchasePaid/
+      // processSplitPayment) — mirrors voidPurchase's handling of the same gap.
+      const voidedPayments = await tx.payment.updateMany({
+        where: { purchaseId: id, voidedAt: null },
+        data: { voidedAt: new Date(), voidedById: userId, voidReason: data.reason },
+      })
+
+      // Reverse any loan deduction tied to this purchase, whether it was applied
+      // at creation or at settlement — the customer's loan balance must reflect
+      // that nothing has actually been paid toward it.
+      await reverseRepaymentsForPurchase(tx, id, purchase.refNumber, userId, 'payment reversed')
+
+      const changed: Array<'purchases' | 'payments' | 'loans'> = ['purchases']
+      if (voidedPayments.count > 0) changed.push('payments')
+      if (hadLoanDeduction) changed.push('loans')
+      await recalculateApprovedCashUpForDate(tx, sessionDate, purchase.createdAt, changed)
+
+      return p
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+  )
+
+  logger.info({ purchaseId: id, refNumber: updated.refNumber, userId }, 'purchase.payment.reversed')
+  return updated
+}
+
 // ─── Get Purchase ─────────────────────────────────────────────────────────────
 
 export async function getPurchase(id: string) {
@@ -702,12 +760,11 @@ export async function listPurchases(opts?: {
     }),
   }
 
-  // Today's total is independent of whatever filters the list itself has
-  // applied (search/status/date range) — a small fixed "how much came in
-  // today" stat, not a total of the current filtered view.
-  const { start: todayStart, end: todayEnd } = getDayBoundsSAST(todaySASTDate())
+  // Voided purchases represent reversed spend, not real money paid out — exclude
+  // them from the total unless the caller explicitly filtered for that status.
+  const totalWhere = opts?.status ? where : { ...where, status: { not: 'voided' as const } }
 
-  const [rawPurchases, total, todayAgg] = await Promise.all([
+  const [rawPurchases, total, totalAgg] = await Promise.all([
     prisma.purchase.findMany({
       where,
       include: {
@@ -719,10 +776,7 @@ export async function listPurchases(opts?: {
       take: pageSize,
     }),
     prisma.purchase.count({ where }),
-    prisma.purchase.aggregate({
-      _sum: { totalAmount: true },
-      where: { status: { not: 'voided' }, createdAt: { gte: todayStart, lte: todayEnd } },
-    }),
+    prisma.purchase.aggregate({ where: totalWhere, _sum: { totalAmount: true } }),
   ])
 
   const purchases = rawPurchases.map((p) => {
@@ -733,7 +787,7 @@ export async function listPurchases(opts?: {
     return { ...p, subTotal: subTotal.toFixed(2), vatAmount: vatAmount.toFixed(2) }
   })
 
-  const todayTotal = new Decimal(todayAgg._sum.totalAmount?.toString() ?? '0').toFixed(2)
+  const totalSum = new Decimal(totalAgg._sum.totalAmount?.toString() ?? '0').toFixed(2)
 
-  return { purchases, total, page, pageSize, pageCount: Math.ceil(total / pageSize), todayTotal }
+  return { purchases, total, totalSum, page, pageSize, pageCount: Math.ceil(total / pageSize) }
 }

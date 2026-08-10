@@ -52,7 +52,12 @@ export const VoidPurchaseSchema = z.object({
   reason: z.string().min(5, 'Void reason must be at least 5 characters'),
 })
 
+export const ReversePurchasePaymentSchema = z.object({
+  reason: z.string().min(5, 'Reason must be at least 5 characters'),
+})
+
 export type PurchaseLineInput = z.infer<typeof PurchaseLineSchema>
 export type CreatePurchaseInput = z.infer<typeof CreatePurchaseSchema>
 export type CreatePurchaseFormInput = z.input<typeof CreatePurchaseSchema>
 export type VoidPurchaseInput = z.infer<typeof VoidPurchaseSchema>
+export type ReversePurchasePaymentInput = z.infer<typeof ReversePurchasePaymentSchema>
