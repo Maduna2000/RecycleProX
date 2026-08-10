@@ -21,10 +21,25 @@ export async function GET(req: NextRequest) {
       // Scope to the actual current (open/submitted) session for this date
       // if one exists — a day can hold more than one session (separate
       // shifts), so "today's live stats" means the one currently in
-      // progress, not the whole day. Falls back to the whole day when no
-      // session has been opened yet (the pre-open live preview).
+      // progress, not the whole day.
+      //
+      // When none exists — either nobody has opened a session yet today, or
+      // the last one for today has already been approved and no new one is
+      // open — pass a synthetic "right now" context instead of leaving the
+      // window unscoped. getSessionWindow (cashUpWindow.ts) then looks up
+      // today's most recent session regardless of status and starts the
+      // window at ITS closedAt; with no session at all today it falls back
+      // to midnight, identical to the old unscoped behaviour. Without this,
+      // the gap between a session being approved and the next one opening
+      // fell back to the whole calendar day, double-counting everything the
+      // just-approved session already reconciled into the Float page's
+      // "Current Balance (Expected in Drawer)" figure until a new session
+      // was opened and re-scoped the window correctly.
       const current = await getOpenSession(dateStr)
-      return getLiveStats(sessionDate, current ? { openedAt: current.openedAt, closedAt: current.closedAt } : undefined)
+      const context = current
+        ? { openedAt: current.openedAt, closedAt: current.closedAt }
+        : { openedAt: new Date(), closedAt: null }
+      return getLiveStats(sessionDate, context)
     })
     return NextResponse.json(stats)
   } catch (err) {
