@@ -1046,9 +1046,28 @@ export default function CashUpPage() {
   const isPreviousDay = cashUp && cashUp.status === 'open' && sessionDate !== todayISO
 
   return (
-    <PortalPage title="Cash-Up">
+    <PortalPage
+      title="Cash-Up"
+      actions={
+        cashUp && (
+          <div className="flex items-center gap-3">
+            <span className="text-xs" style={{ color: colors.textMuted }}>{sessionDate}</span>
+            {cashUp.status === 'open' && isPreviousDay && <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: colors.dangerBg, color: colors.danger }}>Previous Day — Submit Required</span>}
+            {cashUp.status === 'open' && !isPreviousDay && <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: colors.warningBg, color: colors.warning }}>Open</span>}
+            {cashUp.status === 'submitted' && <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: colors.processBg, color: colors.process }}>Submitted — Awaiting Approval</span>}
+            {cashUp.status === 'approved'  && <span className="flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium" style={{ background: colors.actionBg, color: colors.action }}><CheckCircle2 className="w-3 h-3" />Approved</span>}
+            {cashUp.approvedAt && <span className="text-xs" style={{ color: colors.textMuted }}>{new Date(cashUp.approvedAt).toLocaleString('en-ZA')}</span>}
+            {cashUp.status === 'open' && (
+              <button onClick={() => refreshStats()} className="flex items-center gap-1 text-xs font-medium" style={{ color: colors.textSecondary }}>
+                <RefreshCw className="w-3.5 h-3.5" /> Refresh
+              </button>
+            )}
+          </div>
+        )
+      }
+    >
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-      <div className="max-w-6xl mx-auto w-full space-y-2.5 pb-4" style={{ padding: '8px 8px 0' }}>
+      <div className="max-w-6xl mx-auto w-full space-y-2 pb-2" style={{ padding: '6px 8px 0' }}>
 
         {/* No session */}
         {!cashUp && (
@@ -1145,24 +1164,6 @@ export default function CashUpPage() {
               </div>
             )}
 
-            {/* Status + refresh row */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <span className="text-xs" style={{ color: colors.textMuted }}>{sessionDate}</span>
-                {cashUp.status === 'open' && isPreviousDay && <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: colors.dangerBg, color: colors.danger }}>Previous Day — Submit Required</span>}
-                {cashUp.status === 'open' && !isPreviousDay && <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: colors.warningBg, color: colors.warning }}>Open</span>}
-                {cashUp.status === 'submitted' && <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: colors.processBg, color: colors.process }}>Submitted — Awaiting Approval</span>}
-                {cashUp.status === 'approved'  && <span className="flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium" style={{ background: colors.actionBg, color: colors.action }}><CheckCircle2 className="w-3 h-3" />Approved</span>}
-                {cashUp.approvedAt && <span className="text-xs" style={{ color: colors.textMuted }}>{new Date(cashUp.approvedAt).toLocaleString('en-ZA')}</span>}
-              </div>
-              {cashUp.status === 'open' && (
-                <button onClick={() => refreshStats()} className="flex items-center gap-1 text-xs font-medium" style={{ color: colors.textSecondary }}>
-                  <RefreshCw className="w-3.5 h-3.5" /> Refresh
-                </button>
-              )}
-            </div>
-
-
             {/* ── 2-column layout: left = reconciliation, right = count + panels ── */}
             {(() => {
               const isOpen    = cashUp.status === 'open'
@@ -1193,7 +1194,7 @@ export default function CashUpPage() {
               const unpaidAllTimeCount = stats?.unpaidAllTime?.count ?? 0
 
               return (
-                <div className="grid grid-cols-1 lg:grid-cols-5 gap-3">
+                <div className="grid grid-cols-1 lg:grid-cols-5 gap-2">
 
                   {/* ── LEFT: reconciliation ledger (always compact) ─────────── */}
                   <div className="lg:col-span-3" style={PANEL}>
@@ -1369,7 +1370,7 @@ export default function CashUpPage() {
                   </div>
 
                   {/* ── RIGHT: denomination count (open) + panels ────────────── */}
-                  <div className="lg:col-span-2 flex flex-col gap-2.5">
+                  <div className="lg:col-span-2 flex flex-col gap-2">
 
                     {/* Stat tiles — 2-up grid instead of stacked cards */}
                     <div className="grid grid-cols-2 gap-2">
