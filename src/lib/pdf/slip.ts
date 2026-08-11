@@ -644,7 +644,7 @@ export async function generatePurchaseReceiptPdf(data: PurchaseSlipData): Promis
   center(page, (data.companyName || 'Golden Key Investments (Pty) Ltd').toUpperCase(), cursor, NORMAL, bold, BLACK)
   nextLine(NORMAL, 2)
 
-  page.drawText(`PN No: ${data.refNumber}`, { x: PMARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
+  page.drawText(`PN No: ${data.refNumber}`, { x: PMARGIN, y: cursor, size: NORMAL, font: bold, color: BLACK })
   nextLine(NORMAL)
   page.drawText(`Date: ${formatSlipDate(data.createdAt)}`, { x: PMARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
   nextLine(NORMAL, 6)
@@ -683,7 +683,7 @@ export async function generatePurchaseReceiptPdf(data: PurchaseSlipData): Promis
 
   // ── Party ──────────────────────────────────────────────────────────────
   const custLine = data.customerCode ? `${data.customerCode}-${data.customerName}` : data.customerName
-  page.drawText(`Cust: ${custLine}`, { x: PMARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
+  page.drawText(`Cust: ${custLine}`, { x: PMARGIN, y: cursor, size: NORMAL, font: bold, color: BLACK })
   nextLine(NORMAL)
   page.drawText(`Cust VAT: ${data.customerVatNumber ?? ''}`, { x: PMARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
   nextLine(NORMAL, 6)
@@ -701,7 +701,7 @@ export async function generatePurchaseReceiptPdf(data: PurchaseSlipData): Promis
   nextLine(SMALL, 4)
 
   for (const line of data.lines) {
-    pRow(page, cursor, NORMAL, reg, BLACK, [
+    pRow(page, cursor, NORMAL, bold, BLACK, [
       (line.productCode ?? '').substring(0, 10),
       new Decimal(line.unitPrice).toFixed(2),
       line.grossQty ?? '',
@@ -710,7 +710,7 @@ export async function generatePurchaseReceiptPdf(data: PurchaseSlipData): Promis
       new Decimal(line.lineTotal).toFixed(2),
     ])
     nextLine(NORMAL)
-    page.drawText(` ${line.productName}`, { x: PMARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
+    page.drawText(` ${line.productName}`, { x: PMARGIN, y: cursor, size: NORMAL, font: bold, color: BLACK })
     nextLine(NORMAL)
   }
 
@@ -724,11 +724,11 @@ export async function generatePurchaseReceiptPdf(data: PurchaseSlipData): Promis
   const vat        = new Decimal(data.vatAmount ?? '0')
   const grandTotal = total.plus(vat)
 
-  pLeftRight(page, 'Nett Total', nettTotal.toFixed(1), cursor, NORMAL, reg, BLACK)
+  pLeftRight(page, 'Nett Total', nettTotal.toFixed(1), cursor, NORMAL, bold, BLACK)
   nextLine(NORMAL, 2)
-  pLeftRight(page, 'Total', `E ${total.toFixed(2)}`, cursor, NORMAL, reg, BLACK)
+  pLeftRight(page, 'Total', `E ${total.toFixed(2)}`, cursor, NORMAL, bold, BLACK)
   nextLine(NORMAL, 2)
-  pLeftRight(page, '15% VAT', `E ${vat.toFixed(2)}`, cursor, NORMAL, reg, BLACK)
+  pLeftRight(page, '15% VAT', `E ${vat.toFixed(2)}`, cursor, NORMAL, bold, BLACK)
   nextLine(NORMAL, 2)
   pLeftRight(page, 'Grand Total', `E ${grandTotal.toFixed(2)}`, cursor, NORMAL, bold, BLACK)
   nextLine(NORMAL, 3)
@@ -745,19 +745,19 @@ export async function generatePurchaseReceiptPdf(data: PurchaseSlipData): Promis
     page.drawText('Payment Split:', { x: PMARGIN, y: cursor, size: NORMAL, font: bold, color: BLACK })
     nextLine(NORMAL, 2)
     if (cashAmt.gt(0)) {
-      pLeftRight(page, 'Cash', `E ${cashAmt.toFixed(2)}`, cursor, NORMAL, reg, BLACK)
+      pLeftRight(page, 'Cash', `E ${cashAmt.toFixed(2)}`, cursor, NORMAL, bold, BLACK)
       nextLine(NORMAL)
     }
     if (eftAmt.gt(0)) {
-      pLeftRight(page, 'EFT', `E ${eftAmt.toFixed(2)}`, cursor, NORMAL, reg, BLACK)
+      pLeftRight(page, 'EFT', `E ${eftAmt.toFixed(2)}`, cursor, NORMAL, bold, BLACK)
       nextLine(NORMAL)
     }
     if (chequeAmt.gt(0)) {
-      pLeftRight(page, 'Cheque', `E ${chequeAmt.toFixed(2)}`, cursor, NORMAL, reg, BLACK)
+      pLeftRight(page, 'Cheque', `E ${chequeAmt.toFixed(2)}`, cursor, NORMAL, bold, BLACK)
       nextLine(NORMAL)
     }
     if (loanAmt.gt(0)) {
-      pLeftRight(page, 'Loans', `E ${loanAmt.toFixed(2)}${loanRef ? ` #${loanRef}` : ''}`, cursor, NORMAL, reg, BLACK)
+      pLeftRight(page, 'Loans', `E ${loanAmt.toFixed(2)}${loanRef ? ` #${loanRef}` : ''}`, cursor, NORMAL, bold, BLACK)
       nextLine(NORMAL)
     }
   }
@@ -902,7 +902,7 @@ export async function generateSaleReceiptPdf(data: SaleSlipData): Promise<Uint8A
   center(page, (data.companyName || 'Golden Key Investments (Pty) Ltd').toUpperCase(), cursor, NORMAL, bold, BLACK)
   nextLine(NORMAL, 2)
 
-  page.drawText(`PN No: ${data.refNumber}`, { x: PMARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
+  page.drawText(`PN No: ${data.refNumber}`, { x: PMARGIN, y: cursor, size: NORMAL, font: bold, color: BLACK })
   nextLine(NORMAL)
   page.drawText(`Date: ${formatSlipDate(data.createdAt)}`, { x: PMARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
   nextLine(NORMAL, 6)
@@ -937,7 +937,7 @@ export async function generateSaleReceiptPdf(data: SaleSlipData): Promise<Uint8A
 
   // ── Party ──────────────────────────────────────────────────────────────
   const buyerLine = data.buyerCode ? `${data.buyerCode}-${data.buyerName}` : data.buyerName
-  page.drawText(`Buyer: ${buyerLine}`, { x: PMARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
+  page.drawText(`Buyer: ${buyerLine}`, { x: PMARGIN, y: cursor, size: NORMAL, font: bold, color: BLACK })
   nextLine(NORMAL)
   page.drawText(`Buyer VAT: ${data.buyerVatNumber ?? ''}`, { x: PMARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
   nextLine(NORMAL, 6)
@@ -955,7 +955,7 @@ export async function generateSaleReceiptPdf(data: SaleSlipData): Promise<Uint8A
   nextLine(SMALL, 4)
 
   for (const line of data.lines) {
-    pRow(page, cursor, NORMAL, reg, BLACK, [
+    pRow(page, cursor, NORMAL, bold, BLACK, [
       (line.productCode ?? '').substring(0, 10),
       new Decimal(line.unitPrice).toFixed(2),
       line.grossQty ?? '',
@@ -964,7 +964,7 @@ export async function generateSaleReceiptPdf(data: SaleSlipData): Promise<Uint8A
       new Decimal(line.lineTotal).toFixed(2),
     ])
     nextLine(NORMAL)
-    page.drawText(` ${line.productName}`, { x: PMARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
+    page.drawText(` ${line.productName}`, { x: PMARGIN, y: cursor, size: NORMAL, font: bold, color: BLACK })
     nextLine(NORMAL)
   }
 
@@ -978,11 +978,11 @@ export async function generateSaleReceiptPdf(data: SaleSlipData): Promise<Uint8A
   const vat        = new Decimal(data.vatAmount ?? '0')
   const grandTotal = total.plus(vat)
 
-  pLeftRight(page, 'Nett Total', nettTotal.toFixed(1), cursor, NORMAL, reg, BLACK)
+  pLeftRight(page, 'Nett Total', nettTotal.toFixed(1), cursor, NORMAL, bold, BLACK)
   nextLine(NORMAL, 2)
-  pLeftRight(page, 'Total', `E ${total.toFixed(2)}`, cursor, NORMAL, reg, BLACK)
+  pLeftRight(page, 'Total', `E ${total.toFixed(2)}`, cursor, NORMAL, bold, BLACK)
   nextLine(NORMAL, 2)
-  pLeftRight(page, '15% VAT', `E ${vat.toFixed(2)}`, cursor, NORMAL, reg, BLACK)
+  pLeftRight(page, '15% VAT', `E ${vat.toFixed(2)}`, cursor, NORMAL, bold, BLACK)
   nextLine(NORMAL, 2)
   pLeftRight(page, 'Grand Total', `E ${grandTotal.toFixed(2)}`, cursor, NORMAL, bold, BLACK)
   nextLine(NORMAL, 3)
@@ -997,15 +997,15 @@ export async function generateSaleReceiptPdf(data: SaleSlipData): Promise<Uint8A
     page.drawText('Payment Split:', { x: PMARGIN, y: cursor, size: NORMAL, font: bold, color: BLACK })
     nextLine(NORMAL, 2)
     if (cashAmt.gt(0)) {
-      pLeftRight(page, 'Cash', `E ${cashAmt.toFixed(2)}`, cursor, NORMAL, reg, BLACK)
+      pLeftRight(page, 'Cash', `E ${cashAmt.toFixed(2)}`, cursor, NORMAL, bold, BLACK)
       nextLine(NORMAL)
     }
     if (eftAmt.gt(0)) {
-      pLeftRight(page, 'EFT', `E ${eftAmt.toFixed(2)}`, cursor, NORMAL, reg, BLACK)
+      pLeftRight(page, 'EFT', `E ${eftAmt.toFixed(2)}`, cursor, NORMAL, bold, BLACK)
       nextLine(NORMAL)
     }
     if (loanAmt.gt(0)) {
-      pLeftRight(page, 'Business Loan', `E ${loanAmt.toFixed(2)}`, cursor, NORMAL, reg, BLACK)
+      pLeftRight(page, 'Business Loan', `E ${loanAmt.toFixed(2)}`, cursor, NORMAL, bold, BLACK)
       nextLine(NORMAL)
     }
   }
