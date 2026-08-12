@@ -1269,12 +1269,9 @@ export default function CashUpPage() {
                           action={cashUp && <ReportButton type="loan-advances" sessionId={cashUp.id} disabled={loanAdv.isZero()} />}
                         />
                         <ReconRow
-                          label="Loans Repayment (+)" value={loanRep.toFixed(2)} positive currencySymbol={currSym}
+                          label="Loans Repayment (+)" value={loanRep.plus(loanRepStock).toFixed(2)} positive currencySymbol={currSym}
                           action={cashUp && <ReportButton type="loan-repayments" sessionId={cashUp.id} disabled={loanRep.plus(loanRepStock).isZero()} />}
                         />
-                        {loanRepStock.gt(0) && (
-                          <ReconRow label="   of which via stock (not cash)" value={loanRepStock.toFixed(2)} muted currencySymbol={currSym} />
-                        )}
 
                         <ReconRow divider label="Money Spent (−)" value={moneySpent.toFixed(2)} subtotal negative currencySymbol={currSym} />
                         <ReconRow label="Net Cash" value={netCash.toFixed(2)} subtotal currencySymbol={currSym} />
