@@ -5,7 +5,7 @@ import logger from '@/lib/logger'
 import { SubmitCashUpInput, ApproveCashUpInput, type Currency } from '@/lib/schemas/cashup'
 import { getMostRecentFloatAsOf, updateClosingAmount, getDrawingsReceivedForDate } from './floatService'
 import { getExpenseTotalsForDate } from './expenseService'
-import { getLoanTotalsForDate } from './loanService'
+import { getLoanTotalsForDate, formatTransactionMethod } from './loanService'
 import { getSessionWindow, type DateWindow } from './cashUpWindow'
 import { sastDateLabelToUTCDate, getDayBoundsSAST, todaySASTDateStr } from '@/lib/utils/dayBounds'
 
@@ -353,10 +353,10 @@ export async function rejectCashUp(cashUpId: string, rejectedByUserId: string, r
 async function calcSystemTotals(window: DateWindow, drawingsReceived = new Decimal(0), loansTotal = new Decimal(0)) {
   const { start, end } = window
 
-  const [salesCashAgg, salesEftAgg, purchasesAgg, paymentsAgg, saleSettlementsAgg] = await Promise.all([
+  const [salesCashAgg, salesEftAgg, cashPurchaseRows, paymentsAgg, saleSettlementsAgg] = await Promise.all([
     prisma.sale.aggregate({
       _sum: { totalAmount: true },
-      // payments: { none: {} } — mirrors purchasesAgg below: a sale settled
+      // payments: { none: {} } — mirrors cashPurchaseRows below: a sale settled
       // via markSalePaid/processSaleSplitPayment gets its cash inflow
       // captured by a linked Payment row (folded into cashSales via
       // saleSettlementsAgg) — counting its totalAmount here too would
@@ -367,8 +367,14 @@ async function calcSystemTotals(window: DateWindow, drawingsReceived = new Decim
       _sum: { totalAmount: true },
       where: { paymentMethod: { in: ['eft', 'cheque'] }, status: 'completed', createdAt: { gte: start, lte: end } },
     }),
-    prisma.purchase.aggregate({
-      _sum: { totalAmount: true },
+    // findMany (not aggregate) so loanDeductionAmount can be netted out per
+    // row below. A purchase created directly 'completed' with a loan
+    // deduction set at creation time never gets its own Payment row — the
+    // withheld payout only shows up as a LoanRepayment — so totalAmount
+    // alone would overstate the cash actually paid out for it by exactly
+    // the deducted amount.
+    prisma.purchase.findMany({
+      select: { totalAmount: true, loanDeductionAmount: true },
       // payments: { none: {} } — a purchase settled via markPurchasePaid/
       // processSplitPayment gets its cash outflow captured by a linked
       // Payment row instead (see systemCashPayments below); counting its
@@ -391,7 +397,10 @@ async function calcSystemTotals(window: DateWindow, drawingsReceived = new Decim
   ])
 
   const cardPayments    = new Decimal(salesEftAgg._sum.totalAmount?.toString() ?? '0')
-  const cashPurchases   = new Decimal(purchasesAgg._sum.totalAmount?.toString() ?? '0')
+  const cashPurchases   = cashPurchaseRows.reduce(
+    (sum, p) => sum.plus(p.totalAmount.toString()).minus(p.loanDeductionAmount?.toString() ?? '0'),
+    new Decimal(0),
+  )
   const cashPayments    = new Decimal(paymentsAgg._sum.amount?.toString() ?? '0')
   // A sale created pending then later settled in cash (markSalePaid /
   // processSaleSplitPayment) is a real cash inflow — fold it into cashSales
@@ -403,6 +412,13 @@ async function calcSystemTotals(window: DateWindow, drawingsReceived = new Decim
   // Expected in drawer = opening + drawings + cash sales - cash purchases - cash payments - expenses - loan advances + loan repayments
   // "Drawings Received" = additional cash injected into drawer by management (positive, like RecyclePro X).
   // openingBalance is stored on the cashUp record; here we return the variable components only.
+  //
+  // A purchase whose payout was (partly or fully) taken by the customer as a
+  // loan repayment instead of cash never puts that withheld amount through
+  // either side of this formula: cashPurchases nets it out above, and
+  // loansTotal (getLoanTotalsForDate) excludes purchase-linked repayments
+  // from the cash-repaid figure it feeds in here. Only genuine drawer cash —
+  // paid out for stock, or handed over to repay a loan — moves this number.
   const cashExpected = cashSales.minus(cashPurchases).minus(cashPayments).minus(expensesTotal).plus(drawingsReceived).plus(loansTotal)
 
   return { cashSales, cashPurchases, cashPayments, cashExpected, cardPayments, expensesTotal }
@@ -1008,10 +1024,16 @@ export async function getLoanAdvancesForDate(window: DateWindow): Promise<LoanAd
 
 export interface LoanRepaymentRecord {
   id: string
+  refNumber: string
   createdAt: Date
   customerName: string
   loanRefNumber: string
   amount: string
+  // 'Stock' for a repayment deducted from a purchase payout (no cash moved
+  // either way — see getLoanTotalsForDate, which excludes these from the
+  // drawer-cash total even though this list still shows every repayment).
+  // 'Cash' / 'EFT' for one the customer genuinely handed over.
+  settledVia: string
 }
 
 export async function getLoanRepaymentsForDate(window: DateWindow): Promise<LoanRepaymentRecord[]> {
@@ -1026,16 +1048,19 @@ export async function getLoanRepaymentsForDate(window: DateWindow): Promise<Loan
           customer: { select: { firstName: true, lastName: true } },
         },
       },
+      purchase: { select: { refNumber: true } },
     },
     orderBy: { createdAt: 'asc' },
   })
 
   return repayments.map(r => ({
     id: r.id,
+    refNumber: r.refNumber,
     createdAt: r.createdAt,
     customerName: `${r.loan.customer.firstName} ${r.loan.customer.lastName}`,
     loanRefNumber: r.loan.refNumber,
     amount: new Decimal(r.amount.toString()).toFixed(2),
+    settledVia: r.purchase ? `Stock (${r.purchase.refNumber})` : formatTransactionMethod(r.paymentMethod),
   }))
 }
 
