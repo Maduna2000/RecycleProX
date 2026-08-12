@@ -62,6 +62,7 @@ type LiveStats = {
   expenses:      string
   loanAdvance:   string
   loanRepayment: string
+  loanRepaymentStock: string
   nonCashAdvanced: string
   floatTopUps:   string
   unpaidToday:   { total: string; count: number }
@@ -1177,6 +1178,7 @@ export default function CashUpPage() {
               const exp       = new Decimal(isOpen ? (stats?.expenses      ?? '0') : (cashUp.expensesTotal ?? '0'))
               const loanAdv   = new Decimal(stats?.loanAdvance   ?? '0')
               const loanRep   = new Decimal(stats?.loanRepayment ?? '0')
+              const loanRepStock = new Decimal(stats?.loanRepaymentStock ?? '0')
               const moneySpent = cashPurch.plus(cashPay).plus(exp).plus(loanAdv)
               const netCash    = totalCash.minus(moneySpent)
               const calFloat  = totalCash.plus(cashSales).minus(cashPurch).minus(cashPay).minus(exp).minus(loanAdv).plus(loanRep)
@@ -1268,8 +1270,11 @@ export default function CashUpPage() {
                         />
                         <ReconRow
                           label="Loans Repayment (+)" value={loanRep.toFixed(2)} positive currencySymbol={currSym}
-                          action={cashUp && <ReportButton type="loan-repayments" sessionId={cashUp.id} disabled={loanRep.isZero()} />}
+                          action={cashUp && <ReportButton type="loan-repayments" sessionId={cashUp.id} disabled={loanRep.plus(loanRepStock).isZero()} />}
                         />
+                        {loanRepStock.gt(0) && (
+                          <ReconRow label="   of which via stock (not cash)" value={loanRepStock.toFixed(2)} muted currencySymbol={currSym} />
+                        )}
 
                         <ReconRow divider label="Money Spent (−)" value={moneySpent.toFixed(2)} subtotal negative currencySymbol={currSym} />
                         <ReconRow label="Net Cash" value={netCash.toFixed(2)} subtotal currencySymbol={currSym} />

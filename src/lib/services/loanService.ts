@@ -406,7 +406,7 @@ export async function getLoanTotalsForDate(window: DateWindow) {
   // physically received (see getLoanRepaymentsForDate below, which still
   // lists these — unfiltered — for visibility; only the drawer-cash total
   // excludes them).
-  const [advancedAgg, nonCashAdvancedAgg, repaidAgg] = await Promise.all([
+  const [advancedAgg, nonCashAdvancedAgg, repaidAgg, repaidViaStockAgg] = await Promise.all([
     prisma.loan.aggregate({
       where: { status: { not: 'voided' }, paymentMethod: 'cash', createdAt: { gte: start, lte: end } },
       _sum: { principalAmount: true },
@@ -419,11 +419,20 @@ export async function getLoanTotalsForDate(window: DateWindow) {
       where: { paymentMethod: 'cash', purchaseId: null, createdAt: { gte: start, lte: end } },
       _sum: { amount: true },
     }),
+    // Purely informational — surfaced on the cash-up page and the
+    // loan-repayments report so a repayment settled via stock stays visible
+    // ("R12,150 repaid via stock") even though it correctly never enters the
+    // cash total above.
+    prisma.loanRepayment.aggregate({
+      where: { purchaseId: { not: null }, createdAt: { gte: start, lte: end } },
+      _sum: { amount: true },
+    }),
   ])
 
   const advanced        = new Decimal(advancedAgg._sum.principalAmount?.toString() ?? '0')
   const nonCashAdvanced  = new Decimal(nonCashAdvancedAgg._sum.principalAmount?.toString() ?? '0')
   const repaid           = new Decimal(repaidAgg._sum.amount?.toString() ?? '0')
+  const repaidViaStock   = new Decimal(repaidViaStockAgg._sum.amount?.toString() ?? '0')
   // Net cash impact: advances paid out minus repayments received back
   // Positive = net cash went out as loans (reduces drawer cash)
   const netCashOut = advanced.minus(repaid)
@@ -432,6 +441,7 @@ export async function getLoanTotalsForDate(window: DateWindow) {
     advanced:       advanced.toFixed(2),
     nonCashAdvanced: nonCashAdvanced.toFixed(2),
     repaid:         repaid.toFixed(2),
+    repaidViaStock: repaidViaStock.toFixed(2),
     netCashOut:     netCashOut.toFixed(2),
   }
 }
