@@ -103,11 +103,12 @@ const REPORT_COLUMNS: Record<CashupReportType, ColumnConfig[]> = {
     { key: 'principalAmount', label: 'Principal', width: 0.25, align: 'right' },
   ],
   'loan-repayments': [
-    { key: 'id', label: '#', width: 0.08 },
-    { key: 'time', label: 'Time', width: 0.12 },
-    { key: 'customerName', label: 'Customer', width: 0.28 },
-    { key: 'loanRefNumber', label: 'Loan Ref', width: 0.27 },
-    { key: 'amount', label: 'Amount', width: 0.25, align: 'right' },
+    { key: 'refNumber', label: 'Ref', width: 0.13 },
+    { key: 'time', label: 'Time', width: 0.09 },
+    { key: 'customerName', label: 'Customer', width: 0.22 },
+    { key: 'loanRefNumber', label: 'Loan Ref', width: 0.18 },
+    { key: 'settledVia', label: 'Via', width: 0.18 },
+    { key: 'amount', label: 'Amount', width: 0.20, align: 'right' },
   ],
   'unpaid-today': [
     { key: 'refNumber', label: 'Ref', width: 0.12 },
