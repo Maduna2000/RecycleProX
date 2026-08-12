@@ -734,7 +734,7 @@ export async function getLiveStats(
     salesCashAgg,
     salesCardAgg,
     salesCardOnlyAgg,
-    purchasesAgg,
+    cashPurchaseRows,
     transferredPurchasesAgg,
     paymentsAgg,
     saleSettlementsAgg,
@@ -763,8 +763,12 @@ export async function getLiveStats(
       _sum: { totalAmount: true },
       where: { paymentMethod: 'card', status: 'completed', createdAt: { gte: start, lte: end } },
     }),
-    prisma.purchase.aggregate({
-      _sum: { totalAmount: true },
+    // findMany (not aggregate), same reason as calcSystemTotals: a purchase
+    // created directly 'completed' with a loan deduction set at creation
+    // never gets its own Payment row, so totalAmount alone overstates cash
+    // actually paid out by exactly the deducted amount.
+    prisma.purchase.findMany({
+      select: { totalAmount: true, loanDeductionAmount: true },
       // See calcSystemTotals — excludes purchases settled via a Payment record.
       where: { paymentMethod: 'cash', status: 'completed', payments: { none: {} }, createdAt: { gte: start, lte: end } },
     }),
@@ -826,12 +830,20 @@ export async function getLiveStats(
       .plus(saleSettlementsAgg._sum.amount?.toString() ?? '0').toFixed(2),
     cardSales:     new Decimal(salesCardAgg._sum.totalAmount?.toString()  ?? '0').toFixed(2),
     cardOnlySales: new Decimal(salesCardOnlyAgg._sum.totalAmount?.toString() ?? '0').toFixed(2),
-    cashPurchases: new Decimal(purchasesAgg._sum.totalAmount?.toString()  ?? '0').toFixed(2),
+    cashPurchases: cashPurchaseRows.reduce(
+      (sum, p) => sum.plus(p.totalAmount.toString()).minus(p.loanDeductionAmount?.toString() ?? '0'),
+      new Decimal(0),
+    ).toFixed(2),
     transferredPurchases: new Decimal(transferredPurchasesAgg._sum.totalAmount?.toString() ?? '0').toFixed(2),
     cashPayments:  new Decimal(paymentsAgg._sum.amount?.toString()        ?? '0').toFixed(2),
     expenses:      expenses.toFixed(2),
     loanAdvance:   loanTotals.advanced,
     loanRepayment: loanTotals.repaid,
+    // Informational only — a repayment settled via stock, not cash, so it
+    // must never feed into the drawer-cash math (loanRepayment above
+    // already correctly excludes it). Lets the cash-up page show it
+    // happened without corrupting Cal Float.
+    loanRepaymentStock: loanTotals.repaidViaStock,
     nonCashAdvanced: loanTotals.nonCashAdvanced,
     // Drawings received = only mid-day top-ups, not the float opening amount
     floatTopUps:   new Decimal(floatTopUpsAgg._sum.amount?.toString() ?? '0').toFixed(2),
