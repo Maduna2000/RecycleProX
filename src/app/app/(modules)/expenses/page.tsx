@@ -55,6 +55,7 @@ export default function ExpensesPage() {
   const [search,         setSearch]         = useState('')
   const [from,           setFrom]           = useState('')
   const [to,             setTo]             = useState('')
+  const [hideVoided,     setHideVoided]     = useState(false)
 
   // Open modal from toolbar query params
   useEffect(() => {
@@ -79,6 +80,7 @@ export default function ExpensesPage() {
   const statusFilter = statusMap[tab]
   const query = new URLSearchParams({
     ...(statusFilter && { status: statusFilter }),
+    ...(hideVoided   && { hideVoided: 'true' }),
     ...(search       && { search }),
     ...(from         && { from }),
     ...(to           && { to }),
@@ -265,6 +267,18 @@ export default function ExpensesPage() {
         <Field label="To" width={145}>
           <input type="date" value={to} onChange={(e) => setTo(e.target.value)} style={inp} title="To date" />
         </Field>
+        <label
+          className="flex items-center gap-1.5 cursor-pointer"
+          style={{ fontSize: 11, color: colors.textSecondary, paddingBottom: 8 }}
+        >
+          <input
+            type="checkbox"
+            checked={hideVoided}
+            onChange={(e) => setHideVoided(e.target.checked)}
+            className="rounded"
+          />
+          Hide voided
+        </label>
         {hasFilters && (
           <Btn size="sm" icon={X} onClick={clearFilters}>Clear</Btn>
         )}
