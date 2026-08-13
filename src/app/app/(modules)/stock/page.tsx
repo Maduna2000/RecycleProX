@@ -461,7 +461,7 @@ function AdjustmentModal({
               <div className="grid grid-cols-2 gap-3">
                 <Field label="System On Hand" hint={selectedProduct ? selectedProduct.unit : undefined}>
                   <div style={{ ...inp, marginTop: 4, fontFamily: 'monospace', background: colors.neutralBg, display: 'flex', alignItems: 'center' }}>
-                    {onHand !== null ? onHand.toFixed(3) : '—'}
+                    {onHand !== null ? onHand.toFixed(2) : '—'}
                   </div>
                 </Field>
                 <Field label={`Counted Quantity${selectedProduct ? ` (${selectedProduct.unit})` : ''}`}>
@@ -486,7 +486,7 @@ function AdjustmentModal({
                   {diff === null ? 'Adjustment' : diff === 0 ? 'No change' : diff > 0 ? 'Stock IN (found more)' : 'Stock OUT (found less)'}
                 </span>
                 <span className="font-mono font-bold text-sm" style={{ color: diff === null || diff === 0 ? colors.textSecondary : diff > 0 ? colors.action : colors.danger }}>
-                  {diff === null ? 'Enter a count above' : `${diff > 0 ? '+' : ''}${diff.toFixed(3)} ${selectedProduct?.unit ?? ''}`}
+                  {diff === null ? 'Enter a count above' : `${diff > 0 ? '+' : ''}${diff.toFixed(2)} ${selectedProduct?.unit ?? ''}`}
                 </span>
               </div>
             </>

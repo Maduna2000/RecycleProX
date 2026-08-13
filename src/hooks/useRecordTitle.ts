@@ -77,11 +77,19 @@ const ROUTE_PATTERNS: RoutePattern[] = [
   },
 ]
 
+// Every real record id in this app is a UUID (CLAUDE.md rule: no
+// auto-increment ids for business records). Sibling static routes under the
+// same prefix — /app/purchases/new, /app/sales/new, /app/sales/unpaid,
+// /app/customers/new — are not record ids and must never be sent to
+// apiPath(), which would 404 (and previously caused a title-bar hydration
+// mismatch between server and client render).
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 function matchRoute(pathname: string): { pattern: RoutePattern; id: string } | null {
   for (const pattern of ROUTE_PATTERNS) {
     if (pathname.startsWith(pattern.prefix) && pathname !== pattern.prefix.slice(0, -1)) {
       const id = pathname.slice(pattern.prefix.length).split('/')[0]
-      if (id) return { pattern, id }
+      if (id && UUID_RE.test(id)) return { pattern, id }
     }
   }
   return null

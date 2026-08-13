@@ -10,7 +10,8 @@ export async function GET(req: NextRequest) {
   if (!session) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
   const { searchParams } = req.nextUrl
-  const status = searchParams.get('status') ?? undefined
+  const status      = searchParams.get('status') ?? undefined
+  const hideVoided  = searchParams.get('hideVoided') === 'true'
   const search = searchParams.get('search') ?? undefined
   const from   = searchParams.get('from') ? new Date(searchParams.get('from')!) : undefined
   const to     = searchParams.get('to')   ? new Date(searchParams.get('to')!)   : undefined
@@ -18,7 +19,7 @@ export async function GET(req: NextRequest) {
   const page   = parseInt(searchParams.get('page') ?? '1')
   const limit  = searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : undefined
 
-  const result = await runWithRequestTenant(req, () => listExpenses({ status, search, from, to, page, limit }))
+  const result = await runWithRequestTenant(req, () => listExpenses({ status, hideVoided, search, from, to, page, limit }))
   return NextResponse.json(result)
 }
 

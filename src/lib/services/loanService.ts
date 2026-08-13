@@ -56,7 +56,7 @@ export class RepaymentNotLastEntryError extends Error {
 // no-purchaseId shape, different real-world cause.
 const MANUAL_REVERSAL_PREFIX = 'Reversal (manual)'
 
-function formatTransactionMethod(method: string): string {
+export function formatTransactionMethod(method: string): string {
   if (method === 'eft') return 'EFT'
   return method.charAt(0).toUpperCase() + method.slice(1)
 }
@@ -392,13 +392,21 @@ export async function getCustomerLoanSummary(customerId: string) {
 export async function getLoanTotalsForDate(window: DateWindow) {
   const { start, end } = window
 
-  // Only cash-method loans/repayments affect the drawer. Repayments are always
-  // cash in practice (applyRepaymentTx hardcodes it — it's a deduction from a
-  // purchase payout, never handed over by the customer), but advances are
+  // Only cash-method loans/repayments affect the drawer. Advances are
   // genuinely reachable as EFT via the Create Loan dialog, so filtering
   // matters there: an EFT advance never touches the physical drawer and must
   // not reduce the day's expected cash.
-  const [advancedAgg, nonCashAdvancedAgg, repaidAgg] = await Promise.all([
+  //
+  // Repayments additionally exclude purchaseId != null rows even though
+  // applyRepaymentTx stamps them paymentMethod: 'cash' — that stamp is a
+  // mislabel, not a fact. A purchase-deducted repayment is a withheld
+  // payout: the customer never received cash for their stock and never
+  // handed cash back, so no money crossed the drawer in either direction.
+  // Counting it here would tell cashup to expect cash that was never
+  // physically received (see getLoanRepaymentsForDate below, which still
+  // lists these — unfiltered — for visibility; only the drawer-cash total
+  // excludes them).
+  const [advancedAgg, nonCashAdvancedAgg, repaidAgg, repaidViaStockAgg] = await Promise.all([
     prisma.loan.aggregate({
       where: { status: { not: 'voided' }, paymentMethod: 'cash', createdAt: { gte: start, lte: end } },
       _sum: { principalAmount: true },
@@ -408,7 +416,15 @@ export async function getLoanTotalsForDate(window: DateWindow) {
       _sum: { principalAmount: true },
     }),
     prisma.loanRepayment.aggregate({
-      where: { paymentMethod: 'cash', createdAt: { gte: start, lte: end } },
+      where: { paymentMethod: 'cash', purchaseId: null, createdAt: { gte: start, lte: end } },
+      _sum: { amount: true },
+    }),
+    // Purely informational — surfaced on the cash-up page and the
+    // loan-repayments report so a repayment settled via stock stays visible
+    // ("R12,150 repaid via stock") even though it correctly never enters the
+    // cash total above.
+    prisma.loanRepayment.aggregate({
+      where: { purchaseId: { not: null }, createdAt: { gte: start, lte: end } },
       _sum: { amount: true },
     }),
   ])
@@ -416,6 +432,7 @@ export async function getLoanTotalsForDate(window: DateWindow) {
   const advanced        = new Decimal(advancedAgg._sum.principalAmount?.toString() ?? '0')
   const nonCashAdvanced  = new Decimal(nonCashAdvancedAgg._sum.principalAmount?.toString() ?? '0')
   const repaid           = new Decimal(repaidAgg._sum.amount?.toString() ?? '0')
+  const repaidViaStock   = new Decimal(repaidViaStockAgg._sum.amount?.toString() ?? '0')
   // Net cash impact: advances paid out minus repayments received back
   // Positive = net cash went out as loans (reduces drawer cash)
   const netCashOut = advanced.minus(repaid)
@@ -424,6 +441,7 @@ export async function getLoanTotalsForDate(window: DateWindow) {
     advanced:       advanced.toFixed(2),
     nonCashAdvanced: nonCashAdvanced.toFixed(2),
     repaid:         repaid.toFixed(2),
+    repaidViaStock: repaidViaStock.toFixed(2),
     netCashOut:     netCashOut.toFixed(2),
   }
 }
