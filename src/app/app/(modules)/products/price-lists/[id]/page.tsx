@@ -58,7 +58,9 @@ export default function PriceListEditorPage() {
   const [loaded,     setLoaded]     = useState(false)
   const [saving,     setSaving]     = useState(false)
 
-  const { data: products } = useSWR<Product[]>('/api/products?activeOnly=1', fetcher)
+  // /api/products wraps the list: { products: [...] }
+  const { data: productsData } = useSWR<{ products: Product[] }>('/api/products?active=true', fetcher)
+  const products = productsData?.products
   const { data: detail, error: detailError } = useSWR<PriceListDetail>(
     isNew ? null : `/api/price-lists/${params.id}`,
     fetcher,
