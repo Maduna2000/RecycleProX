@@ -15,7 +15,7 @@ import {
   Wifi, WifiOff,
   PrinterX,
   RefreshCw,
-  Scale, ClipboardList,
+  Scale, ClipboardList, ReceiptText,
   Boxes, ArrowLeftRight, Grid3X3, SlidersHorizontal,
   ShieldCheck, History, LifeBuoy, DoorOpen,
 } from 'lucide-react'
@@ -103,11 +103,20 @@ function useToolbarButtons(pathname: string, role: string): ToolbarButton[] {
     ]
   }
 
+  // Price list builder pages get their own toolbar (New + back to Products),
+  // matching the Stock module's sibling-page pattern.
+  if (pathname === '/app/products/price-lists' || pathname.startsWith('/app/products/price-lists/'))
+    return isMgr ? [
+      { label: 'New Price List', icon: Plus,          href: '/app/products/price-lists/new', variant: 'primary' },
+      { label: 'Products',       icon: ClipboardList, href: '/app/products',                 variant: 'secondary' },
+    ] : []
+
   if (pathname === '/app/products' || pathname.startsWith('/app/products/'))
     return isMgr ? [
-      { label: 'Add Product', icon: Plus,       href: '/app/products?add=1',        variant: 'primary' },
-      { label: 'Categories',  icon: Settings2,  href: '/app/products?categories=1', variant: 'secondary' },
-      { label: 'Bulk Price',  icon: TrendingUp, href: '/app/products?bulk=1',       variant: 'secondary' },
+      { label: 'Add Product', icon: Plus,        href: '/app/products?add=1',        variant: 'primary' },
+      { label: 'Categories',  icon: Settings2,   href: '/app/products?categories=1', variant: 'secondary' },
+      { label: 'Bulk Price',  icon: TrendingUp,  href: '/app/products?bulk=1',       variant: 'secondary' },
+      { label: 'Price Lists', icon: ReceiptText, href: '/app/products/price-lists',  variant: 'secondary' },
     ] : []
 
   if (pathname === '/app/price-groups' || pathname.startsWith('/app/price-groups/'))

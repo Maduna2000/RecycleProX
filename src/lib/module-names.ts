@@ -28,6 +28,7 @@ export const MODULE_NAMES: Record<string, string> = {
   '/app/stock/grid':       'Stock Grid',
   '/app/stocktake':        'Stocktake',
   '/app/products':         'Products',
+  '/app/products/price-lists': 'Price Lists',
   '/app/price-groups':     'Price Groups',
   '/app/reports':          'Reports',
   '/app/settings':         'Settings',

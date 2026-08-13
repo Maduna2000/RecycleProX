@@ -3,10 +3,11 @@
 import { useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Plus, Trash2, Loader2, AlertTriangle, Scale, RefreshCw, Camera, ClipboardList, Users, X } from 'lucide-react'
+import { Plus, Trash2, Loader2, AlertTriangle, Scale, RefreshCw, ClipboardList, Users, X } from 'lucide-react'
 import { toast } from 'sonner'
 import useSWR from 'swr'
 import { CasualSelectorPanel, type CasualSelectorPanelRef } from '@/components/customers/CasualSelectorPanel'
+import { TodaysPricesPanel } from '@/components/purchases/TodaysPricesPanel'
 import { AccountSelectorPanel } from '@/components/customers/AccountSelectorPanel'
 import { PrintResultModal } from '@/components/PrintResultModal'
 import { ProductCategoryPicker } from '@/components/products/ProductCategoryPicker'
@@ -123,11 +124,6 @@ export default function NewPurchasePage() {
   const [voidReason,    setVoidReason]    = useState('')
   const [actionLoading, setActionLoading] = useState(false)
 
-  // ── Photo state ──────────────────────────────────────────────────────────
-  const [photoFile,    setPhotoFile]    = useState<File | null>(null)
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
-  const photoInputRef = useRef<HTMLInputElement>(null)
-
   // ── Scale order link (carries the scale-kiosk weigh-in photo through to
   //    police copper reporting) ────────────────────────────────────────────
   const [scaleOrderLink,   setScaleOrderLink]   = useState<{ id: string; orderNumber: string } | null>(null)
@@ -215,8 +211,6 @@ export default function NewPurchasePage() {
     setInvoiceNo('')
     setDeductLoan(false)
     setDeductionAmount('')
-    setPhotoFile(null)
-    setPhotoPreview(null)
     setScaleOrderLink(null)
     setScaleOrderSearch('')
     setScale1(null)
@@ -228,7 +222,6 @@ export default function NewPurchasePage() {
   const hasEnteredData =
     !!customer ||
     lines.some((l) => l.productId || l.quantity || l.unitPrice) ||
-    !!photoFile ||
     !!scaleOrderLink
 
   async function handleCancel() {
@@ -556,25 +549,6 @@ export default function NewPurchasePage() {
         router.push('/app/purchases')
       } else {
         const purchase = data as { id: string; refNumber: string }
-
-        // Upload product photo if one was staged (non-blocking)
-        if (photoFile) {
-          try {
-            const fd = new FormData()
-            fd.append('context', 'purchase_photo')
-            fd.append('referenceId', purchase.id)
-            fd.append('file', photoFile)
-            const upRes = await fetch('/api/r2/upload', { method: 'POST', body: fd })
-            if (upRes.ok) {
-              const { key } = await upRes.json() as { key: string }
-              await fetch(`/api/purchases/${purchase.id}/photos`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ add: key }),
-              })
-            }
-          } catch { /* photo upload failure is non-blocking */ }
-        }
 
         if (status === 'pending') {
           // Reset form so operator can continue making orders
@@ -1347,65 +1321,8 @@ export default function NewPurchasePage() {
             </div>
           </div>
 
-          {/* Product Photo */}
-          <div style={{ flex: 1, padding: '8px 10px', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#1B3A6B' }}>Product Photo</span>
-              {photoPreview && (
-                <button
-                  onClick={() => { setPhotoFile(null); setPhotoPreview(null) }}
-                  style={{ fontSize: 10, color: '#EF4444', background: 'none', border: 'none', cursor: 'pointer' }}
-                >
-                  Remove
-                </button>
-              )}
-            </div>
-
-            <label
-              style={{
-                flex: 1,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                border: photoPreview ? '1px solid #C0C0C0' : '2px dashed #ABABAB',
-                borderRadius: 2,
-                cursor: 'pointer',
-                minHeight: 140,
-                overflow: 'hidden',
-                position: 'relative',
-                background: '#FAFAFA',
-              }}
-            >
-              {photoPreview ? (
-                <img
-                  src={photoPreview}
-                  alt="Product"
-                  style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'contain' }}
-                />
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-                  <Camera style={{ width: 28, height: 28, color: '#9CA3AF' }} />
-                  <span style={{ fontSize: 11, color: '#6C757D', textAlign: 'center', lineHeight: 1.4 }}>
-                    Click to add<br />product photo
-                  </span>
-                </div>
-              )}
-              <input
-                ref={photoInputRef}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                style={{ display: 'none' }}
-                onChange={(e) => {
-                  const f = e.target.files?.[0]
-                  if (!f) return
-                  setPhotoFile(f)
-                  setPhotoPreview(URL.createObjectURL(f))
-                  e.target.value = ''
-                }}
-              />
-            </label>
-          </div>
+          {/* Today's Prices — the active price list from Products → Price Lists */}
+          <TodaysPricesPanel />
 
         </div>
         {/* end RIGHT COLUMN */}
