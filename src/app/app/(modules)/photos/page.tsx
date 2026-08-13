@@ -401,7 +401,7 @@ function PhotoGrid({
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function PhotosPage() {
-  const [activeTab, setActiveTab] = useState<typeof TABS[number]['value']>('casual')
+  const [activeTab, setActiveTab] = useState<typeof TABS[number]['value']>('purchase')
 
   return (
     <PortalPage tabs={[...TABS]} active={activeTab} onChange={(v) => setActiveTab(v as typeof activeTab)}>
