@@ -222,6 +222,12 @@ export async function GET(req: NextRequest) {
       const docWhere: any = {
         documentType: 'id_copy',
         ...(customerId && { customerId }),
+        ...((from || to) && {
+          uploadedAt: {
+            ...(from && { gte: from }),
+            ...(to   && { lte: to   }),
+          },
+        }),
       }
 
       if (search) {
