@@ -82,6 +82,24 @@ async function generateRefNumber(tx: TxClient): Promise<string> {
   return `P${String(count + 1).padStart(5, '0')}`
 }
 
+// ─── Cash-effect day (for the cash-up lock) ───────────────────────────────────
+// A completed purchase's cash was counted into whichever day's cash-up its
+// settlement Payment row (markPurchasePaid/processSplitPayment) landed on —
+// see calcSystemTotals in cashUpService.ts, which buckets Payment rows by
+// their own createdAt, not the parent purchase's. Only a purchase that was
+// completed directly at creation, with no Payment row ever created, has its
+// cash counted on its own createdAt (the payments:{none:{}} branch there).
+// Using purchase.createdAt unconditionally here would check the wrong day
+// whenever a purchase sat pending before being settled later — letting a
+// reversal slip through against a day whose cash-up is already approved.
+async function purchaseCashEffectDayLabel(tx: TxClient, purchase: { id: string; createdAt: Date }): Promise<string> {
+  const settlement = await tx.payment.findFirst({
+    where: { purchaseId: purchase.id, voidedAt: null },
+    orderBy: { createdAt: 'desc' },
+  })
+  return sastDayLabelOfInstant(settlement?.createdAt ?? purchase.createdAt)
+}
+
 // Retries on PostgreSQL serialization failures (P2034 / 40001)
 async function withSerializableRetry<T>(fn: () => Promise<T>): Promise<T> {
   for (let attempt = 1; attempt <= 3; attempt++) {
@@ -364,13 +382,16 @@ export async function voidPurchase(id: string, data: VoidPurchaseInput, voidedBy
       if (!purchase) throw new PurchaseNotFoundError(id)
       if (purchase.status === 'voided') throw new PurchaseAlreadyVoidedError(purchase.refNumber)
 
-      // Once this purchase's day has an approved cash-up, its books are
-      // closed — void is refused outright rather than recalculating the
-      // approved totals. No override; a correction becomes a fresh
-      // adjusting transaction instead.
-      const dayLabel = sastDayLabelOfInstant(purchase.createdAt)
-      const sessionDate = sastDateLabelToUTCDate(dayLabel)
-      if (await isSessionDateApproved(tx, sessionDate)) throw new CashUpAlreadyApprovedError(dayLabel)
+      // Once the day this purchase's cash was actually counted has an
+      // approved cash-up, its books are closed — void is refused outright
+      // rather than recalculating the approved totals. No override; a
+      // correction becomes a fresh adjusting transaction instead. A still-
+      // pending purchase was never counted in any cash-up total, so there's
+      // nothing to protect — only a completed one needs the check.
+      if (purchase.status === 'completed') {
+        const dayLabel = await purchaseCashEffectDayLabel(tx, purchase)
+        if (await isSessionDateApproved(tx, sastDateLabelToUTCDate(dayLabel))) throw new CashUpAlreadyApprovedError(dayLabel)
+      }
 
       const p = await tx.purchase.update({
         where: { id },
@@ -431,9 +452,11 @@ export async function reversePurchasePayment(id: string, data: ReversePurchasePa
       if (!purchase) throw new PurchaseNotFoundError(id)
       if (purchase.status !== 'completed') throw new PurchaseNotCompletedError(purchase.status)
 
-      // Once this purchase's day has an approved cash-up, its books are
-      // closed — a payment reversal is refused outright. No override.
-      const dayLabel = sastDayLabelOfInstant(purchase.createdAt)
+      // Once the day this purchase's cash was actually counted has an
+      // approved cash-up, its books are closed — a payment reversal is
+      // refused outright. No override. Looked up before the settlement
+      // Payment row is voided below, while it's still live.
+      const dayLabel = await purchaseCashEffectDayLabel(tx, purchase)
       if (await isSessionDateApproved(tx, sastDateLabelToUTCDate(dayLabel))) throw new CashUpAlreadyApprovedError(dayLabel)
 
       const p = await tx.purchase.update({
@@ -594,6 +617,11 @@ export async function updatePurchase(id: string, data: UpdatePurchaseInput, user
           source: 'purchase',
           sourceId: id,
           createdByUserId: userId,
+          // Backdated to when the goods actually arrived, not when the
+          // correction was made — otherwise a point-in-time stock report
+          // covering the gap between creation and this edit would
+          // retroactively show them as not yet received.
+          createdAt: purchase.createdAt,
         })
       }
 

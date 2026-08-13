@@ -179,6 +179,14 @@ export async function reverseRepaymentsForPurchase(
         refNumber:       `${prefix}-${String(count + 1).padStart(4, '0')}`,
         loanId:          r.loanId,
         customerId:      r.customerId,
+        // purchaseId carried over from the repayment being reversed — the
+        // original was excluded from getLoanTotalsForDate's drawer-cash sum
+        // because no cash actually crossed the drawer (it was withheld from
+        // the payout instead); reversing a non-cash-event is itself a
+        // non-cash-event, so this row needs the same exclusion. Omitting it
+        // let this reversal alone pass that filter, understating drawer cash
+        // by the deducted amount on the day of the void/reversal/edit.
+        purchaseId:      r.purchaseId,
         amount:          new Decimal(r.amount.toString()).negated(),
         paymentMethod:   r.paymentMethod,
         notes:           `Reversal — purchase ${purchaseRefNumber} ${actionLabel}`,

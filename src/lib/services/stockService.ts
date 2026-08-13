@@ -27,6 +27,11 @@ export async function recordMovement(
     sourceId?: string
     notes?: string
     createdByUserId?: string
+    // Backdates the movement — used when re-posting a transaction's movements
+    // after an edit, so a point-in-time stock report doesn't retroactively
+    // change just because someone corrected a line item weeks later. Omit
+    // for a movement that's a genuinely new event happening now.
+    createdAt?: Date
   }
 ) {
   return tx.stockMovement.create({
@@ -39,6 +44,7 @@ export async function recordMovement(
       sourceId: opts.sourceId,
       notes: opts.notes,
       createdByUserId: opts.createdByUserId,
+      ...(opts.createdAt ? { createdAt: opts.createdAt } : {}),
     },
   })
 }

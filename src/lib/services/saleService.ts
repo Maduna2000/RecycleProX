@@ -77,6 +77,23 @@ async function generateRefNumber(tx: TxClient): Promise<string> {
   return `${prefix}-${String(count + 1).padStart(4, '0')}`
 }
 
+// ─── Cash-effect day (for the cash-up lock) ───────────────────────────────────
+// A completed sale's cash was counted into whichever day's cash-up its
+// settlement Payment row (markSalePaid/processSaleSplitPayment) landed on —
+// see calcSystemTotals in cashUpService.ts, which buckets Payment rows by
+// their own createdAt, not the parent sale's. Only a sale that was completed
+// directly at creation, with no Payment row ever created, has its cash
+// counted on its own createdAt (the payments:{none:{}} branch there). Using
+// sale.createdAt unconditionally here would check the wrong day whenever a
+// sale sat pending before being settled later.
+async function saleCashEffectDayLabel(tx: TxClient, sale: { id: string; createdAt: Date }): Promise<string> {
+  const settlement = await tx.payment.findFirst({
+    where: { saleId: sale.id, voidedAt: null },
+    orderBy: { createdAt: 'desc' },
+  })
+  return sastDayLabelOfInstant(settlement?.createdAt ?? sale.createdAt)
+}
+
 // Retries on PostgreSQL serialization failures (P2034 / 40001)
 async function withSerializableRetry<T>(fn: () => Promise<T>): Promise<T> {
   for (let attempt = 1; attempt <= 3; attempt++) {
@@ -240,12 +257,16 @@ export async function voidSale(id: string, data: VoidSaleInput, voidedById?: str
       if (!sale) throw new SaleNotFoundError(id)
       if (sale.status === 'voided') throw new SaleAlreadyVoidedError(sale.refNumber)
 
-      // Once this sale's day has an approved cash-up, its books are closed —
-      // void is refused outright rather than recalculating the approved
-      // totals. No override; a correction becomes a fresh adjusting
-      // transaction instead.
-      const dayLabel = sastDayLabelOfInstant(sale.createdAt)
-      if (await isSessionDateApproved(tx, sastDateLabelToUTCDate(dayLabel))) throw new CashUpAlreadyApprovedError(dayLabel)
+      // Once the day this sale's cash was actually counted has an approved
+      // cash-up, its books are closed — void is refused outright rather
+      // than recalculating the approved totals. No override; a correction
+      // becomes a fresh adjusting transaction instead. A still-pending sale
+      // was never counted in any cash-up total, so there's nothing to
+      // protect — only a completed one needs the check.
+      if (sale.status === 'completed') {
+        const dayLabel = await saleCashEffectDayLabel(tx, sale)
+        if (await isSessionDateApproved(tx, sastDateLabelToUTCDate(dayLabel))) throw new CashUpAlreadyApprovedError(dayLabel)
+      }
 
       const s = await tx.sale.update({
         where: { id },
@@ -303,9 +324,11 @@ export async function reverseSalePayment(id: string, data: ReverseSalePaymentInp
       if (!sale) throw new SaleNotFoundError(id)
       if (sale.status !== 'completed') throw new SaleNotCompletedError(sale.status)
 
-      // Once this sale's day has an approved cash-up, its books are closed —
-      // a payment reversal is refused outright. No override.
-      const dayLabel = sastDayLabelOfInstant(sale.createdAt)
+      // Once the day this sale's cash was actually counted has an approved
+      // cash-up, its books are closed — a payment reversal is refused
+      // outright. No override. Looked up before the settlement Payment row
+      // is voided below, while it's still live.
+      const dayLabel = await saleCashEffectDayLabel(tx, sale)
       if (await isSessionDateApproved(tx, sastDateLabelToUTCDate(dayLabel))) throw new CashUpAlreadyApprovedError(dayLabel)
 
       const s = await tx.sale.update({
@@ -461,6 +484,11 @@ export async function updateSale(id: string, data: UpdateSaleInput, userId?: str
           source:    'sale',
           sourceId:  id,
           createdByUserId: userId,
+          // Backdated to when the goods actually left, not when the
+          // correction was made — otherwise a point-in-time stock report
+          // covering the gap between creation and this edit would
+          // retroactively show them as not yet sold.
+          createdAt: sale.createdAt,
         })
       }
 

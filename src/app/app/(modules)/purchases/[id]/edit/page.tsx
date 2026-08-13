@@ -6,6 +6,7 @@ import useSWR from 'swr'
 import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
 import { Loader2 } from 'lucide-react'
+import Decimal from 'decimal.js'
 import { colors } from '@/lib/design-tokens'
 import { fetcher } from '@/lib/swrFetcher'
 import { PurchaseForm, type EditingPurchase } from '../../new/PurchaseForm'
@@ -33,7 +34,7 @@ export default function EditPurchasePage() {
 
   const { data: purchase, isLoading, error } = useSWR<FetchedPurchase>(`/api/purchases/${id}`, fetcher)
 
-  const canEdit = !!purchase && purchase.status === 'pending' && Number(purchase.amountPaid) === 0
+  const canEdit = !!purchase && purchase.status === 'pending' && new Decimal(purchase.amountPaid).isZero()
 
   useEffect(() => {
     if (sessionStatus !== 'authenticated' || !purchase) return

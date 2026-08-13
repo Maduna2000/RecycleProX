@@ -6,6 +6,7 @@ import useSWR from 'swr'
 import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
 import { Loader2 } from 'lucide-react'
+import Decimal from 'decimal.js'
 import { colors } from '@/lib/design-tokens'
 import { fetcher } from '@/lib/swrFetcher'
 import { SaleForm, type EditingSale } from '../../new/SaleForm'
@@ -36,7 +37,7 @@ export default function EditSalePage() {
 
   const { data: sale, isLoading, error } = useSWR<FetchedSale>(`/api/sales/${id}`, fetcher)
 
-  const canEdit = !!sale && sale.status === 'pending' && Number(sale.amountPaid ?? 0) === 0
+  const canEdit = !!sale && sale.status === 'pending' && new Decimal(sale.amountPaid ?? '0').isZero()
 
   useEffect(() => {
     if (sessionStatus !== 'authenticated' || !sale) return
