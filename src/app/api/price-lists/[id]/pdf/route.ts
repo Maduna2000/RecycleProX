@@ -42,7 +42,11 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       listDate: priceList.listDate,
       footerText: priceList.footerText,
       showExVat: priceList.showExVat,
-      company: { name: settings['yardName'] ?? 'Renovo Pro' },
+      company: {
+        name: settings['yardName'] ?? 'Renovo Pro',
+        address: settings['yardAddress'] || undefined,
+        phone: settings['yardPhone'] || undefined,
+      },
       logoBytes,
       currencySymbol,
       items: priceList.items.map((item) => ({
@@ -50,6 +54,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
         priceIncVat: item.priceIncVat.toString(),
         priceExVat: exVatPrice(item.priceIncVat.toString()).toFixed(2),
       })),
+      generatedAt: new Date(),
     })
 
     const buffer = pdfBytes.buffer.slice(pdfBytes.byteOffset, pdfBytes.byteOffset + pdfBytes.byteLength) as ArrayBuffer
