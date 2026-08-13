@@ -327,6 +327,10 @@ model PriceListItem {
   priceListId String
   productId   String?
   displayName String
+  // Snapshotted at add-time from the product's category (or "Other" for a
+  // custom line) — drives the printed category divider bars. Independent of
+  // the live Product record, same as displayName/priceIncVat.
+  category    String    @default("Other")
   priceIncVat Decimal   @db.Decimal(18, 2)
   sortOrder   Int       @default(0)
   priceList   PriceList @relation(fields: [priceListId], references: [id], onDelete: Cascade)

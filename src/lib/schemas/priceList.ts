@@ -18,6 +18,7 @@ export const DEFAULT_PRICE_LIST_COLORS = PriceListColorsSchema.parse({})
 export const PriceListItemSchema = z.object({
   productId:   z.string().uuid().nullable().optional(),
   displayName: z.string().min(1, 'Name is required').max(80),
+  category:    z.string().max(40).default('Other'),
   priceIncVat: z.preprocess(
     (v) => (v === '' || v === undefined || v === null ? undefined : parseFloat(String(v))),
     z.number().positive('Price must be positive'),

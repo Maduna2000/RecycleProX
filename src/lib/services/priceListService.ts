@@ -24,7 +24,7 @@ export interface PriceListPdfSource {
   showLogo:   boolean
   showExVat:  boolean
   colors:     PriceListColors
-  items:      { displayName: string; priceIncVat: Decimal.Value }[]
+  items:      { displayName: string; category: string; priceIncVat: Decimal.Value }[]
 }
 
 /**
@@ -58,6 +58,7 @@ export async function buildPriceListPdfBytes(source: PriceListPdfSource): Promis
     currencySymbol,
     items: source.items.map((item) => ({
       displayName: item.displayName,
+      category: item.category,
       priceIncVat: new Decimal(item.priceIncVat).toFixed(2),
       priceExVat: exVatPrice(item.priceIncVat).toFixed(2),
     })),
@@ -70,6 +71,7 @@ function itemRows(items: PriceListItemInput[], tenantId: string) {
     tenantId,
     productId:   item.productId ?? null,
     displayName: item.displayName,
+    category:    item.category || 'Other',
     priceIncVat: new Decimal(item.priceIncVat).toDecimalPlaces(2).toString(),
     sortOrder:   item.sortOrder ?? i,
   }))
@@ -176,6 +178,7 @@ export async function duplicatePriceList(id: string, userId: string) {
           tenantId,
           productId:   item.productId,
           displayName: item.displayName,
+          category:    item.category,
           priceIncVat: item.priceIncVat,
           sortOrder:   item.sortOrder,
         })),
