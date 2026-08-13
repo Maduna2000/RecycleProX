@@ -37,6 +37,7 @@ type Product = {
 type EditableItem = {
   productId: string | null
   displayName: string
+  category: string
   priceIncVat: string // input string — validated on save
 }
 
@@ -48,7 +49,7 @@ type PriceListDetail = PriceListColors & {
   showLogo: boolean
   showExVat: boolean
   updatedAt: string
-  items: { productId: string | null; displayName: string; priceIncVat: string; sortOrder: number }[]
+  items: { productId: string | null; displayName: string; category: string; priceIncVat: string; sortOrder: number }[]
 }
 
 function exVatLabel(priceIncVat: string): string {
@@ -106,6 +107,7 @@ export default function PriceListEditorPage() {
     setItems(detail.items.map((i) => ({
       productId:   i.productId,
       displayName: i.displayName,
+      category:    i.category,
       priceIncVat: new Decimal(i.priceIncVat).toFixed(2),
     })))
     setUpdatedAt(detail.updatedAt)
@@ -132,6 +134,7 @@ export default function PriceListEditorPage() {
     setItems((prev) => [...prev, {
       productId:   product.id,
       displayName: product.name,
+      category:    product.category,
       priceIncVat: new Decimal(product.defaultBuyPrice).toFixed(2),
     }])
   }
@@ -142,13 +145,14 @@ export default function PriceListEditorPage() {
     setItems((prev) => [...prev, ...toAdd.map((p) => ({
       productId:   p.id,
       displayName: p.name,
+      category:    p.category,
       priceIncVat: new Decimal(p.defaultBuyPrice).toFixed(2),
     }))])
     toast.success(`Added ${toAdd.length} product${toAdd.length === 1 ? '' : 's'} from ${category}`)
   }
 
   function addCustomLine() {
-    setItems((prev) => [...prev, { productId: null, displayName: '', priceIncVat: '' }])
+    setItems((prev) => [...prev, { productId: null, displayName: '', category: 'Other', priceIncVat: '' }])
   }
 
   function updateItem(index: number, patch: Partial<EditableItem>) {
@@ -194,6 +198,7 @@ export default function PriceListEditorPage() {
       items: items.map((item, i) => ({
         productId:   item.productId,
         displayName: item.displayName.trim(),
+        category:    item.category.trim() || 'Other',
         priceIncVat: item.priceIncVat,
         sortOrder:   i,
       })),
@@ -396,7 +401,7 @@ export default function PriceListEditorPage() {
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: '52px 1fr 110px 90px 32px',
+              gridTemplateColumns: '52px 100px 1fr 110px 90px 32px',
               gap: 0,
               padding: '4px 8px',
               borderBottom: `1px solid ${colors.border}`,
@@ -410,6 +415,7 @@ export default function PriceListEditorPage() {
             }}
           >
             <span>Order</span>
+            <span>Category</span>
             <span>Material</span>
             <span style={{ textAlign: 'right' }}>Inc VAT (R)</span>
             <span style={{ textAlign: 'right' }}>Ex VAT</span>
@@ -428,7 +434,7 @@ export default function PriceListEditorPage() {
                 key={`${item.productId ?? 'custom'}-${i}`}
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: '52px 1fr 110px 90px 32px',
+                  gridTemplateColumns: '52px 100px 1fr 110px 90px 32px',
                   alignItems: 'center',
                   padding: '2px 8px',
                   borderBottom: `1px solid ${colors.border}`,
@@ -453,6 +459,15 @@ export default function PriceListEditorPage() {
                     <ArrowDown style={{ width: 12, height: 12, color: colors.textSecondary }} />
                   </button>
                 </div>
+                <input
+                  value={item.category}
+                  onChange={(e) => updateItem(i, { category: e.target.value })}
+                  maxLength={40}
+                  placeholder="Category…"
+                  title="Groups this row under a divider bar on the printed list"
+                  style={{ ...inp, height: 22, fontSize: fontSize.xs, marginRight: 8 }}
+                  disabled={saving}
+                />
                 <input
                   value={item.displayName}
                   onChange={(e) => updateItem(i, { displayName: e.target.value })}

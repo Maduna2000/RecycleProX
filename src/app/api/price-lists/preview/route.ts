@@ -33,6 +33,7 @@ export async function POST(req: NextRequest) {
       colors: parsed.data.colors,
       items: parsed.data.items.map((item) => ({
         displayName: item.displayName,
+        category: item.category,
         priceIncVat: item.priceIncVat,
       })),
     }))
