@@ -408,6 +408,20 @@ async function calcSystemTotals(window: DateWindow, drawingsReceived = new Decim
   return { cashSales, cashPurchases, cashPayments, cashExpected, cardPayments, expensesTotal }
 }
 
+// ─── Cash-up lock check ───────────────────────────────────────────────────────
+// Once a day's cash-up is approved, its books are closed — void/reverse-payment
+// must refuse to touch any transaction dated that day, full stop. No override.
+// Any approved session for the date is enough to lock it (a day can hold more
+// than one session for separate shifts; matching one is treated the same as
+// matching all — this is a hard block, not a precise per-shift boundary).
+export async function isSessionDateApproved(
+  tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
+  sessionDate: Date
+): Promise<boolean> {
+  const count = await tx.cashUp.count({ where: { sessionDate, status: 'approved' } })
+  return count > 0
+}
+
 // ─── Recalculate an approved cash-up after a completed sale/purchase is voided ──
 // Called from inside voidSale's/voidPurchase's own transaction — the sale or
 // purchase status change and this correction commit together, never one

@@ -4,7 +4,7 @@ import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import useSWR, { mutate as swrMutate } from 'swr'
 import { useSession } from 'next-auth/react'
-import { Search, Ban, Printer, FileText, Loader2, X, AlertTriangle, Undo2 } from 'lucide-react'
+import { Search, Ban, Printer, FileText, Loader2, X, AlertTriangle, Undo2, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
 import Decimal from 'decimal.js'
 import { DataTable, StatusBadge, Avatar, type Column, type RowAction, type SortDir } from '@/components/ui/DataTable'
@@ -25,6 +25,7 @@ type Purchase = {
   refNumber: string
   status: 'completed' | 'voided' | 'pending'
   totalAmount: string
+  amountPaid: string
   paymentMethod: string
   createdAt: string
   customer: { id: string; firstName: string; lastName: string; idNumber: string | null }
@@ -218,6 +219,12 @@ export default function PurchasesPage() {
       icon:    Undo2,
       hidden:  (row) => !isManager || row.status !== 'completed',
       onClick: (row) => setReverseTarget(row),
+    },
+    {
+      label:   'Edit',
+      icon:    Pencil,
+      hidden:  (row) => !isManager || row.status !== 'pending' || new Decimal(row.amountPaid).greaterThan(0),
+      onClick: (row) => router.push(`/app/purchases/${row.id}/edit`),
     },
     {
       label:   'Void Purchase',

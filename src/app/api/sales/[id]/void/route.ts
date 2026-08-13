@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { VoidSaleSchema } from '@/lib/schemas/sale'
-import { voidSale, SaleNotFoundError, SaleAlreadyVoidedError } from '@/lib/services/saleService'
+import { voidSale, SaleNotFoundError, SaleAlreadyVoidedError, CashUpAlreadyApprovedError } from '@/lib/services/saleService'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
@@ -22,6 +22,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   } catch (err) {
     if (err instanceof SaleNotFoundError) return NextResponse.json({ error: err.message }, { status: 404 })
     if (err instanceof SaleAlreadyVoidedError) return NextResponse.json({ error: err.message }, { status: 409 })
+    if (err instanceof CashUpAlreadyApprovedError) return NextResponse.json({ error: err.message }, { status: 409 })
 
     const message = err instanceof Error ? err.message : 'Failed to void sale'
     logger.error({ err }, 'POST /api/sales/[id]/void failed')

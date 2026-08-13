@@ -56,8 +56,21 @@ export const ReversePurchasePaymentSchema = z.object({
   reason: z.string().min(5, 'Reason must be at least 5 characters'),
 })
 
+// Hand-declared rather than CreatePurchaseSchema.partial() — a partial()
+// still silently re-applies the create schema's .default() to any field
+// the caller omits. An edit always resubmits the full current state of the
+// form (not a sparse patch), so every field below is required as-is.
+export const UpdatePurchaseSchema = z.object({
+  customerId:          z.string().uuid('Invalid customer'),
+  paymentMethod:       z.enum(['cash', 'eft']).default('cash'),
+  notes:               z.string().max(500).optional(),
+  loanDeductionAmount: z.string().regex(/^\d+(\.\d{1,2})?$/, 'Invalid amount').optional(),
+  lines:               z.array(PurchaseLineSchema).min(1, 'At least one product line is required'),
+})
+
 export type PurchaseLineInput = z.infer<typeof PurchaseLineSchema>
 export type CreatePurchaseInput = z.infer<typeof CreatePurchaseSchema>
 export type CreatePurchaseFormInput = z.input<typeof CreatePurchaseSchema>
 export type VoidPurchaseInput = z.infer<typeof VoidPurchaseSchema>
 export type ReversePurchasePaymentInput = z.infer<typeof ReversePurchasePaymentSchema>
+export type UpdatePurchaseInput = z.infer<typeof UpdatePurchaseSchema>

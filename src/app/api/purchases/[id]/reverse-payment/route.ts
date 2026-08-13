@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { ReversePurchasePaymentSchema } from '@/lib/schemas/purchase'
-import { reversePurchasePayment, PurchaseNotFoundError, PurchaseNotCompletedError } from '@/lib/services/purchaseService'
+import { reversePurchasePayment, PurchaseNotFoundError, PurchaseNotCompletedError, CashUpAlreadyApprovedError } from '@/lib/services/purchaseService'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 export async function POST(
@@ -33,6 +33,7 @@ export async function POST(
   } catch (err) {
     if (err instanceof PurchaseNotFoundError) return NextResponse.json({ error: err.message }, { status: 404 })
     if (err instanceof PurchaseNotCompletedError) return NextResponse.json({ error: err.message }, { status: 409 })
+    if (err instanceof CashUpAlreadyApprovedError) return NextResponse.json({ error: err.message }, { status: 409 })
 
     const message = err instanceof Error ? err.message : 'Failed to reverse purchase payment'
     logger.error({ err, purchaseId: id }, 'POST /api/purchases/[id]/reverse-payment failed')

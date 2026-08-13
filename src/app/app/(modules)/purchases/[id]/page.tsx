@@ -1,10 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import useSWR, { mutate } from 'swr'
+import Decimal from 'decimal.js'
 import { Dialog } from '@/components/ui/dialog'
-import { Ban, Printer, Camera, FileText, Loader2 } from 'lucide-react'
+import { Ban, Printer, Camera, FileText, Loader2, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
 import { useSession } from 'next-auth/react'
 import { format } from '@/lib/utils/format'
@@ -36,6 +37,7 @@ type Purchase = {
   refNumber: string
   status: 'completed' | 'voided' | 'pending'
   totalAmount: string
+  amountPaid: string
   loanDeductionAmount?: string
   paymentMethod: string
   notes?: string
@@ -68,6 +70,7 @@ function StatusBadge({ status }: { status: Purchase['status'] }) {
 
 export default function PurchaseDetailPage() {
   const { id } = useParams<{ id: string }>()
+  const router = useRouter()
   const { data: session } = useSession()
   const [voidOpen, setVoidOpen] = useState(false)
 
@@ -259,11 +262,18 @@ export default function PurchaseDetailPage() {
               Download VAT264
             </Btn>
           </div>
-          {isManager && purchase.status !== 'voided' && (
-            <Btn variant="danger" size="sm" icon={Ban} onClick={() => setVoidOpen(true)}>
-              Void Purchase
-            </Btn>
-          )}
+          <div style={{ display: 'flex', gap: 6 }}>
+            {isManager && purchase.status === 'pending' && new Decimal(purchase.amountPaid).isZero() && (
+              <Btn size="sm" icon={Pencil} onClick={() => router.push(`/app/purchases/${purchase.id}/edit`)}>
+                Edit
+              </Btn>
+            )}
+            {isManager && purchase.status !== 'voided' && (
+              <Btn variant="danger" size="sm" icon={Ban} onClick={() => setVoidOpen(true)}>
+                Void Purchase
+              </Btn>
+            )}
+          </div>
         </div>
     </PortalPage>
 

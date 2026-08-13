@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { VoidPurchaseSchema } from '@/lib/schemas/purchase'
-import { voidPurchase, PurchaseNotFoundError, PurchaseAlreadyVoidedError } from '@/lib/services/purchaseService'
+import { voidPurchase, PurchaseNotFoundError, PurchaseAlreadyVoidedError, CashUpAlreadyApprovedError } from '@/lib/services/purchaseService'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 export async function POST(
@@ -34,6 +34,7 @@ export async function POST(
   } catch (err) {
     if (err instanceof PurchaseNotFoundError) return NextResponse.json({ error: err.message }, { status: 404 })
     if (err instanceof PurchaseAlreadyVoidedError) return NextResponse.json({ error: err.message }, { status: 409 })
+    if (err instanceof CashUpAlreadyApprovedError) return NextResponse.json({ error: err.message }, { status: 409 })
 
     // Return specific error messages for known error types
     const message = err instanceof Error ? err.message : 'Failed to void purchase'

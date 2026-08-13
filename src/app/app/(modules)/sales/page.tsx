@@ -4,7 +4,7 @@ import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import useSWR, { mutate as swrMutate } from 'swr'
 import { useSession } from 'next-auth/react'
-import { Search, Eye, Ban, Printer, FileText, Loader2, X, Undo2 } from 'lucide-react'
+import { Search, Eye, Ban, Printer, FileText, Loader2, X, Undo2, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
 import Decimal from 'decimal.js'
 import { DataTable, StatusBadge, Avatar, type Column, type RowAction, type SortDir } from '@/components/ui/DataTable'
@@ -25,6 +25,7 @@ type Sale = {
   refNumber: string
   status: 'completed' | 'voided' | 'pending'
   totalAmount: string
+  amountPaid?: string
   paymentMethod: string
   buyerName: string
   buyerIdNumber?: string
@@ -209,6 +210,12 @@ export default function SalesPage() {
       icon:    Undo2,
       hidden:  (row) => !isManager || row.status !== 'completed',
       onClick: (row) => setReverseTarget(row),
+    },
+    {
+      label:   'Edit',
+      icon:    Pencil,
+      hidden:  (row) => !isManager || row.status !== 'pending' || new Decimal(row.amountPaid ?? '0').greaterThan(0),
+      onClick: (row) => router.push(`/app/sales/${row.id}/edit`),
     },
     {
       label:   'Void Sale',

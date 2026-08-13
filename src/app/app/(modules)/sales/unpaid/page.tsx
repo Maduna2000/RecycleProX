@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import useSWR, { mutate } from 'swr'
-import { Search, Printer, Ban, HandCoins, Loader2, X, AlertCircle } from 'lucide-react'
+import { Search, Printer, Ban, HandCoins, Loader2, X, AlertCircle, Pencil } from 'lucide-react'
 import Decimal from 'decimal.js'
 import { DataTable, Avatar, type Column, type RowAction } from '@/components/ui/DataTable'
 import { InlineDetailPanel } from '@/components/ui/InlineDetailPanel'
@@ -66,6 +67,7 @@ function outstanding(s: { totalAmount: string; amountPaid?: string }): Decimal {
 }
 
 export default function UnpaidSalesPage() {
+  const router = useRouter()
   const { data: session } = useSession()
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
 
@@ -218,6 +220,12 @@ export default function UnpaidSalesPage() {
       label:   'Print Receipt',
       icon:    Printer,
       onClick: (row) => window.open(`/api/sales/${row.id}/receipt?format=pdf`, '_blank'),
+    },
+    {
+      label:   'Edit',
+      icon:    Pencil,
+      hidden:  (row) => !isManager || new Decimal(row.amountPaid ?? '0').greaterThan(0),
+      onClick: (row) => router.push(`/app/sales/${row.id}/edit`),
     },
     {
       label:   'Void Sale',

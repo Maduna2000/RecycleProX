@@ -5,9 +5,9 @@ import logger from '@/lib/logger'
 import Decimal from 'decimal.js'
 import { recordMovement, recordVoidReversal } from '@/lib/services/stockService'
 import { applyBusinessLoanRepaymentTx, reverseRepaymentsForSale } from '@/lib/services/businessLoanService'
-import { recalculateApprovedCashUpForDate } from '@/lib/services/cashUpService'
+import { isSessionDateApproved } from '@/lib/services/cashUpService'
 import { sastDayLabelOfInstant, sastDateLabelToUTCDate } from '@/lib/utils/dayBounds'
-import type { CreateSaleInput, VoidSaleInput, ReverseSalePaymentInput } from '@/lib/schemas/sale'
+import type { CreateSaleInput, VoidSaleInput, ReverseSalePaymentInput, UpdateSaleInput } from '@/lib/schemas/sale'
 import type { ProcessSaleSplitPaymentInput } from '@/lib/schemas/splitPayment'
 import { encodeJsonField } from '@/lib/db/queryHelpers'
 import { encodePhotoKeys, decodePhotoKeys } from '@/lib/offline/photoKeysCodec'
@@ -54,6 +54,14 @@ export class SalePartialPaymentNotAllowedError extends Error {
 
 export class SaleHasNoLinkedCustomerError extends Error {
   constructor() { super('Sale has no linked account customer — business loan deduction is not available'); this.name = 'SaleHasNoLinkedCustomerError' }
+}
+
+export class CashUpAlreadyApprovedError extends Error {
+  constructor(dateLabel: string) { super(`Cannot reverse or void — ${dateLabel}'s cash-up has already been approved`); this.name = 'CashUpAlreadyApprovedError' }
+}
+
+export class AmountAlreadyPaidError extends Error {
+  constructor() { super('This sale already has a payment recorded against it — void it instead of editing'); this.name = 'AmountAlreadyPaidError' }
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -232,13 +240,12 @@ export async function voidSale(id: string, data: VoidSaleInput, voidedById?: str
       if (!sale) throw new SaleNotFoundError(id)
       if (sale.status === 'voided') throw new SaleAlreadyVoidedError(sale.refNumber)
 
-      // If this completed sale's day already has an approved cash-up, voiding
-      // it still goes ahead — recalculateApprovedCashUpForDate below corrects
-      // that cash-up's totals (and every later approved day's
-      // finPeriodCumulative) in the same transaction, rather than blocking
-      // the void until a manager reconciles it by hand.
-      const sessionDate = sastDateLabelToUTCDate(sastDayLabelOfInstant(sale.createdAt))
-      const wasCompleted = sale.status === 'completed'
+      // Once this sale's day has an approved cash-up, its books are closed —
+      // void is refused outright rather than recalculating the approved
+      // totals. No override; a correction becomes a fresh adjusting
+      // transaction instead.
+      const dayLabel = sastDayLabelOfInstant(sale.createdAt)
+      if (await isSessionDateApproved(tx, sastDateLabelToUTCDate(dayLabel))) throw new CashUpAlreadyApprovedError(dayLabel)
 
       const s = await tx.sale.update({
         where: { id },
@@ -273,10 +280,6 @@ export async function voidSale(id: string, data: VoidSaleInput, voidedById?: str
       // balance — no cashup recalculation needed for this specifically.)
       await reverseRepaymentsForSale(tx, id, sale.refNumber, voidedById)
 
-      if (wasCompleted) {
-        await recalculateApprovedCashUpForDate(tx, sessionDate, sale.createdAt, ['sales'])
-      }
-
       return s
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
   )
@@ -300,7 +303,10 @@ export async function reverseSalePayment(id: string, data: ReverseSalePaymentInp
       if (!sale) throw new SaleNotFoundError(id)
       if (sale.status !== 'completed') throw new SaleNotCompletedError(sale.status)
 
-      const sessionDate = sastDateLabelToUTCDate(sastDayLabelOfInstant(sale.createdAt))
+      // Once this sale's day has an approved cash-up, its books are closed —
+      // a payment reversal is refused outright. No override.
+      const dayLabel = sastDayLabelOfInstant(sale.createdAt)
+      if (await isSessionDateApproved(tx, sastDateLabelToUTCDate(dayLabel))) throw new CashUpAlreadyApprovedError(dayLabel)
 
       const s = await tx.sale.update({
         where: { id },
@@ -328,13 +334,141 @@ export async function reverseSalePayment(id: string, data: ReverseSalePaymentInp
       // further to recalculate for that part, same as voidSale.)
       await reverseRepaymentsForSale(tx, id, sale.refNumber, userId, 'payment reversed')
 
-      await recalculateApprovedCashUpForDate(tx, sessionDate, sale.createdAt, ['sales'])
-
       return s
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
   )
 
   logger.info({ saleId: id, refNumber: updated.refNumber, userId }, 'sale.payment.reversed')
+  return updated
+}
+
+// ─── Update Sale ──────────────────────────────────────────────────────────────
+// Corrects a pending sale's products, buyer, payment method, or notes in
+// place — only usable before any money has moved (amountPaid must be zero;
+// a partially-paid pending sale has to be voided instead, since there's no
+// way to unwind just the payment on a still-pending record).
+//
+// Full replace, not a per-line diff — same reasoning as updatePurchase. Old
+// stock OUT movements are reversed before the new lines' availability is
+// checked, so shrinking a line's quantity frees that stock back up for the
+// new lines to draw from.
+
+export async function updateSale(id: string, data: UpdateSaleInput, userId?: string) {
+  // VAT is opt-in and always re-resolved server-side, never trusted from the
+  // client — same rule as createSale.
+  let vatRate = new Decimal(0)
+  if (data.applyVat) {
+    vatRate = new Decimal('0.15')
+    if (data.customerId) {
+      const customer = await prisma.customer.findUnique({ where: { id: data.customerId }, select: { zeroRated: true } })
+      if (customer?.zeroRated) vatRate = new Decimal(0)
+    }
+  }
+
+  const resolvedLines = await Promise.all(
+    data.lines.map(async (line) => {
+      const product = await prisma.product.findUnique({ where: { id: line.productId } })
+      if (!product) throw new Error(`Product "${line.productId}" not found`)
+      if (!product.isActive) throw new ProductInactiveError(product.code)
+
+      const unitPrice = new Decimal(line.unitPrice)
+      const quantity  = new Decimal(line.quantity)
+      const lineTotal = unitPrice.times(quantity)
+
+      return {
+        productId:       line.productId,
+        productName:     product.name,
+        quantity,
+        unitPrice,
+        lineTotal,
+        grossQty:        line.grossQty        ? new Decimal(line.grossQty)        : undefined,
+        tareQty:         line.tareQty         ? new Decimal(line.tareQty)         : undefined,
+        tareReason:      line.tareReason,
+        deductionQty:    line.deductionQty    ? new Decimal(line.deductionQty)    : undefined,
+        deductionReason: line.deductionReason,
+      }
+    })
+  )
+
+  const subTotal    = resolvedLines.reduce((sum, l) => sum.plus(l.lineTotal), new Decimal(0))
+  const vatAmount   = subTotal.times(vatRate)
+  const totalAmount = subTotal.plus(vatAmount)
+
+  const updated = await withSerializableRetry(() =>
+    prisma.$transaction(async (tx) => {
+      const sale = await tx.sale.findUnique({ where: { id } })
+      if (!sale) throw new SaleNotFoundError(id)
+      if (sale.status !== 'pending') throw new SaleNotPendingError(sale.status)
+      if (sale.amountPaid && new Decimal(sale.amountPaid.toString()).greaterThan(0)) throw new AmountAlreadyPaidError()
+
+      // This sale's own stock movements and line rows only — deleting by
+      // sourceId/saleId can't touch any other transaction's ledger.
+      await tx.stockMovement.deleteMany({ where: { source: 'sale', sourceId: id } })
+      await tx.saleLine.deleteMany({ where: { saleId: id } })
+
+      // Stock check inside the tx, after the reversal above frees this
+      // sale's own old quantities back up — eliminates the TOCTOU window
+      // between check and write, same as createSale.
+      for (const line of resolvedLines) {
+        const inAgg = await tx.stockMovement.aggregate({
+          where: { productId: line.productId, direction: 'in' },
+          _sum: { quantity: true },
+        })
+        const outAgg = await tx.stockMovement.aggregate({
+          where: { productId: line.productId, direction: 'out' },
+          _sum: { quantity: true },
+        })
+        const onHand = new Decimal(inAgg._sum.quantity?.toString() ?? '0')
+          .minus(new Decimal(outAgg._sum.quantity?.toString() ?? '0'))
+        if (line.quantity.gt(onHand)) throw new InsufficientStockError(line.productName)
+      }
+
+      const s = await tx.sale.update({
+        where: { id },
+        data: {
+          customerId:    data.customerId,
+          buyerId:       data.buyerId,
+          buyerName:     data.buyerName,
+          buyerIdNumber: data.buyerIdNumber,
+          buyerPhone:    data.buyerPhone,
+          totalAmount,
+          vatAmount,
+          paymentMethod: data.paymentMethod,
+          notes:         data.notes,
+          lines: {
+            create: resolvedLines.map((l) => ({
+              tenantId:        requireTenantId(),
+              productId:       l.productId,
+              quantity:        l.quantity,
+              unitPrice:       l.unitPrice,
+              lineTotal:       l.lineTotal,
+              grossQty:        l.grossQty,
+              tareQty:         l.tareQty,
+              tareReason:      l.tareReason,
+              deductionQty:    l.deductionQty,
+              deductionReason: l.deductionReason,
+            })),
+          },
+        },
+        include: { lines: { include: { product: true } } },
+      })
+
+      for (const line of resolvedLines) {
+        await recordMovement(tx, {
+          productId: line.productId,
+          direction: 'out',
+          quantity:  line.quantity,
+          source:    'sale',
+          sourceId:  id,
+          createdByUserId: userId,
+        })
+      }
+
+      return s
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, maxWait: 10000, timeout: 30000 })
+  )
+
+  logger.info({ saleId: id, refNumber: updated.refNumber, userId }, 'sale.updated')
   return updated
 }
 

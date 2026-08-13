@@ -1,10 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import useSWR, { mutate } from 'swr'
 import { Dialog } from '@/components/ui/dialog'
-import { Ban, Loader2, Printer, Camera } from 'lucide-react'
+import { Ban, Loader2, Printer, Camera, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
 import { useSession } from 'next-auth/react'
 import { format } from '@/lib/utils/format'
@@ -64,6 +64,7 @@ function StatusBadge({ status }: { status: Sale['status'] }) {
 
 export default function SaleDetailPage() {
   const { id } = useParams<{ id: string }>()
+  const router = useRouter()
   const { data: session } = useSession()
   const [voidOpen, setVoidOpen] = useState(false)
 
@@ -264,11 +265,18 @@ export default function SaleDetailPage() {
               Print Receipt
             </Btn>
           </div>
-          {isManager && sale.status !== 'voided' && (
-            <Btn variant="danger" size="sm" icon={Ban} onClick={() => setVoidOpen(true)}>
-              Void Sale
-            </Btn>
-          )}
+          <div style={{ display: 'flex', gap: 6 }}>
+            {isManager && sale.status === 'pending' && new Decimal(sale.amountPaid ?? '0').isZero() && (
+              <Btn size="sm" icon={Pencil} onClick={() => router.push(`/app/sales/${sale.id}/edit`)}>
+                Edit
+              </Btn>
+            )}
+            {isManager && sale.status !== 'voided' && (
+              <Btn variant="danger" size="sm" icon={Ban} onClick={() => setVoidOpen(true)}>
+                Void Sale
+              </Btn>
+            )}
+          </div>
         </div>
     </PortalPage>
 

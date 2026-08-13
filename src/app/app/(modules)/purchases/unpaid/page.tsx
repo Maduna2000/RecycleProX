@@ -1,9 +1,10 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import useSWR, { mutate } from 'swr'
-import { Search, Printer, Ban, CreditCard, Loader2, X } from 'lucide-react'
 import Decimal from 'decimal.js'
+import { Search, Printer, Ban, CreditCard, Loader2, X, Pencil } from 'lucide-react'
 import { DataTable, Avatar, type Column, type RowAction } from '@/components/ui/DataTable'
 import { InlineDetailPanel } from '@/components/ui/InlineDetailPanel'
 import { Dialog } from '@/components/ui/dialog'
@@ -60,6 +61,7 @@ function balance(p: { totalAmount: string; amountPaid: string; loanDeductionAmou
 }
 
 export default function UnpaidPurchasesPage() {
+  const router = useRouter()
   const { data: session } = useSession()
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
 
@@ -185,6 +187,12 @@ export default function UnpaidPurchasesPage() {
       label:   'Print Slip',
       icon:    Printer,
       onClick: (row) => window.open(`/api/purchases/${row.id}/receipt?format=pdf`, '_blank'),
+    },
+    {
+      label:   'Edit',
+      icon:    Pencil,
+      hidden:  (row) => !isManager || new Decimal(row.amountPaid).greaterThan(0),
+      onClick: (row) => router.push(`/app/purchases/${row.id}/edit`),
     },
     {
       label:   'Void Purchase',

@@ -6,7 +6,7 @@ import Decimal from 'decimal.js'
 import { resolvePrice } from '@/lib/services/productService'
 import { recordMovement, recordVoidReversal } from '@/lib/services/stockService'
 import { applyRepaymentTx, reverseRepaymentsForPurchase } from '@/lib/services/loanService'
-import { recalculateApprovedCashUpForDate } from '@/lib/services/cashUpService'
+import { isSessionDateApproved } from '@/lib/services/cashUpService'
 import { autoPromoteCasualIfEligible } from '@/lib/services/customerService'
 import { sastDayLabelOfInstant, sastDateLabelToUTCDate } from '@/lib/utils/dayBounds'
 import { getAllSettings } from '@/lib/services/settingsService'
@@ -16,7 +16,7 @@ import { uploadBytes, purchaseVat264Key, purchaseNoteKey } from '@/lib/r2'
 import { CURRENCY_SYMBOLS } from '@/lib/schemas/cashup'
 import { VAT_RATE, purchaseHeaderVat } from '@/lib/utils/vat'
 import { ScaleOrderNotFoundError, ScaleOrderAlreadyVoidedError } from '@/lib/services/scaleService'
-import type { CreatePurchaseInput, VoidPurchaseInput, ReversePurchasePaymentInput } from '@/lib/schemas/purchase'
+import type { CreatePurchaseInput, VoidPurchaseInput, ReversePurchasePaymentInput, UpdatePurchaseInput } from '@/lib/schemas/purchase'
 import type { ProcessSplitPaymentInput } from '@/lib/schemas/splitPayment'
 import { encodeJsonField } from '@/lib/db/queryHelpers'
 import { encodePhotoKeys, decodePhotoKeys } from '@/lib/offline/photoKeysCodec'
@@ -33,6 +33,14 @@ export class PurchaseAlreadyVoidedError extends Error {
 
 export class PurchaseNotCompletedError extends Error {
   constructor(status: string) { super(`Purchase is not completed (status: ${status}) — only a completed purchase's payment can be reversed`); this.name = 'PurchaseNotCompletedError' }
+}
+
+export class CashUpAlreadyApprovedError extends Error {
+  constructor(dateLabel: string) { super(`Cannot reverse or void — ${dateLabel}'s cash-up has already been approved`); this.name = 'CashUpAlreadyApprovedError' }
+}
+
+export class AmountAlreadyPaidError extends Error {
+  constructor() { super('This purchase already has a payment recorded against it — void it instead of editing'); this.name = 'AmountAlreadyPaidError' }
 }
 
 export class CustomerBlacklistedError extends Error {
@@ -356,13 +364,13 @@ export async function voidPurchase(id: string, data: VoidPurchaseInput, voidedBy
       if (!purchase) throw new PurchaseNotFoundError(id)
       if (purchase.status === 'voided') throw new PurchaseAlreadyVoidedError(purchase.refNumber)
 
-      // If this completed purchase's day already has an approved cash-up,
-      // voiding it still goes ahead — recalculateApprovedCashUpForDate below
-      // corrects that cash-up's totals (and every later approved day's
-      // finPeriodCumulative) in the same transaction, rather than blocking
-      // the void until a manager reconciles it by hand.
-      const sessionDate = sastDateLabelToUTCDate(sastDayLabelOfInstant(purchase.createdAt))
-      const wasCompleted = purchase.status === 'completed'
+      // Once this purchase's day has an approved cash-up, its books are
+      // closed — void is refused outright rather than recalculating the
+      // approved totals. No override; a correction becomes a fresh
+      // adjusting transaction instead.
+      const dayLabel = sastDayLabelOfInstant(purchase.createdAt)
+      const sessionDate = sastDateLabelToUTCDate(dayLabel)
+      if (await isSessionDateApproved(tx, sessionDate)) throw new CashUpAlreadyApprovedError(dayLabel)
 
       const p = await tx.purchase.update({
         where: { id },
@@ -390,7 +398,7 @@ export async function voidPurchase(id: string, data: VoidPurchaseInput, voidedBy
       // (markPurchasePaid/processSplitPayment) that voiding the purchase
       // itself never touched — it would keep counting in systemCashPayments
       // forever. Void it too, in the same transaction.
-      const voidedPayments = await tx.payment.updateMany({
+      await tx.payment.updateMany({
         where: { purchaseId: id, voidedAt: null },
         data: { voidedAt: new Date(), voidedById, voidReason: data.reason },
       })
@@ -399,15 +407,6 @@ export async function voidPurchase(id: string, data: VoidPurchaseInput, voidedBy
       // the customer's loan balance and the day's loan totals both reflect
       // that this purchase no longer happened.
       await reverseRepaymentsForPurchase(tx, id, purchase.refNumber, voidedById)
-
-      if (wasCompleted) {
-        const changed: Array<'purchases' | 'payments' | 'loans'> = ['purchases']
-        if (voidedPayments.count > 0) changed.push('payments')
-        if (purchase.loanDeductionAmount && new Decimal(purchase.loanDeductionAmount.toString()).greaterThan(0)) {
-          changed.push('loans')
-        }
-        await recalculateApprovedCashUpForDate(tx, sessionDate, purchase.createdAt, changed)
-      }
 
       return p
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
@@ -432,8 +431,10 @@ export async function reversePurchasePayment(id: string, data: ReversePurchasePa
       if (!purchase) throw new PurchaseNotFoundError(id)
       if (purchase.status !== 'completed') throw new PurchaseNotCompletedError(purchase.status)
 
-      const sessionDate = sastDateLabelToUTCDate(sastDayLabelOfInstant(purchase.createdAt))
-      const hadLoanDeduction = purchase.loanDeductionAmount && new Decimal(purchase.loanDeductionAmount.toString()).greaterThan(0)
+      // Once this purchase's day has an approved cash-up, its books are
+      // closed — a payment reversal is refused outright. No override.
+      const dayLabel = sastDayLabelOfInstant(purchase.createdAt)
+      if (await isSessionDateApproved(tx, sastDateLabelToUTCDate(dayLabel))) throw new CashUpAlreadyApprovedError(dayLabel)
 
       const p = await tx.purchase.update({
         where: { id },
@@ -448,7 +449,7 @@ export async function reversePurchasePayment(id: string, data: ReversePurchasePa
 
       // Void whatever settlement Payment row(s) recorded this payout (markPurchasePaid/
       // processSplitPayment) — mirrors voidPurchase's handling of the same gap.
-      const voidedPayments = await tx.payment.updateMany({
+      await tx.payment.updateMany({
         where: { purchaseId: id, voidedAt: null },
         data: { voidedAt: new Date(), voidedById: userId, voidReason: data.reason },
       })
@@ -458,16 +459,158 @@ export async function reversePurchasePayment(id: string, data: ReversePurchasePa
       // that nothing has actually been paid toward it.
       await reverseRepaymentsForPurchase(tx, id, purchase.refNumber, userId, 'payment reversed')
 
-      const changed: Array<'purchases' | 'payments' | 'loans'> = ['purchases']
-      if (voidedPayments.count > 0) changed.push('payments')
-      if (hadLoanDeduction) changed.push('loans')
-      await recalculateApprovedCashUpForDate(tx, sessionDate, purchase.createdAt, changed)
-
       return p
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
   )
 
   logger.info({ purchaseId: id, refNumber: updated.refNumber, userId }, 'purchase.payment.reversed')
+  return updated
+}
+
+// ─── Update Purchase ────────────────────────────────────────────────────────────
+// Corrects a pending purchase's products, customer, payment method, or notes
+// in place — only usable before any money has moved (amountPaid must be
+// zero; a partially-paid pending purchase has to be voided instead, since
+// there's no way to unwind just the payment on a still-pending record).
+//
+// Full replace, not a per-line diff: this purchase's own PurchaseLine rows
+// and stock movements are deleted and re-created from the submitted lines,
+// rather than trying to match old lines to new ones by product (ambiguous —
+// the same product could appear twice, or get swapped for a different one
+// entirely). Net effect on stock is identical to a diff, without the
+// matching logic.
+
+export async function updatePurchase(id: string, data: UpdatePurchaseInput, userId?: string) {
+  const customer = await prisma.customer.findUnique({ where: { id: data.customerId } })
+  if (!customer) throw new Error('Customer not found')
+  if (customer.blacklisted) throw new CustomerBlacklistedError()
+  if (!customer.isActive) throw new CustomerInactiveError()
+
+  const resolvedLines = await Promise.all(
+    data.lines.map(async (line) => {
+      const product = await prisma.product.findUnique({ where: { id: line.productId } })
+      if (!product) throw new Error(`Product "${line.productId}" not found`)
+      if (!product.isActive) throw new ProductInactiveError(product.code)
+
+      const resolved = await resolvePrice(line.productId, customer.priceGroupId)
+      const unitPrice = new Decimal(line.unitPrice)
+      const quantity = new Decimal(line.quantity)
+      const lineTotal = unitPrice.times(quantity)
+
+      // Same deduction-line handling as createPurchase — a negative unit
+      // price nets off the payout without ever touching stock or VAT.
+      const isDeduction = unitPrice.isNegative()
+      const vatApplied = !isDeduction && (line.vatApplied ?? false) && !customer.zeroRated
+      const vatAmount = vatApplied ? lineTotal.times(VAT_RATE).toDecimalPlaces(2) : new Decimal(0)
+
+      const standardPrice = new Decimal(resolved.buyPrice.toString())
+      const isOverride = !unitPrice.equals(standardPrice)
+      const priceSource = isOverride ? 'cashier_override' : resolved.source
+
+      if (isOverride) {
+        logger.warn(
+          { productId: line.productId, submittedPrice: unitPrice.toFixed(2), standardPrice: standardPrice.toFixed(2), userId },
+          'purchase.price.override — cashier submitted price differs from standard (edit)'
+        )
+      }
+
+      return {
+        productId:       line.productId,
+        quantity,
+        grossQty:        line.grossQty        ? new Decimal(line.grossQty)        : undefined,
+        tareQty:         line.tareQty         ? new Decimal(line.tareQty)         : undefined,
+        tareReason:      line.tareReason      ?? undefined,
+        deductionQty:    line.deductionQty    ? new Decimal(line.deductionQty)    : undefined,
+        deductionReason: line.deductionReason ?? undefined,
+        unitPrice,
+        lineTotal,
+        vatApplied,
+        vatAmount,
+        priceSource,
+      }
+    })
+  )
+
+  const subTotal    = resolvedLines.reduce((sum, l) => sum.plus(l.lineTotal), new Decimal(0))
+  const vatTotal    = resolvedLines.reduce((sum, l) => sum.plus(l.vatAmount), new Decimal(0))
+  const totalAmount = subTotal.plus(vatTotal)
+
+  const requestedDeduction = data.loanDeductionAmount ? new Decimal(data.loanDeductionAmount) : null
+  const deduction = requestedDeduction ? Decimal.min(requestedDeduction, totalAmount) : null
+
+  const updated = await withSerializableRetry(() =>
+    prisma.$transaction(async (tx) => {
+      const purchase = await tx.purchase.findUnique({ where: { id } })
+      if (!purchase) throw new PurchaseNotFoundError(id)
+      if (purchase.status !== 'pending') throw new PurchaseNotPendingError(purchase.status)
+      if (new Decimal(purchase.amountPaid.toString()).greaterThan(0)) throw new AmountAlreadyPaidError()
+
+      // Reverse any repayment already tied to this purchase (createPurchase
+      // applies a loan deduction unconditionally, even on a pending
+      // purchase) before re-applying the edited amount below.
+      await reverseRepaymentsForPurchase(tx, id, purchase.refNumber, userId, 'purchase edited')
+
+      // This purchase's own stock movements and line rows only — deleting
+      // by sourceId/purchaseId can't touch any other transaction's ledger.
+      await tx.stockMovement.deleteMany({ where: { source: 'purchase', sourceId: id } })
+      await tx.purchaseLine.deleteMany({ where: { purchaseId: id } })
+
+      const p = await tx.purchase.update({
+        where: { id },
+        data: {
+          customerId:          data.customerId,
+          totalAmount,
+          vatAmount:           vatTotal,
+          loanDeductionAmount: deduction ?? null,
+          paymentMethod:       data.paymentMethod,
+          notes:               data.notes,
+          lines: {
+            create: resolvedLines.map((l) => ({
+              tenantId:        requireTenantId(),
+              productId:       l.productId,
+              quantity:        l.quantity,
+              grossQty:        l.grossQty,
+              tareQty:         l.tareQty,
+              tareReason:      l.tareReason,
+              deductionQty:    l.deductionQty,
+              deductionReason: l.deductionReason,
+              unitPrice:       l.unitPrice,
+              lineTotal:       l.lineTotal,
+              vatApplied:      l.vatApplied,
+              vatAmount:       l.vatAmount,
+              priceSource:     l.priceSource,
+            })),
+          },
+        },
+        include: { lines: { include: { product: true } }, customer: true },
+      })
+
+      for (const line of resolvedLines) {
+        if (line.unitPrice.isNegative()) continue
+        await recordMovement(tx, {
+          productId: line.productId,
+          direction: 'in',
+          quantity: line.quantity,
+          source: 'purchase',
+          sourceId: id,
+          createdByUserId: userId,
+        })
+      }
+
+      if (deduction && deduction.greaterThan(0)) {
+        await applyRepaymentTx(tx, data.customerId, deduction.toString(), userId, id)
+      }
+
+      return p
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+  )
+
+  logger.info({ purchaseId: id, refNumber: updated.refNumber, userId }, 'purchase.updated')
+
+  // Fire-and-forget: regenerate VAT264 + purchase note PDFs so anything
+  // reprinted reflects the edited products/totals, not the pre-edit state.
+  void generateAndStorePurchasePdfs(updated)
+
   return updated
 }
 
