@@ -3,7 +3,11 @@ import { requireTenantId } from '@/lib/db/tenantContext'
 import Decimal from 'decimal.js'
 import logger from '@/lib/logger'
 import { VAT_DIVISOR } from '@/lib/utils/vat'
-import type { CreatePriceListInput, UpdatePriceListInput, PriceListItemInput } from '@/lib/schemas/priceList'
+import { getAllSettings } from '@/lib/services/settingsService'
+import { fetchR2Bytes } from '@/lib/r2'
+import { CURRENCY_SYMBOLS } from '@/lib/schemas/cashup'
+import { generatePriceListPdf } from '@/lib/pdf/priceList'
+import type { CreatePriceListInput, UpdatePriceListInput, PriceListItemInput, PriceListColors } from '@/lib/schemas/priceList'
 
 /** SystemSettings key holding the R2 object key of the price list logo. */
 export const PRICE_LIST_LOGO_SETTING_KEY = 'priceListLogoR2Key'
@@ -11,6 +15,54 @@ export const PRICE_LIST_LOGO_SETTING_KEY = 'priceListLogoR2Key'
 /** EX VAT is never stored — always derived from the INC VAT price at 15%. */
 export function exVatPrice(priceIncVat: Decimal.Value): Decimal {
   return new Decimal(priceIncVat).div(VAT_DIVISOR).toDecimalPlaces(2)
+}
+
+export interface PriceListPdfSource {
+  title:      string
+  listDate:   Date
+  footerText: string
+  showLogo:   boolean
+  showExVat:  boolean
+  colors:     PriceListColors
+  items:      { displayName: string; priceIncVat: Decimal.Value }[]
+}
+
+/**
+ * Renders a price list to PDF bytes — shared by the saved-document PDF route
+ * and the unsaved-draft preview route so both produce byte-identical output
+ * for the same content. Must run inside a resolved tenant context (settings
+ * lookup is tenant-scoped).
+ */
+export async function buildPriceListPdfBytes(source: PriceListPdfSource): Promise<Uint8Array> {
+  const [settings, latestCashUp] = await Promise.all([
+    getAllSettings(),
+    prisma.cashUp.findFirst({ orderBy: { sessionDate: 'desc' }, select: { currency: true } }),
+  ])
+  const logoKey = source.showLogo ? settings[PRICE_LIST_LOGO_SETTING_KEY] : undefined
+  const logoBytes = logoKey ? await fetchR2Bytes(logoKey) : null
+  const currencySymbol =
+    CURRENCY_SYMBOLS[latestCashUp?.currency as keyof typeof CURRENCY_SYMBOLS] ?? 'R'
+
+  return generatePriceListPdf({
+    title: source.title,
+    listDate: source.listDate,
+    footerText: source.footerText,
+    showExVat: source.showExVat,
+    colors: source.colors,
+    company: {
+      name: settings['yardName'] ?? 'Renovo Pro',
+      address: settings['yardAddress'] || undefined,
+      phone: settings['yardPhone'] || undefined,
+    },
+    logoBytes,
+    currencySymbol,
+    items: source.items.map((item) => ({
+      displayName: item.displayName,
+      priceIncVat: new Decimal(item.priceIncVat).toFixed(2),
+      priceExVat: exVatPrice(item.priceIncVat).toFixed(2),
+    })),
+    generatedAt: new Date(),
+  })
 }
 
 function itemRows(items: PriceListItemInput[], tenantId: string) {
@@ -60,6 +112,7 @@ export async function createPriceList(data: CreatePriceListInput, userId: string
       footerText:      data.footerText,
       showLogo:        data.showLogo,
       showExVat:       data.showExVat,
+      ...data.colors,
       createdByUserId: userId,
       items:           { create: itemRows(data.items, tenantId) },
     },
@@ -91,6 +144,7 @@ export async function updatePriceList(id: string, data: UpdatePriceListInput) {
         footerText: data.footerText,
         showLogo:   data.showLogo,
         showExVat:  data.showExVat,
+        ...data.colors,
         items:      { create: itemRows(data.items, tenantId) },
       },
       include: { items: { orderBy: { sortOrder: 'asc' } } },
@@ -109,6 +163,13 @@ export async function duplicatePriceList(id: string, userId: string) {
       footerText:      source.footerText,
       showLogo:        source.showLogo,
       showExVat:       source.showExVat,
+      primaryColor:      source.primaryColor,
+      accentColor:       source.accentColor,
+      headerTextColor:   source.headerTextColor,
+      materialTextColor: source.materialTextColor,
+      priceTextColor:    source.priceTextColor,
+      exVatTextColor:    source.exVatTextColor,
+      rowTintColor:      source.rowTintColor,
       createdByUserId: userId,
       items: {
         create: source.items.map((item) => ({

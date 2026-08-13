@@ -19,17 +19,35 @@ export interface PriceListPdfItem {
   priceExVat: string
 }
 
+/** Print palette — hex strings (#RRGGBB). Every document has all seven, defaulted server-side by the Zod schema. */
+export interface PriceListPdfColors {
+  primaryColor:      string
+  accentColor:       string
+  headerTextColor:   string
+  materialTextColor: string
+  priceTextColor:    string
+  exVatTextColor:    string
+  rowTintColor:      string
+}
+
 export interface PriceListPdfData {
   title: string
   listDate: Date
   footerText: string
   showExVat: boolean
+  colors: PriceListPdfColors
   company: { name: string; address?: string; phone?: string }
   /** PNG or JPG bytes; rendered per the logo rules when present. */
   logoBytes?: Uint8Array | null
   currencySymbol: string
   items: PriceListPdfItem[]
   generatedAt: Date
+}
+
+function hexToRgb(hex: string) {
+  const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex)
+  if (!m) return rgb(0, 0, 0)
+  return rgb(parseInt(m[1]!, 16) / 255, parseInt(m[2]!, 16) / 255, parseInt(m[3]!, 16) / 255)
 }
 
 // ─── Layout constants ─────────────────────────────────────────────────────────
@@ -39,14 +57,11 @@ const PAGE_H = 842
 const MARGIN = 50
 const COL_W = PAGE_W - MARGIN * 2
 
-// Brand navy (matches colors.primary / #1B3A6B) + the legacy sheet's gold accent.
-const NAVY  = rgb(0.106, 0.227, 0.420)
-const NAVY_TINT = rgb(0.90, 0.92, 0.96)
-const GOLD  = rgb(0.788, 0.635, 0.153)
+// Fixed neutrals — not part of the customizable palette, so footer/metadata
+// text and hairlines stay legible regardless of the chosen scheme.
 const DARK  = rgb(0.07, 0.07, 0.07)
 const GRAY  = rgb(0.45, 0.45, 0.45)
 const LGRAY = rgb(0.95, 0.95, 0.95)
-const WHITE = rgb(1, 1, 1)
 
 const RIBBON_H = 46
 
@@ -76,6 +91,14 @@ export async function generatePriceListPdf(data: PriceListPdfData): Promise<Uint
   const reg = await doc.embedFont(StandardFonts.Helvetica)
   const italic = await doc.embedFont(StandardFonts.HelveticaOblique)
   const sym = data.currencySymbol
+
+  const PRIMARY   = hexToRgb(data.colors.primaryColor)
+  const ACCENT    = hexToRgb(data.colors.accentColor)
+  const HEADER_TX = hexToRgb(data.colors.headerTextColor)
+  const MATERIAL_TX = hexToRgb(data.colors.materialTextColor)
+  const PRICE_TX  = hexToRgb(data.colors.priceTextColor)
+  const EXVAT_TX  = hexToRgb(data.colors.exVatTextColor)
+  const ROW_TINT  = hexToRgb(data.colors.rowTintColor)
 
   let logo: PDFImage | null = null
   if (data.logoBytes && data.logoBytes.length > 0) {
@@ -108,8 +131,8 @@ export async function generatePriceListPdf(data: PriceListPdfData): Promise<Uint
     return `${sym}${new Decimal(v).toFixed(2)}`
   }
 
-  function drawRight(page: PDFPage, text: string, rightEdge: number, y: number, size: number, font: PDFFont, color = DARK) {
-    page.drawText(text, { x: rightEdge - font.widthOfTextAtSize(text, size), y, size, font, color })
+  function drawRight(page: PDFPage, text: string, rightEdge: number, y: number, size: number, font: PDFFont, color = DARK, opacity = 1) {
+    page.drawText(text, { x: rightEdge - font.widthOfTextAtSize(text, size), y, size, font, color, opacity })
   }
 
   function drawCentered(page: PDFPage, text: string, y: number, size: number, font: PDFFont, color = DARK) {
@@ -118,14 +141,14 @@ export async function generatePriceListPdf(data: PriceListPdfData): Promise<Uint
   }
 
   function drawTableHeader(page: PDFPage, y: number): number {
-    page.drawRectangle({ x: MARGIN, y: y - 20, width: COL_W, height: 20, color: NAVY })
-    page.drawText('MATERIAL', { x: MARGIN + 8, y: y - 14, size: 9.5, font: bold, color: WHITE })
+    page.drawRectangle({ x: MARGIN, y: y - 20, width: COL_W, height: 20, color: PRIMARY })
+    page.drawText('MATERIAL', { x: MARGIN + 8, y: y - 14, size: 9.5, font: bold, color: HEADER_TX })
     let right = MARGIN + COL_W
     if (data.showExVat) {
-      drawRight(page, 'EX VAT', right - 8, y - 14, 9.5, bold, WHITE)
+      drawRight(page, 'EX VAT', right - 8, y - 14, 9.5, bold, HEADER_TX)
       right -= PRICE_COL_W
     }
-    drawRight(page, 'INC VAT', right - 8, y - 14, 9.5, bold, WHITE)
+    drawRight(page, 'INC VAT', right - 8, y - 14, 9.5, bold, HEADER_TX)
     return y - 20
   }
 
@@ -157,7 +180,7 @@ export async function generatePriceListPdf(data: PriceListPdfData): Promise<Uint
       }
       const name = sanitize(data.company.name).toUpperCase()
       const nameSize = 15
-      drawRight(page, name, MARGIN + COL_W, y - nameSize, nameSize, bold, NAVY)
+      drawRight(page, name, MARGIN + COL_W, y - nameSize, nameSize, bold, PRIMARY)
       let infoY = y - nameSize - 13
       if (data.company.address) {
         drawRight(page, sanitize(data.company.address), MARGIN + COL_W, infoY, 8, reg, GRAY)
@@ -170,23 +193,23 @@ export async function generatePriceListPdf(data: PriceListPdfData): Promise<Uint
       y = Math.min(letterheadBottom, infoY) - 12
 
       // ── Colour ribbon: title left, list date right — full page bleed ──────
-      page.drawRectangle({ x: 0, y: y - RIBBON_H, width: PAGE_W, height: RIBBON_H, color: NAVY })
-      page.drawRectangle({ x: 0, y: y - RIBBON_H, width: PAGE_W, height: 3, color: GOLD })
+      page.drawRectangle({ x: 0, y: y - RIBBON_H, width: PAGE_W, height: RIBBON_H, color: PRIMARY })
+      page.drawRectangle({ x: 0, y: y - RIBBON_H, width: PAGE_W, height: 3, color: ACCENT })
       const title = sanitize(data.title).toUpperCase()
-      page.drawText(title, { x: MARGIN, y: y - 30, size: 20, font: bold, color: WHITE })
+      page.drawText(title, { x: MARGIN, y: y - 30, size: 20, font: bold, color: HEADER_TX })
       const dateW = bold.widthOfTextAtSize(dateLabel, 12)
-      page.drawText(dateLabel, { x: PAGE_W - MARGIN - dateW, y: y - 22, size: 12, font: bold, color: WHITE })
+      page.drawText(dateLabel, { x: PAGE_W - MARGIN - dateW, y: y - 22, size: 12, font: bold, color: HEADER_TX })
       const itemsLabel = `${data.items.length} material${data.items.length === 1 ? '' : 's'}`
       const itemsW = reg.widthOfTextAtSize(itemsLabel, 8)
-      page.drawText(itemsLabel, { x: PAGE_W - MARGIN - itemsW, y: y - 36, size: 8, font: reg, color: rgb(0.85, 0.88, 0.95) })
+      page.drawText(itemsLabel, { x: PAGE_W - MARGIN - itemsW, y: y - 36, size: 8, font: reg, color: HEADER_TX, opacity: 0.75 })
       y -= RIBBON_H + 14
     } else {
       // Continuation pages get a slim repeat of the ribbon, no letterhead.
-      page.drawRectangle({ x: 0, y: y - 26, width: PAGE_W, height: 26, color: NAVY })
+      page.drawRectangle({ x: 0, y: y - 26, width: PAGE_W, height: 26, color: PRIMARY })
       const title = sanitize(data.title).toUpperCase()
-      page.drawText(title, { x: MARGIN, y: y - 18, size: 11, font: bold, color: WHITE })
+      page.drawText(title, { x: MARGIN, y: y - 18, size: 11, font: bold, color: HEADER_TX })
       const contLabel = `${dateLabel} — continued`
-      drawRight(page, contLabel, PAGE_W - MARGIN, y - 18, 8, reg, rgb(0.85, 0.88, 0.95))
+      drawRight(page, contLabel, PAGE_W - MARGIN, y - 18, 8, reg, HEADER_TX, 0.75)
       y -= 26 + 12
     }
 
@@ -202,7 +225,7 @@ export async function generatePriceListPdf(data: PriceListPdfData): Promise<Uint
       ;({ page, y } = newPage(false))
     }
     if (i % 2 === 1) {
-      page.drawRectangle({ x: MARGIN, y: y - ROW_H, width: COL_W, height: ROW_H, color: NAVY_TINT })
+      page.drawRectangle({ x: MARGIN, y: y - ROW_H, width: COL_W, height: ROW_H, color: ROW_TINT })
     }
     const textY = y - ROW_H + 7
 
@@ -211,20 +234,20 @@ export async function generatePriceListPdf(data: PriceListPdfData): Promise<Uint
     while (name.length > 1 && bold.widthOfTextAtSize(name, 11.5) > maxNameW) {
       name = name.slice(0, -2) + '…'
     }
-    page.drawText(name, { x: MARGIN + 8, y: textY, size: 11.5, font: bold, color: DARK })
+    page.drawText(name, { x: MARGIN + 8, y: textY, size: 11.5, font: bold, color: MATERIAL_TX })
 
     let right = MARGIN + COL_W
     if (data.showExVat) {
-      drawRight(page, money(item.priceExVat), right - 8, textY, 11, reg, GRAY)
+      drawRight(page, money(item.priceExVat), right - 8, textY, 11, reg, EXVAT_TX)
       right -= PRICE_COL_W
     }
-    drawRight(page, money(item.priceIncVat), right - 8, textY, 12, bold, NAVY)
+    drawRight(page, money(item.priceIncVat), right - 8, textY, 12, bold, PRICE_TX)
     y -= ROW_H
 
     page.drawLine({ start: { x: MARGIN, y }, end: { x: MARGIN + COL_W, y }, thickness: 0.5, color: LGRAY })
   })
 
-  page.drawLine({ start: { x: MARGIN, y }, end: { x: MARGIN + COL_W, y }, thickness: 1, color: NAVY })
+  page.drawLine({ start: { x: MARGIN, y }, end: { x: MARGIN + COL_W, y }, thickness: 1, color: PRIMARY })
   drawFooter(page)
 
   // Page numbers only once every page exists, and only when the list spills

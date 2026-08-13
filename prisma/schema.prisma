@@ -302,6 +302,15 @@ model PriceList {
   footerText           String          @default("Prices subject to change without notice. VAT rate applied as per current legislation.")
   showLogo             Boolean         @default(true)
   showExVat            Boolean         @default(true)
+  // Print palette — hex strings (#RRGGBB), defaults matching the original
+  // fixed navy/gold scheme so existing documents render unchanged.
+  primaryColor         String          @default("#1B3A6B")
+  accentColor          String          @default("#C9A227")
+  headerTextColor      String          @default("#FFFFFF")
+  materialTextColor    String          @default("#121212")
+  priceTextColor       String          @default("#1B3A6B")
+  exVatTextColor       String          @default("#737373")
+  rowTintColor         String          @default("#E6EBF5")
   isActiveForPurchases Boolean         @default(false)
   createdByUserId      String?
   createdAt            DateTime        @default(now())

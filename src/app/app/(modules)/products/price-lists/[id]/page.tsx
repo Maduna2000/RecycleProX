@@ -4,15 +4,30 @@ import { useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import useSWR, { mutate } from 'swr'
 import { useSession } from 'next-auth/react'
-import { ArrowUp, ArrowDown, Trash2, Printer, Save, ListPlus } from 'lucide-react'
+import { ArrowUp, ArrowDown, Trash2, Printer, Save, ListPlus, Eye, RotateCcw } from 'lucide-react'
 import Decimal from 'decimal.js'
 import { toast } from 'sonner'
 import { colors, fontSize } from '@/lib/design-tokens'
 import { fetcher } from '@/lib/swrFetcher'
-import { inp, lbl, Btn, PortalPage, PANEL, PANEL_HEAD } from '@/components/rpx'
+import {
+  inp, lbl, Btn, PortalPage, PANEL, PANEL_HEAD,
+  RpxDialogContent, RpxDialogHeader,
+} from '@/components/rpx'
+import { Dialog } from '@/components/ui/dialog'
 import { ProductCategoryPicker } from '@/components/products/ProductCategoryPicker'
+import { DEFAULT_PRICE_LIST_COLORS, type PriceListColors } from '@/lib/schemas/priceList'
 
 const VAT_DIVISOR = new Decimal('1.15')
+
+const COLOR_FIELDS: { key: keyof PriceListColors; label: string }[] = [
+  { key: 'primaryColor',      label: 'Ribbon / Header' },
+  { key: 'accentColor',       label: 'Accent Strip' },
+  { key: 'headerTextColor',   label: 'Header Text' },
+  { key: 'materialTextColor', label: 'Material Text' },
+  { key: 'priceTextColor',    label: 'Price (Inc)' },
+  { key: 'exVatTextColor',    label: 'Price (Ex)' },
+  { key: 'rowTintColor',      label: 'Row Tint' },
+]
 
 type Product = {
   id: string; code: string; name: string; category: string; unit: string
@@ -25,7 +40,7 @@ type EditableItem = {
   priceIncVat: string // input string — validated on save
 }
 
-type PriceListDetail = {
+type PriceListDetail = PriceListColors & {
   id: string
   title: string
   listDate: string
@@ -54,10 +69,14 @@ export default function PriceListEditorPage() {
   const [footerText, setFooterText] = useState('Prices subject to change without notice. VAT rate applied as per current legislation.')
   const [showLogo,   setShowLogo]   = useState(true)
   const [showExVat,  setShowExVat]  = useState(true)
+  const [docColors,  setDocColors]  = useState<PriceListColors>(DEFAULT_PRICE_LIST_COLORS)
   const [items,      setItems]      = useState<EditableItem[]>([])
   const [updatedAt,  setUpdatedAt]  = useState<string | null>(null)
   const [loaded,     setLoaded]     = useState(false)
   const [saving,     setSaving]     = useState(false)
+  const [previewOpen,    setPreviewOpen]    = useState(false)
+  const [previewUrl,     setPreviewUrl]     = useState<string | null>(null)
+  const [previewLoading, setPreviewLoading] = useState(false)
 
   // /api/products wraps the list: { products: [...] }
   const { data: productsData } = useSWR<{ products: Product[] }>('/api/products?active=true', fetcher)
@@ -75,6 +94,15 @@ export default function PriceListEditorPage() {
     setFooterText(detail.footerText)
     setShowLogo(detail.showLogo)
     setShowExVat(detail.showExVat)
+    setDocColors({
+      primaryColor:      detail.primaryColor,
+      accentColor:       detail.accentColor,
+      headerTextColor:   detail.headerTextColor,
+      materialTextColor: detail.materialTextColor,
+      priceTextColor:    detail.priceTextColor,
+      exVatTextColor:    detail.exVatTextColor,
+      rowTintColor:      detail.rowTintColor,
+    })
     setItems(detail.items.map((i) => ({
       productId:   i.productId,
       displayName: i.displayName,
@@ -83,6 +111,13 @@ export default function PriceListEditorPage() {
     setUpdatedAt(detail.updatedAt)
     setLoaded(true)
   }, [isNew, detail, loaded])
+
+  // Revoke the blob URL on unmount so a closed-without-reopening preview
+  // doesn't leak memory.
+  useEffect(() => {
+    return () => { if (previewUrl) URL.revokeObjectURL(previewUrl) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const categories = useMemo(() => {
     const set = new Set<string>()
@@ -148,25 +183,57 @@ export default function PriceListEditorPage() {
     return null
   }
 
-  async function save(printAfter: boolean) {
-    const problem = validate()
-    if (problem) { toast.error(problem); return }
-
-    setSaving(true)
-    const body = {
+  function draftBody() {
+    return {
       title:      title.trim(),
       listDate,
       footerText: footerText.trim(),
       showLogo,
       showExVat,
+      colors: docColors,
       items: items.map((item, i) => ({
         productId:   item.productId,
         displayName: item.displayName.trim(),
         priceIncVat: item.priceIncVat,
         sortOrder:   i,
       })),
-      ...(isNew ? {} : { updatedAt }),
     }
+  }
+
+  async function handlePreview() {
+    const problem = validate()
+    if (problem) { toast.error(problem); return }
+
+    setPreviewLoading(true)
+    const res = await fetch('/api/price-lists/preview', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(draftBody()),
+    })
+    setPreviewLoading(false)
+
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}))
+      toast.error(j.error ?? 'Failed to generate preview')
+      return
+    }
+    const blob = await res.blob()
+    if (previewUrl) URL.revokeObjectURL(previewUrl)
+    setPreviewUrl(URL.createObjectURL(blob))
+    setPreviewOpen(true)
+  }
+
+  function closePreview() {
+    setPreviewOpen(false)
+    if (previewUrl) { URL.revokeObjectURL(previewUrl); setPreviewUrl(null) }
+  }
+
+  async function save(printAfter: boolean) {
+    const problem = validate()
+    if (problem) { toast.error(problem); return }
+
+    setSaving(true)
+    const body = { ...draftBody(), ...(isNew ? {} : { updatedAt }) }
     const res = await fetch(isNew ? '/api/price-lists' : `/api/price-lists/${params.id}`, {
       method:  isNew ? 'POST' : 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -294,6 +361,36 @@ export default function PriceListEditorPage() {
 
         </div>
 
+        {/* ── Print colors ─────────────────────────────────────────────────── */}
+        <div style={{ ...PANEL, flexShrink: 0 }}>
+          <div className="flex items-center justify-between" style={PANEL_HEAD}>
+            <span className="font-semibold" style={{ fontSize: fontSize.xs, color: colors.textPrimary }}>Print Colors</span>
+            <button
+              onClick={() => setDocColors(DEFAULT_PRICE_LIST_COLORS)}
+              disabled={saving}
+              className="flex items-center gap-1 cursor-pointer"
+              style={{ fontSize: fontSize.xs, color: colors.link, background: 'none', border: 'none' }}
+            >
+              <RotateCcw style={{ width: 11, height: 11 }} />
+              Reset to default
+            </button>
+          </div>
+          <div style={{ padding: '6px 8px', display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+            {COLOR_FIELDS.map(({ key, label }) => (
+              <div key={key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                <input
+                  type="color"
+                  value={docColors[key]}
+                  onChange={(e) => setDocColors((prev) => ({ ...prev, [key]: e.target.value }))}
+                  disabled={saving}
+                  style={{ width: 30, height: 20, padding: 0, border: `1px solid ${colors.border}`, borderRadius: 2, cursor: 'pointer', background: 'none' }}
+                />
+                <span style={{ fontSize: 9, color: colors.textSecondary, textAlign: 'center', lineHeight: 1.2, maxWidth: 66 }}>{label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
         {/* ── Items table — fills remaining height, scrolls internally ───── */}
         <div style={{ ...PANEL, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
           <div
@@ -391,6 +488,7 @@ export default function PriceListEditorPage() {
         {/* ── Actions ───────────────────────────────────────────────────── */}
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexShrink: 0 }}>
           <Btn onClick={() => router.push('/app/products/price-lists')} disabled={saving}>Cancel</Btn>
+          <Btn icon={Eye} onClick={handlePreview} disabled={saving || previewLoading} loading={previewLoading}>Preview</Btn>
           <Btn icon={Printer} onClick={() => save(true)} disabled={saving} loading={saving}>Save &amp; Print</Btn>
           <Btn variant="primary" icon={Save} onClick={() => save(false)} disabled={saving} loading={saving}>
             {isNew ? 'Create Price List' : 'Save Changes'}
@@ -398,6 +496,17 @@ export default function PriceListEditorPage() {
         </div>
 
       </div>
+
+      {previewOpen && previewUrl && (
+        <Dialog open onOpenChange={(o) => { if (!o) closePreview() }}>
+          <RpxDialogContent maxWidth={680} style={{ height: '90vh' }}>
+            <RpxDialogHeader title="Price List Preview" onClose={closePreview} />
+            <div style={{ flex: 1, minHeight: 0, background: colors.bg }}>
+              <iframe src={previewUrl} title="Price list preview" style={{ width: '100%', height: '100%', border: 'none' }} />
+            </div>
+          </RpxDialogContent>
+        </Dialog>
+      )}
     </PortalPage>
   )
 }

@@ -42,6 +42,7 @@ import {
   duplicatePriceList,
   activatePriceList,
 } from '@/lib/services/priceListService'
+import { DEFAULT_PRICE_LIST_COLORS } from '@/lib/schemas/priceList'
 
 // $transaction(cb) executes the callback against the same mocked client.
 function passthroughTransaction() {
@@ -77,6 +78,7 @@ describe('createPriceList', () => {
       footerText: 'All weights in tonnes.',
       showLogo: true,
       showExVat: true,
+      colors: DEFAULT_PRICE_LIST_COLORS,
       items: [
         { productId: 'prod-1', displayName: 'COPPER', priceIncVat: 230, sortOrder: 0 },
         { productId: null, displayName: 'MIXED STEEL', priceIncVat: 2.5, sortOrder: 1 },
@@ -88,10 +90,28 @@ describe('createPriceList', () => {
     expect(arg.data.createdByUserId).toBe('user-1')
     // listDate pinned to UTC midnight so the printed date never TZ-shifts
     expect((arg.data.listDate as Date).toISOString()).toBe('2026-08-13T00:00:00.000Z')
+    expect(arg.data).toMatchObject(DEFAULT_PRICE_LIST_COLORS)
     const items = (arg.data.items as { create: { displayName: string; priceIncVat: string; sortOrder: number; tenantId: string }[] }).create
     expect(items).toHaveLength(2)
     expect(items[0]).toMatchObject({ tenantId: 'tenant-1', displayName: 'COPPER', priceIncVat: '230', sortOrder: 0 })
     expect(items[1]).toMatchObject({ displayName: 'MIXED STEEL', priceIncVat: '2.5', sortOrder: 1 })
+  })
+
+  it('persists a customized palette', async () => {
+    vi.mocked(prisma.priceList.create).mockResolvedValue({ id: 'pl-1' } as never)
+
+    await createPriceList({
+      title: 'PROMO PRICES',
+      listDate: '2026-08-13',
+      footerText: '',
+      showLogo: true,
+      showExVat: true,
+      colors: { ...DEFAULT_PRICE_LIST_COLORS, primaryColor: '#C0392B', accentColor: '#FFD700' },
+      items: [{ productId: 'prod-1', displayName: 'COPPER', priceIncVat: 230, sortOrder: 0 }],
+    }, 'user-1')
+
+    const arg = vi.mocked(prisma.priceList.create).mock.calls[0]![0]
+    expect(arg.data).toMatchObject({ primaryColor: '#C0392B', accentColor: '#FFD700', rowTintColor: DEFAULT_PRICE_LIST_COLORS.rowTintColor })
   })
 })
 
@@ -132,6 +152,8 @@ describe('duplicatePriceList', () => {
       showLogo: false,
       showExVat: true,
       isActiveForPurchases: true,
+      ...DEFAULT_PRICE_LIST_COLORS,
+      primaryColor: '#C0392B', // customized — duplicate must carry this over
       items: [
         { productId: 'prod-1', displayName: 'COPPER', priceIncVat: '230.00', sortOrder: 0 },
       ],
@@ -147,6 +169,8 @@ describe('duplicatePriceList', () => {
     expect((arg.data.listDate as Date).toISOString()).toBe(
       new Date().toISOString().slice(0, 10) + 'T00:00:00.000Z'
     )
+    // Customized palette carries over to the copy
+    expect(arg.data).toMatchObject({ primaryColor: '#C0392B', accentColor: DEFAULT_PRICE_LIST_COLORS.accentColor })
     const items = (arg.data.items as { create: { displayName: string }[] }).create
     expect(items).toHaveLength(1)
     expect(items[0]).toMatchObject({ productId: 'prod-1', displayName: 'COPPER', priceIncVat: '230.00' })
@@ -161,6 +185,7 @@ describe('updatePriceList', () => {
     footerText: '',
     showLogo: true,
     showExVat: false,
+    colors: { ...DEFAULT_PRICE_LIST_COLORS, primaryColor: '#008080' },
     items: [{ productId: null, displayName: 'BRASS', priceIncVat: 120.75, sortOrder: 0 }],
     updatedAt: '2026-08-13T08:00:00.000Z',
   }
@@ -176,6 +201,7 @@ describe('updatePriceList', () => {
     expect(prisma.priceListItem.deleteMany).toHaveBeenCalledWith({ where: { priceListId: 'pl-1' } })
     const arg = vi.mocked(prisma.priceList.update).mock.calls[0]![0]
     expect(arg.where).toEqual({ id: 'pl-1' })
+    expect(arg.data).toMatchObject({ primaryColor: '#008080' })
     expect((arg.data.items as { create: { displayName: string }[] }).create[0]).toMatchObject({ displayName: 'BRASS' })
   })
 
