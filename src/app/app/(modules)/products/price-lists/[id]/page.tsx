@@ -9,12 +9,13 @@ import Decimal from 'decimal.js'
 import { toast } from 'sonner'
 import { colors, fontSize } from '@/lib/design-tokens'
 import { fetcher } from '@/lib/swrFetcher'
-import { inp, lbl, Btn, Field, PortalPage } from '@/components/rpx'
+import { inp, lbl, Btn, PortalPage, PANEL, PANEL_HEAD } from '@/components/rpx'
+import { ProductCategoryPicker } from '@/components/products/ProductCategoryPicker'
 
 const VAT_DIVISOR = new Decimal('1.15')
 
 type Product = {
-  id: string; code: string; name: string; category: string
+  id: string; code: string; name: string; category: string; unit: string
   defaultBuyPrice: string; isActive: boolean
 }
 
@@ -202,108 +203,125 @@ export default function PriceListEditorPage() {
     )
   }
 
+  const pickerProducts = (products ?? []).filter((p) => !usedProductIds.has(p.id))
+
   return (
     <PortalPage title={isNew ? 'New Price List' : 'Edit Price List'}>
-      <div className="flex-1 min-h-0 overflow-y-auto" style={{ padding: 10 }}>
-        <div style={{ maxWidth: 860, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div className="flex-1 min-h-0 flex flex-col overflow-y-auto" style={{ padding: 8, gap: 8 }}>
 
-          {/* ── Document settings ─────────────────────────────────────────── */}
-          <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 2, padding: 12 }}>
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-              <Field label="Title" width={280}>
-                <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={80} style={inp} disabled={saving} />
-              </Field>
-              <Field label="List Date" width={150}>
-                <input type="date" value={listDate} onChange={(e) => setListDate(e.target.value)} style={inp} disabled={saving} />
-              </Field>
-              <label className="flex items-center gap-1.5 cursor-pointer" style={{ fontSize: 11, color: colors.textSecondary, paddingBottom: 8 }}>
-                <input type="checkbox" checked={showLogo} onChange={(e) => setShowLogo(e.target.checked)} className="rounded" />
-                Show logo
-              </label>
-              <label className="flex items-center gap-1.5 cursor-pointer" style={{ fontSize: 11, color: colors.textSecondary, paddingBottom: 8 }}>
-                <input type="checkbox" checked={showExVat} onChange={(e) => setShowExVat(e.target.checked)} className="rounded" />
-                Show EX VAT column
-              </label>
+        {/* ── Document settings + Add products, side by side ─────────────── */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, flexShrink: 0 }}>
+
+          <div style={PANEL}>
+            <div style={PANEL_HEAD}>
+              <span className="font-semibold" style={{ fontSize: fontSize.xs, color: colors.textPrimary }}>Document</span>
             </div>
-            <div style={{ marginTop: 8 }}>
-              <span style={lbl}>Footer text</span>
-              <textarea
-                value={footerText}
-                onChange={(e) => setFooterText(e.target.value)}
-                maxLength={500}
-                rows={2}
-                style={{ ...inp, height: 'auto', width: '100%', resize: 'vertical', fontFamily: 'inherit' }}
-                disabled={saving}
-              />
+            <div style={{ padding: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <div style={{ flex: 1 }}>
+                  <span style={lbl}>Title</span>
+                  <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={80} style={{ ...inp, height: 26 }} disabled={saving} />
+                </div>
+                <div style={{ width: 130 }}>
+                  <span style={lbl}>Date</span>
+                  <input type="date" value={listDate} onChange={(e) => setListDate(e.target.value)} style={{ ...inp, height: 26 }} disabled={saving} />
+                </div>
+              </div>
+              <div>
+                <span style={lbl}>Footer text</span>
+                <textarea
+                  value={footerText}
+                  onChange={(e) => setFooterText(e.target.value)}
+                  maxLength={500}
+                  rows={2}
+                  style={{ ...inp, height: 40, width: '100%', resize: 'none', fontFamily: 'inherit', padding: 6, fontSize: fontSize.xs }}
+                  disabled={saving}
+                />
+              </div>
+              <div style={{ display: 'flex', gap: 14 }}>
+                <label className="flex items-center gap-1.5 cursor-pointer" style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>
+                  <input type="checkbox" checked={showLogo} onChange={(e) => setShowLogo(e.target.checked)} className="rounded" />
+                  Show logo
+                </label>
+                <label className="flex items-center gap-1.5 cursor-pointer" style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>
+                  <input type="checkbox" checked={showExVat} onChange={(e) => setShowExVat(e.target.checked)} className="rounded" />
+                  Show EX VAT column
+                </label>
+              </div>
             </div>
           </div>
 
-          {/* ── Add products ──────────────────────────────────────────────── */}
-          <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 2, padding: 12 }}>
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-              <Field label="Add product" width={280}>
-                <select
-                  value=""
-                  onChange={(e) => {
-                    const p = (products ?? []).find((x) => x.id === e.target.value)
-                    if (p) addProduct(p)
-                  }}
-                  style={inp}
-                  disabled={saving}
-                >
-                  <option value="">Select product…</option>
-                  {(products ?? []).map((p) => (
-                    <option key={p.id} value={p.id} disabled={usedProductIds.has(p.id)}>
-                      {p.name} ({p.code}) — R {new Decimal(p.defaultBuyPrice).toFixed(2)}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-              <Field label="Add whole category" width={220}>
-                <select
-                  value=""
-                  onChange={(e) => { if (e.target.value) addCategory(e.target.value) }}
-                  style={inp}
-                  disabled={saving}
-                >
-                  <option value="">Select category…</option>
-                  {categories.map((c) => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                </select>
-              </Field>
-              <Btn size="sm" icon={ListPlus} onClick={addCustomLine} disabled={saving}>Add custom line</Btn>
-              <span style={{ marginLeft: 'auto', fontSize: 11, color: colors.textMuted, paddingBottom: 8 }}>
+          <div style={PANEL}>
+            <div className="flex items-center justify-between" style={PANEL_HEAD}>
+              <span className="font-semibold" style={{ fontSize: fontSize.xs, color: colors.textPrimary }}>Add Products</span>
+              <span style={{ fontSize: fontSize.xs, color: colors.textMuted }}>
                 {items.length} item{items.length === 1 ? '' : 's'}
               </span>
             </div>
+            <div style={{ padding: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div>
+                <span style={lbl}>Add product</span>
+                <ProductCategoryPicker
+                  products={pickerProducts}
+                  value=""
+                  onChange={(productId) => {
+                    const p = (products ?? []).find((x) => x.id === productId)
+                    if (p) addProduct(p)
+                  }}
+                  placeholder="Select product…"
+                  style={{ height: 26 }}
+                />
+              </div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+                <div style={{ flex: 1 }}>
+                  <span style={lbl}>Add whole category</span>
+                  <select
+                    value=""
+                    onChange={(e) => { if (e.target.value) addCategory(e.target.value) }}
+                    style={{ ...inp, height: 26 }}
+                    disabled={saving}
+                  >
+                    <option value="">Select category…</option>
+                    {categories.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+                <Btn size="sm" icon={ListPlus} onClick={addCustomLine} disabled={saving}>Custom line</Btn>
+              </div>
+            </div>
           </div>
 
-          {/* ── Items table ───────────────────────────────────────────────── */}
-          <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 2 }}>
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '64px 1fr 130px 110px 40px',
-                gap: 0,
-                padding: '6px 10px',
-                borderBottom: `1px solid ${colors.border}`,
-                fontSize: 10,
-                fontWeight: 700,
-                textTransform: 'uppercase',
-                letterSpacing: '0.04em',
-                color: colors.textSecondary,
-              }}
-            >
-              <span>Order</span>
-              <span>Material</span>
-              <span style={{ textAlign: 'right' }}>Inc VAT (R)</span>
-              <span style={{ textAlign: 'right' }}>Ex VAT</span>
-              <span />
-            </div>
+        </div>
 
+        {/* ── Items table — fills remaining height, scrolls internally ───── */}
+        <div style={{ ...PANEL, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '52px 1fr 110px 90px 32px',
+              gap: 0,
+              padding: '4px 8px',
+              borderBottom: `1px solid ${colors.border}`,
+              fontSize: 10,
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em',
+              color: colors.textSecondary,
+              background: colors.bg,
+              flexShrink: 0,
+            }}
+          >
+            <span>Order</span>
+            <span>Material</span>
+            <span style={{ textAlign: 'right' }}>Inc VAT (R)</span>
+            <span style={{ textAlign: 'right' }}>Ex VAT</span>
+            <span />
+          </div>
+
+          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
             {items.length === 0 && (
-              <p style={{ padding: 16, fontSize: fontSize.sm, color: colors.textMuted, textAlign: 'center' }}>
+              <p style={{ padding: 14, fontSize: fontSize.xs, color: colors.textMuted, textAlign: 'center' }}>
                 No items yet — add products or a whole category above.
               </p>
             )}
@@ -313,21 +331,21 @@ export default function PriceListEditorPage() {
                 key={`${item.productId ?? 'custom'}-${i}`}
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: '64px 1fr 130px 110px 40px',
+                  gridTemplateColumns: '52px 1fr 110px 90px 32px',
                   alignItems: 'center',
-                  padding: '4px 10px',
+                  padding: '2px 8px',
                   borderBottom: `1px solid ${colors.border}`,
                   background: i % 2 === 1 ? colors.bg : undefined,
                 }}
               >
-                <div style={{ display: 'flex', gap: 2 }}>
+                <div style={{ display: 'flex', gap: 1 }}>
                   <button
                     onClick={() => moveItem(i, -1)}
                     disabled={i === 0 || saving}
                     style={{ background: 'none', border: 'none', cursor: i === 0 ? 'default' : 'pointer', opacity: i === 0 ? 0.3 : 1, padding: 2 }}
                     title="Move up"
                   >
-                    <ArrowUp style={{ width: 13, height: 13, color: colors.textSecondary }} />
+                    <ArrowUp style={{ width: 12, height: 12, color: colors.textSecondary }} />
                   </button>
                   <button
                     onClick={() => moveItem(i, 1)}
@@ -335,7 +353,7 @@ export default function PriceListEditorPage() {
                     style={{ background: 'none', border: 'none', cursor: i === items.length - 1 ? 'default' : 'pointer', opacity: i === items.length - 1 ? 0.3 : 1, padding: 2 }}
                     title="Move down"
                   >
-                    <ArrowDown style={{ width: 13, height: 13, color: colors.textSecondary }} />
+                    <ArrowDown style={{ width: 12, height: 12, color: colors.textSecondary }} />
                   </button>
                 </div>
                 <input
@@ -343,7 +361,7 @@ export default function PriceListEditorPage() {
                   onChange={(e) => updateItem(i, { displayName: e.target.value })}
                   maxLength={80}
                   placeholder={item.productId ? undefined : 'Custom line name…'}
-                  style={{ ...inp, marginRight: 8 }}
+                  style={{ ...inp, height: 22, fontSize: fontSize.xs, marginRight: 8 }}
                   disabled={saving}
                 />
                 <input
@@ -351,10 +369,10 @@ export default function PriceListEditorPage() {
                   onChange={(e) => updateItem(i, { priceIncVat: e.target.value })}
                   placeholder="0.00"
                   inputMode="decimal"
-                  style={{ ...inp, fontFamily: 'monospace', textAlign: 'right' }}
+                  style={{ ...inp, height: 22, fontSize: fontSize.xs, fontFamily: 'monospace', textAlign: 'right' }}
                   disabled={saving}
                 />
-                <span className="font-mono" style={{ fontSize: fontSize.sm, textAlign: 'right', color: colors.textSecondary, paddingRight: 4 }}>
+                <span className="font-mono" style={{ fontSize: fontSize.xs, textAlign: 'right', color: colors.textSecondary, paddingRight: 4 }}>
                   {showExVat ? exVatLabel(item.priceIncVat) : '—'}
                 </span>
                 <button
@@ -363,22 +381,22 @@ export default function PriceListEditorPage() {
                   style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, justifySelf: 'end' }}
                   title="Remove"
                 >
-                  <Trash2 style={{ width: 13, height: 13, color: colors.danger }} />
+                  <Trash2 style={{ width: 12, height: 12, color: colors.danger }} />
                 </button>
               </div>
             ))}
           </div>
-
-          {/* ── Actions ───────────────────────────────────────────────────── */}
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingBottom: 16 }}>
-            <Btn onClick={() => router.push('/app/products/price-lists')} disabled={saving}>Cancel</Btn>
-            <Btn icon={Printer} onClick={() => save(true)} disabled={saving} loading={saving}>Save &amp; Print</Btn>
-            <Btn variant="primary" icon={Save} onClick={() => save(false)} disabled={saving} loading={saving}>
-              {isNew ? 'Create Price List' : 'Save Changes'}
-            </Btn>
-          </div>
-
         </div>
+
+        {/* ── Actions ───────────────────────────────────────────────────── */}
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexShrink: 0 }}>
+          <Btn onClick={() => router.push('/app/products/price-lists')} disabled={saving}>Cancel</Btn>
+          <Btn icon={Printer} onClick={() => save(true)} disabled={saving} loading={saving}>Save &amp; Print</Btn>
+          <Btn variant="primary" icon={Save} onClick={() => save(false)} disabled={saving} loading={saving}>
+            {isNew ? 'Create Price List' : 'Save Changes'}
+          </Btn>
+        </div>
+
       </div>
     </PortalPage>
   )
