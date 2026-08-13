@@ -81,15 +81,19 @@ export async function createExpense(data: CreateExpenseInput, userId: string) {
 
 export async function listExpenses(filters: {
   status?: string
+  hideVoided?: boolean
   from?: Date
   to?: Date
   search?: string
   page?: number
   limit?: number
 }) {
-  const { status, from, to, search, page = 1, limit = 30 } = filters
+  const { status, hideVoided, from, to, search, page = 1, limit = 30 } = filters
+  const statusFilter = status
+    ? (status as 'pending' | 'approved' | 'voided')
+    : (hideVoided ? { not: 'voided' as const } : undefined)
   const where = {
-    ...(status && { status: status as 'pending' | 'approved' | 'voided' }),
+    ...(statusFilter && { status: statusFilter }),
     ...(from || to ? { createdAt: { ...(from && { gte: from }), ...(to && { lte: to }) } } : {}),
     ...(search && {
       OR: [

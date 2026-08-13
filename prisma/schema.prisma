@@ -223,6 +223,7 @@ model Product {
   categoryRef      ProductCategory?            @relation("ProductCategoryProducts", fields: [categoryId], references: [id])
   priceOverrides   PriceGroupProductOverride[]
   priceHistory     PriceHistory[]
+  priceListItems   PriceListItem[]
   purchaseLines    PurchaseLine[]
   saleLines        SaleLine[]
   scaleOrders      ScaleOrder[]                @relation("ScaleOrderProduct")
@@ -291,6 +292,39 @@ model PriceHistory {
   @@index([tenantId])
   @@index([tenantId, productId])
   @@index([tenantId, createdAt])
+}
+
+model PriceList {
+  id                   String          @id @default(uuid())
+  tenantId             String
+  title                String          @default("TODAY'S PRICES")
+  listDate             DateTime
+  footerText           String          @default("Prices subject to change without notice. VAT rate applied as per current legislation.")
+  showLogo             Boolean         @default(true)
+  showExVat            Boolean         @default(true)
+  isActiveForPurchases Boolean         @default(false)
+  createdByUserId      String?
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  items                PriceListItem[]
+
+  @@index([tenantId])
+  @@index([tenantId, isActiveForPurchases])
+}
+
+model PriceListItem {
+  id          String    @id @default(uuid())
+  tenantId    String
+  priceListId String
+  productId   String?
+  displayName String
+  priceIncVat Decimal   @db.Decimal(18, 2)
+  sortOrder   Int       @default(0)
+  priceList   PriceList @relation(fields: [priceListId], references: [id], onDelete: Cascade)
+  product     Product?  @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([tenantId, priceListId])
 }
 
 model ProductCategory {
