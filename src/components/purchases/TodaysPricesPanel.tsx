@@ -12,7 +12,7 @@ type ActivePriceList = {
   title: string
   listDate: string
   showExVat: boolean
-  items: { id: string; displayName: string; priceIncVat: string }[]
+  items: { id: string; displayName: string; priceExVat: string }[]
 }
 
 /**
@@ -79,10 +79,10 @@ export function TodaysPricesPanel() {
             <thead>
               <tr style={{ position: 'sticky', top: 0, background: '#1B3A6B', color: '#FFFFFF' }}>
                 <th style={{ textAlign: 'left', padding: '3px 6px', fontWeight: 700 }}>Material</th>
-                <th style={{ textAlign: 'right', padding: '3px 6px', fontWeight: 700 }}>Inc</th>
                 {priceList.showExVat && (
                   <th style={{ textAlign: 'right', padding: '3px 6px', fontWeight: 700 }}>Ex</th>
                 )}
+                <th style={{ textAlign: 'right', padding: '3px 6px', fontWeight: 700 }}>Inc</th>
               </tr>
             </thead>
             <tbody>
@@ -91,14 +91,14 @@ export function TodaysPricesPanel() {
                   <td style={{ padding: '2px 6px', fontWeight: 600, color: '#1A1A1A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 110 }}>
                     {item.displayName}
                   </td>
-                  <td style={{ padding: '2px 6px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, color: '#1A1A1A' }}>
-                    {new Decimal(item.priceIncVat).toFixed(2)}
-                  </td>
                   {priceList.showExVat && (
                     <td style={{ padding: '2px 6px', textAlign: 'right', fontFamily: 'monospace', color: '#6C757D' }}>
-                      {new Decimal(item.priceIncVat).div(VAT_DIVISOR).toFixed(2)}
+                      {new Decimal(item.priceExVat).toFixed(2)}
                     </td>
                   )}
+                  <td style={{ padding: '2px 6px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, color: '#1A1A1A' }}>
+                    {new Decimal(item.priceExVat).times(VAT_DIVISOR).toFixed(2)}
+                  </td>
                 </tr>
               ))}
             </tbody>
