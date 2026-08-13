@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
       items: parsed.data.items.map((item) => ({
         displayName: item.displayName,
         category: item.category,
-        priceIncVat: item.priceIncVat,
+        priceExVat: item.priceExVat,
       })),
     }))
 

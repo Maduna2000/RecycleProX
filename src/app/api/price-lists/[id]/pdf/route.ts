@@ -38,7 +38,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
         items: priceList.items.map((item) => ({
           displayName: item.displayName,
           category: item.category,
-          priceIncVat: item.priceIncVat.toString(),
+          priceExVat: item.priceExVat.toString(),
         })),
       })
       return { priceList, pdfBytes }

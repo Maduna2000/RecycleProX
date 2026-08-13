@@ -38,7 +38,7 @@ type EditableItem = {
   productId: string | null
   displayName: string
   category: string
-  priceIncVat: string // input string — validated on save
+  priceExVat: string // input string — validated on save; the entered value (INC VAT is computed for display/print)
 }
 
 type PriceListDetail = PriceListColors & {
@@ -49,13 +49,14 @@ type PriceListDetail = PriceListColors & {
   showLogo: boolean
   showExVat: boolean
   updatedAt: string
-  items: { productId: string | null; displayName: string; category: string; priceIncVat: string; sortOrder: number }[]
+  items: { productId: string | null; displayName: string; category: string; priceExVat: string; sortOrder: number }[]
 }
 
-function exVatLabel(priceIncVat: string): string {
-  const n = parseFloat(priceIncVat)
-  if (!priceIncVat || isNaN(n) || n <= 0) return '—'
-  return new Decimal(priceIncVat).div(VAT_DIVISOR).toFixed(2)
+/** INC VAT is computed for display — EX VAT is the entered, canonical price. */
+function incVatLabel(priceExVat: string): string {
+  const n = parseFloat(priceExVat)
+  if (!priceExVat || isNaN(n) || n <= 0) return '—'
+  return new Decimal(priceExVat).times(VAT_DIVISOR).toFixed(2)
 }
 
 export default function PriceListEditorPage() {
@@ -105,10 +106,10 @@ export default function PriceListEditorPage() {
       rowTintColor:      detail.rowTintColor,
     })
     setItems(detail.items.map((i) => ({
-      productId:   i.productId,
+      productId:  i.productId,
       displayName: i.displayName,
-      category:    i.category,
-      priceIncVat: new Decimal(i.priceIncVat).toFixed(2),
+      category:   i.category,
+      priceExVat: new Decimal(i.priceExVat).toFixed(2),
     })))
     setUpdatedAt(detail.updatedAt)
     setLoaded(true)
@@ -132,10 +133,12 @@ export default function PriceListEditorPage() {
   function addProduct(product: Product) {
     if (usedProductIds.has(product.id)) { toast.info(`${product.name} is already on the list`); return }
     setItems((prev) => [...prev, {
-      productId:   product.id,
+      productId:  product.id,
       displayName: product.name,
-      category:    product.category,
-      priceIncVat: new Decimal(product.defaultBuyPrice).toFixed(2),
+      category:   product.category,
+      // defaultBuyPrice is EX VAT (same convention as Purchases — VAT is
+      // added on top, never derived by dividing it back out).
+      priceExVat: new Decimal(product.defaultBuyPrice).toFixed(2),
     }])
   }
 
@@ -143,16 +146,16 @@ export default function PriceListEditorPage() {
     const toAdd = (products ?? []).filter((p) => p.category === category && !usedProductIds.has(p.id))
     if (toAdd.length === 0) { toast.info('All products in this category are already on the list'); return }
     setItems((prev) => [...prev, ...toAdd.map((p) => ({
-      productId:   p.id,
+      productId:  p.id,
       displayName: p.name,
-      category:    p.category,
-      priceIncVat: new Decimal(p.defaultBuyPrice).toFixed(2),
+      category:   p.category,
+      priceExVat: new Decimal(p.defaultBuyPrice).toFixed(2),
     }))])
     toast.success(`Added ${toAdd.length} product${toAdd.length === 1 ? '' : 's'} from ${category}`)
   }
 
   function addCustomLine() {
-    setItems((prev) => [...prev, { productId: null, displayName: '', category: 'Other', priceIncVat: '' }])
+    setItems((prev) => [...prev, { productId: null, displayName: '', category: 'Other', priceExVat: '' }])
   }
 
   function updateItem(index: number, patch: Partial<EditableItem>) {
@@ -181,8 +184,8 @@ export default function PriceListEditorPage() {
     for (let i = 0; i < items.length; i++) {
       const item = items[i]!
       if (!item.displayName.trim()) return `Row ${i + 1}: name is required`
-      const n = parseFloat(item.priceIncVat)
-      if (!item.priceIncVat || isNaN(n) || n <= 0) return `Row ${i + 1} (${item.displayName || 'unnamed'}): enter a valid price`
+      const n = parseFloat(item.priceExVat)
+      if (!item.priceExVat || isNaN(n) || n <= 0) return `Row ${i + 1} (${item.displayName || 'unnamed'}): enter a valid price`
     }
     return null
   }
@@ -199,7 +202,7 @@ export default function PriceListEditorPage() {
         productId:   item.productId,
         displayName: item.displayName.trim(),
         category:    item.category.trim() || 'Other',
-        priceIncVat: item.priceIncVat,
+        priceExVat:  item.priceExVat,
         sortOrder:   i,
       })),
     }
@@ -417,8 +420,8 @@ export default function PriceListEditorPage() {
             <span>Order</span>
             <span>Category</span>
             <span>Material</span>
-            <span style={{ textAlign: 'right' }}>Inc VAT (R)</span>
-            <span style={{ textAlign: 'right' }}>Ex VAT</span>
+            <span style={{ textAlign: 'right' }}>Inc VAT</span>
+            <span style={{ textAlign: 'right' }}>Ex VAT (R)</span>
             <span />
           </div>
 
@@ -476,17 +479,17 @@ export default function PriceListEditorPage() {
                   style={{ ...inp, height: 22, fontSize: fontSize.xs, marginRight: 8 }}
                   disabled={saving}
                 />
+                <span className="font-mono" style={{ fontSize: fontSize.xs, textAlign: 'right', color: colors.textSecondary, paddingRight: 4 }}>
+                  {incVatLabel(item.priceExVat)}
+                </span>
                 <input
-                  value={item.priceIncVat}
-                  onChange={(e) => updateItem(i, { priceIncVat: e.target.value })}
+                  value={item.priceExVat}
+                  onChange={(e) => updateItem(i, { priceExVat: e.target.value })}
                   placeholder="0.00"
                   inputMode="decimal"
                   style={{ ...inp, height: 22, fontSize: fontSize.xs, fontFamily: 'monospace', textAlign: 'right' }}
                   disabled={saving}
                 />
-                <span className="font-mono" style={{ fontSize: fontSize.xs, textAlign: 'right', color: colors.textSecondary, paddingRight: 4 }}>
-                  {showExVat ? exVatLabel(item.priceIncVat) : '—'}
-                </span>
                 <button
                   onClick={() => removeItem(i)}
                   disabled={saving}
