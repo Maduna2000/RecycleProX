@@ -185,11 +185,11 @@ export async function generatePriceListPdf(data: PriceListPdfData): Promise<Uint
     const textY = y - ROW_H + 6
     drawSpaced(page, 'MATERIAL', MARGIN + 8, textY, 8, bold, NEUTRAL_HEADER_TX, 1.2)
     let right = MARGIN + COL_W
-    if (data.showExVat) {
-      drawSpacedRight(page, 'EX VAT', right - 8, textY, 8, bold, NEUTRAL_HEADER_TX, 1.2)
-      right -= PRICE_COL_W
-    }
     drawSpacedRight(page, 'INC VAT', right - 8, textY, 8, bold, NEUTRAL_HEADER_TX, 1.2)
+    if (data.showExVat) {
+      right -= PRICE_COL_W
+      drawSpacedRight(page, 'EX VAT', right - 8, textY, 8, bold, NEUTRAL_HEADER_TX, 1.2)
+    }
     return y - ROW_H
   }
 
@@ -291,11 +291,11 @@ export async function generatePriceListPdf(data: PriceListPdfData): Promise<Uint
       page.drawText(name, { x: MARGIN + 8, y: textY, size: 10, font: reg, color: MATERIAL_TX })
 
       let right = MARGIN + COL_W
-      if (data.showExVat) {
-        drawRight(page, money(item.priceExVat), right - PRICE_PAD, textY, 10, bold, EXVAT_TX)
-        right -= PRICE_COL_W
-      }
       drawRight(page, money(item.priceIncVat), right - PRICE_PAD, textY, 10, bold, PRICE_TX)
+      if (data.showExVat) {
+        right -= PRICE_COL_W
+        drawRight(page, money(item.priceExVat), right - PRICE_PAD, textY, 10, bold, EXVAT_TX)
+      }
       y -= ROW_H
 
       page.drawLine({ start: { x: MARGIN, y }, end: { x: MARGIN + COL_W, y }, thickness: 0.5, color: HAIRLINE })
