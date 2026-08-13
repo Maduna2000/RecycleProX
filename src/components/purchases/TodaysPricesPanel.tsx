@@ -16,12 +16,15 @@ type ActivePriceList = {
 
 /**
  * Cashier reference panel on the new-purchase screen (right column, below the
- * scales) showing the price list marked "Today's List" in Products → Price
- * Lists. Read-only — prices on the purchase lines are still keyed manually.
+ * scales) showing the price list marked "Today's List" for the selected
+ * customer's price group — falls back to whichever group is flagged Default
+ * when no customer is selected yet, the customer is Casual (no group), or
+ * their own group has no active list of its own. Read-only — prices on the
+ * purchase lines are still keyed manually.
  */
-export function TodaysPricesPanel() {
+export function TodaysPricesPanel({ priceGroupId }: { priceGroupId?: string | null }) {
   const { data } = useSWR<{ priceList: ActivePriceList | null }>(
-    '/api/price-lists/active',
+    `/api/price-lists/active${priceGroupId ? `?priceGroupId=${priceGroupId}` : ''}`,
     fetcher,
     { refreshInterval: 5 * 60_000 }, // catch a mid-shift list swap without a reload
   )

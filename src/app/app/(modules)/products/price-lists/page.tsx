@@ -11,7 +11,7 @@ import { Dialog } from '@/components/ui/dialog'
 import { colors, fontSize } from '@/lib/design-tokens'
 import { fetcher } from '@/lib/swrFetcher'
 import {
-  Btn, PortalPage,
+  Btn, Field, FilterBar, inp, PortalPage,
   RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter,
 } from '@/components/rpx'
 
@@ -21,8 +21,12 @@ type PriceListRow = {
   listDate: string
   isActiveForPurchases: boolean
   updatedAt: string
+  priceGroupId: string
+  priceGroup: { name: string }
   _count: { items: number }
 }
+
+type PriceGroupOption = { id: string; name: string; isDefault: boolean }
 
 const LISTS_KEY = '/api/price-lists'
 const LOGO_KEY = '/api/price-lists/logo'
@@ -33,8 +37,13 @@ export default function PriceListsPage() {
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
 
   const [deleteTarget, setDeleteTarget] = useState<PriceListRow | null>(null)
+  const [priceGroupFilter, setPriceGroupFilter] = useState('')
 
-  const { data, isLoading } = useSWR<{ priceLists: PriceListRow[] }>(LISTS_KEY, fetcher)
+  const { data: priceGroupsData } = useSWR<{ groups: PriceGroupOption[] }>('/api/price-groups', fetcher)
+  const priceGroups = priceGroupsData?.groups ?? []
+
+  const listsKey = priceGroupFilter ? `${LISTS_KEY}?priceGroupId=${priceGroupFilter}` : LISTS_KEY
+  const { data, isLoading } = useSWR<{ priceLists: PriceListRow[] }>(listsKey, fetcher)
   const priceLists = data?.priceLists ?? []
 
   async function handleActivate(row: PriceListRow) {
@@ -74,6 +83,14 @@ export default function PriceListsPage() {
       ),
     },
     {
+      key: 'priceGroup',
+      header: 'Price Group',
+      width: '120px',
+      render: (r) => (
+        <span style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>{r.priceGroup.name}</span>
+      ),
+    },
+    {
       key: 'items',
       header: 'Items',
       width: '70px',
@@ -85,13 +102,13 @@ export default function PriceListsPage() {
     {
       key: 'active',
       header: 'Shown in Purchases',
-      width: '150px',
+      width: '170px',
       render: (r) => r.isActiveForPurchases ? (
         <span
           className="px-2 py-0.5 rounded-full text-xs font-semibold"
           style={{ background: colors.actionBg, color: colors.action }}
         >
-          Today&apos;s List
+          Today&apos;s List · {r.priceGroup.name}
         </span>
       ) : null,
     },
@@ -143,6 +160,21 @@ export default function PriceListsPage() {
   return (
     <PortalPage title="Price Lists">
       {isManager && <LogoCard />}
+
+      <FilterBar>
+        <Field label="Price Group" width={160}>
+          <select
+            value={priceGroupFilter}
+            onChange={(e) => setPriceGroupFilter(e.target.value)}
+            style={inp}
+          >
+            <option value="">All Price Groups</option>
+            {priceGroups.map((g) => (
+              <option key={g.id} value={g.id}>{g.name}{g.isDefault ? ' (Default)' : ''}</option>
+            ))}
+          </select>
+        </Field>
+      </FilterBar>
 
       <div className="flex-1 min-h-0" style={{ padding: 10 }}>
         <DataTable

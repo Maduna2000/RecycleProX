@@ -9,8 +9,10 @@ export async function GET(req: NextRequest) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
+  const priceGroupId = req.nextUrl.searchParams.get('priceGroupId') ?? undefined
+
   try {
-    const priceLists = await runWithRequestTenant(req, () => listPriceLists())
+    const priceLists = await runWithRequestTenant(req, () => listPriceLists({ priceGroupId }))
     return NextResponse.json({ priceLists })
   } catch (err) {
     logger.error({ err }, 'GET /api/price-lists failed')

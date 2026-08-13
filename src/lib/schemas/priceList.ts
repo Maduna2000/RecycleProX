@@ -29,13 +29,18 @@ export const PriceListItemSchema = z.object({
 })
 
 export const CreatePriceListSchema = z.object({
-  title:      z.string().min(1, 'Title is required').max(80),
-  listDate:   z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date is required'),
-  footerText: z.string().max(500).default(''),
-  showLogo:   z.boolean().default(true),
-  showExVat:  z.boolean().default(true),
-  colors:     PriceListColorsSchema.default(DEFAULT_PRICE_LIST_COLORS),
-  items:      z.array(PriceListItemSchema).min(1, 'Add at least one product').max(200),
+  title:        z.string().min(1, 'Title is required').max(80),
+  listDate:     z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date is required'),
+  footerText:   z.string().max(500).default(''),
+  showLogo:     z.boolean().default(true),
+  showExVat:    z.boolean().default(true),
+  // Every list is scoped to a real Price Group — Casual customers (or no
+  // customer selected yet) resolve to whichever group is flagged isDefault,
+  // rather than this being a separate null scope. See
+  // priceListService.getActivePriceListForCustomer.
+  priceGroupId: z.string().uuid('Select a price group'),
+  colors:       PriceListColorsSchema.default(DEFAULT_PRICE_LIST_COLORS),
+  items:        z.array(PriceListItemSchema).min(1, 'Add at least one product').max(200),
 })
 
 export const UpdatePriceListSchema = CreatePriceListSchema.extend({

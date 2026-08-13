@@ -1471,7 +1471,7 @@ export function PurchaseForm({ editingPurchase }: { editingPurchase?: EditingPur
           </div>
 
           {/* Today's Prices — the active price list from Products → Price Lists */}
-          <TodaysPricesPanel />
+          <TodaysPricesPanel priceGroupId={customer?.priceGroupId ?? null} />
 
         </div>
         {/* end RIGHT COLUMN */}

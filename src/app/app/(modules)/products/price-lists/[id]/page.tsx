@@ -33,6 +33,8 @@ type Product = {
   defaultBuyPrice: string; isActive: boolean
 }
 
+type PriceGroupOption = { id: string; name: string; isDefault: boolean }
+
 type EditableItem = {
   productId: string | null
   displayName: string
@@ -47,6 +49,7 @@ type PriceListDetail = PriceListColors & {
   footerText: string
   showLogo: boolean
   showExVat: boolean
+  priceGroupId: string
   updatedAt: string
   items: { productId: string | null; displayName: string; category: string; priceExVat: string; sortOrder: number }[]
 }
@@ -70,6 +73,7 @@ export default function PriceListEditorPage() {
   const [footerText, setFooterText] = useState('Prices subject to change without notice. VAT rate applied as per current legislation.')
   const [showLogo,   setShowLogo]   = useState(true)
   const [showExVat,  setShowExVat]  = useState(true)
+  const [priceGroupId, setPriceGroupId] = useState('')
   const [docColors,  setDocColors]  = useState<PriceListColors>(DEFAULT_PRICE_LIST_COLORS)
   const [items,      setItems]      = useState<EditableItem[]>([])
   const [updatedAt,  setUpdatedAt]  = useState<string | null>(null)
@@ -82,10 +86,20 @@ export default function PriceListEditorPage() {
   // /api/products wraps the list: { products: [...] }
   const { data: productsData } = useSWR<{ products: Product[] }>('/api/products?active=true', fetcher)
   const products = productsData?.products
+  const { data: priceGroupsData } = useSWR<{ groups: PriceGroupOption[] }>('/api/price-groups', fetcher)
+  const priceGroups = useMemo(() => priceGroupsData?.groups ?? [], [priceGroupsData])
   const { data: detail, error: detailError } = useSWR<PriceListDetail>(
     isNew ? null : `/api/price-lists/${params.id}`,
     fetcher,
   )
+
+  // A brand-new list starts pre-selected on whichever group is flagged
+  // default — freely changeable before any products are added.
+  useEffect(() => {
+    if (!isNew || priceGroupId || priceGroups.length === 0) return
+    const defaultGroup = priceGroups.find((g) => g.isDefault) ?? priceGroups[0]!
+    setPriceGroupId(defaultGroup.id)
+  }, [isNew, priceGroupId, priceGroups])
 
   // Hydrate editor state once from the fetched document
   useEffect(() => {
@@ -95,6 +109,7 @@ export default function PriceListEditorPage() {
     setFooterText(detail.footerText)
     setShowLogo(detail.showLogo)
     setShowExVat(detail.showExVat)
+    setPriceGroupId(detail.priceGroupId)
     setDocColors({
       primaryColor:      detail.primaryColor,
       accentColor:       detail.accentColor,
@@ -129,27 +144,44 @@ export default function PriceListEditorPage() {
 
   const usedProductIds = useMemo(() => new Set(items.map((i) => i.productId).filter(Boolean)), [items])
 
-  function addProduct(product: Product) {
+  // Resolves EX VAT for this list's selected price group — a group override
+  // if one exists for the product, else the product's own default (same
+  // convention as Purchases/Sales — VAT is added on top, never derived by
+  // dividing it back out). Reuses the endpoint resolveProductPrice already
+  // calls elsewhere, so this stays consistent with actual purchase pricing.
+  async function resolveGroupPrice(productId: string, fallback: string): Promise<string> {
+    if (!priceGroupId) return new Decimal(fallback).toFixed(2)
+    try {
+      const res = await fetch(`/api/products/${productId}?priceGroupId=${priceGroupId}`)
+      if (res.ok) {
+        const data = await res.json() as { defaultBuyPrice: string }
+        return new Decimal(data.defaultBuyPrice).toFixed(2)
+      }
+    } catch { /* fall through to the product's own default */ }
+    return new Decimal(fallback).toFixed(2)
+  }
+
+  async function addProduct(product: Product) {
     if (usedProductIds.has(product.id)) { toast.info(`${product.name} is already on the list`); return }
+    const priceExVat = await resolveGroupPrice(product.id, product.defaultBuyPrice)
     setItems((prev) => [...prev, {
       productId:  product.id,
       displayName: product.name,
       category:   product.category,
-      // defaultBuyPrice is EX VAT (same convention as Purchases — VAT is
-      // added on top, never derived by dividing it back out).
-      priceExVat: new Decimal(product.defaultBuyPrice).toFixed(2),
+      priceExVat,
     }])
   }
 
-  function addCategory(category: string) {
+  async function addCategory(category: string) {
     const toAdd = (products ?? []).filter((p) => p.category === category && !usedProductIds.has(p.id))
     if (toAdd.length === 0) { toast.info('All products in this category are already on the list'); return }
-    setItems((prev) => [...prev, ...toAdd.map((p) => ({
+    const newItems = await Promise.all(toAdd.map(async (p) => ({
       productId:  p.id,
       displayName: p.name,
       category:   p.category,
-      priceExVat: new Decimal(p.defaultBuyPrice).toFixed(2),
-    }))])
+      priceExVat: await resolveGroupPrice(p.id, p.defaultBuyPrice),
+    })))
+    setItems((prev) => [...prev, ...newItems])
     toast.success(`Added ${toAdd.length} product${toAdd.length === 1 ? '' : 's'} from ${category}`)
   }
 
@@ -179,6 +211,7 @@ export default function PriceListEditorPage() {
   function validate(): string | null {
     if (!title.trim()) return 'Title is required'
     if (!listDate) return 'Date is required'
+    if (!priceGroupId) return 'Select a price group'
     if (items.length === 0) return 'Add at least one product'
     for (let i = 0; i < items.length; i++) {
       const item = items[i]!
@@ -196,6 +229,7 @@ export default function PriceListEditorPage() {
       footerText: footerText.trim(),
       showLogo,
       showExVat,
+      priceGroupId,
       colors: docColors,
       items: items.map((item, i) => ({
         productId:   item.productId,
@@ -300,6 +334,22 @@ export default function PriceListEditorPage() {
                   <span style={lbl}>Date</span>
                   <input type="date" value={listDate} onChange={(e) => setListDate(e.target.value)} style={{ ...inp, height: 26 }} disabled={saving} />
                 </div>
+              </div>
+              <div>
+                <span style={lbl} title="Which dealer tier these prices are for — new products you add resolve their price for this group. Casual customers (and no customer selected yet) see whichever group is flagged Default.">
+                  Price group
+                </span>
+                <select
+                  value={priceGroupId}
+                  onChange={(e) => setPriceGroupId(e.target.value)}
+                  style={{ ...inp, height: 26 }}
+                  disabled={saving}
+                >
+                  <option value="" disabled>Select price group…</option>
+                  {priceGroups.map((g) => (
+                    <option key={g.id} value={g.id}>{g.name}{g.isDefault ? ' (Default)' : ''}</option>
+                  ))}
+                </select>
               </div>
               <div>
                 <span style={lbl}>Footer text</span>

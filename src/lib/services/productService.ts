@@ -58,6 +58,13 @@ export class DefaultPriceGroupDeleteError extends Error {
   }
 }
 
+export class PriceGroupHasPriceListsError extends Error {
+  constructor(public priceListCount: number) {
+    super(`Price group has ${priceListCount} price list${priceListCount === 1 ? '' : 's'} and cannot be deleted`)
+    this.name = 'PriceGroupHasPriceListsError'
+  }
+}
+
 export class ProductInUseError extends Error {
   constructor(public counts: { purchases: number; sales: number; stock: number }) {
     super('Product is referenced by existing transactions')
@@ -321,11 +328,12 @@ export async function updatePriceGroup(id: string, data: UpdatePriceGroupInput, 
 export async function deletePriceGroup(id: string, deletedById?: string) {
   const group = await prisma.priceGroup.findUnique({
     where: { id },
-    include: { _count: { select: { customers: true } } },
+    include: { _count: { select: { customers: true, priceLists: true } } },
   })
   if (!group) throw new PriceGroupNotFoundError(id)
   if (group.isDefault) throw new DefaultPriceGroupDeleteError()
   if (group._count.customers > 0) throw new PriceGroupInUseError(group._count.customers)
+  if (group._count.priceLists > 0) throw new PriceGroupHasPriceListsError(group._count.priceLists)
 
   await prisma.$transaction(async (tx) => {
     await tx.priceGroupProductOverride.deleteMany({ where: { priceGroupId: id } })

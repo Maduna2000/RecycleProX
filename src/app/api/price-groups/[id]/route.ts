@@ -5,7 +5,7 @@ import { UpdatePriceGroupSchema } from '@/lib/schemas/product'
 import {
   getPriceGroupWithOverrides, updatePriceGroup, deletePriceGroup,
   PriceGroupNotFoundError, DuplicatePriceGroupNameError,
-  PriceGroupInUseError, DefaultPriceGroupDeleteError,
+  PriceGroupInUseError, DefaultPriceGroupDeleteError, PriceGroupHasPriceListsError,
 } from '@/lib/services/productService'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
@@ -59,6 +59,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     if (err instanceof PriceGroupNotFoundError) return NextResponse.json({ error: err.message }, { status: 404 })
     if (err instanceof DefaultPriceGroupDeleteError) return NextResponse.json({ error: err.message }, { status: 409 })
     if (err instanceof PriceGroupInUseError) return NextResponse.json({ error: err.message }, { status: 409 })
+    if (err instanceof PriceGroupHasPriceListsError) return NextResponse.json({ error: err.message }, { status: 409 })
     logger.error({ err }, 'DELETE /api/price-groups/[id] failed')
     return NextResponse.json({ error: 'Failed to delete price group' }, { status: 500 })
   }

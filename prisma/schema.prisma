@@ -255,6 +255,7 @@ model PriceGroup {
   updatedAt   DateTime                    @updatedAt
   customers   Customer[]
   overrides   PriceGroupProductOverride[]
+  priceLists  PriceList[]
 
   @@unique([tenantId, name])
   @@index([tenantId])
@@ -311,14 +312,24 @@ model PriceList {
   priceTextColor       String          @default("#1B3A6B")
   exVatTextColor       String          @default("#737373")
   rowTintColor         String          @default("#E6EBF5")
+  // Every list is scoped to a real Price Group — a Casual customer (or no
+  // customer selected yet) resolves to whichever group is flagged
+  // isDefault, rather than this being a separate null scope of its own
+  // (see priceListService.getActivePriceListForCustomer).
+  priceGroupId         String
   isActiveForPurchases Boolean         @default(false)
   createdByUserId      String?
   createdAt            DateTime        @default(now())
   updatedAt            DateTime        @updatedAt
+  priceGroup           PriceGroup      @relation(fields: [priceGroupId], references: [id])
   items                PriceListItem[]
 
   @@index([tenantId])
-  @@index([tenantId, isActiveForPurchases])
+  // isActiveForPurchases' real invariant — at most one active list per
+  // (tenantId, priceGroupId) — is a partial unique index added by raw SQL
+  // in the migration (Prisma's @@unique can't express a WHERE clause), see
+  // PriceList_tenantId_priceGroupId_one_active_key.
+  @@index([tenantId, priceGroupId])
 }
 
 model PriceListItem {

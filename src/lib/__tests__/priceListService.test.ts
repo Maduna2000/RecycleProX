@@ -80,6 +80,7 @@ describe('createPriceList', () => {
       footerText: 'All weights in tonnes.',
       showLogo: true,
       showExVat: true,
+      priceGroupId: 'pg-1',
       colors: DEFAULT_PRICE_LIST_COLORS,
       items: [
         { productId: 'prod-1', displayName: 'COPPER', category: 'Copper', priceExVat: 200, sortOrder: 0 },
@@ -90,6 +91,7 @@ describe('createPriceList', () => {
     const arg = vi.mocked(prisma.priceList.create).mock.calls[0]![0]
     expect(arg.data.tenantId).toBe('tenant-1')
     expect(arg.data.createdByUserId).toBe('user-1')
+    expect(arg.data.priceGroupId).toBe('pg-1')
     // listDate pinned to UTC midnight so the printed date never TZ-shifts
     expect((arg.data.listDate as Date).toISOString()).toBe('2026-08-13T00:00:00.000Z')
     expect(arg.data).toMatchObject(DEFAULT_PRICE_LIST_COLORS)
@@ -108,6 +110,7 @@ describe('createPriceList', () => {
       footerText: '',
       showLogo: true,
       showExVat: true,
+      priceGroupId: 'pg-1',
       colors: { ...DEFAULT_PRICE_LIST_COLORS, primaryColor: '#C0392B', accentColor: '#FFD700' },
       items: [{ productId: 'prod-1', displayName: 'COPPER', category: 'Copper', priceExVat: 200, sortOrder: 0 }],
     }, 'user-1')
@@ -119,15 +122,15 @@ describe('createPriceList', () => {
 
 // ─── Activate ─────────────────────────────────────────────────────────────────
 describe('activatePriceList', () => {
-  it('clears every other active list and sets the target, inside one transaction', async () => {
-    vi.mocked(prisma.priceList.findUnique).mockResolvedValue({ id: 'pl-2' } as never)
-    vi.mocked(prisma.priceList.update).mockResolvedValue({ id: 'pl-2', isActiveForPurchases: true } as never)
+  it('clears every other active list in the same price group and sets the target, inside one transaction', async () => {
+    vi.mocked(prisma.priceList.findUnique).mockResolvedValue({ id: 'pl-2', priceGroupId: 'pg-1' } as never)
+    vi.mocked(prisma.priceList.update).mockResolvedValue({ id: 'pl-2', isActiveForPurchases: true, priceGroupId: 'pg-1' } as never)
 
     const result = await activatePriceList('pl-2', 'user-1')
 
     expect(prisma.$transaction).toHaveBeenCalledTimes(1)
     expect(prisma.priceList.updateMany).toHaveBeenCalledWith({
-      where: { isActiveForPurchases: true, id: { not: 'pl-2' } },
+      where: { isActiveForPurchases: true, id: { not: 'pl-2' }, priceGroupId: 'pg-1' },
       data:  { isActiveForPurchases: false },
     })
     expect(prisma.priceList.update).toHaveBeenCalledWith({
@@ -153,6 +156,7 @@ describe('duplicatePriceList', () => {
       footerText: 'footer',
       showLogo: false,
       showExVat: true,
+      priceGroupId: 'pg-1',
       isActiveForPurchases: true,
       ...DEFAULT_PRICE_LIST_COLORS,
       primaryColor: '#C0392B', // customized — duplicate must carry this over
@@ -166,6 +170,8 @@ describe('duplicatePriceList', () => {
 
     const arg = vi.mocked(prisma.priceList.create).mock.calls[0]![0]
     expect(arg.data.title).toBe('MONDAY PRICES (copy)')
+    // The copy stays in the same price group as the source
+    expect(arg.data.priceGroupId).toBe('pg-1')
     // The copy never inherits the "shown in Purchases" flag
     expect(arg.data).not.toHaveProperty('isActiveForPurchases', true)
     expect((arg.data.listDate as Date).toISOString()).toBe(
@@ -187,6 +193,7 @@ describe('updatePriceList', () => {
     footerText: '',
     showLogo: true,
     showExVat: false,
+    priceGroupId: 'pg-1',
     colors: { ...DEFAULT_PRICE_LIST_COLORS, primaryColor: '#008080' },
     items: [{ productId: null, displayName: 'BRASS', category: 'Brass', priceExVat: 120.75, sortOrder: 0 }],
     updatedAt: '2026-08-13T08:00:00.000Z',

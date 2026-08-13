@@ -88,10 +88,11 @@ function parseListDate(listDate: string): Date {
   return new Date(`${listDate}T00:00:00.000Z`)
 }
 
-export async function listPriceLists() {
+export async function listPriceLists(opts?: { priceGroupId?: string }) {
   return prisma.priceList.findMany({
+    where: { ...(opts?.priceGroupId && { priceGroupId: opts.priceGroupId }) },
     orderBy: [{ listDate: 'desc' }, { createdAt: 'desc' }],
-    include: { _count: { select: { items: true } } },
+    include: { _count: { select: { items: true } }, priceGroup: { select: { name: true } } },
   })
 }
 
@@ -102,9 +103,27 @@ export async function getPriceList(id: string) {
   })
 }
 
-export async function getActivePriceList() {
+/**
+ * Resolves the price list to show for a given customer's price group —
+ * their own group's active list first, falling back to whichever group is
+ * flagged isDefault (a Casual customer, or no customer selected yet, passes
+ * null and always takes this fallback directly). Returns null if neither
+ * resolves to an active list.
+ */
+export async function getActivePriceListForCustomer(customerPriceGroupId: string | null) {
+  if (customerPriceGroupId) {
+    const groupList = await prisma.priceList.findFirst({
+      where: { priceGroupId: customerPriceGroupId, isActiveForPurchases: true },
+      include: { items: { orderBy: { sortOrder: 'asc' } } },
+    })
+    if (groupList) return groupList
+  }
+
+  const defaultGroup = await prisma.priceGroup.findFirst({ where: { isDefault: true } })
+  if (!defaultGroup) return null
+
   return prisma.priceList.findFirst({
-    where: { isActiveForPurchases: true },
+    where: { priceGroupId: defaultGroup.id, isActiveForPurchases: true },
     include: { items: { orderBy: { sortOrder: 'asc' } } },
   })
 }
@@ -119,13 +138,14 @@ export async function createPriceList(data: CreatePriceListInput, userId: string
       footerText:      data.footerText,
       showLogo:        data.showLogo,
       showExVat:       data.showExVat,
+      priceGroupId:    data.priceGroupId,
       ...data.colors,
       createdByUserId: userId,
       items:           { create: itemRows(data.items, tenantId) },
     },
     include: { items: { orderBy: { sortOrder: 'asc' } } },
   })
-  logger.info({ priceListId: priceList.id, userId, itemCount: data.items.length }, 'PriceList created')
+  logger.info({ priceListId: priceList.id, userId, priceGroupId: data.priceGroupId, itemCount: data.items.length }, 'PriceList created')
   return priceList
 }
 
@@ -146,13 +166,14 @@ export async function updatePriceList(id: string, data: UpdatePriceListInput) {
     return tx.priceList.update({
       where: { id },
       data: {
-        title:      data.title,
-        listDate:   parseListDate(data.listDate),
-        footerText: data.footerText,
-        showLogo:   data.showLogo,
-        showExVat:  data.showExVat,
+        title:        data.title,
+        listDate:     parseListDate(data.listDate),
+        footerText:   data.footerText,
+        showLogo:     data.showLogo,
+        showExVat:    data.showExVat,
+        priceGroupId: data.priceGroupId,
         ...data.colors,
-        items:      { create: itemRows(data.items, tenantId) },
+        items:        { create: itemRows(data.items, tenantId) },
       },
       include: { items: { orderBy: { sortOrder: 'asc' } } },
     })
@@ -170,6 +191,7 @@ export async function duplicatePriceList(id: string, userId: string) {
       footerText:      source.footerText,
       showLogo:        source.showLogo,
       showExVat:       source.showExVat,
+      priceGroupId:    source.priceGroupId,
       primaryColor:      source.primaryColor,
       accentColor:       source.accentColor,
       headerTextColor:   source.headerTextColor,
@@ -200,24 +222,27 @@ export async function deletePriceList(id: string) {
   logger.info({ priceListId: id }, 'PriceList deleted')
 }
 
-/** At most one active list per tenant — clear-then-set in one transaction. */
+/** At most one active list per price group — clear-then-set in one transaction. */
 export async function activatePriceList(id: string, userId: string) {
-  // Serializable — two managers activating different lists at nearly the
-  // same instant under the default isolation level could interleave their
-  // clear-then-set steps and leave more than one list "active" at once
-  // (getActivePriceList's findFirst would then depend on unspecified row
-  // order). Serializable makes Postgres abort and retry one of them instead.
+  // Serializable — two managers activating different lists in the same
+  // group at nearly the same instant under the default isolation level
+  // could interleave their clear-then-set steps and leave more than one
+  // list "active" for that group at once (getActivePriceListForCustomer's
+  // findFirst would then depend on unspecified row order). Serializable
+  // makes Postgres abort and retry one of them instead.
   const activated = await withSerializableRetry(() =>
     prisma.$transaction(async (tx) => {
       const target = await tx.priceList.findUnique({ where: { id } })
       if (!target) throw new Error('Price list not found')
+      // Scoped to the same price group only — activating a Dealer 1 list
+      // must never deactivate whatever's active for Casual/Dealer 2/Dealer 3.
       await tx.priceList.updateMany({
-        where: { isActiveForPurchases: true, id: { not: id } },
+        where: { isActiveForPurchases: true, id: { not: id }, priceGroupId: target.priceGroupId },
         data:  { isActiveForPurchases: false },
       })
       return tx.priceList.update({ where: { id }, data: { isActiveForPurchases: true } })
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
   )
-  logger.info({ priceListId: id, userId }, 'PriceList activated for purchases')
+  logger.info({ priceListId: id, userId, priceGroupId: activated.priceGroupId }, 'PriceList activated for purchases')
   return activated
 }
