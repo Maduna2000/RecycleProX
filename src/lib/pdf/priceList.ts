@@ -62,14 +62,20 @@ function hexToRgb(hex: string) {
 const PAGE_W = 595
 const PAGE_H = 842
 const MARGIN = 26
+// Top margin only — trimmed separately from the side/bottom margin so the
+// header sits a little higher on the page, reclaiming vertical space for rows.
+const TOP_MARGIN = 18
 const COL_W = PAGE_W - MARGIN * 2
 
 const CARD_RADIUS = 14
 const CARD_PAD = 18
-const HEADER_CARD_H = 74
+const HEADER_CARD_H = 60
 const CONT_BAR_H = 26
-const FOOTER_CARD_H = 32
+const FOOTER_CARD_H = 26
 const ROW_H = 17
+// Category divider bars are a label, not a data row — shorter than ROW_H so
+// long lists (7+ categories) fit more rows per page without crowding data.
+const CAT_BAR_H = 12
 const PRICE_COL_W = 92
 const PRICE_PAD = 15 // internal right padding for price text within its column
 
@@ -194,16 +200,16 @@ export async function generatePriceListPdf(data: PriceListPdfData): Promise<Uint
   }
 
   function drawCategoryBar(page: PDFPage, category: string, y: number): number {
-    page.drawRectangle({ x: MARGIN, y: y - ROW_H, width: COL_W, height: ROW_H, color: PRIMARY })
-    const textY = y - ROW_H + 6
+    page.drawRectangle({ x: MARGIN, y: y - CAT_BAR_H, width: COL_W, height: CAT_BAR_H, color: PRIMARY })
+    const textY = y - CAT_BAR_H + 3.5
     drawSpaced(page, sanitize(category).toUpperCase(), MARGIN + 8, textY, 8, bold, HEADER_TX, 1.4)
-    return y - ROW_H
+    return y - CAT_BAR_H
   }
 
   function newPage(first: boolean): { page: PDFPage; y: number } {
     const page = doc.addPage([PAGE_W, PAGE_H])
     pages.push(page)
-    let y = PAGE_H - MARGIN
+    let y = PAGE_H - TOP_MARGIN
 
     if (first) {
       // ── Rounded header card: logo/company, subtitle, date pill ──────────
@@ -243,7 +249,7 @@ export async function generatePriceListPdf(data: PriceListPdfData): Promise<Uint
         drawRight(page, sanitize(infoParts), PAGE_W - MARGIN - CARD_PAD, pillY - 11, 7, reg, HEADER_TX, 0.8)
       }
 
-      y = cardBottom - 12
+      y = cardBottom - 8
     } else {
       // Continuation pages get a slim repeat of the card, no logo/letterhead.
       const barBottom = y - CONT_BAR_H
@@ -260,7 +266,7 @@ export async function generatePriceListPdf(data: PriceListPdfData): Promise<Uint
 
   // Every page still needs FOOTER_ZONE clearance below its content for the
   // bottom-anchored footer card.
-  const FOOTER_ZONE = MARGIN + FOOTER_CARD_H + 12
+  const FOOTER_ZONE = MARGIN + FOOTER_CARD_H + 8
 
   let { page, y } = newPage(true)
   const sections = groupByCategory(data.items)
@@ -269,7 +275,7 @@ export async function generatePriceListPdf(data: PriceListPdfData): Promise<Uint
     // Require room for the divider AND at least one row — otherwise the
     // divider is orphaned at the bottom of the page with its rows pushed to
     // an unlabeled continuation.
-    if (y - ROW_H * 2 < FOOTER_ZONE) {
+    if (y - (CAT_BAR_H + ROW_H) < FOOTER_ZONE) {
       ;({ page, y } = newPage(false))
     }
     y = drawCategoryBar(page, section.category, y)
