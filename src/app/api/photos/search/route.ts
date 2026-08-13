@@ -31,8 +31,11 @@ export async function GET(req: NextRequest) {
   const customerId = searchParams.get('customerId')  ?? undefined
   const search     = searchParams.get('search')      ?? undefined
   const product    = searchParams.get('product')     ?? undefined
-  const from       = searchParams.get('from') ? new Date(searchParams.get('from')!) : undefined
-  const to         = searchParams.get('to')   ? new Date(searchParams.get('to')!)   : undefined
+  // Date-only inputs (YYYY-MM-DD) — pin explicitly to UTC day boundaries so
+  // `to` includes the whole day instead of stopping at its midnight start,
+  // which previously excluded every record actually created that day.
+  const from       = searchParams.get('from') ? new Date(`${searchParams.get('from')}T00:00:00.000Z`) : undefined
+  const to         = searchParams.get('to')   ? new Date(`${searchParams.get('to')}T23:59:59.999Z`)   : undefined
   const page       = parseInt(searchParams.get('page')     ?? '1')
   const pageSize   = Math.min(parseInt(searchParams.get('pageSize') ?? '24'), 48)
 
