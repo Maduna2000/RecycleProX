@@ -17,6 +17,18 @@ import Decimal from 'decimal.js'
 export const VAT_RATE = new Decimal('0.15')
 export const VAT_DIVISOR = new Decimal('1.15')
 
+/**
+ * Price-list VAT direction: EX VAT is canonical (the price someone enters),
+ * INC VAT is derived by multiplying it up — the opposite direction from the
+ * purchase-legacy helpers above, which divide an inclusive figure back down.
+ * Pure (no server-only imports), so this is safe to call from client
+ * components too — see TodaysPricesPanel.tsx and the price-list editor,
+ * which both need this same figure.
+ */
+export function incVatPrice(priceExVat: Decimal.Value): Decimal {
+  return new Decimal(priceExVat).times(VAT_DIVISOR).toDecimalPlaces(2)
+}
+
 type DecimalLike = { toString(): string }
 
 /** VAT for a purchase line. Persisted value wins; legacy rows derive from the inclusive lineTotal. */

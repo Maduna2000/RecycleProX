@@ -1,8 +1,10 @@
 import { prisma } from '@/lib/db/prisma'
+import { Prisma } from '@prisma/client'
 import { requireTenantId } from '@/lib/db/tenantContext'
+import { withSerializableRetry } from '@/lib/db/withSerializableRetry'
 import Decimal from 'decimal.js'
 import logger from '@/lib/logger'
-import { VAT_DIVISOR } from '@/lib/utils/vat'
+import { incVatPrice } from '@/lib/utils/vat'
 import { getAllSettings } from '@/lib/services/settingsService'
 import { fetchR2Bytes } from '@/lib/r2'
 import { CURRENCY_SYMBOLS } from '@/lib/schemas/cashup'
@@ -12,15 +14,13 @@ import type { CreatePriceListInput, UpdatePriceListInput, PriceListItemInput, Pr
 /** SystemSettings key holding the R2 object key of the price list logo. */
 export const PRICE_LIST_LOGO_SETTING_KEY = 'priceListLogoR2Key'
 
-/**
- * INC VAT is never stored — always derived from the EX VAT price at 15%.
- * EX VAT is canonical (matches Product.defaultBuyPrice / Purchases, where
- * VAT is added on top of the entered price, never derived by dividing it
- * back out).
- */
-export function incVatPrice(priceExVat: Decimal.Value): Decimal {
-  return new Decimal(priceExVat).times(VAT_DIVISOR).toDecimalPlaces(2)
-}
+// INC VAT is never stored — always derived from the EX VAT price at 15%.
+// EX VAT is canonical (matches Product.defaultBuyPrice / Purchases, where
+// VAT is added on top of the entered price, never derived by dividing it
+// back out). Re-exported here so existing importers of this module don't
+// need to change — the actual formula lives in lib/utils/vat.ts, the one
+// place safe for both server code and client components to import from.
+export { incVatPrice }
 
 export interface PriceListPdfSource {
   title:      string
@@ -202,15 +202,22 @@ export async function deletePriceList(id: string) {
 
 /** At most one active list per tenant — clear-then-set in one transaction. */
 export async function activatePriceList(id: string, userId: string) {
-  const activated = await prisma.$transaction(async (tx) => {
-    const target = await tx.priceList.findUnique({ where: { id } })
-    if (!target) throw new Error('Price list not found')
-    await tx.priceList.updateMany({
-      where: { isActiveForPurchases: true, id: { not: id } },
-      data:  { isActiveForPurchases: false },
-    })
-    return tx.priceList.update({ where: { id }, data: { isActiveForPurchases: true } })
-  })
+  // Serializable — two managers activating different lists at nearly the
+  // same instant under the default isolation level could interleave their
+  // clear-then-set steps and leave more than one list "active" at once
+  // (getActivePriceList's findFirst would then depend on unspecified row
+  // order). Serializable makes Postgres abort and retry one of them instead.
+  const activated = await withSerializableRetry(() =>
+    prisma.$transaction(async (tx) => {
+      const target = await tx.priceList.findUnique({ where: { id } })
+      if (!target) throw new Error('Price list not found')
+      await tx.priceList.updateMany({
+        where: { isActiveForPurchases: true, id: { not: id } },
+        data:  { isActiveForPurchases: false },
+      })
+      return tx.priceList.update({ where: { id }, data: { isActiveForPurchases: true } })
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+  )
   logger.info({ priceListId: id, userId }, 'PriceList activated for purchases')
   return activated
 }

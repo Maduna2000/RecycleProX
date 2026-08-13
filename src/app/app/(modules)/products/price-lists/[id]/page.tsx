@@ -16,8 +16,7 @@ import {
 import { Dialog } from '@/components/ui/dialog'
 import { ProductCategoryPicker } from '@/components/products/ProductCategoryPicker'
 import { DEFAULT_PRICE_LIST_COLORS, type PriceListColors } from '@/lib/schemas/priceList'
-
-const VAT_DIVISOR = new Decimal('1.15')
+import { incVatPrice } from '@/lib/utils/vat'
 
 const COLOR_FIELDS: { key: keyof PriceListColors; label: string }[] = [
   { key: 'primaryColor',      label: 'Ribbon / Header' },
@@ -56,7 +55,7 @@ type PriceListDetail = PriceListColors & {
 function incVatLabel(priceExVat: string): string {
   const n = parseFloat(priceExVat)
   if (!priceExVat || isNaN(n) || n <= 0) return '—'
-  return new Decimal(priceExVat).times(VAT_DIVISOR).toFixed(2)
+  return incVatPrice(priceExVat).toFixed(2)
 }
 
 export default function PriceListEditorPage() {

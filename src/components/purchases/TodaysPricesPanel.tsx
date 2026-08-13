@@ -4,8 +4,7 @@ import useSWR from 'swr'
 import { ReceiptText } from 'lucide-react'
 import Decimal from 'decimal.js'
 import { fetcher } from '@/lib/swrFetcher'
-
-const VAT_DIVISOR = new Decimal('1.15')
+import { incVatPrice } from '@/lib/utils/vat'
 
 type ActivePriceList = {
   id: string
@@ -97,7 +96,7 @@ export function TodaysPricesPanel() {
                     </td>
                   )}
                   <td style={{ padding: '2px 6px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, color: '#1A1A1A' }}>
-                    {new Decimal(item.priceExVat).times(VAT_DIVISOR).toFixed(2)}
+                    {incVatPrice(item.priceExVat).toFixed(2)}
                   </td>
                 </tr>
               ))}
