@@ -420,8 +420,8 @@ export default function PriceListEditorPage() {
             <span>Order</span>
             <span>Category</span>
             <span>Material</span>
-            <span style={{ textAlign: 'right' }}>Inc VAT</span>
             <span style={{ textAlign: 'right' }}>Ex VAT (R)</span>
+            <span style={{ textAlign: 'right' }}>Inc VAT</span>
             <span />
           </div>
 
@@ -479,17 +479,17 @@ export default function PriceListEditorPage() {
                   style={{ ...inp, height: 22, fontSize: fontSize.xs, marginRight: 8 }}
                   disabled={saving}
                 />
-                <span className="font-mono" style={{ fontSize: fontSize.xs, textAlign: 'right', color: colors.textSecondary, paddingRight: 4 }}>
-                  {incVatLabel(item.priceExVat)}
-                </span>
                 <input
                   value={item.priceExVat}
                   onChange={(e) => updateItem(i, { priceExVat: e.target.value })}
                   placeholder="0.00"
                   inputMode="decimal"
-                  style={{ ...inp, height: 22, fontSize: fontSize.xs, fontFamily: 'monospace', textAlign: 'right' }}
+                  style={{ ...inp, height: 22, fontSize: fontSize.xs, fontFamily: 'monospace', textAlign: 'right', marginRight: 8 }}
                   disabled={saving}
                 />
+                <span className="font-mono" style={{ fontSize: fontSize.xs, textAlign: 'right', color: colors.textSecondary, paddingRight: 4 }}>
+                  {incVatLabel(item.priceExVat)}
+                </span>
                 <button
                   onClick={() => removeItem(i)}
                   disabled={saving}
