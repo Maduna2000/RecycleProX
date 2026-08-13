@@ -12,9 +12,14 @@ import type { CreatePriceListInput, UpdatePriceListInput, PriceListItemInput, Pr
 /** SystemSettings key holding the R2 object key of the price list logo. */
 export const PRICE_LIST_LOGO_SETTING_KEY = 'priceListLogoR2Key'
 
-/** EX VAT is never stored — always derived from the INC VAT price at 15%. */
-export function exVatPrice(priceIncVat: Decimal.Value): Decimal {
-  return new Decimal(priceIncVat).div(VAT_DIVISOR).toDecimalPlaces(2)
+/**
+ * INC VAT is never stored — always derived from the EX VAT price at 15%.
+ * EX VAT is canonical (matches Product.defaultBuyPrice / Purchases, where
+ * VAT is added on top of the entered price, never derived by dividing it
+ * back out).
+ */
+export function incVatPrice(priceExVat: Decimal.Value): Decimal {
+  return new Decimal(priceExVat).times(VAT_DIVISOR).toDecimalPlaces(2)
 }
 
 export interface PriceListPdfSource {
@@ -24,7 +29,7 @@ export interface PriceListPdfSource {
   showLogo:   boolean
   showExVat:  boolean
   colors:     PriceListColors
-  items:      { displayName: string; category: string; priceIncVat: Decimal.Value }[]
+  items:      { displayName: string; category: string; priceExVat: Decimal.Value }[]
 }
 
 /**
@@ -59,8 +64,8 @@ export async function buildPriceListPdfBytes(source: PriceListPdfSource): Promis
     items: source.items.map((item) => ({
       displayName: item.displayName,
       category: item.category,
-      priceIncVat: new Decimal(item.priceIncVat).toFixed(2),
-      priceExVat: exVatPrice(item.priceIncVat).toFixed(2),
+      priceExVat: new Decimal(item.priceExVat).toFixed(2),
+      priceIncVat: incVatPrice(item.priceExVat).toFixed(2),
     })),
     generatedAt: new Date(),
   })
@@ -72,7 +77,7 @@ function itemRows(items: PriceListItemInput[], tenantId: string) {
     productId:   item.productId ?? null,
     displayName: item.displayName,
     category:    item.category || 'Other',
-    priceIncVat: new Decimal(item.priceIncVat).toDecimalPlaces(2).toString(),
+    priceExVat:  new Decimal(item.priceExVat).toDecimalPlaces(2).toString(),
     sortOrder:   item.sortOrder ?? i,
   }))
 }
@@ -179,7 +184,7 @@ export async function duplicatePriceList(id: string, userId: string) {
           productId:   item.productId,
           displayName: item.displayName,
           category:    item.category,
-          priceIncVat: item.priceIncVat,
+          priceExVat:  item.priceExVat,
           sortOrder:   item.sortOrder,
         })),
       },

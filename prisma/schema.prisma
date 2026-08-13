@@ -329,9 +329,13 @@ model PriceListItem {
   displayName String
   // Snapshotted at add-time from the product's category (or "Other" for a
   // custom line) — drives the printed category divider bars. Independent of
-  // the live Product record, same as displayName/priceIncVat.
+  // the live Product record, same as displayName/priceExVat.
   category    String    @default("Other")
-  priceIncVat Decimal   @db.Decimal(18, 2)
+  // Canonical stored price, EX VAT — matches the app-wide convention
+  // (Product.defaultBuyPrice, Purchases) where VAT is added on top of the
+  // entered price, never derived by dividing it back out. INC VAT is always
+  // computed from this at display/print time, never stored.
+  priceExVat  Decimal   @db.Decimal(18, 2)
   sortOrder   Int       @default(0)
   priceList   PriceList @relation(fields: [priceListId], references: [id], onDelete: Cascade)
   product     Product?  @relation(fields: [productId], references: [id], onDelete: SetNull)
