@@ -242,6 +242,25 @@ export const REPORT_CATALOG: ReportCatalogEntry[] = [
   },
   // ── Stock ──────────────────────────────────────────────────────────────────
   {
+    id: 'scale-purchase-discrepancy',
+    label: 'Scale vs Purchase Discrepancy',
+    description:
+      'Reconciles what was weighed at the Scale Station against what was actually purchased, per product — flags weigh-ins that never became a purchase (shortfall) and purchases with no scale weigh-in behind them (unverified), not just a netted variance.',
+    area: 'stock',
+    filters: [
+      { key: 'productId', label: 'Product', type: 'product' },
+      {
+        key: 'minVariancePct', label: 'Min Variance %', type: 'select',
+        options: [
+          { value: '1', label: '≥ 1%' },
+          { value: '5', label: '≥ 5%' },
+          { value: '10', label: '≥ 10%' },
+          { value: '20', label: '≥ 20%' },
+        ],
+      },
+    ],
+  },
+  {
     id: 'stock-on-hand',
     label: 'Stock On Hand Report',
     description:

@@ -103,6 +103,12 @@ export const CashupSnapshotParamsSchema = rangeParams({
   cashupId: z.string().uuid({ message: 'Cash-up session is required' }),
 })
 
+/** Scale Station weighed weight vs actually purchased weight, per product. */
+export const ScaleDiscrepancyParamsSchema = rangeParams({
+  productId: z.string().uuid().optional(),
+  minVariancePct: z.enum(['1', '5', '10', '20']).optional(),
+})
+
 // ── Stock ─────────────────────────────────────────────────────────────────────
 export const StockOnHandParamsSchema = rangeParams({
   valuation: z.enum(['buy', 'sell']).optional(),
@@ -140,6 +146,7 @@ export type ExpensesReportParams = z.infer<typeof ExpensesReportParamsSchema>
 export type LoansOutstandingParams = z.infer<typeof LoansOutstandingParamsSchema>
 export type LoanPaymentsParams = z.infer<typeof LoanPaymentsParamsSchema>
 export type CashupSnapshotParams = z.infer<typeof CashupSnapshotParamsSchema>
+export type ScaleDiscrepancyParams = z.infer<typeof ScaleDiscrepancyParamsSchema>
 export type StockOnHandParams = z.infer<typeof StockOnHandParamsSchema>
 export type StockMovementParams = z.infer<typeof StockMovementParamsSchema>
 export type StocktakeReportParams = z.infer<typeof StocktakeReportParamsSchema>
