@@ -2,7 +2,17 @@ import { prisma } from '@/lib/db/prisma'
 import { requireTenantId } from '@/lib/db/tenantContext'
 import Decimal from 'decimal.js'
 import logger from '@/lib/logger'
-import type { AccountType, AccountNormalBalance } from '@prisma/client'
+import type { AccountType, AccountNormalBalance, PaymentMethod } from '@prisma/client'
+
+// Only 'cash' is physical drawer money — eft/cheque/card all settle through
+// the bank, same grouping the cash-up formula and reports already use
+// (e.g. cashUpService.ts's card/cheque sales filters, expenseService.ts's
+// cash-only getExpenseTotalsForDate). Centralised here so every posting
+// helper below treats the four real PaymentMethod values identically
+// instead of each re-deriving its own cash/not-cash split.
+function cashOrBankCode(paymentMethod: PaymentMethod): string {
+  return paymentMethod === 'cash' ? LEDGER_ACCOUNTS.CASH : LEDGER_ACCOUNTS.BANK
+}
 
 // ─── Design ──────────────────────────────────────────────────────────────────
 // See docs/plans/2026-08-14-ledger-module-design.md. Every existing
@@ -74,7 +84,11 @@ export async function ensureStructuralAccounts(tx: TxClient): Promise<void> {
   }
 }
 
-async function structuralAccountId(tx: TxClient, code: string): Promise<string> {
+// Exported for the historical backfill script (scripts/ledger-historical-backfill.ts),
+// which needs to post a couple of hand-assembled entries (standalone loan/
+// business-loan repayment *reversal* rows — see that script's own comment)
+// that don't fit any of this file's higher-level post*/reverse* helpers.
+export async function structuralAccountId(tx: TxClient, code: string): Promise<string> {
   const tenantId = requireTenantId()
   const account = await tx.account.findUnique({ where: { tenantId_code: { tenantId, code } } })
   if (!account) throw new Error(`Ledger account "${code}" not found — ensureStructuralAccounts must run before posting`)
@@ -312,7 +326,7 @@ export async function postPurchase(
     refNumber: string
     entryDate: Date
     isPending: boolean
-    paymentMethod: 'cash' | 'eft'
+    paymentMethod: PaymentMethod
     loanDeductionAmount: Decimal
     lines: PurchaseLedgerLine[]
     userId?: string
@@ -354,7 +368,7 @@ export async function postPurchase(
   if (cashPortion.greaterThan(0)) {
     const code = opts.isPending
       ? LEDGER_ACCOUNTS.ACCOUNTS_PAYABLE
-      : (opts.paymentMethod === 'eft' ? LEDGER_ACCOUNTS.BANK : LEDGER_ACCOUNTS.CASH)
+      : cashOrBankCode(opts.paymentMethod)
     lines.push({ accountId: await structuralAccountId(tx, code), credit: cashPortion })
   }
 
@@ -511,7 +525,7 @@ export async function postSale(
     refNumber: string
     entryDate: Date
     isPending: boolean
-    paymentMethod: 'cash' | 'eft'
+    paymentMethod: PaymentMethod
     vatAmount: Decimal
     businessLoanDeductionAmount: Decimal
     lines: SaleLedgerLine[]
@@ -553,7 +567,7 @@ export async function postSale(
   if (cashPortion.greaterThan(0)) {
     const code = opts.isPending
       ? LEDGER_ACCOUNTS.ACCOUNTS_RECEIVABLE
-      : (opts.paymentMethod === 'eft' ? LEDGER_ACCOUNTS.BANK : LEDGER_ACCOUNTS.CASH)
+      : cashOrBankCode(opts.paymentMethod)
     debitLines.push({ accountId: await structuralAccountId(tx, code), debit: cashPortion })
   }
 
@@ -675,13 +689,13 @@ export async function postExpense(
     entryDate: Date
     expenseTypeId: string
     amount: Decimal
-    paymentMethod: 'cash' | 'eft'
+    paymentMethod: PaymentMethod
     userId?: string
   }
 ): Promise<void> {
   await ensureStructuralAccounts(tx)
   const expenseAccountId = await expenseTypeAccountId(tx, opts.expenseTypeId)
-  const cashCode = opts.paymentMethod === 'eft' ? LEDGER_ACCOUNTS.BANK : LEDGER_ACCOUNTS.CASH
+  const cashCode = cashOrBankCode(opts.paymentMethod)
   await postJournalEntry(tx, {
     entryDate: opts.entryDate,
     description: `Expense ${opts.refNumber}`,
@@ -704,10 +718,10 @@ export async function reverseExpenseLedger(tx: TxClient, expenseId: string, refN
 /** Dr Loans Receivable, Cr Cash/Bank. Repayment nets through a purchase's credit split (postPurchase) — no separate entry needed there. */
 export async function postLoanAdvance(
   tx: TxClient,
-  opts: { loanId: string; refNumber: string; entryDate: Date; principal: Decimal; paymentMethod: 'cash' | 'eft'; userId?: string }
+  opts: { loanId: string; refNumber: string; entryDate: Date; principal: Decimal; paymentMethod: PaymentMethod; userId?: string }
 ): Promise<void> {
   await ensureStructuralAccounts(tx)
-  const cashCode = opts.paymentMethod === 'eft' ? LEDGER_ACCOUNTS.BANK : LEDGER_ACCOUNTS.CASH
+  const cashCode = cashOrBankCode(opts.paymentMethod)
   await postJournalEntry(tx, {
     entryDate: opts.entryDate,
     description: `Loan advance ${opts.refNumber}`,
@@ -735,10 +749,10 @@ export async function reverseLoanAdvanceLedger(tx: TxClient, loanId: string, ref
  */
 export async function postLoanRepayment(
   tx: TxClient,
-  opts: { repaymentId: string; refNumber: string; entryDate: Date; amount: Decimal; paymentMethod: 'cash' | 'eft'; userId?: string }
+  opts: { repaymentId: string; refNumber: string; entryDate: Date; amount: Decimal; paymentMethod: PaymentMethod; userId?: string }
 ): Promise<void> {
   await ensureStructuralAccounts(tx)
-  const cashCode = opts.paymentMethod === 'eft' ? LEDGER_ACCOUNTS.BANK : LEDGER_ACCOUNTS.CASH
+  const cashCode = cashOrBankCode(opts.paymentMethod)
   await postJournalEntry(tx, {
     entryDate: opts.entryDate,
     description: `Loan repayment ${opts.refNumber}`,
@@ -761,10 +775,10 @@ export async function reverseLoanRepaymentLedger(tx: TxClient, repaymentId: stri
 /** Dr Cash/Bank, Cr Loans Payable. Repayment nets through a sale's debit split (postSale) — no separate entry needed there. */
 export async function postBusinessLoanReceived(
   tx: TxClient,
-  opts: { businessLoanId: string; refNumber: string; entryDate: Date; principal: Decimal; paymentMethod: 'cash' | 'eft'; userId?: string }
+  opts: { businessLoanId: string; refNumber: string; entryDate: Date; principal: Decimal; paymentMethod: PaymentMethod; userId?: string }
 ): Promise<void> {
   await ensureStructuralAccounts(tx)
-  const cashCode = opts.paymentMethod === 'eft' ? LEDGER_ACCOUNTS.BANK : LEDGER_ACCOUNTS.CASH
+  const cashCode = cashOrBankCode(opts.paymentMethod)
   await postJournalEntry(tx, {
     entryDate: opts.entryDate,
     description: `Business loan received ${opts.refNumber}`,
@@ -792,10 +806,10 @@ export async function reverseBusinessLoanLedger(tx: TxClient, businessLoanId: st
  */
 export async function postBusinessLoanRepayment(
   tx: TxClient,
-  opts: { repaymentId: string; refNumber: string; entryDate: Date; amount: Decimal; paymentMethod: 'cash' | 'eft'; userId?: string }
+  opts: { repaymentId: string; refNumber: string; entryDate: Date; amount: Decimal; paymentMethod: PaymentMethod; userId?: string }
 ): Promise<void> {
   await ensureStructuralAccounts(tx)
-  const cashCode = opts.paymentMethod === 'eft' ? LEDGER_ACCOUNTS.BANK : LEDGER_ACCOUNTS.CASH
+  const cashCode = cashOrBankCode(opts.paymentMethod)
   await postJournalEntry(tx, {
     entryDate: opts.entryDate,
     description: `Business loan repayment ${opts.refNumber}`,
