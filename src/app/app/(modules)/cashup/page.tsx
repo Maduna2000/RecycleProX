@@ -520,23 +520,22 @@ function ManageSessionsModal({ sessions, onClose, onVoided, currencySymbol = 'R'
               rows={2} disabled={voiding}
             />
           </div>
+
+          <p style={{ fontSize: 11, color: colors.textSecondary, margin: 0 }}>
+            {selected.size} session{selected.size !== 1 ? 's' : ''} selected
+          </p>
         </div>
         </RpxDialogBody>
-        <RpxDialogFooter style={{ justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 11, color: colors.textSecondary }}>
-            {selected.size} session{selected.size !== 1 ? 's' : ''} selected
-          </span>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <Btn onClick={onClose} disabled={voiding}>Cancel</Btn>
-            <Btn
-              variant="danger"
-              onClick={handleBulkVoid}
-              disabled={voiding || selected.size === 0 || !voidReason.trim()}
-              loading={voiding}
-            >
-              Void {selected.size} Session{selected.size !== 1 ? 's' : ''}
-            </Btn>
-          </div>
+        <RpxDialogFooter>
+          <Btn onClick={onClose} disabled={voiding}>Cancel</Btn>
+          <Btn
+            variant="danger"
+            onClick={handleBulkVoid}
+            disabled={voiding || selected.size === 0 || !voidReason.trim()}
+            loading={voiding}
+          >
+            Void {selected.size} Session{selected.size !== 1 ? 's' : ''}
+          </Btn>
         </RpxDialogFooter>
       </RpxDialogContent>
     </Dialog>

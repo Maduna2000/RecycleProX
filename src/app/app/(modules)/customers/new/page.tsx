@@ -423,17 +423,17 @@ export default function NewAccountPage() {
 
         {/* ── Action bar ──────────────────────────────────── */}
         <div
-          className="shrink-0 flex items-center gap-3 px-4 py-2 border-t"
+          className="shrink-0 flex items-center gap-3 px-3 py-1.5 border-t"
           style={{ borderColor: '#B0B0B0', background: HEADER_GRAD }}
         >
-          <Btn disabled={loading} onClick={() => router.push(returnTo ?? '/app/customers')}>Cancel</Btn>
-          <Btn variant="primary" loading={loading} onClick={handleSubmit(onSubmit)}>Save</Btn>
-
-          <div className="h-4 w-px mx-1" style={{ background: '#C0C0C0' }} />
-
           <span className="text-[10px]" style={{ color: '#9CA3AF' }}>
             After saving: Special Prices · Loans · GRV&apos;s · Orders · View Docs available on the customer profile
           </span>
+
+          <div style={{ flex: 1 }} />
+
+          <Btn disabled={loading} onClick={() => router.push(returnTo ?? '/app/customers')}>Cancel</Btn>
+          <Btn variant="primary" loading={loading} onClick={handleSubmit(onSubmit)}>Save</Btn>
         </div>
       </div>
     </PortalPage>

@@ -10,7 +10,7 @@ import { useSession } from 'next-auth/react'
 import { format } from '@/lib/utils/format'
 import Decimal from 'decimal.js'
 import { PhotoViewer } from '@/components/PhotoUploader'
-import { colors } from '@/lib/design-tokens'
+import { colors, layout } from '@/lib/design-tokens'
 import { fetcher } from '@/lib/swrFetcher'
 import {
   inp, lbl, TH, TD, HEADER_GRAD, NAVY,
@@ -101,7 +101,7 @@ export default function SaleDetailPage() {
     <>
     <PortalPage title={sale.refNumber}>
         {/* Sub-header: status + payment method */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderBottom: '1px solid #E0E0E0', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderBottom: '1px solid #E0E0E0', flexShrink: 0 }}>
           <StatusBadge status={sale.status} />
           <span style={{ fontSize: 10, color: colors.textSecondary, padding: '2px 6px', background: colors.neutralBg, border: `1px solid ${colors.border}`, borderRadius: 2, textTransform: 'capitalize' }}>
             {sale.paymentMethod}
@@ -110,7 +110,7 @@ export default function SaleDetailPage() {
 
         {/* Voided banner */}
         {sale.status === 'voided' && (
-          <div style={{ padding: '8px 12px', background: colors.dangerBg, borderBottom: `1px solid ${colors.danger}`, flexShrink: 0 }}>
+          <div style={{ padding: '6px 10px', background: colors.dangerBg, borderBottom: `1px solid ${colors.danger}`, flexShrink: 0 }}>
             <p style={{ fontSize: 12, fontWeight: 600, color: colors.danger }}>This sale has been voided</p>
             {sale.voidReason && <p style={{ fontSize: 11, color: colors.danger, marginTop: 2 }}>Reason: {sale.voidReason}</p>}
             {sale.voidedAt && <p style={{ fontSize: 10, color: colors.danger, opacity: 0.7, marginTop: 2 }}>{format.datetime(sale.voidedAt)}</p>}
@@ -119,7 +119,7 @@ export default function SaleDetailPage() {
 
         {/* Pending banner */}
         {sale.status === 'pending' && (
-          <div style={{ padding: '8px 12px', background: colors.warningBg, borderBottom: `1px solid ${colors.warning}`, flexShrink: 0 }}>
+          <div style={{ padding: '6px 10px', background: colors.warningBg, borderBottom: `1px solid ${colors.warning}`, flexShrink: 0 }}>
             <p style={{ fontSize: 12, fontWeight: 600, color: colors.warning }}>Payment outstanding</p>
             <p style={{ fontSize: 11, color: colors.warning, marginTop: 2 }}>
               Balance due: <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>R {outstanding.toFixed(2)}</span>
@@ -131,13 +131,13 @@ export default function SaleDetailPage() {
         )}
 
         {/* Content area */}
-        <div style={{ flex: 1, overflow: 'auto', padding: 12 }}>
+        <div style={{ flex: 1, overflow: 'auto', padding: layout.contentPadding }}>
           {/* Sale info grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
             {/* Left: Sale details */}
-            <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 2, padding: 12 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', marginBottom: 8 }}>Sale Details</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 12px', fontSize: 12 }}>
+            <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 2, padding: 10 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', marginBottom: 6 }}>Sale Details</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '3px 12px', fontSize: 12 }}>
                 <span style={{ color: colors.textSecondary }}>Reference:</span>
                 <span style={{ fontFamily: 'monospace', fontWeight: 600, color: colors.textPrimary }}>{sale.refNumber}</span>
                 <span style={{ color: colors.textSecondary }}>Date:</span>
@@ -148,8 +148,8 @@ export default function SaleDetailPage() {
             </div>
 
             {/* Right: Buyer info */}
-            <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 2, padding: 12 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', marginBottom: 8 }}>Buyer</div>
+            <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 2, padding: 10 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', marginBottom: 6 }}>Buyer</div>
               <div style={{ fontSize: 12 }}>
                 <p style={{ fontWeight: 600, color: colors.textPrimary }}>{sale.buyerName}</p>
                 {sale.buyerIdNumber && <p style={{ fontFamily: 'monospace', color: colors.textSecondary, marginTop: 2 }}>{sale.buyerIdNumber}</p>}
@@ -160,14 +160,14 @@ export default function SaleDetailPage() {
 
           {/* Notes */}
           {sale.notes && (
-            <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 2, padding: 12, marginBottom: 16 }}>
+            <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 2, padding: 10, marginBottom: 10 }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', marginBottom: 4 }}>Notes</div>
               <p style={{ fontSize: 12, color: colors.textPrimary }}>{sale.notes}</p>
             </div>
           )}
 
           {/* Products table */}
-          <div style={{ background: '#fff', border: `1px solid ${colors.border}`, borderRadius: 2, overflow: 'hidden', marginBottom: 16 }}>
+          <div style={{ background: '#fff', border: `1px solid ${colors.border}`, borderRadius: 2, overflow: 'hidden', marginBottom: 10 }}>
             <div style={{ padding: '6px 10px', borderBottom: `1px solid ${colors.border}`, background: HEADER_GRAD }}>
               <span style={{ fontSize: 11, fontWeight: 700, color: NAVY }}>Products Sold</span>
               <span style={{ fontSize: 10, color: colors.textSecondary, marginLeft: 8 }}>{sale.lines.length} items</span>
@@ -230,12 +230,12 @@ export default function SaleDetailPage() {
 
           {/* Photos */}
           {sale.photoR2Keys && sale.photoR2Keys.length > 0 && (
-            <div style={{ background: '#fff', border: `1px solid ${colors.border}`, borderRadius: 2, overflow: 'hidden', marginBottom: 16 }}>
+            <div style={{ background: '#fff', border: `1px solid ${colors.border}`, borderRadius: 2, overflow: 'hidden' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', borderBottom: `1px solid ${colors.border}`, background: HEADER_GRAD }}>
                 <Camera style={{ width: 12, height: 12, color: colors.action }} />
                 <span style={{ fontSize: 11, fontWeight: 700, color: NAVY }}>Photos</span>
               </div>
-              <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {sale.photoR2Keys.map((key) => (
                   <PhotoViewer
                     key={key}
@@ -259,7 +259,7 @@ export default function SaleDetailPage() {
         </div>
 
         {/* Actions footer */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderTop: '1px solid #E0E0E0', background: '#F8F9FA', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', borderTop: '1px solid #E0E0E0', background: '#F8F9FA', flexShrink: 0 }}>
           <div style={{ display: 'flex', gap: 6 }}>
             {sale.status !== 'voided' && (
               <Btn size="sm" icon={Printer} onClick={() => window.open(`/api/sales/${sale.id}/receipt?format=pdf`, '_blank')}>

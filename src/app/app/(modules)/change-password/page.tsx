@@ -142,7 +142,7 @@ export default function ChangePasswordPage() {
           </div>
         </div>
 
-        <div className="flex justify-end px-6 py-4" style={{ borderTop: `1px solid ${colors.border}`, background: colors.toolbar, flexShrink: 0 }}>
+        <div className="flex justify-end" style={{ padding: '6px 10px', borderTop: `1px solid ${colors.border}`, background: colors.toolbar, flexShrink: 0 }}>
           <Btn type="submit" variant="primary" loading={loading}>
             Update password
           </Btn>

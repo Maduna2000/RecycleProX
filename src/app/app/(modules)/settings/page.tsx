@@ -580,7 +580,7 @@ export default function SettingsPage() {
       </div>
 
       {/* ── Bottom action bar ─────────────────────────────────────────── */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', padding: '8px 16px', borderTop: '1px solid #E0E0E0', background: '#F8F9FA', flexShrink: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', padding: '6px 10px', borderTop: '1px solid #E0E0E0', background: '#F8F9FA', flexShrink: 0 }}>
         <Btn variant="primary" icon={Save} loading={saving} onClick={handleSave}>
           {saving ? 'Saving…' : 'Save Settings'}
         </Btn>

@@ -11,7 +11,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
-import { colors } from '@/lib/design-tokens'
+import { colors, layout } from '@/lib/design-tokens'
 import { Btn, PortalPage } from '@/components/rpx'
 import { StatusBadge } from '@/components/ui/DataTable'
 import { DocumentViewerModal } from '@/components/ui/DocumentViewerModal'
@@ -155,20 +155,20 @@ export default function ExpenseDetailPage() {
 
         {/* Voided banner */}
         {isVoided && (
-          <div style={{ padding: '8px 12px', background: colors.dangerBg, borderBottom: `1px solid ${colors.danger}`, flexShrink: 0 }}>
+          <div style={{ padding: '6px 10px', background: colors.dangerBg, borderBottom: `1px solid ${colors.danger}`, flexShrink: 0 }}>
             <p style={{ fontSize: 12, fontWeight: 600, color: colors.danger }}>This expense has been voided</p>
             {expense.voidReason && <p style={{ fontSize: 11, color: colors.danger, marginTop: 2 }}>Reason: {expense.voidReason}</p>}
           </div>
         )}
 
         {/* Content area */}
-        <div style={{ flex: 1, overflow: 'auto', padding: 12 }}>
+        <div style={{ flex: 1, overflow: 'auto', padding: layout.contentPadding }}>
           {/* Expense info grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
             {/* Left: Expense details */}
-            <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 2, padding: 12 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', marginBottom: 8 }}>Expense Details</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 12px', fontSize: 12 }}>
+            <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 2, padding: 10 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', marginBottom: 6 }}>Expense Details</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '3px 12px', fontSize: 12 }}>
                 <span style={{ color: colors.textSecondary }}>Reference:</span>
                 <span style={{ fontFamily: 'monospace', fontWeight: 600, color: colors.textPrimary }}>{expense.refNumber}</span>
                 <span style={{ color: colors.textSecondary }}>Category:</span>
@@ -193,9 +193,9 @@ export default function ExpenseDetailPage() {
             </div>
 
             {/* Right: Amount info */}
-            <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 2, padding: 12 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', marginBottom: 8 }}>Amount</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 12px', fontSize: 12 }}>
+            <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 2, padding: 10 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', marginBottom: 6 }}>Amount</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '3px 12px', fontSize: 12 }}>
                 <span style={{ color: colors.textSecondary }}>Amount:</span>
                 <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 14, color: colors.action }}>R {new Decimal(expense.amount).toFixed(2)}</span>
                 <span style={{ color: colors.textSecondary }}>VAT:</span>
@@ -211,7 +211,7 @@ export default function ExpenseDetailPage() {
           </div>
 
           {/* Description */}
-          <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 2, padding: 12, marginBottom: 16 }}>
+          <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 2, padding: 10, marginBottom: 10 }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', marginBottom: 4 }}>Description</div>
             <p style={{ fontSize: 12, color: colors.textPrimary }}>{expense.description}</p>
           </div>
@@ -237,7 +237,7 @@ export default function ExpenseDetailPage() {
               </div>
             </div>
 
-            <div style={{ padding: 12 }}>
+            <div style={{ padding: 10 }}>
               {attachList.length === 0 ? (
                 <p style={{ fontSize: 12, textAlign: 'center', padding: '24px 0', color: colors.textSecondary }}>
                   No attachments yet — upload a receipt or slip above.

@@ -231,14 +231,22 @@ export const layout = {
   inputRadius:   2,
   /** Height of each table data row (portal house style) */
   tableRowH:     30,
-  /** Top nav zone height */
-  navbarH:       48,
+  /** Top nav zone height — matches AppShell's actual rendered Zone-1 header
+   * (`AppShell.tsx`'s `header` element, `height: 40`). Previously declared
+   * as 48 here, disagreeing with the real chrome — fixed so a page can
+   * actually compute "space left for content" from this token instead of
+   * guessing. */
+  navbarH:       40,
   /** Contextual toolbar zone height — matches AppShell's actual rendered
    * `var(--rpx-toolbar-h, 32px)` (previously declared as 36 here, disagreeing
    * with what the shell actually renders). */
   toolbarH:      32,
-  /** Zone 3 content padding (all sides) */
-  contentPadding: 24,
+  /** Zone 3 content padding (all sides) — the table-wrapper padding nearly
+   * every `(modules)/*` list/detail page already converges on by hand
+   * (10px). Previously declared as 24 here, a value no page actually used —
+   * fixed to match reality so this token is worth importing instead of
+   * every page re-deriving its own magic number. */
+  contentPadding: 10,
 } as const
 
 // ─── Pre-built Inline Style Objects ──────────────────────────────────────────

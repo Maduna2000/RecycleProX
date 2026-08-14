@@ -10,7 +10,7 @@ import { toast } from 'sonner'
 import { useSession } from 'next-auth/react'
 import { format } from '@/lib/utils/format'
 import { PhotoUploader, PhotoViewer } from '@/components/PhotoUploader'
-import { colors } from '@/lib/design-tokens'
+import { colors, layout } from '@/lib/design-tokens'
 import { fetcher } from '@/lib/swrFetcher'
 import {
   inp, lbl, TH, TD, HEADER_GRAD, NAVY,
@@ -108,7 +108,7 @@ export default function PurchaseDetailPage() {
     <>
     <PortalPage title={purchase.refNumber}>
         {/* Sub-header: status + payment method */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderBottom: '1px solid #E0E0E0', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderBottom: '1px solid #E0E0E0', flexShrink: 0 }}>
           <StatusBadge status={purchase.status} />
           <span style={{ fontSize: 10, color: colors.textSecondary, padding: '2px 6px', background: colors.neutralBg, border: `1px solid ${colors.border}`, borderRadius: 2, textTransform: 'capitalize' }}>
             {purchase.paymentMethod}
@@ -117,7 +117,7 @@ export default function PurchaseDetailPage() {
 
         {/* Voided banner */}
         {purchase.status === 'voided' && (
-          <div style={{ padding: '8px 12px', background: colors.dangerBg, borderBottom: `1px solid ${colors.danger}`, flexShrink: 0 }}>
+          <div style={{ padding: '6px 10px', background: colors.dangerBg, borderBottom: `1px solid ${colors.danger}`, flexShrink: 0 }}>
             <p style={{ fontSize: 12, fontWeight: 600, color: colors.danger }}>This purchase has been voided</p>
             {purchase.voidReason && <p style={{ fontSize: 11, color: colors.danger, marginTop: 2 }}>Reason: {purchase.voidReason}</p>}
             {purchase.voidedAt && <p style={{ fontSize: 10, color: colors.danger, opacity: 0.7, marginTop: 2 }}>{format.datetime(purchase.voidedAt)}</p>}
@@ -125,13 +125,13 @@ export default function PurchaseDetailPage() {
         )}
 
         {/* Content area */}
-        <div style={{ flex: 1, overflow: 'auto', padding: 12 }}>
+        <div style={{ flex: 1, overflow: 'auto', padding: layout.contentPadding }}>
           {/* Purchase info grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
             {/* Left: Purchase details */}
-            <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 2, padding: 12 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', marginBottom: 8 }}>Purchase Details</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 12px', fontSize: 12 }}>
+            <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 2, padding: 10 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', marginBottom: 6 }}>Purchase Details</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '3px 12px', fontSize: 12 }}>
                 <span style={{ color: colors.textSecondary }}>Reference:</span>
                 <span style={{ fontFamily: 'monospace', fontWeight: 600, color: colors.textPrimary }}>{purchase.refNumber}</span>
                 <span style={{ color: colors.textSecondary }}>Date:</span>
@@ -142,8 +142,8 @@ export default function PurchaseDetailPage() {
             </div>
 
             {/* Right: Customer info */}
-            <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 2, padding: 12 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', marginBottom: 8 }}>Customer</div>
+            <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 2, padding: 10 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', marginBottom: 6 }}>Customer</div>
               <div style={{ fontSize: 12 }}>
                 <p style={{ fontWeight: 600, color: colors.textPrimary }}>{purchase.customer.firstName} {purchase.customer.lastName}</p>
                 <p style={{ fontFamily: 'monospace', color: colors.textSecondary, marginTop: 2 }}>{purchase.customer.idNumber}</p>
@@ -154,14 +154,14 @@ export default function PurchaseDetailPage() {
 
           {/* Notes */}
           {purchase.notes && (
-            <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 2, padding: 12, marginBottom: 16 }}>
+            <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 2, padding: 10, marginBottom: 10 }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', marginBottom: 4 }}>Notes</div>
               <p style={{ fontSize: 12, color: colors.textPrimary }}>{purchase.notes}</p>
             </div>
           )}
 
           {/* Products table */}
-          <div style={{ background: '#fff', border: `1px solid ${colors.border}`, borderRadius: 2, overflow: 'hidden', marginBottom: 16 }}>
+          <div style={{ background: '#fff', border: `1px solid ${colors.border}`, borderRadius: 2, overflow: 'hidden', marginBottom: 10 }}>
             <div style={{ padding: '6px 10px', borderBottom: `1px solid ${colors.border}`, background: HEADER_GRAD }}>
               <span style={{ fontSize: 11, fontWeight: 700, color: NAVY }}>Products Purchased</span>
               <span style={{ fontSize: 10, color: colors.textSecondary, marginLeft: 8 }}>{purchase.lines.length} items</span>
@@ -240,12 +240,12 @@ export default function PurchaseDetailPage() {
 
           {/* Photos */}
           {purchase.status !== 'voided' && (
-            <div style={{ background: '#fff', border: `1px solid ${colors.border}`, borderRadius: 2, overflow: 'hidden', marginBottom: 16 }}>
+            <div style={{ background: '#fff', border: `1px solid ${colors.border}`, borderRadius: 2, overflow: 'hidden' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', borderBottom: `1px solid ${colors.border}`, background: HEADER_GRAD }}>
                 <Camera style={{ width: 12, height: 12, color: colors.action }} />
                 <span style={{ fontSize: 11, fontWeight: 700, color: NAVY }}>Product Photos</span>
               </div>
-              <div style={{ padding: 12 }}>
+              <div style={{ padding: 10 }}>
                 <PurchasePhotos purchaseId={purchase.id} initialKeys={purchase.photoR2Keys ?? []} />
               </div>
             </div>
@@ -253,7 +253,7 @@ export default function PurchaseDetailPage() {
         </div>
 
         {/* Actions footer */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderTop: '1px solid #E0E0E0', background: '#F8F9FA', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', borderTop: '1px solid #E0E0E0', background: '#F8F9FA', flexShrink: 0 }}>
           <div style={{ display: 'flex', gap: 6 }}>
             {purchase.status !== 'voided' && (
               <>

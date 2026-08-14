@@ -9,7 +9,7 @@ import { toast } from 'sonner'
 import { useSession } from 'next-auth/react'
 import Decimal from 'decimal.js'
 import { format } from '@/lib/utils/format'
-import { colors, fontWeight } from '@/lib/design-tokens'
+import { colors, fontWeight, layout } from '@/lib/design-tokens'
 import { fetcher } from '@/lib/swrFetcher'
 import { StatusBadge } from '@/components/ui/DataTable'
 import {
@@ -83,7 +83,7 @@ export default function MomoStatementDetailPage() {
     <>
       <PortalPage title={format.date(statement.statementDate)}>
         {/* Sub-header */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderBottom: '1px solid #E0E0E0', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderBottom: '1px solid #E0E0E0', flexShrink: 0 }}>
           <span style={{ fontSize: 11, color: colors.textSecondary }}>{statement.fileName}</span>
           <span style={{ fontSize: 10, color: colors.textSecondary, padding: '2px 6px', background: colors.neutralBg, border: `1px solid ${colors.border}`, borderRadius: 2 }}>
             Uploaded {format.datetime(statement.createdAt)}
@@ -91,9 +91,9 @@ export default function MomoStatementDetailPage() {
         </div>
 
         {/* Content area */}
-        <div style={{ flex: 1, overflow: 'auto', padding: 12 }}>
+        <div style={{ flex: 1, overflow: 'auto', padding: layout.contentPadding }}>
           {/* Summary tiles */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, marginBottom: 10 }}>
             <SummaryTile label="Total Sent" value={`R ${new Decimal(statement.totalSent).toFixed(2)}`} color={colors.process} />
             <SummaryTile label="Total Received" value={`R ${new Decimal(statement.totalReceived).toFixed(2)}`} color={colors.action} />
             <SummaryTile label="Total Fees" value={`R ${new Decimal(statement.totalFees).toFixed(2)}`} color={colors.textSecondary} />
@@ -168,7 +168,7 @@ export default function MomoStatementDetailPage() {
         </div>
 
         {/* Actions footer */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderTop: '1px solid #E0E0E0', background: '#F8F9FA', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', borderTop: '1px solid #E0E0E0', background: '#F8F9FA', flexShrink: 0 }}>
           <Btn size="sm" onClick={() => router.push('/app/momo-statement')}>Back to List</Btn>
           {isAdmin && (
             <Btn variant="danger" size="sm" icon={Trash2} onClick={() => setDeleteOpen(true)}>

@@ -13,7 +13,7 @@ import { Loader2, CheckCircle, Ban, Scale, RefreshCw, Camera, ExternalLink } fro
 import { toast } from 'sonner'
 import Decimal from 'decimal.js'
 import { format } from '@/lib/utils/format'
-import { colors } from '@/lib/design-tokens'
+import { colors, layout } from '@/lib/design-tokens'
 import { fetcher } from '@/lib/swrFetcher'
 import { useOfflineLookup } from '@/hooks/useOfflineLookup'
 import {
@@ -389,12 +389,12 @@ export default function StocktakeDetailPage() {
       }
     >
         {/* Sub-header: status */}
-        <div style={{ padding: '8px 12px', borderBottom: '1px solid #E0E0E0', flexShrink: 0 }}>
+        <div style={{ padding: '6px 10px', borderBottom: '1px solid #E0E0E0', flexShrink: 0 }}>
           <StatusBadge status={stocktake.status} />
         </div>
 
         {/* Info bar */}
-        <div style={{ padding: '6px 12px', background: colors.surface, borderBottom: `1px solid ${colors.border}`, fontSize: 11, color: colors.textSecondary, flexShrink: 0 }}>
+        <div style={{ padding: '6px 10px', background: colors.surface, borderBottom: `1px solid ${colors.border}`, fontSize: 11, color: colors.textSecondary, flexShrink: 0 }}>
           Created by {stocktake.createdBy.fullName} · {format.datetime(stocktake.createdAt)}
           {stocktake.completedAt && ` · Completed ${format.datetime(stocktake.completedAt)}`}
           {stocktake.status === 'voided' && stocktake.voidedAt && (
@@ -407,10 +407,10 @@ export default function StocktakeDetailPage() {
         </div>
 
         {/* Content */}
-        <div style={{ flex: 1, overflow: 'auto', padding: 12 }}>
+        <div style={{ flex: 1, overflow: 'auto', padding: layout.contentPadding }}>
           {/* Summary stats */}
           {entries.length > 0 && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, marginBottom: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, marginBottom: 10 }}>
               <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 2, padding: 12, textAlign: 'center' }}>
                 <p style={{ fontSize: 20, fontWeight: 700, color: colors.textPrimary }}>{entries.length}</p>
                 <p style={{ fontSize: 10, color: colors.textSecondary, marginTop: 4 }}>Products Counted</p>
@@ -424,7 +424,7 @@ export default function StocktakeDetailPage() {
 
           {/* Add entry form */}
           {isOpen && (
-            <div style={{ ...PANEL, marginBottom: 16 }}>
+            <div style={{ ...PANEL, marginBottom: 10 }}>
               <div style={{ padding: '6px 10px', borderBottom: `1px solid ${colors.border}`, background: BAR_GRAD }}>
                 <span style={{ fontSize: 11, fontWeight: 700, color: colors.primary }}>Add Count Entry</span>
               </div>

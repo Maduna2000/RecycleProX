@@ -13,7 +13,7 @@ import { PrintResultModal } from '@/components/PrintResultModal'
 import { ProductCategoryPicker } from '@/components/products/ProductCategoryPicker'
 import Decimal from 'decimal.js'
 import { colors } from '@/lib/design-tokens'
-import { HEADER_GRAD, BAR_GRAD, CARD_BORDER, Btn } from '@/components/rpx'
+import { HEADER_GRAD, BAR_GRAD, Btn } from '@/components/rpx'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { useOfflineMutation } from '@/hooks/useOfflineFetch'
 import { useOfflineLookup } from '@/hooks/useOfflineLookup'
@@ -1531,16 +1531,17 @@ export function PurchaseForm({ editingPurchase }: { editingPurchase?: EditingPur
         style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 16px', borderTop: '2px solid #B0B0B0', background: HEADER_GRAD, flexShrink: 0 }}
       >
         <Btn onClick={handleCancel} disabled={submitting}>Cancel</Btn>
-        <button
-          type="button"
+        <Btn
+          variant="primary"
           onClick={() => editingPurchase ? submitEdit() : submitPurchase(paymentType === 'unpaid')}
           disabled={submitting || (!!customer && !!customer.blacklisted)}
-          style={{ height: 28, padding: '0 24px', borderRadius: 2, fontSize: 12, fontWeight: 700, background: BAR_GRAD, border: CARD_BORDER, color: colors.textPrimary, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, opacity: submitting || (!!customer && !!customer.blacklisted) ? 0.4 : 1 }}
+          loading={submitting}
+          style={{ padding: '0 24px' }}
         >
           {submitting
-            ? <><Loader2 style={{ width: 13, height: 13, animation: 'spin 1s linear infinite' }} /> {editingPurchase ? 'Saving…' : 'Submitting…'}</>
+            ? (editingPurchase ? 'Saving…' : 'Submitting…')
             : editingPurchase ? 'Save Changes' : paymentType === 'unpaid' ? 'Submit' : `Submit · R ${cashToPay.toFixed(2)}`}
-        </button>
+        </Btn>
       </div>
 
       {/* Overlay to close action menu on outside click */}

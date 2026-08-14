@@ -13,7 +13,7 @@ import { RecordPaymentModal, type PayTarget } from '@/components/sales/RecordPay
 import { AdminPinUnlockModal, type BusinessLoanFullSummary } from '@/components/business-loans/AdminPinUnlockModal'
 import Decimal from 'decimal.js'
 import { colors } from '@/lib/design-tokens'
-import { BAR_GRAD, CARD_BORDER } from '@/components/rpx/styles'
+import { BAR_GRAD } from '@/components/rpx/styles'
 import { Dialog } from '@/components/ui/dialog'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { Btn, HEADER_GRAD, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
@@ -1396,8 +1396,8 @@ export function SaleForm({ editingSale }: { editingSale?: EditingSale } = {}) {
         style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 16px', borderTop: '2px solid #B0B0B0', background: HEADER_GRAD, flexShrink: 0 }}
       >
         <Btn onClick={handleCancel} disabled={submitting}>Cancel</Btn>
-        <button
-          type="button"
+        <Btn
+          variant="primary"
           onClick={() => {
             if (editingSale) { submitEdit(); return }
             if (paymentType === 'unpaid') { submitSale(true); return }
@@ -1412,12 +1412,13 @@ export function SaleForm({ editingSale }: { editingSale?: EditingSale } = {}) {
             else submitSale(false)
           }}
           disabled={submitting || isBlacklisted || (!editingSale && paymentType !== 'unpaid' && hasStockError)}
-          style={{ height: 28, padding: '0 24px', borderRadius: 2, fontSize: 12, fontWeight: 700, background: BAR_GRAD, border: CARD_BORDER, color: colors.textPrimary, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, opacity: submitting || isBlacklisted || (!editingSale && paymentType !== 'unpaid' && hasStockError) ? 0.4 : 1 }}
+          loading={submitting}
+          style={{ padding: '0 24px' }}
         >
           {submitting
-            ? <><Loader2 style={{ width: 13, height: 13, animation: 'spin 1s linear infinite' }} /> Saving…</>
+            ? 'Saving…'
             : editingSale ? 'Save Changes' : paymentType === 'unpaid' ? 'Save Sale' : `Save Sale · R ${total.toFixed(2)}`}
-        </button>
+        </Btn>
       </div>
 
       {/* Overlay to close action menu */}

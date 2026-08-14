@@ -561,7 +561,7 @@ export default function PriceListEditorPage() {
         </div>
 
         {/* ── Actions ───────────────────────────────────────────────────── */}
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexShrink: 0 }}>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexShrink: 0, margin: '0 -8px -8px', padding: '6px 10px', borderTop: `1px solid ${colors.border}`, background: '#F8F9FA' }}>
           <Btn onClick={() => router.push('/app/products/price-lists')} disabled={saving}>Cancel</Btn>
           <Btn icon={Eye} onClick={handlePreview} disabled={saving || previewLoading} loading={previewLoading}>Preview</Btn>
           <Btn icon={Printer} onClick={() => save(true)} disabled={saving} loading={saving}>Save &amp; Print</Btn>

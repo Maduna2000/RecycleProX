@@ -93,7 +93,7 @@ export function TabStrip({
               position: 'relative', zIndex: isActive ? 2 : 1,
               marginLeft: i === 0 ? 0 : -1,
               display: 'inline-flex', alignItems: 'center', gap: 6,
-              padding: '7px 16px', fontSize: 12, fontWeight: 600,
+              padding: '5px 14px', fontSize: 12, fontWeight: 600,
               border: '1px solid #B0B0B0', borderBottom: 'none',
               borderRadius: '4px 4px 0 0', cursor: 'pointer',
               background: isActive
