@@ -230,6 +230,7 @@ model Product {
   scaleOrderLines  ScaleOrderLine[]            @relation("ScaleOrderLineProduct")
   stockMovements   StockMovement[]
   stocktakeEntries StocktakeEntry[]
+  averageCost      ProductAverageCost?
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -643,6 +644,7 @@ model ExpenseType {
   expenses  Expense[]
   parent    ExpenseType?  @relation("children", fields: [parentId], references: [id])
   children  ExpenseType[] @relation("children")
+  accounts  Account[]
 
   @@unique([tenantId, name])
   @@index([tenantId])
@@ -1166,6 +1168,111 @@ model GateSellOption {
 
   @@unique([tenantId, label])
   @@index([tenantId])
+}
+
+// ─── Ledger (double-entry general ledger, /ledger sub-app) ────────────────────
+// See docs/plans/2026-08-14-ledger-module-design.md. Structural accounts
+// (Cash, Inventory, Sales Revenue, ...) are created by ledgerService's own
+// idempotent bootstrap, not seeded here — category/expense-type sub-accounts
+// are generated from real ProductCategory/ExpenseType data, never fabricated.
+
+model Account {
+  id        String  @id @default(uuid())
+  tenantId  String
+  // Deterministic and stable — e.g. "1000" for a structural account, or
+  // "4000:CAT:Copper" for a category sub-account — so the bootstrap/
+  // auto-vivify logic can always upsert by (tenantId, code) instead of
+  // needing to search first.
+  code      String
+  name      String
+  type      AccountType
+  normalBalance AccountNormalBalance
+  parentAccountId String?
+  // Category sub-accounts (Inventory/Sales Revenue/COGS) key off the
+  // product's category *name* (Product.category), not a ProductCategory FK
+  // — categoryId on Product is nullable/legacy-incomplete, but the name
+  // string is always present, matching how PriceListItem.category already
+  // snapshots category by name rather than by FK.
+  sourceCategoryName  String?
+  sourceExpenseTypeId String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  parent            Account?      @relation("AccountChildren", fields: [parentAccountId], references: [id])
+  children          Account[]     @relation("AccountChildren")
+  sourceExpenseType ExpenseType?  @relation(fields: [sourceExpenseTypeId], references: [id])
+  lines             JournalLine[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, parentAccountId])
+  @@index([tenantId, sourceExpenseTypeId])
+}
+
+model JournalEntry {
+  id              String   @id @default(uuid())
+  tenantId        String
+  entryDate       DateTime
+  description     String
+  // e.g. 'purchase' | 'sale' | 'purchase_settlement' | 'expense' |
+  // 'loan_advance' | 'business_loan' | 'cashup_variance' |
+  // 'opening_balance' | 'void_reversal' | 'edit_reversal' — a plain string
+  // (not an enum) so a new source type never needs a migration, matching
+  // StockMovement.source's own convention.
+  sourceType      String
+  sourceId        String?
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+  lines           JournalLine[]
+
+  @@index([tenantId])
+  @@index([tenantId, entryDate])
+  @@index([tenantId, sourceType, sourceId])
+}
+
+model JournalLine {
+  id             String  @id @default(uuid())
+  tenantId       String
+  journalEntryId String
+  accountId      String
+  // Exactly one of debit/credit is non-zero per line — enforced by
+  // ledgerService.postJournalEntry, not by a DB constraint.
+  debit          Decimal @default(0) @db.Decimal(18, 2)
+  credit         Decimal @default(0) @db.Decimal(18, 2)
+  journalEntry   JournalEntry @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+  account        Account      @relation(fields: [accountId], references: [id])
+
+  @@index([tenantId])
+  @@index([tenantId, accountId])
+  @@index([journalEntryId])
+}
+
+// Moving weighted-average cost per product — updated on every purchase,
+// consumed on every sale, so each sale's COGS entry always reflects the
+// true running average rather than a guess. One row per product.
+model ProductAverageCost {
+  id             String   @id @default(uuid())
+  tenantId       String
+  productId      String   @unique
+  quantityOnHand Decimal  @default(0) @db.Decimal(18, 3)
+  averageCost    Decimal  @default(0) @db.Decimal(18, 4)
+  updatedAt      DateTime @updatedAt
+  product        Product  @relation(fields: [productId], references: [id])
+
+  @@index([tenantId])
+}
+
+enum AccountType {
+  asset
+  liability
+  equity
+  revenue
+  expense
+}
+
+enum AccountNormalBalance {
+  debit
+  credit
 }
 
 enum UserRole {

@@ -8,6 +8,7 @@ import { getExpenseTotalsForDate } from './expenseService'
 import { getLoanTotalsForDate, formatTransactionMethod } from './loanService'
 import { getSessionWindow, type DateWindow } from './cashUpWindow'
 import { sastDateLabelToUTCDate, getDayBoundsSAST, todaySASTDateStr } from '@/lib/utils/dayBounds'
+import { postCashUpVariance } from '@/lib/services/ledgerService'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -717,6 +718,13 @@ export async function approveCashUp(
     // session counts. No override needed — variance was already computed
     // and stored correctly back at submission.
     await repropagateFinPeriodCumulative(tx, cashUp.sessionDate)
+
+    await postCashUpVariance(tx, {
+      cashUpId: approved.id,
+      sessionDate: cashUp.sessionDate,
+      variance: new Decimal(approved.variance?.toString() ?? '0'),
+      userId: approvedByUserId,
+    })
 
     return approved
   })

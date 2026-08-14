@@ -11,6 +11,7 @@ import type { CreateSaleInput, VoidSaleInput, ReverseSalePaymentInput, UpdateSal
 import type { ProcessSaleSplitPaymentInput } from '@/lib/schemas/splitPayment'
 import { encodeJsonField } from '@/lib/db/queryHelpers'
 import { encodePhotoKeys, decodePhotoKeys } from '@/lib/offline/photoKeysCodec'
+import { postSale, reverseSaleLedger, reverseSalePaymentLedger, postSaleSettlement, reverseJournalEntry, reverseSaleCost } from '@/lib/services/ledgerService'
 
 // ─── Typed Errors ─────────────────────────────────────────────────────────────
 
@@ -236,6 +237,23 @@ export async function createSale(data: CreateSaleInput, createdByUserId?: string
         await applyBusinessLoanRepaymentTx(tx, data.customerId, deduction.toString(), createdByUserId, s.id)
       }
 
+      await postSale(tx, {
+        saleId: s.id,
+        refNumber: s.refNumber,
+        entryDate: s.createdAt,
+        isPending,
+        paymentMethod: (data.paymentMethod ?? 'cash') as 'cash' | 'eft',
+        vatAmount,
+        businessLoanDeductionAmount: deduction ?? new Decimal(0),
+        lines: s.lines.map((l) => ({
+          productId: l.productId,
+          productCategory: l.product.category,
+          quantity: new Decimal(l.quantity.toString()),
+          lineTotal: new Decimal(l.lineTotal.toString()),
+        })),
+        userId: createdByUserId,
+      })
+
       return s
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, maxWait: 10000, timeout: 30000 })
   )
@@ -301,6 +319,15 @@ export async function voidSale(id: string, data: VoidSaleInput, voidedById?: str
       // balance — no cashup recalculation needed for this specifically.)
       await reverseRepaymentsForSale(tx, id, sale.refNumber, voidedById)
 
+      await reverseSaleLedger(
+        tx,
+        id,
+        sale.refNumber,
+        sale.lines.map((l) => ({ productId: l.productId, quantity: new Decimal(l.quantity.toString()) })),
+        data.reason,
+        voidedById
+      )
+
       return s
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
   )
@@ -356,6 +383,8 @@ export async function reverseSalePayment(id: string, data: ReverseSalePaymentInp
       // (Business loans aren't part of the cash-up formula at all — nothing
       // further to recalculate for that part, same as voidSale.)
       await reverseRepaymentsForSale(tx, id, sale.refNumber, userId, 'payment reversed')
+
+      await reverseSalePaymentLedger(tx, id, sale.refNumber, data.reason, userId)
 
       return s
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
@@ -419,10 +448,19 @@ export async function updateSale(id: string, data: UpdateSaleInput, userId?: str
 
   const updated = await withSerializableRetry(() =>
     prisma.$transaction(async (tx) => {
-      const sale = await tx.sale.findUnique({ where: { id } })
+      const sale = await tx.sale.findUnique({ where: { id }, include: { lines: true } })
       if (!sale) throw new SaleNotFoundError(id)
       if (sale.status !== 'pending') throw new SaleNotPendingError(sale.status)
       if (sale.amountPaid && new Decimal(sale.amountPaid.toString()).greaterThan(0)) throw new AmountAlreadyPaidError()
+
+      // The original ledger entry is now stale — reverse it and each line's
+      // average-cost impact before the new lines are resolved and re-posted
+      // below. Amount-paid is guaranteed zero (checked above), so there's
+      // never a settlement entry to also undo.
+      await reverseJournalEntry(tx, 'sale', id, `Edited — Sale ${sale.refNumber}`, userId)
+      for (const l of sale.lines) {
+        await reverseSaleCost(tx, l.productId, new Decimal(l.quantity.toString()))
+      }
 
       // This sale's own stock movements and line rows only — deleting by
       // sourceId/saleId can't touch any other transaction's ledger.
@@ -491,6 +529,23 @@ export async function updateSale(id: string, data: UpdateSaleInput, userId?: str
           createdAt: sale.createdAt,
         })
       }
+
+      await postSale(tx, {
+        saleId: s.id,
+        refNumber: s.refNumber,
+        entryDate: sale.createdAt,
+        isPending: true,
+        paymentMethod: data.paymentMethod as 'cash' | 'eft',
+        vatAmount,
+        businessLoanDeductionAmount: new Decimal(0),
+        lines: s.lines.map((l) => ({
+          productId: l.productId,
+          productCategory: l.product.category,
+          quantity: new Decimal(l.quantity.toString()),
+          lineTotal: new Decimal(l.lineTotal.toString()),
+        })),
+        userId,
+      })
 
       return s
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, maxWait: 10000, timeout: 30000 })
@@ -565,6 +620,16 @@ export async function markSalePaid(
           saleId:          sale.id,
           createdByUserId: userId,
         } as Prisma.PaymentUncheckedCreateInput,
+      })
+
+      await postSaleSettlement(tx, {
+        saleId: sale.id,
+        refNumber: sale.refNumber,
+        entryDate: new Date(),
+        cashAmount: data.paymentMethod === 'cash' ? settleAmount : new Decimal(0),
+        eftAmount: data.paymentMethod === 'eft' ? settleAmount : new Decimal(0),
+        loanAmount: new Decimal(0),
+        userId,
       })
 
       return { updated, isFullySettled }
@@ -673,6 +738,16 @@ export async function processSaleSplitPayment(
           } as Prisma.PaymentUncheckedCreateInput,
         })
       }
+
+      await postSaleSettlement(tx, {
+        saleId: sale.id,
+        refNumber: sale.refNumber,
+        entryDate: new Date(),
+        cashAmount: cashAmt,
+        eftAmount: eftAmt,
+        loanAmount: businessLoanAmt,
+        userId,
+      })
 
       return { updated, isFullySettled }
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, maxWait: 10000, timeout: 30000 })

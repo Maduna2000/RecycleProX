@@ -5,6 +5,7 @@ import logger from '@/lib/logger'
 import type { CreateExpenseInput, CreateExpenseTypeInput, UpdateExpenseInput, SettlePendingExpenseInput } from '@/lib/schemas/expense'
 import { todaySASTDate } from '@/lib/utils/dayBounds'
 import type { DateWindow } from '@/lib/services/cashUpWindow'
+import { postExpense, reverseExpenseLedger } from '@/lib/services/ledgerService'
 
 // ─── Ref number ───────────────────────────────────────────────────────────────
 
@@ -57,23 +58,41 @@ export async function createExpense(data: CreateExpenseInput, userId: string) {
   // If isPending is false (default), auto-approve; otherwise leave as pending
   const isPending = data.isPending ?? false
 
-  const expense = await prisma.expense.create({
-    data: {
-      tenantId,
-      refNumber,
-      expenseTypeId:   data.expenseTypeId,
-      description:     data.description,
-      amount:          amount,
-      estimatedAmount: isPending ? amount : null,
-      changeReceived:  null,
-      vatAmount:       vatAmount,
-      includesVat:     data.includesVat ?? false,
-      paymentMethod:   data.paymentMethod ?? 'cash',
-      cashUpId:        openSession?.id ?? null,
-      createdByUserId: userId,
-      ...(!isPending && { status: 'approved', approvedById: userId, approvedAt: new Date() }),
-    },
-    include: { expenseType: true },
+  const expense = await prisma.$transaction(async (tx) => {
+    const created = await tx.expense.create({
+      data: {
+        tenantId,
+        refNumber,
+        expenseTypeId:   data.expenseTypeId,
+        description:     data.description,
+        amount:          amount,
+        estimatedAmount: isPending ? amount : null,
+        changeReceived:  null,
+        vatAmount:       vatAmount,
+        includesVat:     data.includesVat ?? false,
+        paymentMethod:   data.paymentMethod ?? 'cash',
+        cashUpId:        openSession?.id ?? null,
+        createdByUserId: userId,
+        ...(!isPending && { status: 'approved', approvedById: userId, approvedAt: new Date() }),
+      },
+      include: { expenseType: true },
+    })
+
+    // A pending expense hasn't actually cost anything yet — nothing to
+    // post until it's approved/settled (settlePendingExpense/approveExpense).
+    if (!isPending) {
+      await postExpense(tx, {
+        expenseId: created.id,
+        refNumber: created.refNumber,
+        entryDate: created.createdAt,
+        expenseTypeId: created.expenseTypeId,
+        amount,
+        paymentMethod: created.paymentMethod as 'cash' | 'eft',
+        userId,
+      })
+    }
+
+    return created
   })
   logger.info({ expenseId: expense.id, userId, cashUpId: openSession?.id, isPending }, 'Expense created')
   return expense
@@ -248,6 +267,16 @@ export async function settlePendingExpense(
       include: { expenseType: true },
     })
 
+    await postExpense(tx, {
+      expenseId: updated.id,
+      refNumber: updated.refNumber,
+      entryDate: new Date(),
+      expenseTypeId: updated.expenseTypeId,
+      amount: actualAmount,
+      paymentMethod: updated.paymentMethod as 'cash' | 'eft',
+      userId,
+    })
+
     logger.info({
       expenseId,
       userId,
@@ -261,20 +290,43 @@ export async function settlePendingExpense(
 }
 
 export async function approveExpense(id: string, userId: string) {
-  const expense = await prisma.expense.update({
-    where: { id },
-    data: { status: 'approved', approvedById: userId, approvedAt: new Date() },
-    include: { expenseType: true },
+  const expense = await prisma.$transaction(async (tx) => {
+    const updated = await tx.expense.update({
+      where: { id },
+      data: { status: 'approved', approvedById: userId, approvedAt: new Date() },
+      include: { expenseType: true },
+    })
+    await postExpense(tx, {
+      expenseId: updated.id,
+      refNumber: updated.refNumber,
+      entryDate: new Date(),
+      expenseTypeId: updated.expenseTypeId,
+      amount: new Decimal(updated.amount.toString()),
+      paymentMethod: updated.paymentMethod as 'cash' | 'eft',
+      userId,
+    })
+    return updated
   })
   logger.info({ expenseId: id, userId }, 'Expense approved')
   return expense
 }
 
 export async function voidExpense(id: string, userId: string, reason: string) {
-  const expense = await prisma.expense.update({
-    where: { id },
-    data: { status: 'voided', voidedById: userId, voidedAt: new Date(), voidReason: reason },
-    include: { expenseType: true },
+  const expense = await prisma.$transaction(async (tx) => {
+    // Only an 'approved' expense ever had anything posted to the ledger —
+    // a still-pending expense (never settled/approved) has nothing to
+    // reverse; reverseExpenseLedger is a no-op in that case anyway, but
+    // checking here avoids the extra lookup for the common pending-void path.
+    const existing = await tx.expense.findUniqueOrThrow({ where: { id } })
+    const updated = await tx.expense.update({
+      where: { id },
+      data: { status: 'voided', voidedById: userId, voidedAt: new Date(), voidReason: reason },
+      include: { expenseType: true },
+    })
+    if (existing.status === 'approved') {
+      await reverseExpenseLedger(tx, id, updated.refNumber, reason, userId)
+    }
+    return updated
   })
   logger.info({ expenseId: id, userId, reason }, 'Expense voided')
   return expense
