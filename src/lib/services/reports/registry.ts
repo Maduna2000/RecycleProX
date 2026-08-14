@@ -29,6 +29,7 @@ import {
   StockMovementParamsSchema,
   StocktakeReportParamsSchema,
   PoliceCopperReportParamsSchema,
+  ScaleDiscrepancyParamsSchema,
 } from '@/lib/schemas/report'
 import {
   buildPurchasesByProductCategory,
@@ -61,6 +62,7 @@ import {
 } from './builders/cash'
 import { buildStockOnHand, buildStockMovement } from './builders/stock'
 import { buildStocktakeReport } from './builders/stocktake'
+import { buildScaleDiscrepancy } from './builders/scale'
 import { buildDealersPriceList, buildAccountList, buildAccountIdUploadStatus, buildCasualList, buildCasualIdUploadStatus } from './builders/accounts'
 import {
   buildPoliceRegisterReport,
@@ -157,6 +159,10 @@ export const REPORT_REGISTRY: Record<string, ReportDefinition> = {
   'cancelled-transactions': {
     paramsSchema: BaseReportParamsSchema,
     build: buildCancelledTransactions,
+  },
+  'scale-purchase-discrepancy': {
+    paramsSchema: ScaleDiscrepancyParamsSchema,
+    build: buildScaleDiscrepancy,
   },
   'stock-on-hand': {
     paramsSchema: StockOnHandParamsSchema,
