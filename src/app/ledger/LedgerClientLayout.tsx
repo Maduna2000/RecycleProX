@@ -61,6 +61,18 @@ export default function LedgerClientLayout({ children }: { children: React.React
           </div>
         </div>
         <div className="flex items-center gap-3 sm:gap-4 shrink-0">
+          {/* Which tenant's books this is — every figure on every /ledger
+              page is scoped to this company and no other, via the same
+              tenantId the session carries into every API call. */}
+          {session.user.tenantSlug && (
+            <span
+              className="text-[11px] font-medium px-2.5 py-1 rounded-full hidden sm:block"
+              style={{ background: 'rgba(255,255,255,0.12)', color: '#DCE8FF' }}
+              title="The company these books belong to"
+            >
+              {session.user.tenantSlug}
+            </span>
+          )}
           <span className="text-blue-100 text-sm hidden md:block truncate max-w-[160px]">
             {session.user.fullName}
           </span>
