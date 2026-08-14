@@ -236,6 +236,22 @@ export function PurchaseForm({ editingPurchase }: { editingPurchase?: EditingPur
   const hasOutstandingLoan    = loanData?.summary?.hasOutstanding ?? false
   const outstandingLoanAmount = loanData?.summary?.outstanding    ?? '0'
 
+  // Same SWR key TodaysPricesPanel uses below — shares its cache, no extra
+  // request. Today's active price list wins over the group-override/default
+  // price whenever it lists the picked product (see onProductSelect /
+  // handleLoadScaleOrder); this is purely a client-side pre-fill convenience
+  // — the server re-resolves the same way regardless of what's submitted.
+  const priceGroupId = customer?.priceGroupId ?? null
+  const { data: activePriceListData } = useSWR<{ priceList: { items: { productId: string | null; priceExVat: string }[] } | null }>(
+    `/api/price-lists/active${priceGroupId ? `?priceGroupId=${priceGroupId}` : ''}`,
+    fetcher,
+    { refreshInterval: 5 * 60_000 },
+  )
+  function todaysListPrice(productId: string): string | null {
+    const item = activePriceListData?.priceList?.items.find((i) => i.productId === productId)
+    return item ? new Decimal(item.priceExVat).toFixed(2) : null
+  }
+
   // ── Derived calculations ─────────────────────────────────────────────────
   const vatRate = customer?.zeroRated ? new Decimal(0) : new Decimal('0.15')
 
@@ -336,7 +352,10 @@ export function PurchaseForm({ editingPurchase }: { editingPurchase?: EditingPur
   async function onProductSelect(key: number, productId: string) {
     const product = products.find((p) => p.id === productId) ?? null
     let unitPrice = product ? new Decimal(product.defaultBuyPrice).toFixed(2) : ''
-    if (product && customer?.priceGroupId) {
+    const listPrice = product ? todaysListPrice(productId) : null
+    if (listPrice) {
+      unitPrice = listPrice
+    } else if (product && customer?.priceGroupId) {
       const resolved = await resolveProductPrice(productId, customer.priceGroupId, 'buy')
       if (resolved) unitPrice = new Decimal(resolved).toFixed(2)
     }
@@ -471,6 +490,16 @@ export function PurchaseForm({ editingPurchase }: { editingPurchase?: EditingPur
         ? match.lines
         : [{ weight: match.weight, product: match.product }]
 
+      // Fetched directly here (not via the reactive todaysListPrice helper)
+      // since fullCustomer's price group is only known within this same
+      // synchronous run — the customer state update above hasn't re-rendered
+      // yet, so the component's own active-price-list fetch is still keyed
+      // to whatever customer was selected before this scale order was loaded.
+      const activeListRes = await fetch(`/api/price-lists/active${fullCustomer.priceGroupId ? `?priceGroupId=${fullCustomer.priceGroupId}` : ''}`)
+      const activeListItems = activeListRes.ok
+        ? ((await activeListRes.json()) as { priceList: { items: { productId: string | null; priceExVat: string }[] } | null }).priceList?.items ?? []
+        : []
+
       const vatApplied = !fullCustomer.zeroRated
       const newLines: LineItem[] = []
       let nextKey = keyCounter
@@ -479,7 +508,10 @@ export function PurchaseForm({ editingPurchase }: { editingPurchase?: EditingPur
         const weight = ol.weight ?? match.weight
         const product = products.find((p) => p.id === productId) ?? null
         let unitPrice = product ? new Decimal(product.defaultBuyPrice).toFixed(2) : ''
-        if (product && fullCustomer.priceGroupId) {
+        const listItem = activeListItems.find((i) => i.productId === productId)
+        if (listItem) {
+          unitPrice = new Decimal(listItem.priceExVat).toFixed(2)
+        } else if (product && fullCustomer.priceGroupId) {
           const resolved = await resolveProductPrice(productId, fullCustomer.priceGroupId, 'buy')
           if (resolved) unitPrice = new Decimal(resolved).toFixed(2)
         }
@@ -1471,7 +1503,7 @@ export function PurchaseForm({ editingPurchase }: { editingPurchase?: EditingPur
           </div>
 
           {/* Today's Prices — the active price list from Products → Price Lists */}
-          <TodaysPricesPanel priceGroupId={customer?.priceGroupId ?? null} />
+          <TodaysPricesPanel priceGroupId={priceGroupId} />
 
         </div>
         {/* end RIGHT COLUMN */}

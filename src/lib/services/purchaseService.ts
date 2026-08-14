@@ -3,7 +3,7 @@ import { requireTenantId } from '@/lib/db/tenantContext'
 import { Prisma } from '@prisma/client'
 import logger from '@/lib/logger'
 import Decimal from 'decimal.js'
-import { resolvePrice } from '@/lib/services/productService'
+import { resolvePurchasePrice } from '@/lib/services/priceListService'
 import { recordMovement, recordVoidReversal } from '@/lib/services/stockService'
 import { applyRepaymentTx, reverseRepaymentsForPurchase } from '@/lib/services/loanService'
 import { isSessionDateApproved } from '@/lib/services/cashUpService'
@@ -16,7 +16,7 @@ import { uploadBytes, purchaseVat264Key, purchaseNoteKey } from '@/lib/r2'
 import { CURRENCY_SYMBOLS } from '@/lib/schemas/cashup'
 import { VAT_RATE, purchaseHeaderVat } from '@/lib/utils/vat'
 import { ScaleOrderNotFoundError, ScaleOrderAlreadyVoidedError } from '@/lib/services/scaleService'
-import type { CreatePurchaseInput, VoidPurchaseInput, ReversePurchasePaymentInput, UpdatePurchaseInput } from '@/lib/schemas/purchase'
+import type { CreatePurchaseInput, VoidPurchaseInput, ReversePurchasePaymentInput, UpdatePurchaseInput, PurchaseLineInput } from '@/lib/schemas/purchase'
 import type { ProcessSplitPaymentInput } from '@/lib/schemas/splitPayment'
 import { encodeJsonField } from '@/lib/db/queryHelpers'
 import { encodePhotoKeys, decodePhotoKeys } from '@/lib/offline/photoKeysCodec'
@@ -211,24 +211,30 @@ async function generateAndStorePurchasePdfs(purchase: PurchaseWithCustomerAndLin
   }
 }
 
-// ─── Create Purchase ──────────────────────────────────────────────────────────
+// ─── Shared line resolution (create + update) ─────────────────────────────────
+// Validates each line's product and resolves its price — today's active
+// price list (for the customer's price group) first, falling through to the
+// standard group-override/product-default chain when the product isn't on
+// it or no list is active (resolvePurchasePrice handles that fallback).
+// Cashier-submitted price still always wins on the line itself; this only
+// decides what counts as the "standard" price for override detection/logging
+// and for priceSource.
 
-export async function createPurchase(data: CreatePurchaseInput, createdByUserId?: string) {
-  // Validate customer
-  const customer = await prisma.customer.findUnique({ where: { id: data.customerId } })
-  if (!customer) throw new Error('Customer not found')
-  if (customer.blacklisted) throw new CustomerBlacklistedError()
-  if (!customer.isActive) throw new CustomerInactiveError()
-
-  // Validate all products and resolve prices
-  const resolvedLines = await Promise.all(
-    data.lines.map(async (line) => {
+async function resolvePurchaseLines(
+  customer: { priceGroupId: string | null; zeroRated: boolean },
+  lines: PurchaseLineInput[],
+  actorUserId: string | undefined,
+  actionLabel: 'created' | 'edited',
+) {
+  return Promise.all(
+    lines.map(async (line) => {
       const product = await prisma.product.findUnique({ where: { id: line.productId } })
       if (!product) throw new Error(`Product "${line.productId}" not found`)
       if (!product.isActive) throw new ProductInactiveError(product.code)
 
-      // Resolve the standard/price-group price for this customer
-      const resolved = await resolvePrice(line.productId, customer.priceGroupId)
+      // Resolve the standard price for this customer — today's price list
+      // if it lists this product, else the usual group-override/default chain.
+      const resolved = await resolvePurchasePrice(line.productId, customer.priceGroupId)
       const unitPrice = new Decimal(line.unitPrice)
       const quantity = new Decimal(line.quantity)
       const lineTotal = unitPrice.times(quantity)
@@ -249,8 +255,8 @@ export async function createPurchase(data: CreatePurchaseInput, createdByUserId?
 
       if (isOverride) {
         logger.warn(
-          { productId: line.productId, submittedPrice: unitPrice.toFixed(2), standardPrice: standardPrice.toFixed(2), createdByUserId },
-          'purchase.price.override — cashier submitted price differs from standard'
+          { productId: line.productId, submittedPrice: unitPrice.toFixed(2), standardPrice: standardPrice.toFixed(2), userId: actorUserId },
+          `purchase.price.override — cashier submitted price differs from standard${actionLabel === 'edited' ? ' (edit)' : ''}`
         )
       }
 
@@ -270,6 +276,18 @@ export async function createPurchase(data: CreatePurchaseInput, createdByUserId?
       }
     })
   )
+}
+
+// ─── Create Purchase ──────────────────────────────────────────────────────────
+
+export async function createPurchase(data: CreatePurchaseInput, createdByUserId?: string) {
+  // Validate customer
+  const customer = await prisma.customer.findUnique({ where: { id: data.customerId } })
+  if (!customer) throw new Error('Customer not found')
+  if (customer.blacklisted) throw new CustomerBlacklistedError()
+  if (!customer.isActive) throw new CustomerInactiveError()
+
+  const resolvedLines = await resolvePurchaseLines(customer, data.lines, createdByUserId, 'created')
 
   const subTotal = resolvedLines.reduce((sum, l) => sum.plus(l.lineTotal), new Decimal(0))
   const vatAmount = resolvedLines.reduce((sum, l) => sum.plus(l.vatAmount), new Decimal(0))
@@ -509,50 +527,7 @@ export async function updatePurchase(id: string, data: UpdatePurchaseInput, user
   if (customer.blacklisted) throw new CustomerBlacklistedError()
   if (!customer.isActive) throw new CustomerInactiveError()
 
-  const resolvedLines = await Promise.all(
-    data.lines.map(async (line) => {
-      const product = await prisma.product.findUnique({ where: { id: line.productId } })
-      if (!product) throw new Error(`Product "${line.productId}" not found`)
-      if (!product.isActive) throw new ProductInactiveError(product.code)
-
-      const resolved = await resolvePrice(line.productId, customer.priceGroupId)
-      const unitPrice = new Decimal(line.unitPrice)
-      const quantity = new Decimal(line.quantity)
-      const lineTotal = unitPrice.times(quantity)
-
-      // Same deduction-line handling as createPurchase — a negative unit
-      // price nets off the payout without ever touching stock or VAT.
-      const isDeduction = unitPrice.isNegative()
-      const vatApplied = !isDeduction && (line.vatApplied ?? false) && !customer.zeroRated
-      const vatAmount = vatApplied ? lineTotal.times(VAT_RATE).toDecimalPlaces(2) : new Decimal(0)
-
-      const standardPrice = new Decimal(resolved.buyPrice.toString())
-      const isOverride = !unitPrice.equals(standardPrice)
-      const priceSource = isOverride ? 'cashier_override' : resolved.source
-
-      if (isOverride) {
-        logger.warn(
-          { productId: line.productId, submittedPrice: unitPrice.toFixed(2), standardPrice: standardPrice.toFixed(2), userId },
-          'purchase.price.override — cashier submitted price differs from standard (edit)'
-        )
-      }
-
-      return {
-        productId:       line.productId,
-        quantity,
-        grossQty:        line.grossQty        ? new Decimal(line.grossQty)        : undefined,
-        tareQty:         line.tareQty         ? new Decimal(line.tareQty)         : undefined,
-        tareReason:      line.tareReason      ?? undefined,
-        deductionQty:    line.deductionQty    ? new Decimal(line.deductionQty)    : undefined,
-        deductionReason: line.deductionReason ?? undefined,
-        unitPrice,
-        lineTotal,
-        vatApplied,
-        vatAmount,
-        priceSource,
-      }
-    })
-  )
+  const resolvedLines = await resolvePurchaseLines(customer, data.lines, userId, 'edited')
 
   const subTotal    = resolvedLines.reduce((sum, l) => sum.plus(l.lineTotal), new Decimal(0))
   const vatTotal    = resolvedLines.reduce((sum, l) => sum.plus(l.vatAmount), new Decimal(0))

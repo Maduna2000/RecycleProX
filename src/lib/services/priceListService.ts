@@ -9,6 +9,7 @@ import { getAllSettings } from '@/lib/services/settingsService'
 import { fetchR2Bytes } from '@/lib/r2'
 import { CURRENCY_SYMBOLS } from '@/lib/schemas/cashup'
 import { generatePriceListPdf } from '@/lib/pdf/priceList'
+import { resolvePrice } from '@/lib/services/productService'
 import type { CreatePriceListInput, UpdatePriceListInput, PriceListItemInput, PriceListColors } from '@/lib/schemas/priceList'
 
 /** SystemSettings key holding the R2 object key of the price list logo. */
@@ -126,6 +127,26 @@ export async function getActivePriceListForCustomer(customerPriceGroupId: string
     where: { priceGroupId: defaultGroup.id, isActiveForPurchases: true },
     include: { items: { orderBy: { sortOrder: 'asc' } } },
   })
+}
+
+/**
+ * Purchase-specific price resolution — today's active price list (for the
+ * customer's price group, same resolution/fallback as
+ * getActivePriceListForCustomer) takes priority when it lists this product;
+ * otherwise falls through to the standard group-override/product-default
+ * chain (resolvePrice), completely unchanged. Purchases-only on purpose —
+ * the price-list editor's own "add product" convenience keeps calling
+ * resolvePrice directly, so building today's list never suggests prices
+ * sourced from itself.
+ */
+export async function resolvePurchasePrice(
+  productId: string,
+  customerPriceGroupId: string | null
+): Promise<{ buyPrice: Decimal.Value; source: 'price_list' | 'group_override' | 'default' }> {
+  const activeList = await getActivePriceListForCustomer(customerPriceGroupId)
+  const item = activeList?.items.find((i) => i.productId === productId)
+  if (item) return { buyPrice: item.priceExVat, source: 'price_list' }
+  return resolvePrice(productId, customerPriceGroupId)
 }
 
 export async function createPriceList(data: CreatePriceListInput, userId: string) {
