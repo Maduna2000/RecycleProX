@@ -74,9 +74,21 @@ const STRUCTURAL_ACCOUNTS: { code: string; name: string; type: AccountType; norm
   { code: LEDGER_ACCOUNTS.STOCK_VARIANCE, name: 'Stock Count Variance', type: 'expense', normalBalance: 'debit' },
 ]
 
+// Per-tenant, per-process cache — STRUCTURAL_ACCOUNTS is a fixed constant
+// that never changes at runtime, so once this process has confirmed a
+// tenant's structural accounts exist, every subsequent call in the same
+// process is a pure no-op rather than 17 redundant upsert round trips.
+// Matters little for a single live posting, but adds up fast for a script
+// posting hundreds of entries in one run (confirmed contributing to
+// transaction-timeout failures in scripts/ledger-historical-backfill.ts) —
+// and is always safe to short-circuit since nothing else in this file ever
+// deletes a structural Account row.
+const structuralAccountsEnsuredForTenant = new Set<string>()
+
 /** Idempotent — safe to call from every posting path; only ever creates what's missing. */
 export async function ensureStructuralAccounts(tx: TxClient): Promise<void> {
   const tenantId = requireTenantId()
+  if (structuralAccountsEnsuredForTenant.has(tenantId)) return
   for (const a of STRUCTURAL_ACCOUNTS) {
     await tx.account.upsert({
       where: { tenantId_code: { tenantId, code: a.code } },
@@ -84,6 +96,7 @@ export async function ensureStructuralAccounts(tx: TxClient): Promise<void> {
       create: { tenantId, code: a.code, name: a.name, type: a.type, normalBalance: a.normalBalance },
     })
   }
+  structuralAccountsEnsuredForTenant.add(tenantId)
 }
 
 // Exported for the historical backfill script (scripts/ledger-historical-backfill.ts),
@@ -858,6 +871,45 @@ export async function postCashUpVariance(
       ? [{ accountId: varianceAccountId, debit: amount }, { accountId: cashAccountId, credit: amount }]
       : [{ accountId: cashAccountId, debit: amount }, { accountId: varianceAccountId, credit: amount }],
   })
+}
+
+// ─── Float movement (top-up / withdrawal) ──────────────────────────────────
+
+/**
+ * Cash injected into (or taken out of) the till from OUTSIDE Renovo Pro's
+ * own tracked money flow — a manager/admin physically adding cash (e.g.
+ * from a bank withdrawal or the owner's own funds) or removing it. Renovo
+ * Pro has no record of where a top-up's cash came from or a withdrawal's
+ * cash goes, so the standard, correct treatment is an equity movement:
+ * top_up: Dr Cash, Cr Owner's Equity. withdrawal/adjustment (both reduce
+ * the float, same as each other from the ledger's perspective): Dr Owner's
+ * Equity, Cr Cash. 'opening' is excluded — a fresh CashFloat's very first
+ * opening amount is carried from the previous day's real closing balance
+ * (see addFloatMovement), not new money from outside the tracked system,
+ * so it isn't a separate cash-affecting event.
+ */
+export async function postFloatMovement(
+  tx: TxClient,
+  opts: { floatMovementId: string; entryDate: Date; movementType: 'top_up' | 'withdrawal' | 'adjustment'; amount: Decimal; note?: string; userId?: string }
+): Promise<void> {
+  await ensureStructuralAccounts(tx)
+  const cashAccountId = await structuralAccountId(tx, LEDGER_ACCOUNTS.CASH)
+  const equityAccountId = await structuralAccountId(tx, LEDGER_ACCOUNTS.OWNERS_EQUITY)
+  const isTopUp = opts.movementType === 'top_up'
+  await postJournalEntry(tx, {
+    entryDate: opts.entryDate,
+    description: `Float ${opts.movementType}${opts.note ? ` — ${opts.note}` : ''}`,
+    sourceType: 'float_movement',
+    sourceId: opts.floatMovementId,
+    createdByUserId: opts.userId,
+    lines: isTopUp
+      ? [{ accountId: cashAccountId, debit: opts.amount }, { accountId: equityAccountId, credit: opts.amount }]
+      : [{ accountId: equityAccountId, debit: opts.amount }, { accountId: cashAccountId, credit: opts.amount }],
+  })
+}
+
+export async function reverseFloatMovementLedger(tx: TxClient, floatMovementId: string, reason: string, userId?: string): Promise<void> {
+  await reverseJournalEntry(tx, 'float_movement', floatMovementId, `Reversed — Float movement: ${reason}`, userId)
 }
 
 // ─── Stocktake adjustment ───────────────────────────────────────────────────

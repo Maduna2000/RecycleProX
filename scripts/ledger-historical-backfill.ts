@@ -76,7 +76,7 @@ import {
   postExpense,
   postLoanAdvance, postLoanRepayment,
   postBusinessLoanReceived, postBusinessLoanRepayment,
-  postCashUpVariance, postStocktakeAdjustment,
+  postCashUpVariance, postStocktakeAdjustment, postFloatMovement,
   postJournalEntry, structuralAccountId,
   LEDGER_ACCOUNTS,
 } from '@/lib/services/ledgerService'
@@ -93,6 +93,19 @@ function loadOpeningBalance(): OpeningBalanceConfig | null {
   if (!openingBalanceFile) return null
   if (!existsSync(openingBalanceFile)) throw new Error(`Opening balance file not found: ${openingBalanceFile}`)
   return JSON.parse(readFileSync(openingBalanceFile, 'utf-8'))
+}
+
+type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
+
+// Every posting transaction in this script goes through here rather than a
+// bare txn(...) call — Prisma's hard 5s default transaction
+// timeout is too tight for a remote Neon connection once a transaction does
+// more than one or two round trips (confirmed hitting this in practice on
+// ensureStructuralAccounts's 17-row upsert loop, consistently ~5.2-5.5s).
+// `options` lets a specific call override the default (the big initial
+// fetch below asks for more).
+async function txn<T>(fn: (tx: TxClient) => Promise<T>, options?: { timeout?: number; maxWait?: number }): Promise<T> {
+  return prisma.$transaction(fn, { timeout: 30_000, maxWait: 10_000, ...options })
 }
 
 /** Derives the actual cash/eft/loan split a now-settled Purchase/Sale was paid with, from its final persisted state. */
@@ -119,9 +132,25 @@ function splitFromFinalState(opts: {
   }
 }
 
-async function alreadyPosted(sourceType: string, sourceId: string): Promise<boolean> {
-  const existing = await prisma.journalEntry.findFirst({ where: { sourceType, sourceId } })
-  return !!existing
+// Populated once, right before the posting loops, from a single query —
+// replaces ~370 individual "does this already exist?" round trips (one
+// bare prisma.journalEntry.findFirst() per candidate event, each opening
+// its own mini-transaction) with one. That per-event-check design was
+// reliable in principle but exhausted Neon's connection/maxWait budget in
+// practice under this many rapid sequential transactions — confirmed
+// hitting P2028 "unable to start a transaction in the given time" here
+// specifically. Re-fetched fresh on every script invocation, so a resumed
+// run after a crash still sees exactly what's really posted.
+let postedKeys: Set<string> | null = null
+
+async function loadPostedKeys(): Promise<void> {
+  const existing = await txn((tx) => tx.journalEntry.findMany({ where: { sourceId: { not: null } }, select: { sourceType: true, sourceId: true } }))
+  postedKeys = new Set(existing.map((e) => `${e.sourceType}:${e.sourceId}`))
+}
+
+function alreadyPosted(sourceType: string, sourceId: string): boolean {
+  if (!postedKeys) throw new Error('loadPostedKeys() must run before alreadyPosted() is called')
+  return postedKeys.has(`${sourceType}:${sourceId}`)
 }
 
 /**
@@ -143,7 +172,7 @@ async function postStandaloneRepaymentReversal(opts: {
   loanAccountCode: string
   loanIsDebitNormal: boolean
 }): Promise<void> {
-  await prisma.$transaction(async (tx) => {
+  await txn(async (tx) => {
     await ensureStructuralAccounts(tx)
     const cashCode = opts.paymentMethod === 'eft' ? LEDGER_ACCOUNTS.BANK : LEDGER_ACCOUNTS.CASH
     const cashAccountId = await structuralAccountId(tx, cashCode)
@@ -176,21 +205,37 @@ async function main() {
   )
 
   await withTenantId(tenant.id, async () => {
-    const [purchases, sales, expenses, loans, standaloneLoanRepayments, businessLoans, standaloneBusinessLoanRepayments, cashUps, stocktakes] = await Promise.all([
-      prisma.purchase.findMany({ where: { status: { not: 'voided' } }, include: { lines: { include: { product: true } } }, orderBy: { createdAt: 'asc' } }),
-      prisma.sale.findMany({ where: { status: { not: 'voided' } }, include: { lines: { include: { product: true } } }, orderBy: { createdAt: 'asc' } }),
-      prisma.expense.findMany({ where: { status: 'approved' }, orderBy: { createdAt: 'asc' } }),
-      prisma.loan.findMany({ where: { status: { not: 'voided' } }, orderBy: { createdAt: 'asc' } }),
-      prisma.loanRepayment.findMany({ where: { purchaseId: null }, orderBy: { createdAt: 'asc' } }),
-      prisma.businessLoan.findMany({ where: { status: { not: 'voided' } }, orderBy: { createdAt: 'asc' } }),
-      prisma.businessLoanRepayment.findMany({ where: { saleId: null }, orderBy: { createdAt: 'asc' } }),
-      prisma.cashUp.findMany({ where: { status: 'approved' }, orderBy: { sessionDate: 'asc' } }),
+    // A single shared transaction with a generous explicit timeout — a bare
+    // `prisma.x.findMany()` call opens its own transaction under Prisma's
+    // hard 5s default (the tenant-scoping wrapper only forwards a custom
+    // timeout when the caller explicitly gives prisma.$transaction one),
+    // which a 240+ row nested fetch over a remote Neon connection can
+    // exceed. Sequential (not Promise.all) for the same reason the per-event
+    // posting loop below is sequential — concurrent transactions exhaust the
+    // pooled-connection budget (confirmed hitting P2028 both ways in
+    // practice: default-timeout expiry, and too many at once).
+    const {
+      purchases, sales, expenses, loans, standaloneLoanRepayments,
+      businessLoans, standaloneBusinessLoanRepayments, cashUps, stocktakes, floatMovements,
+    } = await txn(async (tx) => {
+      const purchases = await tx.purchase.findMany({ where: { status: { not: 'voided' } }, include: { lines: { include: { product: true } } }, orderBy: { createdAt: 'asc' } })
+      const sales = await tx.sale.findMany({ where: { status: { not: 'voided' } }, include: { lines: { include: { product: true } } }, orderBy: { createdAt: 'asc' } })
+      const expenses = await tx.expense.findMany({ where: { status: 'approved' }, orderBy: { createdAt: 'asc' } })
+      const loans = await tx.loan.findMany({ where: { status: { not: 'voided' } }, orderBy: { createdAt: 'asc' } })
+      const standaloneLoanRepayments = await tx.loanRepayment.findMany({ where: { purchaseId: null }, orderBy: { createdAt: 'asc' } })
+      const businessLoans = await tx.businessLoan.findMany({ where: { status: { not: 'voided' } }, orderBy: { createdAt: 'asc' } })
+      const standaloneBusinessLoanRepayments = await tx.businessLoanRepayment.findMany({ where: { saleId: null }, orderBy: { createdAt: 'asc' } })
+      const cashUps = await tx.cashUp.findMany({ where: { status: 'approved' }, orderBy: { sessionDate: 'asc' } })
       // completed only (not 'open'/'voided') — quantityOnHand doesn't feed
       // into any dollar figure (only averageCost does, which a stocktake
       // adjustment never touches), so unlike purchases/sales these don't
       // need chronological interleaving for correctness.
-      prisma.stocktake.findMany({ where: { status: 'completed' }, include: { entries: { include: { product: true } } }, orderBy: { completedAt: 'asc' } }),
-    ])
+      const stocktakes = await tx.stocktake.findMany({ where: { status: 'completed' }, include: { entries: { include: { product: true } } }, orderBy: { completedAt: 'asc' } })
+      // 'opening' excluded — see postFloatMovement's comment, it isn't a
+      // cash-affecting event from outside the tracked system.
+      const floatMovements = await tx.floatMovement.findMany({ where: { movementType: { in: ['top_up', 'withdrawal', 'adjustment'] } }, orderBy: { createdAt: 'asc' } })
+      return { purchases, sales, expenses, loans, standaloneLoanRepayments, businessLoans, standaloneBusinessLoanRepayments, cashUps, stocktakes, floatMovements }
+    }, { timeout: 60_000 })
 
     console.log('\nFound:')
     console.log(`  Purchases (non-voided): ${purchases.length}`)
@@ -200,6 +245,7 @@ async function main() {
     console.log(`  Business loans (non-voided): ${businessLoans.length}, standalone repayments: ${standaloneBusinessLoanRepayments.length}`)
     console.log(`  Cash-ups (approved): ${cashUps.length}`)
     console.log(`  Stocktakes (completed): ${stocktakes.length}`)
+    console.log(`  Float movements (top-up/withdrawal/adjustment): ${floatMovements.length}`)
 
     if (!EXECUTE) {
       console.log('\nDry run only — no changes made. Re-run with --execute to actually post.')
@@ -207,15 +253,15 @@ async function main() {
       return
     }
 
-    await prisma.$transaction(async (tx) => { await ensureStructuralAccounts(tx) })
+    await txn(async (tx) => { await ensureStructuralAccounts(tx) })
 
     if (openingBalance) {
       // No sourceId on an opening_balance entry (there's only ever one, not
       // tied to any existing row) — alreadyPosted's (sourceType, sourceId)
       // lookup doesn't apply; check for sourceType alone instead.
-      const alreadyDone = !!(await prisma.journalEntry.findFirst({ where: { sourceType: 'opening_balance' } }))
+      const alreadyDone = !!(await txn((tx) => tx.journalEntry.findFirst({ where: { sourceType: 'opening_balance' } })))
       if (!alreadyDone) {
-        await prisma.$transaction(async (tx) => {
+        await txn(async (tx) => {
           await postOpeningBalance(tx, {
             entryDate: new Date(openingBalance.date),
             lines: openingBalance.lines,
@@ -226,6 +272,8 @@ async function main() {
         console.log('\nOpening balance already posted — skipping (idempotent).')
       }
     }
+
+    await loadPostedKeys()
 
     // ─── Chronologically interleaved: purchases + sales (moving-average COGS depends on true order) ───
     type CostEvent =
@@ -241,7 +289,7 @@ async function main() {
       if (ev.kind === 'purchase') {
         const p = ev.row
         if (!(await alreadyPosted('purchase', p.id))) {
-          await prisma.$transaction(async (tx) => {
+          await txn(async (tx) => {
             await postPurchase(tx, {
               purchaseId: p.id, refNumber: p.refNumber, entryDate: p.createdAt,
               isPending: true,
@@ -267,7 +315,7 @@ async function main() {
             splitPayments: p.splitPayments,
             loanKey: 'loan',
           })
-          await prisma.$transaction(async (tx) => {
+          await txn(async (tx) => {
             await postPurchaseSettlement(tx, {
               purchaseId: p.id, refNumber: p.refNumber, entryDate: p.updatedAt,
               cashAmount: split.cash, eftAmount: split.eft, loanAmount: split.loan,
@@ -277,7 +325,7 @@ async function main() {
       } else {
         const s = ev.row
         if (!(await alreadyPosted('sale', s.id))) {
-          await prisma.$transaction(async (tx) => {
+          await txn(async (tx) => {
             await postSale(tx, {
               saleId: s.id, refNumber: s.refNumber, entryDate: s.createdAt,
               isPending: true,
@@ -301,7 +349,7 @@ async function main() {
             splitPayments: s.splitPayments,
             loanKey: 'businessLoan',
           })
-          await prisma.$transaction(async (tx) => {
+          await txn(async (tx) => {
             await postSaleSettlement(tx, {
               saleId: s.id, refNumber: s.refNumber, entryDate: s.updatedAt,
               cashAmount: split.cash, eftAmount: split.eft, loanAmount: split.loan,
@@ -317,7 +365,7 @@ async function main() {
     // ─── Order-independent: expenses, loans, business loans, cash-up variance ───
     for (const e of expenses) {
       if (await alreadyPosted('expense', e.id)) continue
-      await prisma.$transaction(async (tx) => {
+      await txn(async (tx) => {
         await postExpense(tx, {
           expenseId: e.id, refNumber: e.refNumber, entryDate: e.approvedAt ?? e.createdAt,
           expenseTypeId: e.expenseTypeId, amount: new Decimal(e.amount.toString()),
@@ -329,7 +377,7 @@ async function main() {
 
     for (const l of loans) {
       if (await alreadyPosted('loan_advance', l.id)) continue
-      await prisma.$transaction(async (tx) => {
+      await txn(async (tx) => {
         await postLoanAdvance(tx, {
           loanId: l.id, refNumber: l.refNumber, entryDate: l.createdAt,
           principal: new Decimal(l.principalAmount.toString()), paymentMethod: l.paymentMethod as 'cash' | 'eft',
@@ -341,7 +389,7 @@ async function main() {
       const amount = new Decimal(r.amount.toString())
       if (amount.isZero()) continue
       if (amount.isPositive()) {
-        await prisma.$transaction(async (tx) => {
+        await txn(async (tx) => {
           await postLoanRepayment(tx, {
             repaymentId: r.id, refNumber: r.refNumber, entryDate: r.createdAt,
             amount, paymentMethod: r.paymentMethod as 'cash' | 'eft',
@@ -359,7 +407,7 @@ async function main() {
 
     for (const bl of businessLoans) {
       if (await alreadyPosted('business_loan', bl.id)) continue
-      await prisma.$transaction(async (tx) => {
+      await txn(async (tx) => {
         await postBusinessLoanReceived(tx, {
           businessLoanId: bl.id, refNumber: bl.refNumber, entryDate: bl.createdAt,
           principal: new Decimal(bl.principalAmount.toString()), paymentMethod: bl.paymentMethod as 'cash' | 'eft',
@@ -371,7 +419,7 @@ async function main() {
       const amount = new Decimal(r.amount.toString())
       if (amount.isZero()) continue
       if (amount.isPositive()) {
-        await prisma.$transaction(async (tx) => {
+        await txn(async (tx) => {
           await postBusinessLoanRepayment(tx, {
             repaymentId: r.id, refNumber: r.refNumber, entryDate: r.createdAt,
             amount, paymentMethod: r.paymentMethod as 'cash' | 'eft',
@@ -389,7 +437,7 @@ async function main() {
 
     for (const c of cashUps) {
       if (await alreadyPosted('cashup_variance', c.id)) continue
-      await prisma.$transaction(async (tx) => {
+      await txn(async (tx) => {
         await postCashUpVariance(tx, {
           cashUpId: c.id, sessionDate: c.sessionDate, variance: new Decimal(c.variance?.toString() ?? '0'),
         })
@@ -399,7 +447,7 @@ async function main() {
 
     for (const s of stocktakes) {
       if (await alreadyPosted('stocktake_adjustment', s.id)) continue
-      await prisma.$transaction(async (tx) => {
+      await txn(async (tx) => {
         await postStocktakeAdjustment(tx, {
           stocktakeId: s.id, refNumber: s.refNumber, entryDate: s.completedAt ?? s.createdAt,
           lines: s.entries.map((e) => ({
@@ -410,10 +458,31 @@ async function main() {
     }
     console.log(`Stocktake adjustments posted (${stocktakes.length}).`)
 
+    for (const m of floatMovements) {
+      if (await alreadyPosted('float_movement', m.id)) continue
+      await txn(async (tx) => {
+        await postFloatMovement(tx, {
+          floatMovementId: m.id, entryDate: m.createdAt,
+          movementType: m.movementType as 'top_up' | 'withdrawal' | 'adjustment',
+          amount: new Decimal(m.amount.toString()), note: m.referenceNote ?? undefined,
+        })
+      })
+    }
+    console.log(`Float movements posted (${floatMovements.length}).`)
+
     console.log('\nDone. Open /ledger and review the Trial Balance and Balance Sheet.')
   })
 }
 
 main()
   .catch((e) => { console.error(e); process.exitCode = 1 })
-  .finally(async () => { await prisma.$disconnect() })
+  .finally(async () => {
+    // Both clients — registryPrisma is a separate PrismaClient instance
+    // (its own connection(s), never implicitly closed by disconnecting
+    // `prisma`) and was never being disconnected here, which for a
+    // one-shot script process leaves it lingering against Neon's pooler
+    // instead of releasing the slot on exit. Long-running server contexts
+    // deliberately never call this (the singleton is meant to be reused
+    // across requests) — a one-shot script is the opposite case.
+    await Promise.allSettled([prisma.$disconnect(), registryPrisma.$disconnect()])
+  })

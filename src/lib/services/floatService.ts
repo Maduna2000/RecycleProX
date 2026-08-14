@@ -5,6 +5,7 @@ import Decimal from 'decimal.js'
 import logger from '@/lib/logger'
 import type { SetFloatInput } from '@/lib/schemas/float'
 import { withSerializableRetry } from '@/lib/db/withSerializableRetry'
+import { postFloatMovement, reverseFloatMovementLedger } from '@/lib/services/ledgerService'
 
 // Mirrors the FloatMovementType enum in prisma/schema.prisma. Defined locally
 // rather than imported from @prisma/client because that enum becomes a
@@ -297,6 +298,19 @@ export async function addFloatMovement(
       data: { tenantId, cashFloatId: floatRecord.id, movementType, amount: moveAmount, balanceAfter, referenceNote, createdByUserId },
     })
 
+    // 'opening' isn't a cash-affecting event from outside the tracked
+    // system — see postFloatMovement's own comment — so nothing posts for it.
+    if (movementType === 'top_up' || movementType === 'withdrawal' || movementType === 'adjustment') {
+      await postFloatMovement(tx, {
+        floatMovementId: movement.id,
+        entryDate: movement.createdAt,
+        movementType,
+        amount: moveAmount,
+        note: referenceNote,
+        userId: createdByUserId,
+      })
+    }
+
     logger.info({ cashFloatId: floatRecord.id, movementType, amount, balanceAfter: balanceAfter.toFixed(2), createdByUserId }, 'float.movement.added')
     return { movement, balanceAfter: balanceAfter.toFixed(2) }
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }))
@@ -399,8 +413,16 @@ export async function reverseFloatMovement(
     )
   }
 
-  // Delete the movement
-  await prisma.floatMovement.delete({ where: { id: movementId } })
+  // Delete the movement — but the ledger itself never deletes an entry
+  // (same convention as every other void/reverse path in this codebase);
+  // it gets a mirror-image reversing entry instead, inside the same
+  // transaction as the delete.
+  await prisma.$transaction(async (tx) => {
+    if (movement.movementType === 'top_up' || movement.movementType === 'withdrawal' || movement.movementType === 'adjustment') {
+      await reverseFloatMovementLedger(tx, movementId, reason, userId)
+    }
+    await tx.floatMovement.delete({ where: { id: movementId } })
+  })
 
   logger.info(
     {
@@ -579,8 +601,16 @@ export async function reverseFloat(
       throw new FloatReversalError('HAS_CASHUP', 'Cannot reverse: cash-up session exists for this date')
     }
 
-    // 6. All checks passed - delete the float record (cascade deletes movements)
-    // Note: Top-ups/withdrawals are part of the float and cascade delete automatically
+    // 6. All checks passed - delete the float record (cascade deletes movements).
+    // The cascade only deletes the FloatMovement rows themselves — it has no
+    // idea any of them posted to the ledger, so each one's entry needs its
+    // own explicit reversal first (same "never delete a ledger entry, mirror
+    // it instead" rule as everywhere else).
+    for (const m of floatRecord.movements) {
+      if (m.movementType === 'top_up' || m.movementType === 'withdrawal' || m.movementType === 'adjustment') {
+        await reverseFloatMovementLedger(tx, m.id, reason ?? 'float reversed', userId)
+      }
+    }
     await tx.cashFloat.delete({ where: { id: floatId } })
 
     // 8. Log the reversal action
