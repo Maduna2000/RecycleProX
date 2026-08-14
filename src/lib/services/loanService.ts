@@ -7,6 +7,7 @@ import type { CreateLoanInput, CreateRepaymentInput, VoidLoanInput } from '@/lib
 import { todaySASTDate, todaySASTDateStr, getRangeBoundsSAST, sastDateLabelToUTCDate } from '@/lib/utils/dayBounds'
 import type { DateWindow } from '@/lib/services/cashUpWindow'
 import type { CreateManualRepaymentInput } from '@/lib/schemas/loan'
+import { postLoanAdvance, reverseLoanAdvanceLedger, postLoanRepayment, reverseLoanRepaymentLedger } from '@/lib/services/ledgerService'
 
 // ─── Typed Errors ─────────────────────────────────────────────────────────────
 
@@ -210,7 +211,7 @@ export async function createLoan(data: CreateLoanInput, createdByUserId?: string
   const refNumber = await generateLoanRef()
 
   const loan = await prisma.$transaction(async (tx) => {
-    return tx.loan.create({
+    const created = await tx.loan.create({
       data: {
         tenantId:        requireTenantId(),
         refNumber,
@@ -226,6 +227,17 @@ export async function createLoan(data: CreateLoanInput, createdByUserId?: string
         customer: { select: { id: true, firstName: true, lastName: true, idNumber: true } },
       },
     })
+
+    await postLoanAdvance(tx, {
+      loanId: created.id,
+      refNumber: created.refNumber,
+      entryDate: created.createdAt,
+      principal,
+      paymentMethod: created.paymentMethod as 'cash' | 'eft',
+      userId: createdByUserId,
+    })
+
+    return created
   })
 
   logger.info({ loanId: loan.id, refNumber, customerId: data.customerId, principal: principal.toFixed(2), createdByUserId }, 'loan.created')
@@ -276,6 +288,15 @@ export async function createRepayment(data: CreateRepaymentInput, createdByUserI
       },
     })
 
+    await postLoanRepayment(tx, {
+      repaymentId: repayment.id,
+      refNumber: repayment.refNumber,
+      entryDate: repayment.createdAt,
+      amount: repayAmount,
+      paymentMethod: (data.paymentMethod ?? 'cash') as 'cash' | 'eft',
+      userId: createdByUserId,
+    })
+
     return repayment
   })
 
@@ -294,10 +315,14 @@ export async function voidLoan(id: string, data: VoidLoanInput, voidedById?: str
   if (loan.status === 'voided') throw new LoanAlreadyVoidedError(loan.refNumber)
   if (loan._count.repayments > 0) throw new LoanHasRepaymentsError(loan.refNumber)
 
-  const updated = await prisma.loan.update({
-    where: { id },
-    data: { status: 'voided', voidedAt: new Date(), voidedById, voidReason: data.reason },
-    include: { customer: { select: { id: true, firstName: true, lastName: true, idNumber: true } } },
+  const updated = await prisma.$transaction(async (tx) => {
+    const u = await tx.loan.update({
+      where: { id },
+      data: { status: 'voided', voidedAt: new Date(), voidedById, voidReason: data.reason },
+      include: { customer: { select: { id: true, firstName: true, lastName: true, idNumber: true } } },
+    })
+    await reverseLoanAdvanceLedger(tx, id, loan.refNumber, data.reason, voidedById)
+    return u
   })
 
   logger.info({ loanId: id, refNumber: loan.refNumber, voidedById }, 'loan.voided')
@@ -514,6 +539,14 @@ export async function createManualRepayment(
         where: { id: loan.id },
         data: { balanceAmount: newBalance, status: isNowSettled ? 'settled' : 'active' },
       })
+      await postLoanRepayment(tx, {
+        repaymentId: repayment.id,
+        refNumber: repayment.refNumber,
+        entryDate: repayment.createdAt,
+        amount: repayAmt,
+        paymentMethod: (data.paymentMethod ?? 'cash') as 'cash' | 'eft',
+        userId: createdByUserId,
+      })
       repayments.push(repayment)
       remaining = remaining.minus(repayAmt)
     }
@@ -551,7 +584,7 @@ export async function reverseRepayment(repaymentId: string, reason: string, user
 
   const reversal = await prisma.$transaction(async (tx) => {
     await tx.loan.update({ where: { id: repayment.loanId }, data: { balanceAmount: restoredBalance, status: 'active' } })
-    return tx.loanRepayment.create({
+    const r = await tx.loanRepayment.create({
       data: {
         tenantId:        requireTenantId(),
         refNumber,
@@ -563,6 +596,14 @@ export async function reverseRepayment(repaymentId: string, reason: string, user
         createdByUserId: userId,
       },
     })
+    // A purchase-linked repayment (applyRepaymentTx) never posted its own
+    // ledger entry — that cash movement lives inside the purchase's own
+    // entry instead (see postLoanRepayment's comment) — so there's nothing
+    // to reverse here in that case; it stays keyed to the purchase.
+    if (!repayment.purchaseId) {
+      await reverseLoanRepaymentLedger(tx, repayment.id, repayment.refNumber, reason, userId)
+    }
+    return r
   })
 
   logger.info(

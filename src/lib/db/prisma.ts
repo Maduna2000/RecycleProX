@@ -50,6 +50,7 @@ const TENANT_SCOPED_MODELS = new Set([
   'transactionPaymentLink', 'scaleOrder', 'scaleOrderLine',
   'gateEntry', 'gatePurposeConfig', 'gateSellOption', 'businessLoan', 'businessLoanRepayment',
   'momoStatementImport', 'momoStatementLine', 'priceList', 'priceListItem',
+  'account', 'journalEntry', 'journalLine', 'productAverageCost',
 ])
 
 // Top-level raw-query methods — routed through the same tenant-scoping

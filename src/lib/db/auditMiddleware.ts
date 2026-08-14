@@ -20,6 +20,9 @@ const WRITE_MODELS = [
   'TransactionPayment', 'TransactionPaymentLink',
   'PriceHistory', 'ProductCategory', 'CategoryStepConfig', 'ScaleOrderLine',
   'MomoStatementImport', 'MomoStatementLine',
+  // Ledger module (2026-08-14) — real money-moving/valuation tables, same
+  // reasoning as the 2026-07-30 audit above.
+  'Account', 'JournalEntry', 'JournalLine', 'ProductAverageCost',
 ]
 const WRITE_ACTIONS = ['create', 'update', 'delete']
 

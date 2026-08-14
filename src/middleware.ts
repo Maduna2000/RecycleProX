@@ -151,7 +151,7 @@ export default auth(async (req: NextRequest & { auth: { user?: SessionUser } | n
   // authenticated the same way — Desktop's background sync process has no
   // interactive login — see src/lib/services/deviceAuthClient.ts.
   if (pathname.startsWith('/login') ||
-      pathname === '/api/r2/test' || pathname === '/scale/login' || pathname === '/gate/login' ||
+      pathname === '/api/r2/test' || pathname === '/scale/login' || pathname === '/gate/login' || pathname === '/ledger/login' ||
       pathname.startsWith('/api/mobile/') || pathname.startsWith('/api/internal/') ||
       pathname.startsWith('/api/sync/')) {
     return next()
@@ -234,6 +234,18 @@ export default auth(async (req: NextRequest & { auth: { user?: SessionUser } | n
     return next()
   }
 
+  // Ledger sub-app — admin-only, no allowedModules grant fallback (unlike
+  // Scale/Gate). Ledger exposes real financial figures across the whole
+  // business, not a single kiosk workflow someone can be individually
+  // granted into.
+  if (pathname.startsWith('/ledger')) {
+    if (!session) return NextResponse.redirect(new URL('/ledger/login', req.url))
+    if (session.user?.role !== 'admin') {
+      return NextResponse.redirect(new URL('/app/dashboard', req.url))
+    }
+    return next()
+  }
+
   // App routes — redirect to login if no session
   if (pathname.startsWith('/app')) {
     if (!session) {
@@ -302,5 +314,5 @@ export default auth(async (req: NextRequest & { auth: { user?: SessionUser } | n
 })
 
 export const config = {
-  matcher: ['/login', '/app/:path*', '/scale/:path*', '/gate/:path*', '/police/:path*', '/police', '/api/:path*'],
+  matcher: ['/login', '/app/:path*', '/scale/:path*', '/gate/:path*', '/ledger/:path*', '/police/:path*', '/police', '/api/:path*'],
 }

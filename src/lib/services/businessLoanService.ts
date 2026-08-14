@@ -6,6 +6,7 @@ import Decimal from 'decimal.js'
 import type { Prisma } from '@prisma/client'
 import type { CreateBusinessLoanInput, VoidBusinessLoanInput } from '@/lib/schemas/businessLoan'
 import { todaySASTDate, todaySASTDateStr, sastDateLabelToUTCDate, getRangeBoundsSAST } from '@/lib/utils/dayBounds'
+import { postBusinessLoanReceived, reverseBusinessLoanLedger, postBusinessLoanRepayment, reverseBusinessLoanRepaymentLedger } from '@/lib/services/ledgerService'
 
 // ─── Typed Errors ─────────────────────────────────────────────────────────────
 
@@ -216,7 +217,7 @@ export async function recordBusinessLoanRepayment(
     for (let i = 0; i < legs.length; i++) {
       const leg = legs[i]!
       const refNumber = `${prefix}-${String(baseCount + i + 1).padStart(4, '0')}`
-      created.push(await tx.businessLoanRepayment.create({
+      const repayment = await tx.businessLoanRepayment.create({
         data: {
           tenantId:        requireTenantId(),
           refNumber,
@@ -227,7 +228,16 @@ export async function recordBusinessLoanRepayment(
           notes,
           createdByUserId,
         },
-      }))
+      })
+      await postBusinessLoanRepayment(tx, {
+        repaymentId: repayment.id,
+        refNumber: repayment.refNumber,
+        entryDate: repayment.createdAt,
+        amount: leg.amount,
+        paymentMethod: leg.method,
+        userId: createdByUserId,
+      })
+      created.push(repayment)
     }
 
     await tx.businessLoan.update({
@@ -280,7 +290,7 @@ export async function reverseManualBusinessLoanRepayment(repaymentId: string, re
   const reversal = await prisma.$transaction(async (tx) => {
     await tx.businessLoan.update({ where: { id: repayment.businessLoanId }, data: { balanceAmount: restoredBalance, status: 'active' } })
     const count = await tx.businessLoanRepayment.count({ where: { createdAt: { gte: startOfDay } } })
-    return tx.businessLoanRepayment.create({
+    const r = await tx.businessLoanRepayment.create({
       data: {
         tenantId:        requireTenantId(),
         refNumber:       `${prefix}-${String(count + 1).padStart(4, '0')}`,
@@ -292,6 +302,12 @@ export async function reverseManualBusinessLoanRepayment(repaymentId: string, re
         createdByUserId: userId,
       },
     })
+    // A sale-linked repayment (applyBusinessLoanRepaymentTx) never posted
+    // its own ledger entry — see postBusinessLoanRepayment's comment.
+    if (!repayment.saleId) {
+      await reverseBusinessLoanRepaymentLedger(tx, repayment.id, repayment.refNumber, reason, userId)
+    }
+    return r
   })
 
   logger.info(
@@ -459,7 +475,7 @@ export async function createBusinessLoan(data: CreateBusinessLoanInput, createdB
   const refNumber = await generateBusinessLoanRef()
 
   const loan = await prisma.$transaction(async (tx) => {
-    return tx.businessLoan.create({
+    const created = await tx.businessLoan.create({
       data: {
         tenantId:        requireTenantId(),
         refNumber,
@@ -475,6 +491,17 @@ export async function createBusinessLoan(data: CreateBusinessLoanInput, createdB
         customer: { select: { id: true, firstName: true, lastName: true, idNumber: true } },
       },
     })
+
+    await postBusinessLoanReceived(tx, {
+      businessLoanId: created.id,
+      refNumber: created.refNumber,
+      entryDate: created.createdAt,
+      principal,
+      paymentMethod: created.paymentMethod as 'cash' | 'eft',
+      userId: createdByUserId,
+    })
+
+    return created
   })
 
   logger.info({ businessLoanId: loan.id, refNumber, customerId: data.customerId, principal: principal.toFixed(2), createdByUserId }, 'businessLoan.created')
@@ -492,10 +519,14 @@ export async function voidBusinessLoan(id: string, data: VoidBusinessLoanInput, 
   if (loan.status === 'voided') throw new BusinessLoanAlreadyVoidedError(loan.refNumber)
   if (loan._count.repayments > 0) throw new BusinessLoanHasRepaymentsError(loan.refNumber)
 
-  const updated = await prisma.businessLoan.update({
-    where: { id },
-    data: { status: 'voided', voidedAt: new Date(), voidedById, voidReason: data.reason },
-    include: { customer: { select: { id: true, firstName: true, lastName: true, idNumber: true } } },
+  const updated = await prisma.$transaction(async (tx) => {
+    const u = await tx.businessLoan.update({
+      where: { id },
+      data: { status: 'voided', voidedAt: new Date(), voidedById, voidReason: data.reason },
+      include: { customer: { select: { id: true, firstName: true, lastName: true, idNumber: true } } },
+    })
+    await reverseBusinessLoanLedger(tx, id, loan.refNumber, data.reason, voidedById)
+    return u
   })
 
   logger.info({ businessLoanId: id, refNumber: loan.refNumber, voidedById }, 'businessLoan.voided')

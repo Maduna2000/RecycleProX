@@ -6,6 +6,7 @@ import { getStockOnHand, recordMovement } from './stockService'
 import { Prisma } from '@prisma/client'
 import { withSerializableRetry } from '@/lib/db/withSerializableRetry'
 import { encodeJsonField } from '@/lib/db/queryHelpers'
+import { postStocktakeAdjustment, reverseStocktakeAdjustmentLedger } from '@/lib/services/ledgerService'
 
 // ─── Ref number ───────────────────────────────────────────────────────────────
 
@@ -216,6 +217,18 @@ export async function completeStocktake(id: string, userId: string) {
       )
     }
 
+    await postStocktakeAdjustment(tx, {
+      stocktakeId: id,
+      refNumber: result.refNumber,
+      entryDate: new Date(),
+      lines: result.entries.map((e) => ({
+        productId: e.productId,
+        productCategory: e.product.category,
+        variance: new Decimal(e.variance.toString()),
+      })),
+      userId,
+    })
+
     return result
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, maxWait: 10000, timeout: 60000 }))
 
@@ -278,6 +291,15 @@ export async function voidStocktake(id: string, userId: string, reason: string) 
         voidedBy: { select: { fullName: true } },
       },
     })
+
+    await reverseStocktakeAdjustmentLedger(
+      tx,
+      id,
+      stocktake.refNumber,
+      stocktake.entries.map((e) => ({ productId: e.productId, variance: new Decimal(e.variance.toString()) })),
+      reason,
+      userId
+    )
 
     return result
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, maxWait: 10000, timeout: 60000 }))

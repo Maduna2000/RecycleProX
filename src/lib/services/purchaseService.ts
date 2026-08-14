@@ -10,6 +10,7 @@ import { isSessionDateApproved } from '@/lib/services/cashUpService'
 import { autoPromoteCasualIfEligible } from '@/lib/services/customerService'
 import { sastDayLabelOfInstant, sastDateLabelToUTCDate } from '@/lib/utils/dayBounds'
 import { getAllSettings } from '@/lib/services/settingsService'
+import { postPurchase, reversePurchaseLedger, reversePurchasePaymentLedger, postPurchaseSettlement, reverseJournalEntry, reversePurchaseCost } from '@/lib/services/ledgerService'
 import { generateVat264 } from '@/lib/pdf/vat264'
 import { generatePurchaseReceiptPdf } from '@/lib/pdf/slip'
 import { uploadBytes, purchaseVat264Key, purchaseNoteKey } from '@/lib/r2'
@@ -371,6 +372,25 @@ export async function createPurchase(data: CreatePurchaseInput, createdByUserId?
       await applyRepaymentTx(tx, data.customerId, deduction.toString(), createdByUserId, p.id)
     }
 
+    await postPurchase(tx, {
+      purchaseId: p.id,
+      refNumber: p.refNumber,
+      entryDate: p.createdAt,
+      isPending: p.status === 'pending',
+      paymentMethod: (data.paymentMethod ?? 'cash') as 'cash' | 'eft',
+      loanDeductionAmount: deduction ?? new Decimal(0),
+      lines: p.lines.map((l) => ({
+        productId: l.productId,
+        productCategory: l.product.category,
+        quantity: new Decimal(l.quantity.toString()),
+        unitPrice: new Decimal(l.unitPrice.toString()),
+        lineTotal: new Decimal(l.lineTotal.toString()),
+        vatAmount: new Decimal(l.vatAmount?.toString() ?? '0'),
+        isDeduction: new Decimal(l.unitPrice.toString()).isNegative(),
+      })),
+      userId: createdByUserId,
+    })
+
       return p
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
   )
@@ -447,6 +467,19 @@ export async function voidPurchase(id: string, data: VoidPurchaseInput, voidedBy
       // that this purchase no longer happened.
       await reverseRepaymentsForPurchase(tx, id, purchase.refNumber, voidedById)
 
+      await reversePurchaseLedger(
+        tx,
+        id,
+        purchase.refNumber,
+        purchase.lines.map((l) => ({
+          productId: l.productId,
+          quantity: new Decimal(l.quantity.toString()),
+          isDeduction: new Decimal(l.unitPrice.toString()).isNegative(),
+        })),
+        data.reason,
+        voidedById
+      )
+
       return p
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
   )
@@ -500,6 +533,8 @@ export async function reversePurchasePayment(id: string, data: ReversePurchasePa
       // that nothing has actually been paid toward it.
       await reverseRepaymentsForPurchase(tx, id, purchase.refNumber, userId, 'payment reversed')
 
+      await reversePurchasePaymentLedger(tx, id, purchase.refNumber, data.reason, userId)
+
       return p
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
   )
@@ -538,7 +573,7 @@ export async function updatePurchase(id: string, data: UpdatePurchaseInput, user
 
   const updated = await withSerializableRetry(() =>
     prisma.$transaction(async (tx) => {
-      const purchase = await tx.purchase.findUnique({ where: { id } })
+      const purchase = await tx.purchase.findUnique({ where: { id }, include: { lines: true } })
       if (!purchase) throw new PurchaseNotFoundError(id)
       if (purchase.status !== 'pending') throw new PurchaseNotPendingError(purchase.status)
       if (new Decimal(purchase.amountPaid.toString()).greaterThan(0)) throw new AmountAlreadyPaidError()
@@ -547,6 +582,16 @@ export async function updatePurchase(id: string, data: UpdatePurchaseInput, user
       // applies a loan deduction unconditionally, even on a pending
       // purchase) before re-applying the edited amount below.
       await reverseRepaymentsForPurchase(tx, id, purchase.refNumber, userId, 'purchase edited')
+
+      // The original ledger entry (Inventory/VAT/AP amounts) is now stale —
+      // reverse it and each line's average-cost impact before the new lines
+      // are resolved and re-posted below. Amount-paid is guaranteed zero
+      // (checked above), so there's never a settlement entry to also undo.
+      await reverseJournalEntry(tx, 'purchase', id, `Edited — Purchase ${purchase.refNumber}`, userId)
+      for (const l of purchase.lines) {
+        if (new Decimal(l.unitPrice.toString()).isNegative()) continue
+        await reversePurchaseCost(tx, l.productId, new Decimal(l.quantity.toString()))
+      }
 
       // This purchase's own stock movements and line rows only — deleting
       // by sourceId/purchaseId can't touch any other transaction's ledger.
@@ -603,6 +648,25 @@ export async function updatePurchase(id: string, data: UpdatePurchaseInput, user
       if (deduction && deduction.greaterThan(0)) {
         await applyRepaymentTx(tx, data.customerId, deduction.toString(), userId, id)
       }
+
+      await postPurchase(tx, {
+        purchaseId: p.id,
+        refNumber: p.refNumber,
+        entryDate: purchase.createdAt,
+        isPending: true,
+        paymentMethod: data.paymentMethod as 'cash' | 'eft',
+        loanDeductionAmount: deduction ?? new Decimal(0),
+        lines: p.lines.map((l) => ({
+          productId: l.productId,
+          productCategory: l.product.category,
+          quantity: new Decimal(l.quantity.toString()),
+          unitPrice: new Decimal(l.unitPrice.toString()),
+          lineTotal: new Decimal(l.lineTotal.toString()),
+          vatAmount: new Decimal(l.vatAmount?.toString() ?? '0'),
+          isDeduction: new Decimal(l.unitPrice.toString()).isNegative(),
+        })),
+        userId,
+      })
 
       return p
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
@@ -699,6 +763,16 @@ export async function markPurchasePaid(
           purchaseId:      purchase.id,
           createdByUserId: userId,
         },
+      })
+
+      await postPurchaseSettlement(tx, {
+        purchaseId: purchase.id,
+        refNumber: purchase.refNumber,
+        entryDate: new Date(),
+        cashAmount: data.paymentMethod === 'cash' ? settleAmount : new Decimal(0),
+        eftAmount: data.paymentMethod === 'eft' ? settleAmount : new Decimal(0),
+        loanAmount: new Decimal(0),
+        userId,
       })
 
       return { updated, isFullySettled }
@@ -811,6 +885,16 @@ export async function processSplitPayment(
           },
         })
       }
+
+      await postPurchaseSettlement(tx, {
+        purchaseId: purchase.id,
+        refNumber: purchase.refNumber,
+        entryDate: new Date(),
+        cashAmount: cashAmt,
+        eftAmount: eftAmt,
+        loanAmount: loanAmt,
+        userId,
+      })
 
       return { updated, isFullySettled }
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
