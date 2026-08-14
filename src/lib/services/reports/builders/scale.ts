@@ -122,7 +122,7 @@ export async function buildScaleDiscrepancy(
       }
     }
 
-    for (const [productId, weighed] of weighedByProduct) {
+    for (const [productId, weighed] of Array.from(weighedByProduct)) {
       const pm = productMeta.get(productId)!
       items.push({
         date: so.createdAt,
@@ -173,7 +173,7 @@ export async function buildScaleDiscrepancy(
         productMeta.set(l.productId, { code: l.product.code, name: l.product.name, category: categoryOf(l.product) })
       }
     }
-    for (const [productId, purchased] of byProduct) {
+    for (const [productId, purchased] of Array.from(byProduct)) {
       const pm = productMeta.get(productId)!
       items.push({
         date: p.createdAt,
