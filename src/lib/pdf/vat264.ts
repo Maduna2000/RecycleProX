@@ -44,6 +44,9 @@ export interface Vat264Data {
 
   // Signature (PNG/JPG bytes from R2, optional)
   signatureBytes?: Uint8Array
+
+  /** The underlying purchase was voided — stamps the header so a reprinted/re-downloaded declaration can never be mistaken for a still-valid one. */
+  voided?: boolean
 }
 
 // ─── Layout constants ─────────────────────────────────────────────────────────
@@ -107,6 +110,15 @@ export async function generateVat264(data: Vat264Data): Promise<Uint8Array> {
   const dateStr = data.date.toLocaleDateString('en-ZA', { timeZone: 'Africa/Johannesburg' })
   const dateW = reg.widthOfTextAtSize(dateStr, 9)
   page.drawText(dateStr, { x: PAGE_W - MARGIN - dateW, y: PAGE_H - 50, size: 9, font: reg, color: rgb(0.8, 1, 0.8) })
+
+  // Same "stamp the title" convention transactionNote.ts uses for its own
+  // PAID/UNPAID/PARTIAL/VOIDED label — the underlying purchase was voided,
+  // so this declaration is void too.
+  if (data.voided) {
+    const voidStr = 'VOIDED'
+    const voidW = bold.widthOfTextAtSize(voidStr, 9)
+    page.drawText(voidStr, { x: PAGE_W - MARGIN - voidW, y: PAGE_H - 63, size: 9, font: bold, color: rgb(1, 0.85, 0.85) })
+  }
 
   y = PAGE_H - 94
 

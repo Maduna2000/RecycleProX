@@ -255,12 +255,16 @@ export default function PurchaseDetailPage() {
         {/* Actions footer */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderTop: '1px solid #E0E0E0', background: '#F8F9FA', flexShrink: 0 }}>
           <div style={{ display: 'flex', gap: 6 }}>
-            <Btn size="sm" icon={Printer} onClick={() => window.open(`/api/purchases/${purchase.id}/receipt?format=pdf`, '_blank')}>
-              Print Receipt
-            </Btn>
-            <Btn size="sm" icon={FileText} onClick={() => window.open(`/api/purchases/${purchase.id}/vat264`, '_blank')}>
-              Download VAT264
-            </Btn>
+            {purchase.status !== 'voided' && (
+              <>
+                <Btn size="sm" icon={Printer} onClick={() => window.open(`/api/purchases/${purchase.id}/receipt?format=pdf`, '_blank')}>
+                  Print Receipt
+                </Btn>
+                <Btn size="sm" icon={FileText} onClick={() => window.open(`/api/purchases/${purchase.id}/vat264`, '_blank')}>
+                  Download VAT264
+                </Btn>
+              </>
+            )}
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
             {isManager && purchase.status === 'pending' && new Decimal(purchase.amountPaid).isZero() && (

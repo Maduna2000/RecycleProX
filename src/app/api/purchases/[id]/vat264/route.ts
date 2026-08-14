@@ -82,6 +82,7 @@ export async function GET(
       paymentMethod: purchase.paymentMethod,
       currencySymbol,
       signatureBytes,
+      voided:        purchase.status === 'voided',
     })
 
     return new NextResponse(Buffer.from(pdfBytes), {

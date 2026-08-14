@@ -261,9 +261,11 @@ export default function SaleDetailPage() {
         {/* Actions footer */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderTop: '1px solid #E0E0E0', background: '#F8F9FA', flexShrink: 0 }}>
           <div style={{ display: 'flex', gap: 6 }}>
-            <Btn size="sm" icon={Printer} onClick={() => window.open(`/api/sales/${sale.id}/receipt?format=pdf`, '_blank')}>
-              Print Receipt
-            </Btn>
+            {sale.status !== 'voided' && (
+              <Btn size="sm" icon={Printer} onClick={() => window.open(`/api/sales/${sale.id}/receipt?format=pdf`, '_blank')}>
+                Print Receipt
+              </Btn>
+            )}
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
             {isManager && sale.status === 'pending' && new Decimal(sale.amountPaid ?? '0').isZero() && (

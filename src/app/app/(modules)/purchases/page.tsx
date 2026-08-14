@@ -184,6 +184,11 @@ export default function PurchasesPage() {
     {
       label:   'Print Slip',
       icon:    Printer,
+      // A voided purchase never actually happened as far as the books are
+      // concerned — printing/downloading its official documents (slip,
+      // VAT264, tax invoice) is at best confusing and at worst a document
+      // someone could pass off as still valid, so all four are hidden here.
+      hidden:  (row) => row.status === 'voided',
       onClick: (row) => window.open(`/api/purchases/${row.id}/receipt?format=pdf`, '_blank'),
     },
     {
@@ -192,7 +197,7 @@ export default function PurchasesPage() {
       // Only where a receipt printer could plausibly be attached (Electron
       // or a local-server install) — same gate autoPrintReceipt itself
       // relies on elsewhere. Never opens the cash drawer for a reprint.
-      hidden:  () => !canAutoPrint(),
+      hidden:  (row) => !canAutoPrint() || row.status === 'voided',
       onClick: (row) => {
         autoPrintReceipt({ type: 'purchase', id: row.id }, { openDrawer: false })
           .then(() => toast.success(`Reprinted ${row.refNumber}`))
@@ -202,16 +207,19 @@ export default function PurchasesPage() {
     {
       label:   'Purchase Note',
       icon:    FileText,
+      hidden:  (row) => row.status === 'voided',
       onClick: (row) => window.open(`/api/purchases/${row.id}/note`, '_blank'),
     },
     {
       label:   'Download VAT264',
       icon:    FileText,
+      hidden:  (row) => row.status === 'voided',
       onClick: (row) => window.open(`/api/purchases/${row.id}/vat264`, '_blank'),
     },
     {
       label:   'Tax Invoice',
       icon:    FileText,
+      hidden:  (row) => row.status === 'voided',
       onClick: (row) => window.open(`/api/purchases/${row.id}/tax-invoice`, '_blank'),
     },
     {

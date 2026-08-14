@@ -51,7 +51,8 @@ export default function MomoStatementDetailPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
   const { data: session } = useSession()
-  const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
+  // Deleting a statement is admin-only.
+  const isAdmin = session?.user?.role === 'admin'
   const [deleteOpen, setDeleteOpen] = useState(false)
 
   const { data: statement, isLoading, error } = useSWR<MomoDetail>(`/api/momo-statements/${id}`, fetcher)
@@ -169,7 +170,7 @@ export default function MomoStatementDetailPage() {
         {/* Actions footer */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderTop: '1px solid #E0E0E0', background: '#F8F9FA', flexShrink: 0 }}>
           <Btn size="sm" onClick={() => router.push('/app/momo-statement')}>Back to List</Btn>
-          {isManager && (
+          {isAdmin && (
             <Btn variant="danger" size="sm" icon={Trash2} onClick={() => setDeleteOpen(true)}>
               Delete Statement
             </Btn>

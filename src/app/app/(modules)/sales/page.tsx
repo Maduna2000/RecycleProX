@@ -183,12 +183,17 @@ export default function SalesPage() {
     {
       label:   'Print Receipt',
       icon:    Printer,
+      // A voided sale never actually happened as far as the books are
+      // concerned — printing/downloading its official documents is at best
+      // confusing and at worst a document someone could pass off as still
+      // valid, so all of these are hidden here.
+      hidden:  (row) => row.status === 'voided',
       onClick: (row) => window.open(`/api/sales/${row.id}/receipt?format=pdf`, '_blank'),
     },
     {
       label:   'Reprint to Printer',
       icon:    Printer,
-      hidden:  () => !canAutoPrint(),
+      hidden:  (row) => !canAutoPrint() || row.status === 'voided',
       onClick: (row) => {
         autoPrintReceipt({ type: 'sale', id: row.id }, { openDrawer: false })
           .then(() => toast.success(`Reprinted ${row.refNumber}`))
@@ -198,11 +203,13 @@ export default function SalesPage() {
     {
       label:   'Sale Note',
       icon:    FileText,
+      hidden:  (row) => row.status === 'voided',
       onClick: (row) => window.open(`/api/sales/${row.id}/note`, '_blank'),
     },
     {
       label:   'Tax Invoice',
       icon:    FileText,
+      hidden:  (row) => row.status === 'voided',
       onClick: (row) => window.open(`/api/sales/${row.id}/tax-invoice`, '_blank'),
     },
     {

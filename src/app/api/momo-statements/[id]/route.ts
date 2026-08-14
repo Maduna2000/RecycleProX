@@ -29,8 +29,8 @@ export async function DELETE(
 ) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!['admin', 'manager'].includes(session.user.role)) {
-    return NextResponse.json({ error: 'Forbidden — only managers can delete a MoMo statement' }, { status: 403 })
+  if (session.user.role !== 'admin') {
+    return NextResponse.json({ error: 'Forbidden — only an admin can delete a MoMo statement' }, { status: 403 })
   }
 
   const { id } = await context.params

@@ -32,6 +32,8 @@ export default function MomoStatementPage() {
   const router = useRouter()
   const { data: session } = useSession()
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
+  // Deleting a statement is admin-only — upload stays open to managers too.
+  const isAdmin = session?.user?.role === 'admin'
 
   const [page, setPage] = useState(1)
   const [uploading, setUploading] = useState(false)
@@ -153,7 +155,7 @@ export default function MomoStatementPage() {
       label:   'Delete',
       icon:    Trash2,
       danger:  true,
-      hidden:  () => !isManager,
+      hidden:  () => !isAdmin,
       onClick: (row) => setDeleteTarget(row),
     },
   ]
