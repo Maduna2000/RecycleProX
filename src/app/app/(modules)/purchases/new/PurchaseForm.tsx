@@ -52,6 +52,8 @@ type LineItem = {
   selectedScale: '1' | '2' | '3'
   weighingGross: boolean
   weighingTare: boolean
+  /** True once Gross/Tare has been set directly (typed or scale-read) via weigh mode — after that, the plain Qty field no longer mirrors into Gross. */
+  grossOverridden: boolean
 }
 
 type PendingPurchase = {
@@ -96,6 +98,7 @@ const emptyLine = (key: number, vatApplied = false): LineItem => ({
   key, productId: '', product: null, quantity: '', grossQty: '', tareQty: '',
   tareReason: '', deductionQty: '', deductionReason: '', unitPrice: '', vatApplied,
   weighMode: false, selectedScale: '1', weighingGross: false, weighingTare: false,
+  grossOverridden: false,
 })
 
 function timeAgo(iso: string): string {
@@ -189,6 +192,7 @@ export function PurchaseForm({ editingPurchase }: { editingPurchase?: EditingPur
       selectedScale: '1',
       weighingGross: false,
       weighingTare: false,
+      grossOverridden: !!l.grossQty,
     })))
     setKeyCounter(editingPurchase.lines.length + 1)
     setPaymentType(editingPurchase.paymentMethod === 'eft' ? 'eft' : 'cash')
@@ -345,7 +349,9 @@ export function PurchaseForm({ editingPurchase }: { editingPurchase?: EditingPur
     const deduction = new Decimal(deductionStr || '0')
     const net       = Decimal.max(gross.minus(tare), new Decimal('0'))
     const paid      = Decimal.max(net.minus(deduction), new Decimal('0'))
-    patchLine(key, { quantity: paid.toFixed(2), grossQty: grossStr, tareQty: tareStr })
+    // Gross/Tare set directly (typed or scale-read) from here on — the plain
+    // Qty field stops mirroring into Gross for this line.
+    patchLine(key, { quantity: paid.toFixed(2), grossQty: grossStr, tareQty: tareStr, grossOverridden: true })
   }
 
   // ── Product selection ────────────────────────────────────────────────────
@@ -515,10 +521,12 @@ export function PurchaseForm({ editingPurchase }: { editingPurchase?: EditingPur
           const resolved = await resolveProductPrice(productId, fullCustomer.priceGroupId, 'buy')
           if (resolved) unitPrice = new Decimal(resolved).toFixed(2)
         }
+        const qtyStr = weight ? new Decimal(weight).toFixed(3) : ''
         newLines.push({
           ...emptyLine(nextKey, vatApplied),
           productId, product, unitPrice,
-          quantity: weight ? new Decimal(weight).toFixed(3) : '',
+          quantity: qtyStr,
+          grossQty: qtyStr,
         })
         nextKey += 1
       }
@@ -1063,11 +1071,18 @@ export function PurchaseForm({ editingPurchase }: { editingPurchase?: EditingPur
                         onChange={(productId) => onProductSelect(line.key, productId)}
                       />
 
-                      {/* Qty */}
+                      {/* Qty — mirrors into Gross (with Tare 0) until Gross/Tare is set
+                          directly via the weigh-mode row, at which point that takes over. */}
                       <input
                         type="number" step="0.001" min="0" placeholder="0.000"
                         value={line.quantity}
-                        onChange={(e) => patchLine(line.key, { quantity: e.target.value })}
+                        onChange={(e) => {
+                          const quantity = e.target.value
+                          patchLine(line.key, {
+                            quantity,
+                            ...(line.grossOverridden ? {} : { grossQty: quantity }),
+                          })
+                        }}
                         className={cellInput} style={cellInputStyle}
                       />
 
