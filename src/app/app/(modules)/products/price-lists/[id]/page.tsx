@@ -17,6 +17,7 @@ import { Dialog } from '@/components/ui/dialog'
 import { ProductCategoryPicker } from '@/components/products/ProductCategoryPicker'
 import { DEFAULT_PRICE_LIST_COLORS, type PriceListColors } from '@/lib/schemas/priceList'
 import { incVatPrice } from '@/lib/utils/vat'
+import { useOfflineLookup } from '@/hooks/useOfflineLookup'
 
 const COLOR_FIELDS: { key: keyof PriceListColors; label: string }[] = [
   { key: 'primaryColor',      label: 'Ribbon / Header' },
@@ -30,7 +31,7 @@ const COLOR_FIELDS: { key: keyof PriceListColors; label: string }[] = [
 
 type Product = {
   id: string; code: string; name: string; category: string; unit: string
-  defaultBuyPrice: string; isActive: boolean
+  defaultBuyPrice: string
 }
 
 type PriceGroupOption = { id: string; name: string; isDefault: boolean }
@@ -83,9 +84,16 @@ export default function PriceListEditorPage() {
   const [previewUrl,     setPreviewUrl]     = useState<string | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
 
-  // /api/products wraps the list: { products: [...] }
-  const { data: productsData } = useSWR<{ products: Product[] }>('/api/products?active=true', fetcher)
-  const products = productsData?.products
+  // Fetched via getActiveProducts (same as Purchases/Sales) rather than a
+  // plain fetcher — SWR's cache is keyed on the URL alone, shared across the
+  // whole app regardless of which component/fetcher populates it. The plain
+  // fetcher returned the raw { products: [...] } wrapper under this same
+  // key, while every other page reading /api/products?active=true expects
+  // the unwrapped array getActiveProducts already normalizes to — colliding
+  // and handing an object where an array was expected, crashing on whichever
+  // page rendered next.
+  const { getActiveProducts } = useOfflineLookup()
+  const { data: products } = useSWR<Product[]>('/api/products?active=true', () => getActiveProducts())
   const { data: priceGroupsData } = useSWR<{ groups: PriceGroupOption[] }>('/api/price-groups', fetcher)
   const priceGroups = useMemo(() => priceGroupsData?.groups ?? [], [priceGroupsData])
   const { data: detail, error: detailError } = useSWR<PriceListDetail>(

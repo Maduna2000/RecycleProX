@@ -15,6 +15,7 @@ import Decimal from 'decimal.js'
 import { format } from '@/lib/utils/format'
 import { colors } from '@/lib/design-tokens'
 import { fetcher } from '@/lib/swrFetcher'
+import { useOfflineLookup } from '@/hooks/useOfflineLookup'
 import {
   Btn, PortalPage, BAR_GRAD, PANEL,
   RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter,
@@ -69,9 +70,15 @@ export default function StocktakeDetailPage() {
     isManager ? `/api/stocktake/${id}` : null,
     fetcher
   )
-  const { data: productsData } = useSWR<{ products: Product[] }>(
+  // Fetched via getActiveProducts (same as Purchases/Sales/the price-list
+  // editor) rather than a plain fetcher — SWR's cache is keyed on the URL
+  // alone, shared app-wide regardless of which fetcher populates it; a plain
+  // fetcher here would hand other pages reading this same key the raw
+  // { products: [...] } wrapper where they expect the unwrapped array.
+  const { getActiveProducts } = useOfflineLookup()
+  const { data: productsData } = useSWR<Product[]>(
     isManager ? '/api/products?active=true' : null,
-    fetcher
+    () => getActiveProducts()
   )
 
   const [productId, setProductId] = useState('')
@@ -248,7 +255,7 @@ export default function StocktakeDetailPage() {
     }
   }
 
-  const products = productsData?.products ?? []
+  const products = productsData ?? []
   const entries = stocktake?.entries ?? []
   const isOpen = stocktake?.status === 'open'
   const countedIds = new Set(entries.map((e) => e.productId))

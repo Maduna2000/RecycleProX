@@ -15,6 +15,7 @@ import { useSession } from 'next-auth/react'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { colors } from '@/lib/design-tokens'
 import { fetcher } from '@/lib/swrFetcher'
+import { useOfflineLookup } from '@/hooks/useOfflineLookup'
 import {
   TH, TD, HEADER_GRAD,
   Btn, PortalPage,
@@ -263,7 +264,13 @@ function ManagePriceGroupModal({ groupId, onClose, onChanged }: {
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
 
   const { data: group, isLoading: groupLoading } = useSWR<PriceGroupDetail>(`/api/price-groups/${groupId}`, fetcher)
-  const { data: productsData } = useSWR<{ products: ManageProduct[] }>('/api/products?active=true', fetcher)
+  // Fetched via getActiveProducts (same as Purchases/Sales/the price-list
+  // editor/stocktake) rather than a plain fetcher — SWR's cache is keyed on
+  // the URL alone, shared app-wide regardless of which fetcher populates it;
+  // a plain fetcher here would hand other pages reading this same key the
+  // raw { products: [...] } wrapper where they expect the unwrapped array.
+  const { getActiveProducts } = useOfflineLookup()
+  const { data: products } = useSWR<ManageProduct[]>('/api/products?active=true', () => getActiveProducts())
 
   const [overrides, setOverrides] = useState<Record<string, { buy: string; sell: string; enabled: boolean }>>({})
   const [saving, setSaving] = useState(false)
@@ -272,10 +279,10 @@ function ManagePriceGroupModal({ groupId, onClose, onChanged }: {
   const [copyConfirmOpen, setCopyConfirmOpen] = useState(false)
 
   useEffect(() => {
-    if (!group || !productsData) return
+    if (!group || !products) return
     const init: Record<string, { buy: string; sell: string; enabled: boolean }> = {}
     const groupOverrideMap = Object.fromEntries(group.overrides.map((o) => [o.productId, o]))
-    for (const p of productsData.products) {
+    for (const p of products) {
       const existing = groupOverrideMap[p.id]
       init[p.id] = {
         buy:     existing ? Number(existing.buyPrice).toFixed(2)  : Number(p.defaultBuyPrice).toFixed(2),
@@ -285,7 +292,7 @@ function ManagePriceGroupModal({ groupId, onClose, onChanged }: {
     }
     setOverrides(init)
     setDirty(false)
-  }, [group, productsData])
+  }, [group, products])
 
   async function onSave() {
     const activeOverrides = Object.entries(overrides)
@@ -303,10 +310,10 @@ function ManagePriceGroupModal({ groupId, onClose, onChanged }: {
   }
 
   function onReset() {
-    if (!group || !productsData) return
+    if (!group || !products) return
     const init: Record<string, { buy: string; sell: string; enabled: boolean }> = {}
     const groupOverrideMap = Object.fromEntries(group.overrides.map((o) => [o.productId, o]))
-    for (const p of productsData.products) {
+    for (const p of products) {
       const existing = groupOverrideMap[p.id]
       init[p.id] = {
         buy:     existing ? Number(existing.buyPrice).toFixed(2)  : Number(p.defaultBuyPrice).toFixed(2),
@@ -336,8 +343,7 @@ function ManagePriceGroupModal({ groupId, onClose, onChanged }: {
     } finally { setCopying(false) }
   }
 
-  const products = productsData?.products ?? []
-  const categories = Array.from(new Set(products.map((p) => p.category))).sort()
+  const categories = Array.from(new Set((products ?? []).map((p) => p.category))).sort()
 
   return (
     <>
@@ -388,7 +394,7 @@ function ManagePriceGroupModal({ groupId, onClose, onChanged }: {
                 </thead>
                 <tbody>
                   {categories.map((cat) => {
-                    const catProducts = products.filter((p) => p.category === cat)
+                    const catProducts = (products ?? []).filter((p) => p.category === cat)
                     return (
                       <>
                         <tr key={`cat-${cat}`}>
