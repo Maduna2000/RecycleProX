@@ -150,6 +150,16 @@ export const REPORT_CATALOG: ReportCatalogEntry[] = [
   },
   // ── Cash & Financial ───────────────────────────────────────────────────────
   {
+    id: 'cashup-snapshot',
+    label: 'Cash-Up Snapshot',
+    description:
+      'A full snapshot of one cash-up session exactly as it stood at cash-up: opening balance, every cash sale/purchase, payments, expenses, loans, expected vs declared cash, variance, and the denomination count.',
+    area: 'cash',
+    filters: [
+      { key: 'cashupId', label: 'Cash-Up Session', type: 'cashup', required: true },
+    ],
+  },
+  {
     id: 'cashup-history',
     label: 'Cash-Up History',
     description:

@@ -24,6 +24,7 @@ import {
   ExpensesReportParamsSchema,
   LoansOutstandingParamsSchema,
   LoanPaymentsParamsSchema,
+  CashupSnapshotParamsSchema,
   StockOnHandParamsSchema,
   StockMovementParamsSchema,
   StocktakeReportParamsSchema,
@@ -56,6 +57,7 @@ import {
   buildProfitSummary,
   buildVatSummary,
   buildCancelledTransactions,
+  buildCashupSnapshot,
 } from './builders/cash'
 import { buildStockOnHand, buildStockMovement } from './builders/stock'
 import { buildStocktakeReport } from './builders/stocktake'
@@ -119,6 +121,10 @@ export const REPORT_REGISTRY: Record<string, ReportDefinition> = {
   'cashup-history': {
     paramsSchema: BaseReportParamsSchema,
     build: buildCashupHistory,
+  },
+  'cashup-snapshot': {
+    paramsSchema: CashupSnapshotParamsSchema,
+    build: buildCashupSnapshot,
   },
   'expenses': {
     paramsSchema: ExpensesReportParamsSchema,

@@ -206,6 +206,44 @@ function ProductSelect({
   )
 }
 
+interface CashupHistoryHit {
+  id: string
+  sessionDate: string
+  status: string
+  currency: string
+}
+
+/** Cash-up session picker — backed by /api/cashup/history, newest first. */
+function CashupSelect({
+  label,
+  value,
+  onChange,
+  required,
+}: {
+  label: string
+  value: string
+  onChange: (id: string) => void
+  required?: boolean
+}) {
+  const { data } = useSWR<{ sessions: CashupHistoryHit[] }>(
+    '/api/cashup/history?status=open,submitted,approved&take=100',
+    fetcher
+  )
+  return (
+    <div>
+      <label style={lbl}>{label}</label>
+      <FilterSelect value={value} onChange={onChange}>
+        {!required && <option value="">Select a session…</option>}
+        {(data?.sessions ?? []).map((s) => (
+          <option key={s.id} value={s.id}>
+            {s.sessionDate.slice(0, 10).replace(/-/g, '/')} — {s.status.toUpperCase()}
+          </option>
+        ))}
+      </FilterSelect>
+    </div>
+  )
+}
+
 /** Plain free-text filter — e.g. a partial ID number or transaction number search. */
 function TextFilter({
   label,
@@ -253,6 +291,9 @@ function FilterControl({
   }
   if (spec.type === 'text') {
     return <TextFilter label={spec.label} value={value} onChange={onChange} />
+  }
+  if (spec.type === 'cashup') {
+    return <CashupSelect label={spec.label} value={value} onChange={onChange} required={spec.required} />
   }
 
   const options =
