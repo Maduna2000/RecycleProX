@@ -47,6 +47,7 @@ export const LEDGER_ACCOUNTS = {
   COGS: '5000',
   OPERATING_EXPENSES: '5100',
   CASH_OVER_SHORT: '5200',
+  STOCK_VARIANCE: '5300',
 } as const
 
 const STRUCTURAL_ACCOUNTS: { code: string; name: string; type: AccountType; normalBalance: AccountNormalBalance }[] = [
@@ -70,6 +71,7 @@ const STRUCTURAL_ACCOUNTS: { code: string; name: string; type: AccountType; norm
   { code: LEDGER_ACCOUNTS.COGS, name: 'Cost of Goods Sold', type: 'expense', normalBalance: 'debit' },
   { code: LEDGER_ACCOUNTS.OPERATING_EXPENSES, name: 'Operating Expenses', type: 'expense', normalBalance: 'debit' },
   { code: LEDGER_ACCOUNTS.CASH_OVER_SHORT, name: 'Cash Over/Short', type: 'expense', normalBalance: 'debit' },
+  { code: LEDGER_ACCOUNTS.STOCK_VARIANCE, name: 'Stock Count Variance', type: 'expense', normalBalance: 'debit' },
 ]
 
 /** Idempotent — safe to call from every posting path; only ever creates what's missing. */
@@ -856,6 +858,94 @@ export async function postCashUpVariance(
       ? [{ accountId: varianceAccountId, debit: amount }, { accountId: cashAccountId, credit: amount }]
       : [{ accountId: cashAccountId, debit: amount }, { accountId: varianceAccountId, credit: amount }],
   })
+}
+
+// ─── Stocktake adjustment ───────────────────────────────────────────────────
+
+export interface StocktakeAdjustmentLine {
+  productId: string
+  productCategory: string
+  // Signed: positive = physical count found MORE than the system expected
+  // (surplus), negative = found LESS (shortage/shrinkage).
+  variance: Decimal
+}
+
+/**
+ * A physical count correcting the system's stock record is a real change in
+ * Inventory's value, valued at each product's current average cost (there's
+ * no transaction price for a miscount — it's not a purchase or a sale, just
+ * a correction) — the average cost itself is left untouched, only quantity
+ * moves, via the same reversePurchaseCost/reverseSaleCost helpers void
+ * handling already uses. Surplus: Dr Inventory–[category], Cr Stock Count
+ * Variance. Shortage: Dr Stock Count Variance, Cr Inventory–[category].
+ * Same "single account absorbs both directions" shape as
+ * postCashUpVariance's Cash Over/Short.
+ */
+export async function postStocktakeAdjustment(
+  tx: TxClient,
+  opts: { stocktakeId: string; refNumber: string; entryDate: Date; lines: StocktakeAdjustmentLine[]; userId?: string }
+): Promise<void> {
+  await ensureStructuralAccounts(tx)
+
+  const inventoryLines: JournalLineInput[] = []
+  let totalSurplus = new Decimal(0)
+  let totalShortage = new Decimal(0)
+
+  for (const line of opts.lines) {
+    if (line.variance.isZero()) continue
+    const existing = await tx.productAverageCost.findUnique({ where: { productId: line.productId } })
+    const avgCost = existing ? new Decimal(existing.averageCost.toString()) : new Decimal(0)
+    const value = line.variance.abs().times(avgCost).toDecimalPlaces(2)
+    const inventoryAccountId = await categoryAccountId(tx, LEDGER_ACCOUNTS.INVENTORY, line.productCategory)
+
+    if (line.variance.isPositive()) {
+      await reverseSaleCost(tx, line.productId, line.variance)
+      if (value.greaterThan(0)) {
+        inventoryLines.push({ accountId: inventoryAccountId, debit: value })
+        totalSurplus = totalSurplus.plus(value)
+      }
+    } else {
+      await reversePurchaseCost(tx, line.productId, line.variance.abs())
+      if (value.greaterThan(0)) {
+        inventoryLines.push({ accountId: inventoryAccountId, credit: value })
+        totalShortage = totalShortage.plus(value)
+      }
+    }
+  }
+
+  const varianceAccountId = await structuralAccountId(tx, LEDGER_ACCOUNTS.STOCK_VARIANCE)
+  const net = totalShortage.minus(totalSurplus)
+  if (net.greaterThan(0)) inventoryLines.push({ accountId: varianceAccountId, debit: net })
+  else if (net.lessThan(0)) inventoryLines.push({ accountId: varianceAccountId, credit: net.abs() })
+
+  await postJournalEntry(tx, {
+    entryDate: opts.entryDate,
+    description: `Stocktake adjustment ${opts.refNumber}`,
+    sourceType: 'stocktake_adjustment',
+    sourceId: opts.stocktakeId,
+    createdByUserId: opts.userId,
+    lines: inventoryLines,
+  })
+}
+
+export async function reverseStocktakeAdjustmentLedger(
+  tx: TxClient,
+  stocktakeId: string,
+  refNumber: string,
+  lines: { productId: string; variance: Decimal }[],
+  reason: string,
+  userId?: string
+): Promise<void> {
+  await reverseJournalEntry(tx, 'stocktake_adjustment', stocktakeId, `Void — Stocktake ${refNumber}: ${reason}`, userId)
+  // Mirror the quantity impact too — a surplus's quantity gain (added via
+  // reverseSaleCost) is taken back out via reversePurchaseCost, and vice
+  // versa for a shortage, same "opposite of whichever helper posting used"
+  // pairing postStocktakeAdjustment itself relies on.
+  for (const line of lines) {
+    if (line.variance.isZero()) continue
+    if (line.variance.isPositive()) await reversePurchaseCost(tx, line.productId, line.variance)
+    else await reverseSaleCost(tx, line.productId, line.variance.abs())
+  }
 }
 
 // ─── Opening balance (historical backfill, run once) ───────────────────────

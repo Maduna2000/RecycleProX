@@ -19,7 +19,7 @@ function monthStartLabel(): string {
 const SOURCE_TYPES = [
   '', 'purchase', 'purchase_settlement', 'sale', 'sale_settlement', 'expense',
   'loan_advance', 'loan_repayment', 'business_loan', 'business_loan_repayment',
-  'cashup_variance', 'opening_balance',
+  'cashup_variance', 'stocktake_adjustment', 'opening_balance',
 ]
 
 export default function JournalPage() {

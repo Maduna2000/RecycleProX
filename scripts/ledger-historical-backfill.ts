@@ -27,7 +27,10 @@
  *    on postLoanRepayment). These don't touch inventory costing, so unlike
  *    step 2 they don't need to interleave with anything — each posts
  *    independently.
- * 4. Replays approved CashUp variances.
+ * 4. Replays approved CashUp variances and completed Stocktake adjustments
+ *    (also order-independent — a stocktake corrects quantityOnHand only,
+ *    never averageCost, so it doesn't feed into any dollar figure that
+ *    depends on purchase/sale ordering).
  *
  * Voided/reversed historical transactions are excluded entirely — net-zero
  * effect either way, simpler and equally correct for final balances (same
@@ -73,7 +76,7 @@ import {
   postExpense,
   postLoanAdvance, postLoanRepayment,
   postBusinessLoanReceived, postBusinessLoanRepayment,
-  postCashUpVariance,
+  postCashUpVariance, postStocktakeAdjustment,
   postJournalEntry, structuralAccountId,
   LEDGER_ACCOUNTS,
 } from '@/lib/services/ledgerService'
@@ -173,7 +176,7 @@ async function main() {
   )
 
   await withTenantId(tenant.id, async () => {
-    const [purchases, sales, expenses, loans, standaloneLoanRepayments, businessLoans, standaloneBusinessLoanRepayments, cashUps] = await Promise.all([
+    const [purchases, sales, expenses, loans, standaloneLoanRepayments, businessLoans, standaloneBusinessLoanRepayments, cashUps, stocktakes] = await Promise.all([
       prisma.purchase.findMany({ where: { status: { not: 'voided' } }, include: { lines: { include: { product: true } } }, orderBy: { createdAt: 'asc' } }),
       prisma.sale.findMany({ where: { status: { not: 'voided' } }, include: { lines: { include: { product: true } } }, orderBy: { createdAt: 'asc' } }),
       prisma.expense.findMany({ where: { status: 'approved' }, orderBy: { createdAt: 'asc' } }),
@@ -182,6 +185,11 @@ async function main() {
       prisma.businessLoan.findMany({ where: { status: { not: 'voided' } }, orderBy: { createdAt: 'asc' } }),
       prisma.businessLoanRepayment.findMany({ where: { saleId: null }, orderBy: { createdAt: 'asc' } }),
       prisma.cashUp.findMany({ where: { status: 'approved' }, orderBy: { sessionDate: 'asc' } }),
+      // completed only (not 'open'/'voided') — quantityOnHand doesn't feed
+      // into any dollar figure (only averageCost does, which a stocktake
+      // adjustment never touches), so unlike purchases/sales these don't
+      // need chronological interleaving for correctness.
+      prisma.stocktake.findMany({ where: { status: 'completed' }, include: { entries: { include: { product: true } } }, orderBy: { completedAt: 'asc' } }),
     ])
 
     console.log('\nFound:')
@@ -191,6 +199,7 @@ async function main() {
     console.log(`  Loans (non-voided): ${loans.length}, standalone repayments: ${standaloneLoanRepayments.length}`)
     console.log(`  Business loans (non-voided): ${businessLoans.length}, standalone repayments: ${standaloneBusinessLoanRepayments.length}`)
     console.log(`  Cash-ups (approved): ${cashUps.length}`)
+    console.log(`  Stocktakes (completed): ${stocktakes.length}`)
 
     if (!EXECUTE) {
       console.log('\nDry run only — no changes made. Re-run with --execute to actually post.')
@@ -387,6 +396,19 @@ async function main() {
       })
     }
     console.log(`Cash-up variances posted (${cashUps.length}).`)
+
+    for (const s of stocktakes) {
+      if (await alreadyPosted('stocktake_adjustment', s.id)) continue
+      await prisma.$transaction(async (tx) => {
+        await postStocktakeAdjustment(tx, {
+          stocktakeId: s.id, refNumber: s.refNumber, entryDate: s.completedAt ?? s.createdAt,
+          lines: s.entries.map((e) => ({
+            productId: e.productId, productCategory: e.product.category, variance: new Decimal(e.variance.toString()),
+          })),
+        })
+      })
+    }
+    console.log(`Stocktake adjustments posted (${stocktakes.length}).`)
 
     console.log('\nDone. Open /ledger and review the Trial Balance and Balance Sheet.')
   })
