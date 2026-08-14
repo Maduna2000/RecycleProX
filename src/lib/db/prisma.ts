@@ -49,7 +49,7 @@ const TENANT_SCOPED_MODELS = new Set([
   'policeSearchLog', 'mediaFile', 'floatMovement', 'transactionPayment',
   'transactionPaymentLink', 'scaleOrder', 'scaleOrderLine',
   'gateEntry', 'gatePurposeConfig', 'gateSellOption', 'businessLoan', 'businessLoanRepayment',
-  'momoStatementImport', 'momoStatementLine',
+  'momoStatementImport', 'momoStatementLine', 'priceList', 'priceListItem',
 ])
 
 // Top-level raw-query methods — routed through the same tenant-scoping
