@@ -580,7 +580,14 @@ export async function postSale(
     debitLines.push({ accountId: await structuralAccountId(tx, LEDGER_ACCOUNTS.LOANS_PAYABLE), debit: loanPortion })
   }
   if (cashPortion.greaterThan(0)) {
-    const code = opts.isPending
+    // A completed EFT sale isn't confirmed money yet — Renovo Pro has no
+    // way to know an EFT actually landed in the bank until someone checks
+    // the statement, so it posts to Accounts Receivable (same as a
+    // genuinely-pending sale) rather than straight to Bank. Moves to Bank
+    // only once postEftConfirmation is explicitly called. Cash is
+    // physically counted at the point of sale, so it's still confirmed
+    // immediately.
+    const code = opts.isPending || opts.paymentMethod === 'eft'
       ? LEDGER_ACCOUNTS.ACCOUNTS_RECEIVABLE
       : cashOrBankCode(opts.paymentMethod)
     debitLines.push({ accountId: await structuralAccountId(tx, code), debit: cashPortion })
@@ -679,9 +686,16 @@ export async function postSaleSettlement(
   if (totalSettled.lessThanOrEqualTo(0)) return
 
   if (opts.cashAmount.greaterThan(0)) lines.push({ accountId: await structuralAccountId(tx, LEDGER_ACCOUNTS.CASH), debit: opts.cashAmount })
-  if (opts.eftAmount.greaterThan(0)) lines.push({ accountId: await structuralAccountId(tx, LEDGER_ACCOUNTS.BANK), debit: opts.eftAmount })
+  // The eft leg stays in Accounts Receivable rather than moving to Bank —
+  // same "not confirmed until the bank statement is checked" reasoning as
+  // postSale. Net effect: crediting AR for totalSettled (clearing the
+  // original pending balance) while debiting AR back for just the eft
+  // portion leaves exactly that portion still sitting in AR, only the
+  // cash/loan portions actually leave the receivable.
+  const arAccountId = await structuralAccountId(tx, LEDGER_ACCOUNTS.ACCOUNTS_RECEIVABLE)
+  if (opts.eftAmount.greaterThan(0)) lines.push({ accountId: arAccountId, debit: opts.eftAmount })
   if (opts.loanAmount.greaterThan(0)) lines.push({ accountId: await structuralAccountId(tx, LEDGER_ACCOUNTS.LOANS_PAYABLE), debit: opts.loanAmount })
-  lines.push({ accountId: await structuralAccountId(tx, LEDGER_ACCOUNTS.ACCOUNTS_RECEIVABLE), credit: totalSettled })
+  lines.push({ accountId: arAccountId, credit: totalSettled })
 
   await postJournalEntry(tx, {
     entryDate: opts.entryDate,
@@ -690,6 +704,77 @@ export async function postSaleSettlement(
     sourceId: opts.saleId,
     createdByUserId: opts.userId,
     lines,
+  })
+}
+
+// ─── EFT receipt confirmation ──────────────────────────────────────────────
+// postSale/postSaleSettlement leave a completed EFT sale sitting in
+// Accounts Receivable rather than Bank — Renovo Pro has no way to know an
+// EFT actually landed until someone checks the bank statement. This is the
+// explicit "yes, it landed" step that moves it from AR to Bank.
+
+export interface SaleEftAmountInput {
+  totalAmount: { toString(): string }
+  businessLoanDeductionAmount: { toString(): string } | null
+  paymentMethod: string
+  splitPayments: unknown
+}
+
+/** The eft-specific portion of a completed sale — same derivation postSale/postSaleSettlement's own posting already relies on, extracted here so this confirmation flow and the historical backfill agree on what "the eft amount" means for a given sale. */
+export function computeSaleEftAmount(sale: SaleEftAmountInput): Decimal {
+  if (sale.splitPayments && typeof sale.splitPayments === 'object') {
+    const sp = sale.splitPayments as Record<string, string>
+    return new Decimal(sp.eft ?? '0')
+  }
+  if (sale.paymentMethod !== 'eft') return new Decimal(0)
+  const loanDeduction = sale.businessLoanDeductionAmount ? new Decimal(sale.businessLoanDeductionAmount.toString()) : new Decimal(0)
+  return new Decimal(sale.totalAmount.toString()).minus(loanDeduction)
+}
+
+/** Dr Bank, Cr Accounts Receivable. */
+export async function postEftConfirmation(
+  tx: TxClient,
+  opts: { saleId: string; refNumber: string; entryDate: Date; amount: Decimal; userId?: string }
+): Promise<void> {
+  await ensureStructuralAccounts(tx)
+  const bankAccountId = await structuralAccountId(tx, LEDGER_ACCOUNTS.BANK)
+  const arAccountId = await structuralAccountId(tx, LEDGER_ACCOUNTS.ACCOUNTS_RECEIVABLE)
+  await postJournalEntry(tx, {
+    entryDate: opts.entryDate,
+    description: `EFT confirmed received — Sale ${opts.refNumber}`,
+    sourceType: 'eft_confirmation',
+    sourceId: opts.saleId,
+    createdByUserId: opts.userId,
+    lines: [
+      { accountId: bankAccountId, debit: opts.amount },
+      { accountId: arAccountId, credit: opts.amount },
+    ],
+  })
+}
+
+export class EftAlreadyConfirmedError extends Error {
+  constructor(refNumber: string) { super(`EFT for sale "${refNumber}" has already been confirmed received`); this.name = 'EftAlreadyConfirmedError' }
+}
+
+export class NoEftAmountError extends Error {
+  constructor(refNumber: string) { super(`Sale "${refNumber}" has no EFT-paid amount to confirm`); this.name = 'NoEftAmountError' }
+}
+
+/** Top-level, self-transacting — the admin action a "Confirm Received" button on the /ledger dashboard calls, not something wired into another service's own transaction. */
+export async function confirmEftReceived(saleId: string, userId?: string): Promise<void> {
+  await prisma.$transaction(async (tx) => {
+    const sale = await tx.sale.findUniqueOrThrow({ where: { id: saleId } })
+    const amount = computeSaleEftAmount(sale)
+    if (amount.lessThanOrEqualTo(0)) throw new NoEftAmountError(sale.refNumber)
+
+    const alreadyConfirmed = await tx.journalEntry.findFirst({
+      where: { sourceType: 'eft_confirmation', sourceId: saleId },
+    })
+    if (alreadyConfirmed) throw new EftAlreadyConfirmedError(sale.refNumber)
+
+    await postEftConfirmation(tx, {
+      saleId, refNumber: sale.refNumber, entryDate: new Date(), amount, userId,
+    })
   })
 }
 

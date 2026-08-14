@@ -1,11 +1,14 @@
 'use client'
 
+import { useState } from 'react'
 import useSWR from 'swr'
 import Link from 'next/link'
+import { toast } from 'sonner'
 import { fetcher } from '@/lib/swrFetcher'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
+import { TH, TD, Btn } from '@/components/rpx'
 import { formatMoney } from './_lib/money'
-import type { AccountTreeNode } from '@/lib/services/ledgerReportService'
+import type { AccountTreeNode, PendingSalePaymentRow, EftAwaitingConfirmationRow } from '@/lib/services/ledgerReportService'
 import type { ProfitAndLossReport } from '@/lib/services/ledgerReportService'
 
 function todayLabel(): string {
@@ -32,6 +35,137 @@ function StatCard({ label, value, tone }: { label: string; value: string; tone?:
         {value}
       </div>
     </div>
+  )
+}
+
+function Panel({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
+  return (
+    <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 6, overflow: 'hidden' }}>
+      <div style={{ padding: '12px 16px', borderBottom: `1px solid ${colors.border}` }}>
+        <div style={{ fontSize: fontSize.md, fontWeight: fontWeight.semibold, color: colors.mainInstruction }}>{title}</div>
+        <div style={{ fontSize: fontSize.sm, color: colors.textSecondary, marginTop: 2 }}>{subtitle}</div>
+      </div>
+      {children}
+    </div>
+  )
+}
+
+// ─── Pending Payments (unpaid Sales) ───────────────────────────────────────
+
+function PendingPaymentsSection() {
+  const { data, isLoading } = useSWR<{ rows: PendingSalePaymentRow[]; total: string }>('/api/ledger/pending-payments', fetcher)
+
+  return (
+    <Panel title="Pending Payments" subtitle="Unpaid sales — money expected but not yet received, from any method.">
+      {isLoading ? (
+        <div style={{ padding: 24, textAlign: 'center', color: colors.textSecondary }}>Loading…</div>
+      ) : !data || data.rows.length === 0 ? (
+        <div style={{ padding: 24, textAlign: 'center', color: colors.textSecondary }}>No unpaid sales.</div>
+      ) : (
+        <div style={{ overflow: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ borderBottom: `1px solid ${colors.border}` }}>
+                <th style={TH}>Sale</th>
+                <th style={TH}>Buyer</th>
+                <th style={TH}>Date</th>
+                <th style={{ ...TH, textAlign: 'right' }}>Outstanding</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.rows.map((r) => (
+                <tr key={r.saleId} style={{ borderBottom: `1px solid ${colors.rowDivider}` }}>
+                  <td style={TD}>{r.refNumber}</td>
+                  <td style={TD}>{r.buyerName ?? '—'}</td>
+                  <td style={TD}>{new Date(r.createdAt).toLocaleDateString()}</td>
+                  <td style={{ ...TD, fontFamily: 'monospace', textAlign: 'right', color: colors.warning, fontWeight: fontWeight.semibold }}>{formatMoney(r.outstanding)}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr style={{ borderTop: `2px solid ${colors.border}`, background: colors.bg }}>
+                <td colSpan={3} style={{ ...TD, textAlign: 'right', fontWeight: fontWeight.semibold }}>Total expected</td>
+                <td style={{ ...TD, fontFamily: 'monospace', fontWeight: fontWeight.bold, textAlign: 'right' }}>{formatMoney(data.total)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
+    </Panel>
+  )
+}
+
+// ─── Accounts Receivable — EFT Awaiting Confirmation ───────────────────────
+
+function EftReceivablesSection() {
+  const { data, isLoading, mutate } = useSWR<{ rows: EftAwaitingConfirmationRow[]; total: string }>('/api/ledger/eft-receivables', fetcher)
+  const [confirmingId, setConfirmingId] = useState<string | null>(null)
+
+  async function handleConfirm(row: EftAwaitingConfirmationRow) {
+    setConfirmingId(row.saleId)
+    try {
+      const res = await fetch('/api/ledger/eft-receivables/confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ saleId: row.saleId }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error ?? `Request failed (${res.status})`)
+      }
+      await mutate()
+      toast.success(`Confirmed ${formatMoney(row.eftAmount)} received for ${row.refNumber}`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to confirm receipt')
+    } finally {
+      setConfirmingId(null)
+    }
+  }
+
+  return (
+    <Panel title="Accounts Receivable — EFT Awaiting Confirmation" subtitle="Completed EFT sales still sitting as receivable until you confirm the transfer actually landed in the bank.">
+      {isLoading ? (
+        <div style={{ padding: 24, textAlign: 'center', color: colors.textSecondary }}>Loading…</div>
+      ) : !data || data.rows.length === 0 ? (
+        <div style={{ padding: 24, textAlign: 'center', color: colors.textSecondary }}>Nothing awaiting confirmation.</div>
+      ) : (
+        <div style={{ overflow: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ borderBottom: `1px solid ${colors.border}` }}>
+                <th style={TH}>Sale</th>
+                <th style={TH}>Buyer</th>
+                <th style={TH}>Date</th>
+                <th style={{ ...TH, textAlign: 'right' }}>EFT Amount</th>
+                <th style={TH}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.rows.map((r) => (
+                <tr key={r.saleId} style={{ borderBottom: `1px solid ${colors.rowDivider}` }}>
+                  <td style={TD}>{r.refNumber}</td>
+                  <td style={TD}>{r.buyerName ?? '—'}</td>
+                  <td style={TD}>{new Date(r.createdAt).toLocaleDateString()}</td>
+                  <td style={{ ...TD, fontFamily: 'monospace', textAlign: 'right' }}>{formatMoney(r.eftAmount)}</td>
+                  <td style={{ ...TD, textAlign: 'right' }}>
+                    <Btn size="sm" variant="primary" loading={confirmingId === r.saleId} onClick={() => handleConfirm(r)}>
+                      Confirm Received
+                    </Btn>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr style={{ borderTop: `2px solid ${colors.border}`, background: colors.bg }}>
+                <td colSpan={3} style={{ ...TD, textAlign: 'right', fontWeight: fontWeight.semibold }}>Total awaiting confirmation</td>
+                <td style={{ ...TD, fontFamily: 'monospace', fontWeight: fontWeight.bold, textAlign: 'right' }}>{formatMoney(data.total)}</td>
+                <td />
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
+    </Panel>
   )
 }
 
@@ -83,6 +217,9 @@ export default function LedgerDashboardPage() {
           </div>
         </>
       )}
+
+      <PendingPaymentsSection />
+      <EftReceivablesSection />
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {[

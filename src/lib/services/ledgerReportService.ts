@@ -1,6 +1,7 @@
 import Decimal from 'decimal.js'
 import { prisma } from '@/lib/db/prisma'
 import { sastDateLabelToUTCDate, getDayBoundsSAST, getRangeBoundsSAST } from '@/lib/utils/dayBounds'
+import { computeSaleEftAmount } from '@/lib/services/ledgerService'
 import type { AccountType, AccountNormalBalance } from '@prisma/client'
 
 // ─── Design ──────────────────────────────────────────────────────────────────
@@ -388,4 +389,93 @@ const LEDGER_CODES = {
   SALES_REVENUE: '4000',
   COGS: '5000',
   OPERATING_EXPENSES: '5100',
+}
+
+// ─── Pending Payments (unpaid Sales) ───────────────────────────────────────
+// Dashboard widget: real Sale rows still owed by a buyer, not derived from
+// the ledger's own Accounts Receivable balance — that account also holds
+// completed-but-EFT-unconfirmed amounts (see getEftAwaitingConfirmation),
+// and this list is specifically "money not paid via ANY method yet".
+
+export interface PendingSalePaymentRow {
+  saleId: string
+  refNumber: string
+  buyerName: string | null
+  totalAmount: string
+  amountPaid: string
+  outstanding: string
+  createdAt: string
+}
+
+export async function getPendingSalesPayments(): Promise<{ rows: PendingSalePaymentRow[]; total: string }> {
+  const sales = await prisma.sale.findMany({
+    where: { status: 'pending' },
+    include: { customer: { select: { firstName: true, lastName: true } } },
+    orderBy: { createdAt: 'asc' },
+  })
+
+  const rows: PendingSalePaymentRow[] = sales.map((s) => {
+    const totalAmount = new Decimal(s.totalAmount.toString())
+    const amountPaid = new Decimal(s.amountPaid?.toString() ?? '0')
+    return {
+      saleId: s.id,
+      refNumber: s.refNumber,
+      buyerName: s.customer ? `${s.customer.firstName} ${s.customer.lastName}` : s.buyerName,
+      totalAmount: totalAmount.toFixed(2),
+      amountPaid: amountPaid.toFixed(2),
+      outstanding: totalAmount.minus(amountPaid).toFixed(2),
+      createdAt: s.createdAt.toISOString(),
+    }
+  })
+  const total = rows.reduce((sum, r) => sum.plus(r.outstanding), new Decimal(0))
+  return { rows, total: total.toFixed(2) }
+}
+
+// ─── EFT Awaiting Confirmation ──────────────────────────────────────────────
+// Dashboard widget: completed sales paid (fully or partly) via EFT that
+// postSale/postSaleSettlement left sitting in Accounts Receivable, not yet
+// moved to Bank via postEftConfirmation.
+
+export interface EftAwaitingConfirmationRow {
+  saleId: string
+  refNumber: string
+  buyerName: string | null
+  eftAmount: string
+  createdAt: string
+}
+
+export async function getEftAwaitingConfirmation(): Promise<{ rows: EftAwaitingConfirmationRow[]; total: string }> {
+  // Filtered in JS (not the WHERE clause) — a split-payment sale might carry
+  // an eft leg regardless of its own top-level paymentMethod, and Prisma's
+  // JSON-field "not null" filter typing is awkward for a mixed OR like
+  // this; computeSaleEftAmount below is the one true source of "does this
+  // sale actually have an eft amount" anyway, so there's no real need to
+  // duplicate that logic in the query itself.
+  const candidates = await prisma.sale.findMany({
+    where: { status: 'completed' },
+    include: { customer: { select: { firstName: true, lastName: true } } },
+    orderBy: { createdAt: 'asc' },
+  })
+
+  const confirmedSaleIds = new Set(
+    (await prisma.journalEntry.findMany({ where: { sourceType: 'eft_confirmation' }, select: { sourceId: true } }))
+      .map((e) => e.sourceId)
+      .filter((id): id is string => !!id)
+  )
+
+  const rows: EftAwaitingConfirmationRow[] = []
+  for (const s of candidates) {
+    if (confirmedSaleIds.has(s.id)) continue
+    const eftAmount = computeSaleEftAmount(s)
+    if (eftAmount.lessThanOrEqualTo(0)) continue
+    rows.push({
+      saleId: s.id,
+      refNumber: s.refNumber,
+      buyerName: s.customer ? `${s.customer.firstName} ${s.customer.lastName}` : s.buyerName,
+      eftAmount: eftAmount.toFixed(2),
+      createdAt: s.createdAt.toISOString(),
+    })
+  }
+  const total = rows.reduce((sum, r) => sum.plus(r.eftAmount), new Decimal(0))
+  return { rows, total: total.toFixed(2) }
 }

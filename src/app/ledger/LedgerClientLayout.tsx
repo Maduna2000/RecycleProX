@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { signOut, useSession } from 'next-auth/react'
 import { LogOut, BookOpen } from 'lucide-react'
 import { colors } from '@/lib/design-tokens'
+import { Toaster } from '@/components/ui/sonner'
 
 const NAV_ITEMS = [
   { href: '/ledger', label: 'Dashboard' },
@@ -107,6 +108,7 @@ export default function LedgerClientLayout({ children }: { children: React.React
       </nav>
 
       <main className="flex-1 flex flex-col min-h-0 p-4 sm:p-6">{children}</main>
+      <Toaster richColors />
     </div>
   )
 }
