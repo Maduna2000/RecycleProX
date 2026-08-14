@@ -1,12 +1,10 @@
 'use client'
 
 /**
- * Report catalog — cards grouped by area, driven by REPORT_CATALOG. The Cash
- * area also links to the existing per-session Cash-Up report pack.
+ * Report catalog — cards grouped by area, driven by REPORT_CATALOG.
  */
 import { useState } from 'react'
-import Link from 'next/link'
-import { FileBarChart2, ExternalLink, Search } from 'lucide-react'
+import { FileBarChart2, Search } from 'lucide-react'
 import { REPORT_CATALOG, REPORT_AREA_LABELS } from '@/lib/reports/catalog'
 import type { ReportArea } from '@/lib/reports/types'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
@@ -47,7 +45,7 @@ export function ReportCatalog({ selectedId, onSelect }: ReportCatalogProps) {
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
         {AREA_ORDER.map((area) => {
           const entries = filtered.filter((r) => r.area === area)
-          if (entries.length === 0 && area !== 'cash') return null
+          if (entries.length === 0) return null
           return (
             <div key={area}>
               <div
@@ -97,27 +95,6 @@ export function ReportCatalog({ selectedId, onSelect }: ReportCatalogProps) {
                   </button>
                 )
               })}
-              {area === 'cash' && (
-                <Link
-                  href="/app/cashup"
-                  style={{
-                    display: 'block', padding: '7px 10px 7px 12px',
-                    borderLeft: '3px solid transparent', borderBottom: '1px solid #F2F2F2',
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = '#F5F5F5' }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
-                >
-                  <div className="flex items-center gap-2">
-                    <ExternalLink className="w-3.5 h-3.5 shrink-0" style={{ color: colors.textSecondary }} />
-                    <span style={{ fontSize: fontSize.sm, fontWeight: fontWeight.medium, color: colors.textPrimary }}>
-                      Cash-Up Session Reports
-                    </span>
-                  </div>
-                  <p style={{ margin: '2px 0 0 22px', fontSize: fontSize.xs, color: colors.textSecondary }}>
-                    Per-session report pack in the Cash-Up module.
-                  </p>
-                </Link>
-              )}
             </div>
           )
         })}

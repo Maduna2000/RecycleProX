@@ -12,13 +12,27 @@ import { getCustomerLoanStatement } from '@/lib/services/loanService'
 import { getCustomerBusinessLoanStatement } from '@/lib/services/businessLoanService'
 import { groupRows } from '@/lib/services/reports/grouping'
 import { countDataRows } from '@/lib/reports/flatten'
-import { DENOMINATION_LABELS, DENOMINATIONS } from '@/lib/schemas/cashup'
+import { DENOMINATION_LABELS, DENOMINATIONS, CURRENCY_SYMBOLS } from '@/lib/schemas/cashup'
+import {
+  getCashUp,
+  getCashSalesForDate,
+  getCashPurchasesForDate,
+  getAccountPaymentsForDate,
+  getExpensesForDateReport,
+  getLoanAdvancesForDate,
+  getLoanRepaymentsForDate,
+  getCardSalesForDate,
+  getTransferredPurchasesForDate,
+  getDrawingsReceivedForDateReport,
+} from '@/lib/services/cashUpService'
+import { getSessionWindow } from '@/lib/services/cashUpWindow'
 import type { ReportDocument, ReportGroup, ReportMeta, ReportRow } from '@/lib/reports/types'
 import type {
   BaseReportParams,
   ExpensesReportParams,
   LoansOutstandingParams,
   LoanPaymentsParams,
+  CashupSnapshotParams,
 } from '@/lib/schemas/report'
 
 type MetaBase = Omit<ReportMeta, 'rowCount'>
@@ -92,6 +106,121 @@ export async function buildCashupHistory(
       variance: varianceTotal,
     },
     meta: { ...meta, rowCount: rows.length },
+  }
+}
+
+// ─── Cash-Up Snapshot (single session, as it stood at cash-up) ────────────────
+
+class CashupNotFoundForReportError extends Error {}
+
+const SNAPSHOT_COLUMNS = [
+  { key: 'time', label: 'Time', width: 0.13, format: 'datetime' as const, excelWidth: 16 },
+  { key: 'ref', label: 'Ref', width: 0.13, format: 'text' as const, excelWidth: 14 },
+  { key: 'party', label: 'Party', width: 0.24, format: 'text' as const, excelWidth: 24 },
+  { key: 'description', label: 'Description', width: 0.3, format: 'text' as const, excelWidth: 30 },
+  { key: 'amount', label: 'Amount', width: 0.2, align: 'right' as const, format: 'money' as const, excelWidth: 13 },
+]
+
+function snapshotRow(time: Date | null, ref: string | null, party: string | null, description: string | null, amount: string): ReportRow {
+  return { cells: { time: time ? time.toISOString() : null, ref, party, description, amount } }
+}
+
+function snapshotGroup(label: string, rows: ReportRow[]): ReportGroup | null {
+  if (!rows.length) return null
+  const total = rows.reduce((a, r) => a.plus(D(r.cells.amount)), new Decimal(0))
+  return { level: 0, label, rows, subtotal: { amount: total.toFixed(2) } }
+}
+
+export async function buildCashupSnapshot(
+  params: CashupSnapshotParams,
+  meta: MetaBase
+): Promise<ReportDocument> {
+  const cashUp = await getCashUp(params.cashupId)
+  if (!cashUp) throw new CashupNotFoundForReportError()
+
+  const window = await getSessionWindow(prisma, cashUp)
+
+  const [cashSales, cashPurchases, accountPayments, cardSales, transferred, expenses, loanAdvances, loanRepayments, drawings] =
+    await Promise.all([
+      getCashSalesForDate(window),
+      getCashPurchasesForDate(window),
+      getAccountPaymentsForDate(window),
+      getCardSalesForDate(window),
+      getTransferredPurchasesForDate(window),
+      getExpensesForDateReport(window),
+      getLoanAdvancesForDate(window),
+      getLoanRepaymentsForDate(window),
+      getDrawingsReceivedForDateReport(window),
+    ])
+
+  const groups: ReportGroup[] = []
+
+  const declared = cashUp.declaredCash !== null ? D(cashUp.declaredCash).toFixed(2) : null
+  const variance = cashUp.variance !== null ? D(cashUp.variance).toFixed(2) : null
+  const summaryRows: ReportRow[] = [
+    snapshotRow(cashUp.openedAt, null, null, 'Opening Balance', D(cashUp.openingBalance).toFixed(2)),
+    snapshotRow(null, null, null, 'System Cash Sales', D(cashUp.systemCashSales).toFixed(2)),
+    snapshotRow(null, null, null, 'System Cash Purchases', D(cashUp.systemCashPurchases).toFixed(2)),
+    snapshotRow(null, null, null, 'Expenses', D(cashUp.expensesTotal).toFixed(2)),
+    snapshotRow(null, null, null, 'System Cash Expected', D(cashUp.systemCashExpected).toFixed(2)),
+    ...(declared !== null ? [snapshotRow(cashUp.closedAt, null, null, 'Declared Cash (Counted)', declared)] : []),
+    ...(variance !== null ? [snapshotRow(null, null, null, 'Variance', variance)] : []),
+  ]
+  groups.push({ level: 0, label: 'SESSION SUMMARY', rows: summaryRows })
+
+  const g1 = snapshotGroup('CASH SALES', cashSales.map((s) =>
+    snapshotRow(s.createdAt, s.refNumber, s.customerName, s.description, s.totalAmount)))
+  const g2 = snapshotGroup('CASH PURCHASES', cashPurchases.map((p) =>
+    snapshotRow(p.createdAt, p.refNumber, p.supplierName, p.items, p.totalAmount)))
+  const g3 = snapshotGroup('ACCOUNT PAYMENTS (OUT)', accountPayments.map((a) =>
+    snapshotRow(a.createdAt, a.refNumber, a.customerName, a.notes, a.amount)))
+  const g4 = snapshotGroup('CARD SALES', cardSales.map((s) =>
+    snapshotRow(s.createdAt, s.refNumber, s.customerName, s.paymentMethod.toUpperCase(), s.totalAmount)))
+  const g5 = snapshotGroup('TRANSFERRED PURCHASES (EFT)', transferred.map((p) =>
+    snapshotRow(p.createdAt, p.refNumber, p.supplierName, p.bankRef, p.totalAmount)))
+  const g6 = snapshotGroup('EXPENSES', expenses.map((e) =>
+    snapshotRow(e.createdAt, e.refNumber, e.typeName, e.description, e.amount)))
+  const g7 = snapshotGroup('LOAN ADVANCES', loanAdvances.map((l) =>
+    snapshotRow(l.createdAt, l.refNumber, l.customerName, l.customerId, l.principalAmount)))
+  const g8 = snapshotGroup('LOAN REPAYMENTS', loanRepayments.map((r) =>
+    snapshotRow(r.createdAt, r.refNumber, r.customerName, `${r.loanRefNumber} · ${r.settledVia}`, r.amount)))
+  const g9 = snapshotGroup('DRAWINGS RECEIVED', drawings.map((d) =>
+    snapshotRow(d.createdAt, null, null, d.notes ?? d.movementType.toUpperCase(), d.amount)))
+
+  for (const g of [g1, g2, g3, g4, g5, g6, g7, g8, g9]) if (g) groups.push(g)
+
+  if (cashUp.status !== 'open') {
+    const denoms = (cashUp.denominations ?? {}) as Record<string, number>
+    const denomRows: ReportRow[] = []
+    let counted = new Decimal(0)
+    for (const cents of DENOMINATIONS) {
+      const count = denoms[String(cents)] ?? 0
+      if (!count) continue
+      const value = new Decimal(cents).times(count).div(100)
+      counted = counted.plus(value)
+      denomRows.push(snapshotRow(null, null, null, `${DENOMINATION_LABELS[cents]} × ${count}`, value.toFixed(2)))
+    }
+    if (denomRows.length) {
+      groups.push({ level: 0, label: 'CASH COUNT (DENOMINATIONS)', rows: denomRows, subtotal: { amount: counted.toFixed(2) } })
+    }
+  }
+
+  const rowCount = groups.reduce((n, g) => n + (g.rows?.length ?? 0), 0)
+  const currencySymbol = CURRENCY_SYMBOLS[cashUp.currency as keyof typeof CURRENCY_SYMBOLS] ?? meta.currencySymbol
+
+  return {
+    reportId: 'cashup-snapshot',
+    title: 'Cash-Up Snapshot',
+    subtitle: `Session ${cashUp.sessionDate.toISOString().slice(0, 10).replace(/-/g, '/')} — ${cashUp.status.toUpperCase()}`,
+    params: { from: params.from, to: params.to, filters: { cashupId: params.cashupId } },
+    columns: SNAPSHOT_COLUMNS,
+    groups,
+    summary: [
+      { label: 'Expected Cash', value: `${currencySymbol}${D(cashUp.systemCashExpected).toFixed(2)}`, emphasis: false },
+      ...(declared !== null ? [{ label: 'Declared Cash', value: `${currencySymbol}${declared}`, emphasis: false }] : []),
+      ...(variance !== null ? [{ label: 'Variance', value: `${currencySymbol}${variance}`, emphasis: true }] : []),
+    ],
+    meta: { ...meta, currencySymbol, rowCount },
   }
 }
 
