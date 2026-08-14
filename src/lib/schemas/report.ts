@@ -98,6 +98,11 @@ export const LoanPaymentsParamsSchema = rangeParams({
   customerId: z.string().uuid().optional(),
 })
 
+/** Snapshot of a single cash-up session exactly as it stood at cash-up — from/to are unused (accepted for viewer symmetry). */
+export const CashupSnapshotParamsSchema = rangeParams({
+  cashupId: z.string().uuid({ message: 'Cash-up session is required' }),
+})
+
 // ── Stock ─────────────────────────────────────────────────────────────────────
 export const StockOnHandParamsSchema = rangeParams({
   valuation: z.enum(['buy', 'sell']).optional(),
@@ -134,6 +139,7 @@ export type SalesSplitPaymentsParams = z.infer<typeof SalesSplitPaymentsParamsSc
 export type ExpensesReportParams = z.infer<typeof ExpensesReportParamsSchema>
 export type LoansOutstandingParams = z.infer<typeof LoansOutstandingParamsSchema>
 export type LoanPaymentsParams = z.infer<typeof LoanPaymentsParamsSchema>
+export type CashupSnapshotParams = z.infer<typeof CashupSnapshotParamsSchema>
 export type StockOnHandParams = z.infer<typeof StockOnHandParamsSchema>
 export type StockMovementParams = z.infer<typeof StockMovementParamsSchema>
 export type StocktakeReportParams = z.infer<typeof StocktakeReportParamsSchema>
