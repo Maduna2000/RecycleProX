@@ -7,6 +7,23 @@
 -- AddColumn (nullable first — existing rows need a value before NOT NULL)
 ALTER TABLE "PriceList" ADD COLUMN "priceGroupId" TEXT;
 
+-- Guarantee every tenant that has at least one PriceList also has at least
+-- one PriceGroup flagged isDefault to backfill onto — nothing upstream of
+-- this migration guaranteed that, and without it the NOT NULL below fails.
+UPDATE "PriceGroup" pg
+SET "isDefault" = true
+WHERE pg."id" = (
+  SELECT id FROM "PriceGroup" pg2
+  WHERE pg2."tenantId" = pg."tenantId"
+  ORDER BY pg2."createdAt" ASC
+  LIMIT 1
+)
+AND EXISTS (SELECT 1 FROM "PriceList" pl WHERE pl."tenantId" = pg."tenantId")
+AND NOT EXISTS (
+  SELECT 1 FROM "PriceGroup" pg3
+  WHERE pg3."tenantId" = pg."tenantId" AND pg3."isDefault" = true
+);
+
 -- Backfill existing price lists to whichever Price Group is currently
 -- flagged isDefault for that same tenant.
 UPDATE "PriceList" SET "priceGroupId" = (
