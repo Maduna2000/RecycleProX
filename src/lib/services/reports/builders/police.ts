@@ -138,14 +138,15 @@ async function queryCopperPurchases(from: string, to: string, idNumber?: string)
   // itself, and what it actually returns, are unaffected). Deriving `Line`
   // from GetPayload against the same args explicitly sidesteps it.
   type Line = Prisma.PurchaseLineGetPayload<{ select: typeof copperPurchasesArgs.select }>
-  // Copper can appear at any level of the category tree: as its own
-  // (possibly parentless) category, as a child of a "Non-Ferrous"-style
-  // parent, or as a further subcategory (e.g. Bright/Burnt Copper) — so
-  // check every name in the line's category chain rather than assuming
-  // Copper is always the topmost ancestor.
+  // Copper can appear at any level of the (at most 2-level) category tree —
+  // as its own category, as a child of a "Non-Ferrous"-style parent, or
+  // under a variant name (e.g. "Bright Copper", "Burnt Copper", "Copper
+  // Tanks") rather than a bare "Copper" node — so match substring "COPPER"
+  // against every name in the line's category chain instead of requiring
+  // an exact "Copper" category to exist.
   const isCopperLine = (l: Line) =>
-    [l.product.categoryRef?.name, l.product.categoryRef?.parent?.name, l.product.category].some(
-      (name) => name?.toUpperCase() === 'COPPER'
+    [l.product.categoryRef?.name, l.product.categoryRef?.parent?.name, l.product.category].some((name) =>
+      name?.toUpperCase().includes('COPPER')
     )
 
   const byPurchase = new Map<string, CopperPurchase>()
