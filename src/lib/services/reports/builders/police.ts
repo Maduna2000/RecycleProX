@@ -138,12 +138,19 @@ async function queryCopperPurchases(from: string, to: string, idNumber?: string)
   // itself, and what it actually returns, are unaffected). Deriving `Line`
   // from GetPayload against the same args explicitly sidesteps it.
   type Line = Prisma.PurchaseLineGetPayload<{ select: typeof copperPurchasesArgs.select }>
-  const topCategoryOf = (l: Line) =>
-    (l.product.categoryRef?.parent?.name ?? l.product.categoryRef?.name ?? l.product.category).toUpperCase()
+  // Copper can appear at any level of the category tree: as its own
+  // (possibly parentless) category, as a child of a "Non-Ferrous"-style
+  // parent, or as a further subcategory (e.g. Bright/Burnt Copper) — so
+  // check every name in the line's category chain rather than assuming
+  // Copper is always the topmost ancestor.
+  const isCopperLine = (l: Line) =>
+    [l.product.categoryRef?.name, l.product.categoryRef?.parent?.name, l.product.category].some(
+      (name) => name?.toUpperCase() === 'COPPER'
+    )
 
   const byPurchase = new Map<string, CopperPurchase>()
   for (const l of lines) {
-    if (topCategoryOf(l) !== 'COPPER') continue
+    if (!isCopperLine(l)) continue
     // A negative unit price is a deduction line (e.g. a transport charge),
     // never real goods received — exclude it from the regulated copper tally.
     if (new Decimal(l.unitPrice.toString()).isNegative()) continue
