@@ -912,10 +912,15 @@ export async function buildTopSellersByCategory(
   const topCategoryOf = (l: Line) =>
     (l.product.categoryRef?.parent?.name ?? l.product.categoryRef?.name ?? l.product.category).toUpperCase()
 
+  // Only "Ferrous" is itself a top-level category in most tenants' trees —
+  // Copper, Aluminium, Plastic, etc. are separate top-level siblings, not
+  // children of a "Non-Ferrous" parent. So the Non-Ferrous bucket is
+  // everything that isn't Ferrous, not a literal "NON-FERROUS" name match.
   function topTenFor(category: 'FERROUS' | 'NON-FERROUS'): TopSellerAgg[] {
     const byCustomer = new Map<string, TopSellerAgg>()
     for (const l of lines) {
-      if (topCategoryOf(l) !== category) continue
+      const isFerrous = topCategoryOf(l) === 'FERROUS'
+      if (category === 'FERROUS' ? !isFerrous : isFerrous) continue
       const c = l.purchase.customer
       let agg = byCustomer.get(c.id)
       if (!agg) {
