@@ -143,11 +143,18 @@ async function queryCopperPurchases(from: string, to: string, idNumber?: string)
   // under a variant name (e.g. "Bright Copper", "Burnt Copper", "Copper
   // Tanks") rather than a bare "Copper" node — so match substring "COPPER"
   // against every name in the line's category chain instead of requiring
-  // an exact "Copper" category to exist.
+  // an exact "Copper" category to exist. "CU" (the chemical-symbol
+  // abbreviation scrap yards commonly file copper grades under, e.g. "CU
+  // 1A", "CU MIX") contains no "COPPER" substring, so it needs its own
+  // exact-name check — kept exact rather than substring so it can't
+  // false-positive against an unrelated category that merely contains "cu"
+  // (e.g. a category named "Circuit Boards").
   const isCopperLine = (l: Line) =>
-    [l.product.categoryRef?.name, l.product.categoryRef?.parent?.name, l.product.category].some((name) =>
-      name?.toUpperCase().includes('COPPER')
-    )
+    [l.product.categoryRef?.name, l.product.categoryRef?.parent?.name, l.product.category].some((name) => {
+      if (!name) return false
+      const upper = name.toUpperCase()
+      return upper.includes('COPPER') || upper === 'CU'
+    })
 
   const byPurchase = new Map<string, CopperPurchase>()
   for (const l of lines) {
