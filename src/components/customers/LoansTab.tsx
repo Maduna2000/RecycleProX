@@ -56,6 +56,11 @@ const PAYMENT_METHODS = [
   { value: 'eft', label: 'EFT' },
 ]
 
+// Tighter than the shared Btn "sm" size — this toolbar sits directly above a
+// narrow, capped-width table, so its buttons should read as compact controls
+// rather than full-size actions.
+const COMPACT_BTN: React.CSSProperties = { fontSize: 10.5, padding: '3px 9px', gap: 4 }
+
 function SHdr({ title }: { title: string }) {
   return (
     <div style={{ background: HEADER_GRAD, borderBottom: '1px solid #C0C0C0', padding: '4px 10px', flexShrink: 0 }}>
@@ -149,26 +154,30 @@ export function LoansTab({ customerId, customerName, userRole, userAllowedModule
       <SHdr title="Loans" />
 
       {/* Toolbar — mirrors the legacy "Special Loans" window: actions on the
-          left, period picker + print on the right. */}
+          left, period picker + print on the right. Capped to the same width
+          as the ledger table below so the right-hand controls line up with
+          its edge instead of drifting off to the far right of the panel. */}
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: 6,
-          padding: '8px 10px',
+          gap: 5,
+          padding: '6px 10px',
           borderBottom: '1px solid #E0E0E0',
           background: '#FAFAFA',
           flexWrap: 'wrap',
+          maxWidth: 720,
         }}
       >
         {canManage && (
           <>
-            <Btn size="sm" icon={Plus} onClick={() => setAddLoanOpen(true)}>Add Loan</Btn>
-            <Btn size="sm" icon={Plus} onClick={() => setAddRepaymentOpen(true)}>Add Repayment</Btn>
+            <Btn size="sm" icon={Plus} style={COMPACT_BTN} onClick={() => setAddLoanOpen(true)}>Add Loan</Btn>
+            <Btn size="sm" icon={Plus} style={COMPACT_BTN} onClick={() => setAddRepaymentOpen(true)}>Add Repayment</Btn>
             <Btn
               size="sm"
               icon={Trash2}
               variant="danger"
+              style={COMPACT_BTN}
               disabled={!data?.lastEntry}
               onClick={() => setDeleteLastOpen(true)}
               title={data?.lastEntry ? 'Undo the most recent loan or repayment entry' : 'No loan activity to delete'}
@@ -190,6 +199,7 @@ export function LoansTab({ customerId, customerName, userRole, userAllowedModule
         <Btn
           size="sm"
           icon={Printer}
+          style={COMPACT_BTN}
           onClick={() => window.open(`/api/customers/${customerId}/loans/statement/pdf?period=${period}`, '_blank')}
         >
           Print Statement
@@ -219,6 +229,7 @@ export function LoansTab({ customerId, customerName, userRole, userAllowedModule
           padding: '8px 12px',
           borderTop: '1px solid #E0E0E0',
           background: '#FAFAFA',
+          maxWidth: 720,
         }}
       >
         <span style={lbl}>Amount Due</span>
