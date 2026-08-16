@@ -82,7 +82,7 @@ const ledgerColumns: Column<LedgerRow>[] = [
   {
     key: 'date',
     header: 'Loan Date',
-    width: '110px',
+    width: '95px',
     render: (row) => (
       <span style={{ color: '#6C757D' }}>
         {new Date(row.date).toLocaleDateString('en-ZA', { year: 'numeric', month: '2-digit', day: '2-digit' })}
@@ -92,27 +92,27 @@ const ledgerColumns: Column<LedgerRow>[] = [
   {
     key: 'transaction',
     header: 'Transaction',
-    width: '120px',
+    width: '100px',
     render: (row) => <span style={{ color: '#6C757D' }}>{row.transaction}</span>,
   },
   {
     key: 'advance',
     header: 'Advance',
-    width: '110px',
+    width: '95px',
     align: 'right',
     render: (row) => <span style={{ fontFamily: 'monospace' }}>{format.currency(row.advance ?? '0')}</span>,
   },
   {
     key: 'repayment',
     header: 'Repayment',
-    width: '110px',
+    width: '95px',
     align: 'right',
     render: (row) => <span style={{ fontFamily: 'monospace' }}>{format.currency(row.repayment ?? '0')}</span>,
   },
   {
     key: 'balance',
     header: 'Balance',
-    width: '120px',
+    width: '105px',
     align: 'right',
     render: (row) => (
       <span style={{ fontFamily: 'monospace', fontWeight: 600, color: moneyColor(row.balance) }}>
@@ -196,8 +196,9 @@ export function LoansTab({ customerId, customerName, userRole, userAllowedModule
         </Btn>
       </div>
 
-      {/* Ledger */}
-      <div style={{ padding: 10 }}>
+      {/* Ledger — capped width so the narrow, mostly-numeric columns don't
+          stretch across the full panel with large gaps between them. */}
+      <div style={{ padding: 10, maxWidth: 720 }}>
         <DataTable
           columns={ledgerColumns}
           rows={data?.rows ?? []}
