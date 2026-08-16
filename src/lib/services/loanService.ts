@@ -8,6 +8,7 @@ import { todaySASTDate, todaySASTDateStr, getRangeBoundsSAST, sastDateLabelToUTC
 import type { DateWindow } from '@/lib/services/cashUpWindow'
 import type { CreateManualRepaymentInput } from '@/lib/schemas/loan'
 import { postLoanAdvance, reverseLoanAdvanceLedger, postLoanRepayment, reverseLoanRepaymentLedger } from '@/lib/services/ledgerService'
+import { randomUUID } from 'crypto'
 
 // ─── Typed Errors ─────────────────────────────────────────────────────────────
 
@@ -104,6 +105,9 @@ export async function applyRepaymentTx(
 
   let remaining = new Decimal(amount)
   let seqOffset = 0
+  // Shared across every loan this one payout deduction splits across, so the
+  // ledger statement can show it as a single combined entry.
+  const batchId = randomUUID()
 
   for (const loan of activeLoans) {
     if (remaining.isZero()) break
@@ -122,6 +126,7 @@ export async function applyRepaymentTx(
         loanId:          loan.id,
         customerId,
         purchaseId,
+        batchId,
         amount:          repayAmount,
         paymentMethod:   'cash',
         createdByUserId,
@@ -513,6 +518,9 @@ export async function createManualRepayment(
     let remaining = repayAmount
     let seqOffset = 0
     const repayments = []
+    // Shared across every loan this one "Add Repayment" splits across, so
+    // the ledger statement can show it as a single combined entry.
+    const batchId = randomUUID()
 
     for (const loan of activeLoans) {
       if (remaining.isZero()) break
@@ -529,6 +537,7 @@ export async function createManualRepayment(
           refNumber,
           loanId:          loan.id,
           customerId,
+          batchId,
           amount:          repayAmt,
           paymentMethod:   data.paymentMethod ?? 'cash',
           notes:           data.notes,
@@ -572,45 +581,71 @@ export async function reverseRepayment(repaymentId: string, reason: string, user
   const repayment = await prisma.loanRepayment.findUnique({ where: { id: repaymentId } })
   if (!repayment) throw new RepaymentNotFoundError(repaymentId)
 
+  // A single "Add Repayment" split FIFO across more than one active loan
+  // shares a batchId — treat the whole batch as one logical entry to undo,
+  // matching how the ledger statement displays it as a single combined row.
+  const siblings = repayment.batchId
+    ? await prisma.loanRepayment.findMany({ where: { customerId: repayment.customerId, batchId: repayment.batchId } })
+    : [repayment]
+  const siblingIds = new Set(siblings.map((s) => s.id))
+  const latestSiblingCreatedAt = siblings.reduce((max, s) => (s.createdAt > max ? s.createdAt : max), siblings[0]!.createdAt)
+
   const [laterLoan, laterRepayment] = await Promise.all([
-    prisma.loan.findFirst({ where: { customerId: repayment.customerId, createdAt: { gt: repayment.createdAt } } }),
-    prisma.loanRepayment.findFirst({ where: { customerId: repayment.customerId, createdAt: { gt: repayment.createdAt }, id: { not: repayment.id } } }),
+    prisma.loan.findFirst({ where: { customerId: repayment.customerId, createdAt: { gt: latestSiblingCreatedAt } } }),
+    prisma.loanRepayment.findFirst({
+      where: { customerId: repayment.customerId, createdAt: { gt: latestSiblingCreatedAt }, id: { notIn: Array.from(siblingIds) } },
+    }),
   ])
   if (laterLoan || laterRepayment) throw new RepaymentNotLastEntryError()
 
-  const loan = await prisma.loan.findUniqueOrThrow({ where: { id: repayment.loanId } })
-  const restoredBalance = new Decimal(loan.balanceAmount.toString()).plus(repayment.amount.toString())
-  const refNumber = await generateRepaymentRef()
+  const prefix = `REP-${todaySASTDateStr().replace(/-/g, '')}`
+  const startOfDay = todaySASTDate()
+  // Shared across every reversal row this undo creates, so the ledger
+  // statement collapses them back into a single combined entry too.
+  const reversalBatchId = siblings.length > 1 ? randomUUID() : undefined
 
-  const reversal = await prisma.$transaction(async (tx) => {
-    await tx.loan.update({ where: { id: repayment.loanId }, data: { balanceAmount: restoredBalance, status: 'active' } })
-    const r = await tx.loanRepayment.create({
-      data: {
-        tenantId:        requireTenantId(),
-        refNumber,
-        loanId:          repayment.loanId,
-        customerId:      repayment.customerId,
-        amount:          new Decimal(repayment.amount.toString()).negated(),
-        paymentMethod:   repayment.paymentMethod,
-        notes:           `${MANUAL_REVERSAL_PREFIX} — ${reason}`,
-        createdByUserId: userId,
-      },
-    })
-    // A purchase-linked repayment (applyRepaymentTx) never posted its own
-    // ledger entry — that cash movement lives inside the purchase's own
-    // entry instead (see postLoanRepayment's comment) — so there's nothing
-    // to reverse here in that case; it stays keyed to the purchase.
-    if (!repayment.purchaseId) {
-      await reverseLoanRepaymentLedger(tx, repayment.id, repayment.refNumber, reason, userId)
+  const reversals = await prisma.$transaction(async (tx) => {
+    const created = []
+    let seqOffset = 0
+    for (const s of siblings) {
+      const loan = await tx.loan.findUniqueOrThrow({ where: { id: s.loanId } })
+      const restoredBalance = new Decimal(loan.balanceAmount.toString()).plus(s.amount.toString())
+      await tx.loan.update({ where: { id: s.loanId }, data: { balanceAmount: restoredBalance, status: 'active' } })
+
+      const count = await tx.loanRepayment.count({ where: { createdAt: { gte: startOfDay } } })
+      const refNumber = `${prefix}-${String(count + seqOffset + 1).padStart(4, '0')}`
+      seqOffset++
+
+      const r = await tx.loanRepayment.create({
+        data: {
+          tenantId:        requireTenantId(),
+          refNumber,
+          loanId:          s.loanId,
+          customerId:      s.customerId,
+          batchId:         reversalBatchId,
+          amount:          new Decimal(s.amount.toString()).negated(),
+          paymentMethod:   s.paymentMethod,
+          notes:           `${MANUAL_REVERSAL_PREFIX} — ${reason}`,
+          createdByUserId: userId,
+        },
+      })
+      // A purchase-linked repayment (applyRepaymentTx) never posted its own
+      // ledger entry — that cash movement lives inside the purchase's own
+      // entry instead (see postLoanRepayment's comment) — so there's nothing
+      // to reverse here in that case; it stays keyed to the purchase.
+      if (!s.purchaseId) {
+        await reverseLoanRepaymentLedger(tx, s.id, s.refNumber, reason, userId)
+      }
+      created.push(r)
+      logger.info(
+        { reversedRepaymentId: s.id, loanId: s.loanId, amount: s.amount.toString(), restoredBalance: restoredBalance.toFixed(2), userId },
+        'loan.repayment.manually_reversed'
+      )
     }
-    return r
+    return created
   })
 
-  logger.info(
-    { reversedRepaymentId: repayment.id, loanId: repayment.loanId, amount: repayment.amount.toString(), restoredBalance: restoredBalance.toFixed(2), userId },
-    'loan.repayment.manually_reversed'
-  )
-  return reversal
+  return siblings.length > 1 ? reversals : reversals[0]
 }
 
 // ─── Customer Loan Statement (ledger) ────────────────────────────────────────
@@ -686,11 +721,26 @@ export async function getCustomerLoanStatement(customerId: string, periodStr?: s
       repayment:   null,
     })
   }
+  // A single repayment action (manual "Add Repayment", a purchase payout
+  // deduction, or an undo of either) can split FIFO across more than one
+  // active loan, leaving one LoanRepayment row per loan it touched. Those
+  // rows share a batchId (older, pre-migration rows and single-loan
+  // repayments don't, so each falls back to its own group) — collapse each
+  // group into one combined ledger entry rather than showing the split.
+  const repaymentGroups = new Map<string, typeof repaymentsInPeriod>()
   for (const r of repaymentsInPeriod) {
-    const amount = new Decimal(r.amount.toString())
+    const key = r.batchId ?? r.id
+    const group = repaymentGroups.get(key)
+    if (group) group.push(r)
+    else repaymentGroups.set(key, [r])
+  }
+  for (const group of Array.from(repaymentGroups.values())) {
+    const first = group[0]!
+    const amount = group.reduce((sum, r) => sum.plus(r.amount.toString()), new Decimal(0))
+    const earliestCreatedAt = group.reduce((min, r) => (r.createdAt < min ? r.createdAt : min), first.createdAt)
     const isReversal = amount.isNegative()
-    const isManualReversal = isReversal && (r.notes ?? '').startsWith(MANUAL_REVERSAL_PREFIX)
-    const description = r.purchaseId
+    const isManualReversal = isReversal && (first.notes ?? '').startsWith(MANUAL_REVERSAL_PREFIX)
+    const description = first.purchaseId
       ? 'Loan Repayment - Purchase'
       : isManualReversal
         ? 'Loan Repayment - Reversal'
@@ -698,10 +748,10 @@ export async function getCustomerLoanStatement(customerId: string, periodStr?: s
           ? 'Loan Repayment - Reversal (Purchase Voided)'
           : 'Loan Repayment - Manual'
     entries.push({
-      id:          r.id,
-      createdAt:   r.createdAt,
+      id:          first.id,
+      createdAt:   earliestCreatedAt,
       description,
-      transaction: r.purchaseId ? 'Stock' : formatTransactionMethod(r.paymentMethod),
+      transaction: first.purchaseId ? 'Stock' : formatTransactionMethod(first.paymentMethod),
       advance:     null,
       repayment:   amount,
     })
@@ -740,12 +790,20 @@ export async function getCustomerLoanStatement(customerId: string, periodStr?: s
     prisma.loan.findFirst({ where: { customerId, status: { not: 'voided' } }, orderBy: { createdAt: 'desc' } }),
     prisma.loanRepayment.findFirst({ where: { customerId }, orderBy: { createdAt: 'desc' } }),
   ])
-  const lastEntry = (() => {
+  const lastEntry = await (async () => {
     if (!lastLoan && !lastRepayment) return null
     if (!lastRepayment || (lastLoan && lastLoan.createdAt > lastRepayment.createdAt)) {
       return { kind: 'loan' as const, id: lastLoan!.id, description: 'Advance - loan', amount: lastLoan!.principalAmount.toString(), date: lastLoan!.createdAt.toISOString() }
     }
-    return { kind: 'repayment' as const, id: lastRepayment.id, description: 'Repayment', amount: lastRepayment.amount.toString(), date: lastRepayment.createdAt.toISOString() }
+    // The most recent repayment may be one leg of a multi-loan batch —
+    // reflect the whole batch's total and its earliest leg's id (what
+    // reverseRepayment/"Delete Last" actually key off of).
+    const siblings = lastRepayment.batchId
+      ? await prisma.loanRepayment.findMany({ where: { customerId, batchId: lastRepayment.batchId } })
+      : [lastRepayment]
+    const total = siblings.reduce((sum, r) => sum.plus(r.amount.toString()), new Decimal(0))
+    const earliest = siblings.reduce((min, r) => (r.createdAt < min.createdAt ? r : min), siblings[0]!)
+    return { kind: 'repayment' as const, id: earliest.id, description: 'Repayment', amount: total.toString(), date: earliest.createdAt.toISOString() }
   })()
 
   return {

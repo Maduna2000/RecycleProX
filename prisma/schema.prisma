@@ -846,6 +846,14 @@ model LoanRepayment {
   createdByUserId String?
   createdAt       DateTime      @default(now())
   purchaseId      String?
+  // Ties together the per-loan rows a single FIFO repayment action (manual
+  // "Add Repayment", or a purchase payout deducting from loans) split across
+  // more than one active loan — null on older rows predating this column, and
+  // on any repayment that only ever touched one loan. The ledger statement
+  // groups by this (falling back to the row's own id) to show one combined
+  // entry per real-world transaction instead of one per loan it happened to
+  // cross.
+  batchId         String?
   customer        Customer      @relation(fields: [customerId], references: [id])
   loan            Loan          @relation(fields: [loanId], references: [id], onDelete: Cascade)
   purchase        Purchase?     @relation(fields: [purchaseId], references: [id])
@@ -856,6 +864,7 @@ model LoanRepayment {
   @@index([tenantId, customerId])
   @@index([tenantId, purchaseId])
   @@index([tenantId, createdAt])
+  @@index([tenantId, batchId])
 }
 
 // A dealer (account customer) advances the business cash to buy stock — the
