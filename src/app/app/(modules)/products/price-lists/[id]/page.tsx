@@ -421,39 +421,40 @@ export default function PriceListEditorPage() {
                 </div>
                 <Btn size="sm" icon={ListPlus} onClick={addCustomLine} disabled={saving}>Custom line</Btn>
               </div>
+
+              {/* Print colors — moved in from its own standalone panel so the
+                  items table below gets more vertical room. */}
+              <div style={{ borderTop: `1px solid ${colors.border}`, marginTop: 2, paddingTop: 6 }}>
+                <div className="flex items-center justify-between" style={{ marginBottom: 4 }}>
+                  <span style={lbl}>Print colors</span>
+                  <button
+                    onClick={() => setDocColors(DEFAULT_PRICE_LIST_COLORS)}
+                    disabled={saving}
+                    className="flex items-center gap-1 cursor-pointer"
+                    style={{ fontSize: fontSize.xs, color: colors.link, background: 'none', border: 'none' }}
+                  >
+                    <RotateCcw style={{ width: 11, height: 11 }} />
+                    Reset to default
+                  </button>
+                </div>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                  {COLOR_FIELDS.map(({ key, label }) => (
+                    <div key={key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                      <input
+                        type="color"
+                        value={docColors[key]}
+                        onChange={(e) => setDocColors((prev) => ({ ...prev, [key]: e.target.value }))}
+                        disabled={saving}
+                        style={{ width: 30, height: 20, padding: 0, border: `1px solid ${colors.border}`, borderRadius: 2, cursor: 'pointer', background: 'none' }}
+                      />
+                      <span style={{ fontSize: 9, color: colors.textSecondary, textAlign: 'center', lineHeight: 1.2, maxWidth: 66 }}>{label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
 
-        </div>
-
-        {/* ── Print colors ─────────────────────────────────────────────────── */}
-        <div style={{ ...PANEL, flexShrink: 0 }}>
-          <div className="flex items-center justify-between" style={PANEL_HEAD}>
-            <span className="font-semibold" style={{ fontSize: fontSize.xs, color: colors.textPrimary }}>Print Colors</span>
-            <button
-              onClick={() => setDocColors(DEFAULT_PRICE_LIST_COLORS)}
-              disabled={saving}
-              className="flex items-center gap-1 cursor-pointer"
-              style={{ fontSize: fontSize.xs, color: colors.link, background: 'none', border: 'none' }}
-            >
-              <RotateCcw style={{ width: 11, height: 11 }} />
-              Reset to default
-            </button>
-          </div>
-          <div style={{ padding: '6px 8px', display: 'flex', gap: 14, flexWrap: 'wrap' }}>
-            {COLOR_FIELDS.map(({ key, label }) => (
-              <div key={key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                <input
-                  type="color"
-                  value={docColors[key]}
-                  onChange={(e) => setDocColors((prev) => ({ ...prev, [key]: e.target.value }))}
-                  disabled={saving}
-                  style={{ width: 30, height: 20, padding: 0, border: `1px solid ${colors.border}`, borderRadius: 2, cursor: 'pointer', background: 'none' }}
-                />
-                <span style={{ fontSize: 9, color: colors.textSecondary, textAlign: 'center', lineHeight: 1.2, maxWidth: 66 }}>{label}</span>
-              </div>
-            ))}
-          </div>
         </div>
 
         {/* ── Items table — fills remaining height, scrolls internally ───── */}
