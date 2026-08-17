@@ -15,10 +15,35 @@
  * its own engine. Server-side only. Returns PDF bytes.
  */
 import { PDFDocument, rgb, StandardFonts, PDFPage, PDFFont, PDFImage } from 'pdf-lib'
+import sharp from 'sharp'
 import type { FlatRow, ReportDocument } from '@/lib/reports/types'
 import { flattenReportDocument } from '@/lib/reports/flatten'
 import { formatCell, formatDateSAST, formatDateTimeSAST } from '@/lib/reports/format'
 import { fetchR2Bytes } from '@/lib/r2'
+
+// Scale-kiosk photos are captured at full camera resolution (often several
+// MB each) but only ever render as a thumbnail in the printed report — and
+// pdf-lib embeds the RAW bytes regardless of how small drawImage later
+// scales them on the page, so a report with many photos at native
+// resolution can produce a PDF response large enough to exceed the hosting
+// platform's response-size cap, which fails the whole download outright
+// (surfacing as a bare "Failed to fetch", not a real error). Downscaling
+// and re-compressing to a print-thumbnail size before embedding keeps the
+// PDF a small fraction of that.
+const REPORT_IMAGE_MAX_DIMENSION = 600
+const REPORT_IMAGE_JPEG_QUALITY = 70
+
+async function downscaleForReport(bytes: Uint8Array): Promise<Uint8Array | null> {
+  try {
+    return await sharp(bytes)
+      .rotate() // apply EXIF orientation before stripping metadata
+      .resize({ width: REPORT_IMAGE_MAX_DIMENSION, height: REPORT_IMAGE_MAX_DIMENSION, fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: REPORT_IMAGE_JPEG_QUALITY })
+      .toBuffer()
+  } catch {
+    return null
+  }
+}
 
 // ─── Layout constants ─────────────────────────────────────────────────────────
 const PAGE_SIZES: Record<'portrait' | 'landscape', { w: number; h: number }> = {
@@ -124,10 +149,10 @@ export async function generateBusinessReportPdf(report: ReportDocument): Promise
         batch.map(async (key) => {
           const bytes = await fetchR2Bytes(key)
           if (!bytes || bytes.length === 0) return
+          const downscaled = await downscaleForReport(bytes)
+          if (!downscaled) return
           try {
-            let img: PDFImage
-            try { img = await doc.embedPng(bytes) }
-            catch { img = await doc.embedJpg(bytes) }
+            const img = await doc.embedJpg(downscaled)
             imageCache.set(key, img)
           } catch {
             // Unembeddable image — falls back to "No image" at render time
