@@ -172,17 +172,16 @@ export default function CustomerDetailPage() {
   const fmtDate     = (v?: string | null) => v ? new Date(v).toLocaleDateString('en-ZA') : '—'
 
   return (
-    // Capped and centered like the Float page's own `max-w-3xl mx-auto`
-    // content wrapper — passed as cardStyle so it's the actual ContentCard
-    // (with its real border/radius) that shrinks, instead of drawing a
-    // second, separate border around an inner div. No top border/radius —
-    // PageTitleBar (also capped to 960px on this route) already draws the
-    // top edge and its own bottom border serves as the seam between the
-    // two, so this box continues seamlessly below it rather than doubling
-    // the border line.
+    // Capped and centered to 960px (see src/lib/pageWidthCaps.ts, which
+    // PageTitleBar reads to cap/border itself to match). No top border/
+    // radius on ContentCard — PageTitleBar already draws the top edge and
+    // its own bottom border serves as the seam between the two (this page
+    // has no PortalPage tab row in between, unlike e.g. police-register), so
+    // the box continues seamlessly below it rather than doubling the line.
     <PortalPage
       title={fullName}
-      cardStyle={{ maxWidth: 960, margin: '0 auto', width: '100%', borderTop: 'none', borderTopLeftRadius: 0, borderTopRightRadius: 0 }}
+      maxWidth={960}
+      cardStyle={{ borderTop: 'none', borderTopLeftRadius: 0, borderTopRightRadius: 0 }}
     >
       <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, background: '#fff' }}>
       {/* ── Sub-header ────────────────────────────────────────────────────────── */}

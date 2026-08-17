@@ -3,6 +3,7 @@
 import { usePathname, useRouter } from 'next/navigation'
 import { Minus, X } from 'lucide-react'
 import { getModuleName } from '@/lib/module-names'
+import { getPageWidthCap } from '@/lib/pageWidthCaps'
 import { useWindowStore } from '@/stores/windowStore'
 
 interface PageTitleBarProps {
@@ -14,12 +15,11 @@ export function PageTitleBar({ title }: PageTitleBarProps = {}) {
   const pathname = usePathname()
   const router   = useRouter()
   const { windows, closeWindow } = useWindowStore()
-  // Only the customer *detail* page (the "view profile" screen) caps its own
-  // content to a centered 960px block — the Accounts list and "new customer"
-  // pages don't, so this only matches /app/customers/<id>, not the whole
-  // module, or this bar would shrink on pages whose content still spans full
-  // width underneath it.
-  const isCustomerDetailPage = /^\/app\/customers\/[^/]+$/.test(pathname) && !pathname.endsWith('/new')
+  // Pages that cap their own content to a centered, narrower block (see
+  // pageWidthCaps.ts) get this bar capped and bordered to match, so it fuses
+  // into one framed box with the content beneath instead of spanning the
+  // full window width above a narrower page. Every other page is unaffected.
+  const widthCap = getPageWidthCap(pathname)
 
   const entry = windows.find(w => w.href === pathname)
 
@@ -49,20 +49,20 @@ export function PageTitleBar({ title }: PageTitleBarProps = {}) {
         height:      28,
         background:  'rgba(27,58,107,0.05)',
         borderBottom: '1px solid rgba(0,0,0,0.07)',
-        // Matches the customer detail page's own capped-and-centered
-        // ContentCard (see PortalPage's cardStyle there) — same width, same
-        // border color/weight on every side but the bottom, and rounded top
-        // corners meeting ContentCard's own squared-off top (borderTop:
-        // 'none' there) — so the two fuse into one continuous framed box
-        // instead of a separate strip floating above it.
-        ...(isCustomerDetailPage && {
+        // Matches the page's own capped-and-centered ContentCard (see that
+        // page's cardStyle) — same width, same border color/weight on every
+        // side but the bottom, and rounded top corners meeting ContentCard's
+        // own squared-off top (borderTop: 'none' there) — so the two fuse
+        // into one continuous framed box instead of a separate strip
+        // floating above it.
+        ...(widthCap !== null && {
           // width: '100%' is required alongside maxWidth here — without it,
           // this flex item shrinks to fit its own text ("BAN001 ⁠— ✕") rather
-          // than stretching to 960px first and then being centered by the
-          // auto margins, which is what actually produced the tiny floating
+          // than stretching to the cap first and then being centered by the
+          // auto margins, which is what actually produced a tiny floating
           // pill in testing.
           width:    '100%',
-          maxWidth: 960,
+          maxWidth: widthCap,
           margin:   '0 auto',
           border:   '1px solid #B0B0B0',
           borderTopLeftRadius: 3,

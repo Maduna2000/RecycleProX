@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useSession } from 'next-auth/react'
 import useSWR, { mutate } from 'swr'
 import { Dialog } from '@/components/ui/dialog'
-import { FileDown, Pen, CheckCircle, ExternalLink, RotateCcw, ChevronDown, ChevronRight, OctagonX, ShieldCheck, Loader2, ClipboardList, History } from 'lucide-react'
+import { FileDown, Pen, CheckCircle, ExternalLink, RotateCcw, ChevronDown, ChevronLeft, ChevronRight, OctagonX, ShieldCheck, Loader2, ClipboardList, History } from 'lucide-react'
 import { toast } from 'sonner'
 import { colors } from '@/lib/design-tokens'
 import { DEFAULT_POLICE_SERVICE_NAME, DEFAULT_POLICE_LEGAL_NOTE } from '@/lib/police-defaults'
@@ -73,10 +73,12 @@ export default function PoliceRegisterPage() {
 
   const [pendingVisitId, setPendingVisitId] = useState<string | null>(null)
   const [sigDialogOpen, setSigDialogOpen]   = useState(false)
+  const [visitsPage, setVisitsPage]         = useState(1)
+  const VISITS_PAGE_SIZE = 20
 
   const { data: visitsData, isLoading: visitsLoading } =
     useSWR<{ visits: PoliceVisit[]; total: number }>(
-      tab === 'history' ? '/api/police-visits?limit=50' : null,
+      tab === 'history' ? `/api/police-visits?limit=${VISITS_PAGE_SIZE}&offset=${(visitsPage - 1) * VISITS_PAGE_SIZE}` : null,
       fetcher
     )
 
@@ -154,6 +156,9 @@ export default function PoliceRegisterPage() {
             Officer Portal
           </Btn>
         }
+        // Capped and centered (see src/lib/pageWidthCaps.ts, which
+        // PageTitleBar reads to cap/border itself to match).
+        maxWidth={960}
       >
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: tab === 'generate' ? 16 : 0 }}>
 
@@ -231,7 +236,15 @@ export default function PoliceRegisterPage() {
             ) : !visitsData?.visits?.length ? (
               <EmptyHint text="No visits recorded yet" />
             ) : (
-              <VisitHistoryTable visits={visitsData.visits} />
+              <>
+                <VisitHistoryTable visits={visitsData.visits} />
+                <VisitHistoryPager
+                  page={visitsPage}
+                  pageSize={VISITS_PAGE_SIZE}
+                  total={visitsData.total}
+                  onPageChange={setVisitsPage}
+                />
+              </>
             )
           )}
         </div>
@@ -396,6 +409,40 @@ function VisitHistoryTable({ visits }: { visits: PoliceVisit[] }) {
 
 function FragmentRow({ children }: { children: React.ReactNode }) {
   return <>{children}</>
+}
+
+/** Matches DataTable's own pager styling (prev/next only — the visit list
+ * doesn't need numbered pages) since this table is hand-rolled rather than
+ * built on DataTable. */
+function VisitHistoryPager({
+  page, pageSize, total, onPageChange,
+}: {
+  page: number; pageSize: number; total: number; onPageChange: (page: number) => void
+}) {
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
+  const showing = `Showing ${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, total)} of ${total}`
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 2px 0', flexShrink: 0 }}>
+      <span style={{ fontSize: 11, color: '#6C757D' }}>{showing}</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+        <button
+          className="px-2 h-6 rounded-sm border border-[#B0B0B0] hover:bg-[#E8E8E8] disabled:opacity-40 disabled:cursor-not-allowed text-[11px] transition-colors"
+          disabled={page <= 1}
+          onClick={() => onPageChange(page - 1)}
+        >
+          <ChevronLeft className="w-3 h-3" />
+        </button>
+        <span style={{ fontSize: 11, color: '#212529', padding: '0 6px' }}>{page} / {totalPages}</span>
+        <button
+          className="px-2 h-6 rounded-sm border border-[#B0B0B0] hover:bg-[#E8E8E8] disabled:opacity-40 disabled:cursor-not-allowed text-[11px] transition-colors"
+          disabled={page >= totalPages}
+          onClick={() => onPageChange(page + 1)}
+        >
+          <ChevronRight className="w-3 h-3" />
+        </button>
+      </div>
+    </div>
+  )
 }
 
 function MetaItem({ label, value }: { label: string; value: string }) {

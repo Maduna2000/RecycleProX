@@ -165,6 +165,7 @@ export function PortalPage({
   actions,
   children,
   cardStyle,
+  maxWidth,
 }: {
   tabs?: RpxTab[]
   active?: string
@@ -174,6 +175,14 @@ export function PortalPage({
   actions?: React.ReactNode
   children: React.ReactNode
   cardStyle?: React.CSSProperties
+  /**
+   * Caps and centers the tab row (if any) and ContentCard together to this
+   * width, instead of the default full-bleed layout — for pages that don't
+   * need the full window width (see src/lib/pageWidthCaps.ts, which
+   * PageTitleBar reads to cap/border itself to match, so the two fuse into
+   * one framed page).
+   */
+  maxWidth?: number
 }) {
   const hasTabs = !!tabs && tabs.length > 0
 
@@ -182,6 +191,7 @@ export function PortalPage({
       style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}
       aria-label={hasTabs ? undefined : title}
     >
+      <div style={maxWidth ? { width: '100%', maxWidth, margin: '0 auto', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 } : { display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
       {(hasTabs || actions) && (
         <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, flexShrink: 0 }}>
           {hasTabs && (
@@ -198,6 +208,7 @@ export function PortalPage({
       <ContentCard attached={hasTabs} style={cardStyle}>
         {children}
       </ContentCard>
+      </div>
     </div>
   )
 }
