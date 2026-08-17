@@ -5,6 +5,7 @@ import { Minus, X } from 'lucide-react'
 import { getModuleName } from '@/lib/module-names'
 import { getPageWidthCap } from '@/lib/pageWidthCaps'
 import { useWindowStore } from '@/stores/windowStore'
+import { useTitleBarActionsStore } from '@/stores/titleBarActionsStore'
 
 interface PageTitleBarProps {
   /** Override the default module name with a custom title (e.g., record name for detail pages) */
@@ -15,6 +16,7 @@ export function PageTitleBar({ title }: PageTitleBarProps = {}) {
   const pathname = usePathname()
   const router   = useRouter()
   const { windows, closeWindow } = useWindowStore()
+  const titleBarActions = useTitleBarActionsStore((s) => s.actions)
   // Pages that cap their own content to a centered, narrower block (see
   // pageWidthCaps.ts) get this bar capped and bordered to match, so it fuses
   // into one framed box with the content beneath instead of spanning the
@@ -44,7 +46,7 @@ export function PageTitleBar({ title }: PageTitleBarProps = {}) {
 
   return (
     <div
-      className="flex items-center justify-between shrink-0 px-3 select-none"
+      className="flex items-center shrink-0 px-3 select-none"
       style={{
         height:      28,
         background:  'rgba(27,58,107,0.05)',
@@ -70,10 +72,16 @@ export function PageTitleBar({ title }: PageTitleBarProps = {}) {
         }),
       }}
     >
-      <span className="text-[12px] font-semibold text-[#374151]">
+      <span className="text-[12px] font-semibold text-[#374151] shrink-0">
         {displayTitle}
       </span>
-      <div className="flex items-center gap-0.5">
+      <div className="flex-1 min-w-0" />
+      {titleBarActions && (
+        <div className="flex items-center gap-2 mr-2 min-w-0">
+          {titleBarActions}
+        </div>
+      )}
+      <div className="flex items-center gap-0.5 shrink-0">
         <button
           onClick={handleMinimize}
           title="Minimise"
