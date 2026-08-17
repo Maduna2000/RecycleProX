@@ -21,8 +21,8 @@ const PAGE_WIDTH_CAPS: { test: RegExp; width: number }[] = [
   { test: /^\/app\/stock\/movements$/, width: 950 },
   { test: /^\/app\/stock\/grid$/, width: 1000 },
   // Products — the unbounded "Name" column stretched to fill whatever width
-  // was left.
-  { test: /^\/app\/products$/, width: 950 },
+  // was left. Same width as Stock On Hand.
+  { test: /^\/app\/products$/, width: 1100 },
   // Price Groups — the unbounded "Name" and "Description" columns did the
   // same.
   { test: /^\/app\/price-groups$/, width: 900 },
