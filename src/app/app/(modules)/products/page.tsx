@@ -176,7 +176,10 @@ export default function ProductsPage() {
   ]
 
   return (
-    <PortalPage title={`Products (${products.length})`}>
+    // maxWidth matches src/lib/pageWidthCaps.ts, which PageTitleBar reads to
+    // cap/border itself to match — keeps the unbounded "Name" column from
+    // stretching to fill the whole window.
+    <PortalPage title={`Products (${products.length})`} maxWidth={950}>
         {/* Filter toolbar */}
         <FilterBar>
           <Field label="Search" width={200}>
