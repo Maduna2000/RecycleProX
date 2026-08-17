@@ -44,15 +44,24 @@ export function PageTitleBar({ title }: PageTitleBarProps = {}) {
 
   return (
     <div
-      className="flex items-center justify-between shrink-0 px-3 border-b select-none"
+      className="flex items-center justify-between shrink-0 px-3 select-none"
       style={{
         height:      28,
         background:  'rgba(27,58,107,0.05)',
-        borderColor: 'rgba(0,0,0,0.07)',
+        borderBottom: '1px solid rgba(0,0,0,0.07)',
         // Matches the customer detail page's own capped-and-centered
-        // ContentCard (see PortalPage's cardStyle there) so this bar's
-        // edges line up with the page beneath it.
-        ...(isCustomerDetailPage && { maxWidth: 960, margin: '0 auto' }),
+        // ContentCard (see PortalPage's cardStyle there) — same width, same
+        // border color/weight on every side but the bottom, and rounded top
+        // corners meeting ContentCard's own squared-off top (borderTop:
+        // 'none' there) — so the two fuse into one continuous framed box
+        // instead of a separate strip floating above it.
+        ...(isCustomerDetailPage && {
+          maxWidth: 960,
+          margin:   '0 auto',
+          border:   '1px solid #B0B0B0',
+          borderTopLeftRadius: 3,
+          borderTopRightRadius: 3,
+        }),
       }}
     >
       <span className="text-[12px] font-semibold text-[#374151]">
