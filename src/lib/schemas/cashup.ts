@@ -31,6 +31,10 @@ export const SubmitCashUpSchema = z.object({
   denominations: denominationsSchema,
   declaredCash:  z.number().min(0, 'Declared cash must be non-negative'),
   notes:         z.string().max(500).optional(),
+  // Admin-only escape hatch when expected cash doesn't match the day's
+  // uploaded MoMo statement closing balance — see submitCashUp's
+  // MomoBalanceMismatchError. Ignored (and re-blocked) for any other role.
+  momoOverrideReason: z.string().trim().min(5, 'Reason must be at least 5 characters').max(500).optional(),
 })
 
 export const ApproveCashUpSchema = z.object({

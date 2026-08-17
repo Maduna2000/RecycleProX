@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { SubmitCashUpSchema } from '@/lib/schemas/cashup'
-import { getCashUp, submitCashUp } from '@/lib/services/cashUpService'
+import { getCashUp, submitCashUp, MomoBalanceMismatchError } from '@/lib/services/cashUpService'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 // GET /api/cashup/[id]
@@ -38,9 +38,28 @@ export async function PUT(
       return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
     }
 
-    const cashUp = await runWithRequestTenant(req, () => submitCashUp(params.id, session.user.id, parsed.data))
+    // The MoMo-mismatch override is admin-only — strip it from anyone else's
+    // request here rather than trusting cashUpService to re-derive the
+    // caller's role, so a non-admin can never talk the service into
+    // accepting an override reason it shouldn't.
+    const input = session.user.role === 'admin' ? parsed.data : { ...parsed.data, momoOverrideReason: undefined }
+
+    const cashUp = await runWithRequestTenant(req, () => submitCashUp(params.id, session.user.id, input))
     return NextResponse.json({ cashUp })
   } catch (err: unknown) {
+    if (err instanceof MomoBalanceMismatchError) {
+      return NextResponse.json(
+        {
+          error: err.message,
+          code: err.code,
+          expected: err.expected,
+          statementBalance: err.statementBalance,
+          difference: err.difference,
+          canOverride: session.user.role === 'admin',
+        },
+        { status: 422 }
+      )
+    }
     const msg = err instanceof Error ? err.message : 'Failed to submit cash-up'
     logger.error({ err, id: params.id }, 'PUT /api/cashup/[id] failed')
     return NextResponse.json({ error: msg }, { status: 400 })

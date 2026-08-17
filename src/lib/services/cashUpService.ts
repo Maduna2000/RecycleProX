@@ -6,6 +6,7 @@ import { SubmitCashUpInput, ApproveCashUpInput, type Currency } from '@/lib/sche
 import { getMostRecentFloatAsOf, updateClosingAmount, getDrawingsReceivedForDate } from './floatService'
 import { getExpenseTotalsForDate } from './expenseService'
 import { getLoanTotalsForDate, formatTransactionMethod } from './loanService'
+import { getMomoStatementForDate } from './momoStatementService'
 import { getSessionWindow, type DateWindow } from './cashUpWindow'
 import { sastDateLabelToUTCDate, getDayBoundsSAST, todaySASTDateStr } from '@/lib/utils/dayBounds'
 import { postCashUpVariance } from '@/lib/services/ledgerService'
@@ -31,6 +32,24 @@ export class CashUpNewerSessionOpenError extends Error {
   code = 'NEWER_SESSION_OPEN' as const
   constructor() { super('Cannot reject — a newer session already exists (open or submitted). Void this session instead if it cannot be corrected.'); this.name = 'CashUpNewerSessionOpenError' }
 }
+
+// Expected cash doesn't match the day's uploaded MoMo statement closing
+// balance. Non-admins can never submit through this; admins can, but only
+// by resubmitting with a momoOverrideReason (see the route handler, which
+// strips that field from any non-admin request before it ever reaches
+// here — this class itself doesn't check roles).
+export class MomoBalanceMismatchError extends Error {
+  code = 'MOMO_BALANCE_MISMATCH' as const
+  constructor(public expected: string, public statementBalance: string, public difference: string) {
+    super(`Expected cash (${expected}) does not match today's MoMo statement closing balance (${statementBalance})`)
+    this.name = 'MomoBalanceMismatchError'
+  }
+}
+
+// Marks a submission that went through despite a MoMo mismatch, so the
+// reason and both figures stay on record — same "prefix the free-text
+// notes field" convention as loanService.ts's MANUAL_REVERSAL_PREFIX.
+const MOMO_OVERRIDE_PREFIX = 'MoMo override'
 
 // ─── Open a cash-up session ───────────────────────────────────────────────────
 // A day can hold more than one session (separate shifts) — the only real
@@ -640,6 +659,32 @@ export async function submitCashUp(
   const fullExpected = openingBalance.plus(totals.cashExpected)
   const variance = declared.minus(fullExpected)
 
+  // Cross-check against the day's uploaded MoMo statement, if one exists —
+  // most purchases are paid out via mobile money, so a mismatch here means
+  // either the statement or the day's recorded transactions are wrong.
+  // Skipped entirely when no statement was uploaded for this session's date
+  // (or it has no parseable closing balance) — this check never blocks a
+  // cash-up that has nothing to compare against.
+  let momoOverrideNote: string | null = null
+  const momoStatement = await getMomoStatementForDate(cashUp.sessionDate)
+  if (momoStatement?.closingBalance != null) {
+    const statementBalance = new Decimal(momoStatement.closingBalance.toString())
+    if (!fullExpected.equals(statementBalance)) {
+      if (!input.momoOverrideReason) {
+        throw new MomoBalanceMismatchError(
+          fullExpected.toFixed(2),
+          statementBalance.toFixed(2),
+          fullExpected.minus(statementBalance).toFixed(2),
+        )
+      }
+      momoOverrideNote = `${MOMO_OVERRIDE_PREFIX} — ${input.momoOverrideReason} (expected ${fullExpected.toFixed(2)}, statement ${statementBalance.toFixed(2)})`
+      logger.info(
+        { cashUpId, expected: fullExpected.toFixed(2), statementBalance: statementBalance.toFixed(2), userId: closedByUserId },
+        'cashup.momo_mismatch.overridden'
+      )
+    }
+  }
+
   // Cumulative variance = sum of all previously approved cash-up variances + this one
   const priorApproved = await prisma.cashUp.aggregate({
     where: { status: 'approved' },
@@ -666,7 +711,7 @@ export async function submitCashUp(
       variance,
       finPeriodCumulative,
       denominations:       input.denominations ?? {},
-      notes:               input.notes ?? null,
+      notes:               [input.notes, momoOverrideNote].filter(Boolean).join('\n') || null,
     },
   })
 

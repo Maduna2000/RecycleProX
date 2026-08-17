@@ -389,6 +389,91 @@ function ReasonModal({ title, message, confirmLabel, loading, onConfirm, onClose
   )
 }
 
+// ─── MoMo Balance Mismatch Modal ──────────────────────────────────────────────
+// Shown when submitCashUp rejects the submission because expected cash
+// doesn't match the day's uploaded MoMo statement closing balance. Admins
+// get a reason field to override; everyone else just sees the block.
+function MomoMismatchModal({
+  expected, statementBalance, difference, canOverride, submitting, onOverride, onClose, currencySymbol = 'R',
+}: {
+  expected: string
+  statementBalance: string
+  difference: string
+  canOverride: boolean
+  submitting: boolean
+  onOverride: (reason: string) => void
+  onClose: () => void
+  currencySymbol?: string
+}) {
+  const [reason, setReason] = useState('')
+  const diff = new Decimal(difference)
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
+      <RpxDialogContent maxWidth={440}>
+        <RpxDialogHeader title="MoMo Statement Mismatch" onClose={onClose} />
+        <RpxDialogBody>
+          <div className="space-y-3">
+            <div className="rounded p-3 text-sm" style={{ background: colors.dangerBg, border: `1px solid ${colors.danger}` }}>
+              <p style={{ color: colors.danger, fontWeight: 600 }}>
+                Expected cash doesn&apos;t match today&apos;s MoMo statement closing balance.
+              </p>
+              <p className="text-xs mt-1" style={{ color: colors.danger }}>
+                Cash-up can&apos;t be submitted until this is resolved{canOverride ? ', or an admin overrides it below.' : '.'}
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div>
+                <span style={{ display: 'block', color: colors.textSecondary }}>Expected Cash</span>
+                <span className="font-mono font-semibold">{currencySymbol} {new Decimal(expected).toFixed(2)}</span>
+              </div>
+              <div>
+                <span style={{ display: 'block', color: colors.textSecondary }}>MoMo Closing Balance</span>
+                <span className="font-mono font-semibold">{currencySymbol} {new Decimal(statementBalance).toFixed(2)}</span>
+              </div>
+              <div className="col-span-2">
+                <span style={{ display: 'block', color: colors.textSecondary }}>Difference</span>
+                <span className="font-mono font-semibold" style={{ color: colors.danger }}>
+                  {diff.gt(0) ? '+' : ''}{currencySymbol} {diff.toFixed(2)}
+                </span>
+              </div>
+            </div>
+            {canOverride && (
+              <div>
+                <Label style={{ display: 'block', marginBottom: 4, fontSize: 10, fontWeight: 600, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Override Reason <span style={{ color: colors.danger }}>(required)</span>
+                </Label>
+                <Textarea
+                  value={reason}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setReason(e.target.value)}
+                  placeholder="e.g., MoMo statement missing a late transaction, confirmed with provider"
+                  style={{ fontSize: 12, border: `1px solid ${colors.border}`, borderRadius: 2, resize: 'vertical' }}
+                  rows={2}
+                  disabled={submitting}
+                  autoFocus
+                />
+              </div>
+            )}
+          </div>
+        </RpxDialogBody>
+        <RpxDialogFooter>
+          <Btn onClick={onClose} disabled={submitting}>{canOverride ? 'Cancel' : 'Close'}</Btn>
+          {canOverride && (
+            <Btn
+              variant="danger"
+              loading={submitting}
+              disabled={reason.trim().length < 5}
+              onClick={() => onOverride(reason)}
+            >
+              Override & Submit
+            </Btn>
+          )}
+        </RpxDialogFooter>
+      </RpxDialogContent>
+    </Dialog>
+  )
+}
+
 // ─── Manage Open Sessions Modal ───────────────────────────────────────────────
 function ManageSessionsModal({ sessions, onClose, onVoided, currencySymbol = 'R' }: {
   sessions: CashUp[]
@@ -832,6 +917,14 @@ export default function CashUpPage() {
   const [manageSessionsOpen, setManageSessionsOpen] = useState(false)
   const [previousReportsOpen, setPreviousReportsOpen] = useState(false)
   const [momoModalOpen, setMomoModalOpen] = useState(false)
+  // Set when submitCashUp rejects with MOMO_BALANCE_MISMATCH — CountCashModal
+  // has already closed by this point (its Submit button closes it
+  // optimistically), so this renders as its own follow-up modal rather than
+  // an inline error inside CountCashModal.
+  const [momoMismatch, setMomoMismatch] = useState<{
+    expected: string; statementBalance: string; difference: string; canOverride: boolean
+  } | null>(null)
+  const isAdmin = session?.user?.role === 'admin'
 
   // Fetch all open sessions to show count
   const { data: openSessionsData, mutate: refreshOpenSessions } = useSWR<{ sessions: CashUp[] }>('/api/cashup/open-sessions', fetcher)
@@ -951,7 +1044,7 @@ export default function CashUpPage() {
     }
   }
 
-  async function handleSubmit() {
+  async function handleSubmit(momoOverrideReason?: string) {
     if (!cashUp) return
     setSubmitting(true)
     const denoms: Record<string, number> = {}
@@ -963,6 +1056,7 @@ export default function CashUpPage() {
           denominations: denoms,
           declaredCash:  declaredCash.toNumber(),
           notes:         notes || undefined,
+          momoOverrideReason,
         },
         localId: cashUp.id,
       })
@@ -972,11 +1066,24 @@ export default function CashUpPage() {
         await swrMutate(CASHUP_KEY)
         toast.success('Cash-up submitted for approval')
       }
+      setMomoMismatch(null)
     } catch (err) {
       let msg = 'Failed to submit cash-up'
       if (err instanceof Error) {
         try {
-          const parsed = JSON.parse(err.message) as { error?: string }
+          const parsed = JSON.parse(err.message) as {
+            error?: string; code?: string
+            expected?: string; statementBalance?: string; difference?: string; canOverride?: boolean
+          }
+          if (parsed.code === 'MOMO_BALANCE_MISMATCH' && parsed.expected && parsed.statementBalance && parsed.difference) {
+            setMomoMismatch({
+              expected: parsed.expected,
+              statementBalance: parsed.statementBalance,
+              difference: parsed.difference,
+              canOverride: !!parsed.canOverride,
+            })
+            return
+          }
           if (parsed.error) msg = parsed.error
         } catch { /* not JSON — keep default message */ }
       }
@@ -1588,6 +1695,19 @@ export default function CashUpPage() {
           />
         )
       })()}
+
+      {momoMismatch && (
+        <MomoMismatchModal
+          expected={momoMismatch.expected}
+          statementBalance={momoMismatch.statementBalance}
+          difference={momoMismatch.difference}
+          canOverride={momoMismatch.canOverride && isAdmin}
+          submitting={submitting}
+          onOverride={(reason) => { void handleSubmit(reason) }}
+          onClose={() => setMomoMismatch(null)}
+          currencySymbol={CURRENCY_SYMBOLS[cashUp?.currency ?? 'ZAR']}
+        />
+      )}
 
       {manageSessionsOpen && openSessions.length > 0 && (
         <ManageSessionsModal
