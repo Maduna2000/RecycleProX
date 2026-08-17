@@ -105,11 +105,22 @@ export async function deleteR2Object(key: string): Promise<void> {
 
 // ─── Fetch raw bytes from R2 ─────────────────────────────────────────────────
 
+// A single hung/slow R2 request (e.g. a report embedding dozens of scale-
+// kiosk photos) must never be allowed to stall the whole request past the
+// hosting platform's own function timeout — that kills the connection with
+// no response at all, which the browser surfaces as an opaque "Failed to
+// fetch" rather than a proper error. Bounding each fetch lets a single bad
+// object fall back to null (→ "No image" at render time) instead of taking
+// the entire export down with it.
+const R2_FETCH_TIMEOUT_MS = 15_000
+
 export async function fetchR2Bytes(key: string): Promise<Uint8Array | null> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), R2_FETCH_TIMEOUT_MS)
   try {
     const client = getR2Client()
     const cmd = new GetObjectCommand({ Bucket: R2_BUCKET, Key: key })
-    const res = await client.send(cmd)
+    const res = await client.send(cmd, { abortSignal: controller.signal })
     if (!res.Body) return null
     const chunks: Uint8Array[] = []
     for await (const chunk of res.Body as AsyncIterable<Uint8Array>) {
@@ -122,6 +133,8 @@ export async function fetchR2Bytes(key: string): Promise<Uint8Array | null> {
     return buf
   } catch {
     return null
+  } finally {
+    clearTimeout(timer)
   }
 }
 

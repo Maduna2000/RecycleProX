@@ -11,6 +11,12 @@ import { generateBusinessReportXlsx } from '@/lib/excel/businessReportXlsx'
 import { encodeJsonField } from '@/lib/db/queryHelpers'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
+// Image-heavy PDF reports (e.g. the Police Copper report with photos) embed
+// dozens of R2-fetched images and can legitimately take longer than the
+// platform's default function timeout — bump it where the hosting plan
+// allows (a no-op, not an error, on plans that cap it lower).
+export const maxDuration = 60
+
 /**
  * GET /api/reports/[reportId]?from=YYYY-MM-DD&to=YYYY-MM-DD&format=json|pdf|xlsx&<filters>
  *

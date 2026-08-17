@@ -110,20 +110,31 @@ export async function generateBusinessReportPdf(report: ReportDocument): Promise
   const imageCache = new Map<string, PDFImage>()
   if (hasImageCol) {
     const keys = Array.from(new Set(flat.filter((r) => r.imageR2Key).map((r) => r.imageR2Key as string)))
-    await Promise.all(
-      keys.map(async (key) => {
-        const bytes = await fetchR2Bytes(key)
-        if (!bytes || bytes.length === 0) return
-        try {
-          let img: PDFImage
-          try { img = await doc.embedPng(bytes) }
-          catch { img = await doc.embedJpg(bytes) }
-          imageCache.set(key, img)
-        } catch {
-          // Unembeddable image — falls back to "No image" at render time
-        }
-      })
-    )
+    // Bounded concurrency instead of one unlimited Promise.all — a report
+    // covering a busy month can have 100+ distinct photos, and fetching
+    // them all at once risks exhausting memory/bandwidth and blowing past
+    // the hosting platform's function timeout (which kills the connection
+    // outright, surfacing to the user as a generic "Failed to fetch" rather
+    // than any real error). fetchR2Bytes itself is already timeout-bounded
+    // per key, so a single slow object just falls back to "No image".
+    const IMAGE_FETCH_CONCURRENCY = 6
+    for (let i = 0; i < keys.length; i += IMAGE_FETCH_CONCURRENCY) {
+      const batch = keys.slice(i, i + IMAGE_FETCH_CONCURRENCY)
+      await Promise.all(
+        batch.map(async (key) => {
+          const bytes = await fetchR2Bytes(key)
+          if (!bytes || bytes.length === 0) return
+          try {
+            let img: PDFImage
+            try { img = await doc.embedPng(bytes) }
+            catch { img = await doc.embedJpg(bytes) }
+            imageCache.set(key, img)
+          } catch {
+            // Unembeddable image — falls back to "No image" at render time
+          }
+        })
+      )
+    }
   }
 
   const hasPlainClassBands = flat.some((r) => r.type === 'groupHeader' && r.level === 1 && !r.meta)
