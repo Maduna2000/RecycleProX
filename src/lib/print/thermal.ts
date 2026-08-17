@@ -113,23 +113,17 @@ function statusLabelFor(status: 'completed' | 'pending' | 'voided'): string {
 
 function addHeader(printer: ThermalPrinter, refNumber: string, date: Date, info: CompanyInfo, provisional?: boolean, statusLabel = 'PAID') {
   printer.alignCenter()
-  printer.bold(true)
   printer.println(statusLabel)
   printer.println((info.companyName || 'GOLDEN KEY INVESTMENTS (PTY) LTD').toUpperCase())
-  printer.bold(false)
   printer.alignLeft()
-  printer.bold(true)
   printer.println(`PN No: ${refNumber}`)
-  printer.bold(false)
   printer.println(`Date: ${date.toLocaleString('en-ZA')}`)
   printer.newLine()
   printAddressLines(printer, info.companyAddress)
   if (info.companyPhone) printer.println(`Tel: ${info.companyPhone}`)
   if (info.vatNumber)    printer.println(`VAT No.: ${info.vatNumber}`)
   if (provisional) {
-    printer.bold(true)
     printer.println('*** PROVISIONAL - PENDING SYNC ***')
-    printer.bold(false)
   }
   printer.drawLine()
 }
@@ -143,15 +137,12 @@ function addPeopleLines(printer: ThermalPrinter, cashierName: string, scaleOpera
 
 function addPartyLines(printer: ThermalPrinter, label: string, code: string | undefined, name: string, vatNumber?: string) {
   const custLine = code ? `${code}-${name}` : name
-  printer.bold(true)
   printer.println(`${label}: ${custLine}`)
-  printer.bold(false)
   printer.println(`${label} VAT: ${vatNumber ?? ''}`)
   printer.newLine()
 }
 
 function addLines(printer: ThermalPrinter, lines: ReceiptLine[]) {
-  printer.bold(true)
   printer.tableCustom([
     { text: 'Product', align: 'LEFT',  width: 0.22 },
     { text: 'InPrice', align: 'RIGHT', width: 0.16 },
@@ -160,9 +151,7 @@ function addLines(printer: ThermalPrinter, lines: ReceiptLine[]) {
     { text: 'Nett',    align: 'RIGHT', width: 0.14 },
     { text: 'Total',   align: 'RIGHT', width: 0.22 },
   ])
-  printer.bold(false)
 
-  printer.bold(true)
   for (const line of lines) {
     printer.tableCustom([
       { text: (line.productCode ?? '').substring(0, 10), align: 'LEFT',  width: 0.22 },
@@ -176,7 +165,6 @@ function addLines(printer: ThermalPrinter, lines: ReceiptLine[]) {
     // matching the legacy slip's own wrapping (e.g. "08002" / "ally o/r").
     printer.println(` ${line.productName}`)
   }
-  printer.bold(false)
 }
 
 function addTotals(printer: ThermalPrinter, lines: ReceiptLine[], totalAmount: string, vatAmount: string | undefined) {
@@ -186,12 +174,10 @@ function addTotals(printer: ThermalPrinter, lines: ReceiptLine[], totalAmount: s
   const grandTotal = total.plus(vat)
 
   printer.drawLine()
-  printer.bold(true)
   printer.leftRight('Nett Total', nettTotal.toFixed(1))
   printer.leftRight('Total', `E ${total.toFixed(2)}`)
   printer.leftRight('15% VAT', `E ${vat.toFixed(2)}`)
   printer.leftRight('Grand Total', `E ${grandTotal.toFixed(2)}`)
-  printer.bold(false)
 }
 
 function addSplitPayments(
@@ -213,16 +199,12 @@ function addSplitPayments(
   if (!hasAny) return
 
   printer.newLine()
-  printer.bold(true)
   printer.println('Payment Split:')
-  printer.bold(false)
 
-  printer.bold(true)
   if (cashAmt.greaterThan(0))   printer.leftRight('Cash', `E ${cashAmt.toFixed(2)}`)
   if (eftAmt.greaterThan(0))    printer.leftRight('EFT', `E ${eftAmt.toFixed(2)}`)
   if (chequeAmt.greaterThan(0)) printer.leftRight('Cheque', `E ${chequeAmt.toFixed(2)}`)
   if (loanAmt.greaterThan(0))   printer.leftRight(loanLabel, `E ${loanAmt.toFixed(2)}${loanReference ? ` #${loanReference}` : ''}`)
-  printer.bold(false)
 }
 
 function addFooter(printer: ThermalPrinter, slipNo: string | number | undefined, footerText: string | undefined, includeSignature = false) {
@@ -266,6 +248,11 @@ export async function buildPurchaseReceipt(data: PurchaseReceiptData): Promise<B
     removeSpecialCharacters: false,
     lineCharacter: '-',
   })
+  // Bold for the entire receipt, never toggled off below — thin regular-
+  // weight text prints too faint on thermal paper to read reliably (fades
+  // fast too), so the whole slip prints in emphasis mode rather than mixing
+  // weights section by section.
+  printer.bold(true)
 
   addHeader(printer, data.refNumber, data.createdAt, data, data.provisional, statusLabelFor(data.status))
   addPeopleLines(printer, data.cashierName, data.scaleOperatorName)
@@ -279,10 +266,8 @@ export async function buildPurchaseReceipt(data: PurchaseReceiptData): Promise<B
     addSplitPayments(printer, data.splitPayments, 'Loans', data.loanDeduction?.reference)
   } else if (data.loanDeduction && new Decimal(data.loanDeduction.amount).greaterThan(0)) {
     printer.newLine()
-    printer.bold(true)
     printer.println('Payment Split:')
     printer.leftRight('Loans', `E ${new Decimal(data.loanDeduction.amount).toFixed(2)}${data.loanDeduction.reference ? ` #${data.loanDeduction.reference}` : ''}`)
-    printer.bold(false)
   }
   addFooter(printer, data.slipNo, data.footerText, true)
 
@@ -300,6 +285,9 @@ export async function buildSaleReceipt(data: SaleReceiptData): Promise<Buffer> {
     removeSpecialCharacters: false,
     lineCharacter: '-',
   })
+  // See buildPurchaseReceipt's comment — bold for the whole receipt, never
+  // toggled off.
+  printer.bold(true)
 
   addHeader(printer, data.refNumber, data.createdAt, data, data.provisional, statusLabelFor(data.status))
   addPeopleLines(printer, data.cashierName)
@@ -313,10 +301,8 @@ export async function buildSaleReceipt(data: SaleReceiptData): Promise<Buffer> {
     addSplitPayments(printer, { cash: data.splitPayments.cash, eft: data.splitPayments.eft, loan: data.splitPayments.businessLoan }, 'Business Loan')
   } else if (data.businessLoanDeduction && new Decimal(data.businessLoanDeduction.amount).greaterThan(0)) {
     printer.newLine()
-    printer.bold(true)
     printer.println('Payment Split:')
     printer.leftRight('Business Loan', `E ${new Decimal(data.businessLoanDeduction.amount).toFixed(2)}`)
-    printer.bold(false)
   }
   addFooter(printer, data.slipNo, data.footerText)
 

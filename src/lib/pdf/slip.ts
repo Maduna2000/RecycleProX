@@ -628,8 +628,14 @@ function estimatePurchaseHeight(data: PurchaseSlipData, footerLineCount: number)
 
 export async function generatePurchaseReceiptPdf(data: PurchaseSlipData): Promise<Uint8Array> {
   const doc  = await PDFDocument.create()
+  // Everything on this receipt draws with the bold font, including what
+  // used to be the "regular" text (company/customer details, footer
+  // declaration) — thin regular-weight strokes print too faint to read
+  // reliably (and fade fast), so the whole slip is bold rather than mixing
+  // weights section by section. `reg` is kept only for wrapText's width
+  // measurements below, which must match what's actually drawn.
   const bold = await doc.embedFont(StandardFonts.HelveticaBold)
-  const reg  = await doc.embedFont(StandardFonts.Helvetica)
+  const reg  = bold
 
   const footerLines = data.footerText ? wrapText(data.footerText, NORMAL, reg, PBODY_W) : []
   const docHeight = estimatePurchaseHeight(data, footerLines.length)
@@ -646,20 +652,20 @@ export async function generatePurchaseReceiptPdf(data: PurchaseSlipData): Promis
 
   page.drawText(`PN No: ${data.refNumber}`, { x: PMARGIN, y: cursor, size: NORMAL, font: bold, color: BLACK })
   nextLine(NORMAL)
-  page.drawText(`Date: ${formatSlipDate(data.createdAt)}`, { x: PMARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
+  page.drawText(`Date: ${formatSlipDate(data.createdAt)}`, { x: PMARGIN, y: cursor, size: NORMAL, font: bold, color: BLACK })
   nextLine(NORMAL, 6)
 
   const addressSegments = (data.companyAddress ?? '').split(',').map((s) => s.trim()).filter(Boolean)
   for (const segment of addressSegments) {
-    page.drawText(segment, { x: PMARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
+    page.drawText(segment, { x: PMARGIN, y: cursor, size: NORMAL, font: bold, color: BLACK })
     nextLine(NORMAL)
   }
   if (data.companyPhone) {
-    page.drawText(`Tel: ${data.companyPhone}`, { x: PMARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
+    page.drawText(`Tel: ${data.companyPhone}`, { x: PMARGIN, y: cursor, size: NORMAL, font: bold, color: BLACK })
     nextLine(NORMAL)
   }
   if (data.vatNumber) {
-    page.drawText(`VAT No.: ${data.vatNumber}`, { x: PMARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
+    page.drawText(`VAT No.: ${data.vatNumber}`, { x: PMARGIN, y: cursor, size: NORMAL, font: bold, color: BLACK })
     nextLine(NORMAL)
   }
   if (data.provisional) {
@@ -672,27 +678,27 @@ export async function generatePurchaseReceiptPdf(data: PurchaseSlipData): Promis
   cursor -= 10
 
   // ── People ─────────────────────────────────────────────────────────────
-  page.drawText(`Done By: ${data.cashierName}`, { x: PMARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
+  page.drawText(`Done By: ${data.cashierName}`, { x: PMARGIN, y: cursor, size: NORMAL, font: bold, color: BLACK })
   nextLine(NORMAL)
   if (data.scaleOperatorName) {
-    page.drawText(`Scale Op: ${data.scaleOperatorName}`, { x: PMARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
+    page.drawText(`Scale Op: ${data.scaleOperatorName}`, { x: PMARGIN, y: cursor, size: NORMAL, font: bold, color: BLACK })
     nextLine(NORMAL)
   }
-  page.drawText('Rep:', { x: PMARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
+  page.drawText('Rep:', { x: PMARGIN, y: cursor, size: NORMAL, font: bold, color: BLACK })
   nextLine(NORMAL, 6)
 
   // ── Party ──────────────────────────────────────────────────────────────
   const custLine = data.customerCode ? `${data.customerCode}-${data.customerName}` : data.customerName
   page.drawText(`Cust: ${custLine}`, { x: PMARGIN, y: cursor, size: NORMAL, font: bold, color: BLACK })
   nextLine(NORMAL)
-  page.drawText(`Cust VAT: ${data.customerVatNumber ?? ''}`, { x: PMARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
+  page.drawText(`Cust VAT: ${data.customerVatNumber ?? ''}`, { x: PMARGIN, y: cursor, size: NORMAL, font: bold, color: BLACK })
   nextLine(NORMAL, 6)
   if (data.customerIdNo) {
-    page.drawText(`ID: ${data.customerIdNo}`, { x: PMARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
+    page.drawText(`ID: ${data.customerIdNo}`, { x: PMARGIN, y: cursor, size: NORMAL, font: bold, color: BLACK })
     nextLine(NORMAL)
   }
   if (data.customerPhone) {
-    page.drawText(`Phone: ${data.customerPhone}`, { x: PMARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
+    page.drawText(`Phone: ${data.customerPhone}`, { x: PMARGIN, y: cursor, size: NORMAL, font: bold, color: BLACK })
     nextLine(NORMAL)
   }
 
@@ -765,12 +771,12 @@ export async function generatePurchaseReceiptPdf(data: PurchaseSlipData): Promis
   // ── Footer ─────────────────────────────────────────────────────────────
   if (data.slipNo !== undefined) {
     nextLine(NORMAL, 0)
-    page.drawText(`Slip No. ${data.slipNo}`, { x: PMARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
+    page.drawText(`Slip No. ${data.slipNo}`, { x: PMARGIN, y: cursor, size: NORMAL, font: bold, color: BLACK })
     nextLine(NORMAL)
   }
   nextLine(NORMAL, 0)
   for (const fLine of footerLines) {
-    page.drawText(fLine, { x: PMARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
+    page.drawText(fLine, { x: PMARGIN, y: cursor, size: NORMAL, font: bold, color: BLACK })
     nextLine(NORMAL)
   }
 
@@ -781,9 +787,9 @@ export async function generatePurchaseReceiptPdf(data: PurchaseSlipData): Promis
   // SMALL for Helvetica) or its ascenders poke back up through the line
   // instead of sitting cleanly underneath it.
   cursor -= LINE_H * 2
-  signatureLine(page, cursor, reg)
+  signatureLine(page, cursor, bold)
   cursor -= LINE_H
-  center(page, 'Signature', cursor, SMALL, reg, GRAY)
+  center(page, 'Signature', cursor, SMALL, bold, BLACK)
 
   return doc.save()
 }
@@ -886,8 +892,11 @@ function estimateSaleHeight(data: SaleSlipData, footerLineCount: number): number
 
 export async function generateSaleReceiptPdf(data: SaleSlipData): Promise<Uint8Array> {
   const doc  = await PDFDocument.create()
+  // See generatePurchaseReceiptPdf's comment — everything on this receipt
+  // draws bold, including what used to be the "regular" text. `reg` is kept
+  // only for wrapText's width measurements, which must match what's drawn.
   const bold = await doc.embedFont(StandardFonts.HelveticaBold)
-  const reg  = await doc.embedFont(StandardFonts.Helvetica)
+  const reg  = bold
 
   const footerLines = data.footerText ? wrapText(data.footerText, NORMAL, reg, PBODY_W) : []
   const docHeight = estimateSaleHeight(data, footerLines.length)
@@ -904,20 +913,20 @@ export async function generateSaleReceiptPdf(data: SaleSlipData): Promise<Uint8A
 
   page.drawText(`PN No: ${data.refNumber}`, { x: PMARGIN, y: cursor, size: NORMAL, font: bold, color: BLACK })
   nextLine(NORMAL)
-  page.drawText(`Date: ${formatSlipDate(data.createdAt)}`, { x: PMARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
+  page.drawText(`Date: ${formatSlipDate(data.createdAt)}`, { x: PMARGIN, y: cursor, size: NORMAL, font: bold, color: BLACK })
   nextLine(NORMAL, 6)
 
   const addressSegments = (data.companyAddress ?? '').split(',').map((s) => s.trim()).filter(Boolean)
   for (const segment of addressSegments) {
-    page.drawText(segment, { x: PMARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
+    page.drawText(segment, { x: PMARGIN, y: cursor, size: NORMAL, font: bold, color: BLACK })
     nextLine(NORMAL)
   }
   if (data.companyPhone) {
-    page.drawText(`Tel: ${data.companyPhone}`, { x: PMARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
+    page.drawText(`Tel: ${data.companyPhone}`, { x: PMARGIN, y: cursor, size: NORMAL, font: bold, color: BLACK })
     nextLine(NORMAL)
   }
   if (data.vatNumber) {
-    page.drawText(`VAT No.: ${data.vatNumber}`, { x: PMARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
+    page.drawText(`VAT No.: ${data.vatNumber}`, { x: PMARGIN, y: cursor, size: NORMAL, font: bold, color: BLACK })
     nextLine(NORMAL)
   }
   if (data.provisional) {
@@ -930,23 +939,23 @@ export async function generateSaleReceiptPdf(data: SaleSlipData): Promise<Uint8A
   cursor -= 10
 
   // ── People ─────────────────────────────────────────────────────────────
-  page.drawText(`Done By: ${data.cashierName}`, { x: PMARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
+  page.drawText(`Done By: ${data.cashierName}`, { x: PMARGIN, y: cursor, size: NORMAL, font: bold, color: BLACK })
   nextLine(NORMAL)
-  page.drawText('Rep:', { x: PMARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
+  page.drawText('Rep:', { x: PMARGIN, y: cursor, size: NORMAL, font: bold, color: BLACK })
   nextLine(NORMAL, 6)
 
   // ── Party ──────────────────────────────────────────────────────────────
   const buyerLine = data.buyerCode ? `${data.buyerCode}-${data.buyerName}` : data.buyerName
   page.drawText(`Buyer: ${buyerLine}`, { x: PMARGIN, y: cursor, size: NORMAL, font: bold, color: BLACK })
   nextLine(NORMAL)
-  page.drawText(`Buyer VAT: ${data.buyerVatNumber ?? ''}`, { x: PMARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
+  page.drawText(`Buyer VAT: ${data.buyerVatNumber ?? ''}`, { x: PMARGIN, y: cursor, size: NORMAL, font: bold, color: BLACK })
   nextLine(NORMAL, 6)
   if (data.buyerIdNumber) {
-    page.drawText(`ID: ${data.buyerIdNumber}`, { x: PMARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
+    page.drawText(`ID: ${data.buyerIdNumber}`, { x: PMARGIN, y: cursor, size: NORMAL, font: bold, color: BLACK })
     nextLine(NORMAL)
   }
   if (data.buyerPhone) {
-    page.drawText(`Phone: ${data.buyerPhone}`, { x: PMARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
+    page.drawText(`Phone: ${data.buyerPhone}`, { x: PMARGIN, y: cursor, size: NORMAL, font: bold, color: BLACK })
     nextLine(NORMAL)
   }
 
@@ -1013,12 +1022,12 @@ export async function generateSaleReceiptPdf(data: SaleSlipData): Promise<Uint8A
   // ── Footer ─────────────────────────────────────────────────────────────
   if (data.slipNo !== undefined) {
     nextLine(NORMAL, 0)
-    page.drawText(`Slip No. ${data.slipNo}`, { x: PMARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
+    page.drawText(`Slip No. ${data.slipNo}`, { x: PMARGIN, y: cursor, size: NORMAL, font: bold, color: BLACK })
     nextLine(NORMAL)
   }
   nextLine(NORMAL, 0)
   for (const fLine of footerLines) {
-    page.drawText(fLine, { x: PMARGIN, y: cursor, size: NORMAL, font: reg, color: BLACK })
+    page.drawText(fLine, { x: PMARGIN, y: cursor, size: NORMAL, font: bold, color: BLACK })
     nextLine(NORMAL)
   }
   cursor -= 2
