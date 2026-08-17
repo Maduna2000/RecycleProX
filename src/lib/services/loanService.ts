@@ -57,6 +57,51 @@ export class RepaymentNotLastEntryError extends Error {
 // no-purchaseId shape, different real-world cause.
 const MANUAL_REVERSAL_PREFIX = 'Reversal (manual)'
 
+// Real observed gap between LoanRepayment rows written by one applyRepaymentTx
+// call is ~20-40ms per loan touched (each tx.loanRepayment.create() is its
+// own round-trip, timestamped individually — NOT a single frozen
+// transaction-start value the way plain SQL now() would be). This threshold
+// is far larger than that, and far smaller than the minutes/hours/days
+// between genuinely separate events, so it safely tells "one purchase's FIFO
+// split across N loans" apart from "two unrelated things that happen to
+// share a purchaseId" (see batchPurchaseRepayments).
+const REPAYMENT_BATCH_GAP_MS = 10_000
+
+/**
+ * Buckets a purchaseId-scoped repayment list into "batches" — the tight
+ * burst of rows one applyRepaymentTx call produces (a single purchase
+ * deduction split FIFO across every active loan it touched). A purchase's
+ * loan deduction can be applied more than once over its lifetime (create,
+ * edit, settle — see purchaseService.ts's three applyRepaymentTx call
+ * sites) and later reversed as a whole (void) — both reuse the same
+ * purchaseId, so a batch also breaks on a sign change (a reversal must
+ * never merge with the deduction it reverses) in addition to a gap larger
+ * than REPAYMENT_BATCH_GAP_MS. Rows are returned earliest-batch-first, each
+ * batch sorted earliest-row-first.
+ */
+function batchPurchaseRepayments<T extends { createdAt: Date; amount: { toString(): string } }>(rows: T[]): T[][] {
+  const sorted = [...rows].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+  const batches: T[][] = []
+  let current: T[] = []
+  let prevTime = -Infinity
+  let prevIsNegative = false
+
+  for (const r of sorted) {
+    const isNegative = new Decimal(r.amount.toString()).isNegative()
+    const gap = r.createdAt.getTime() - prevTime
+    if (current.length > 0 && isNegative === prevIsNegative && gap <= REPAYMENT_BATCH_GAP_MS) {
+      current.push(r)
+    } else {
+      if (current.length > 0) batches.push(current)
+      current = [r]
+    }
+    prevTime = r.createdAt.getTime()
+    prevIsNegative = isNegative
+  }
+  if (current.length > 0) batches.push(current)
+  return batches
+}
+
 export function formatTransactionMethod(method: string): string {
   if (method === 'eft') return 'EFT'
   return method.charAt(0).toUpperCase() + method.slice(1)
@@ -570,8 +615,9 @@ export async function createManualRepayment(
 // historical edit.
 //
 // A purchase's loan deduction can be split FIFO across several active loans
-// (applyRepaymentTx) — every split is its own LoanRepayment row, but all
-// share the same purchaseId and createdAt (written in one $transaction).
+// (applyRepaymentTx) — every split is its own LoanRepayment row, all written
+// a few tens of milliseconds apart within one $transaction (see
+// batchPurchaseRepayments — they do NOT share an identical createdAt).
 // getCustomerLoanStatement displays that whole batch as a single ledger
 // line, so reversing "the last entry" has to reverse every row in the
 // batch too, not just whichever split repaymentId happens to point at —
@@ -582,9 +628,10 @@ export async function reverseRepayment(repaymentId: string, reason: string, user
   if (!repayment) throw new RepaymentNotFoundError(repaymentId)
 
   const group = repayment.purchaseId
-    ? await prisma.loanRepayment.findMany({
-        where: { purchaseId: repayment.purchaseId, createdAt: repayment.createdAt },
-      })
+    ? await (async () => {
+        const siblings = await prisma.loanRepayment.findMany({ where: { purchaseId: repayment.purchaseId! } })
+        return batchPurchaseRepayments(siblings).find((batch) => batch.some((r) => r.id === repayment.id)) ?? [repayment]
+      })()
     : [repayment]
 
   const [laterLoan, laterRepayment] = await Promise.all([
@@ -722,22 +769,30 @@ export async function getCustomerLoanStatement(customerId: string, periodStr?: s
     })
   }
   // A purchase's loan deduction can pay down more than one active loan FIFO
-  // (applyRepaymentTx) — each loan touched gets its own LoanRepayment row,
-  // but they're all written inside the same $transaction, so they share both
-  // purchaseId and createdAt. That's one real-world event (one purchase), so
-  // the ledger groups them into a single line with the summed amount rather
-  // than showing R2,300 / R200 / ... instead of the R5,000 actually
-  // deducted. Non-purchase rows (manual repayments, reversals with no
-  // purchaseId) have no sibling to merge with and pass through as-is.
-  const repaymentGroups = new Map<string, typeof repaymentsInPeriod>()
+  // (applyRepaymentTx) — each loan touched gets its own LoanRepayment row.
+  // That's one real-world event (one purchase), so the ledger groups them
+  // into a single line with the summed amount rather than showing R2,300 /
+  // R200 / ... instead of the R5,000 actually deducted — see
+  // batchPurchaseRepayments for how those rows are told apart from
+  // unrelated ones sharing the same purchaseId. Non-purchase rows (manual
+  // repayments, reversals with no purchaseId) have no batch to join and
+  // pass through as-is.
+  const purchaseBuckets = new Map<string, typeof repaymentsInPeriod>()
+  const repaymentBatches: (typeof repaymentsInPeriod)[] = []
   for (const r of repaymentsInPeriod) {
-    const key = r.purchaseId ? `${r.purchaseId}|${r.createdAt.getTime()}` : r.id
-    const group = repaymentGroups.get(key)
-    if (group) group.push(r)
-    else repaymentGroups.set(key, [r])
+    if (!r.purchaseId) {
+      repaymentBatches.push([r])
+      continue
+    }
+    const bucket = purchaseBuckets.get(r.purchaseId)
+    if (bucket) bucket.push(r)
+    else purchaseBuckets.set(r.purchaseId, [r])
+  }
+  for (const bucket of Array.from(purchaseBuckets.values())) {
+    repaymentBatches.push(...batchPurchaseRepayments(bucket))
   }
 
-  for (const group of Array.from(repaymentGroups.values())) {
+  for (const group of repaymentBatches) {
     const first = group[0]!
     const amount = group.reduce((sum, r) => sum.plus(r.amount.toString()), new Decimal(0))
     const isReversal = amount.isNegative()
@@ -803,11 +858,9 @@ export async function getCustomerLoanStatement(customerId: string, periodStr?: s
     // purchase, not just this one split.
     let amount = new Decimal(lastRepayment.amount.toString())
     if (lastRepayment.purchaseId) {
-      const siblings = await prisma.loanRepayment.aggregate({
-        where: { purchaseId: lastRepayment.purchaseId, createdAt: lastRepayment.createdAt },
-        _sum: { amount: true },
-      })
-      amount = new Decimal(siblings._sum.amount?.toString() ?? amount.toString())
+      const siblings = await prisma.loanRepayment.findMany({ where: { purchaseId: lastRepayment.purchaseId } })
+      const batch = batchPurchaseRepayments(siblings).find((b) => b.some((r) => r.id === lastRepayment.id))
+      if (batch) amount = batch.reduce((sum, r) => sum.plus(r.amount.toString()), new Decimal(0))
     }
     return { kind: 'repayment' as const, id: lastRepayment.id, description: 'Repayment', amount: amount.toFixed(2), date: lastRepayment.createdAt.toISOString() }
   })()
