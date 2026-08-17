@@ -107,6 +107,7 @@ async function queryCopperPurchases(from: string, to: string, idNumber?: string)
       },
     },
     select: {
+      productId: true,
       quantity: true,
       unitPrice: true,
       product: {
@@ -123,7 +124,22 @@ async function queryCopperPurchases(from: string, to: string, idNumber?: string)
           customer: {
             select: { firstName: true, lastName: true, companyName: true, customerType: true, idNumber: true },
           },
-          scaleOrder: { select: { photoR2Keys: true } },
+          // A scale order weighing more than one product stamps EVERY
+          // product — including the first — as its own ScaleOrderLine (see
+          // scaleService.ts's createScaleOrder: the top-level
+          // ScaleOrder.photoR2Keys is always just the first line's photos,
+          // duplicated onto ScaleOrderLine too). Matching by productId
+          // against `lines` below picks the photo of the product actually
+          // on THIS purchase line, instead of always defaulting to
+          // whichever product happened to be weighed first. `photoR2Keys`
+          // stays selected as a fallback for the (should-be-rare) case of
+          // no matching line at all.
+          scaleOrder: {
+            select: {
+              photoR2Keys: true,
+              lines: { select: { productId: true, photoR2Keys: true } },
+            },
+          },
         },
       },
     },
@@ -169,6 +185,17 @@ async function queryCopperPurchases(from: string, to: string, idNumber?: string)
       existing.netKg = existing.netKg.plus(qty)
       continue
     }
+    // Prefer the ScaleOrderLine matching THIS line's own product — accurate
+    // for a scale order that weighed more than one product. Falls back to
+    // the scale order's top-level photos only when no per-line match exists
+    // at all (e.g. a scale order predating per-line photo capture).
+    const matchedScaleLine = p.scaleOrder?.lines.find((sl) => sl.productId === l.productId)
+    // Index 1 = the "Product / Load" photo slot from the scale kiosk (Step4Photos);
+    // index 0 is the scale-reading display, not the goods themselves.
+    const scaleOrderPhotoKey = matchedScaleLine
+      ? matchedScaleLine.photoR2Keys[1] ?? null
+      : p.scaleOrder?.photoR2Keys[1] ?? null
+
     byPurchase.set(p.id, {
       refNumber: p.refNumber,
       createdAt: p.createdAt,
@@ -177,9 +204,7 @@ async function queryCopperPurchases(from: string, to: string, idNumber?: string)
       casualName: p.customer.customerType === 'casual' ? `${p.customer.firstName} ${p.customer.lastName}` : null,
       idNumber: p.customer.idNumber ?? null,
       netKg: qty,
-      // Index 1 = the "Product / Load" photo slot from the scale kiosk (Step4Photos);
-      // index 0 is the scale-reading display, not the goods themselves.
-      scaleOrderPhotoKey: p.scaleOrder?.photoR2Keys?.[1] ?? null,
+      scaleOrderPhotoKey,
     })
   }
 
