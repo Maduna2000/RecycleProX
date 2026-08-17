@@ -208,7 +208,7 @@ function EntriesTab() {
     abortRef.current = ctrl
 
     const params = new URLSearchParams({
-      page: String(pg), pageSize: '50',
+      page: String(pg), pageSize: '30',
       ...(debouncedSearch && { search: debouncedSearch }),
       ...(purpose          && { purpose }),
       ...(onSiteOnly       && { onSiteOnly: 'true' }),
@@ -400,7 +400,7 @@ function EntriesTab() {
           emptyMessage="No gate entries found"
           total={total}
           page={page}
-          pageSize={50}
+          pageSize={30}
           onPageChange={setPage}
         />
       </div>
@@ -439,7 +439,7 @@ function GuardsTab() {
   const debouncedSearch = useDebounce(search, 300)
 
   const fetchGuards = useCallback(async (pg: number) => {
-    const params = new URLSearchParams({ page: String(pg), limit: '50', ...(debouncedSearch && { search: debouncedSearch }) })
+    const params = new URLSearchParams({ page: String(pg), limit: '30', ...(debouncedSearch && { search: debouncedSearch }) })
     setLoading(true); setError(null)
     try {
       const data = await fetcher(`/api/gate/guards?${params}`)
@@ -517,7 +517,7 @@ function GuardsTab() {
             emptyMessage="No security guards found — create one to get started"
             total={total}
             page={page}
-            pageSize={50}
+            pageSize={30}
             onPageChange={setPage}
           />
         </div>

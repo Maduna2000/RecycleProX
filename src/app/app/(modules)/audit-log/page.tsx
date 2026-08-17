@@ -42,7 +42,7 @@ const ACTION_STYLES: Record<AuditEntry['action'], { background: string; color: s
   LOGOUT:  { background: colors.neutralBg, color: colors.textSecondary },
 }
 
-const PAGE_SIZE = 50
+const PAGE_SIZE = 30
 
 export default function AuditLogPage() {
   const router = useRouter()

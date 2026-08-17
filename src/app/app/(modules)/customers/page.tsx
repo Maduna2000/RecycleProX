@@ -115,7 +115,7 @@ function AccountsList() {
   const [convertId,       setConvertId]       = useState<string | null>(null)
   const [convertLoading,  setConvertLoading]  = useState(false)
 
-  const PAGE_SIZE = 50
+  const PAGE_SIZE = 30
 
   const query = new URLSearchParams({
     type: 'account',

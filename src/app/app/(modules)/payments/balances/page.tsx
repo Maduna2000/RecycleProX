@@ -33,7 +33,7 @@ export default function AccountBalancesPage() {
   const outstandingCount = balances.filter((b) => new Decimal(b.balance).gt(0)).length
   const totalOutstanding = balances.reduce((sum, b) => sum.plus(new Decimal(b.balance).gt(0) ? new Decimal(b.balance) : new Decimal(0)), new Decimal(0))
 
-  const PAGE_SIZE     = 50
+  const PAGE_SIZE     = 30
   const totalPages    = Math.max(1, Math.ceil(balances.length / PAGE_SIZE))
   const safePage      = Math.min(page, totalPages)
   const pagedBalances = balances.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)

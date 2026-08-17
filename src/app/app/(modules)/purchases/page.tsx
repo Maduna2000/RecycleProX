@@ -88,7 +88,7 @@ export default function PurchasesPage() {
     ...(to            && { to }),
     ...(sortKey && sortDir && { sortKey, sortDir }),
     page:     String(page),
-    pageSize: '50',
+    pageSize: '30',
   })
 
   const { data, isLoading, error } = useSWR<{ purchases: Purchase[]; total: number; totalSum: string }>(
@@ -326,7 +326,7 @@ export default function PurchasesPage() {
           emptyAction={{ label: '+ New Purchase', onClick: () => router.push('/app/purchases/new') }}
           total={data?.total}
           page={page}
-          pageSize={50}
+          pageSize={30}
           onPageChange={setPage}
           onSort={handleSort}
           sortKey={sortKey}

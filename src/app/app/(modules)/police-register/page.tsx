@@ -74,7 +74,7 @@ export default function PoliceRegisterPage() {
   const [pendingVisitId, setPendingVisitId] = useState<string | null>(null)
   const [sigDialogOpen, setSigDialogOpen]   = useState(false)
   const [visitsPage, setVisitsPage]         = useState(1)
-  const VISITS_PAGE_SIZE = 20
+  const VISITS_PAGE_SIZE = 30
 
   const { data: visitsData, isLoading: visitsLoading } =
     useSWR<{ visits: PoliceVisit[]; total: number }>(

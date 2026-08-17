@@ -12,7 +12,7 @@ export interface AuditLogFilter {
 }
 
 export async function listAuditLogs(filter: AuditLogFilter = {}) {
-  const { table, action, recordId, userId, from, to, page = 1, pageSize = 50 } = filter
+  const { table, action, recordId, userId, from, to, page = 1, pageSize = 30 } = filter
 
   const where = {
     ...(table    && { tableName:   { equals: table, mode: 'insensitive' as const } }),

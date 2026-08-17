@@ -84,7 +84,7 @@ export default function ExpensesPage() {
     ...(search       && { search }),
     ...(from         && { from }),
     ...(to           && { to }),
-    limit: '50',
+    limit: '30',
   })
   const key = `/api/expenses?${query}`
   const { data, isLoading } = useSWR<{ expenses: Expense[]; total: number }>(key, fetcher)
@@ -320,7 +320,7 @@ export default function ExpensesPage() {
             onClick: () => setAddOpen(true),
           }}
           total={data?.total}
-          pageSize={50}
+          pageSize={30}
         />
       </div>
 

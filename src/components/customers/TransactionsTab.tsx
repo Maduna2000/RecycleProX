@@ -16,7 +16,7 @@ const columns: Column<Transaction>[] = [
   { key: 'status', header: 'Status', width: '110px', render: (tx) => <span style={{ textTransform: 'capitalize' }}>{tx.status}</span> },
 ]
 
-const PAGE_SIZE = 25
+const PAGE_SIZE = 30
 
 /** Shared between the account and casual customer profile pages — both list the same transaction history. */
 export function TransactionsTab({ customerId }: { customerId: string }) {
