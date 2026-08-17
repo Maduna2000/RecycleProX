@@ -172,14 +172,12 @@ export default function CustomerDetailPage() {
   const fmtDate     = (v?: string | null) => v ? new Date(v).toLocaleDateString('en-ZA') : '—'
 
   return (
-    <PortalPage title={fullName}>
+    // Capped and centered like the Float page's own `max-w-3xl mx-auto`
+    // content wrapper — passed as cardStyle so it's the actual ContentCard
+    // (with its real border/radius) that shrinks, instead of drawing a
+    // second, separate border around an inner div.
+    <PortalPage title={fullName} cardStyle={{ maxWidth: 960, margin: '0 auto', width: '100%' }}>
       <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, background: '#F5F5F5' }}>
-      {/* Everything below — sub-header, tab strip, and the two-column content
-          — is capped to the same 960px (760 content + 200 sidebar) and
-          centered as one block, so the header/tab-strip borders line up with
-          the content's actual edges instead of spanning the full page while
-          the content beneath them is narrower. */}
-      <div style={{ width: 960, maxWidth: '100%', margin: '0 auto', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
       {/* ── Sub-header ────────────────────────────────────────────────────────── */}
       <div style={{ padding: '6px 10px', borderBottom: '1px solid #E0E0E0', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
         <span style={{ fontSize: 11, color: '#6C757D' }}>{customer.customerType === 'account' ? 'Account Customer' : 'Casual Customer'}</span>
@@ -235,8 +233,8 @@ export default function CustomerDetailPage() {
       </div>
 
       {/* ── Two-column layout: main content + sidebar ─────────────────────────── */}
-      {/* Exactly fills the 960px wrapper above (760 content + 200 sidebar) —
-          the wrapper itself handles centering the whole page block. */}
+      {/* Fills the capped 960px ContentCard from cardStyle above (760 content
+          + 200 sidebar). */}
       <div style={{ display: 'flex', alignItems: 'flex-start', flex: 1, minHeight: 0, overflowY: 'auto' }}>
 
         {/* Main content — fixed width so every tab (Personal, Business,
@@ -382,7 +380,7 @@ export default function CustomerDetailPage() {
                   <input {...register('vatNumber')} disabled={!isEditing || saving} style={{ ...(isEditing ? inp : inpDisabled), fontFamily: 'monospace' }} />
                   {errors.vatNumber && <span style={{ fontSize: 10, color: '#DC2626' }}>{errors.vatNumber.message}</span>}
                 </div>
-                <div>
+                <div style={{ gridColumn: 'span 2' }}>
                   <span style={lbl}>Trade Commodities</span>
                   <TradeCommoditiesSelect
                     options={commodityOptions}
@@ -559,7 +557,6 @@ export default function CustomerDetailPage() {
             </Btn>
           </div>
         </div>
-      </div>
       </div>
       </div>
 
