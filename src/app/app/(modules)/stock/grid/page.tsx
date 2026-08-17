@@ -39,7 +39,7 @@ export default function StockGridPage() {
   const { data: gridData, isLoading: gridLoading, error: gridError } = useSWR<{ grid: GridRow[] }>(gridKey, fetcher)
 
   const gridRows   = gridData?.grid ?? []
-  const PAGE_SIZE  = 50
+  const PAGE_SIZE  = 12
   const totalPages = Math.max(1, Math.ceil(gridRows.length / PAGE_SIZE))
   const safePage   = Math.min(page, totalPages)
   const pagedGrid  = gridRows.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)

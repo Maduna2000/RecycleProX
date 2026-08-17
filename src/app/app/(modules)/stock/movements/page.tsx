@@ -29,7 +29,7 @@ const SOURCE_LABELS: Record<string, string> = {
   stocktake_adjustment: 'Stocktake Adj.',
 }
 
-const MOVEMENTS_PAGE_SIZE = 50
+const MOVEMENTS_PAGE_SIZE = 12
 
 export default function StockMovementsPage() {
   const [movDirection, setMovDirection] = useState('')
