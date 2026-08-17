@@ -95,6 +95,12 @@ export default function ProductsPage() {
   const { data, isLoading, error } = useSWR<{ products: Product[] }>(swrKey, fetcher)
   const products = data?.products ?? []
 
+  const [page, setPage] = useState(1)
+  const PAGE_SIZE  = 30
+  const totalPages = Math.max(1, Math.ceil(products.length / PAGE_SIZE))
+  const safePage   = Math.min(page, totalPages)
+  const pagedProducts = products.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
+
   const { data: catData, mutate: mutateCats } = useSWR<{ categories: CategoryItem[] }>('/api/product-categories', fetcher)
   const categories: CategoryItem[] = catData?.categories ?? []
   // Flat list of all category names (parents + children) for lookup helpers
@@ -102,7 +108,7 @@ export default function ProductsPage() {
 
   const revalidate = () => mutate(swrKey)
 
-  useEffect(() => { setSelectedKeys(new Set()) }, [swrKey])
+  useEffect(() => { setSelectedKeys(new Set()); setPage(1) }, [swrKey])
 
   async function handleBulkDeactivate() {
     setBulkLoading('deactivate')
@@ -178,8 +184,8 @@ export default function ProductsPage() {
   return (
     // maxWidth matches src/lib/pageWidthCaps.ts, which PageTitleBar reads to
     // cap/border itself to match — keeps the unbounded "Name" column from
-    // stretching to fill the whole window.
-    <PortalPage title={`Products (${products.length})`} maxWidth={950}>
+    // stretching to fill the whole window. Same width as Stock On Hand.
+    <PortalPage title={`Products (${products.length})`} maxWidth={1100}>
         {/* Filter toolbar */}
         <FilterBar>
           <Field label="Search" width={200}>
@@ -229,7 +235,7 @@ export default function ProductsPage() {
         <div style={{ flex: 1, minHeight: 0, padding: 10 }}>
           <DataTable
             columns={columns}
-            rows={products}
+            rows={pagedProducts}
             rowKey={(p) => p.id}
             rowActions={isManager ? rowActions : undefined}
             selectedKeys={isManager ? selectedKeys : undefined}
@@ -238,6 +244,10 @@ export default function ProductsPage() {
             error={error}
             emptyMessage="No products found"
             emptyAction={isManager ? { label: 'Add Product', onClick: () => setCreateOpen(true) } : undefined}
+            total={products.length}
+            page={safePage}
+            pageSize={PAGE_SIZE}
+            onPageChange={setPage}
           />
         </div>
 
