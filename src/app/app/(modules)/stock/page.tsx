@@ -91,7 +91,7 @@ export default function StockPage() {
     return true
   })
 
-  const PAGE_SIZE  = 50
+  const PAGE_SIZE  = 12
   const totalPages = Math.max(1, Math.ceil(stock.length / PAGE_SIZE))
   const safePage   = Math.min(page, totalPages)
   const pagedStock = stock.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
