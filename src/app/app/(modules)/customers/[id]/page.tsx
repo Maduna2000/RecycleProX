@@ -231,8 +231,12 @@ export default function CustomerDetailPage() {
       {/* ── Two-column layout: main content + sidebar ─────────────────────────── */}
       <div style={{ display: 'flex', alignItems: 'flex-start', flex: 1, minHeight: 0, overflowY: 'auto' }}>
 
-        {/* Main content */}
-        <div style={{ flex: 1, borderRight: '1px solid #D0D0D0', background: '#fff' }}>
+        {/* Main content — the Loans tab's own ledger table is capped to
+            720px, so on that tab this panel is capped to match instead of
+            stretching to fill the remaining width; otherwise the Profile
+            sidebar ends up stranded far past the table's right edge with a
+            big empty gap between them. */}
+        <div style={tab === 'Loans' ? { flex: '0 1 auto', width: 760, borderRight: '1px solid #D0D0D0', background: '#fff' } : { flex: 1, borderRight: '1px solid #D0D0D0', background: '#fff' }}>
 
           {/* Section Content - Personal */}
           {tab === 'Personal' && (
