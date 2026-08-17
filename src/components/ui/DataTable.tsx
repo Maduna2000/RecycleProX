@@ -159,7 +159,7 @@ export function DataTable<T>({
   emptyAction,
   total,
   page = 1,
-  pageSize = 50,
+  pageSize = 30,
   onPageChange,
   onSort,
   sortKey,

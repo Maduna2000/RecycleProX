@@ -62,7 +62,7 @@ export default function PaymentsPage() {
     ...(from          && { from }),
     ...(to            && { to }),
     ...(includeVoided && { includeVoided: 'true' }),
-    pageSize: '100',
+    pageSize: '30',
   })
 
   const { data: paymentsData, isLoading: paymentsLoading, error: paymentsError } = useSWR<{
@@ -232,7 +232,7 @@ export default function PaymentsPage() {
           error={paymentsError instanceof Error ? paymentsError.message : !!paymentsError}
           emptyMessage="No payments found"
           total={paymentsData?.total}
-          pageSize={100}
+          pageSize={30}
         />
       </div>
 

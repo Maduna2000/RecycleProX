@@ -398,7 +398,7 @@ function OrdersTab() {
     abortRef.current = ctrl
 
     const params = new URLSearchParams({
-      page: String(pg), pageSize: '50',
+      page: String(pg), pageSize: '30',
       ...(debouncedSearch && { search: debouncedSearch }),
       ...(status          && { status }),
       ...(dateFrom        && { dateFrom }),
@@ -794,7 +794,7 @@ function OrdersTab() {
             emptyMessage="No scale orders found"
             total={total}
             page={page}
-            pageSize={50}
+            pageSize={30}
             onPageChange={setPage}
           />
         </div>
@@ -845,7 +845,7 @@ function OperatorsTab() {
   const debouncedSearch = useDebounce(search, 300)
 
   const fetchOperators = useCallback(async (pg: number) => {
-    const params = new URLSearchParams({ page: String(pg), limit: '50', ...(debouncedSearch && { search: debouncedSearch }) })
+    const params = new URLSearchParams({ page: String(pg), limit: '30', ...(debouncedSearch && { search: debouncedSearch }) })
     setLoading(true); setError(null)
     try {
       const data = await fetcher(`/api/scale/operators?${params}`)
@@ -963,7 +963,7 @@ function OperatorsTab() {
             emptyMessage="No scale operators found — create one to get started"
             total={total}
             page={page}
-            pageSize={50}
+            pageSize={30}
             onPageChange={setPage}
           />
         </div>

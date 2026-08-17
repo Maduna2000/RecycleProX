@@ -61,7 +61,7 @@ const PAYMENT_METHODS = [
 // rather than full-size actions.
 const COMPACT_BTN: React.CSSProperties = { fontSize: 10.5, padding: '3px 9px', gap: 4 }
 
-const LEDGER_PAGE_SIZE = 20
+const LEDGER_PAGE_SIZE = 30
 
 function SHdr({ title }: { title: string }) {
   return (

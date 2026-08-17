@@ -51,7 +51,7 @@ function buildQuery(f: Filters, page: number) {
   if (f.operatorId) p.set('operatorId', f.operatorId)
   if (f.search)     p.set('search',     f.search)
   p.set('page',     String(page))
-  p.set('pageSize', '50')
+  p.set('pageSize', '30')
   return p.toString()
 }
 
@@ -238,7 +238,7 @@ export default function ScaleOrdersPage() {
           emptyMessage="No orders found"
           total={data?.total}
           page={page}
-          pageSize={50}
+          pageSize={30}
           onPageChange={setPage}
         />
       </div>

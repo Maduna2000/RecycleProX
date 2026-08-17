@@ -87,7 +87,7 @@ export default function SalesPage() {
     ...(to            && { to }),
     ...(sortKey && sortDir && { sortKey, sortDir }),
     page:     String(page),
-    pageSize: '50',
+    pageSize: '30',
   })
 
   const { data, isLoading, error } = useSWR<{ sales: Sale[]; total: number }>(
@@ -297,7 +297,7 @@ export default function SalesPage() {
           emptyAction={{ label: '+ New Sale', onClick: () => router.push('/app/sales/new') }}
           total={data?.total}
           page={page}
-          pageSize={50}
+          pageSize={30}
           onPageChange={setPage}
           onSort={handleSort}
           sortKey={sortKey}

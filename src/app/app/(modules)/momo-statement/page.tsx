@@ -40,7 +40,7 @@ export default function MomoStatementPage() {
   const [deleteTarget, setDeleteTarget] = useState<MomoImport | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
-  const query = `page=${page}&pageSize=50`
+  const query = `page=${page}&pageSize=30`
   const { data, isLoading, error } = useSWR<{ imports: MomoImport[]; total: number }>(
     `/api/momo-statements?${query}`,
     fetcher,
@@ -187,7 +187,7 @@ export default function MomoStatementPage() {
           emptyAction={isManager ? { label: 'Upload Statement', onClick: () => fileRef.current?.click() } : undefined}
           total={data?.total}
           page={page}
-          pageSize={50}
+          pageSize={30}
           onPageChange={setPage}
         />
       </div>

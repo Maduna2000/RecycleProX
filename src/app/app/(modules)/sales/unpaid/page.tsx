@@ -91,7 +91,7 @@ export default function UnpaidSalesPage() {
   const { data, isLoading, error } = useSWR<{ sales: Sale[] }>(KEY, fetcher)
   const sales = data?.sales ?? []
 
-  const PAGE_SIZE  = 50
+  const PAGE_SIZE  = 30
   const totalPages = Math.max(1, Math.ceil(sales.length / PAGE_SIZE))
   const safePage   = Math.min(page, totalPages)
   const pagedSales = sales.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
