@@ -151,7 +151,10 @@ export default function StockGridPage() {
   ]
 
   return (
-    <PortalPage title="Stock Grid">
+    // maxWidth matches src/lib/pageWidthCaps.ts, which PageTitleBar reads to
+    // cap/border itself to match — keeps the unbounded "Product" column from
+    // stretching to fill the whole window.
+    <PortalPage title="Stock Grid" maxWidth={1000}>
       <FilterBar>
         <Field label="Period" width={150}>
           <select value={gridPeriod} onChange={(e) => setGridPeriod(e.target.value as 'daily' | 'weekly' | 'mtd')} style={inp}>

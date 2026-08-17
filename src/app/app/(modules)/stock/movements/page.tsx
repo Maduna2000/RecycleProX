@@ -128,7 +128,10 @@ export default function StockMovementsPage() {
   ]
 
   return (
-    <PortalPage title="Stock Movements">
+    // maxWidth matches src/lib/pageWidthCaps.ts, which PageTitleBar reads to
+    // cap/border itself to match — keeps the unbounded Product/Notes columns
+    // from stretching to fill the whole window.
+    <PortalPage title="Stock Movements" maxWidth={950}>
       <FilterBar>
         <Field label="Direction" width={130}>
           <select value={movDirection} onChange={(e) => setMovDirection(e.target.value)} style={inp}>
