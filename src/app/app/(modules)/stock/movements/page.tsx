@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import useSWR from 'swr'
 import { X } from 'lucide-react'
 import { DataTable, type Column } from '@/components/ui/DataTable'
@@ -29,23 +29,31 @@ const SOURCE_LABELS: Record<string, string> = {
   stocktake_adjustment: 'Stocktake Adj.',
 }
 
+const MOVEMENTS_PAGE_SIZE = 50
+
 export default function StockMovementsPage() {
   const [movDirection, setMovDirection] = useState('')
   const [movSource,    setMovSource]    = useState('')
   const [movFrom,      setMovFrom]      = useState('')
   const [movTo,        setMovTo]        = useState('')
+  const [movPage,      setMovPage]      = useState(1)
 
   const hasMovFilters = !!(movDirection || movSource || movFrom || movTo)
   function clearMovFilters() {
-    setMovDirection(''); setMovSource(''); setMovFrom(''); setMovTo('')
+    setMovDirection(''); setMovSource(''); setMovFrom(''); setMovTo(''); setMovPage(1)
   }
+
+  // Reset to page 1 whenever a filter changes, so the table never gets
+  // stuck showing an empty page past the end of a newly-narrowed result set.
+  useEffect(() => { setMovPage(1) }, [movDirection, movSource, movFrom, movTo])
 
   const movementsQuery = new URLSearchParams({
     ...(movDirection && { direction: movDirection }),
     ...(movSource    && { source: movSource }),
     ...(movFrom      && { from: movFrom }),
     ...(movTo        && { to: movTo }),
-    pageSize: '200',
+    page:     String(movPage),
+    pageSize: String(MOVEMENTS_PAGE_SIZE),
   })
 
   const { data: movementsData, isLoading: movLoading, error: movError } = useSWR<{ movements: Movement[]; total: number }>(
@@ -172,7 +180,9 @@ export default function StockMovementsPage() {
           error={movError}
           emptyMessage="No movements recorded yet"
           total={movementsData?.total}
-          pageSize={200}
+          page={movPage}
+          pageSize={MOVEMENTS_PAGE_SIZE}
+          onPageChange={setMovPage}
         />
       </div>
     </PortalPage>
