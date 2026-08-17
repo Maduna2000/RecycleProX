@@ -14,9 +14,12 @@ const PAGE_WIDTH_CAPS: { test: RegExp; width: number }[] = [
   { test: /^\/app\/float$/, width: 768 },
   // Matches Cash-Up's own `max-w-6xl` (1152px) content wrapper.
   { test: /^\/app\/cashup$/, width: 1152 },
-  // Stock On Hand — the unbounded "Product" column stretched to fill
-  // whatever width was left; capping the page keeps it reasonable.
+  // Stock module — all three pages have the same unbounded-"Product"-column
+  // problem; capping each keeps its table reasonable instead of stretching
+  // to fill the whole window.
   { test: /^\/app\/stock$/, width: 1100 },
+  { test: /^\/app\/stock\/movements$/, width: 950 },
+  { test: /^\/app\/stock\/grid$/, width: 1000 },
 ]
 
 export function getPageWidthCap(pathname: string): number | null {
