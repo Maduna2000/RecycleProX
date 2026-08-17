@@ -229,14 +229,17 @@ export default function CustomerDetailPage() {
       </div>
 
       {/* ── Two-column layout: main content + sidebar ─────────────────────────── */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', flex: 1, minHeight: 0, overflowY: 'auto' }}>
+      {/* Centered as a block instead of stretching edge-to-edge — the actual
+          content (2-column field grids, the Loans ledger, etc.) never needs
+          more than ~760px, so on a wide screen `flex: 1` used to leave the
+          Profile sidebar stranded far to the right with a lot of dead space
+          in between. */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', flex: 1, minHeight: 0, overflowY: 'auto' }}>
 
-        {/* Main content — the Loans tab's own ledger table is capped to
-            720px, so on that tab this panel is capped to match instead of
-            stretching to fill the remaining width; otherwise the Profile
-            sidebar ends up stranded far past the table's right edge with a
-            big empty gap between them. */}
-        <div style={tab === 'Loans' ? { flex: '0 1 auto', width: 760, borderRight: '1px solid #D0D0D0', background: '#fff' } : { flex: 1, borderRight: '1px solid #D0D0D0', background: '#fff' }}>
+        {/* Main content — fixed width so every tab (Personal, Business,
+            Loans, …) renders at the same, page-appropriate size instead of
+            its fields/table stretching out to fill whatever's left. */}
+        <div style={{ width: 760, flexShrink: 0, borderRight: '1px solid #D0D0D0', background: '#fff' }}>
 
           {/* Section Content - Personal */}
           {tab === 'Personal' && (
