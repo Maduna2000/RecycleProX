@@ -56,6 +56,12 @@ export function PageTitleBar({ title }: PageTitleBarProps = {}) {
         // 'none' there) — so the two fuse into one continuous framed box
         // instead of a separate strip floating above it.
         ...(isCustomerDetailPage && {
+          // width: '100%' is required alongside maxWidth here — without it,
+          // this flex item shrinks to fit its own text ("BAN001 ⁠— ✕") rather
+          // than stretching to 960px first and then being centered by the
+          // auto margins, which is what actually produced the tiny floating
+          // pill in testing.
+          width:    '100%',
           maxWidth: 960,
           margin:   '0 auto',
           border:   '1px solid #B0B0B0',
