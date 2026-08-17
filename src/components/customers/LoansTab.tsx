@@ -164,9 +164,11 @@ export function LoansTab({ customerId, customerName, userRole, userAllowedModule
       <SHdr title="Loans" />
 
       {/* Toolbar — mirrors the legacy "Special Loans" window: actions on the
-          left, period picker + print on the right. Capped to the same width
-          as the ledger table below so the right-hand controls line up with
-          its edge instead of drifting off to the far right of the panel. */}
+          left, period picker + print on the right. Fills the panel's full
+          width (like the Transactions tab's table) instead of capping to
+          the ledger's old narrower width, which left a dead gap between the
+          table and the panel's actual edge now that the whole page is
+          already capped. */}
       <div
         style={{
           display: 'flex',
@@ -176,7 +178,6 @@ export function LoansTab({ customerId, customerName, userRole, userAllowedModule
           borderBottom: '1px solid #E0E0E0',
           background: '#FAFAFA',
           flexWrap: 'wrap',
-          maxWidth: 720,
         }}
       >
         {canManage && (
@@ -216,9 +217,8 @@ export function LoansTab({ customerId, customerName, userRole, userAllowedModule
         </Btn>
       </div>
 
-      {/* Ledger — capped width so the narrow, mostly-numeric columns don't
-          stretch across the full panel with large gaps between them. */}
-      <div style={{ padding: 10, maxWidth: 720 }}>
+      {/* Ledger — fills the panel width, matching the Transactions tab. */}
+      <div style={{ padding: 10 }}>
         <DataTable
           columns={ledgerColumns}
           rows={ledgerPageRows}
@@ -243,7 +243,6 @@ export function LoansTab({ customerId, customerName, userRole, userAllowedModule
           padding: '8px 12px',
           borderTop: '1px solid #E0E0E0',
           background: '#FAFAFA',
-          maxWidth: 720,
         }}
       >
         <span style={lbl}>Amount Due</span>
