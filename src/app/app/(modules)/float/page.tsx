@@ -283,8 +283,12 @@ export default function FloatPage() {
     }
   }
 
+  // maxWidth matches this page's own long-standing max-w-3xl (768px) content
+  // wrapper below — see src/lib/pageWidthCaps.ts, which PageTitleBar reads
+  // to cap/border itself to match — so ContentCard's border now actually
+  // hugs the content instead of stretching full width around it.
   return (
-    <PortalPage title="Cash Float">
+    <PortalPage title="Cash Float" maxWidth={768}>
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
       <div className="max-w-3xl mx-auto w-full space-y-2.5 pb-4" style={{ padding: '8px 8px 0' }}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
