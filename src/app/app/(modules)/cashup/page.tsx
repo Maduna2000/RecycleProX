@@ -1141,7 +1141,7 @@ export default function CashUpPage() {
 
   if (isLoading) {
     return (
-      <PortalPage title="Cash-Up">
+      <PortalPage title="Cash-Up" maxWidth={1152}>
         <div className="flex items-center justify-center h-40 text-sm" style={{ color: colors.textSecondary }}>
           Loading…
         </div>
@@ -1153,8 +1153,12 @@ export default function CashUpPage() {
   const isPreviousDay = cashUp && cashUp.status === 'open' && sessionDate !== todayISO
 
   return (
+    // maxWidth matches this page's own long-standing max-w-6xl (1152px)
+    // content wrapper below — see src/lib/pageWidthCaps.ts, which
+    // PageTitleBar reads to cap/border itself to match.
     <PortalPage
       title="Cash-Up"
+      maxWidth={1152}
       actions={
         cashUp && (
           <div className="flex items-center gap-3">
