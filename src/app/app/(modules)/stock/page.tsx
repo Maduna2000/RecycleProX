@@ -207,7 +207,10 @@ export default function StockPage() {
   ].filter(Boolean).join(' · ')
 
   return (
-    <PortalPage title="Stock On Hand">
+    // maxWidth matches src/lib/pageWidthCaps.ts, which PageTitleBar reads to
+    // cap/border itself to match — keeps the unbounded "Product" column from
+    // stretching to fill the whole window.
+    <PortalPage title="Stock On Hand" maxWidth={1100}>
       <FilterBar>
         <Field label="Search" width={180}>
           <div style={{ position: 'relative' }}>
