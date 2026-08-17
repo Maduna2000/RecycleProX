@@ -184,7 +184,7 @@ export default function CustomerDetailPage() {
       title={fullName}
       cardStyle={{ maxWidth: 960, margin: '0 auto', width: '100%', borderTop: 'none', borderTopLeftRadius: 0, borderTopRightRadius: 0 }}
     >
-      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, background: '#F5F5F5' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, background: '#fff' }}>
       {/* ── Sub-header ────────────────────────────────────────────────────────── */}
       <div style={{ padding: '6px 10px', borderBottom: '1px solid #E0E0E0', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
         <span style={{ fontSize: 11, color: '#6C757D' }}>{customer.customerType === 'account' ? 'Account Customer' : 'Casual Customer'}</span>
@@ -241,8 +241,14 @@ export default function CustomerDetailPage() {
 
       {/* ── Two-column layout: main content + sidebar ─────────────────────────── */}
       {/* Fills the capped 960px ContentCard from cardStyle above (760 content
-          + 200 sidebar). */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', flex: 1, minHeight: 0, overflowY: 'auto' }}>
+          + 200 sidebar). alignItems: 'stretch' (the flex default, set
+          explicitly here) so the main content and sidebar panels' own
+          backgrounds always reach the full height of this row — with
+          'flex-start' they were only as tall as their own content, leaving
+          a visible seam of the page's own background below any short tab
+          (e.g. Notes, Compliance) instead of one uniform panel down to the
+          box's actual bottom edge. */}
+      <div style={{ display: 'flex', alignItems: 'stretch', flex: 1, minHeight: 0, overflowY: 'auto' }}>
 
         {/* Main content — fixed width so every tab (Personal, Business,
             Loans, …) renders at the same, page-appropriate size instead of

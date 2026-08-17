@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import useSWR, { mutate } from 'swr'
 import { Plus, Minus, Trash2, Printer } from 'lucide-react'
 import { toast } from 'sonner'
@@ -60,6 +60,8 @@ const PAYMENT_METHODS = [
 // narrow, capped-width table, so its buttons should read as compact controls
 // rather than full-size actions.
 const COMPACT_BTN: React.CSSProperties = { fontSize: 10.5, padding: '3px 9px', gap: 4 }
+
+const LEDGER_PAGE_SIZE = 20
 
 function SHdr({ title }: { title: string }) {
   return (
@@ -134,9 +136,15 @@ export function LoansTab({ customerId, customerName, userRole, userAllowedModule
   const [addLoanOpen,      setAddLoanOpen]      = useState(false)
   const [addRepaymentOpen, setAddRepaymentOpen] = useState(false)
   const [deleteLastOpen,   setDeleteLastOpen]   = useState(false)
+  const [ledgerPage,       setLedgerPage]       = useState(1)
 
   const statementKey = `/api/customers/${customerId}/loans/statement?period=${period}`
   const { data, isLoading, error } = useSWR<StatementResponse>(statementKey, fetcher)
+
+  // Reset to page 1 whenever the Fin Period changes so switching months
+  // never leaves the ledger stuck on a page that no longer has that many
+  // rows in it.
+  useEffect(() => { setLedgerPage(1) }, [period])
 
   const canManage =
     userRole === 'admin' ||
@@ -148,6 +156,8 @@ export function LoansTab({ customerId, customerName, userRole, userAllowedModule
   }
 
   const closingBalance = data ? new Decimal(data.closingBalance) : new Decimal(0)
+  const ledgerRows = data?.rows ?? []
+  const ledgerPageRows = ledgerRows.slice((ledgerPage - 1) * LEDGER_PAGE_SIZE, ledgerPage * LEDGER_PAGE_SIZE)
 
   return (
     <div>
@@ -211,11 +221,15 @@ export function LoansTab({ customerId, customerName, userRole, userAllowedModule
       <div style={{ padding: 10, maxWidth: 720 }}>
         <DataTable
           columns={ledgerColumns}
-          rows={data?.rows ?? []}
+          rows={ledgerPageRows}
           rowKey={(row) => row.id}
           loading={isLoading}
           error={error instanceof Error ? error.message : !!error}
           emptyMessage="No loan activity for this period"
+          total={ledgerRows.length}
+          page={ledgerPage}
+          pageSize={LEDGER_PAGE_SIZE}
+          onPageChange={setLedgerPage}
         />
       </div>
 
