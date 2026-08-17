@@ -23,6 +23,9 @@ const PAGE_WIDTH_CAPS: { test: RegExp; width: number }[] = [
   // Products — the unbounded "Name" column stretched to fill whatever width
   // was left.
   { test: /^\/app\/products$/, width: 950 },
+  // Price Groups — the unbounded "Name" and "Description" columns did the
+  // same.
+  { test: /^\/app\/price-groups$/, width: 900 },
 ]
 
 export function getPageWidthCap(pathname: string): number | null {
