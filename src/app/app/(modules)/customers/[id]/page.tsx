@@ -174,6 +174,12 @@ export default function CustomerDetailPage() {
   return (
     <PortalPage title={fullName}>
       <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, background: '#F5F5F5' }}>
+      {/* Everything below — sub-header, tab strip, and the two-column content
+          — is capped to the same 960px (760 content + 200 sidebar) and
+          centered as one block, so the header/tab-strip borders line up with
+          the content's actual edges instead of spanning the full page while
+          the content beneath them is narrower. */}
+      <div style={{ width: 960, maxWidth: '100%', margin: '0 auto', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
       {/* ── Sub-header ────────────────────────────────────────────────────────── */}
       <div style={{ padding: '6px 10px', borderBottom: '1px solid #E0E0E0', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
         <span style={{ fontSize: 11, color: '#6C757D' }}>{customer.customerType === 'account' ? 'Account Customer' : 'Casual Customer'}</span>
@@ -229,12 +235,9 @@ export default function CustomerDetailPage() {
       </div>
 
       {/* ── Two-column layout: main content + sidebar ─────────────────────────── */}
-      {/* Centered as a block instead of stretching edge-to-edge — the actual
-          content (2-column field grids, the Loans ledger, etc.) never needs
-          more than ~760px, so on a wide screen `flex: 1` used to leave the
-          Profile sidebar stranded far to the right with a lot of dead space
-          in between. */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', flex: 1, minHeight: 0, overflowY: 'auto' }}>
+      {/* Exactly fills the 960px wrapper above (760 content + 200 sidebar) —
+          the wrapper itself handles centering the whole page block. */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', flex: 1, minHeight: 0, overflowY: 'auto' }}>
 
         {/* Main content — fixed width so every tab (Personal, Business,
             Loans, …) renders at the same, page-appropriate size instead of
@@ -556,6 +559,7 @@ export default function CustomerDetailPage() {
             </Btn>
           </div>
         </div>
+      </div>
       </div>
       </div>
 
