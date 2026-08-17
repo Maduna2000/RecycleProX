@@ -101,7 +101,10 @@ export default function PriceGroupsPage() {
   ]
 
   return (
-    <PortalPage title={`Price Groups (${groups.length})`}>
+    // maxWidth matches src/lib/pageWidthCaps.ts, which PageTitleBar reads to
+    // cap/border itself to match — keeps the unbounded Name/Description
+    // columns from stretching to fill the whole window.
+    <PortalPage title={`Price Groups (${groups.length})`} maxWidth={900}>
         {/* Table */}
         <div style={{ flex: 1, minHeight: 0, padding: 10 }}>
           <DataTable
