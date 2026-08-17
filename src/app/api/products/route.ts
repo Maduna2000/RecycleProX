@@ -12,10 +12,16 @@ export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl
   const category = searchParams.get('category') ?? undefined
   const search = searchParams.get('search') ?? undefined
-  const activeOnly = searchParams.get('active') !== 'false'
+  // Tri-state: 'true' -> active only, 'false' -> inactive only, absent (the
+  // "All statuses" filter) -> no isActive filter at all. The old `!== 'false'`
+  // check treated a missing param as active-only (wrong for "All statuses")
+  // and 'false' as "no filter" (wrong for "Inactive only" — it showed every
+  // product, active ones included, instead of just the inactive ones).
+  const activeParam = searchParams.get('active')
+  const isActive = activeParam === 'true' ? true : activeParam === 'false' ? false : undefined
 
   try {
-    const products = await runWithRequestTenant(req, () => listProducts({ category, search, isActive: activeOnly ? true : undefined }))
+    const products = await runWithRequestTenant(req, () => listProducts({ category, search, isActive }))
     return NextResponse.json({ products })
   } catch (err) {
     logger.error({ err }, 'GET /api/products failed')
