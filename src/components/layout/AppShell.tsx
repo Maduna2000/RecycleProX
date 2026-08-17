@@ -692,11 +692,6 @@ export function AppShell({
   const router      = useRouter()
   const toolbarBtns = useToolbarButtons(pathname, role)
   const moduleName  = getModuleName(pathname)
-  // The Accounts module's customer detail page caps its own content to a
-  // centered 960px block — match that here so the top bar's edges line up
-  // with the page beneath it there, without narrowing the header (still a
-  // full-width app chrome element) on every other page.
-  const isAccountsPage = pathname.startsWith('/app/customers')
 
   // Dynamic route title (for detail pages like /app/purchases/[id])
   const { title: recordTitle, isDetailPage, parentPath, parentLabel } = useRecordTitle(pathname)
@@ -737,14 +732,6 @@ export function AppShell({
           boxShadow: NAVY_GLOSS_BEVEL,
         }}
       >
-        {/* On the Accounts module, cap this row to the same 960px block the
-            customer detail page centers its own content in, so the header's
-            edges line up with the page beneath it. Every other module keeps
-            the header spanning the full width. */}
-        <div
-          className="flex items-center w-full min-w-0"
-          style={isAccountsPage ? { maxWidth: 960, margin: '0 auto' } : undefined}
-        >
         {/* Logo mark */}
         <div className="flex items-center gap-2 pr-3 border-r border-white/15 shrink-0">
           <Image src="/brand/renovo-icon.png" alt="" width={22} height={22} className="rounded shrink-0" />
@@ -797,7 +784,6 @@ export function AppShell({
           <PrinterStatusChip />
           <UpdateChip />
           <UserMenu role={role} fullName={fullName} />
-        </div>
         </div>
       </header>
 
