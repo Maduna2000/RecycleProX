@@ -2,7 +2,8 @@ import NextAuth, { type Session } from 'next-auth'
 import Credentials from 'next-auth/providers/credentials'
 import { decode } from '@auth/core/jwt'
 import { headers } from 'next/headers'
-import { login } from '@/lib/services/authService'
+import { login, InvalidCredentialsError, AccountInactiveError, AccountLockedError } from '@/lib/services/authService'
+import { cacheOfflineLogin, tryOfflineLogin } from '@/lib/services/offlineAuthCache'
 import { LoginSchema } from '@/lib/schemas/auth'
 import { authConfig } from '@/auth.config'
 import logger from '@/lib/logger'
@@ -29,18 +30,13 @@ const {
       async authorize(credentials) {
         const parsed = LoginSchema.safeParse(credentials)
         if (!parsed.success) return null
+        const { username, password, tenantSlug } = parsed.data
 
         try {
-          const result = await login(
-            parsed.data.username,
-            parsed.data.password,
-            parsed.data.tenantSlug,
-          )
+          const result = await login(username, password, tenantSlug)
           const { user, forcePasswordChange, allowedModules } = result
-          return {
+          const payload = {
             id: user.id,
-            name: user.fullName,
-            email: user.username,
             role: user.role,
             forcePasswordChange,
             fullName: user.fullName,
@@ -51,10 +47,33 @@ const {
             tenantSlug: 'tenantSlug' in result ? result.tenantSlug : undefined,
             featureFlags: 'featureFlags' in result ? result.featureFlags : undefined,
           }
+          // Refresh this device's offline login fallback on every successful
+          // online auth (see offlineAuthCache.ts) — best-effort, never blocks
+          // the real login that triggered it.
+          void cacheOfflineLogin(username, password, tenantSlug, payload)
+          return { ...payload, name: user.fullName, email: user.username }
         } catch (err) {
-          // Log the real error so it shows in Vercel function logs
-          logger.error({ err }, 'authorize() failed')
-          return null
+          if (err instanceof InvalidCredentialsError || err instanceof AccountInactiveError || err instanceof AccountLockedError) {
+            // The database was reachable and it said no — a genuine
+            // rejection, not a connectivity problem. Never fall through to
+            // the offline cache here; that would let a stale/offline device
+            // silently overrule an authoritative "wrong password"/"locked".
+            logger.warn({ err, username }, 'authorize() rejected credentials')
+            return null
+          }
+
+          // Anything else here (Prisma connection refused, DNS failure,
+          // timeout, tenant registry unreachable, ...) means the database
+          // itself couldn't be reached — the exact scenario an offline-first
+          // desktop app needs to survive. Fall back to the last known-good
+          // credentials cached locally from this user's last successful
+          // online login on this machine, rather than locking the till out
+          // of the app entirely the moment its internet drops.
+          logger.warn({ err, username }, 'authorize(): database unreachable, trying offline login fallback')
+          const offline = await tryOfflineLogin(username, password, tenantSlug)
+          if (!offline) return null
+          logger.info({ username }, 'authorize(): offline login accepted')
+          return { ...offline, name: offline.fullName, email: offline.username }
         }
       },
     }),
