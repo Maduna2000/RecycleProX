@@ -380,25 +380,6 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              {/* ── Security / PIN ─── */}
-              <SHdr title="Security &amp; PIN Lock" />
-              <div style={{ padding: '10px 12px', borderBottom: '1px solid #E0E0E0' }}>
-                <p style={{ fontSize: 11, color: '#6C757D', marginBottom: 8 }}>
-                  Session lock activates after 5 minutes of inactivity. Users without a personal PIN use the default below.
-                  Use <strong>Users → Reset PIN to Default</strong> to clear any user&apos;s custom PIN.
-                </p>
-                <div style={{ maxWidth: 180 }}>
-                  <Field label="Default PIN (4 digits)" hint="Applies to users who have not set their own PIN. Default: 1234">
-                    <input
-                      value={form.defaultPin ?? '1234'}
-                      onChange={(e) => { const v = e.target.value.replace(/\D/g, '').slice(0, 4); set('defaultPin', v) }}
-                      maxLength={4} pattern="\d{4}" placeholder="1234"
-                      style={{ ...inp, fontFamily: 'monospace', letterSpacing: '0.3em' }}
-                    />
-                  </Field>
-                </div>
-              </div>
-
               {/* ── Scale Configuration ─── */}
               <SHdr title="Scale Configuration" />
               <div style={{ borderBottom: '1px solid #E0E0E0' }}>
@@ -408,34 +389,18 @@ export default function SettingsPage() {
                 {SCALE_NUMS.map((n) => <ScaleRow key={n} n={n} form={form} set={set} />)}
               </div>
 
-              {/* ── Data Management ─── */}
-              <SHdr title="Data Management" />
-              <div style={{ padding: '10px 12px', borderBottom: '1px solid #E0E0E0' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: '#212529' }}>Trade Commodity Categories</span>
-                    <p style={{ fontSize: 11, color: '#6C757D', marginTop: 2 }}>
-                      Configure the list of commodities shown when registering account customers.
-                    </p>
-                  </div>
-                  <Btn size="sm" onClick={() => setTradeCommoditiesOpen(true)} style={{ whiteSpace: 'nowrap' }}>
-                    Manage →
-                  </Btn>
-                </div>
-              </div>
-
             </div>
           )}
         </div>
         {/* end LEFT COLUMN */}
 
-        {/* ── RIGHT COLUMN — Printer + Offline ─────────────────────────── */}
+        {/* ── RIGHT COLUMN — Printer, Offline, Security, Data ────────────── */}
         <div style={{ width: 260, display: 'flex', flexDirection: 'column', borderLeft: '1px solid #C0C0C0', flexShrink: 0 }}>
 
           {/* Title bar (right) */}
           <div style={{ padding: '5px 10px', borderBottom: '2px solid #B0B0B0', background: HEADER_GRAD, flexShrink: 0 }}>
             <span style={{ fontSize: 11, fontWeight: 700, color: NAVY, display: 'flex', alignItems: 'center', gap: 5 }}>
-              <Printer style={{ width: 12, height: 12 }} /> Devices &amp; Sync
+              <Printer style={{ width: 12, height: 12 }} /> Devices &amp; More
             </span>
           </div>
 
@@ -616,6 +581,35 @@ export default function SettingsPage() {
                   {seeding ? 'Refreshing…' : 'Refresh Data'}
                 </Btn>
               </div>
+            </div>
+
+            {/* ── Security / PIN ─── */}
+            <SHdr title="Security &amp; PIN Lock" />
+            <div style={{ padding: '8px 10px', borderBottom: '1px solid #C0C0C0' }}>
+              <p style={{ fontSize: 10, color: '#6C757D', marginBottom: 8 }}>
+                Session lock activates after 5 minutes of inactivity. Users without a personal PIN use the default below.
+                Use <strong>Users → Reset PIN to Default</strong> to clear any user&apos;s custom PIN.
+              </p>
+              <Field label="Default PIN (4 digits)" hint="Applies to users who have not set their own PIN. Default: 1234">
+                <input
+                  value={form.defaultPin ?? '1234'}
+                  onChange={(e) => { const v = e.target.value.replace(/\D/g, '').slice(0, 4); set('defaultPin', v) }}
+                  maxLength={4} pattern="\d{4}" placeholder="1234"
+                  style={{ ...inp, fontFamily: 'monospace', letterSpacing: '0.3em' }}
+                />
+              </Field>
+            </div>
+
+            {/* ── Data Management ─── */}
+            <SHdr title="Data Management" />
+            <div style={{ padding: '8px 10px' }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: '#212529' }}>Trade Commodity Categories</span>
+              <p style={{ fontSize: 10, color: '#6C757D', marginTop: 2, marginBottom: 8 }}>
+                Configure the list of commodities shown when registering account customers.
+              </p>
+              <Btn size="sm" onClick={() => setTradeCommoditiesOpen(true)} style={{ width: '100%', justifyContent: 'center' }}>
+                Manage →
+              </Btn>
             </div>
 
           </div>
