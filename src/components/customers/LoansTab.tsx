@@ -80,6 +80,48 @@ function currentPeriod(): string {
 // the business money (matches the reference tool's "Amount Due: R -198.50").
 const moneyColor = (v: string) => (new Decimal(v).isNegative() ? '#D97706' : colors.action)
 
+// Display-only grouping for this tab's ledger: if a customer repays more
+// than once on the same calendar day — even across separate transactions
+// made hours apart — collapse those rows into one combined line instead of
+// one row per transaction (e.g. a R500 stock-repayment and a later R400
+// one both read as a single R900 repayment for the day). Doesn't touch the
+// server-computed balances, doesn't merge advance/opening rows, and has no
+// effect on the Reports module, which builds its own statement separately.
+function aggregateSameDayRepayments(rows: LedgerRow[]): LedgerRow[] {
+  const isRepaymentRow = (row: LedgerRow) => row.id !== 'opening' && row.advance == null && row.repayment != null
+  const dayKey = (row: LedgerRow) => new Date(row.date).toDateString()
+
+  const lastIndexByDay = new Map<string, number>()
+  rows.forEach((row, i) => {
+    if (isRepaymentRow(row)) lastIndexByDay.set(dayKey(row), i)
+  })
+
+  const result: LedgerRow[] = []
+  rows.forEach((row, i) => {
+    if (!isRepaymentRow(row)) {
+      result.push(row)
+      return
+    }
+    // Earlier same-day repayments are folded into the day's last row below.
+    if (i !== lastIndexByDay.get(dayKey(row))) return
+
+    const group = rows.filter((r) => isRepaymentRow(r) && dayKey(r) === dayKey(row))
+    if (group.length === 1) {
+      result.push(row)
+      return
+    }
+    const totalRepayment = group.reduce((sum, r) => sum.plus(r.repayment ?? '0'), new Decimal(0))
+    const transactions = Array.from(new Set(group.map((r) => r.transaction).filter(Boolean)))
+    result.push({
+      ...row,
+      description: 'Loan Repayment',
+      transaction: transactions.length === 1 ? transactions[0]! : 'Multiple',
+      repayment: totalRepayment.toFixed(2),
+    })
+  })
+  return result
+}
+
 const ledgerColumns: Column<LedgerRow>[] = [
   {
     key: 'description',
@@ -156,7 +198,7 @@ export function LoansTab({ customerId, customerName, userRole, userAllowedModule
   }
 
   const closingBalance = data ? new Decimal(data.closingBalance) : new Decimal(0)
-  const ledgerRows = data?.rows ?? []
+  const ledgerRows = aggregateSameDayRepayments(data?.rows ?? [])
   const ledgerPageRows = ledgerRows.slice((ledgerPage - 1) * LEDGER_PAGE_SIZE, ledgerPage * LEDGER_PAGE_SIZE)
 
   return (
