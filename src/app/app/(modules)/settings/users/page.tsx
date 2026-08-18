@@ -125,8 +125,13 @@ export default function UsersPage() {
 
   return (
     <>
+    {/* maxWidth matches src/lib/pageWidthCaps.ts, which PageTitleBar reads to
+        cap/border itself to match — keeps the unbounded Full Name/Username
+        columns from stretching to fill the whole window, same fix already
+        applied to Purchases/Sales/Payments/Expenses/Products/Price Groups. */}
     <PortalPage
       title={`Users (${users.length})`}
+      maxWidth={950}
     >
         {/* Filters */}
         <FilterBar>
