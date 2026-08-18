@@ -64,6 +64,7 @@ export default function UsersPage() {
   const [editUser, setEditUser] = useState<User | null>(null)
   const [resetUser, setResetUser] = useState<User | null>(null)
   const [pinUser, setPinUser] = useState<User | null>(null)
+  const [page, setPage] = useState(1)
 
   useEffect(() => {
     if (searchParams.get('create') === '1') {
@@ -76,12 +77,25 @@ export default function UsersPage() {
   const query = new URLSearchParams({ ...(search && { search }), ...(roleFilter && { role: roleFilter }) })
   const { data, error } = useSWR<{ users: User[] }>(isAdmin ? `/api/users?${query}` : null, fetcher)
 
+  // A filter change can leave `page` pointing past the end of a newly
+  // narrowed result set — reset to page 1 whenever the filter shape
+  // changes, same fix as Expenses/Payments/Stock Movements.
+  useEffect(() => { setPage(1) }, [search, roleFilter])
+
   if (!isAdmin) {
     router.replace('/app/dashboard')
     return null
   }
 
   const users = data?.users ?? []
+
+  // Client-side pagination — same pattern as Products/Price Groups, and
+  // the only thing DataTable needs to render its "Showing X–Y of Z"
+  // footer bar, which this page was previously missing entirely.
+  const PAGE_SIZE  = 30
+  const totalPages = Math.max(1, Math.ceil(users.length / PAGE_SIZE))
+  const safePage   = Math.min(page, totalPages)
+  const pagedUsers = users.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
 
   async function handleToggleActive(user: User) {
     const res = await fetch(`/api/users/${user.id}/toggle-active`, { method: 'POST' })
@@ -166,11 +180,15 @@ export default function UsersPage() {
         <div style={{ flex: 1, minHeight: 0, padding: 10 }}>
           <DataTable
             columns={columns}
-            rows={users}
+            rows={pagedUsers}
             rowKey={(user) => user.id}
             rowActions={rowActions}
             error={error instanceof Error ? error.message : !!error}
             emptyMessage="No users found"
+            total={users.length}
+            page={safePage}
+            pageSize={PAGE_SIZE}
+            onPageChange={setPage}
           />
         </div>
     </PortalPage>

@@ -28,6 +28,7 @@ export default function StocktakePage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [creating, setCreating] = useState(false)
+  const [page, setPage] = useState(1)
   const createFired = useRef(false)
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
 
@@ -75,6 +76,14 @@ export default function StocktakePage() {
   const items = data?.items ?? []
   const count = data?.total ?? 0
 
+  // Client-side pagination — same pattern as Products/Price Groups/Users,
+  // and the only thing DataTable needs to render its "Showing X–Y of Z"
+  // footer bar, which this page was previously missing entirely.
+  const PAGE_SIZE  = 30
+  const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE))
+  const safePage   = Math.min(page, totalPages)
+  const pagedItems = items.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
+
   const columns: Column<StocktakeItem>[] = [
     {
       key: 'refNumber', header: 'Ref #',
@@ -107,12 +116,16 @@ export default function StocktakePage() {
       <div style={{ flex: 1, minHeight: 0, padding: 10 }}>
         <DataTable
           columns={columns}
-          rows={items}
+          rows={pagedItems}
           rowKey={(s) => s.id}
           onRowClick={(s) => router.push(`/app/stocktake/${s.id}`)}
           loading={isLoading}
           error={error}
           emptyMessage="No stocktakes yet — create one to start counting"
+          total={items.length}
+          page={safePage}
+          pageSize={PAGE_SIZE}
+          onPageChange={setPage}
         />
       </div>
     </PortalPage>

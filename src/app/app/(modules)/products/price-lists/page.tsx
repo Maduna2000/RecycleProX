@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import useSWR, { mutate } from 'swr'
 import { useSession } from 'next-auth/react'
@@ -45,6 +45,17 @@ export default function PriceListsPage() {
   const listsKey = priceGroupFilter ? `${LISTS_KEY}?priceGroupId=${priceGroupFilter}` : LISTS_KEY
   const { data, isLoading } = useSWR<{ priceLists: PriceListRow[] }>(listsKey, fetcher)
   const priceLists = data?.priceLists ?? []
+
+  // Client-side pagination — same pattern as Products/Price Groups/Users,
+  // and the only thing DataTable needs to render its "Showing X–Y of Z"
+  // footer bar, which this page was previously missing entirely.
+  const [page, setPage] = useState(1)
+  const PAGE_SIZE  = 30
+  const totalPages = Math.max(1, Math.ceil(priceLists.length / PAGE_SIZE))
+  const safePage   = Math.min(page, totalPages)
+  const pagedPriceLists = priceLists.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
+
+  useEffect(() => { setPage(1) }, [priceGroupFilter])
 
   async function handleActivate(row: PriceListRow) {
     const res = await fetch(`/api/price-lists/${row.id}/activate`, { method: 'POST' })
@@ -179,7 +190,7 @@ export default function PriceListsPage() {
       <div className="flex-1 min-h-0" style={{ padding: 10 }}>
         <DataTable
           columns={columns}
-          rows={priceLists}
+          rows={pagedPriceLists}
           rowKey={(r) => r.id}
           rowActions={rowActions}
           loading={isLoading}
@@ -189,6 +200,10 @@ export default function PriceListsPage() {
             label: 'Create your first price list',
             onClick: () => router.push('/app/products/price-lists/new'),
           } : undefined}
+          total={priceLists.length}
+          page={safePage}
+          pageSize={PAGE_SIZE}
+          onPageChange={setPage}
         />
       </div>
 

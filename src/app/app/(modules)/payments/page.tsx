@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import useSWR, { mutate } from 'swr'
 import { useSession } from 'next-auth/react'
 import { Search, Ban, X, FileText } from 'lucide-react'
@@ -46,6 +46,7 @@ export default function PaymentsPage() {
   const [to,             setTo]             = useState('')
   const [includeVoided,  setIncludeVoided]  = useState(false)
   const [voidTarget,     setVoidTarget]     = useState<Payment | null>(null)
+  const [page,           setPage]           = useState(1)
 
   const hasFilters = !!(search || paymentMethod || from || to)
 
@@ -62,8 +63,14 @@ export default function PaymentsPage() {
     ...(from          && { from }),
     ...(to            && { to }),
     ...(includeVoided && { includeVoided: 'true' }),
+    page:     String(page),
     pageSize: '30',
   })
+
+  // A filter change can leave `page` pointing past the end of a newly
+  // narrowed result set — reset to page 1 whenever the filter shape
+  // changes, same fix as Expenses/Stock Movements.
+  useEffect(() => { setPage(1) }, [search, paymentMethod, from, to, includeVoided])
 
   const { data: paymentsData, isLoading: paymentsLoading, error: paymentsError } = useSWR<{
     payments: Payment[]; total: number; totalReceived: string; totalPaidOut: string
@@ -237,7 +244,9 @@ export default function PaymentsPage() {
           error={paymentsError instanceof Error ? paymentsError.message : !!paymentsError}
           emptyMessage="No payments found"
           total={paymentsData?.total}
+          page={page}
           pageSize={30}
+          onPageChange={setPage}
         />
       </div>
 

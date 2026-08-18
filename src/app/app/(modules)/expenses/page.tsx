@@ -56,6 +56,7 @@ export default function ExpensesPage() {
   const [from,           setFrom]           = useState('')
   const [to,             setTo]             = useState('')
   const [hideVoided,     setHideVoided]     = useState(false)
+  const [page,           setPage]           = useState(1)
 
   // Open modal from toolbar query params
   useEffect(() => {
@@ -84,10 +85,17 @@ export default function ExpensesPage() {
     ...(search       && { search }),
     ...(from         && { from }),
     ...(to           && { to }),
+    page:  String(page),
     limit: '30',
   })
   const key = `/api/expenses?${query}`
   const { data, isLoading } = useSWR<{ expenses: Expense[]; total: number }>(key, fetcher)
+
+  // A filter/tab change can leave `page` pointing past the end of a newly
+  // narrowed result set (e.g. going from page 3 of "All" to "Pending" with
+  // only 1 page) — reset to page 1 whenever the filter shape changes,
+  // matching the same fix already applied to Stock Movements.
+  useEffect(() => { setPage(1) }, [tab, hideVoided, search, from, to])
   const expenses = data?.expenses ?? []
 
   const totalApproved = expenses
@@ -327,7 +335,9 @@ export default function ExpensesPage() {
             onClick: () => setAddOpen(true),
           }}
           total={data?.total}
+          page={page}
           pageSize={30}
+          onPageChange={setPage}
         />
       </div>
 
