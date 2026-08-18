@@ -5,7 +5,7 @@ import Decimal from 'decimal.js'
 import { prisma } from '@/lib/db/prisma'
 import { getRangeBoundsSAST } from '@/lib/utils/dayBounds'
 import type { ReportDocument, ReportGroup, ReportMeta, ReportRow } from '@/lib/reports/types'
-import type { BaseReportParams } from '@/lib/schemas/report'
+import type { BaseReportParams, SellerIdUploadStatusParams } from '@/lib/schemas/report'
 
 type MetaBase = Omit<ReportMeta, 'rowCount'>
 
@@ -342,6 +342,106 @@ export async function buildCasualList(
       { key: 'blacklisted', label: 'Blacklisted', width: 0.12, align: 'center', format: 'text', excelWidth: 10 },
     ],
     groups: [{ level: 0, label: 'CASUAL SELLERS', rows }],
+    meta: { ...meta, rowCount: rows.length },
+  }
+}
+
+/**
+ * Casual and/or account sellers who actually sold to the business (had a
+ * completed purchase) within the date range, with their ID upload status
+ * (same 'id_copy' CustomerDocument rule as the other ID-status reports).
+ * customerType/idUploaded narrow which sellers are *listed*, but the
+ * with-ID/without-ID summary totals always reflect everyone who sold in
+ * the period (before the idUploaded filter), so the two counts stay
+ * meaningful regardless of which filter is applied.
+ */
+export async function buildSellerIdUploadStatus(
+  params: SellerIdUploadStatusParams,
+  meta: MetaBase
+): Promise<ReportDocument> {
+  const { start, end } = getRangeBoundsSAST(params.from, params.to)
+
+  const purchases = await prisma.purchase.findMany({
+    where: {
+      status: 'completed',
+      createdAt: { gte: start, lte: end },
+      ...(params.customerType ? { customer: { customerType: params.customerType } } : {}),
+    },
+    select: {
+      customer: {
+        select: { id: true, firstName: true, lastName: true, customerType: true, idNumber: true, phone: true },
+      },
+    },
+  })
+
+  const sellerById = new Map<string, (typeof purchases)[number]['customer']>()
+  for (const p of purchases) sellerById.set(p.customer.id, p.customer)
+  const sellers = Array.from(sellerById.values())
+
+  const sellerIds = sellers.map((s) => s.id)
+  const idDocs = sellerIds.length > 0
+    ? await prisma.customerDocument.findMany({
+        where: { customerId: { in: sellerIds }, documentType: 'id_copy' },
+        select: { customerId: true },
+      })
+    : []
+  const hasIdDocument = new Set(idDocs.map((d) => d.customerId))
+
+  const allSellers = sellers
+    .map((c) => ({
+      id:       c.id,
+      name:     `${c.firstName} ${c.lastName}`,
+      type:     c.customerType === 'account' ? 'Account' : 'Casual',
+      idNumber: c.idNumber ?? null,
+      phone:    c.phone ?? null,
+      uploaded: hasIdDocument.has(c.id),
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name))
+
+  const uploadedCount = allSellers.filter((s) => s.uploaded).length
+  const missingCount = allSellers.length - uploadedCount
+
+  const visibleSellers = allSellers.filter((s) => {
+    if (params.idUploaded === 'yes') return s.uploaded
+    if (params.idUploaded === 'no') return !s.uploaded
+    return true
+  })
+
+  const rows: ReportRow[] = visibleSellers.map((s) => ({
+    cells: {
+      name:       s.name,
+      type:       s.type,
+      idNumber:   s.idNumber,
+      phone:      s.phone,
+      idUploaded: s.uploaded ? 'Yes' : 'No',
+    },
+  }))
+
+  return {
+    reportId: 'seller-id-status-by-period',
+    title: 'Sellers ID Upload Status',
+    subtitle: `${params.from} to ${params.to}`,
+    params: {
+      from: params.from,
+      to: params.to,
+      filters: {
+        ...(params.customerType ? { customerType: params.customerType } : {}),
+        ...(params.idUploaded ? { idUploaded: params.idUploaded } : {}),
+      },
+    },
+    columns: [
+      { key: 'name', label: 'Name', width: 0.24, format: 'text', excelWidth: 22 },
+      { key: 'type', label: 'Type', width: 0.13, align: 'center', format: 'text', excelWidth: 10 },
+      { key: 'idNumber', label: 'ID Number', width: 0.2, format: 'text', excelWidth: 18 },
+      { key: 'phone', label: 'Phone', width: 0.18, format: 'text', excelWidth: 14 },
+      { key: 'idUploaded', label: 'ID Uploaded', width: 0.25, align: 'center', format: 'text', excelWidth: 12 },
+    ],
+    groups: [{ level: 0, label: 'SELLERS WHO SOLD IN PERIOD', rows }],
+    summary: [
+      { label: 'Total sellers who sold', value: String(allSellers.length) },
+      { label: 'Sold with ID on system', value: String(uploadedCount) },
+      { label: 'Sold without ID on system', value: String(missingCount), emphasis: missingCount > 0 },
+    ],
     meta: { ...meta, rowCount: rows.length },
   }
 }

@@ -17,6 +17,7 @@ import {
   PurchasesSplitPaymentsParamsSchema,
   PurchasesByIdSearchParamsSchema,
   TopSellersParamsSchema,
+  SellerIdUploadStatusParamsSchema,
   SalesDailyParamsSchema,
   SalesByProductParamsSchema,
   SalesByCustomerParamsSchema,
@@ -63,7 +64,7 @@ import {
 import { buildStockOnHand, buildStockMovement } from './builders/stock'
 import { buildStocktakeReport } from './builders/stocktake'
 import { buildScaleDiscrepancy } from './builders/scale'
-import { buildDealersPriceList, buildAccountList, buildAccountIdUploadStatus, buildCasualList, buildCasualIdUploadStatus } from './builders/accounts'
+import { buildDealersPriceList, buildAccountList, buildAccountIdUploadStatus, buildCasualList, buildCasualIdUploadStatus, buildSellerIdUploadStatus } from './builders/accounts'
 import {
   buildPoliceRegisterReport,
   buildPoliceCopperReport,
@@ -195,6 +196,10 @@ export const REPORT_REGISTRY: Record<string, ReportDefinition> = {
   'casual-id-status': {
     paramsSchema: BaseReportParamsSchema,
     build: buildCasualIdUploadStatus,
+  },
+  'seller-id-status-by-period': {
+    paramsSchema: SellerIdUploadStatusParamsSchema,
+    build: buildSellerIdUploadStatus,
   },
   'purchases-by-casual-id': {
     paramsSchema: PurchasesByIdSearchParamsSchema,

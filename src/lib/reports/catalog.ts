@@ -351,6 +351,29 @@ export const REPORT_CATALOG: ReportCatalogEntry[] = [
     area: 'accounts',
     filters: [],
   },
+  {
+    id: 'seller-id-status-by-period',
+    label: 'Sellers ID Upload Status (by Period)',
+    description:
+      'Casual and/or account sellers who actually sold to the business in the selected date range, with Yes/No ID upload status and totals for sold-with-ID vs sold-without-ID.',
+    area: 'accounts',
+    filters: [
+      {
+        key: 'customerType', label: 'Seller Type', type: 'select',
+        options: [
+          { value: 'casual', label: 'Casual' },
+          { value: 'account', label: 'Account' },
+        ],
+      },
+      {
+        key: 'idUploaded', label: 'ID Uploaded', type: 'select',
+        options: [
+          { value: 'yes', label: 'Yes' },
+          { value: 'no', label: 'No' },
+        ],
+      },
+    ],
+  },
   // ── Purchases: seller lookups ──────────────────────────────────────────────
   {
     id: 'purchases-by-casual-id',

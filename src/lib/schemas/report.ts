@@ -69,6 +69,16 @@ export const TopSellersParamsSchema = rangeParams({
   customerType: z.enum(['casual', 'account']),
 })
 
+/**
+ * Sellers (casual and/or account) who sold to the business in the period,
+ * with their ID upload status — customerType/idUploaded left optional so
+ * "both" is simply the filter being omitted.
+ */
+export const SellerIdUploadStatusParamsSchema = rangeParams({
+  customerType: z.enum(['casual', 'account']).optional(),
+  idUploaded: z.enum(['yes', 'no']).optional(),
+})
+
 // ── Sales ─────────────────────────────────────────────────────────────────────
 export const SalesDailyParamsSchema = rangeParams({
   customerId: z.string().uuid().optional(),
@@ -152,3 +162,4 @@ export type StockMovementParams = z.infer<typeof StockMovementParamsSchema>
 export type StocktakeReportParams = z.infer<typeof StocktakeReportParamsSchema>
 export type PoliceCopperReportParams = z.infer<typeof PoliceCopperReportParamsSchema>
 export type TopSellersParams = z.infer<typeof TopSellersParamsSchema>
+export type SellerIdUploadStatusParams = z.infer<typeof SellerIdUploadStatusParamsSchema>
