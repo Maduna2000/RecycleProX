@@ -16,7 +16,7 @@ import { fetcher } from '@/lib/swrFetcher'
 
 
 type ScaleType   = 'none' | 'tcp' | 'serial'
-type PrinterType = 'none' | 'serial' | 'tcp'
+type PrinterType = 'none' | 'serial' | 'tcp' | 'windows'
 
 type SettingsMap = {
   yardName?: string; yardAddress?: string; yardPhone?: string
@@ -27,6 +27,7 @@ type SettingsMap = {
   police_service_name?: string; police_legal_note?: string
   printerType?: PrinterType; printerSerialPort?: string; printerBaudRate?: string
   printerIp?: string; printerTcpPort?: string; cashDrawerAttached?: string
+  printerWindowsQueueName?: string
   scale1Type?: ScaleType; scale1Ip?: string; scale1Port?: string; scale1SerialPort?: string; scale1BaudRate?: string
   scale2Type?: ScaleType; scale2Ip?: string; scale2Port?: string; scale2SerialPort?: string; scale2BaudRate?: string
   scale3Type?: ScaleType; scale3Ip?: string; scale3Port?: string; scale3SerialPort?: string; scale3BaudRate?: string
@@ -190,6 +191,8 @@ export default function SettingsPage() {
   const [availablePorts, setPorts]  = useState<SerialPortInfo[]>([])
   const [scanningNetwork, setScanNetwork] = useState(false)
   const [foundNetworkIps, setFoundIps]    = useState<string[]>([])
+  const [detectingQueues, setDetectQueues] = useState(false)
+  const [availableQueues, setQueues]       = useState<string[]>([])
   const [testingPrinter, setTest]   = useState(false)
   const [printerStatus, setPStatus] = useState<'idle' | 'ok' | 'err'>('idle')
   const [syncing, setSyncing]       = useState(false)
@@ -251,6 +254,17 @@ export default function SettingsPage() {
     if (j.cloudMode) toast.info('Network scan only works on a local install.')
     else if (j.ips.length === 0) toast.info('No printers found on port 9100.')
     else setFoundIps(j.ips)
+  }
+
+  async function detectQueues() {
+    setDetectQueues(true)
+    const res = await fetch('/api/settings/printer-queues')
+    setDetectQueues(false)
+    if (!res.ok) { toast.error('Could not list Windows printers'); return }
+    const j = await res.json() as { cloudMode?: boolean; printers: string[] }
+    if (j.cloudMode) toast.info('Windows printer detection only works on a local install.')
+    else if (j.printers.length === 0) toast.info('No Windows printers found.')
+    else setQueues(j.printers)
   }
 
   async function testPrint() {
@@ -438,6 +452,7 @@ export default function SettingsPage() {
                   <option value="none">Not Connected</option>
                   <option value="serial">Serial / USB-Serial</option>
                   <option value="tcp">TCP / Network (IP)</option>
+                  <option value="windows">Windows Print Queue (USB)</option>
                 </select>
               </Field>
 
@@ -502,6 +517,36 @@ export default function SettingsPage() {
                   {foundNetworkIps.length > 0 && (
                     <p style={{ fontSize: 10, color: '#6C757D', margin: 0 }}>Found: {foundNetworkIps.join(', ')}</p>
                   )}
+                </div>
+              )}
+
+              {form.printerType === 'windows' && (
+                <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <Field label="Windows Printer Queue">
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <input
+                        value={form.printerWindowsQueueName ?? ''} onChange={(e) => set('printerWindowsQueueName', e.target.value)}
+                        placeholder="e.g. POS-58 Printer" list="detected-queues"
+                        style={{ ...inp, flex: 1 }}
+                      />
+                      <datalist id="detected-queues">
+                        {availableQueues.map((name) => <option key={name} value={name}>{name}</option>)}
+                      </datalist>
+                      <button
+                        onClick={detectQueues} disabled={detectingQueues}
+                        style={{ height: 26, padding: '0 6px', borderRadius: 2, border: '1px solid #ABABAB', background: '#F5F5F5', color: '#6C757D', cursor: 'pointer', display: 'flex', alignItems: 'center', opacity: detectingQueues ? 0.5 : 1 }}
+                        title="Auto-detect"
+                      >
+                        <RefreshCw className={`w-3 h-3 ${detectingQueues ? 'animate-spin' : ''}`} />
+                      </button>
+                    </div>
+                    {availableQueues.length > 0 && (
+                      <p style={{ fontSize: 10, color: '#6C757D', marginTop: 2 }}>Detected: {availableQueues.join(', ')}</p>
+                    )}
+                    <p style={{ fontSize: 10, color: '#6C757D', marginTop: 2 }}>
+                      For a USB thermal printer installed as a normal Windows printer (not a COM port). Use the exact name shown in Windows &quot;Printers &amp; scanners&quot;.
+                    </p>
+                  </Field>
                 </div>
               )}
 
