@@ -129,16 +129,23 @@ export function TabStrip({
 // ─── ContentCard ──────────────────────────────────────────────────────────────
 
 /**
- * White content card. `attached` squares the top-left corner under a
- * PortalPage `tabs` row (that row owns the seam with its own top border,
- * ContentCard keeps its top border there to meet it).
+ * White content card. Both top corners always stay square (radius 0):
+ * top-left because it sits directly under either PageTitleBar's own
+ * square-left edge or a tab's left edge, and top-right because PageTitleBar
+ * spans this same width and its own bottom-right corner is unconditionally
+ * square (see PageTitleBar.tsx's `3px 3px 0 0`) — rounding this card's
+ * top-right corner instead left a visible notch where the two borders met,
+ * since a square corner directly above a rounded one never actually lines
+ * up. `attached` squares the top-left corner under a PortalPage `tabs` row
+ * (that row owns the seam with its own top border, ContentCard keeps its
+ * top border there to meet it).
  *
  * When there's no tab row, PageTitleBar sits directly above this card and
  * always owns the top edge now (see PageTitleBar.tsx) — so the default
- * (non-attached) shape drops its own top border and squares its top
- * corners, fusing into one continuous window frame instead of doubling the
- * line PageTitleBar already draws. Pages used to opt into this by hand via
- * `cardStyle`; it's the default now so no page can forget it.
+ * (non-attached) shape drops its own top border, fusing into one continuous
+ * window frame instead of doubling the line PageTitleBar already draws.
+ * Pages used to opt into this by hand via `cardStyle`; it's the default now
+ * so no page can forget it.
  */
 export function ContentCard({
   attached,
@@ -154,9 +161,8 @@ export function ContentCard({
       style={{
         flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column',
         background: '#fff', border: CARD_BORDER, overflow: 'hidden',
-        ...(attached
-          ? { borderRadius: '0 3px 3px 3px' }
-          : { borderTop: 'none', borderRadius: '0 0 3px 3px' }),
+        borderRadius: '0 0 3px 3px',
+        ...(attached ? {} : { borderTop: 'none' }),
         ...style,
       }}
     >
