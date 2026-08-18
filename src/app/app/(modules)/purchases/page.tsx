@@ -304,16 +304,20 @@ export default function PurchasesPage() {
         {hasFilters && (
           <Btn size="sm" icon={X} onClick={clearFilters}>Clear</Btn>
         )}
+      </FilterBar>
 
-        <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
-          <p className="uppercase tracking-wide font-semibold" style={{ fontSize: 10, color: colors.textSecondary }}>
-            Total Purchases &middot; {rangeLabel}
-          </p>
-          <p className="font-mono font-bold" style={{ fontSize: 16, color: colors.textPrimary }}>
+      {/* Total for the current filter/date range — same summary-card layout as Sales Payments */}
+      <div className="flex items-center gap-3" style={{ padding: '0 10px' }}>
+        <div
+          className="flex-1 rounded-lg px-3 py-2"
+          style={{ background: colors.actionBg, border: `1px solid ${colors.border}` }}
+        >
+          <p style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>Total Purchases &middot; {rangeLabel}</p>
+          <p className="font-mono font-semibold" style={{ fontSize: fontSize.md, color: colors.action }}>
             R {new Decimal(data?.totalSum ?? '0').toFixed(2)}
           </p>
         </div>
-      </FilterBar>
+      </div>
 
       {/* Table — grows to fill available height */}
       <div className="flex-1 min-h-0" style={{ padding: 10 }}>

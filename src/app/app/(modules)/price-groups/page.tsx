@@ -1,12 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import useSWR, { mutate } from 'swr'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog } from '@/components/ui/dialog'
-import { Star, ExternalLink, Pencil, Trash2, Save, RotateCcw, Copy, Loader2 } from 'lucide-react'
+import { Star, ExternalLink, Pencil, Trash2, Save, RotateCcw, Copy, Loader2, ChevronDown, ChevronRight } from 'lucide-react'
 import { toast } from 'sonner'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -360,7 +360,42 @@ function ManagePriceGroupModal({ groupId, onClose, onChanged }: {
     } finally { setCopying(false) }
   }
 
-  const categories = Array.from(new Set((products ?? []).map((p) => p.category))).sort()
+  // Grouped + collapsible, same pattern as the Bulk Price Update modal
+  // (products/page.tsx) — a price group can cover just as many products, and
+  // an always-expanded flat list was exactly the unmanageable wall of rows
+  // that pattern exists to avoid.
+  const grouped = useMemo(() => {
+    const map = new Map<string, ManageProduct[]>()
+    for (const p of products ?? []) {
+      const key = p.category || 'Uncategorized'
+      if (!map.has(key)) map.set(key, [])
+      map.get(key)!.push(p)
+    }
+    return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b))
+  }, [products])
+
+  const [collapsedCats, setCollapsedCats] = useState<Set<string>>(new Set())
+  // Collapsed by default, like Bulk Price Update — seeded once when the
+  // product list first arrives (it's fetched inside this modal, so it isn't
+  // available synchronously the way Bulk Price Update's `products` prop is).
+  const collapseSeeded = useRef(false)
+  useEffect(() => {
+    if (!products || collapseSeeded.current) return
+    collapseSeeded.current = true
+    setCollapsedCats(new Set(products.map((p) => p.category || 'Uncategorized')))
+  }, [products])
+
+  function toggleCat(cat: string) {
+    setCollapsedCats((prev) => {
+      const next = new Set(prev)
+      if (next.has(cat)) next.delete(cat); else next.add(cat)
+      return next
+    })
+  }
+  const allCollapsed = grouped.length > 0 && collapsedCats.size >= grouped.length
+  function toggleAllCats() {
+    setCollapsedCats(allCollapsed ? new Set() : new Set(grouped.map(([cat]) => cat)))
+  }
 
   return (
     <>
@@ -390,13 +425,16 @@ function ManagePriceGroupModal({ groupId, onClose, onChanged }: {
                   {group.isActive ? 'Active' : 'Inactive'}
                 </span>
               </div>
-              {isManager && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-                  <Btn size="sm" icon={Copy} loading={copying} onClick={() => setCopyConfirmOpen(true)}>Copy Defaults</Btn>
-                  {dirty && <Btn size="sm" icon={RotateCcw} onClick={onReset}>Reset</Btn>}
-                  {dirty && <Btn size="sm" variant="primary" icon={Save} loading={saving} onClick={onSave}>Save</Btn>}
-                </div>
-              )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                <Btn size="sm" onClick={toggleAllCats}>{allCollapsed ? 'Expand All' : 'Collapse All'}</Btn>
+                {isManager && (
+                  <>
+                    <Btn size="sm" icon={Copy} loading={copying} onClick={() => setCopyConfirmOpen(true)}>Copy Defaults</Btn>
+                    {dirty && <Btn size="sm" icon={RotateCcw} onClick={onReset}>Reset</Btn>}
+                    {dirty && <Btn size="sm" variant="primary" icon={Save} loading={saving} onClick={onSave}>Save</Btn>}
+                  </>
+                )}
+              </div>
             </div>
 
             {/* Table */}
@@ -410,16 +448,29 @@ function ManagePriceGroupModal({ groupId, onClose, onChanged }: {
                   </tr>
                 </thead>
                 <tbody>
-                  {categories.map((cat) => {
-                    const catProducts = (products ?? []).filter((p) => p.category === cat)
+                  {grouped.map(([cat, catProducts]) => {
+                    const isCollapsed = collapsedCats.has(cat)
+                    const enabledInCat = catProducts.filter((p) => overrides[p.id]?.enabled).length
                     return (
-                      <>
-                        <tr key={`cat-${cat}`}>
-                          <td colSpan={6} style={{ padding: '1px 8px', fontSize: 10, fontWeight: 700, color: '#6C757D', textTransform: 'uppercase', letterSpacing: '0.05em', background: '#F0F0F0', borderTop: '1px solid #E0E0E0', borderBottom: '1px solid #E0E0E0' }}>
-                            {cat}
+                      <Fragment key={cat}>
+                        <tr
+                          onClick={() => toggleCat(cat)}
+                          style={{ cursor: 'pointer', background: '#F0F0F0', borderTop: '1px solid #E0E0E0', borderBottom: '1px solid #E0E0E0' }}
+                        >
+                          <td colSpan={6} style={{ padding: '2px 8px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              {isCollapsed
+                                ? <ChevronRight style={{ width: 13, height: 13, color: '#6C757D', flexShrink: 0 }} />
+                                : <ChevronDown style={{ width: 13, height: 13, color: '#6C757D', flexShrink: 0 }} />}
+                              <span style={{ fontSize: 10, fontWeight: 700, color: '#6C757D', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{cat}</span>
+                              <span style={{ fontSize: 10, color: '#9CA3AF' }}>{catProducts.length} product{catProducts.length !== 1 ? 's' : ''}</span>
+                              {enabledInCat > 0 && (
+                                <span style={{ fontSize: 10, fontWeight: 600, color: colors.action }}>{enabledInCat} override{enabledInCat !== 1 ? 's' : ''}</span>
+                              )}
+                            </div>
                           </td>
                         </tr>
-                        {catProducts.map((p, i) => {
+                        {!isCollapsed && catProducts.map((p, i) => {
                           const ov = overrides[p.id]
                           const isEnabled = ov?.enabled ?? false
                           const rowBg = isEnabled ? '#F0FAF4' : (i % 2 === 1 ? '#FAFAFA' : '#fff')
@@ -482,7 +533,7 @@ function ManagePriceGroupModal({ groupId, onClose, onChanged }: {
                             </tr>
                           )
                         })}
-                      </>
+                      </Fragment>
                     )
                   })}
                 </tbody>

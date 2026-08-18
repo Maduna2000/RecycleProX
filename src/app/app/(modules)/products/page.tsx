@@ -610,11 +610,11 @@ function BulkPriceModal({ products, categoryOrder, onClose, onSuccess }: {
               <p style={{ fontSize: 12, color: colors.textSecondary }}>Edit buy/sell prices below. Only changed prices will be updated.</p>
               <Btn onClick={toggleAll}>{allCollapsed ? 'Expand All' : 'Collapse All'}</Btn>
             </div>
-            <table className="w-full" style={{ fontSize: fontSize.sm }}>
+            <table className="w-full" style={{ fontSize: fontSize.sm, borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ borderBottom: `1px solid ${colors.border}` }}>
                   {['Product', 'Buy Price (R)', 'Sell Price (R)'].map((h) => (
-                    <th key={h} className="text-left px-2 py-2 uppercase" style={{ fontSize: fontSize.xs, fontWeight: fontWeight.semibold, color: colors.textSecondary }}>
+                    <th key={h} className="text-left px-2 py-1.5 uppercase" style={{ fontSize: fontSize.xs, fontWeight: fontWeight.semibold, color: colors.textSecondary }}>
                       {h}
                     </th>
                   ))}
@@ -632,12 +632,12 @@ function BulkPriceModal({ products, categoryOrder, onClose, onSuccess }: {
                   <tbody key={cat}>
                     <tr
                       onClick={() => toggleCat(cat)}
-                      style={{ cursor: 'pointer', background: colors.neutralBg, borderTop: `1px solid ${colors.border}`, borderBottom: `1px solid ${colors.border}` }}
+                      style={{ cursor: 'pointer', background: colors.neutralBg, borderBottom: `1px solid ${colors.border}` }}
                     >
-                      <td colSpan={3} className="px-2 py-2">
+                      <td colSpan={3} className="px-2 py-1">
                         <div className="flex items-center gap-2">
-                          {isCollapsed ? <ChevronRight style={{ width: 14, height: 14, color: colors.textSecondary }} /> : <ChevronDown style={{ width: 14, height: 14, color: colors.textSecondary }} />}
-                          <span style={{ ...catStyle, display: 'inline-flex', padding: '1px 6px', borderRadius: 3, fontSize: 11, fontWeight: 600 }}>{cat}</span>
+                          {isCollapsed ? <ChevronRight style={{ width: 13, height: 13, color: colors.textSecondary }} /> : <ChevronDown style={{ width: 13, height: 13, color: colors.textSecondary }} />}
+                          <span style={{ ...catStyle, display: 'inline-flex', padding: '0px 6px', borderRadius: 3, fontSize: 11, fontWeight: 600, lineHeight: '16px' }}>{cat}</span>
                           <span style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>{items.length} product{items.length !== 1 ? 's' : ''}</span>
                           {changedInCat > 0 && (
                             <span style={{ fontSize: fontSize.xs, fontWeight: fontWeight.semibold, color: colors.warning }}>{changedInCat} changed</span>
@@ -656,14 +656,14 @@ function BulkPriceModal({ products, categoryOrder, onClose, onSuccess }: {
                               ? colors.warningBg : undefined,
                         }}
                       >
-                        <td className="px-2 py-2">
+                        <td className="px-2 py-1">
                           <p style={{ fontWeight: fontWeight.medium, color: colors.textPrimary }}>{p.name}</p>
                           <p className="font-mono" style={{ fontSize: fontSize.xs, color: colors.textMuted }}>{p.code}</p>
                         </td>
-                        <td className="px-2 py-2">
+                        <td className="px-2 py-1">
                           <input value={prices[p.id]?.buy ?? ''} onChange={(e) => setPrices((prev) => ({ ...prev, [p.id]: { ...prev[p.id]!, buy: e.target.value } }))} style={{ ...inp, width: 112, fontFamily: 'monospace' }} />
                         </td>
-                        <td className="px-2 py-2">
+                        <td className="px-2 py-1">
                           <input value={prices[p.id]?.sell ?? ''} onChange={(e) => setPrices((prev) => ({ ...prev, [p.id]: { ...prev[p.id]!, sell: e.target.value } }))} style={{ ...inp, width: 112, fontFamily: 'monospace' }} />
                         </td>
                       </tr>
