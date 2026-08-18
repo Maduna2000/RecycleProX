@@ -4,7 +4,7 @@ import { useState, useRef } from 'react'
 import { ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight, MoreHorizontal, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { colors, statusStyle } from '@/lib/design-tokens'
-import { Btn, HEADER_GRAD, GLOSS_BEVEL, winBevel } from '@/components/rpx'
+import { Btn, HEADER_GRAD, winBevel } from '@/components/rpx'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
