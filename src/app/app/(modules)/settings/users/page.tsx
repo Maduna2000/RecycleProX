@@ -8,10 +8,10 @@ import { CreateUserModal } from '@/components/users/CreateUserModal'
 import { EditUserModal } from '@/components/users/EditUserModal'
 import { ResetPasswordModal } from '@/components/users/ResetPasswordModal'
 import { SetPinModal } from '@/components/users/SetPinModal'
-import { Search, Unlock, UserCheck, UserX, KeyRound, Pencil } from 'lucide-react'
+import { Search, Unlock, UserCheck, UserX, KeyRound, Pencil, UserPlus } from 'lucide-react'
 import { toast } from 'sonner'
 import { colors, badgeStyle } from '@/lib/design-tokens'
-import { inp, Field, PortalPage, FilterBar } from '@/components/rpx'
+import { Btn, inp, Field, PortalPage, FilterBar } from '@/components/rpx'
 import { DataTable, type Column, type RowAction, StatusBadge as SharedStatusBadge } from '@/components/ui/DataTable'
 import { fetcher } from '@/lib/swrFetcher'
 
@@ -174,6 +174,9 @@ export default function UsersPage() {
               <option value="security_guard">Security Guard</option>
             </select>
           </Field>
+          <span style={{ marginLeft: 'auto', paddingBottom: 8 }}>
+            <Btn size="sm" variant="primary" icon={UserPlus} onClick={() => setCreateOpen(true)}>Add User</Btn>
+          </span>
         </FilterBar>
 
         {/* Table */}
