@@ -134,6 +134,7 @@ export default function ExpensesPage() {
     {
       key: 'description',
       header: 'Description',
+      width: '220px',
       render: (r) => (
         <span
           className="truncate block max-w-[200px]"
@@ -244,10 +245,16 @@ export default function ExpensesPage() {
   const pageTabs = PAGE_TABS.map((t) => ({ value: t, label: t }))
 
   return (
+    // maxWidth matches src/lib/pageWidthCaps.ts, which PageTitleBar reads to
+    // cap/border itself to match — the Description column previously had no
+    // width so its cell stretched to fill whatever was left even though the
+    // text inside it was already truncated, same pattern already fixed on
+    // Purchases/Sales/Payments.
     <PortalPage
       tabs={pageTabs}
       active={tab}
       onChange={(v) => setTab(v as PageTab)}
+      maxWidth={1150}
     >
       <FilterBar>
         <Field label="Search" width={220}>

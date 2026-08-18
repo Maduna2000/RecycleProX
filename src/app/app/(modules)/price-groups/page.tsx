@@ -6,7 +6,7 @@ import useSWR, { mutate } from 'swr'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog } from '@/components/ui/dialog'
-import { Star, ExternalLink, Pencil, Trash2, Save, RotateCcw, Copy, Loader2 } from 'lucide-react'
+import { Star, ExternalLink, Pencil, Trash2, Save, RotateCcw, Copy, Loader2, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown } from 'lucide-react'
 import { toast } from 'sonner'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -280,6 +280,11 @@ function ManagePriceGroupModal({ groupId, onClose, onChanged }: {
   const [dirty, setDirty] = useState(false)
   const [copying, setCopying] = useState(false)
   const [copyConfirmOpen, setCopyConfirmOpen] = useState(false)
+  // Category sections collapse independently so a price group with a lot of
+  // products doesn't force scrolling through every category to find one —
+  // all expanded by default (matches the previous always-expanded layout),
+  // toggled per-category or via the Collapse All / Expand All shortcut.
+  const [collapsedCats, setCollapsedCats] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     if (!group || !products) return
@@ -348,6 +353,14 @@ function ManagePriceGroupModal({ groupId, onClose, onChanged }: {
 
   const categories = Array.from(new Set((products ?? []).map((p) => p.category))).sort()
 
+  function toggleCategory(cat: string) {
+    setCollapsedCats((prev) => {
+      const next = new Set(prev)
+      if (next.has(cat)) next.delete(cat); else next.add(cat)
+      return next
+    })
+  }
+
   return (
     <>
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
@@ -376,13 +389,22 @@ function ManagePriceGroupModal({ groupId, onClose, onChanged }: {
                   {group.isActive ? 'Active' : 'Inactive'}
                 </span>
               </div>
-              {isManager && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-                  <Btn size="sm" icon={Copy} loading={copying} onClick={() => setCopyConfirmOpen(true)}>Copy Defaults</Btn>
-                  {dirty && <Btn size="sm" icon={RotateCcw} onClick={onReset}>Reset</Btn>}
-                  {dirty && <Btn size="sm" variant="primary" icon={Save} loading={saving} onClick={onSave}>Save</Btn>}
-                </div>
-              )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                <Btn
+                  size="sm"
+                  icon={collapsedCats.size > 0 ? ChevronsUpDown : ChevronsDownUp}
+                  onClick={() => setCollapsedCats(collapsedCats.size > 0 ? new Set() : new Set(categories))}
+                >
+                  {collapsedCats.size > 0 ? 'Expand All' : 'Collapse All'}
+                </Btn>
+                {isManager && (
+                  <>
+                    <Btn size="sm" icon={Copy} loading={copying} onClick={() => setCopyConfirmOpen(true)}>Copy Defaults</Btn>
+                    {dirty && <Btn size="sm" icon={RotateCcw} onClick={onReset}>Reset</Btn>}
+                    {dirty && <Btn size="sm" variant="primary" icon={Save} loading={saving} onClick={onSave}>Save</Btn>}
+                  </>
+                )}
+              </div>
             </div>
 
             {/* Table */}
@@ -398,14 +420,32 @@ function ManagePriceGroupModal({ groupId, onClose, onChanged }: {
                 <tbody>
                   {categories.map((cat) => {
                     const catProducts = (products ?? []).filter((p) => p.category === cat)
+                    const isCollapsed = collapsedCats.has(cat)
+                    const enabledCount = catProducts.filter((p) => overrides[p.id]?.enabled).length
                     return (
                       <>
                         <tr key={`cat-${cat}`}>
-                          <td colSpan={6} style={{ padding: '1px 8px', fontSize: 10, fontWeight: 700, color: '#6C757D', textTransform: 'uppercase', letterSpacing: '0.05em', background: '#F0F0F0', borderTop: '1px solid #E0E0E0', borderBottom: '1px solid #E0E0E0' }}>
+                          <td
+                            colSpan={6}
+                            onClick={() => toggleCategory(cat)}
+                            style={{
+                              padding: '1px 8px', fontSize: 10, fontWeight: 700, color: '#6C757D',
+                              textTransform: 'uppercase', letterSpacing: '0.05em', background: '#F0F0F0',
+                              borderTop: '1px solid #E0E0E0', borderBottom: '1px solid #E0E0E0',
+                              cursor: 'pointer', userSelect: 'none',
+                              display: 'flex', alignItems: 'center', gap: 4,
+                            }}
+                          >
+                            {isCollapsed
+                              ? <ChevronRight style={{ width: 11, height: 11, flexShrink: 0 }} />
+                              : <ChevronDown style={{ width: 11, height: 11, flexShrink: 0 }} />}
                             {cat}
+                            <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 'normal', color: '#9CA3AF' }}>
+                              ({catProducts.length}{enabledCount > 0 ? `, ${enabledCount} overridden` : ''})
+                            </span>
                           </td>
                         </tr>
-                        {catProducts.map((p, i) => {
+                        {!isCollapsed && catProducts.map((p, i) => {
                           const ov = overrides[p.id]
                           const isEnabled = ov?.enabled ?? false
                           const rowBg = isEnabled ? '#F0FAF4' : (i % 2 === 1 ? '#FAFAFA' : '#fff')

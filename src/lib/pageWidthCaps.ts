@@ -40,6 +40,9 @@ const PAGE_WIDTH_CAPS: { test: RegExp; width: number }[] = [
   { test: /^\/app\/sales$/, width: 1050 },
   // Sales Payments — same unbounded "Customer" column, same fix.
   { test: /^\/app\/payments$/, width: 1050 },
+  // Expenses — the Description column had no width so its cell stretched
+  // even though the text inside it was already truncated.
+  { test: /^\/app\/expenses$/, width: 1150 },
 ]
 
 export function getPageWidthCap(pathname: string): number | null {
