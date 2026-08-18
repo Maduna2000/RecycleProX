@@ -386,15 +386,31 @@ export function ReportViewer({ report }: ReportViewerProps) {
               </button>
             )}
           </div>
-          <div className="flex flex-wrap items-end gap-3">
-            <DateRangeFilter from={from} to={to} onChange={(f, t) => { setFrom(f); setTo(t) }} />
+          {/*
+            One row, always — every report shares this layout, and a report
+            with 2+ filters (Stock Movement, Scale Discrepancy, Sellers ID
+            Upload Status, ...) alongside the date range's own from/to/quick-
+            range trio easily needs 1000px+, more than the window reliably
+            has. Wrapping to a second line made those reports look
+            inconsistent next to reports with 0-1 filters, which never
+            wrapped. Scrolling horizontally instead keeps every report's
+            filter row exactly one line tall (flexShrink: 0 on each control
+            so it keeps its intended width rather than getting squeezed);
+            the themed scrollbar is the same one already used for wide
+            tables/pages app-wide (see globals.css).
+          */}
+          <div className="flex items-end gap-3" style={{ flexWrap: 'nowrap', overflowX: 'auto', paddingBottom: 4 }}>
+            <div style={{ flexShrink: 0 }}>
+              <DateRangeFilter from={from} to={to} onChange={(f, t) => { setFrom(f); setTo(t) }} />
+            </div>
             {report.filters.map((spec) => (
-              <FilterControl
-                key={spec.key}
-                spec={spec}
-                value={filters[spec.key] ?? ''}
-                onChange={(v) => setFilters((prev) => ({ ...prev, [spec.key]: v }))}
-              />
+              <div key={spec.key} style={{ flexShrink: 0 }}>
+                <FilterControl
+                  spec={spec}
+                  value={filters[spec.key] ?? ''}
+                  onChange={(v) => setFilters((prev) => ({ ...prev, [spec.key]: v }))}
+                />
+              </div>
             ))}
           </div>
         </div>
