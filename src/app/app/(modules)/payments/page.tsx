@@ -169,7 +169,12 @@ export default function PaymentsPage() {
   ]
 
   return (
-    <PortalPage title="Sales Payments">
+    // maxWidth matches src/lib/pageWidthCaps.ts, which PageTitleBar reads to
+    // cap/border itself to match — keeps the unbounded "Customer" column
+    // from stretching to fill the whole window, same fix already applied to
+    // Purchases/Sales (same row shape: a few fixed-width columns plus one
+    // unbounded name column).
+    <PortalPage title="Sales Payments" maxWidth={1050}>
       <FilterBar>
         <Field label="Search" width={200}>
           <div style={{ position: 'relative' }}>

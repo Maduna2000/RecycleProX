@@ -38,6 +38,8 @@ const PAGE_WIDTH_CAPS: { test: RegExp; width: number }[] = [
   // switching between the two views.
   { test: /^\/app\/purchases$/, width: 1050 },
   { test: /^\/app\/sales$/, width: 1050 },
+  // Sales Payments — same unbounded "Customer" column, same fix.
+  { test: /^\/app\/payments$/, width: 1050 },
 ]
 
 export function getPageWidthCap(pathname: string): number | null {
