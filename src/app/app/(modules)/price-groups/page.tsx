@@ -18,7 +18,7 @@ import { fetcher } from '@/lib/swrFetcher'
 import { useOfflineLookup } from '@/hooks/useOfflineLookup'
 import {
   TH, TD, HEADER_GRAD,
-  Btn, PortalPage, winBevel,
+  Btn, PortalPage,
   RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter,
 } from '@/components/rpx'
 import { DataTable, StatusBadge, type Column, type RowAction } from '@/components/ui/DataTable'
@@ -450,7 +450,7 @@ function ManagePriceGroupModal({ groupId, onClose, onChanged }: {
                           const isEnabled = ov?.enabled ?? false
                           const rowBg = isEnabled ? '#F0FAF4' : (i % 2 === 1 ? '#FAFAFA' : '#fff')
                           return (
-                            <tr key={p.id} style={{ background: rowBg, borderBottom: '1px solid #F0F0F0', height: 26 }}>
+                            <tr key={p.id} style={{ background: rowBg, borderBottom: '1px solid #F0F0F0', height: 32 }}>
                               <td style={{ ...TD, padding: '1px 8px', width: 50, textAlign: 'center' }}>
                                 <input
                                   type="checkbox"
@@ -475,8 +475,13 @@ function ManagePriceGroupModal({ groupId, onClose, onChanged }: {
                                     value={ov?.buy ?? ''}
                                     onChange={(e) => { setOverrides((prev) => ({ ...prev, [p.id]: { ...prev[p.id]!, buy: e.target.value } })); setDirty(true) }}
                                     disabled={!isManager}
-                                    className="h-5 text-xs font-mono"
-                                    style={{ width: 100, ...winBevel(true) }}
+                                    // Matches the app's standard 30px text-field height (see `inp`
+                                    // in styles.ts) — previously h-5 (20px), which read as a
+                                    // visibly smaller/thinner text box than every other input in
+                                    // the app (Settings, Customers, etc.), even though this table
+                                    // needs to stay denser than a full form.
+                                    className="h-[30px] text-xs font-mono"
+                                    style={{ width: 100 }}
                                   />
                                 ) : (
                                   <span style={{ fontSize: 11, color: '#C0C0C0', fontFamily: 'monospace' }}>—</span>
@@ -488,8 +493,13 @@ function ManagePriceGroupModal({ groupId, onClose, onChanged }: {
                                     value={ov?.sell ?? ''}
                                     onChange={(e) => { setOverrides((prev) => ({ ...prev, [p.id]: { ...prev[p.id]!, sell: e.target.value } })); setDirty(true) }}
                                     disabled={!isManager}
-                                    className="h-5 text-xs font-mono"
-                                    style={{ width: 100, ...winBevel(true) }}
+                                    // Matches the app's standard 30px text-field height (see `inp`
+                                    // in styles.ts) — previously h-5 (20px), which read as a
+                                    // visibly smaller/thinner text box than every other input in
+                                    // the app (Settings, Customers, etc.), even though this table
+                                    // needs to stay denser than a full form.
+                                    className="h-[30px] text-xs font-mono"
+                                    style={{ width: 100 }}
                                   />
                                 ) : (
                                   <span style={{ fontSize: 11, color: '#C0C0C0', fontFamily: 'monospace' }}>—</span>
