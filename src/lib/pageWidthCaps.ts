@@ -46,6 +46,11 @@ const PAGE_WIDTH_CAPS: { test: RegExp; width: number }[] = [
   // Users — the unbounded "Full Name"/"Username"/"Last Login" columns did
   // the same.
   { test: /^\/app\/settings\/users$/, width: 950 },
+  // Price Lists — the unbounded "Title" column did the same. Same width as
+  // Price Groups (same row shape: one prominent text column plus several
+  // narrow fixed ones). Scoped to the list page only, not the editor
+  // (/price-lists/[id]) or the "new" form.
+  { test: /^\/app\/products\/price-lists$/, width: 900 },
 ]
 
 export function getPageWidthCap(pathname: string): number | null {

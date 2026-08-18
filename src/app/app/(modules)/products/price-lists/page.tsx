@@ -169,7 +169,10 @@ export default function PriceListsPage() {
   ]
 
   return (
-    <PortalPage title="Price Lists">
+    // maxWidth matches src/lib/pageWidthCaps.ts, which PageTitleBar reads to
+    // cap/border itself to match — keeps the unbounded "Title" column from
+    // stretching to fill the whole window, same fix as Products/Price Groups.
+    <PortalPage title="Price Lists" maxWidth={900}>
       {isManager && <LogoCard />}
 
       <FilterBar>
