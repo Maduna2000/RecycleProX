@@ -37,6 +37,15 @@ export function ReportPreviewTable({ doc }: ReportPreviewTableProps) {
   const symbol = doc.meta.currencySymbol
   const colCount = doc.columns.length
 
+  // Each column's `width` is a fraction of content width (same numbers the
+  // PDF export uses) — sizing the on-screen table to those same proportions,
+  // scaled to fill 100%, is what keeps every report's columns snug against
+  // each other instead of stretching to fit unwrapped content and forcing a
+  // horizontal scroll. Falls back to an even split if a report definition
+  // ever omits widths.
+  const totalWidth = doc.columns.reduce((sum, c) => sum + (c.width || 0), 0) || colCount
+  const colWidthPct = doc.columns.map((c) => `${((c.width || 1) / totalWidth) * 100}%`)
+
   if (flat.length === 0) {
     return (
       <div style={{ ...PANEL, padding: '32px 16px', textAlign: 'center', fontSize: fontSize.sm, color: colors.textSecondary }}>
@@ -51,20 +60,22 @@ export function ReportPreviewTable({ doc }: ReportPreviewTableProps) {
 
   return (
     <div style={{ ...PANEL, overflow: 'auto' }}>
-      <table style={{ width: '100%', fontSize: fontSize.xs, borderCollapse: 'collapse' }}>
+      <table style={{ width: '100%', tableLayout: 'fixed', fontSize: fontSize.xs, borderCollapse: 'collapse' }}>
         <thead>
           <tr>
             {doc.columns.map((col, i) => (
               <th
                 key={col.key}
                 style={{
-                  position: 'sticky', top: 0, padding: '0 10px', height: 30,
+                  position: 'sticky', top: 0, padding: '0 6px', height: 30,
+                  width: colWidthPct[i],
                   background: HEADER_GRAD,
                   borderBottom: CARD_BORDER,
                   borderRight: i < colCount - 1 ? GRID_LINE : undefined,
                   color: colors.textSecondary,
                   textAlign: col.align ?? 'left',
-                  whiteSpace: 'nowrap',
+                  whiteSpace: 'normal',
+                  wordBreak: 'break-word',
                   textTransform: 'uppercase',
                   letterSpacing: '0.05em',
                   fontWeight: 700,
@@ -84,7 +95,7 @@ export function ReportPreviewTable({ doc }: ReportPreviewTableProps) {
                   <td
                     colSpan={colCount}
                     style={{
-                      padding: '5px 10px',
+                      padding: '4px 6px',
                       fontWeight: 700,
                       background: GROUP_SHADES[Math.min(row.level, GROUP_SHADES.length - 1)],
                       borderBottom: GRID_LINE,
@@ -134,7 +145,7 @@ export function ReportPreviewTable({ doc }: ReportPreviewTableProps) {
                         <td
                           key={col.key}
                           colSpan={span}
-                          style={{ padding: '5px 10px', fontWeight: 700, textAlign: 'right', color: colors.textPrimary, whiteSpace: 'nowrap', ...cellBorder }}
+                          style={{ padding: '4px 6px', fontWeight: 700, textAlign: 'right', color: colors.textPrimary, whiteSpace: 'nowrap', ...cellBorder }}
                         >
                           {row.label}
                         </td>
@@ -145,7 +156,7 @@ export function ReportPreviewTable({ doc }: ReportPreviewTableProps) {
 
                   if (col.isImage) {
                     return (
-                      <td key={col.key} style={{ padding: '5px 10px', textAlign: 'center', whiteSpace: 'nowrap', ...cellBorder }}>
+                      <td key={col.key} style={{ padding: '4px 6px', textAlign: 'center', whiteSpace: 'nowrap', ...cellBorder }}>
                         {row.imageUrl ? (
                           <a href={row.imageUrl} target="_blank" rel="noopener noreferrer" style={{ color: colors.process }}>
                             View
@@ -162,12 +173,19 @@ export function ReportPreviewTable({ doc }: ReportPreviewTableProps) {
                     <td
                       key={col.key}
                       style={{
-                        padding: '5px 10px',
+                        padding: '4px 6px',
                         fontWeight: isTotal ? 700 : 400,
                         textAlign: col.align ?? 'left',
                         color: colors.textPrimary,
                         fontFamily: col.format && col.format !== 'text' ? 'monospace' : undefined,
-                        whiteSpace: 'nowrap',
+                        // Text columns wrap within their assigned share of
+                        // the table's width instead of forcing the column
+                        // wider to fit unwrapped content (which is what was
+                        // pushing reports into horizontal scroll) — short,
+                        // fixed-shape values (dates, money, mass) stay on
+                        // one line since they never need the room.
+                        whiteSpace: !col.format || col.format === 'text' ? 'normal' : 'nowrap',
+                        wordBreak: 'break-word',
                         ...cellBorder,
                       }}
                     >
