@@ -8,7 +8,7 @@
  * absorbed by the renderer's own offline queue (src/lib/offline/), not by
  * this process — there is no local database here.
  */
-const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, dialog, shell } = require('electron')
+const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, dialog, shell, session } = require('electron')
 const path = require('node:path')
 const fs = require('node:fs')
 const { spawn } = require('node:child_process')
@@ -286,6 +286,39 @@ function createTray() {
   }
 }
 
+// ─── Report / document downloads ────────────────────────────────────────────
+//
+// Reports (DownloadButtons.tsx) fetch the PDF/Excel bytes, build a blob: URL,
+// and click a hidden <a download> — Electron intercepts that exactly like a
+// server-initiated download, firing 'will-download' on the session. Left
+// unhandled, Electron silently saves to the OS default Downloads folder with
+// no prompt and no way to pick a location. Showing a native Save dialog here
+// instead — same one a real desktop app would use — lets the user choose
+// where a report/statement actually goes, while still defaulting to the
+// Downloads folder with the report's suggested filename if they don't
+// navigate elsewhere.
+function setupDownloadHandler() {
+  session.defaultSession.on('will-download', (event, item) => {
+    const suggested = item.getFilename()
+    const savePath = dialog.showSaveDialogSync(mainWindow, {
+      title: 'Save Report',
+      defaultPath: path.join(app.getPath('downloads'), suggested),
+    })
+    if (!savePath) {
+      item.cancel()
+      return
+    }
+    item.setSavePath(savePath)
+    item.once('done', (_event, state) => {
+      if (state === 'completed') {
+        console.log(`[download] saved ${savePath}`)
+      } else {
+        console.warn(`[download] did not complete (${state}): ${savePath}`)
+      }
+    })
+  })
+}
+
 // ─── Auto-updater ─────────────────────────────────────────────────────────────
 //
 // Checks the feed baked into resources/app-update.yml at build time (see
@@ -395,6 +428,7 @@ async function startApp() {
 }
 
 app.whenReady().then(() => {
+  setupDownloadHandler()
   startApp()
 
   app.on('activate', () => {
