@@ -3,6 +3,7 @@
 import { useRouter, usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { useWindowStore } from '@/stores/windowStore'
+import { winBevelDark } from '@/components/rpx'
 
 export function WindowTaskbar() {
   const router   = useRouter()
@@ -25,11 +26,18 @@ export function WindowTaskbar() {
             key={win.id}
             className={cn(
               'flex items-center gap-1 px-2 rounded-sm group cursor-pointer transition-colors',
-              isActive
-                ? 'bg-white/20 border-t-2 border-t-[#F2AB1A]'
-                : 'hover:bg-white/10 border-t-2 border-t-transparent',
+              isActive ? 'bg-white/20' : 'hover:bg-white/10',
             )}
-            style={{ height: 20, minWidth: 80, maxWidth: 140 }}
+            style={{
+              height: 20, minWidth: 80, maxWidth: 140,
+              // Raised bevel when idle, inverted/pushed-in when active — the
+              // same hard-edge affordance as buttons and the title bar
+              // (winBevelDark, tuned for this dark navy strip). The amber
+              // top accent still marks "active" on top of that, 2px so it
+              // reads clearly over the 1px bevel line.
+              ...winBevelDark(isActive),
+              borderTop: isActive ? '2px solid #F2AB1A' : (winBevelDark(false).borderTop as string),
+            }}
             onClick={() => router.push(win.href)}
             title={win.label}
             role="button"

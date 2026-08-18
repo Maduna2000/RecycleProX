@@ -10,7 +10,7 @@ import { toast } from 'sonner'
 import { CreateCustomerSchema, type CreateCustomerFormInput, type CreateCustomerInput } from '@/lib/schemas/customer'
 import { TradeCommoditiesSelect } from '@/components/customers/TradeCommoditiesSelect'
 import { colors } from '@/lib/design-tokens'
-import { Btn, Field, HEADER_GRAD, inp, lbl, PortalPage, SectionLabel } from '@/components/rpx'
+import { Btn, Field, HEADER_GRAD, inp, lbl, PortalPage, SectionLabel, winBevel } from '@/components/rpx'
 import { fetcher } from '@/lib/swrFetcher'
 
 
@@ -334,8 +334,8 @@ export default function NewAccountPage() {
               {/* Market Sector — scrollable listbox */}
               <Field label="Market Sector">
                 <div
-                  className="border rounded-[2px] overflow-y-auto"
-                  style={{ borderColor: '#ABABAB', height: 52, background: '#FFFFFF' }}
+                  className="rounded-[2px] overflow-y-auto"
+                  style={{ height: 52, background: '#FFFFFF', ...winBevel(true) }}
                 >
                   {(['formal', 'informal'] as const).map((s) => (
                     <label

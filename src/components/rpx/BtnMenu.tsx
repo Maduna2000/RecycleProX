@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { ChevronDown } from 'lucide-react'
 import { Btn, type BtnVariant, type BtnSize } from './Btn'
+import { winBevel } from './styles'
 
 export interface BtnMenuItem {
   label:    string
@@ -74,8 +75,11 @@ export function BtnMenu({
               position: 'absolute', top: '100%', marginTop: 4, zIndex: 50,
               ...(align === 'right' ? { right: 0 } : { left: 0 }),
               minWidth: 170, background: '#fff', borderRadius: 3,
-              border: '1px solid #D0D0D0', boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+              // A real little pop-out window (same raised bevel as
+              // dialogs), hard offset shadow instead of a blurry one.
+              boxShadow: '2px 2px 6px rgba(0,0,0,0.3)',
               padding: '4px 0',
+              ...winBevel(),
             }}
           >
             {items.map((item) => {

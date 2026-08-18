@@ -6,7 +6,7 @@
  */
 
 import { colors } from '@/lib/design-tokens'
-import { NAVY, CARD_BORDER, GLOSS_BEVEL, lbl } from './styles'
+import { NAVY, CARD_BORDER, lbl } from './styles'
 
 // ─── Field / FormLabel ────────────────────────────────────────────────────────
 
@@ -94,12 +94,17 @@ export function TabStrip({
               marginLeft: i === 0 ? 0 : -1,
               display: 'inline-flex', alignItems: 'center', gap: 6,
               padding: '5px 14px', fontSize: 12, fontWeight: 600,
-              border: '1px solid #B0B0B0', borderBottom: 'none',
+              // Light top edge (raised highlight) + the same #B0B0B0 side
+              // dividers as before (unchanged so adjacent tabs' shared
+              // edges still align) — a hard highlight instead of a soft
+              // GLOSS_BEVEL box-shadow standing in for one.
+              borderTop: '1px solid #FFFFFF',
+              borderLeft: '1px solid #B0B0B0', borderRight: '1px solid #B0B0B0',
+              borderBottom: 'none',
               borderRadius: '4px 4px 0 0', cursor: 'pointer',
               background: isActive
                 ? 'linear-gradient(180deg,#FFFFFF 0%,#F2F2F2 100%)'
                 : 'linear-gradient(180deg,#E8E8E8 0%,#D0D0D0 100%)',
-              boxShadow: GLOSS_BEVEL,
               color: isActive ? NAVY : '#6C757D',
             }}
           >
@@ -123,7 +128,18 @@ export function TabStrip({
 
 // ─── ContentCard ──────────────────────────────────────────────────────────────
 
-/** White content card; `attached` squares the top-left corner under tabs. */
+/**
+ * White content card. `attached` squares the top-left corner under a
+ * PortalPage `tabs` row (that row owns the seam with its own top border,
+ * ContentCard keeps its top border there to meet it).
+ *
+ * When there's no tab row, PageTitleBar sits directly above this card and
+ * always owns the top edge now (see PageTitleBar.tsx) — so the default
+ * (non-attached) shape drops its own top border and squares its top
+ * corners, fusing into one continuous window frame instead of doubling the
+ * line PageTitleBar already draws. Pages used to opt into this by hand via
+ * `cardStyle`; it's the default now so no page can forget it.
+ */
 export function ContentCard({
   attached,
   style,
@@ -138,7 +154,9 @@ export function ContentCard({
       style={{
         flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column',
         background: '#fff', border: CARD_BORDER, overflow: 'hidden',
-        borderRadius: attached ? '0 3px 3px 3px' : 3,
+        ...(attached
+          ? { borderRadius: '0 3px 3px 3px' }
+          : { borderTop: 'none', borderRadius: '0 0 3px 3px' }),
         ...style,
       }}
     >

@@ -18,10 +18,10 @@
  *   </Dialog>
  */
 
+import { useState } from 'react'
 import { X } from 'lucide-react'
 import { DialogContent } from '@/components/ui/dialog'
-import { colors } from '@/lib/design-tokens'
-import { NAVY, BAR_GRAD, GLOSS_BEVEL } from './styles'
+import { BAR_GRAD, winBevel, windowTitleText } from './styles'
 
 export function RpxDialogContent({
   maxWidth = 480,
@@ -34,23 +34,60 @@ export function RpxDialogContent({
 }) {
   return (
     <DialogContent
-      className="p-0 gap-0"
+      // Cancel the shadcn base's rounded-xl + soft ring at the className
+      // level (not just via inline style) — tailwind-merge dedupes same-
+      // category utilities so these win outright, rather than relying on
+      // inline style to out-specificity a ring's composited box-shadow.
+      className="p-0 gap-0 rounded-[3px] ring-0"
       showCloseButton={false}
       style={{
         maxWidth,
         borderRadius: 3,
-        border: '1px solid #B0B0B0',
         boxShadow: '0 6px 24px rgba(0,0,0,0.2)',
         background: '#fff',
         overflow: 'hidden',
         display: 'flex',
         flexDirection: 'column',
         maxHeight: 'calc(100dvh - 4rem)',
+        // The whole dialog reads as one raised physical window (same hard
+        // bevel as PageTitleBar/Btn) — the header inside it is a flat strip,
+        // not a second nested bevel.
+        ...winBevel(),
         ...style,
       }}
     >
       {children}
     </DialogContent>
+  )
+}
+
+/** The dialog's own close button — same raised-bevel window control as
+ * PageTitleBar's [−]/[×] (see components/ui/PageTitleBar.tsx), just without
+ * a minimize button since modals aren't minimizable. */
+function DialogCloseButton({ onClose }: { onClose: () => void }) {
+  const [pressed, setPressed] = useState(false)
+  const [hover, setHover] = useState(false)
+
+  return (
+    <button
+      onClick={onClose}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => { setHover(false); setPressed(false) }}
+      onMouseDown={() => setPressed(true)}
+      onMouseUp={() => setPressed(false)}
+      title="Close"
+      aria-label="Close"
+      style={{
+        width: 22, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: pressed ? 'linear-gradient(180deg,#D4D4D4 0%,#EAEAEA 100%)' : BAR_GRAD,
+        borderRadius: 2, cursor: 'pointer',
+        transform: pressed ? 'translateY(1px)' : undefined,
+        color: hover ? '#C0392B' : '#495057',
+        ...winBevel(pressed),
+      }}
+    >
+      <X style={{ width: 12, height: 12 }} />
+    </button>
   )
 }
 
@@ -70,28 +107,13 @@ export function RpxDialogHeader({
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         height: 34, padding: '0 8px 0 14px', flexShrink: 0,
         background: BAR_GRAD, borderBottom: '2px solid #B0B0B0',
-        boxShadow: GLOSS_BEVEL,
       }}
     >
-      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 700, color: NAVY }}>
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, ...windowTitleText }}>
         {Icon && <Icon style={{ width: 14, height: 14 }} />}
         {title}
       </span>
-      {onClose && (
-        <button
-          onClick={onClose}
-          title="Close"
-          aria-label="Close"
-          style={{
-            width: 24, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'none', border: 'none', cursor: 'pointer', borderRadius: 2, color: '#6C757D',
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = colors.danger; e.currentTarget.style.color = '#fff' }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = '#6C757D' }}
-        >
-          <X style={{ width: 14, height: 14 }} />
-        </button>
-      )}
+      {onClose && <DialogCloseButton onClose={onClose} />}
     </div>
   )
 }

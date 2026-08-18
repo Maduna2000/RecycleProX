@@ -7,7 +7,7 @@
  * rendered filled, so it's obvious at a glance which range is applied.
  */
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
-import { Field, inp } from '@/components/rpx'
+import { Field, inp, winBevel } from '@/components/rpx'
 
 interface DateRangeFilterProps {
   from: string
@@ -54,6 +54,7 @@ export function DateRangeFilter({ from, to, onChange }: DateRangeFilterProps) {
                   borderLeft: i === 0 ? 'none' : `1px solid ${colors.border}`,
                   cursor: 'pointer',
                   whiteSpace: 'nowrap',
+                  ...(active ? winBevel(true) : {}),
                 }}
                 onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = colors.rowHover }}
                 onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = colors.surface }}

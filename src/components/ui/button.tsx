@@ -5,16 +5,17 @@ import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"
 
-// House-style Aero button: flat grey BAR_GRAD fill, 1px #B0B0B0 border, 3px
-// radius, inner top highlight bevel — matches rpx/Btn.tsx and rpx/styles.ts
-// exactly (kept as literal values here since this file can't import from
-// rpx without a circular dependency; if BAR_GRAD's value changes, update
-// both). Severity/emphasis is signalled by label/text colour, not a solid
-// colour block or a different radius — no variant here uses rounded-lg or
-// a press-down transform, both of which used to visibly clash with the
-// gradient Btn used everywhere else in the app.
+// House-style Aero button: flat grey BAR_GRAD fill, real raised Win32 bevel
+// (light top/left, dark bottom/right — winBevel()), 3px radius — matches
+// rpx/Btn.tsx and rpx/styles.ts exactly (kept as literal values here since
+// this file can't import from rpx without a circular dependency; if
+// BAR_GRAD/winBevel's values change, update both). Severity/emphasis is
+// signalled by label/text colour, not a solid colour block or a different
+// radius — no variant here uses rounded-lg or a press-down transform, both
+// of which used to visibly clash with the gradient Btn used everywhere else
+// in the app.
 const AERO_BASE =
-  "bg-[linear-gradient(180deg,#EAEAEA_0%,#D4D4D4_100%)] border-[#B0B0B0] shadow-[inset_0_1px_0_rgba(255,255,255,0.6)] hover:bg-[#D2D2D2] hover:bg-none"
+  "bg-[linear-gradient(180deg,#EAEAEA_0%,#D4D4D4_100%)] border-t-white border-l-white border-r-[#B0B0B0] border-b-[#B0B0B0] hover:bg-[#D2D2D2] hover:bg-none"
 
 const buttonVariants = cva(
   "group/button inline-flex shrink-0 items-center justify-center rounded-[3px] border bg-clip-padding text-sm font-medium whitespace-nowrap transition-colors outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
@@ -26,7 +27,7 @@ const buttonVariants = cva(
         // ordinary Dialog/AlertDialog Close/Cancel slot, the single most
         // frequent shadcn-Button call site in the app.
         outline:
-          "bg-white border-[#ABABAB] text-[#212529] hover:bg-[#F1F3F4] aria-expanded:bg-[#F1F3F4]",
+          "bg-white border-t-white border-l-white border-r-[#B0B0B0] border-b-[#B0B0B0] text-[#212529] hover:bg-[#F1F3F4] aria-expanded:bg-[#F1F3F4]",
         secondary: `${AERO_BASE} text-[#212529]`,
         ghost:
           "border-transparent hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:hover:bg-muted/50",

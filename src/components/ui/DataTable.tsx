@@ -4,7 +4,7 @@ import { useState, useRef } from 'react'
 import { ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight, MoreHorizontal, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { colors, statusStyle } from '@/lib/design-tokens'
-import { Btn, HEADER_GRAD, GLOSS_BEVEL } from '@/components/rpx'
+import { Btn, HEADER_GRAD, GLOSS_BEVEL, winBevel } from '@/components/rpx'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -116,10 +116,17 @@ function ActionsDropdown<T>({ row, actions }: { row: T; actions: RowAction<T>[] 
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
           <div
             className={cn(
-              'absolute right-0 w-44 bg-white shadow-xl border border-[#B0B0B0] py-0.5 z-20',
+              'absolute right-0 w-44 bg-white py-0.5 z-20',
               openUpward ? 'bottom-full mb-0.5' : 'top-full mt-0.5',
             )}
-            style={{ borderRadius: 2 }}
+            style={{
+              borderRadius: 2,
+              // A real little pop-out window (same raised bevel as
+              // dialogs), with a hard offset shadow instead of Tailwind's
+              // blurry shadow-xl — classic Win32 context-menu depth cue.
+              boxShadow: '2px 2px 6px rgba(0,0,0,0.3)',
+              ...winBevel(),
+            }}
           >
             {visible.map((action, i) => (
               <button
@@ -192,15 +199,22 @@ export function DataTable<T>({
 
   return (
     <div className="flex flex-col h-full">
-      {/* Table wrapper — square corners, legacy border */}
-      <div className="flex-1 overflow-auto border border-[#B0B0B0] bg-white" style={{ borderRadius: 0 }}>
+      {/* Table wrapper — square corners, sunken well (same hard-edge bevel
+          as buttons/title bars, inverted: dark top/left, light bottom/right)
+          so the grid reads as recessed into the page, the way a real Win32
+          data grid (e.g. MT4's Market Watch/Trade tables) is built. */}
+      <div className="flex-1 overflow-auto bg-white" style={{ borderRadius: 0, ...winBevel(true) }}>
         <table className="w-full text-sm border-collapse">
           {/* Header */}
           <thead className="sticky top-0 z-10">
             <tr style={{
               background: HEADER_GRAD,
               borderBottom: '2px solid #B0B0B0',
-              boxShadow: GLOSS_BEVEL,
+              // Crisp (zero-blur) inset highlight/shadow pair instead of
+              // GLOSS_BEVEL's soft blur — a <tr> under border-collapse
+              // can't reliably take a real `border`, so this is the
+              // hard-edge-safe equivalent for this one spot.
+              boxShadow: 'inset 0 1px 0 #FFFFFF, inset 0 -1px 0 #B0B0B0',
             }}>
               {multiSelect && (
                 <th style={{ width: 36, height: 30, padding: '0 10px', borderRight: '1px solid #D0D0D0' }}>
@@ -380,7 +394,8 @@ export function DataTable<T>({
           <span className="text-[11px] text-[#6C757D]">{showing}</span>
           <div className="flex items-center gap-0.5">
             <button
-              className="px-2 h-6 rounded-sm border border-[#B0B0B0] hover:bg-[#E8E8E8] disabled:opacity-40 disabled:cursor-not-allowed text-[11px] transition-colors"
+              className="px-2 h-6 rounded-sm hover:bg-[#E8E8E8] disabled:opacity-40 disabled:cursor-not-allowed text-[11px] transition-colors"
+              style={winBevel()}
               disabled={page <= 1}
               onClick={() => onPageChange(page - 1)}
             >
@@ -388,15 +403,15 @@ export function DataTable<T>({
             </button>
             {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
               const p = i + 1
+              const isCurrent = p === page
               return (
                 <button
                   key={p}
                   className={cn(
-                    'w-6 h-6 rounded-sm text-[11px] transition-colors border',
-                    p === page
-                      ? 'bg-[#1B3A6B] text-white border-[#1B3A6B]'
-                      : 'border-[#B0B0B0] hover:bg-[#E8E8E8] text-[#212529]',
+                    'w-6 h-6 rounded-sm text-[11px] transition-colors',
+                    isCurrent ? 'bg-[#1B3A6B] text-white' : 'hover:bg-[#E8E8E8] text-[#212529]',
                   )}
+                  style={winBevel(isCurrent)}
                   onClick={() => onPageChange(p)}
                 >
                   {p}
@@ -404,7 +419,8 @@ export function DataTable<T>({
               )
             })}
             <button
-              className="px-2 h-6 rounded-sm border border-[#B0B0B0] hover:bg-[#E8E8E8] disabled:opacity-40 disabled:cursor-not-allowed text-[11px] transition-colors"
+              className="px-2 h-6 rounded-sm hover:bg-[#E8E8E8] disabled:opacity-40 disabled:cursor-not-allowed text-[11px] transition-colors"
+              style={winBevel()}
               disabled={page >= totalPages}
               onClick={() => onPageChange(page + 1)}
             >

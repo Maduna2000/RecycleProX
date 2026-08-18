@@ -25,7 +25,7 @@ import {
 } from '@/lib/schemas/customer'
 import {
   inp, lbl, HEADER_GRAD, NAVY,
-  Btn, TabStrip, PortalPage,
+  Btn, TabStrip, PortalPage, winBevel,
   RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter,
 } from '@/components/rpx'
 
@@ -173,16 +173,11 @@ export default function CustomerDetailPage() {
 
   return (
     // Capped and centered to 960px (see src/lib/pageWidthCaps.ts, which
-    // PageTitleBar reads to cap/border itself to match). No top border/
-    // radius on ContentCard — PageTitleBar already draws the top edge and
-    // its own bottom border serves as the seam between the two (this page
-    // has no PortalPage tab row in between, unlike e.g. police-register), so
-    // the box continues seamlessly below it rather than doubling the line.
-    <PortalPage
-      title={fullName}
-      maxWidth={960}
-      cardStyle={{ borderTop: 'none', borderTopLeftRadius: 0, borderTopRightRadius: 0 }}
-    >
+    // PageTitleBar reads to cap/border itself to match). ContentCard's own
+    // default already drops its top border/radius when there's no
+    // PortalPage tab row (unlike e.g. police-register) — PageTitleBar draws
+    // the top edge and the box continues seamlessly below it.
+    <PortalPage title={fullName} maxWidth={960}>
       <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, background: '#fff' }}>
       {/* ── Sub-header ────────────────────────────────────────────────────────── */}
       <div style={{ padding: '6px 10px', borderBottom: '1px solid #E0E0E0', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
@@ -465,7 +460,7 @@ export default function CustomerDetailPage() {
                   disabled={!isEditing || saving}
                   rows={5}
                   style={{
-                    width: '100%', borderRadius: 2, border: '1px solid #ABABAB',
+                    width: '100%', borderRadius: 2, ...winBevel(true),
                     padding: '7px', fontSize: 12, resize: 'vertical', minHeight: 80,
                     background: isEditing ? '#fff' : '#F5F5F5',
                     color: isEditing ? '#212529' : '#6C757D',

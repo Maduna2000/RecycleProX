@@ -10,7 +10,7 @@ import { useOfflineStore } from '@/stores/offlineStore'
 import { triggerSync, getPendingCount } from '@/lib/offline/sync'
 import { runSeeder } from '@/lib/offline/seeder'
 import { DEFAULT_POLICE_SERVICE_NAME, DEFAULT_POLICE_LEGAL_NOTE } from '@/lib/police-defaults'
-import { inp, HEADER_GRAD, NAVY, Btn, Field, PortalPage } from '@/components/rpx'
+import { inp, HEADER_GRAD, NAVY, Btn, Field, PortalPage, winBevel } from '@/components/rpx'
 import { TradeCommoditiesModal } from './_components/TradeCommoditiesModal'
 import { fetcher } from '@/lib/swrFetcher'
 
@@ -100,7 +100,7 @@ function LogoSection({ logoKey }: { logoKey?: string }) {
           {/* Preview on a checker background so transparency is visible */}
           <div style={{
             width: 180, height: 72, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            border: '1px solid #ABABAB', borderRadius: 2,
+            borderRadius: 2, ...winBevel(true),
             backgroundImage: 'linear-gradient(45deg,#ddd 25%,transparent 25%,transparent 75%,#ddd 75%),linear-gradient(45deg,#ddd 25%,#fff 25%,#fff 75%,#ddd 75%)',
             backgroundSize: '12px 12px', backgroundPosition: '0 0, 6px 6px',
           }}>
@@ -470,7 +470,7 @@ export default function SettingsPage() {
                       </datalist>
                       <button
                         onClick={detectPorts} disabled={detectingPorts}
-                        style={{ height: 26, padding: '0 6px', borderRadius: 2, border: '1px solid #ABABAB', background: '#F5F5F5', color: '#6C757D', cursor: 'pointer', display: 'flex', alignItems: 'center', opacity: detectingPorts ? 0.5 : 1 }}
+                        style={{ height: 26, padding: '0 6px', borderRadius: 2, background: '#F5F5F5', color: '#6C757D', cursor: 'pointer', display: 'flex', alignItems: 'center', opacity: detectingPorts ? 0.5 : 1, ...winBevel() }}
                         title="Auto-detect"
                       >
                         <RefreshCw className={`w-3 h-3 ${detectingPorts ? 'animate-spin' : ''}`} />
@@ -503,7 +503,7 @@ export default function SettingsPage() {
                         </datalist>
                         <button
                           onClick={detectNetworkPrinters} disabled={scanningNetwork}
-                          style={{ height: 26, padding: '0 6px', borderRadius: 2, border: '1px solid #ABABAB', background: '#F5F5F5', color: '#6C757D', cursor: 'pointer', display: 'flex', alignItems: 'center', opacity: scanningNetwork ? 0.5 : 1 }}
+                          style={{ height: 26, padding: '0 6px', borderRadius: 2, background: '#F5F5F5', color: '#6C757D', cursor: 'pointer', display: 'flex', alignItems: 'center', opacity: scanningNetwork ? 0.5 : 1, ...winBevel() }}
                           title="Scan network"
                         >
                           <RefreshCw className={`w-3 h-3 ${scanningNetwork ? 'animate-spin' : ''}`} />

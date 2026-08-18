@@ -41,7 +41,8 @@ function SelectTrigger({
       data-slot="select-trigger"
       data-size={size}
       className={cn(
-        "flex w-fit items-center justify-between gap-1.5 rounded-[2px] border border-[#ABABAB] bg-white py-2 pr-2 pl-2.5 text-sm whitespace-nowrap shadow-none transition-colors outline-none select-none focus-visible:border-[#0078D7] focus-visible:ring-0 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 data-placeholder:text-muted-foreground data-[size=default]:h-8 data-[size=sm]:h-7 *:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-1.5 dark:bg-input/30 dark:hover:bg-input/50 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        // Sunken (winBevel(true)) — see input.tsx for the same treatment.
+        "flex w-fit items-center justify-between gap-1.5 rounded-[2px] border-t border-l border-r border-b border-t-[#B0B0B0] border-l-[#B0B0B0] border-r-white border-b-white bg-white py-2 pr-2 pl-2.5 text-sm whitespace-nowrap shadow-none transition-colors outline-none select-none focus-visible:border-[#0078D7] focus-visible:ring-0 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 data-placeholder:text-muted-foreground data-[size=default]:h-8 data-[size=sm]:h-7 *:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-1.5 dark:bg-input/30 dark:hover:bg-input/50 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
         className
       )}
       {...props}
@@ -83,7 +84,7 @@ function SelectContent({
         <SelectPrimitive.Popup
           data-slot="select-content"
           data-align-trigger={alignItemWithTrigger}
-          className={cn("relative isolate z-50 max-h-[var(--available-height)] w-[var(--anchor-width)] origin-[var(--transform-origin)] overflow-x-hidden overflow-y-auto rounded-[2px] border border-[#B0B0B0] bg-white text-popover-foreground shadow-[0_4px_12px_rgba(0,0,0,0.15)] duration-100 data-[align-trigger=true]:animate-none data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0", className )}
+          className={cn("relative isolate z-50 max-h-[var(--available-height)] w-[var(--anchor-width)] origin-[var(--transform-origin)] overflow-x-hidden overflow-y-auto rounded-[2px] border-t border-l border-r border-b border-t-white border-l-white border-r-[#B0B0B0] border-b-[#B0B0B0] bg-white text-popover-foreground shadow-[2px_2px_6px_rgba(0,0,0,0.3)] duration-100 data-[align-trigger=true]:animate-none data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0", className )}
           {...props}
         >
           <SelectScrollUpButton />

@@ -12,7 +12,7 @@ import { StatusBadge as SharedStatusBadge } from '@/components/ui/DataTable'
 import { fetcher } from '@/lib/swrFetcher'
 import {
   inp, lbl, TH, TD, HEADER_GRAD, NAVY,
-  Btn, Field, EmptyHint, PortalPage,
+  Btn, Field, EmptyHint, PortalPage, winBevel,
   RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter,
 } from '@/components/rpx'
 import { useSignatureCanvas } from '@/hooks/useSignatureCanvas'
@@ -508,7 +508,7 @@ function SignatureDialog({
           <p style={{ fontSize: 12.5, color: colors.textSecondary, margin: '0 0 10px' }}>
             Ask the officer to sign below using a mouse or touchscreen.
           </p>
-          <div style={{ border: '1px solid #ABABAB', borderRadius: 2, overflow: 'hidden', background: '#fff' }}>
+          <div style={{ borderRadius: 2, overflow: 'hidden', background: '#fff', ...winBevel(true) }}>
             <canvas
               ref={canvasRef}
               width={480}

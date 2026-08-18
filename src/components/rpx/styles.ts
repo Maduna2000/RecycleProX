@@ -35,15 +35,58 @@ export const CARD_BORDER = '1px solid #B0B0B0'
 export const NAVY_GLOSS_GRAD = 'linear-gradient(180deg,#1e4a8a 0%,#1B3A6B 100%)'
 export const NAVY_GLOSS_BEVEL = 'inset 0 1px 0 rgba(255,255,255,0.22), inset 0 -2px 3px rgba(0,0,0,0.22)'
 /** Same bevel shape as NAVY_GLOSS_BEVEL, tuned for light grey/white chrome
- * (buttons, dialog/panel title bars, table headers) rather than dark navy. */
+ * (dialog/panel title bars, table headers) rather than dark navy. */
 export const GLOSS_BEVEL = 'inset 0 1px 0 rgba(255,255,255,0.85), inset 0 -2px 4px rgba(0,0,0,0.10)'
 
-/** Standard 30px input / select / textarea skin. */
+/**
+ * Real Win32-style raised/pressed bevel — hard 1px border-color pairs
+ * instead of a soft box-shadow standing in for one, the way an actual
+ * Windows button or title bar is built. No new colors: the light edge is
+ * `colors.surface` (white), the dark edge is the same `#B0B0B0` already
+ * used everywhere as CARD_BORDER.
+ *
+ * Raised (idle): light top/left, dark bottom/right — reads as popping out.
+ * Pressed (active/selected): inverted — reads as pushed in.
+ *
+ * Used by Btn, PageTitleBar, RpxDialogHeader, and WindowTaskbar tabs.
+ */
+export function winBevel(pressed = false): React.CSSProperties {
+  const light = colors.surface
+  const dark  = '#B0B0B0'
+  return pressed
+    ? { borderTop: `1px solid ${dark}`, borderLeft: `1px solid ${dark}`, borderRight: `1px solid ${light}`, borderBottom: `1px solid ${light}` }
+    : { borderTop: `1px solid ${light}`, borderLeft: `1px solid ${light}`, borderRight: `1px solid ${dark}`, borderBottom: `1px solid ${dark}` }
+}
+
+/** Same idea as winBevel, tuned for a dark navy surface (the open-windows
+ * taskbar) — a light gray/white edge would be nearly invisible or look like
+ * a stray highlight against navy, so this uses white/black tint pairs
+ * already used elsewhere for dark-chrome bevels (NAVY_GLOSS_BEVEL). */
+export function winBevelDark(pressed = false): React.CSSProperties {
+  const light = 'rgba(255,255,255,0.25)'
+  const dark  = 'rgba(0,0,0,0.35)'
+  return pressed
+    ? { borderTop: `1px solid ${dark}`, borderLeft: `1px solid ${dark}`, borderRight: `1px solid ${light}`, borderBottom: `1px solid ${light}` }
+    : { borderTop: `1px solid ${light}`, borderLeft: `1px solid ${light}`, borderRight: `1px solid ${dark}`, borderBottom: `1px solid ${dark}` }
+}
+
+/** Title-bar/header title text — shared by PageTitleBar (module pages) and
+ * RpxDialogHeader (dialogs) so both "window" surfaces render provably
+ * identical title typography instead of two separately hand-tuned values. */
+export const windowTitleText: React.CSSProperties = {
+  fontSize: 13, fontWeight: 700, color: NAVY,
+}
+
+/** Standard 30px input / select / textarea skin — sunken (winBevel(true)),
+ * the way a real Win32 text field is recessed into the page rather than
+ * sitting flat on top of it. Same visual family as the raised buttons: this
+ * is the "pressed in, waiting for data" counterpart. */
 export const inp: React.CSSProperties = {
   height: 30, width: '100%', borderRadius: 2,
-  border: '1px solid #ABABAB', padding: '0 8px',
+  padding: '0 8px',
   fontSize: 13, color: colors.textPrimary, outline: 'none',
   background: '#fff', boxSizing: 'border-box',
+  ...winBevel(true),
 }
 
 /** 10px uppercase field label. */
@@ -66,40 +109,52 @@ export const TD: React.CSSProperties = {
 }
 
 /**
- * Legacy Windows-style grey button — the house style for every Btn variant.
- * Flat grey fill (BAR_GRAD) with a #B0B0B0 border, the way real legacy
- * dialogs looked; severity/emphasis is signalled by label, weight, and text
- * colour rather than a solid colour block.
+ * Legacy Win32-style grey button — the house style for every Btn variant.
+ * Flat grey fill (BAR_GRAD) with a real raised bevel (winBevel), the way an
+ * actual Windows button is built; severity/emphasis is signalled by label,
+ * weight, and text colour rather than a solid colour block. Fixed height
+ * (not padding-derived) so every button on a page shares the same box
+ * regardless of label length.
  */
 export const btnPrimary: React.CSSProperties = {
-  display: 'inline-flex', alignItems: 'center', gap: 6,
-  fontSize: 12, fontWeight: 700, padding: '7px 16px',
-  background: BAR_GRAD, color: colors.textPrimary, border: CARD_BORDER,
+  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+  height: 30, fontSize: 12, fontWeight: 700, padding: '0 16px',
+  background: BAR_GRAD, color: colors.textPrimary,
   borderRadius: 3, cursor: 'pointer',
-  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.6)',
+  ...winBevel(),
 }
 
 /** Grey secondary button — pairs with the (also grey) primary. Same 3px
  * radius as btnPrimary (previously 2px — the two variants disagreed). */
 export const btnSecondary: React.CSSProperties = {
-  display: 'inline-flex', alignItems: 'center', gap: 5,
-  fontSize: 11, fontWeight: 600, padding: '5px 12px',
-  background: BAR_GRAD, color: colors.textPrimary, border: CARD_BORDER,
+  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+  height: 30, fontSize: 11, fontWeight: 600, padding: '0 12px',
+  background: BAR_GRAD, color: colors.textPrimary,
   borderRadius: 3, cursor: 'pointer',
-  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.6)',
+  ...winBevel(),
 }
 
 /** Destructive button — same grey fill, red label instead of a solid red block. */
 export const btnDanger: React.CSSProperties = {
   ...btnSecondary,
-  background: BAR_GRAD, color: colors.danger, border: CARD_BORDER,
+  background: BAR_GRAD, color: colors.danger,
+}
+
+/** Same raised bevel, inverted — the "pushed in" look Btn swaps to on
+ * mousedown, and what a pressed/active toggle state should reuse. */
+export const btnPressed: React.CSSProperties = {
+  ...winBevel(true),
+  background: 'linear-gradient(180deg,#D4D4D4 0%,#EAEAEA 100%)',
+  transform: 'translateY(1px)',
 }
 
 /**
  * Panel chrome for grid-tile layouts (Cash-Up, Float, …) — matches
- * ContentCard/Dialog exactly (#B0B0B0 border, BAR_GRAD title strip) but,
- * unlike ContentCard, isn't hard-coded to a single full-bleed page body, so
- * it can be reused as one of several independently-sized tiles in a grid.
+ * ContentCard/Dialog exactly (raised winBevel border, BAR_GRAD title strip)
+ * but, unlike ContentCard, isn't hard-coded to a single full-bleed page
+ * body, so it can be reused as one of several independently-sized tiles in
+ * a grid. Whole panel reads as one raised window (same as RpxDialogContent)
+ * — PANEL_HEAD inside it is a flat strip, not a second nested bevel.
  */
-export const PANEL: React.CSSProperties = { border: CARD_BORDER, borderRadius: 3, overflow: 'hidden', background: '#fff' }
-export const PANEL_HEAD: React.CSSProperties = { padding: '5px 10px', borderBottom: CARD_BORDER, background: BAR_GRAD, boxShadow: GLOSS_BEVEL }
+export const PANEL: React.CSSProperties = { borderRadius: 3, overflow: 'hidden', background: '#fff', ...winBevel() }
+export const PANEL_HEAD: React.CSSProperties = { padding: '5px 10px', borderBottom: CARD_BORDER, background: BAR_GRAD }

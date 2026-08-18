@@ -13,7 +13,7 @@ import { PrintResultModal } from '@/components/PrintResultModal'
 import { ProductCategoryPicker } from '@/components/products/ProductCategoryPicker'
 import Decimal from 'decimal.js'
 import { colors } from '@/lib/design-tokens'
-import { HEADER_GRAD, BAR_GRAD, Btn } from '@/components/rpx'
+import { HEADER_GRAD, BAR_GRAD, Btn, winBevel } from '@/components/rpx'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { useOfflineMutation } from '@/hooks/useOfflineFetch'
 import { useOfflineLookup } from '@/hooks/useOfflineLookup'
@@ -781,7 +781,7 @@ export function PurchaseForm({ editingPurchase }: { editingPurchase?: EditingPur
 
   // ─── Shared styles ────────────────────────────────────────────────────────
   const cellInput      = 'w-full px-1.5 py-0.5 text-[11px] font-mono border rounded-[2px] bg-white focus:outline-none focus:border-[#185ABD]'
-  const cellInputStyle = { borderColor: '#ABABAB', color: '#212529' }
+  const cellInputStyle = { color: '#212529', ...winBevel(true) }
   const headerBg       = { background: HEADER_GRAD, borderBottom: '2px solid #B0B0B0' }
 
   // ─── Render ───────────────────────────────────────────────────────────────
@@ -851,7 +851,7 @@ export function PurchaseForm({ editingPurchase }: { editingPurchase?: EditingPur
                   onChange={(e) => setScaleOrderSearch(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') handleLoadScaleOrder() }}
                   placeholder="Scale Order #"
-                  style={{ width: 110, fontSize: 11, padding: '2px 6px', border: '1px solid #ABABAB', borderRadius: 2, outline: 'none' }}
+                  style={{ width: 110, fontSize: 11, padding: '2px 6px', borderRadius: 2, outline: 'none', ...winBevel(true) }}
                 />
                 <button
                   type="button"
@@ -871,13 +871,13 @@ export function PurchaseForm({ editingPurchase }: { editingPurchase?: EditingPur
             <input
               value={grvNumber}
               onChange={(e) => setGrvNumber(e.target.value)}
-              style={{ width: 72, fontSize: 11, padding: '2px 6px', border: '1px solid #ABABAB', borderRadius: 2, outline: 'none' }}
+              style={{ width: 72, fontSize: 11, padding: '2px 6px', borderRadius: 2, outline: 'none', ...winBevel(true) }}
             />
             <label style={{ fontSize: 11, fontWeight: 600, color: '#374151' }}>Invoice No</label>
             <input
               value={invoiceNo}
               onChange={(e) => setInvoiceNo(e.target.value)}
-              style={{ width: 72, fontSize: 11, padding: '2px 6px', border: '1px solid #ABABAB', borderRadius: 2, outline: 'none' }}
+              style={{ width: 72, fontSize: 11, padding: '2px 6px', borderRadius: 2, outline: 'none', ...winBevel(true) }}
             />
           </div>
 
@@ -938,12 +938,12 @@ export function PurchaseForm({ editingPurchase }: { editingPurchase?: EditingPur
                     )}
                     {!showAllProducts && (customer.tradeCommodities?.length ?? 0) > 0 && (
                       <button onClick={() => setShowAllProducts(true)}
-                        style={{ fontSize: 10, padding: '1px 6px', border: '1px solid #ABABAB', borderRadius: 2, color: '#6C757D', background: 'none', cursor: 'pointer' }}>
+                        style={{ fontSize: 10, padding: '1px 6px', borderRadius: 2, color: '#6C757D', background: 'none', cursor: 'pointer', ...winBevel() }}>
                         Show All Products
                       </button>
                     )}
                     <button onClick={() => setCustomer(null)}
-                      style={{ fontSize: 10, padding: '1px 8px', border: '1px solid #ABABAB', borderRadius: 2, color: '#6C757D', background: 'none', cursor: 'pointer', marginLeft: 'auto' }}>
+                      style={{ fontSize: 10, padding: '1px 8px', borderRadius: 2, color: '#6C757D', background: 'none', cursor: 'pointer', marginLeft: 'auto', ...winBevel() }}>
                       Change
                     </button>
                   </div>
@@ -992,7 +992,7 @@ export function PurchaseForm({ editingPurchase }: { editingPurchase?: EditingPur
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Any remarks…"
-              style={{ flex: 1, fontSize: 12, padding: '2px 8px', border: '1px solid #ABABAB', borderRadius: 2, color: '#212529', outline: 'none' }}
+              style={{ flex: 1, fontSize: 12, padding: '2px 8px', borderRadius: 2, color: '#212529', outline: 'none', ...winBevel(true) }}
             />
           </div>
 
@@ -1148,8 +1148,8 @@ export function PurchaseForm({ editingPurchase }: { editingPurchase?: EditingPur
                         style={{
                           height: 24, width: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 2, cursor: 'pointer',
                           ...(line.weighMode
-                            ? { background: '#185ABD', color: '#fff', border: 'none' }
-                            : { border: '1px solid #ABABAB', color: '#6C757D', background: 'transparent' }),
+                            ? { background: '#185ABD', color: '#fff', ...winBevel(true) }
+                            : { color: '#6C757D', background: 'transparent', ...winBevel() }),
                         }}
                       >
                         <Scale style={{ width: 12, height: 12 }} />
@@ -1180,7 +1180,7 @@ export function PurchaseForm({ editingPurchase }: { editingPurchase?: EditingPur
                             value={line.selectedScale}
                             onValueChange={(v) => patchLine(line.key, { selectedScale: v as '1' | '2' | '3' })}
                           >
-                            <SelectTrigger className="h-6 w-24 text-[11px]" style={{ borderColor: '#ABABAB' }}>
+                            <SelectTrigger className="h-6 w-24 text-[11px]" style={winBevel(true)}>
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -1199,7 +1199,7 @@ export function PurchaseForm({ editingPurchase }: { editingPurchase?: EditingPur
                               type="number" step="0.001" placeholder="0.000"
                               value={line.grossQty}
                               onChange={(e) => recomputeNet(line.key, e.target.value, line.tareQty, line.deductionQty)}
-                              style={{ height: 24, width: 76, borderRadius: 2, border: '1px solid #ABABAB', padding: '0 6px', fontSize: 11, fontFamily: 'monospace', outline: 'none' }}
+                              style={{ height: 24, width: 76, borderRadius: 2, padding: '0 6px', fontSize: 11, fontFamily: 'monospace', outline: 'none', ...winBevel(true) }}
                             />
                             <button
                               type="button"
@@ -1220,13 +1220,13 @@ export function PurchaseForm({ editingPurchase }: { editingPurchase?: EditingPur
                               type="number" step="0.001" placeholder="0.000"
                               value={line.tareQty}
                               onChange={(e) => recomputeNet(line.key, line.grossQty, e.target.value, line.deductionQty)}
-                              style={{ height: 24, width: 76, borderRadius: 2, border: '1px solid #ABABAB', padding: '0 6px', fontSize: 11, fontFamily: 'monospace', outline: 'none' }}
+                              style={{ height: 24, width: 76, borderRadius: 2, padding: '0 6px', fontSize: 11, fontFamily: 'monospace', outline: 'none', ...winBevel(true) }}
                             />
                             <button
                               type="button"
                               disabled={line.weighingTare}
                               onClick={() => handleWeighTare(line)}
-                              style={{ height: 24, padding: '0 6px', borderRadius: 2, border: '1px solid #ABABAB', background: '#fff', color: '#6C757D', cursor: 'pointer', display: 'flex', alignItems: 'center', opacity: line.weighingTare ? 0.6 : 1 }}
+                              style={{ height: 24, padding: '0 6px', borderRadius: 2, background: '#fff', color: '#6C757D', cursor: 'pointer', display: 'flex', alignItems: 'center', opacity: line.weighingTare ? 0.6 : 1, ...winBevel() }}
                             >
                               {line.weighingTare ? <Loader2 style={{ width: 12, height: 12, animation: 'spin 1s linear infinite' }} /> : <RefreshCw style={{ width: 12, height: 12 }} />}
                             </button>
@@ -1258,7 +1258,7 @@ export function PurchaseForm({ editingPurchase }: { editingPurchase?: EditingPur
                               const paid = Decimal.max(net.minus(new Decimal(e.target.value || '0')), new Decimal('0'))
                               patchLine(line.key, { deductionQty: e.target.value, quantity: paid.toFixed(2) })
                             }}
-                            style={{ height: 24, width: 76, borderRadius: 2, border: '1px solid #ABABAB', padding: '0 6px', fontSize: 11, fontFamily: 'monospace', outline: 'none' }}
+                            style={{ height: 24, width: 76, borderRadius: 2, padding: '0 6px', fontSize: 11, fontFamily: 'monospace', outline: 'none', ...winBevel(true) }}
                           />
                         </div>
 
@@ -1278,7 +1278,7 @@ export function PurchaseForm({ editingPurchase }: { editingPurchase?: EditingPur
                               placeholder="e.g. Bag…"
                               value={line.tareReason}
                               onChange={(e) => patchLine(line.key, { tareReason: e.target.value })}
-                              style={{ height: 24, width: 100, borderRadius: 2, border: '1px solid #ABABAB', padding: '0 6px', fontSize: 11, outline: 'none' }}
+                              style={{ height: 24, width: 100, borderRadius: 2, padding: '0 6px', fontSize: 11, outline: 'none', ...winBevel(true) }}
                             />
                           </div>
                         )}
@@ -1290,7 +1290,7 @@ export function PurchaseForm({ editingPurchase }: { editingPurchase?: EditingPur
                               placeholder="e.g. Contamination…"
                               value={line.deductionReason}
                               onChange={(e) => patchLine(line.key, { deductionReason: e.target.value })}
-                              style={{ height: 24, width: 120, borderRadius: 2, border: '1px solid #ABABAB', padding: '0 6px', fontSize: 11, outline: 'none' }}
+                              style={{ height: 24, width: 120, borderRadius: 2, padding: '0 6px', fontSize: 11, outline: 'none', ...winBevel(true) }}
                             />
                           </div>
                         )}
@@ -1433,7 +1433,7 @@ export function PurchaseForm({ editingPurchase }: { editingPurchase?: EditingPur
                         </button>
                         <button
                           onClick={() => { setVoidId(null); setVoidReason('') }}
-                          style={{ height: 24, padding: '0 8px', fontSize: 11, background: 'none', border: '1px solid #ABABAB', borderRadius: 2, cursor: 'pointer', color: '#6C757D' }}
+                          style={{ height: 24, padding: '0 8px', fontSize: 11, background: 'none', borderRadius: 2, cursor: 'pointer', color: '#6C757D', ...winBevel() }}
                         >
                           Cancel
                         </button>

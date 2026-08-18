@@ -11,7 +11,7 @@ import type { ReportCatalogEntry, FilterSpec } from '@/lib/reports/catalog'
 import { DEALER_CATEGORY_OPTIONS } from '@/lib/reports/catalog'
 import type { ReportDocument } from '@/lib/reports/types'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
-import { PANEL, PANEL_HEAD, NAVY, inp, lbl } from '@/components/rpx'
+import { PANEL, PANEL_HEAD, NAVY, inp, lbl, winBevel } from '@/components/rpx'
 import { ActionButton } from './ActionButton'
 import { DateRangeFilter } from './DateRangeFilter'
 import { DownloadButtons } from './DownloadButtons'
@@ -77,8 +77,8 @@ function CustomerSearchSelect({
       <div
         style={{
           display: 'flex', alignItems: 'center', height: 30,
-          borderRadius: 2, border: `1px solid ${active ? NAVY : '#ABABAB'}`,
-          background: active ? '#EBF3FC' : '#fff',
+          borderRadius: 2, background: active ? '#EBF3FC' : '#fff',
+          ...winBevel(true),
         }}
       >
         <input
@@ -115,7 +115,8 @@ function CustomerSearchSelect({
         <div
           style={{
             position: 'absolute', zIndex: 20, marginTop: 2, width: '100%', maxHeight: 224, overflowY: 'auto',
-            borderRadius: 2, border: '1px solid #B0B0B0', background: '#fff', boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+            borderRadius: 2, background: '#fff', boxShadow: '2px 2px 6px rgba(0,0,0,0.3)',
+            ...winBevel(),
           }}
         >
           {data!.customers.map((c) => (
@@ -166,7 +167,13 @@ function FilterSelect({
       onChange={(e) => onChange(e.target.value)}
       style={{
         ...inp, width: 'auto', minWidth: 170, cursor: 'pointer',
-        borderColor: active ? NAVY : '#ABABAB',
+        // Same sunken structure as `inp`, but the dark corner of the bevel
+        // swaps to navy when active — keeps the "tinted fill + navy
+        // border" active signal without flattening the bevel back to a
+        // uniform borderColor (which would erase the raised/sunken edge).
+        borderTop: `1px solid ${active ? NAVY : '#B0B0B0'}`,
+        borderLeft: `1px solid ${active ? NAVY : '#B0B0B0'}`,
+        borderRight: '1px solid #FFFFFF', borderBottom: '1px solid #FFFFFF',
         background: active ? '#EBF3FC' : '#fff',
         color: active ? colors.textPrimary : colors.textSecondary,
         fontWeight: active ? fontWeight.medium : fontWeight.regular,
@@ -264,7 +271,9 @@ function TextFilter({
         placeholder="Type to filter…"
         style={{
           ...inp, width: 170,
-          borderColor: active ? NAVY : '#ABABAB',
+          borderTop: `1px solid ${active ? NAVY : '#B0B0B0'}`,
+          borderLeft: `1px solid ${active ? NAVY : '#B0B0B0'}`,
+          borderRight: '1px solid #FFFFFF', borderBottom: '1px solid #FFFFFF',
           background: active ? '#EBF3FC' : '#fff',
           color: active ? colors.textPrimary : colors.textSecondary,
           fontWeight: active ? fontWeight.medium : fontWeight.regular,

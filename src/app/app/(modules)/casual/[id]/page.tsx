@@ -8,7 +8,7 @@ import { toast } from 'sonner'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { inp, lbl, HEADER_GRAD, NAVY, Btn, TabStrip, PortalPage } from '@/components/rpx'
+import { inp, lbl, HEADER_GRAD, NAVY, Btn, TabStrip, PortalPage, winBevel } from '@/components/rpx'
 import { colors } from '@/lib/design-tokens'
 import { TransactionsTab } from '@/components/customers/TransactionsTab'
 import { DocumentsTab } from '@/components/customers/DocumentsTab'
@@ -122,13 +122,9 @@ export default function CasualCustomerDetailPage() {
   return (
     // Capped and centered to 960px, same as the account customer detail
     // page (src/lib/pageWidthCaps.ts, which PageTitleBar reads to cap/
-    // border itself to match). No top border/radius on ContentCard —
-    // PageTitleBar already draws the top edge.
-    <PortalPage
-      title={fullName}
-      maxWidth={960}
-      cardStyle={{ borderTop: 'none', borderTopLeftRadius: 0, borderTopRightRadius: 0 }}
-    >
+    // border itself to match). ContentCard's own default already drops its
+    // top border/radius when there's no PortalPage tab row.
+    <PortalPage title={fullName} maxWidth={960}>
       <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, background: '#fff' }}>
       {/* ── Sub-header ────────────────────────────────────────────────────────── */}
       <div style={{ padding: '6px 10px', borderBottom: '1px solid #E0E0E0', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
@@ -215,7 +211,7 @@ export default function CasualCustomerDetailPage() {
                   disabled={!isEditing || saving}
                   rows={5}
                   style={{
-                    width: '100%', borderRadius: 2, border: '1px solid #ABABAB',
+                    width: '100%', borderRadius: 2, ...winBevel(true),
                     padding: '7px', fontSize: 12, resize: 'vertical', minHeight: 80,
                     background: isEditing ? '#fff' : '#F5F5F5',
                     color: isEditing ? '#212529' : '#6C757D',

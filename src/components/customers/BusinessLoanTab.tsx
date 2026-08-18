@@ -13,7 +13,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { DataTable, type Column } from '@/components/ui/DataTable'
 import { format } from '@/lib/utils/format'
 import { colors } from '@/lib/design-tokens'
-import { HEADER_GRAD, lbl, Btn, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
+import { HEADER_GRAD, lbl, Btn, winBevel, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
 import { fetcher } from '@/lib/swrFetcher'
 
 
@@ -266,7 +266,7 @@ export function BusinessLoanTab({ customerId, customerName, userRole }: Business
             type="month"
             value={period}
             onChange={(e) => setPeriod(e.target.value)}
-            style={{ fontSize: 11, padding: '3px 6px', border: '1px solid #ABABAB', borderRadius: 3, background: '#fff' }}
+            style={{ fontSize: 11, padding: '3px 6px', borderRadius: 3, background: '#fff', ...winBevel(true) }}
           />
         </label>
         <Btn

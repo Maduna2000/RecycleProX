@@ -18,7 +18,7 @@ import { fetcher } from '@/lib/swrFetcher'
 import { useOfflineLookup } from '@/hooks/useOfflineLookup'
 import {
   TH, TD, HEADER_GRAD,
-  Btn, PortalPage,
+  Btn, PortalPage, winBevel,
   RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter,
 } from '@/components/rpx'
 import { DataTable, StatusBadge, type Column, type RowAction } from '@/components/ui/DataTable'
@@ -435,8 +435,8 @@ function ManagePriceGroupModal({ groupId, onClose, onChanged }: {
                                     value={ov?.buy ?? ''}
                                     onChange={(e) => { setOverrides((prev) => ({ ...prev, [p.id]: { ...prev[p.id]!, buy: e.target.value } })); setDirty(true) }}
                                     disabled={!isManager}
-                                    className="h-5 text-xs font-mono border-[#ABABAB]"
-                                    style={{ width: 100 }}
+                                    className="h-5 text-xs font-mono"
+                                    style={{ width: 100, ...winBevel(true) }}
                                   />
                                 ) : (
                                   <span style={{ fontSize: 11, color: '#C0C0C0', fontFamily: 'monospace' }}>—</span>
@@ -448,8 +448,8 @@ function ManagePriceGroupModal({ groupId, onClose, onChanged }: {
                                     value={ov?.sell ?? ''}
                                     onChange={(e) => { setOverrides((prev) => ({ ...prev, [p.id]: { ...prev[p.id]!, sell: e.target.value } })); setDirty(true) }}
                                     disabled={!isManager}
-                                    className="h-5 text-xs font-mono border-[#ABABAB]"
-                                    style={{ width: 100 }}
+                                    className="h-5 text-xs font-mono"
+                                    style={{ width: 100, ...winBevel(true) }}
                                   />
                                 ) : (
                                   <span style={{ fontSize: 11, color: '#C0C0C0', fontFamily: 'monospace' }}>—</span>

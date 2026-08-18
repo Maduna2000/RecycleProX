@@ -27,7 +27,7 @@ import { getModuleName } from '@/lib/module-names'
 import { WindowTaskbar } from '@/components/ui/WindowTaskbar'
 import { useRecordTitle } from '@/hooks/useRecordTitle'
 import { useFeatureFlag } from '@/hooks/useFeatureFlags'
-import { Btn, BtnMenu, type BtnVariant, type BtnMenuItem, NAVY_GLOSS_GRAD, NAVY_GLOSS_BEVEL } from '@/components/rpx'
+import { Btn, BtnMenu, type BtnVariant, type BtnMenuItem, NAVY_GLOSS_GRAD, NAVY_GLOSS_BEVEL, winBevel } from '@/components/rpx'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -209,7 +209,10 @@ function UserMenu({ role, fullName }: { role: string; fullName: string }) {
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-xl border border-[#E0E0E0] py-1 z-50">
+          <div
+            className="absolute right-0 top-full mt-1 w-48 bg-white py-1 z-50"
+            style={{ borderRadius: 3, boxShadow: '2px 2px 6px rgba(0,0,0,0.3)', ...winBevel() }}
+          >
             <div className="px-4 py-2.5 border-b border-[#E0E0E0]">
               <p className="text-xs font-semibold text-[#212529]">{fullName}</p>
               <p className="text-[11px] text-[#6C757D] capitalize">{role}</p>
@@ -269,7 +272,10 @@ function ScalePopup() {
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full mt-1 w-56 bg-white rounded-sm shadow-2xl border border-[#E0E0E0] py-1.5 z-50">
+          <div
+            className="absolute right-0 top-full mt-1 w-56 bg-white rounded-sm py-1.5 z-50"
+            style={{ boxShadow: '2px 2px 6px rgba(0,0,0,0.3)', ...winBevel() }}
+          >
             <p className="px-3 pb-1.5 pt-0.5 text-[10px] font-semibold text-[#6C757D] uppercase tracking-widest border-b border-[#F1F3F4]">
               Scale Station
             </p>
@@ -327,7 +333,10 @@ function GatePopup() {
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full mt-1 w-56 bg-white rounded-sm shadow-2xl border border-[#E0E0E0] py-1.5 z-50">
+          <div
+            className="absolute right-0 top-full mt-1 w-56 bg-white rounded-sm py-1.5 z-50"
+            style={{ boxShadow: '2px 2px 6px rgba(0,0,0,0.3)', ...winBevel() }}
+          >
             <p className="px-3 pb-1.5 pt-0.5 text-[10px] font-semibold text-[#6C757D] uppercase tracking-widest border-b border-[#F1F3F4]">
               Guard Station
             </p>
@@ -492,16 +501,20 @@ function UpdateChip() {
 // ─── Taskbar ──────────────────────────────────────────────────────────────────
 
 function Taskbar() {
-  const [time, setTime] = useState(() => {
-    const now = new Date()
-    return `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
-  })
+  // Starts null on both server and client so the very first render (SSR and
+  // the client's pre-hydration pass) always matches — computing `new Date()`
+  // directly in the initializer instead ran on both sides independently and
+  // could disagree by a minute if hydration happened to straddle a minute
+  // boundary (React hydration error #418/#425). The real value is only set
+  // once mounted, a normal post-hydration update rather than a mismatch.
+  const [time, setTime] = useState<string | null>(null)
 
   useEffect(() => {
     const tick = () => {
       const now = new Date()
       setTime(`${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`)
     }
+    tick()
     const msUntilNextMinute = 60000 - (Date.now() % 60000)
     let interval: ReturnType<typeof setInterval>
     const timeout = setTimeout(() => {
@@ -519,7 +532,7 @@ function Taskbar() {
       <span className="flex-1 text-center text-[10px] text-white/50 font-medium tracking-wide select-none whitespace-nowrap">
         Renovo Pro Management Software &nbsp;·&nbsp; V1.0
       </span>
-      <span className="text-[11px] text-white/55 shrink-0 font-mono tabular-nums">{time}</span>
+      <span className="text-[11px] text-white/55 shrink-0 font-mono tabular-nums">{time ?? '--:--'}</span>
     </div>
   )
 }

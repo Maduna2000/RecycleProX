@@ -6,7 +6,7 @@ import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
 import { FileText } from 'lucide-react'
 import { fetcher } from '@/lib/swrFetcher'
-import { Btn, HEADER_GRAD, NAVY } from '@/components/rpx'
+import { Btn, HEADER_GRAD, NAVY, winBevel } from '@/components/rpx'
 import { DocumentViewerModal } from '@/components/ui/DocumentViewerModal'
 
 type CustomerDoc = {
@@ -139,7 +139,7 @@ export function DocumentsTab({ customerId }: { customerId: string }) {
           <select
             value={docType}
             onChange={(e) => setDocType(e.target.value)}
-            style={{ height: 26, borderRadius: 2, border: '1px solid #ABABAB', padding: '0 7px', fontSize: 12, color: '#212529', background: '#fff', outline: 'none' }}
+            style={{ height: 26, borderRadius: 2, padding: '0 7px', fontSize: 12, color: '#212529', background: '#fff', outline: 'none', ...winBevel(true) }}
           >
             {Object.entries(DOCUMENT_TYPE_LABELS).map(([v, l]) => (
               <option key={v} value={v}>{l}</option>

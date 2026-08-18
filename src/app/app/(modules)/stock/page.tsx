@@ -12,7 +12,7 @@ import { CategoryFilterSelect, useProductCategories } from '@/components/product
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
 import { fetcher } from '@/lib/swrFetcher'
 import {
-  inp, Btn, Field, PortalPage, FilterBar, BAR_GRAD, GLOSS_BEVEL,
+  inp, Btn, Field, PortalPage, FilterBar, BAR_GRAD, winBevel,
   RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter,
 } from '@/components/rpx'
 
@@ -317,8 +317,8 @@ export default function StockPage() {
 
 // ─── Manual Adjustment Modal ──────────────────────────────────────────────────
 
-/** Two-way legacy segmented toggle — same GLOSS_BEVEL chrome as the "Quick
- * range" control on the Reports date filter, not a modern pill/switch. */
+/** Two-way legacy segmented toggle — same sunken/pressed chrome as the
+ * "Quick range" control on the Reports date filter, not a modern pill/switch. */
 function ModeToggle<T extends string>({
   value,
   onChange,
@@ -349,9 +349,9 @@ function ModeToggle<T extends string>({
               background: active ? BAR_GRAD : colors.surface,
               color: active ? colors.textPrimary : colors.textSecondary,
               borderLeft: i === 0 ? 'none' : `1px solid ${colors.border}`,
-              boxShadow: active ? GLOSS_BEVEL : undefined,
               cursor: disabled ? 'default' : 'pointer',
               whiteSpace: 'nowrap',
+              ...(active ? winBevel(true) : {}),
             }}
           >
             {o.label}

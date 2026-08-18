@@ -12,11 +12,15 @@
 
 The user's complaint: pages "look like components combined together," not one window — the title bar visibly floats separately from the content card beneath it, everywhere except the few width-capped pages. Reference: MetaTrader 4's window/dialog/button/taskbar structure. Explicitly **not** a palette change — same NAVY/BAR_GRAD/CARD_BORDER tokens throughout, just applied consistently and with more pronounced 3D structure. Dashboard is explicitly excluded (it doesn't render `PageTitleBar` today and stays that way).
 
+**This is a real offline Windows desktop app (Electron), not a website with a retro theme applied to it** — the in-page title bars, buttons, dialogs, and taskbar are a *simulated* MDI system sitting inside Electron's real native window frame (per the May spec, Zone 1 deliberately has no window controls of its own — that's this simulated system's job), and that simulation needs to be authentic enough to read as a real Windows application, not as a web page decorated to look like one.
+
+**Design principle: crisp Win32 bevels, not soft CSS approximations.** Every raised/pressed surface (buttons, title bars, taskbar tabs) uses hard 1px solid border-color pairs — light on top/left, dark on bottom/right for raised, inverted for pressed — the way an actual Win32 button or title bar is built. No blurry `box-shadow` gradients standing in for a bevel; `GLOSS_BEVEL`'s soft inset shadows get replaced by real bordered edges wherever this design touches them. This is the fidelity bar for every section below, not just a stylistic preference.
+
 ---
 
 ## 1. Title bar + window fusion
 
-**`src/components/ui/PageTitleBar.tsx`** — always renders the same chrome dialogs already get (`BAR_GRAD` background, `GLOSS_BEVEL` shadow, `CARD_BORDER`, bold `NAVY` title text), not just on width-capped pages. The `widthCap !== null` branch currently gates whether a border/rounding is applied at all — that gate goes away; `widthCap` still controls max-width/centering, but the chrome (border, gradient, bevel, rounded top corners) becomes unconditional. Height increases from 28px to 34px to match the dialog header height it's now sharing chrome with.
+**`src/components/ui/PageTitleBar.tsx`** — always renders real window chrome, not just on width-capped pages: `BAR_GRAD` background, bold `NAVY` title text, and a hard-edged raised border (light top/left, dark bottom/right — not `GLOSS_BEVEL`'s soft inset shadow) instead of the current flat single-color `CARD_BORDER`. The `widthCap !== null` branch currently gates whether a border/rounding is applied at all — that gate goes away; `widthCap` still controls max-width/centering, but the chrome (border, gradient, bevel, rounded top corners) becomes unconditional. Height increases from 28px to 34px to match the dialog header height it's now sharing chrome with.
 
 The `[−]`/`[×]` controls move from bare hover-only icon buttons into a small bordered button group (reusing the new `Btn`-style bevel at a compact size), so they read as physical window controls rather than floating icons.
 
@@ -32,7 +36,7 @@ The `[−]`/`[×]` controls move from bare hover-only icon buttons into a small 
 
 ## 3. Dialogs / pop-outs
 
-Factor the title-bar chrome (gradient, bevel, border, title typography) that `PageTitleBar` and `RpxDialogHeader` (`src/components/rpx/Dialog.tsx`) both need into one shared definition, so the two are provably identical instead of two hand-tuned components that happen to match today. `RpxDialogFooter` buttons already use `Btn`, so they inherit the new bevel/press-state automatically. `RpxDialogHeader`'s close button gets the same bordered window-control treatment as `PageTitleBar`'s controls — no minimize button there (modals aren't minimizable), just the one close control restyled to match.
+Factor the title-bar chrome (gradient, hard-edged bevel border, title typography) that `PageTitleBar` and `RpxDialogHeader` (`src/components/rpx/Dialog.tsx`) both need into one shared definition, so the two are provably identical instead of two hand-tuned components that happen to match today — this also moves `RpxDialogHeader` off its current `GLOSS_BEVEL` soft shadow onto the same hard-edged border. `RpxDialogFooter` buttons already use `Btn`, so they inherit the new bevel/press-state automatically. `RpxDialogHeader`'s close button gets the same bordered window-control treatment as `PageTitleBar`'s controls — no minimize button there (modals aren't minimizable), just the one close control restyled to match.
 
 ## 4. Open-windows taskbar
 

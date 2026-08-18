@@ -89,8 +89,13 @@ main.rpx-content input[type="search"],
 main.rpx-content input[type="password"],
 main.rpx-content textarea,
 main.rpx-content select {
-  border: 1px solid #ABABAB;
-  box-shadow: inset 1px 1px 2px rgba(0, 0, 0, 0.12);
+  /* Sunken (winBevel(true)) — real hard-edge bevel border instead of a
+     soft inset box-shadow standing in for one, matching components/rpx's
+     inp/Btn treatment. */
+  border-top: 1px solid #B0B0B0;
+  border-left: 1px solid #B0B0B0;
+  border-right: 1px solid #FFFFFF;
+  border-bottom: 1px solid #FFFFFF;
   border-radius: 2px;
   background: #FFFFFF;
   font-size: 12px;

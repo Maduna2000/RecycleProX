@@ -1,8 +1,8 @@
 export {
   NAVY, HEADER_GRAD, BAR_GRAD, ACTION_GRAD, VIOLET_GRAD, CARD_BORDER,
-  NAVY_GLOSS_GRAD, NAVY_GLOSS_BEVEL, GLOSS_BEVEL,
+  NAVY_GLOSS_GRAD, NAVY_GLOSS_BEVEL, GLOSS_BEVEL, winBevel, winBevelDark, windowTitleText,
   inp, lbl, TH, TD,
-  btnPrimary, btnSecondary, btnDanger,
+  btnPrimary, btnSecondary, btnDanger, btnPressed,
   PANEL, PANEL_HEAD,
 } from './styles'
 export { Btn, type BtnProps, type BtnVariant } from './Btn'

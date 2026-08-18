@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react'
 import { ChevronRight, ChevronDown } from 'lucide-react'
+import { winBevel } from '@/components/rpx'
 
 export type PickerProduct = {
   id: string
@@ -76,11 +77,12 @@ export function ProductCategoryPicker({
         type="button"
         onClick={() => (open ? handleClose() : handleOpen())}
         style={{
-          height: 24, width: '100%', borderRadius: 2, border: '1px solid #ABABAB',
+          height: 24, width: '100%', borderRadius: 2,
           padding: '0 4px', fontSize: 11, color: '#212529',
           background: '#fff', outline: 'none', textAlign: 'left',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4,
           cursor: 'pointer',
+          ...winBevel(true),
           ...style,
         }}
       >
@@ -96,8 +98,9 @@ export function ProductCategoryPicker({
           <div
             style={{
               position: 'fixed', top: pos.top, bottom: pos.bottom, left: pos.left, width: pos.width,
-              zIndex: 50, background: '#fff', border: '1px solid #B0B0B0', borderRadius: 3,
-              boxShadow: '0 4px 12px rgba(0,0,0,0.15)', maxHeight: 320, overflowY: 'auto',
+              zIndex: 50, background: '#fff', borderRadius: 3,
+              boxShadow: '2px 2px 6px rgba(0,0,0,0.3)', maxHeight: 320, overflowY: 'auto',
+              ...winBevel(),
             }}
           >
             {categories.length === 0 ? (

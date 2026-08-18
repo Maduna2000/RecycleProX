@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { Loader2 } from 'lucide-react'
-import { btnPrimary, btnSecondary, btnDanger, BAR_GRAD } from './styles'
+import { btnPrimary, btnSecondary, btnDanger, btnPressed, BAR_GRAD, winBevel } from './styles'
 
 export type BtnVariant = 'primary' | 'secondary' | 'danger'
 export type BtnSize = 'md' | 'sm'
@@ -27,8 +27,20 @@ const BASE_BG: Record<BtnVariant, string> = {
   danger:    BAR_GRAD,
 }
 
-/** Compact scale — fits the 32px toolbar strip and dense rows. */
-const SM_OVERRIDE: React.CSSProperties = { fontSize: 11, padding: '4px 12px' }
+/** Compact scale — fits the 32px toolbar strip and dense rows. Fixed height
+ * (not padding-derived), same reasoning as the md size in styles.ts. */
+const SM_OVERRIDE: React.CSSProperties = { height: 24, fontSize: 11, padding: '0 12px' }
+
+/** Swaps a button element's raised bevel for the inverted/pushed-in one —
+ * imperative DOM writes, same pattern as the existing hover handlers below,
+ * since these are inline styles rather than CSS classes with :active. */
+function setBevel(el: HTMLElement, pressed: boolean) {
+  const bevel = winBevel(pressed)
+  el.style.borderTop    = bevel.borderTop    as string
+  el.style.borderLeft   = bevel.borderLeft   as string
+  el.style.borderRight  = bevel.borderRight  as string
+  el.style.borderBottom = bevel.borderBottom as string
+}
 
 export interface BtnProps {
   variant?:  BtnVariant
@@ -84,7 +96,27 @@ export function Btn({
     if (!inactive) e.currentTarget.style.background = hoverBg ?? HOVER_BG[variant]
   }
   const handleLeave = (e: React.MouseEvent<HTMLElement>) => {
-    if (!inactive) e.currentTarget.style.background = (style?.background as string) ?? BASE_BG[variant]
+    if (!inactive) {
+      e.currentTarget.style.background = (style?.background as string) ?? BASE_BG[variant]
+      e.currentTarget.style.transform = ''
+      setBevel(e.currentTarget, false)
+    }
+  }
+  // Real pressed feedback — the button visibly pushes in on click instead
+  // of only changing shade on hover.
+  const handleDown = (e: React.MouseEvent<HTMLElement>) => {
+    if (!inactive) {
+      e.currentTarget.style.background = btnPressed.background as string
+      e.currentTarget.style.transform = 'translateY(1px)'
+      setBevel(e.currentTarget, true)
+    }
+  }
+  const handleUp = (e: React.MouseEvent<HTMLElement>) => {
+    if (!inactive) {
+      e.currentTarget.style.background = hoverBg ?? HOVER_BG[variant]
+      e.currentTarget.style.transform = ''
+      setBevel(e.currentTarget, false)
+    }
   }
 
   const inner = (
@@ -107,6 +139,8 @@ export function Btn({
         onClick={onClick}
         onMouseEnter={handleEnter}
         onMouseLeave={handleLeave}
+        onMouseDown={handleDown}
+        onMouseUp={handleUp}
       >
         {inner}
       </Link>
@@ -123,6 +157,8 @@ export function Btn({
       onClick={onClick}
       onMouseEnter={handleEnter}
       onMouseLeave={handleLeave}
+      onMouseDown={handleDown}
+      onMouseUp={handleUp}
     >
       {inner}
     </button>
