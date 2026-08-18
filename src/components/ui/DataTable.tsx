@@ -202,8 +202,15 @@ export function DataTable<T>({
       {/* Table wrapper — square corners, sunken well (same hard-edge bevel
           as buttons/title bars, inverted: dark top/left, light bottom/right)
           so the grid reads as recessed into the page, the way a real Win32
-          data grid (e.g. MT4's Market Watch/Trade tables) is built. */}
-      <div className="flex-1 overflow-auto bg-white" style={{ borderRadius: 0, ...winBevel(true) }}>
+          data grid (e.g. MT4's Market Watch/Trade tables) is built.
+          flex-initial (0 1 auto), not flex-1 (1 1 0%) — a short result set
+          must size to its own content, not stretch the bordered well to
+          fill the whole remaining page height with dead white space below
+          the last row. A tall result set still shrinks to fit (overflow:
+          auto makes the browser's automatic min-height 0, so flex-shrink
+          isn't blocked by the table's intrinsic height) and scrolls
+          internally exactly as before. */}
+      <div className="flex-initial overflow-auto bg-white" style={{ borderRadius: 0, ...winBevel(true) }}>
         <table className="w-full text-sm border-collapse">
           {/* Header */}
           <thead className="sticky top-0 z-10">
