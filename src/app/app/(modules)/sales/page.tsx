@@ -234,7 +234,11 @@ export default function SalesPage() {
   ]
 
   return (
-    <PortalPage title="All Sales">
+    // maxWidth matches src/lib/pageWidthCaps.ts, which PageTitleBar reads to
+    // cap/border itself to match — keeps the unbounded "Buyer" column from
+    // stretching to fill the whole window. Same width as Unpaid Sales so the
+    // columns line up between the two views.
+    <PortalPage title="All Sales" maxWidth={1050}>
       {/* Filters */}
       <FilterBar>
         <Field label="Search" width={210}>

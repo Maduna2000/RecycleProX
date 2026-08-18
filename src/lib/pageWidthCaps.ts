@@ -9,6 +9,9 @@ const PAGE_WIDTH_CAPS: { test: RegExp; width: number }[] = [
   // Customer detail ("view profile") page only — not the Accounts list or
   // the "new customer" form, which still span full width.
   { test: /^\/app\/customers\/[^/]+$/, width: 960 },
+  // Casual detail ("view profile") — same page shape as the account customer
+  // detail page above (760 main + 200 sidebar), so same width.
+  { test: /^\/app\/casual\/[^/]+$/, width: 960 },
   { test: /^\/app\/police-register$/, width: 960 },
   // Matches Float's own `max-w-3xl` (768px) content wrapper.
   { test: /^\/app\/float$/, width: 768 },
@@ -26,6 +29,15 @@ const PAGE_WIDTH_CAPS: { test: RegExp; width: number }[] = [
   // Price Groups — the unbounded "Name" and "Description" columns did the
   // same.
   { test: /^\/app\/price-groups$/, width: 900 },
+  // Unpaid Purchases/Sales — the unbounded "Customer"/"Buyer" column did the
+  // same; both share this width since they're the same table shape.
+  { test: /^\/app\/purchases\/unpaid$/, width: 1050 },
+  { test: /^\/app\/sales\/unpaid$/, width: 1050 },
+  // All Purchases/Sales — same unbounded "Customer"/"Buyer" column, same
+  // width as their Unpaid counterparts so the columns line up when
+  // switching between the two views.
+  { test: /^\/app\/purchases$/, width: 1050 },
+  { test: /^\/app\/sales$/, width: 1050 },
 ]
 
 export function getPageWidthCap(pathname: string): number | null {

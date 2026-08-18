@@ -237,7 +237,11 @@ export default function UnpaidSalesPage() {
   ]
 
   return (
-    <PortalPage title="Unpaid Sales">
+    // maxWidth matches src/lib/pageWidthCaps.ts, which PageTitleBar reads to
+    // cap/border itself to match — keeps the unbounded "Buyer" column from
+    // stretching to fill the whole window. Same width as Unpaid Purchases,
+    // since it's the same table shape.
+    <PortalPage title="Unpaid Sales" maxWidth={1050}>
 
       {/* Grand total banner */}
       {!isLoading && sales.length > 0 && (

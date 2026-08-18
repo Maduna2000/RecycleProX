@@ -204,7 +204,10 @@ export default function UnpaidPurchasesPage() {
   ]
 
   return (
-    <PortalPage title="Unpaid Purchases">
+    // maxWidth matches src/lib/pageWidthCaps.ts, which PageTitleBar reads to
+    // cap/border itself to match — keeps the unbounded "Customer" column
+    // from stretching to fill the whole window.
+    <PortalPage title="Unpaid Purchases" maxWidth={1050}>
 
       {/* Grand total banner */}
       {!isLoading && purchases.length > 0 && (

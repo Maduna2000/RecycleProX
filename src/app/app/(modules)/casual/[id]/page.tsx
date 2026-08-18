@@ -120,8 +120,16 @@ export default function CasualCustomerDetailPage() {
   const fullName = `${customer.firstName} ${customer.lastName}`
 
   return (
-    <PortalPage title={fullName}>
-      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, background: '#F5F5F5' }}>
+    // Capped and centered to 960px, same as the account customer detail
+    // page (src/lib/pageWidthCaps.ts, which PageTitleBar reads to cap/
+    // border itself to match). No top border/radius on ContentCard —
+    // PageTitleBar already draws the top edge.
+    <PortalPage
+      title={fullName}
+      maxWidth={960}
+      cardStyle={{ borderTop: 'none', borderTopLeftRadius: 0, borderTopRightRadius: 0 }}
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, background: '#fff' }}>
       {/* ── Sub-header ────────────────────────────────────────────────────────── */}
       <div style={{ padding: '6px 10px', borderBottom: '1px solid #E0E0E0', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
         <Pill text="Casual Seller" bg="#FEF3C7" color="#92400E" />
@@ -155,10 +163,15 @@ export default function CasualCustomerDetailPage() {
       </div>
 
       {/* ── Two-column layout: main content + sidebar ─────────────────────────── */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', flex: 1, minHeight: 0, overflowY: 'auto' }}>
+      {/* Fills the capped 960px ContentCard (760 content + 200 sidebar).
+          alignItems: 'stretch' so both panels' backgrounds reach the full
+          height of this row instead of stopping at their own content. */}
+      <div style={{ display: 'flex', alignItems: 'stretch', flex: 1, minHeight: 0, overflowY: 'auto' }}>
 
-        {/* Main content */}
-        <div style={{ flex: 1, borderRight: '1px solid #D0D0D0', background: '#fff' }}>
+        {/* Main content — fixed width so every tab renders at the same,
+            page-appropriate size instead of stretching to fill whatever's
+            left. */}
+        <div style={{ width: 760, flexShrink: 0, borderRight: '1px solid #D0D0D0', background: '#fff' }}>
 
           {/* Section Content - Personal */}
           {tab === 'Personal' && (
