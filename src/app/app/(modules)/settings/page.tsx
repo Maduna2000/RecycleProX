@@ -534,7 +534,7 @@ export default function SettingsPage() {
                       </datalist>
                       <button
                         onClick={detectQueues} disabled={detectingQueues}
-                        style={{ height: 26, padding: '0 6px', borderRadius: 2, border: '1px solid #ABABAB', background: '#F5F5F5', color: '#6C757D', cursor: 'pointer', display: 'flex', alignItems: 'center', opacity: detectingQueues ? 0.5 : 1 }}
+                        style={{ height: 26, padding: '0 6px', borderRadius: 2, background: '#F5F5F5', color: '#6C757D', cursor: 'pointer', display: 'flex', alignItems: 'center', opacity: detectingQueues ? 0.5 : 1, ...winBevel() }}
                         title="Auto-detect"
                       >
                         <RefreshCw className={`w-3 h-3 ${detectingQueues ? 'animate-spin' : ''}`} />
