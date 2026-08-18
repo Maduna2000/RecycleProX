@@ -204,7 +204,9 @@ function ProductSelect({
     <div>
       <label style={lbl}>{label}</label>
       <FilterSelect value={value} onChange={onChange}>
-        {!required && <option value="">All products</option>}
+        {required
+          ? <option value="" disabled hidden>Select a product…</option>
+          : <option value="">All products</option>}
         {(data?.products ?? []).map((p) => (
           <option key={p.id} value={p.id}>{p.code} — {p.name}</option>
         ))}
@@ -240,7 +242,7 @@ function CashupSelect({
     <div>
       <label style={lbl}>{label}</label>
       <FilterSelect value={value} onChange={onChange}>
-        {!required && <option value="">Select a session…</option>}
+        <option value="" disabled={required} hidden={required}>Select a session…</option>
         {(data?.sessions ?? []).map((s) => (
           <option key={s.id} value={s.id}>
             {s.sessionDate.slice(0, 10).replace(/-/g, '/')} — {s.status.toUpperCase()}
@@ -312,7 +314,9 @@ function FilterControl({
     <div>
       <label style={lbl}>{spec.label}</label>
       <FilterSelect value={value} onChange={onChange}>
-        {!spec.required && <option value="">All</option>}
+        {spec.required
+          ? <option value="" disabled hidden>Select…</option>
+          : <option value="">All</option>}
         {options.map((o) => (
           <option key={o.value} value={o.value}>{o.label}</option>
         ))}
