@@ -22,6 +22,7 @@
  * Server-side only — dynamically imports `serialport` so this module has no
  * load-time cost/failure in environments where it's unavailable (cloud/Vercel).
  */
+import { WindowsQueuePrinterInterface } from './windowsQueuePrinter'
 
 const OPEN_TIMEOUT_MS  = 5_000
 const WRITE_TIMEOUT_MS = 8_000
@@ -82,20 +83,24 @@ export class SerialPrinterInterface {
 }
 
 export interface PrinterSettingsLike {
-  printerType?:       string
-  printerIp?:         string
-  printerTcpPort?:    string
-  printerSerialPort?: string
-  printerBaudRate?:   string
+  printerType?:            string
+  printerIp?:              string
+  printerTcpPort?:         string
+  printerSerialPort?:      string
+  printerBaudRate?:        string
+  printerWindowsQueueName?: string
 }
 
 /**
  * Resolves saved settings into what `new ThermalPrinter({ interface })`
  * actually needs: a `tcp://host:port` string for TCP (node-thermal-printer's
- * own regex handles that correctly), or a real SerialPrinterInterface object
- * for serial — every call site building a printer connection must go through
- * this, not hand-roll the bare-COM-string form (see class comment above for
- * why that silently does the wrong thing).
+ * own regex handles that correctly), a real SerialPrinterInterface object
+ * for serial, or a WindowsQueuePrinterInterface for a printer installed as
+ * an ordinary Windows print queue (USB thermal printers that show up as a
+ * spooler queue rather than a COM port or network socket — the fallback
+ * transport, see windowsQueuePrinter.ts) — every call site building a
+ * printer connection must go through this, not hand-roll the bare-COM-string
+ * form (see class comment above for why that silently does the wrong thing).
  *
  * Return type is declared `string` to match node-thermal-printer's own (stale)
  * .d.ts, which only types `interface` as a string — its actual runtime
@@ -107,6 +112,10 @@ export interface PrinterSettingsLike {
 export function resolvePrinterInterface(cfg: PrinterSettingsLike): string {
   if (cfg.printerType === 'tcp') {
     return `tcp://${cfg.printerIp ?? '127.0.0.1'}:${cfg.printerTcpPort ?? '9100'}`
+  }
+  if (cfg.printerType === 'windows') {
+    const iface = new WindowsQueuePrinterInterface(cfg.printerWindowsQueueName ?? '')
+    return iface as unknown as string
   }
   const path = cfg.printerSerialPort ?? 'COM1'
   const baudRate = cfg.printerBaudRate ? parseInt(cfg.printerBaudRate, 10) : DEFAULT_PRINTER_BAUD_RATE
