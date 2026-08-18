@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight, MoreHorizontal, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { colors, statusStyle } from '@/lib/design-tokens'
@@ -85,9 +86,11 @@ export function Avatar({ name, size = 32 }: { name: string; size?: number }) {
 
 // ─── Row Actions Dropdown ─────────────────────────────────────────────────────
 
+const ACTIONS_MENU_WIDTH = 176 // w-44
+
 function ActionsDropdown<T>({ row, actions }: { row: T; actions: RowAction<T>[] }) {
-  const [open,       setOpen]       = useState(false)
-  const [openUpward, setOpenUpward] = useState(false)
+  const [open,    setOpen]    = useState(false)
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null)
   const btnRef = useRef<HTMLButtonElement>(null)
   const visible = actions.filter((a) => !a.hidden?.(row))
   if (visible.length === 0) return null
@@ -97,7 +100,19 @@ function ActionsDropdown<T>({ row, actions }: { row: T; actions: RowAction<T>[] 
     if (!open && btnRef.current) {
       const rect = btnRef.current.getBoundingClientRect()
       const estimatedMenuH = visible.length * 32 + 8
-      setOpenUpward(rect.bottom + estimatedMenuH > window.innerHeight - 8)
+      const openUpward = rect.bottom + estimatedMenuH > window.innerHeight - 8
+      // Viewport-relative coordinates, since the menu is portaled straight
+      // to document.body below — a plain `absolute` position here would
+      // still be clipped by this row's own scrollable table ancestor
+      // (see the portal comment below for why that's the actual bug this
+      // replaced: a short result set's table well now hugs its content
+      // instead of always padding out to the full page, so a menu that
+      // used to have plenty of slack below it to render into no longer
+      // does).
+      setMenuPos({
+        top:  openUpward ? rect.top - estimatedMenuH - 2 : rect.bottom + 2,
+        left: Math.max(4, rect.right - ACTIONS_MENU_WIDTH),
+      })
     }
     setOpen((o) => !o)
   }
@@ -111,15 +126,20 @@ function ActionsDropdown<T>({ row, actions }: { row: T; actions: RowAction<T>[] 
       >
         <MoreHorizontal className="w-4 h-4" />
       </button>
-      {open && (
+      {/* Portaled to document.body, not rendered inline — an inline
+          `absolute` popup here would be clipped by this row's own table
+          wrapper (`overflow: auto`, see the well's own comment above),
+          since only `position: fixed` truly escapes a scrollable
+          ancestor's clipping. Positioned from the trigger button's real
+          screen coordinates rather than CSS-relative offsets. */}
+      {open && menuPos && createPortal(
         <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="fixed inset-0 z-[90]" onClick={() => setOpen(false)} />
           <div
-            className={cn(
-              'absolute right-0 w-44 bg-white py-0.5 z-20',
-              openUpward ? 'bottom-full mb-0.5' : 'top-full mt-0.5',
-            )}
+            className="fixed w-44 bg-white py-0.5 z-[91]"
             style={{
+              top: menuPos.top,
+              left: menuPos.left,
               borderRadius: 2,
               // A real little pop-out window (same raised bevel as
               // dialogs), with a hard offset shadow instead of Tailwind's
@@ -144,7 +164,8 @@ function ActionsDropdown<T>({ row, actions }: { row: T; actions: RowAction<T>[] 
               </button>
             ))}
           </div>
-        </>
+        </>,
+        document.body
       )}
     </div>
   )
