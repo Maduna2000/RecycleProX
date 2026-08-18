@@ -8,10 +8,10 @@ import { CreateUserModal } from '@/components/users/CreateUserModal'
 import { EditUserModal } from '@/components/users/EditUserModal'
 import { ResetPasswordModal } from '@/components/users/ResetPasswordModal'
 import { SetPinModal } from '@/components/users/SetPinModal'
-import { Search, Unlock, UserCheck, UserX, KeyRound, Pencil, UserPlus } from 'lucide-react'
+import { Search, Unlock, UserCheck, UserX, KeyRound, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
 import { colors, badgeStyle } from '@/lib/design-tokens'
-import { Btn, inp, Field, PortalPage, FilterBar } from '@/components/rpx'
+import { inp, Field, PortalPage, FilterBar } from '@/components/rpx'
 import { DataTable, type Column, type RowAction, StatusBadge as SharedStatusBadge } from '@/components/ui/DataTable'
 import { fetcher } from '@/lib/swrFetcher'
 
@@ -19,8 +19,16 @@ import { fetcher } from '@/lib/swrFetcher'
 type User = {
   id: string; fullName: string; username: string; role: string
   isActive: boolean; lockedAt: string | null; lastLoginAt: string | null
+  createdAt: string
   allowedModules?: string[]
   hasPersonalPin?: boolean
+}
+
+// Locked beats inactive beats active — shared by the Status column badge and
+// the Status filter below so "filter by Active" always matches exactly the
+// rows actually showing the "Active" badge.
+function userStatus(user: User): 'locked' | 'inactive' | 'active' {
+  return user.lockedAt ? 'locked' : !user.isActive ? 'inactive' : 'active'
 }
 
 function PinBadge({ hasPersonalPin }: { hasPersonalPin?: boolean }) {
@@ -32,8 +40,7 @@ function PinBadge({ hasPersonalPin }: { hasPersonalPin?: boolean }) {
 }
 
 function StatusBadge({ user }: { user: User }) {
-  const status = user.lockedAt ? 'locked' : !user.isActive ? 'inactive' : 'active'
-  return <SharedStatusBadge status={status} />
+  return <SharedStatusBadge status={userStatus(user)} />
 }
 
 const ROLE_STYLES: Record<string, { background: string; color: string }> = {
@@ -60,6 +67,9 @@ export default function UsersPage() {
   const searchParams = useSearchParams()
   const [search, setSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
+  const [createdFrom, setCreatedFrom] = useState('')
+  const [createdTo, setCreatedTo] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
   const [editUser, setEditUser] = useState<User | null>(null)
   const [resetUser, setResetUser] = useState<User | null>(null)
@@ -74,20 +84,34 @@ export default function UsersPage() {
   }, [searchParams, router])
 
   const isAdmin = session?.user?.role === 'admin'
-  const query = new URLSearchParams({ ...(search && { search }), ...(roleFilter && { role: roleFilter }) })
+  // limit is explicit rather than relying on the API's own default (20) —
+  // Status/Created filters below need the complete matching set to filter
+  // over client-side, same as Search/Role already fetch everything that
+  // matches; 1000 comfortably covers any real yard's staff count.
+  const query = new URLSearchParams({
+    ...(search      && { search }),
+    ...(roleFilter  && { role: roleFilter }),
+    limit: '1000',
+  })
   const { data, error } = useSWR<{ users: User[] }>(isAdmin ? `/api/users?${query}` : null, fetcher)
 
   // A filter change can leave `page` pointing past the end of a newly
   // narrowed result set — reset to page 1 whenever the filter shape
   // changes, same fix as Expenses/Payments/Stock Movements.
-  useEffect(() => { setPage(1) }, [search, roleFilter])
+  useEffect(() => { setPage(1) }, [search, roleFilter, statusFilter, createdFrom, createdTo])
 
   if (!isAdmin) {
     router.replace('/app/dashboard')
     return null
   }
 
-  const users = data?.users ?? []
+  const users = (data?.users ?? []).filter((u) => {
+    if (statusFilter && userStatus(u) !== statusFilter) return false
+    const createdDate = u.createdAt.slice(0, 10)
+    if (createdFrom && createdDate < createdFrom) return false
+    if (createdTo && createdDate > createdTo) return false
+    return true
+  })
 
   // Client-side pagination — same pattern as Products/Price Groups, and
   // the only thing DataTable needs to render its "Showing X–Y of Z"
@@ -174,9 +198,24 @@ export default function UsersPage() {
               <option value="security_guard">Security Guard</option>
             </select>
           </Field>
-          <span style={{ marginLeft: 'auto', paddingBottom: 8 }}>
-            <Btn size="sm" variant="primary" icon={UserPlus} onClick={() => setCreateOpen(true)}>Add User</Btn>
-          </span>
+          <Field label="Status" width={140}>
+            <select
+              style={inp}
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
+              <option value="">All Statuses</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+              <option value="locked">Locked</option>
+            </select>
+          </Field>
+          <Field label="Created From" width={145}>
+            <input type="date" value={createdFrom} onChange={(e) => setCreatedFrom(e.target.value)} style={inp} title="Created from date" />
+          </Field>
+          <Field label="Created To" width={145}>
+            <input type="date" value={createdTo} onChange={(e) => setCreatedTo(e.target.value)} style={inp} title="Created to date" />
+          </Field>
         </FilterBar>
 
         {/* Table */}

@@ -11,7 +11,7 @@ import {
   Plus,
   ClipboardCheck,
   Download, LogOut, Settings, Settings2, TrendingUp,
-  Users, ChevronRight,
+  Users, UserPlus, ChevronRight,
   Wifi, WifiOff,
   PrinterX,
   RefreshCw,
@@ -133,13 +133,15 @@ function useToolbarButtons(pathname: string, role: string): ToolbarButton[] {
       { label: 'Download', icon: Download, href: '/app/audit-log?export=1', variant: 'secondary' },
     ] : []
 
-  // "Add User" now lives inline on the Users page itself, next to its search
-  // filter (see settings/users/page.tsx), instead of floating in this global
-  // ribbon across every Settings sub-page. "Users" stays as a plain
-  // navigation shortcut and shouldn't point at the page you're already on.
   if (pathname === '/app/settings' || pathname.startsWith('/app/settings/'))
-    return !isAdmin || pathname === '/app/settings/users' ? [] : [
-      { label: 'Users', icon: Users, href: '/app/settings/users', variant: 'secondary' },
+    // "Add User" stays even on the Users page itself (it drives ?create=1,
+    // opening the modal — genuinely useful there). "Users" is a plain
+    // navigation shortcut and shouldn't point at the page you're already on.
+    return !isAdmin ? [] : [
+      { label: 'Add User', icon: UserPlus, href: '/app/settings/users?create=1', variant: 'primary' },
+      ...(pathname === '/app/settings/users' ? [] : [
+        { label: 'Users', icon: Users, href: '/app/settings/users', variant: 'secondary' as const },
+      ]),
     ]
 
   if (pathname === '/app/support' || pathname.startsWith('/app/support/'))
