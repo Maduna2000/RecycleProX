@@ -397,13 +397,18 @@ function PhotoGrid({
         )}
       </div>
 
-      {/* Decorative footer scroller — same permanent "end of content" cap
+      {/* Decorative footer scroller — same track + floating thumb look
           used on every DataTable page, present whether or not the grid
           above actually overflows or has pagination showing. */}
       <div
-        className="shrink-0"
-        style={{ height: 14, marginTop: 6, borderRadius: 2, background: BAR_GRAD, border: '1px solid #B0B0B0' }}
-      />
+        className="shrink-0 relative"
+        style={{ height: 14, marginTop: 6, borderRadius: 2, background: '#F0F0F0', border: '1px solid #D4D4D4' }}
+      >
+        <div
+          className="absolute"
+          style={{ top: 1, left: 1, bottom: 1, width: '35%', minWidth: 60, borderRadius: 2, background: BAR_GRAD, border: '1px solid #B0B0B0' }}
+        />
+      </div>
       </div>
 
       {/* Viewer */}

@@ -473,16 +473,23 @@ export function DataTable<T>({
       )}
 
       {/* Decorative footer scroller — a permanent "end of content" cap
-          along the bottom, matching the always-visible scrollbar strip
-          used elsewhere in the app (globals.css). Not a real scrollbar
-          (this table's own horizontal overflow, if any, already gets one)
-          — just a static bar so every page's bottom edge reads the same
-          way whether or not there's anything to actually scroll, and
-          whether or not the pagination footer above it is showing. */}
+          along the bottom, styled as an actual track + floating thumb
+          (matching ::-webkit-scrollbar-track / -thumb in globals.css)
+          rather than a single flat bar. Not a real scrollbar (this
+          table's own horizontal overflow, if any, already gets one) —
+          just a static echo of that look so every page's bottom edge
+          reads the same way whether or not there's anything to actually
+          scroll, and whether or not the pagination footer above it is
+          showing. */}
       <div
-        className="shrink-0"
-        style={{ height: 14, marginTop: 6, borderRadius: 2, background: BAR_GRAD, border: '1px solid #B0B0B0' }}
-      />
+        className="shrink-0 relative"
+        style={{ height: 14, marginTop: 6, borderRadius: 2, background: '#F0F0F0', border: '1px solid #D4D4D4' }}
+      >
+        <div
+          className="absolute"
+          style={{ top: 1, left: 1, bottom: 1, width: '35%', minWidth: 60, borderRadius: 2, background: BAR_GRAD, border: '1px solid #B0B0B0' }}
+        />
+      </div>
     </div>
   )
 }
