@@ -926,6 +926,72 @@ export async function getLiveStats(
   }
 }
 
+// ─── Current cash on hand (the one true "how much cash is in the drawer
+// right now" figure) ───────────────────────────────────────────────────────
+// Exactly the math the Cashup module itself shows as "Cal Float (Expected
+// in Drawer)" — Opening Balance + today's live cash movements — computed
+// server-side as a single reusable figure instead of duplicated client-side
+// arithmetic. This is the real-world, operational cash-on-hand number;
+// other modules (the Ledger dashboard) should read it from here rather
+// than deriving their own competing figure.
+export async function getCurrentCashOnHand(dateStr?: string): Promise<string> {
+  const sessionDateStr = dateStr ?? todayStr()
+  const sessionDate = toDate(sessionDateStr)
+
+  const current = await getOpenSession(sessionDateStr)
+  let openingBalance: Decimal
+  let context: { openedAt: Date; closedAt: Date | null }
+
+  if (current) {
+    openingBalance = new Decimal(current.openingBalance.toString())
+    context = { openedAt: current.openedAt, closedAt: current.closedAt }
+  } else {
+    // No session open for this date — mirror openCashUp's own carry-forward
+    // priority exactly (see its comment for why prevCashUp's own state
+    // always takes priority over the float record). Unlike
+    // previewOpeningBalance, this runs server-side only and always needs a
+    // real number to sum against live stats, so the "previous session
+    // still open" tier is computed from live totals here too instead of
+    // being left unset.
+    const prevCashUp = await prisma.cashUp.findFirst({
+      where:   { sessionDate: { lte: sessionDate }, status: { not: 'voided' } },
+      orderBy: [{ sessionDate: 'desc' }, { openedAt: 'desc' }],
+    })
+
+    if (prevCashUp?.status === 'submitted' && prevCashUp.declaredCash) {
+      openingBalance = new Decimal(prevCashUp.declaredCash.toString())
+    } else if (prevCashUp?.status === 'open') {
+      const prevStats = await getLiveStats(prevCashUp.sessionDate, prevCashUp)
+      const calcClosing = new Decimal(prevCashUp.openingBalance.toString())
+        .plus(prevStats.floatTopUps)
+        .plus(prevStats.cashSales)
+        .minus(prevStats.cashPurchases)
+        .minus(prevStats.cashPayments)
+        .minus(prevStats.expenses)
+        .minus(prevStats.loanAdvance)
+        .plus(prevStats.loanRepayment)
+      openingBalance = calcClosing.isNegative() ? new Decimal(0) : calcClosing
+    } else if (prevCashUp?.declaredCash) {
+      openingBalance = new Decimal(prevCashUp.declaredCash.toString())
+    } else {
+      const prevFloat = await getMostRecentFloatAsOf(sessionDate)
+      openingBalance = new Decimal(prevFloat?.closingAmount?.toString() ?? prevFloat?.openingAmount?.toString() ?? '0')
+    }
+    context = { openedAt: new Date(), closedAt: null }
+  }
+
+  const stats = await getLiveStats(sessionDate, context)
+  return openingBalance
+    .plus(stats.floatTopUps)
+    .plus(stats.cashSales)
+    .minus(stats.cashPurchases)
+    .minus(stats.cashPayments)
+    .minus(stats.expenses)
+    .minus(stats.loanAdvance)
+    .plus(stats.loanRepayment)
+    .toFixed(2)
+}
+
 // ─── Get by ID ────────────────────────────────────────────────────────────────
 export async function getCashUp(id: string) {
   return prisma.cashUp.findUnique({ where: { id } })

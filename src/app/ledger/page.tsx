@@ -174,14 +174,18 @@ export default function LedgerDashboardPage() {
   const from = monthStartLabel()
   const to = todayLabel()
   const { data: pl, isLoading: plLoading } = useSWR<ProfitAndLossReport>(`/api/ledger/profit-loss?from=${from}&to=${to}`, fetcher)
+  // Cash on Hand is the Cashup module's real-time "cash in the drawer right
+  // now" figure (Opening Balance + today's live movements), not the ledger's
+  // own journal-posted Cash account balance — the two are different
+  // calculations and the posted balance drifts from the operational one.
+  const { data: cashOnHandData, isLoading: cashLoading } = useSWR<{ date: string; cashOnHand: string }>('/api/ledger/cash-on-hand', fetcher)
 
   const accounts = accountsData?.accounts ?? []
-  const cash = findByCode(accounts, '1000')
   const bank = findByCode(accounts, '1010')
   const ar = findByCode(accounts, '1150')
   const inventory = findByCode(accounts, '1200')
   const ap = findByCode(accounts, '2000')
-  const loading = accountsLoading || plLoading
+  const loading = accountsLoading || plLoading || cashLoading
 
   return (
     <div className="flex flex-col gap-6">
@@ -197,7 +201,7 @@ export default function LedgerDashboardPage() {
       ) : (
         <>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-            <StatCard label="Cash on Hand" value={formatMoney(cash?.totalBalance ?? '0')} tone="action" />
+            <StatCard label="Cash on Hand" value={formatMoney(cashOnHandData?.cashOnHand ?? '0')} tone="action" />
             <StatCard label="Bank" value={formatMoney(bank?.totalBalance ?? '0')} tone="action" />
             <StatCard label="Accounts Receivable" value={formatMoney(ar?.totalBalance ?? '0')} />
             <StatCard label="Inventory" value={formatMoney(inventory?.totalBalance ?? '0')} />
