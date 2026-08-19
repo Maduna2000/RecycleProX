@@ -430,9 +430,12 @@ export function DataTable<T>({
         </table>
       </div>
 
-      {/* Pagination */}
+      {/* Pagination — mt-auto pins it to the bottom of the available space
+          regardless of how tall the table itself is, so a short table
+          (few rows) doesn't leave it floating right under the last row
+          with a gap below before the window's own bottom edge. */}
       {(total !== undefined && onPageChange) && (
-        <div className="flex items-center justify-between pt-2.5 shrink-0">
+        <div className="flex items-center justify-between pt-2.5 shrink-0 mt-auto">
           <span className="text-[11px] text-[#6C757D]">{showing}</span>
           <div className="flex items-center gap-0.5">
             <button
@@ -483,7 +486,7 @@ export function DataTable<T>({
           showing. */}
       <div
         className="shrink-0 relative"
-        style={{ height: 14, marginTop: 6, borderRadius: 2, background: '#F0F0F0', border: '1px solid #D4D4D4' }}
+        style={{ height: 14, marginTop: 6, borderRadius: 2, background: '#F0F0F0', borderLeft: '1px solid #D4D4D4', borderTop: '1px solid #D4D4D4' }}
       >
         <div
           className="absolute"
