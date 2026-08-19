@@ -108,11 +108,22 @@ async function txn<T>(fn: (tx: TxClient) => Promise<T>, options?: { timeout?: nu
   return prisma.$transaction(fn, { timeout: 30_000, maxWait: 10_000, ...options })
 }
 
-/** Derives the actual cash/eft/loan split a now-settled Purchase/Sale was paid with, from its final persisted state. */
+/**
+ * Derives the actual cash/eft/loan split a now-settled Purchase/Sale was
+ * paid with, from its final persisted state. postPurchaseSettlement/
+ * postSaleSettlement only understand cash/eft/loan buckets (eft doubling as
+ * "bank", same as cashOrBankCode's live-forward treatment) — a historical
+ * row whose paymentMethod is 'cheque' or 'card' (the PaymentMethod enum
+ * allows both, even though live creation currently validates purchases/
+ * sales down to cash/eft only) previously matched neither branch here,
+ * silently producing cash:0, eft:0 and leaving that purchase/sale parked in
+ * Accounts Payable/Receivable forever despite genuinely being paid. Treated
+ * as "not cash" now, same as every other non-cash method.
+ */
 function splitFromFinalState(opts: {
   totalAmount: Decimal
   loanDeduction: Decimal
-  paymentMethod: 'cash' | 'eft'
+  paymentMethod: 'cash' | 'eft' | 'cheque' | 'card'
   splitPayments: unknown
   loanKey: 'loan' | 'businessLoan'
 }): { cash: Decimal; eft: Decimal; loan: Decimal } {
@@ -127,7 +138,7 @@ function splitFromFinalState(opts: {
   const remaining = opts.totalAmount.minus(opts.loanDeduction)
   return {
     cash: opts.paymentMethod === 'cash' ? remaining : new Decimal(0),
-    eft: opts.paymentMethod === 'eft' ? remaining : new Decimal(0),
+    eft: opts.paymentMethod !== 'cash' ? remaining : new Decimal(0),
     loan: opts.loanDeduction,
   }
 }
@@ -311,7 +322,7 @@ async function main() {
           const split = splitFromFinalState({
             totalAmount: new Decimal(p.totalAmount.toString()),
             loanDeduction: p.loanDeductionAmount ? new Decimal(p.loanDeductionAmount.toString()) : new Decimal(0),
-            paymentMethod: p.paymentMethod as 'cash' | 'eft',
+            paymentMethod: p.paymentMethod,
             splitPayments: p.splitPayments,
             loanKey: 'loan',
           })
@@ -345,7 +356,7 @@ async function main() {
           const split = splitFromFinalState({
             totalAmount: new Decimal(s.totalAmount.toString()),
             loanDeduction: s.businessLoanDeductionAmount ? new Decimal(s.businessLoanDeductionAmount.toString()) : new Decimal(0),
-            paymentMethod: s.paymentMethod as 'cash' | 'eft',
+            paymentMethod: s.paymentMethod,
             splitPayments: s.splitPayments,
             loanKey: 'businessLoan',
           })

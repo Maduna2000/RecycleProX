@@ -872,7 +872,7 @@ export async function buildProfitSummary(
 
   const rows: ReportRow[] = [
     { cells: { metric: 'Sales Revenue', amount: p.revenue } },
-    { cells: { metric: 'Cost of Goods (Purchases)', amount: p.costOfGoods } },
+    { cells: { metric: 'Cost of Goods Sold', amount: p.costOfGoods } },
     { cells: { metric: 'Gross Profit', amount: p.grossProfit } },
     { cells: { metric: 'Expenses', amount: p.expenses } },
     { cells: { metric: 'Net Profit', amount: p.netProfit } },

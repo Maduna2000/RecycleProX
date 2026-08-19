@@ -210,6 +210,15 @@ export async function postJournalEntry(tx: TxClient, opts: PostJournalEntryInput
         })),
       },
     },
+    // Prisma's classic middleware (auditMiddleware.ts) only ever sees the
+    // top-level call's own result — a nested `lines: { create: [...] } }`
+    // write is otherwise invisible to it, so the audit row for this
+    // JournalEntry would record only its header (date/description/source)
+    // and nothing about which accounts/amounts were actually debited and
+    // credited. Including the lines here puts them in what the middleware
+    // snapshots as newValues, so the audit trail actually proves what
+    // moved, not just that something was posted.
+    include: { lines: true },
   })
 }
 
@@ -1108,4 +1117,34 @@ export async function postOpeningBalance(tx: TxClient, opts: { entryDate: Date; 
     lines: resolved,
   })
   logger.info({ entryDate: opts.entryDate, userId: opts.userId }, 'ledger.openingBalance.posted')
+}
+
+export class OpeningBalanceAlreadyPostedError extends Error {
+  constructor() { super('An opening balance has already been posted for this business — it cannot be entered twice.'); this.name = 'OpeningBalanceAlreadyPostedError' }
+}
+
+/**
+ * Self-transacting, admin-facing counterpart to postOpeningBalance — the one
+ * entry point the /ledger "Set Opening Balances" screen calls. Unlike the
+ * historical-backfill script (which is a developer-run, one-off tool),
+ * this is how a business owner actually gets real starting figures (cash on
+ * hand, bank, inventory value, outstanding loans/debts) into the books
+ * themselves, without which every account silently understates reality by
+ * whatever existed before the ledger went live. Refuses a second opening
+ * entry outright — correcting an already-posted opening balance is a real
+ * accounting adjustment (its own dated journal entry), not a re-do of this
+ * one-time step.
+ */
+export async function postOpeningBalanceOnce(opts: { entryDate: Date; lines: OpeningBalanceLine[]; userId?: string }): Promise<void> {
+  await prisma.$transaction(async (tx) => {
+    const existing = await tx.journalEntry.findFirst({ where: { sourceType: 'opening_balance' } })
+    if (existing) throw new OpeningBalanceAlreadyPostedError()
+    await postOpeningBalance(tx, opts)
+  })
+}
+
+/** Whether an opening balance has ever been posted — the /ledger UI uses this to show current state and disable re-entry. */
+export async function hasOpeningBalance(): Promise<boolean> {
+  const existing = await prisma.journalEntry.findFirst({ where: { sourceType: 'opening_balance' } })
+  return !!existing
 }

@@ -233,6 +233,7 @@ export default function LedgerDashboardPage() {
           { href: '/ledger/profit-loss', label: 'Profit & Loss', desc: 'Revenue, COGS, expenses' },
           { href: '/ledger/balance-sheet', label: 'Balance Sheet', desc: 'Assets = Liabilities + Equity' },
           { href: '/ledger/journal', label: 'Journal', desc: 'Raw chronological entry feed' },
+          { href: '/ledger/opening-balance', label: 'Opening Balances', desc: 'One-time starting figures for a new ledger' },
         ].map((l) => (
           <Link
             key={l.href}

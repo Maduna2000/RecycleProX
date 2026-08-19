@@ -1,6 +1,8 @@
 import { prisma } from '@/lib/db/prisma'
 import Decimal from 'decimal.js'
 import { getExpensesByCategory } from './expenseService'
+import { getProfitAndLoss } from './ledgerReportService'
+import { sastDayLabelOfInstant } from '@/lib/utils/dayBounds'
 
 export async function getDateRangeReport(from: Date, to: Date) {
   const [
@@ -182,20 +184,18 @@ export async function getCancelledReport(from: Date, to: Date) {
   }
 }
 
+/**
+ * Sourced from the ledger's own Profit & Loss (getProfitAndLoss) rather than
+ * a separate purchases-vs-sales aggregate — the two used to disagree,
+ * sometimes wildly, because this report's old "Cost of Goods" summed every
+ * Purchase in the period at purchase price (a cash-basis figure) against
+ * VAT-inclusive Sale totals, instead of matching revenue (ex-VAT) to the
+ * actual moving-average cost of what was sold, the way real accrual
+ * accounting — and the Ledger module's own P&L — does. One P&L now, not two.
+ */
 export async function getProfitSummary(from: Date, to: Date) {
-  const [salesAgg, purchasesAgg, expensesAgg, loansAdvancedAgg, loansRepaidAgg] = await Promise.all([
-    prisma.sale.aggregate({
-      _sum: { totalAmount: true },
-      where: { status: 'completed', createdAt: { gte: from, lte: to } },
-    }),
-    prisma.purchase.aggregate({
-      _sum: { totalAmount: true },
-      where: { status: 'completed', createdAt: { gte: from, lte: to } },
-    }),
-    prisma.expense.aggregate({
-      _sum: { amount: true },
-      where: { status: 'approved', createdAt: { gte: from, lte: to } },
-    }),
+  const [pl, loansAdvancedAgg, loansRepaidAgg] = await Promise.all([
+    getProfitAndLoss(sastDayLabelOfInstant(from), sastDayLabelOfInstant(to)),
     prisma.loan.aggregate({
       _sum: { principalAmount: true },
       where: { status: { not: 'voided' }, createdAt: { gte: from, lte: to } },
@@ -206,21 +206,17 @@ export async function getProfitSummary(from: Date, to: Date) {
     }),
   ])
 
-  const revenue     = new Decimal(salesAgg._sum.totalAmount?.toString()      ?? '0')
-  const costOfGoods = new Decimal(purchasesAgg._sum.totalAmount?.toString()  ?? '0')
-  const expenses    = new Decimal(expensesAgg._sum.amount?.toString()         ?? '0')
-  const grossProfit = revenue.minus(costOfGoods)
-  const netProfit   = grossProfit.minus(expenses)
-  const advanced    = new Decimal(loansAdvancedAgg._sum.principalAmount?.toString() ?? '0')
-  const repaid      = new Decimal(loansRepaidAgg._sum.amount?.toString()            ?? '0')
+  const revenue     = new Decimal(pl.totalRevenue)
+  const advanced     = new Decimal(loansAdvancedAgg._sum.principalAmount?.toString() ?? '0')
+  const repaid       = new Decimal(loansRepaidAgg._sum.amount?.toString()            ?? '0')
 
   return {
-    revenue:     revenue.toFixed(2),
-    costOfGoods: costOfGoods.toFixed(2),
-    grossProfit: grossProfit.toFixed(2),
-    expenses:    expenses.toFixed(2),
-    netProfit:   netProfit.toFixed(2),
-    margin:      revenue.isZero() ? '0.00' : grossProfit.div(revenue).times(100).toFixed(2),
+    revenue:     pl.totalRevenue,
+    costOfGoods: pl.totalCogs,
+    grossProfit: pl.grossProfit,
+    expenses:    pl.totalOperatingExpenses,
+    netProfit:   pl.netProfit,
+    margin:      revenue.isZero() ? '0.00' : new Decimal(pl.grossProfit).div(revenue).times(100).toFixed(2),
     loans: {
       advanced: advanced.toFixed(2),
       repaid:   repaid.toFixed(2),
