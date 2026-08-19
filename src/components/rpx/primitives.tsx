@@ -95,18 +95,18 @@ export function TabStrip({
               marginLeft: i === 0 ? 0 : -1,
               display: 'inline-flex', alignItems: 'center', gap: 6,
               padding: '5px 14px', fontSize: 12, fontWeight: 600,
-              // Light top edge (raised highlight) + the same #B0B0B0 side
+              // Light top edge (raised highlight) + the same #9E9E9E side
               // dividers as before (unchanged so adjacent tabs' shared
               // edges still align) — a hard highlight instead of a soft
               // GLOSS_BEVEL box-shadow standing in for one.
               borderTop: '1px solid #FFFFFF',
-              borderLeft: '1px solid #B0B0B0', borderRight: '1px solid #B0B0B0',
+              borderLeft: '1px solid #9E9E9E', borderRight: '1px solid #9E9E9E',
               borderBottom: 'none',
               borderRadius: '4px 4px 0 0', cursor: 'pointer',
               background: isActive
                 ? 'linear-gradient(180deg,#FFFFFF 0%,#F2F2F2 100%)'
                 : 'linear-gradient(180deg,#E8E8E8 0%,#D0D0D0 100%)',
-              color: isActive ? NAVY : '#6C757D',
+              color: isActive ? NAVY : '#495057',
             }}
           >
             {t.icon && <t.icon style={{ width: 13, height: 13 }} />}
@@ -262,7 +262,7 @@ export function FilterBar({ style, children }: { style?: React.CSSProperties; ch
     <div
       style={{
         display: 'flex', alignItems: 'flex-end', gap: 10,
-        padding: '10px 14px', borderBottom: '1px solid #E0E0E0',
+        padding: '10px 14px', borderBottom: '1px solid #C9CDD1',
         flexShrink: 0, flexWrap: 'wrap',
         ...style,
       }}
@@ -276,7 +276,7 @@ export function FilterBar({ style, children }: { style?: React.CSSProperties; ch
 
 export function EmptyHint({ text, height = 160 }: { text: string; height?: number }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height, color: '#6C757D', fontSize: 12.5 }}>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height, color: '#495057', fontSize: 12.5 }}>
       {text}
     </div>
   )
@@ -292,7 +292,7 @@ export function DL({ rows }: { rows: [string, React.ReactNode][] }) {
     <div style={{ marginBottom: 6 }}>
       {rows.map(([k, v]) => (
         <div key={k} style={{ display: 'flex', padding: '3px 0', borderBottom: '1px solid #F5F5F5' }}>
-          <span style={{ width: 130, fontSize: 11, fontWeight: 700, color: '#6C757D', textTransform: 'uppercase', letterSpacing: '0.03em', flexShrink: 0 }}>{k}</span>
+          <span style={{ width: 130, fontSize: 11, fontWeight: 700, color: '#495057', textTransform: 'uppercase', letterSpacing: '0.03em', flexShrink: 0 }}>{k}</span>
           <span style={{ fontSize: 12.5, color: '#212529' }}>{v}</span>
         </div>
       ))}

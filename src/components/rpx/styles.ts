@@ -14,18 +14,22 @@ import { colors } from '@/lib/design-tokens'
 
 export const NAVY = colors.primary
 
-/** Sticky table-header row background. */
-export const HEADER_GRAD = 'linear-gradient(180deg,#FFFFFF 0%,#E8E8E8 100%)'
-/** Dialog / drawer / section title-bar background. */
-export const BAR_GRAD = 'linear-gradient(180deg,#EAEAEA 0%,#D4D4D4 100%)'
+/** Sticky table-header row background — deepened from #E8E8E8 for more
+ * contrast against the white row body beneath it. */
+export const HEADER_GRAD = 'linear-gradient(180deg,#FFFFFF 0%,#DCDCDC 100%)'
+/** Dialog / drawer / section title-bar background — deepened from
+ * #EAEAEA/#D4D4D4 so title bars read as a defined bar, not a pale wash. */
+export const BAR_GRAD = 'linear-gradient(180deg,#E2E2E2 0%,#C4C4C4 100%)'
 /** Primary money/CTA affordance (Loans "+ New Loan" and equivalents). */
 export const ACTION_GRAD = `linear-gradient(180deg,${colors.action} 0%,${colors.actionHover} 100%)`
 /** Business-Loan CTA — deliberately distinct from ACTION_GRAD per the app's
  * "differentiate mirrored features" convention (Business Loan is the reverse
  * of Loan and must not look identical to it). */
 export const VIOLET_GRAD = `linear-gradient(180deg,${colors.violet} 0%,#6B21A8 100%)`
-/** Outer border of content cards and dialogs. */
-export const CARD_BORDER = '1px solid #B0B0B0'
+/** Outer border of content cards and dialogs — darkened from #B0B0B0 to
+ * match winBevel's own dark edge below, so a card's outer frame and its
+ * internal raised/sunken bevels read as the same weight of line. */
+export const CARD_BORDER = '1px solid #9E9E9E'
 
 /**
  * Glossy Win7/Aero navy chrome — the same light-to-base sheen used for the
@@ -52,7 +56,7 @@ export const GLOSS_BEVEL = 'inset 0 1px 0 rgba(255,255,255,0.85), inset 0 -2px 4
  */
 export function winBevel(pressed = false): React.CSSProperties {
   const light = colors.surface
-  const dark  = '#B0B0B0'
+  const dark  = '#9E9E9E'
   return pressed
     ? { borderTop: `1px solid ${dark}`, borderLeft: `1px solid ${dark}`, borderRight: `1px solid ${light}`, borderBottom: `1px solid ${light}` }
     : { borderTop: `1px solid ${light}`, borderLeft: `1px solid ${light}`, borderRight: `1px solid ${dark}`, borderBottom: `1px solid ${dark}` }
