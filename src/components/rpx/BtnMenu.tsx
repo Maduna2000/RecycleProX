@@ -86,7 +86,7 @@ export function BtnMenu({
               const Icon = item.icon
               const inner = (
                 <>
-                  {Icon && <Icon style={{ width: 12, height: 12, flexShrink: 0, color: '#6C757D' }} />}
+                  {Icon && <Icon style={{ width: 12, height: 12, flexShrink: 0, color: '#495057' }} />}
                   {item.label}
                 </>
               )

@@ -106,7 +106,7 @@ export function RpxDialogHeader({
       style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         height: 34, padding: '0 8px 0 14px', flexShrink: 0,
-        background: BAR_GRAD, borderBottom: '2px solid #B0B0B0',
+        background: BAR_GRAD, borderBottom: '2px solid #9E9E9E',
       }}
     >
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, ...windowTitleText }}>
@@ -131,7 +131,7 @@ export function RpxDialogFooter({ style, children }: { style?: React.CSSProperti
     <div
       style={{
         display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 8,
-        padding: '10px 14px', borderTop: '1px solid #E0E0E0', background: '#F8F9FA',
+        padding: '10px 14px', borderTop: '1px solid #C9CDD1', background: '#F8F9FA',
         flexShrink: 0,
         ...style,
       }}

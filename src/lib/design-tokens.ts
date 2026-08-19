@@ -51,16 +51,21 @@ export const colors = {
   // Text
   /** Near-black — all primary body text */
   textPrimary:   '#212529',
-  /** Mid-grey — secondary labels, metadata */
-  textSecondary: '#6C757D',
+  /** Darkened mid-grey — secondary labels, metadata, table/filter headers.
+   * Was #6C757D — too low-contrast at the 10-11px sizes labels and column
+   * headers actually render at, reading as faded rather than "secondary."
+   * Still clearly a step down from textPrimary, just no longer washed out. */
+  textSecondary: '#495057',
   /** Light grey — muted captions, placeholders */
   textMuted:     '#9CA3AF',
   /** White text — used on coloured backgrounds */
   textOnDark:    '#FFFFFF',
 
   // Borders & Outlines
-  /** Standard border on cards, inputs, dividers */
-  border:        '#E0E0E0',
+  /** Standard border on cards, inputs, dividers — darkened from #E0E0E0 for
+   * more definition; still a hairline, just no longer nearly invisible
+   * against the #F1F3F4 page background. */
+  border:        '#C9CDD1',
   /** Focused input / active element ring */
   borderFocus:   '#185ABD',
 

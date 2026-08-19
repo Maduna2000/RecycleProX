@@ -121,7 +121,7 @@ function ActionsDropdown<T>({ row, actions }: { row: T; actions: RowAction<T>[] 
     <div className="relative flex justify-end">
       <button
         ref={btnRef}
-        className="p-1 rounded-sm hover:bg-[#D6E8FF] text-[#6C757D] hover:text-[#00205B] transition-colors"
+        className="p-1 rounded-sm hover:bg-[#D6E8FF] text-[#495057] hover:text-[#00205B] transition-colors"
         onClick={handleToggle}
       >
         <MoreHorizontal className="w-4 h-4" />
@@ -242,8 +242,8 @@ export function DataTable<T>({
           // sits this well directly on ContentCard's own white background,
           // so those two edges were invisible everywhere, not just here.
           // Override them to the same visible grey as the top/left edges.
-          borderRight: '1px solid #B0B0B0',
-          borderBottom: '1px solid #B0B0B0',
+          borderRight: '1px solid #9E9E9E',
+          borderBottom: '1px solid #9E9E9E',
         }}
       >
         <table className="w-full text-sm border-collapse">
@@ -251,12 +251,12 @@ export function DataTable<T>({
           <thead className="sticky top-0 z-10">
             <tr style={{
               background: HEADER_GRAD,
-              borderBottom: '2px solid #B0B0B0',
+              borderBottom: '2px solid #9E9E9E',
               // Crisp (zero-blur) inset highlight/shadow pair instead of
               // GLOSS_BEVEL's soft blur — a <tr> under border-collapse
               // can't reliably take a real `border`, so this is the
               // hard-edge-safe equivalent for this one spot.
-              boxShadow: 'inset 0 1px 0 #FFFFFF, inset 0 -1px 0 #B0B0B0',
+              boxShadow: 'inset 0 1px 0 #FFFFFF, inset 0 -1px 0 #9E9E9E',
             }}>
               {multiSelect && (
                 <th style={{ width: 36, height: 30, padding: '0 10px', borderRight: '1px solid #D0D0D0' }}>
@@ -284,7 +284,7 @@ export function DataTable<T>({
                       fontSize:      10,
                       fontWeight:    700,
                       letterSpacing: '0.05em',
-                      color:         '#6C757D',
+                      color:         '#495057',
                       textTransform: 'uppercase',
                       height:        30,
                       width:         col.width,
@@ -326,7 +326,7 @@ export function DataTable<T>({
               </tr>
             ) : loading ? (
               <tr>
-                <td colSpan={totalCols} className="py-12 text-center text-[#6C757D]">
+                <td colSpan={totalCols} className="py-12 text-center text-[#495057]">
                   <div className="flex items-center justify-center gap-2">
                     <Loader2 className="w-4 h-4 animate-spin" />
                     <span className="text-sm">Loading...</span>
@@ -338,7 +338,7 @@ export function DataTable<T>({
                 <td colSpan={totalCols} className="py-16 text-center">
                   <div className="flex flex-col items-center gap-3">
                     {EmptyIcon && (
-                      <EmptyIcon className="w-12 h-12" style={{ color: '#B0B0B0' }} />
+                      <EmptyIcon className="w-12 h-12" style={{ color: '#9E9E9E' }} />
                     )}
                     <p className="text-sm" style={{ color: colors.textSecondary }}>{emptyMessage}</p>
                     {emptyAction && (
@@ -377,7 +377,7 @@ export function DataTable<T>({
                   >
                     {multiSelect && (
                       <td
-                        className="border-b border-[#E0E0E0]"
+                        className="border-b border-[#C9CDD1]"
                         style={{ width: 36, height: 30, padding: '0 10px', borderRight: '1px solid #D0D0D0' }}
                         onClick={(e) => e.stopPropagation()}
                       >
@@ -399,7 +399,7 @@ export function DataTable<T>({
                       return (
                         <td
                           key={col.key}
-                          className="border-b border-[#E0E0E0]"
+                          className="border-b border-[#C9CDD1]"
                           style={{
                             height:      30,
                             padding:     '4px 10px',
@@ -415,7 +415,7 @@ export function DataTable<T>({
                     })}
                     {hasActions && (
                       <td
-                        className="px-2 border-b border-[#E0E0E0]"
+                        className="px-2 border-b border-[#C9CDD1]"
                         style={{ height: 30, borderRight: 'none' }}
                         onClick={(e) => e.stopPropagation()}
                       >
@@ -436,7 +436,7 @@ export function DataTable<T>({
           with a gap below before the window's own bottom edge. */}
       {(total !== undefined && onPageChange) && (
         <div className="flex items-center justify-between pt-2.5 shrink-0 mt-auto">
-          <span className="text-[11px] text-[#6C757D]">{showing}</span>
+          <span className="text-[11px] text-[#495057]">{showing}</span>
           <div className="flex items-center gap-0.5">
             <button
               className="px-2 h-6 rounded-sm hover:bg-[#E8E8E8] disabled:opacity-40 disabled:cursor-not-allowed text-[11px] transition-colors"
@@ -490,7 +490,7 @@ export function DataTable<T>({
       >
         <div
           className="absolute"
-          style={{ top: 1, left: 1, bottom: 1, width: '35%', minWidth: 60, borderRadius: 2, background: BAR_GRAD, border: '1px solid #B0B0B0' }}
+          style={{ top: 1, left: 1, bottom: 1, width: '35%', minWidth: 60, borderRadius: 2, background: BAR_GRAD, border: '1px solid #9E9E9E' }}
         />
       </div>
     </div>
