@@ -163,7 +163,19 @@ export function FloatingWindowFrame({ title, children }: { title?: string | null
         display: 'flex', flexDirection: 'column',
         boxShadow: '4px 4px 16px rgba(0,0,0,0.25)',
       }
-    : { position: 'relative', width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }
+    : {
+        // Maximized/default state. A page registered in pageWidthCaps.ts
+        // caps and centers here too — matching its own PortalPage content,
+        // which independently caps to the same width via ordinary CSS
+        // max-width — instead of stretching the title bar to full Zone 3
+        // width while the content beneath stays capped, which is the
+        // "title bar wider than the page" bug this fixes. Uncapped pages
+        // still fill 100%, unchanged.
+        position: 'relative', height: '100%', display: 'flex', flexDirection: 'column',
+        ...(widthCap
+          ? { width: '100%', maxWidth: widthCap, margin: '0 auto' }
+          : { width: '100%' }),
+      }
 
   return (
     <div ref={containerRef} style={containerStyle}>

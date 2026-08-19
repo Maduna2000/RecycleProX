@@ -822,13 +822,15 @@ export function AppShell({
       })()}
 
       {/* ── ZONE 3: Content Area ──────────────────────────────── */}
-      {/* `relative` + `overflow-hidden` on the inner div is the positioning
-          anchor FloatingWindowFrame's `position: absolute` window measures
-          itself against and stays clamped within (see FloatingWindowFrame.tsx).
-          Each page already manages its own internal scrolling (ContentCard),
-          so this wrapper never needed to scroll itself. */}
+      {/* `relative` is the positioning anchor FloatingWindowFrame's
+          `position: absolute` window measures itself against and stays
+          clamped within (see FloatingWindowFrame.tsx). Kept `overflow-y-auto`
+          (not `hidden`) — only `relative` is actually required for the
+          floating window's own positioning to work, and this wrapper
+          scrolling is a real safety net for any page whose content turns
+          out taller than the available height, same as before this feature. */}
       <main className="rpx-content flex-1 min-h-0 flex flex-col overflow-hidden bg-[#F1F3F4]">
-        <div className="relative flex flex-col flex-1 min-h-0 w-full overflow-hidden">
+        <div className="relative flex flex-col flex-1 min-h-0 w-full overflow-y-auto">
           {children}
         </div>
       </main>
