@@ -44,12 +44,25 @@ export const MODULE_NAMES: Record<string, string> = {
   '/scale/admin/orders':   'Scale Orders',
 }
 
-export function getModuleName(pathname: string): string {
-  if (MODULE_NAMES[pathname]) return MODULE_NAMES[pathname]
+/**
+ * The MODULE_NAMES key a pathname resolves to (exact match, or the longest
+ * prefix match for a dynamic detail route like `/app/customers/[id]`) — or
+ * the raw pathname itself if nothing matches. Used as the stable identity
+ * for anything that should be shared across every instance of a route
+ * pattern rather than per exact URL, e.g. window-geometry persistence
+ * (windowGeometryStore.ts): any customer's detail page remembers the same
+ * window position, not a separate one per customer.
+ */
+export function getModuleKey(pathname: string): string {
+  if (MODULE_NAMES[pathname]) return pathname
   const match = Object.keys(MODULE_NAMES)
     .filter(k => pathname.startsWith(k + '/'))
     .sort((a, b) => b.length - a.length)[0]
-  return match ? (MODULE_NAMES[match] ?? 'Renovo Pro') : 'Renovo Pro'
+  return match ?? pathname
+}
+
+export function getModuleName(pathname: string): string {
+  return MODULE_NAMES[getModuleKey(pathname)] ?? 'Renovo Pro'
 }
 
 export const HREF_TO_ICON: Record<string, LucideIcon> = {

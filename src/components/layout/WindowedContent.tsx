@@ -4,7 +4,7 @@ import { useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import { getModuleName, getModuleIcon } from '@/lib/module-names'
 import { useWindowStore } from '@/stores/windowStore'
-import { PageTitleBar } from '@/components/ui/PageTitleBar'
+import { FloatingWindowFrame } from '@/components/layout/FloatingWindowFrame'
 import { useRecordTitle } from '@/hooks/useRecordTitle'
 import { ConfirmDialogProvider } from '@/components/ui/ConfirmDialog'
 
@@ -31,10 +31,9 @@ export function WindowedContent({ children }: { children: React.ReactNode }) {
 
   return (
     <ConfirmDialogProvider>
-      <div className="flex flex-col flex-1 min-h-0">
-        <PageTitleBar title={isDetailPage ? recordTitle : undefined} />
+      <FloatingWindowFrame title={isDetailPage ? recordTitle : undefined}>
         {children}
-      </div>
+      </FloatingWindowFrame>
     </ConfirmDialogProvider>
   )
 }

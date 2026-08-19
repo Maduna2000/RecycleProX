@@ -2,9 +2,8 @@
 
 import { useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
-import { Minus, X } from 'lucide-react'
+import { Minus, Square, Copy, X } from 'lucide-react'
 import { getModuleName } from '@/lib/module-names'
-import { getPageWidthCap } from '@/lib/pageWidthCaps'
 import { useWindowStore } from '@/stores/windowStore'
 import { useTitleBarActionsStore } from '@/stores/titleBarActionsStore'
 import { BAR_GRAD, winBevel, windowTitleText } from '@/components/rpx'
@@ -12,6 +11,15 @@ import { BAR_GRAD, winBevel, windowTitleText } from '@/components/rpx'
 interface PageTitleBarProps {
   /** Override the default module name with a custom title (e.g., record name for detail pages) */
   title?: string | null
+  /** Whether the enclosing window is currently maximized — swaps the
+   * maximize icon for a "restore" one, matching real Win32 chrome. Omit
+   * (or leave both maximize props out) to hide the control entirely, e.g.
+   * when PageTitleBar renders outside FloatingWindowFrame. */
+  isMaximized?: boolean
+  onMaximizeToggle?: () => void
+  /** Starts a move-drag — wired by FloatingWindowFrame, which owns the
+   * actual geometry math. Omit to render a non-draggable bar. */
+  onTitleBarMouseDown?: (e: React.MouseEvent) => void
 }
 
 /** A real Win32-style window control button — hard raised bevel, pushes in
@@ -35,7 +43,7 @@ function WindowControlButton({
       onClick={onClick}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => { setHover(false); setPressed(false) }}
-      onMouseDown={() => setPressed(true)}
+      onMouseDown={(e) => { e.stopPropagation(); setPressed(true) }}
       onMouseUp={() => setPressed(false)}
       title={label}
       aria-label={label}
@@ -53,17 +61,11 @@ function WindowControlButton({
   )
 }
 
-export function PageTitleBar({ title }: PageTitleBarProps = {}) {
+export function PageTitleBar({ title, isMaximized, onMaximizeToggle, onTitleBarMouseDown }: PageTitleBarProps = {}) {
   const pathname = usePathname()
   const router   = useRouter()
   const { windows, closeWindow } = useWindowStore()
   const titleBarActions = useTitleBarActionsStore((s) => s.actions)
-  // widthCap still centers/caps the bar's own width to match the page's
-  // content below (see pageWidthCaps.ts) — but the window chrome itself
-  // (gradient, bevel, border, rounded top corners) is unconditional now, so
-  // every page's title bar fuses with its content card the same way,
-  // capped or full-width.
-  const widthCap = getPageWidthCap(pathname)
 
   const entry = windows.find(w => w.href === pathname)
 
@@ -88,15 +90,15 @@ export function PageTitleBar({ title }: PageTitleBarProps = {}) {
 
   return (
     <div
+      onMouseDown={onTitleBarMouseDown}
       className="flex items-center shrink-0 px-3 select-none"
       style={{
         height: 34,
+        width: '100%',
         background: BAR_GRAD,
         borderRadius: '3px 3px 0 0',
+        cursor: onTitleBarMouseDown ? 'move' : undefined,
         ...winBevel(),
-        ...(widthCap !== null
-          ? { width: '100%', maxWidth: widthCap, margin: '0 auto' }
-          : {}),
       }}
     >
       <span className="shrink-0" style={windowTitleText}>
@@ -104,12 +106,19 @@ export function PageTitleBar({ title }: PageTitleBarProps = {}) {
       </span>
       <div className="flex-1 min-w-0" />
       {titleBarActions && (
-        <div className="flex items-center gap-2 mr-2 min-w-0">
+        <div className="flex items-center gap-2 mr-2 min-w-0" onMouseDown={(e) => e.stopPropagation()}>
           {titleBarActions}
         </div>
       )}
       <div className="flex items-center gap-1 shrink-0">
         <WindowControlButton icon={Minus} label="Minimise" onClick={handleMinimize} />
+        {onMaximizeToggle && (
+          <WindowControlButton
+            icon={isMaximized ? Copy : Square}
+            label={isMaximized ? 'Restore' : 'Maximise'}
+            onClick={onMaximizeToggle}
+          />
+        )}
         <WindowControlButton icon={X} label="Close" onClick={handleClose} dangerHover />
       </div>
     </div>
