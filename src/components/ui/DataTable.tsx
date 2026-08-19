@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom'
 import { ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight, MoreHorizontal, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { colors, statusStyle } from '@/lib/design-tokens'
-import { Btn, HEADER_GRAD, winBevel } from '@/components/rpx'
+import { Btn, HEADER_GRAD, BAR_GRAD, winBevel } from '@/components/rpx'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -231,7 +231,21 @@ export function DataTable<T>({
           auto makes the browser's automatic min-height 0, so flex-shrink
           isn't blocked by the table's intrinsic height) and scrolls
           internally exactly as before. */}
-      <div className="flex-initial overflow-auto bg-white" style={{ borderRadius: 0, ...winBevel(true) }}>
+      <div
+        className="flex-initial overflow-auto bg-white"
+        style={{
+          borderRadius: 0,
+          ...winBevel(true),
+          // winBevel(true)'s sunken bevel puts the "light" (colors.surface,
+          // i.e. pure white) edge on the right/bottom — a real highlight
+          // only reads against a darker surface behind it, but every page
+          // sits this well directly on ContentCard's own white background,
+          // so those two edges were invisible everywhere, not just here.
+          // Override them to the same visible grey as the top/left edges.
+          borderRight: '1px solid #B0B0B0',
+          borderBottom: '1px solid #B0B0B0',
+        }}
+      >
         <table className="w-full text-sm border-collapse">
           {/* Header */}
           <thead className="sticky top-0 z-10">
@@ -457,6 +471,18 @@ export function DataTable<T>({
           </div>
         </div>
       )}
+
+      {/* Decorative footer scroller — a permanent "end of content" cap
+          along the bottom, matching the always-visible scrollbar strip
+          used elsewhere in the app (globals.css). Not a real scrollbar
+          (this table's own horizontal overflow, if any, already gets one)
+          — just a static bar so every page's bottom edge reads the same
+          way whether or not there's anything to actually scroll, and
+          whether or not the pagination footer above it is showing. */}
+      <div
+        className="shrink-0"
+        style={{ height: 14, marginTop: 6, borderRadius: 2, background: BAR_GRAD, border: '1px solid #B0B0B0' }}
+      />
     </div>
   )
 }

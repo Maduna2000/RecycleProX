@@ -10,7 +10,7 @@ import {
 } from 'lucide-react'
 import { colors, fontSize } from '@/lib/design-tokens'
 import type { PhotoRecord } from '@/app/api/photos/search/route'
-import { inp, Btn, Field, PortalPage, FilterBar, RpxDialogContent, RpxDialogFooter } from '@/components/rpx'
+import { inp, Btn, Field, PortalPage, FilterBar, RpxDialogContent, RpxDialogFooter, BAR_GRAD, winBevel } from '@/components/rpx'
 
 
 type PhotosResponse = {
@@ -331,7 +331,20 @@ function PhotoGrid({
         </FilterBar>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-3" style={{ padding: 10 }}>
+      <div className="flex-1 min-h-0 flex flex-col" style={{ padding: 10 }}>
+      <div
+        className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-3 bg-white"
+        style={{
+          padding: 10, borderRadius: 0,
+          ...winBevel(true),
+          // Same fix as DataTable's own well — winBevel(true)'s "light"
+          // right/bottom edges are pure white and invisible against this
+          // white background, so this grid (unlike table pages) had no
+          // visible frame on any side at all.
+          borderRight: '1px solid #B0B0B0',
+          borderBottom: '1px solid #B0B0B0',
+        }}
+      >
 
         {/* Loading */}
         {isLoading && (
@@ -382,6 +395,15 @@ function PhotoGrid({
             <Btn size="sm" icon={ChevronRight} disabled={page >= pageCount} onClick={() => setPage((p) => p + 1)} />
           </div>
         )}
+      </div>
+
+      {/* Decorative footer scroller — same permanent "end of content" cap
+          used on every DataTable page, present whether or not the grid
+          above actually overflows or has pagination showing. */}
+      <div
+        className="shrink-0"
+        style={{ height: 14, marginTop: 6, borderRadius: 2, background: BAR_GRAD, border: '1px solid #B0B0B0' }}
+      />
       </div>
 
       {/* Viewer */}
