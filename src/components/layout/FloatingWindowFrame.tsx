@@ -160,7 +160,7 @@ export function FloatingWindowFrame({ title, children }: { title?: string | null
   const containerStyle: React.CSSProperties = showFloating && rect
     ? {
         position: 'absolute', left: rect.x, top: rect.y, width: rect.width, height: rect.height,
-        display: 'flex', flexDirection: 'column',
+        minHeight: 0, display: 'flex', flexDirection: 'column',
         boxShadow: '4px 4px 16px rgba(0,0,0,0.25)',
       }
     : {
@@ -171,7 +171,15 @@ export function FloatingWindowFrame({ title, children }: { title?: string | null
         // width while the content beneath stays capped, which is the
         // "title bar wider than the page" bug this fixes. Uncapped pages
         // still fill 100%, unchanged.
-        position: 'relative', height: '100%', display: 'flex', flexDirection: 'column',
+        //
+        // `flex: 1, minHeight: 0` (not `height: '100%'` alone) — this div
+        // is still a flex item of Zone 3's flex-column wrapper even though
+        // it's `position: relative`, and without minHeight: 0 a flex item
+        // defaults to refusing to shrink below its own content's natural
+        // height. That silently grew every page's window past its actual
+        // box instead of clipping/scrolling within it — the "no ending at
+        // the bottom, content continues past the footer" bug on every page.
+        position: 'relative', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column',
         ...(widthCap
           ? { width: '100%', maxWidth: widthCap, margin: '0 auto' }
           : { width: '100%' }),
