@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
   const to = searchParams.get('to') ? new Date(searchParams.get('to')!) : undefined
 
   try {
-    const result = await runWithRequestTenant(req, () => listPayments({ customerId, search, paymentMethod, source, includeVoided, page, pageSize, from, to }))
+    const result = await runWithRequestTenant(req, () => listPayments({ customerId, search, paymentMethod, source, includeVoided, page, pageSize, from, to, viewerRole: session.user.role }))
     return NextResponse.json(result)
   } catch (err) {
     logger.error({ err }, 'GET /api/payments failed')

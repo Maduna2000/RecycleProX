@@ -797,10 +797,23 @@ export async function listSales(opts?: {
   paymentMethod?: string
   page?: number
   pageSize?: number
+  // The viewer's own role — an admin's sales are invisible to everyone else
+  // (Sales History, Unpaid Sales), but the admin who made them still sees
+  // them, and another admin viewing sees every admin's sales too. Omitting
+  // this hides nothing, so every existing/background caller is unaffected;
+  // only the two request routes that pass it get the restriction.
+  viewerRole?: string
 }) {
   const page     = opts?.page ?? 1
   const pageSize = opts?.pageSize ?? 50
   const skip     = (page - 1) * pageSize
+
+  // Resolved once and reused in both the page query and the count so the
+  // two stay consistent with each other.
+  const hideAdminSales = !!opts?.viewerRole && opts.viewerRole !== 'admin'
+  const adminUserIds = hideAdminSales
+    ? (await prisma.user.findMany({ where: { role: 'admin' }, select: { id: true } })).map((u) => u.id)
+    : []
 
   const where = {
     ...(opts?.status        && { status:        opts.status        as 'completed' | 'voided' | 'pending' }),
@@ -817,6 +830,9 @@ export async function listSales(opts?: {
         { buyerName:     { contains: opts.search, mode: 'insensitive' as const } },
         { buyerIdNumber: { contains: opts.search, mode: 'insensitive' as const } },
       ],
+    }),
+    ...(hideAdminSales && adminUserIds.length > 0 && {
+      createdByUserId: { notIn: adminUserIds },
     }),
   }
 

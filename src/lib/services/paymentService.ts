@@ -214,10 +214,20 @@ export async function listPayments(opts?: {
   source?: 'sale' | 'purchase'
   page?: number
   pageSize?: number
+  // Same admin-sale-hiding rule as listSales (saleService.ts) — a sale-
+  // sourced payment or direct-sale row is invisible to everyone but the
+  // admin who made the underlying sale (or another admin). Purchase-sourced
+  // rows are never affected. Omitting this hides nothing.
+  viewerRole?: string
 }) {
   const page = opts?.page ?? 1
   const pageSize = opts?.pageSize ?? 50
   const skip = (page - 1) * pageSize
+
+  const hideAdminSales = !!opts?.viewerRole && opts.viewerRole !== 'admin'
+  const adminUserIds = hideAdminSales
+    ? (await prisma.user.findMany({ where: { role: 'admin' }, select: { id: true } })).map((u) => u.id)
+    : []
 
   const where = {
     ...(opts?.customerId && { customerId: opts.customerId }),
@@ -237,6 +247,11 @@ export async function listPayments(opts?: {
         { customer: { lastName: { contains: opts.search, mode: 'insensitive' as const } } },
         { customer: { idNumber: { contains: opts.search, mode: 'insensitive' as const } } },
       ],
+    }),
+    // Only bites sale-sourced rows whose linked sale was made by an admin —
+    // purchase-sourced rows (sale: null) are untouched.
+    ...(hideAdminSales && adminUserIds.length > 0 && {
+      NOT: { source: 'sale' as const, sale: { createdByUserId: { in: adminUserIds } } },
     }),
   }
 
@@ -268,6 +283,9 @@ export async function listPayments(opts?: {
         { customer: { idNumber: { contains: opts.search, mode: 'insensitive' as const } } },
         { buyerName: { contains: opts.search, mode: 'insensitive' as const } },
       ],
+    }),
+    ...(hideAdminSales && adminUserIds.length > 0 && {
+      createdByUserId: { notIn: adminUserIds },
     }),
   }
 
