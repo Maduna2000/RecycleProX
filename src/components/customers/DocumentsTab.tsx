@@ -17,6 +17,7 @@ type CustomerDoc = {
 const DOCUMENT_TYPE_LABELS: Record<string, string> = {
   id_copy:              'ID',
   passport:             'Passport',
+  drivers_licence:      "Driver's License",
   trading_licence:      'Trading License',
   company_registration: 'Company Registration',
   eea_license:          'EEA License',

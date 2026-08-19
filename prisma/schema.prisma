@@ -1376,6 +1376,7 @@ enum CustomerDocumentType {
   other
   passport
   eea_license
+  drivers_licence
 }
 
 enum FloatMovementType {
