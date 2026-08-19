@@ -51,6 +51,15 @@ const PAGE_WIDTH_CAPS: { test: RegExp; width: number }[] = [
   // narrow fixed ones). Scoped to the list page only, not the editor
   // (/price-lists/[id]) or the "new" form.
   { test: /^\/app\/products\/price-lists$/, width: 900 },
+  // Scale Station — every column on both its Orders and Operators tabs
+  // already has an explicit width (no unbounded stretch column), so on an
+  // uncapped page the fixed-width table just sat flush-left with a large
+  // dead gutter beside it, and the filter bar's wide empty middle looked
+  // similarly sparse. One shared width across all three tabs (Orders,
+  // Operators, Config) since they're a single route with client-side tab
+  // switching, not separate pages — sized for Orders' 8 columns (the
+  // widest tab).
+  { test: /^\/app\/scale$/, width: 1100 },
 ]
 
 export function getPageWidthCap(pathname: string): number | null {

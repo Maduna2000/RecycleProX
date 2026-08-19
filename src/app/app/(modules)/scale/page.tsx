@@ -710,9 +710,13 @@ function OrdersTab() {
     <div className="flex flex-col flex-1 min-h-0 gap-2">
       <StatsStrip />
 
-      {/* Filter bar */}
-      <FilterBar>
-        <Field label="Search" width={220}>
+      {/* Filter bar — nowrap + horizontal scroll (flexShrink: 0 per field)
+          instead of flex-wrap, same fix as the Reports module: 7 filters
+          plus 3 action buttons easily needs more width than the window has,
+          and wrapping to a second/third line was exactly the "a lot of
+          space" look this closes up. */}
+      <FilterBar style={{ flexWrap: 'nowrap', overflowX: 'auto' }}>
+        <Field label="Search" width={220} style={{ flexShrink: 0 }}>
           <div style={{ position: 'relative' }}>
             <Search style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', width: 12, height: 12, color: '#6C757D' }} />
             <input
@@ -723,7 +727,7 @@ function OrdersTab() {
             />
           </div>
         </Field>
-        <Field label="Status" width={120}>
+        <Field label="Status" width={120} style={{ flexShrink: 0 }}>
           <select style={inp} value={status} onChange={e => { setStatus(e.target.value); setPage(1) }}>
             <option value="">All Statuses</option>
             <option value="pending">Pending</option>
@@ -731,40 +735,40 @@ function OrdersTab() {
             <option value="voided">Voided</option>
           </select>
         </Field>
-        <Field label="Customer" width={120}>
+        <Field label="Customer" width={120} style={{ flexShrink: 0 }}>
           <select style={inp} value={customerType} onChange={e => { setCustomerType(e.target.value); setPage(1) }}>
             <option value="">All Customers</option>
             <option value="casual">Walk-in</option>
             <option value="account">Account</option>
           </select>
         </Field>
-        <Field label="Category" width={140}>
+        <Field label="Category" width={140} style={{ flexShrink: 0 }}>
           <select style={inp} value={categoryName} onChange={e => { setCategoryName(e.target.value); setPage(1) }}>
             <option value="">All Categories</option>
             {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
           </select>
         </Field>
-        <Field label="Operator" width={140}>
+        <Field label="Operator" width={140} style={{ flexShrink: 0 }}>
           <select style={inp} value={operatorId} onChange={e => { setOperatorId(e.target.value); setPage(1) }}>
             <option value="">All Operators</option>
             {operators.map(op => <option key={op.id} value={op.id}>{op.fullName}</option>)}
           </select>
         </Field>
-        <Field label="From" width={140}>
+        <Field label="From" width={140} style={{ flexShrink: 0 }}>
           <input type="date" style={inp} value={dateFrom} onChange={e => { setDateFrom(e.target.value); setPage(1) }} />
         </Field>
-        <Field label="To" width={140}>
+        <Field label="To" width={140} style={{ flexShrink: 0 }}>
           <input type="date" style={inp} value={dateTo} onChange={e => { setDateTo(e.target.value); setPage(1) }} />
         </Field>
         {hasFilters && (
-          <Field label={' '}>
+          <Field label={' '} style={{ flexShrink: 0 }}>
             <Btn size="sm" icon={X} onClick={clearFilters}>Reset</Btn>
           </Field>
         )}
-        <Field label={' '}>
+        <Field label={' '} style={{ flexShrink: 0 }}>
           <Btn size="sm" icon={RefreshCw} onClick={() => fetchOrders(page)} title="Refresh">Refresh</Btn>
         </Field>
-        <Field label={' '}>
+        <Field label={' '} style={{ flexShrink: 0 }}>
           <BtnMenu
             size="sm"
             icon={Download}
@@ -776,7 +780,7 @@ function OrdersTab() {
             ]}
           />
         </Field>
-        <span style={{ fontSize: 11, color: '#6C757D', marginLeft: 'auto', paddingBottom: 8 }}>
+        <span style={{ fontSize: 11, color: '#6C757D', marginLeft: 'auto', paddingBottom: 8, flexShrink: 0 }}>
           {total} order{total !== 1 ? 's' : ''}
         </span>
       </FilterBar>
@@ -934,8 +938,8 @@ function OperatorsTab() {
 
   return (
     <div className="flex flex-col flex-1 min-h-0 gap-3">
-      <FilterBar>
-        <Field label="Search" width={230}>
+      <FilterBar style={{ flexWrap: 'nowrap', overflowX: 'auto' }}>
+        <Field label="Search" width={230} style={{ flexShrink: 0 }}>
           <div style={{ position: 'relative' }}>
             <Search style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', width: 12, height: 12, color: '#6C757D' }} />
             <input
@@ -946,7 +950,7 @@ function OperatorsTab() {
             />
           </div>
         </Field>
-        <span style={{ marginLeft: 'auto', paddingBottom: 8 }}>
+        <span style={{ marginLeft: 'auto', paddingBottom: 8, flexShrink: 0 }}>
           <Btn size="sm" variant="primary" icon={UserPlus} onClick={() => setShowCreate(true)}>Create Operator</Btn>
         </span>
       </FilterBar>
@@ -1135,10 +1139,15 @@ function ScaleManagementInner() {
   }
 
   return (
+    // maxWidth matches src/lib/pageWidthCaps.ts, which PageTitleBar reads to
+    // cap/border itself to match — every column on Orders/Operators already
+    // has a fixed width, so an uncapped page just left a large dead gutter
+    // beside the table instead of stretching any column into it.
     <PortalPage
       tabs={[...TABS]}
       active={activeTab}
       onChange={changeTab}
+      maxWidth={1100}
     >
       {activeTab === 'orders'    && <OrdersTab />}
       {activeTab === 'operators' && <OperatorsTab />}
