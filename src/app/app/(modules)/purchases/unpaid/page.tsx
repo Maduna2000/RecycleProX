@@ -209,26 +209,6 @@ export default function UnpaidPurchasesPage() {
     // from stretching to fill the whole window.
     <PortalPage title="Unpaid Purchases" maxWidth={1050}>
 
-      {/* Grand total banner */}
-      {!isLoading && purchases.length > 0 && (
-        <div
-          className="flex items-center gap-4 px-4 py-3 shrink-0"
-          style={{ background: colors.alertBg, borderBottom: `1px solid ${colors.alertBorder}` }}
-        >
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: colors.alertIcon }}>
-              Total Outstanding
-            </p>
-            <p className="font-mono font-bold" style={{ fontSize: fontSize['2xl'], color: colors.alertText }}>
-              R {grandTotal.toFixed(2)}
-            </p>
-          </div>
-          <p className="ml-4 text-xs" style={{ color: colors.alertIcon }}>
-            {purchases.length} unpaid purchase{purchases.length !== 1 ? 's' : ''}
-          </p>
-        </div>
-      )}
-
       {/* Filter bar */}
       <FilterBar>
         <Field label="Search" width={230}>
@@ -252,6 +232,22 @@ export default function UnpaidPurchasesPage() {
           <Btn size="sm" icon={X} onClick={clearFilters}>Clear</Btn>
         )}
       </FilterBar>
+
+      {/* Total outstanding — same summary-card layout as Sales Payments'
+          "Total Received", instead of the previous full-width alert banner. */}
+      {!isLoading && purchases.length > 0 && (
+        <div className="flex items-center gap-3" style={{ padding: '0 10px' }}>
+          <div
+            className="flex-1 rounded-lg px-3 py-2"
+            style={{ background: colors.alertBg, border: `1px solid ${colors.alertBorder}` }}
+          >
+            <p style={{ fontSize: fontSize.xs, color: colors.alertIcon }}>Total Outstanding</p>
+            <p className="font-mono font-semibold" style={{ fontSize: fontSize.md, color: colors.alertText }}>
+              R {grandTotal.toFixed(2)}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Table */}
       <div className="flex-1 min-h-0" style={{ padding: 10 }}>

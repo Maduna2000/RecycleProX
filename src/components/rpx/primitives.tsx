@@ -217,7 +217,17 @@ export function PortalPage({
     >
       <div style={maxWidth ? { width: '100%', maxWidth, margin: '0 auto', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 } : { display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
       {(hasTabs || actions) && (
-        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, flexShrink: 0 }}>
+        // Only the tab buttons themselves draw a border — the row's own
+        // background is transparent, so the stretch beside them (there's
+        // always some once actions don't fill the rest, and always all of
+        // it when there's no `actions` at all) showed bare page background
+        // instead of any line, for the row's full height, before
+        // ContentCard's own top border finally closed things off one row
+        // below. That read as the frame not connecting on that side. A
+        // border-bottom here — the same CARD_BORDER ContentCard already
+        // draws — closes the seam continuously across the full width
+        // immediately below the title bar, no matter where the tabs end.
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, flexShrink: 0, borderBottom: CARD_BORDER }}>
           {hasTabs && (
             <TabStrip tabs={tabs!} active={active ?? tabs![0]?.value ?? ''} onChange={onChange ?? (() => {})} />
           )}
