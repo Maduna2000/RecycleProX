@@ -457,7 +457,7 @@ export async function listCustomerDocuments(customerId: string) {
 // than imported from @prisma/client because SQLite's Prisma connector has no
 // enum support (see scripts/generate-sqlite-schema.ts), so the enum becomes
 // a plain `string` on the Desktop client.
-type CustomerDocumentType = 'id_copy' | 'passport' | 'trading_licence' | 'company_registration' | 'eea_license' | 'sars_certificate' | 'other'
+type CustomerDocumentType = 'id_copy' | 'passport' | 'drivers_licence' | 'trading_licence' | 'company_registration' | 'eea_license' | 'sars_certificate' | 'other'
 
 export async function addCustomerDocument(
   customerId: string,

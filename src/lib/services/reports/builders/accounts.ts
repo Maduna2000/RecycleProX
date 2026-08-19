@@ -3,6 +3,7 @@
  */
 import Decimal from 'decimal.js'
 import { prisma } from '@/lib/db/prisma'
+import { ID_LIKE_DOCUMENT_TYPES } from '@/lib/customerDocuments'
 import { getRangeBoundsSAST } from '@/lib/utils/dayBounds'
 import type { ReportDocument, ReportGroup, ReportMeta, ReportRow } from '@/lib/reports/types'
 import type { BaseReportParams, SellerIdUploadStatusParams } from '@/lib/schemas/report'
@@ -166,7 +167,8 @@ export async function buildAccountList(
 /**
  * Account (dealer) customers as at the "to" date, with whether an "ID"
  * document has been uploaded via the customer profile's Documents tab
- * (CustomerDocument, documentType 'id_copy') — the dedicated ID Photo field
+ * (CustomerDocument, documentType in ID_LIKE_DOCUMENT_TYPES — a national ID,
+ * passport, or driver's license all count) — the dedicated ID Photo field
  * (idPhotoR2Key, set during gate/scale/purchase intake) is a separate,
  * older mechanism and deliberately not counted here.
  */
@@ -192,7 +194,7 @@ export async function buildAccountIdUploadStatus(
   const customerIds = customers.map((c) => c.id)
   const idDocs = customerIds.length > 0
     ? await prisma.customerDocument.findMany({
-        where: { customerId: { in: customerIds }, documentType: 'id_copy' },
+        where: { customerId: { in: customerIds }, documentType: { in: ID_LIKE_DOCUMENT_TYPES } },
         select: { customerId: true },
       })
     : []
@@ -236,8 +238,9 @@ export async function buildAccountIdUploadStatus(
 /**
  * Casual (walk-in) sellers as at the "to" date, with whether an "ID"
  * document has been uploaded via the customer profile's Documents tab
- * (CustomerDocument, documentType 'id_copy') — same rule as the account
- * version, deliberately not counting the older idPhotoR2Key field.
+ * (CustomerDocument, documentType in ID_LIKE_DOCUMENT_TYPES) — same rule
+ * as the account version, deliberately not counting the older
+ * idPhotoR2Key field.
  */
 export async function buildCasualIdUploadStatus(
   params: BaseReportParams,
@@ -260,7 +263,7 @@ export async function buildCasualIdUploadStatus(
   const customerIds = customers.map((c) => c.id)
   const idDocs = customerIds.length > 0
     ? await prisma.customerDocument.findMany({
-        where: { customerId: { in: customerIds }, documentType: 'id_copy' },
+        where: { customerId: { in: customerIds }, documentType: { in: ID_LIKE_DOCUMENT_TYPES } },
         select: { customerId: true },
       })
     : []
@@ -349,7 +352,8 @@ export async function buildCasualList(
 /**
  * Casual and/or account sellers who actually sold to the business (had a
  * completed purchase) within the date range, with their ID upload status
- * (same 'id_copy' CustomerDocument rule as the other ID-status reports).
+ * (same ID_LIKE_DOCUMENT_TYPES CustomerDocument rule as the other
+ * ID-status reports).
  * customerType/idUploaded narrow which sellers are *listed*, but the
  * with-ID/without-ID summary totals always reflect everyone who sold in
  * the period (before the idUploaded filter), so the two counts stay
@@ -381,7 +385,7 @@ export async function buildSellerIdUploadStatus(
   const sellerIds = sellers.map((s) => s.id)
   const idDocs = sellerIds.length > 0
     ? await prisma.customerDocument.findMany({
-        where: { customerId: { in: sellerIds }, documentType: 'id_copy' },
+        where: { customerId: { in: sellerIds }, documentType: { in: ID_LIKE_DOCUMENT_TYPES } },
         select: { customerId: true },
       })
     : []

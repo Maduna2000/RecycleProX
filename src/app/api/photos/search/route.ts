@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { prisma } from '@/lib/db/prisma'
 import { getViewUrl } from '@/lib/r2'
+import { ID_LIKE_DOCUMENT_TYPES } from '@/lib/customerDocuments'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 // Photo record shape returned to the client
@@ -215,12 +216,14 @@ export async function GET(req: NextRequest) {
 
     // ── ID photos (account + casual) ──────────────────────────────────────────
     // Sourced from the customer profile's Documents tab (CustomerDocument,
-    // documentType 'id_copy') — the same source of truth as the Account/Casual
-    // ID Upload Status reports — not the older idPhotoR2Key field.
+    // documentType in ID_LIKE_DOCUMENT_TYPES — a national ID, passport, or
+    // driver's license all count as identification) — the same source of
+    // truth as the Account/Casual ID Upload Status reports — not the older
+    // idPhotoR2Key field.
     if (!type || type === 'casual') {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const docWhere: any = {
-        documentType: 'id_copy',
+        documentType: { in: ID_LIKE_DOCUMENT_TYPES },
         ...(customerId && { customerId }),
         ...((from || to) && {
           uploadedAt: {
