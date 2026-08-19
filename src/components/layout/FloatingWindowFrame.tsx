@@ -19,6 +19,7 @@ import { getModuleKey } from '@/lib/module-names'
 import { getPageWidthCap } from '@/lib/pageWidthCaps'
 import { useWindowGeometryStore } from '@/stores/windowGeometryStore'
 import { PageTitleBar } from '@/components/ui/PageTitleBar'
+import { WindowFloatingContext } from '@/lib/windowFloatingContext'
 
 const MIN_WIDTH = 560
 const MIN_HEIGHT = 360
@@ -194,7 +195,9 @@ export function FloatingWindowFrame({ title, children }: { title?: string | null
         onTitleBarMouseDown={isSmallViewport ? undefined : handleTitleBarMouseDown}
       />
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-        {children}
+        <WindowFloatingContext.Provider value={showFloating}>
+          {children}
+        </WindowFloatingContext.Provider>
       </div>
 
       {!isSmallViewport && showFloating && (

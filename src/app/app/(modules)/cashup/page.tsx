@@ -1175,15 +1175,20 @@ export default function CashUpPage() {
   }
 
   return (
-    // maxWidth matches this page's own long-standing max-w-6xl (1152px)
-    // content wrapper below — see src/lib/pageWidthCaps.ts, which
-    // PageTitleBar reads to cap/border itself to match. The date/status/
+    // maxWidth (1152px, ex-max-w-6xl) is now PortalPage's job entirely — see
+    // src/lib/pageWidthCaps.ts, which PageTitleBar reads to cap/border
+    // itself to match. The inner wrapper used to duplicate this same cap
+    // with its own max-w-6xl class, which stopped this page's content from
+    // actually growing when the window is manually resized wider (only the
+    // window's border moved) — PortalPage's own cap already relaxes once
+    // the window is floating (see useIsWindowFloating), so this wrapper
+    // just needs to fill whatever width it's given now. The date/status/
     // Refresh cluster now lives in the title bar itself (useTitleBarActions
     // above) instead of here, so there's no more actions prop / near-empty
     // row between the title bar and the content.
     <PortalPage title="Cash-Up" maxWidth={1152}>
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-      <div className="max-w-6xl mx-auto w-full space-y-2 pb-2" style={{ padding: '6px 8px 0' }}>
+      <div className="w-full space-y-2 pb-2" style={{ padding: '6px 8px 0' }}>
 
         {/* No session */}
         {!cashUp && (

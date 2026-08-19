@@ -7,6 +7,7 @@
 
 import { colors } from '@/lib/design-tokens'
 import { NAVY, CARD_BORDER, lbl } from './styles'
+import { useIsWindowFloating } from '@/lib/windowFloatingContext'
 
 // ─── Field / FormLabel ────────────────────────────────────────────────────────
 
@@ -202,20 +203,26 @@ export function PortalPage({
   /**
    * Caps and centers the tab row (if any) and ContentCard together to this
    * width, instead of the default full-bleed layout — for pages that don't
-   * need the full window width (see src/lib/pageWidthCaps.ts, which
-   * PageTitleBar reads to cap/border itself to match, so the two fuse into
-   * one framed page).
+   * need the full window width (see src/lib/pageWidthCaps.ts). This is only
+   * the window's *default* width now, not a permanent ceiling: once the
+   * user has manually resized the enclosing FloatingWindowFrame wider (see
+   * useIsWindowFloating below), this cap stops applying so the table/content
+   * actually grows with the window instead of staying stuck at its original
+   * size while only the window's border moves. Outside a FloatingWindowFrame
+   * (the standalone police/scale/gate/ledger apps), the cap always applies.
    */
   maxWidth?: number
 }) {
   const hasTabs = !!tabs && tabs.length > 0
+  const isFloating = useIsWindowFloating()
+  const effectiveMaxWidth = isFloating ? undefined : maxWidth
 
   return (
     <div
       style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}
       aria-label={hasTabs ? undefined : title}
     >
-      <div style={maxWidth ? { width: '100%', maxWidth, margin: '0 auto', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 } : { display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+      <div style={effectiveMaxWidth ? { width: '100%', maxWidth: effectiveMaxWidth, margin: '0 auto', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 } : { display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
       {(hasTabs || actions) && (
         // Only the tab buttons themselves draw a border — the row's own
         // background is transparent, so the stretch beside them (there's
