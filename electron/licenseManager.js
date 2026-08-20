@@ -87,7 +87,14 @@ async function activate(activationCode, portalBaseUrl, appVersion) {
   store.set('companySlug', result.companySlug)
   store.set('schemaName', result.schemaName)
   store.set('lastCheckAt', new Date().toISOString())
-  store.set('lastKnownStatus', result)
+  // runtimeConfig (desktop.env values — real DB credentials) is deliberately
+  // never persisted here. electron-store's own encryption is obfuscation,
+  // not real security (see the comment on `store` above) — the one place
+  // this belongs on disk is desktop.env itself (main.js writes it), not a
+  // second copy sitting in the license store. Stripped before persisting;
+  // still returned below so main.js can consume it this one time.
+  const { runtimeConfig: _omit, ...persistedStatus } = result
+  store.set('lastKnownStatus', persistedStatus)
   return result
 }
 
@@ -105,7 +112,10 @@ async function heartbeat(portalBaseUrl, appVersion) {
 
   const result = await res.json()
   store.set('lastCheckAt', new Date().toISOString())
-  store.set('lastKnownStatus', result)
+  // Same reasoning as activate() above — never persist runtimeConfig into
+  // electron-store, only into desktop.env itself.
+  const { runtimeConfig: _omit, ...persistedStatus } = result
+  store.set('lastKnownStatus', persistedStatus)
   return result
 }
 

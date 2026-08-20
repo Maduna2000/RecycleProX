@@ -26,6 +26,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   installUpdate: () => ipcRenderer.invoke('install-update'),
 
+  // Auto-provisioned desktop.env — main process pushes a status change
+  // whenever the Portal hands back a changed runtimeConfig on heartbeat
+  // (electron/main.js's sendConfigStatus); restartApp() applies it, same
+  // "never forced mid-shift" pattern as the app-update chip above.
+  onConfigStatus: (callback) => {
+    const listener = (_event, status) => callback(status)
+    ipcRenderer.on('config-status', listener)
+    return () => ipcRenderer.removeListener('config-status', listener)
+  },
+  restartApp: () => ipcRenderer.invoke('restart-app'),
+
   // Detect if running inside Electron
   isElectron: true,
 })

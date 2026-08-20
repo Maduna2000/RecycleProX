@@ -23,6 +23,7 @@ import { cn } from '@/lib/utils'
 import { useOfflineStore } from '@/stores/offlineStore'
 import { usePrinterStatusStore } from '@/stores/printerStatusStore'
 import { useUpdateStore } from '@/stores/updateStore'
+import { useConfigStore } from '@/stores/configStore'
 import { getModuleName } from '@/lib/module-names'
 import { WindowTaskbar } from '@/components/ui/WindowTaskbar'
 import { useRecordTitle } from '@/hooks/useRecordTitle'
@@ -520,6 +521,30 @@ function UpdateChip() {
   )
 }
 
+// ─── ConfigRefreshChip ──────────────────────────────────────────────────────
+//
+// Shown when the Portal has handed back a changed desktop.env on heartbeat
+// (a rotated credential, a reissued device token) — see
+// useDesktopConfigRefresh.ts. The file is already rewritten on disk; this
+// only offers to restart the app to actually pick it up, same soft,
+// operator-chosen timing as UpdateChip above, never forced mid-shift.
+function ConfigRefreshChip() {
+  const needsRestart = useConfigStore((s) => s.needsRestart)
+  if (!needsRestart) return null
+
+  return (
+    <button
+      type="button"
+      onClick={() => window.electronAPI?.restartApp()}
+      title="Updated device configuration is ready — click to restart and apply it"
+      className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium shrink-0 bg-emerald-900/30 text-emerald-200 hover:bg-emerald-900/50 transition-colors"
+    >
+      <RefreshCw className="w-3 h-3" />
+      <span className="hidden sm:inline">Restart to apply config</span>
+    </button>
+  )
+}
+
 // ─── Taskbar ──────────────────────────────────────────────────────────────────
 
 function Taskbar() {
@@ -818,6 +843,7 @@ export function AppShell({
           <OfflineChip />
           <PrinterStatusChip />
           <UpdateChip />
+          <ConfigRefreshChip />
           <UserMenu role={role} fullName={fullName} />
         </div>
       </header>

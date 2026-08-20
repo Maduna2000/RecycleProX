@@ -28,12 +28,40 @@ by the default packaging pipeline.
 
 ## First-run setup on the target PC
 
-The installer does **not** bundle production database credentials. After
-installing, copy `electron/desktop.env.example` to the app's userData
-folder as `desktop.env` (Windows: `%APPDATA%\renovopro\desktop.env`) and
-fill in the real values — see that file's own comments for where to find
-each one. The app shows a clear "Setup Required" dialog with the exact
-expected path if this file is missing or incomplete.
+The installer does **not** bundle production database credentials — but the
+operator never has to source or type one either. Entering the one-time
+activation code the Portal issues is the only setup step: on success, the
+Portal's `POST /api/desktop/activate` response includes a `runtimeConfig`
+block, and `electron/main.js` writes `desktop.env` from it automatically
+(`writeDesktopEnv()`). No dashboard, no manual file, no production
+credential ever passes through a person.
+
+**Credential model (Phase 1 of a planned two-phase rollout):** every device
+today still receives the same underlying restricted `app_runtime` Postgres
+connection string (never the owner/admin one — see `desktop.env.example`),
+just delivered by the Portal instead of copy-pasted from Vercel's dashboard.
+A revoked/blocked device stops receiving it on its next heartbeat, but an
+already-cached copy on a since-revoked till isn't invalidated until that
+shared secret is rotated — full per-device credential isolation (distinct
+Postgres roles, instantly revocable) is a deliberately separate, larger
+follow-up, not yet built.
+
+**Config refresh while running:** every heartbeat (every 8h) can bring back
+an updated `runtimeConfig` — a rotated secret, a reissued token. `desktop.env`
+is rewritten on disk immediately either way, but the already-running local
+server keeps using what it was started with (no hot-swapping env vars into
+a live process) until the operator restarts — a "Restart to apply config"
+chip appears in the app header, same soft, never-forced-mid-shift pattern
+as the existing app-update chip. This also applies to a revoked device: it
+still gets a rewritten (if stale) file rather than silently drifting, and
+is never hard-killed mid-shift.
+
+The manual path — copy `electron/desktop.env.example` to
+`%APPDATA%\renovopro\desktop.env` and fill in the real values by hand — still
+works as a fallback: for `provision-till.ps1`'s network-share pre-seeding,
+or a support scenario needing a hand-edited value. The app still shows a
+clear "Setup Required" dialog with the exact expected path if activation
+hasn't run and no file exists yet.
 
 The installer is **per-machine** (`nsis.perMachine` in `package.json`) and
 shows a license/EULA acceptance screen (`electron/LICENSE.txt`) — one

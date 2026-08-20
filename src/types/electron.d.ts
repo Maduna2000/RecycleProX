@@ -18,6 +18,10 @@ interface ElectronAPI {
   // unsubscribe function, matching the addEventListener-style convention.
   onUpdateStatus:   (callback: (status: UpdateStatus) => void) => () => void
   installUpdate:    () => Promise<void>
+  // Auto-provisioned desktop.env — see electron/main.js's sendConfigStatus
+  // and the heartbeat-loop callback that fires it.
+  onConfigStatus:   (callback: (status: ConfigStatus) => void) => () => void
+  restartApp:       () => Promise<void>
 }
 
 declare global {
@@ -38,6 +42,14 @@ declare global {
     status:  'available' | 'none' | 'downloading' | 'ready'
     version?: string
     percent?: number
+  }
+
+  // Mirrors electron/main.js's sendConfigStatus() payload shape. Only ever
+  // 'ready' today (the Portal handed back a changed runtimeConfig) — kept
+  // as a status union rather than a bare boolean so it can grow the same
+  // way UpdateStatus did without a breaking shape change.
+  interface ConfigStatus {
+    status: 'ready'
   }
 
   interface Window {
