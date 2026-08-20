@@ -6,9 +6,6 @@
 const { contextBridge, ipcRenderer } = require('electron')
 
 contextBridge.exposeInMainWorld('electronAPI', {
-  // Scale hardware
-  readScale:     (scaleNum) => ipcRenderer.invoke('read-scale', scaleNum),
-
   // Thermal printer
   printSlip:     (data)     => ipcRenderer.invoke('print-slip', data),
   openCashDrawer:()         => ipcRenderer.invoke('open-cash-drawer'),
