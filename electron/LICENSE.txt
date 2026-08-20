@@ -1,0 +1,42 @@
+RENOVO PRO — END-USER LICENSE AGREEMENT
+
+Renovo Pro is proprietary software owned by Golden Key Investments (Pty)
+Ltd, Matsapha, Eswatini ("the Company"). By installing this application
+you agree to the following terms:
+
+1. GRANT OF LICENSE
+   The Company grants you a non-exclusive, non-transferable license to
+   install and use Renovo Pro on the devices covered by your active
+   subscription, for the purpose of operating your recycling/scrap yard
+   business.
+
+2. OWNERSHIP
+   Renovo Pro, including its source code, design, and documentation,
+   remains the exclusive property of the Company. This license does not
+   transfer any ownership rights.
+
+3. RESTRICTIONS
+   You may not reverse-engineer, decompile, redistribute, sublicense, or
+   resell this software without the Company's prior written consent.
+
+4. DATA
+   Renovo Pro connects to a shared production database over the internet.
+   Access is gated by a per-device activation code issued by the Company
+   and may be revoked if your subscription lapses or is suspended.
+
+5. UPDATES
+   The application may check for and install updates automatically. You
+   may decline an individual update, but continued use requires a
+   supported version.
+
+6. WARRANTY
+   Renovo Pro is provided "as is" without warranty of any kind, express or
+   implied, except as otherwise agreed in a separate written support
+   agreement with the Company.
+
+7. SUPPORT
+   For support, contact your Renovo Pro administrator or Golden Key
+   Investments (Pty) Ltd directly.
+
+By clicking "I Agree" you acknowledge that you have read and accept these
+terms.

@@ -109,6 +109,34 @@ async function heartbeat(portalBaseUrl, appVersion) {
   return result
 }
 
+/**
+ * Best-effort, fire-and-forget report of a fatal desktop error (uncaught
+ * exception, server crash) to the same Portal every activation/heartbeat
+ * call already talks to — so a rollout across multiple tills is visible in
+ * one place instead of only ever discoverable by someone physically opening
+ * this one machine's local log file (see electron/main.js's LOG_FILE).
+ *
+ * Deliberately never throws and never blocks anything on its result: until
+ * the Portal (a separate repo) adds a matching POST /api/desktop/error-report
+ * route, this 404s and is silently swallowed — the same "wired client-side,
+ * turns on the moment the other end exists" pattern already used for code
+ * signing and the auto-update feed (see electron/README.md).
+ */
+async function reportFatalError(portalBaseUrl, appVersion, reason, message) {
+  try {
+    const deviceToken = store.get('deviceToken')
+    await fetch(`${portalBaseUrl}/api/desktop/error-report`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ deviceToken: deviceToken ?? null, reason, message, ...deviceInfo(appVersion) }),
+      signal: AbortSignal.timeout(5000),
+    })
+  } catch {
+    // Offline, Portal unreachable, or the endpoint doesn't exist yet —
+    // never let error *reporting* itself become a second failure.
+  }
+}
+
 // Computed purely from local state — callable while offline. One of:
 //   'not_activated' | 'blocked' | 'normal' | 'grace_warning' | 'read_only'
 // 'blocked' reflects the last known server verdict (subscription/company
@@ -151,6 +179,7 @@ module.exports = {
   getStoredLicense,
   activate,
   heartbeat,
+  reportFatalError,
   getAccessState,
   startHeartbeatLoop,
   DEFAULT_OFFLINE_GRACE_DAYS,

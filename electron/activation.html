@@ -48,24 +48,41 @@
   <div class="card">
     <h1>Activate Renovo Pro</h1>
     <p>Enter the activation code your platform administrator gave you.</p>
-    <input id="code" type="text" placeholder="rpt_..." autofocus />
-    <button id="activateBtn">Activate</button>
+    <form id="activateForm">
+      <input id="code" type="text" placeholder="rpt_..." autofocus />
+      <button id="activateBtn" type="submit">Activate</button>
+    </form>
     <div id="error" class="error"></div>
   </div>
 
   <script>
+    const form = document.getElementById('activateForm')
     const btn = document.getElementById('activateBtn')
     const input = document.getElementById('code')
     const errorEl = document.getElementById('error')
 
-    btn.addEventListener('click', async () => {
+    // A network-level failure (no internet yet on a freshly unboxed till)
+    // throws a raw "Failed to fetch"/"fetch failed" from the platform —
+    // technically accurate, meaningless to whoever is setting up the
+    // machine. Caught here and given a message that actually tells them
+    // what to check.
+    function friendlyMessage(err) {
+      const raw = err && err.message ? err.message : ''
+      if (/fetch|network|ENOTFOUND|ECONNREFUSED|ETIMEDOUT/i.test(raw)) {
+        return 'No internet connection — activation needs to reach the Renovo Pro Portal. Check this PC\'s network connection and try again.'
+      }
+      return raw || 'Activation failed'
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault()
       errorEl.textContent = ''
       btn.disabled = true
       btn.textContent = 'Activating…'
       try {
         await window.electronAPI.activateDevice(input.value.trim())
       } catch (err) {
-        errorEl.textContent = err.message || 'Activation failed'
+        errorEl.textContent = friendlyMessage(err)
         btn.disabled = false
         btn.textContent = 'Activate'
       }

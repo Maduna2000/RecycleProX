@@ -93,7 +93,9 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
-      "runAfterFinish": true
+      "runAfterFinish": true,
+      "license": "electron/LICENSE.txt",
+      "perMachine": true
     }
   },
   "prisma": {

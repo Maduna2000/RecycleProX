@@ -11,14 +11,22 @@
 const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, dialog, shell, session } = require('electron')
 const path = require('node:path')
 const fs = require('node:fs')
+const net = require('node:net')
 const { spawn } = require('node:child_process')
 const { autoUpdater } = require('electron-updater')
 const licenseManager = require('./licenseManager')
 
 let mainWindow = null
+let splashWindow = null
 let tray = null
 let serverProcess = null
 let heartbeatTimer = null
+// Set the moment the spawned server process exits, for any reason, so the
+// startup wait loop below can tell "still starting" (no signal yet) apart
+// from "already dead" (this set) instead of treating both identically —
+// see waitForServerReady()'s own comment for what that confusion used to
+// look like to a user.
+let serverExitInfo = null
 
 const isDev = !app.isPackaged
 const PORT = process.env.PORT || 3100 // distinct from Web's 3000 so both can run side by side during dev
@@ -60,6 +68,7 @@ for (const level of ['log', 'warn', 'error']) {
 
 process.on('uncaughtException', (err) => {
   logToFile(`[uncaughtException] ${err.stack || err.message}`)
+  licenseManager.reportFatalError(PORTAL_BASE_URL, app.getVersion(), 'uncaughtException', err.message)
   dialog.showErrorBox('Renovo Pro — Unexpected Error', `${err.message}\n\nDetails were written to:\n${LOG_FILE}`)
 })
 
@@ -173,9 +182,27 @@ function resolveBundlePaths() {
 // bundling a separate Node.js binary just for them.
 const RUN_AS_NODE_ENV = { ELECTRON_RUN_AS_NODE: '1' }
 
+/**
+ * Resolves true only if 127.0.0.1:PORT is free to bind — false for anything
+ * else (already bound, permission denied, ...). Checked once before every
+ * spawn: a zombie server process left over from a previous crash or an
+ * unclean shutdown binds this exact port just as effectively as a brand new
+ * one, and without this check that produces the same silent "never comes
+ * up" symptom as a slow first boot (see waitForServerReady()).
+ */
+function isPortFree(port) {
+  return new Promise((resolve) => {
+    const tester = net.createServer()
+    tester.once('error', () => resolve(false))
+    tester.once('listening', () => tester.close(() => resolve(true)))
+    tester.listen(port, '127.0.0.1')
+  })
+}
+
 function startStandaloneServer(desktopEnv) {
   const { standaloneServer } = resolveBundlePaths()
   console.log(`[server] starting standalone server: ${standaloneServer}`)
+  serverExitInfo = null
 
   serverProcess = spawn(process.execPath, [standaloneServer], {
     env: {
@@ -201,26 +228,38 @@ function startStandaloneServer(desktopEnv) {
   serverProcess.stdout.on('data', (chunk) => logToFile(`[server:stdout] ${chunk.toString().trimEnd()}`))
   serverProcess.stderr.on('data', (chunk) => logToFile(`[server:stderr] ${chunk.toString().trimEnd()}`))
 
-  serverProcess.on('exit', (code) => {
-    console.error(`[server] standalone server exited unexpectedly (code ${code})`)
+  serverProcess.on('exit', (code, signal) => {
+    console.error(`[server] standalone server exited unexpectedly (code ${code}, signal ${signal})`)
+    serverExitInfo = { code, signal }
     serverProcess = null
   })
 }
 
+/**
+ * Polls until the server responds or gives up — but "gives up" now has two
+ * distinct outcomes instead of one: 'timeout' (nothing came up in time —
+ * possibly just a slow first boot) and 'crashed' (the process already
+ * exited, so continuing to poll would never succeed no matter how long we
+ * waited). startApp() shows a different, specific dialog for each instead
+ * of the single "Still Starting" prompt that used to cover both.
+ */
 async function waitForServerReady(maxAttempts = 60) {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    if (serverExitInfo) return { ready: false, reason: 'crashed' }
     try {
       const res = await fetch(`http://127.0.0.1:${PORT}/login`)
-      if (res.ok || res.status === 200 || res.status === 307) return true
+      if (res.ok || res.status === 200 || res.status === 307) return { ready: true }
     } catch {
       // not up yet
     }
     await new Promise((resolve) => setTimeout(resolve, 500))
   }
-  return false
+  return { ready: false, reason: serverExitInfo ? 'crashed' : 'timeout' }
 }
 
 // ─── Windows ────────────────────────────────────────────────────────────────
+
+const APP_ICON_PATH = path.join(__dirname, '..', 'assets', 'icon.png')
 
 function createActivationWindow() {
   mainWindow = new BrowserWindow({
@@ -228,6 +267,7 @@ function createActivationWindow() {
     height: 420,
     resizable: false,
     backgroundColor: '#1B3A6B',
+    icon: APP_ICON_PATH,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -236,6 +276,31 @@ function createActivationWindow() {
     },
   })
   mainWindow.loadFile(path.join(__dirname, 'activation.html'))
+}
+
+// Shown the instant startApp() begins waiting on the local server, and
+// closed the moment either the real window is ready or a startup error
+// dialog needs to be shown. Without this, a slow first boot (cold Prisma
+// engine load, empty disk cache) leaves the user staring at nothing at all
+// for up to 30 seconds — no window, no taskbar entry — which reads exactly
+// like the install silently failed.
+function createSplashWindow() {
+  splashWindow = new BrowserWindow({
+    width: 360,
+    height: 220,
+    resizable: false,
+    frame: false,
+    backgroundColor: '#1B3A6B',
+    icon: APP_ICON_PATH,
+    skipTaskbar: false,
+    webPreferences: { sandbox: true },
+  })
+  splashWindow.loadFile(path.join(__dirname, 'splash.html'))
+}
+
+function closeSplashWindow() {
+  if (splashWindow && !splashWindow.isDestroyed()) splashWindow.close()
+  splashWindow = null
 }
 
 function createMainWindow() {
@@ -392,15 +457,55 @@ async function startApp() {
     return
   }
 
+  // A zombie server process from a previous crash/unclean shutdown binds
+  // this exact port just as effectively as a fresh spawn does — checked up
+  // front so that failure mode gets its own clear message instead of
+  // silently falling into the same "still starting" retry loop below as a
+  // merely slow first boot.
+  if (!(await isPortFree(PORT))) {
+    const { response } = await dialog.showMessageBox({
+      type: 'error',
+      title: 'Renovo Pro — Port Already In Use',
+      message: `Port ${PORT} is already in use on this PC.`,
+      detail: 'This usually means another copy of Renovo Pro is already running, or didn\'t shut down cleanly last time. Open Task Manager and end any existing "Renovo Pro" process, then try again.',
+      buttons: ['Try Again', 'Quit'],
+      defaultId: 0,
+      cancelId: 1,
+    })
+    if (response !== 0) { app.quit(); return }
+    return startApp()
+  }
+
+  createSplashWindow()
   startStandaloneServer(desktopEnv)
-  let ready = await waitForServerReady()
+  let result = await waitForServerReady()
+
   // A cold first run (disk cache empty, Prisma engine loading) can
-  // legitimately take longer than the initial 30s wait. Proceeding
-  // straight to createMainWindow() here used to load a URL nothing was
-  // listening on yet, showing Chromium's generic "site can't be reached"
-  // page with no indication of what actually went wrong or what to do
-  // about it — this offers a real choice instead of a dead end.
-  while (!ready) {
+  // legitimately take longer than the initial 30s wait — that case alone
+  // gets the retry/quit prompt below. A process that has already exited
+  // (bad DB credentials, a missing Prisma engine, ...) never was and never
+  // will be "still starting", so it gets its own distinct message instead
+  // of silently reusing the same generic timeout prompt forever.
+  while (!result.ready) {
+    closeSplashWindow()
+    if (result.reason === 'crashed') {
+      const exitDetail = serverExitInfo
+        ? `It exited immediately (code ${serverExitInfo.code ?? 'unknown'}).`
+        : 'It exited immediately.'
+      // Awaited (it caps itself at 5s internally) so app.quit() below
+      // doesn't tear the process down before the report actually goes out.
+      await licenseManager.reportFatalError(PORTAL_BASE_URL, app.getVersion(), 'server-crashed', exitDetail)
+      dialog.showErrorBox(
+        'Renovo Pro — Failed to Start',
+        `The local server ${exitDetail}\n\n` +
+        `This is usually a configuration problem (wrong database details in desktop.env) ` +
+        `rather than something a retry will fix. Details were written to:\n${LOG_FILE}\n\n` +
+        'Check that file, or contact support with it attached.'
+      )
+      app.quit()
+      return
+    }
+
     const { response } = await dialog.showMessageBox({
       type: 'warning',
       title: 'Renovo Pro — Still Starting',
@@ -414,9 +519,11 @@ async function startApp() {
       app.quit()
       return
     }
-    ready = await waitForServerReady()
+    createSplashWindow()
+    result = await waitForServerReady()
   }
 
+  closeSplashWindow()
   createMainWindow()
   createTray()
   setupAutoUpdater()

@@ -5,6 +5,15 @@ directly over the internet when online; queues transactions locally and
 auto-syncs when a dropped connection returns (see
 `docs/plans/2026-08-01-desktop-hybrid-sync-design.md` for the full design).
 
+## System requirements
+
+Windows 10 version 1809 or newer, 64-bit (Electron's own Chromium runtime
+requirement) — no separate runtime install needed, Electron bundles its
+own. A network path to both the Renovo Pro Portal (activation/licensing)
+and the production Postgres database is required for first activation and
+for ongoing data sync; short outages after that are absorbed by the
+offline queue (see the hybrid-sync design doc above).
+
 ## Building
 
 ```
@@ -25,6 +34,28 @@ folder as `desktop.env` (Windows: `%APPDATA%\renovopro\desktop.env`) and
 fill in the real values — see that file's own comments for where to find
 each one. The app shows a clear "Setup Required" dialog with the exact
 expected path if this file is missing or incomplete.
+
+The installer is **per-machine** (`nsis.perMachine` in `package.json`) and
+shows a license/EULA acceptance screen (`electron/LICENSE.txt`) — one
+install (with an admin/UAC prompt) covers every Windows account on a
+shared till, rather than needing a separate install per login.
+
+### Provisioning many tills at once
+
+The NSIS installer already supports the standard silent flag
+(`RenovoProSetup.exe /S`) with no extra configuration. `scripts/desktop/
+provision-till.ps1` wraps that plus the `desktop.env` copy step into one
+command, for staging a new till from a network share without clicking
+through the wizard by hand:
+
+```
+.\provision-till.ps1 -InstallerPath \\fileserver\renovopro\RenovoProSetup.exe -DesktopEnvSource \\fileserver\renovopro\desktop.env
+```
+
+Device activation (the one-time code from the Portal) is intentionally
+**not** automated by this script — it's tied to a specific device/company
+pairing and is meant to be entered once by whoever is actually setting up
+that till.
 
 ## Code signing (not yet configured)
 
@@ -80,3 +111,35 @@ Once configured: updates download automatically in the background (never
 disrupts a till mid-shift) and a "Restart to update" chip appears in the
 app header when one's ready — installing always waits for that click, or
 happens automatically on the next natural full app quit either way.
+
+## Startup reliability
+
+A slow-starting server (cold Prisma engine load, empty disk cache on
+first run) and an already-dead one (bad `desktop.env` values, a missing
+engine binary, another copy already bound to the port) used to look
+identical to the user — both just sat on the same generic "Still
+Starting…" retry loop. `main.js` now tells them apart:
+
+- A **branded splash window** (`splash.html`) shows immediately while the
+  server is starting, instead of no window at all for up to 30 seconds.
+- The port (3100) is checked for availability *before* spawning — a
+  leftover process from a previous crash gets its own "Port Already In
+  Use" message pointing at Task Manager, not a silent timeout.
+- If the spawned server process exits on its own, that's detected
+  immediately and reported as "Failed to Start" with the exit code — not
+  retried forever against a process that no longer exists.
+
+## Error reporting (partially wired — needs a Portal-side endpoint)
+
+`licenseManager.reportFatalError()` best-effort POSTs a fatal
+error/crash (uncaught exception, server-start failure) to
+`POST {RENOVO_PORTAL_BASE_URL}/api/desktop/error-report`, the same Portal
+every activation/heartbeat call already talks to — so a rollout across
+many tills is visible in one place instead of only ever discoverable by
+opening one specific machine's local log file
+(`%APPDATA%\renovopro\logs\main.log`, always written regardless).
+
+This is the desktop side only. Like signing and auto-updates, it's a
+no-op until the matching route is added to the **Portal** (a separate
+repo, out of scope here) — until then the POST just 404s and is silently
+swallowed, and the local log file remains the source of truth.
