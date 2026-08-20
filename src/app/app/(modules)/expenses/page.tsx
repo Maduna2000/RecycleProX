@@ -270,16 +270,15 @@ export default function ExpensesPage() {
           </div>
         </Field>
         <Field label="Status" width={140}>
-          <Select value={statusTab} onValueChange={(v) => setStatusTab(v as PageTab)}>
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {PAGE_TABS.map((t) => (
-                <SelectItem key={t} value={t}>{t}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <select
+            style={inp}
+            value={statusTab}
+            onChange={(e) => setStatusTab(e.target.value as PageTab)}
+          >
+            {PAGE_TABS.map((t) => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
         </Field>
         <Field label="From" width={145}>
           <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} style={inp} title="From date" />

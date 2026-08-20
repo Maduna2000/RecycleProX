@@ -89,6 +89,28 @@ function useToolbarButtons(pathname: string, role: string): ToolbarButton[] {
       { label: 'Start Stocktake', icon: ClipboardCheck, href: '/app/stocktake?create=1', variant: 'primary' },
     ] : []
 
+  if (pathname === '/app/gate' || pathname.startsWith('/app/gate/')) {
+    const isEntries = pathname === '/app/gate'
+    const isGuards  = pathname === '/app/gate/guards'
+    const isConfig  = pathname === '/app/gate/config'
+    return [
+      { label: 'Entries',        icon: ClipboardList, href: '/app/gate',         variant: isEntries ? 'primary' : 'secondary' as const },
+      { label: 'Guards',         icon: Users,         href: '/app/gate/guards',  variant: isGuards  ? 'primary' : 'secondary' as const },
+      { label: 'Purpose Config', icon: Settings2,     href: '/app/gate/config',  variant: isConfig  ? 'primary' : 'secondary' as const },
+    ]
+  }
+
+  if (pathname === '/app/scale' || pathname.startsWith('/app/scale/')) {
+    const isOrders    = pathname === '/app/scale'
+    const isOperators = pathname === '/app/scale/operators'
+    const isConfig    = pathname === '/app/scale/config'
+    return [
+      { label: 'Orders',      icon: ClipboardList, href: '/app/scale',           variant: isOrders    ? 'primary' : 'secondary' as const },
+      { label: 'Operators',   icon: Users,         href: '/app/scale/operators', variant: isOperators ? 'primary' : 'secondary' as const },
+      { label: 'Step Config', icon: Settings2,     href: '/app/scale/config',    variant: isConfig    ? 'primary' : 'secondary' as const },
+    ]
+  }
+
   if (pathname === '/app/stock' || pathname.startsWith('/app/stock/')) {
     const isOnHand    = pathname === '/app/stock'
     const isMovements = pathname === '/app/stock/movements'
@@ -253,7 +275,7 @@ function ScalePopup() {
 
   const tiles = [
     { label: 'Scale Orders',    icon: ClipboardList, href: '/app/scale',                  desc: 'View & manage orders' },
-    { label: 'Scale Operators', icon: Users,         href: '/app/scale?tab=operators',    desc: 'Manage operator accounts' },
+    { label: 'Scale Operators', icon: Users,         href: '/app/scale/operators',        desc: 'Manage operator accounts' },
     { label: 'Scale Station',   icon: Scale,         href: '/scale',                      desc: 'Open tablet app', external: true },
   ]
 
@@ -314,7 +336,7 @@ function GatePopup() {
 
   const tiles = [
     { label: 'Gate Entries',  icon: ClipboardList, href: '/app/gate',               desc: 'View & manage entries' },
-    { label: 'Gate Guards',   icon: Users,         href: '/app/gate?tab=guards',    desc: 'Manage guard accounts' },
+    { label: 'Gate Guards',   icon: Users,         href: '/app/gate/guards',        desc: 'Manage guard accounts' },
     { label: 'Guard Station', icon: DoorOpen,      href: '/gate',                   desc: 'Open kiosk app', external: true },
   ]
 

@@ -1,12 +1,12 @@
 'use client'
 
 import { PortalPage } from '@/components/rpx'
-import { EntriesTab } from './GateTabs'
+import { GuardsTab } from '../GateTabs'
 
-export default function GateEntriesPage() {
+export default function GateGuardsPage() {
   return (
     <PortalPage>
-      <EntriesTab />
+      <GuardsTab />
     </PortalPage>
   )
 }

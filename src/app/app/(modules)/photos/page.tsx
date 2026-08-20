@@ -11,7 +11,6 @@ import {
 import { colors, fontSize } from '@/lib/design-tokens'
 import type { PhotoRecord } from '@/app/api/photos/search/route'
 import { inp, Btn, Field, PortalPage, FilterBar, RpxDialogContent, RpxDialogFooter, BAR_GRAD, winBevel } from '@/components/rpx'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 
 type PhotosResponse = {
@@ -318,19 +317,15 @@ function PhotoGrid({
             </div>
           </Field>
           <Field label="Type" width={160}>
-            <Select
+            <select
+              style={inp}
               value={queryType ?? 'all'}
-              onValueChange={(v) => { onQueryTypeChange(v as typeof TABS[number]['value']); setPage(1) }}
+              onChange={(e) => { onQueryTypeChange(e.target.value as typeof TABS[number]['value']); setPage(1) }}
             >
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {TABS.map((t) => (
-                  <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              {TABS.map((t) => (
+                <option key={t.value} value={t.value}>{t.label}</option>
+              ))}
+            </select>
           </Field>
           <Field label="From" width={145}>
             <input type="date" value={from} onChange={(e) => { setFrom(e.target.value); setPage(1) }} style={inp} />
