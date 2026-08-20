@@ -12,6 +12,16 @@ jobs:
   build:
     name: Build Renovo Pro Desktop (Windows)
     runs-on: windows-latest
+    # Job-level so it's both an OS env var for every step (the build step
+    # needs it baked into resources/app-update.yml) AND readable from a
+    # step's `if:` condition below — the `secrets` context is NOT allowed
+    # directly inside `if:` (GitHub Actions rejects the workflow at parse
+    # time with "Unrecognized named-value: 'secrets'"), only inside `env:`
+    # or a `run:` step's own env mapping. Proxying it through `env:` here
+    # once, then referencing `env.DESKTOP_UPDATE_FEED_BASE_URL` in the `if:`
+    # below, is the actual supported pattern.
+    env:
+      DESKTOP_UPDATE_FEED_BASE_URL: ${{ secrets.DESKTOP_UPDATE_FEED_BASE_URL }}
 
     steps:
       - name: Checkout repository
@@ -47,11 +57,13 @@ jobs:
           # two secrets are added — no further workflow changes needed then.
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-          # Baked into resources/app-update.yml so the installed app knows
-          # where to check for updates (package.json's build.publish) — see
-          # electron/README.md's "Auto-updates" section. Empty until this
-          # secret is added, same no-op-until-configured pattern as signing.
-          DESKTOP_UPDATE_FEED_BASE_URL: ${{ secrets.DESKTOP_UPDATE_FEED_BASE_URL }}
+          # DESKTOP_UPDATE_FEED_BASE_URL itself comes from the job-level env
+          # above (already an OS env var for every step, including this
+          # one) — baked into resources/app-update.yml so the installed app
+          # knows where to check for updates (package.json's build.publish).
+          # See electron/README.md's "Auto-updates" section. Empty until
+          # that secret is added, same no-op-until-configured pattern as
+          # signing.
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
@@ -65,14 +77,14 @@ jobs:
         # No-op until DESKTOP_UPDATE_FEED_BASE_URL is added as a repo secret
         # — see electron/README.md's "Auto-updates" section for what it
         # needs to point at and why.
-        if: ${{ secrets.DESKTOP_UPDATE_FEED_BASE_URL != '' }}
+        if: ${{ env.DESKTOP_UPDATE_FEED_BASE_URL != '' }}
         shell: bash
         run: |
           shopt -s nullglob
           files=(dist/*.exe dist/latest.yml dist/*.blockmap)
           for f in "${files[@]}"; do
             echo "Uploading $f"
-            curl -sf -X POST "${{ secrets.DESKTOP_UPDATE_FEED_BASE_URL }}/api/internal/desktop-release" \
+            curl -sf -X POST "$DESKTOP_UPDATE_FEED_BASE_URL/api/internal/desktop-release" \
               -H "x-internal-secret: ${{ secrets.INTERNAL_API_SHARED_SECRET }}" \
               -F "file=@$f"
           done
