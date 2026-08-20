@@ -7,6 +7,7 @@ import { decode } from '@auth/core/jwt'
 import { authConfig } from '@/auth.config'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { findModuleKey } from '@/lib/moduleKeys'
 
 const { auth } = NextAuth(authConfig)
 
@@ -49,39 +50,6 @@ async function resolveMobileSession(req: NextRequest): Promise<{ user: SessionUs
   } catch {
     return null
   }
-}
-
-// Module keys that can be controlled via permissions
-const MODULE_KEYS = [
-  '/app/dashboard',
-  '/app/customers',
-  '/app/purchases',
-  '/app/sales',
-  '/app/payments',
-  '/app/expenses',
-  '/app/cashup',
-  '/app/float',
-  '/app/stock',
-  '/app/stocktake',
-  '/app/products',
-  '/app/price-groups',
-  '/app/reports',
-  '/app/police-register',
-  '/app/audit-log',
-  '/app/photos',
-  '/app/settings',
-]
-
-/**
- * Find the module key for a given pathname.
- * e.g., /app/purchases/new → /app/purchases
- */
-function findModuleKey(pathname: string): string | null {
-  // Exact match
-  if (MODULE_KEYS.includes(pathname)) return pathname
-
-  // Prefix match (e.g., /app/purchases/new → /app/purchases)
-  return MODULE_KEYS.find((key) => pathname.startsWith(key + '/')) ?? null
 }
 
 type SessionUser = {

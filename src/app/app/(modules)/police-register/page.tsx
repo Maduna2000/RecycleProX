@@ -151,11 +151,8 @@ export default function PoliceRegisterPage() {
         ]}
         active={tab}
         onChange={(v) => setTab(v as Tab)}
-        actions={
-          <Btn variant="primary" size="sm" icon={ShieldCheck} href="/police">
-            Officer Portal
-          </Btn>
-        }
+        // "Officer Portal" moved to the unified Zone 2 toolbar (see
+        // 2026-08-19 toolbar redesign) — no longer an in-page actions slot.
         // Capped and centered (see src/lib/pageWidthCaps.ts, which
         // PageTitleBar reads to cap/border itself to match).
         maxWidth={960}

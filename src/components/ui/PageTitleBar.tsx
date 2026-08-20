@@ -5,7 +5,6 @@ import { usePathname, useRouter } from 'next/navigation'
 import { Minus, Square, Copy, X } from 'lucide-react'
 import { getModuleName } from '@/lib/module-names'
 import { useWindowStore } from '@/stores/windowStore'
-import { useTitleBarActionsStore } from '@/stores/titleBarActionsStore'
 import { BAR_GRAD, winBevel, windowTitleText } from '@/components/rpx'
 
 interface PageTitleBarProps {
@@ -65,7 +64,6 @@ export function PageTitleBar({ title, isMaximized, onMaximizeToggle, onTitleBarM
   const pathname = usePathname()
   const router   = useRouter()
   const { windows, closeWindow } = useWindowStore()
-  const titleBarActions = useTitleBarActionsStore((s) => s.actions)
 
   const entry = windows.find(w => w.href === pathname)
 
@@ -105,11 +103,6 @@ export function PageTitleBar({ title, isMaximized, onMaximizeToggle, onTitleBarM
         {displayTitle}
       </span>
       <div className="flex-1 min-w-0" />
-      {titleBarActions && (
-        <div className="flex items-center gap-2 mr-2 min-w-0" onMouseDown={(e) => e.stopPropagation()}>
-          {titleBarActions}
-        </div>
-      )}
       <div className="flex items-center gap-1 shrink-0">
         <WindowControlButton icon={Minus} label="Minimise" onClick={handleMinimize} />
         {onMaximizeToggle && (

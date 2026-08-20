@@ -7,7 +7,7 @@ import { useSession } from 'next-auth/react'
 import Decimal from 'decimal.js'
 import { fetcher } from '@/lib/swrFetcher'
 import {
-  CheckCircle, Paperclip, Eye, Loader2, Upload, X,
+  Paperclip, Eye, Loader2, Upload, X,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
@@ -15,6 +15,7 @@ import { colors, layout } from '@/lib/design-tokens'
 import { Btn, PortalPage } from '@/components/rpx'
 import { StatusBadge } from '@/components/ui/DataTable'
 import { DocumentViewerModal } from '@/components/ui/DocumentViewerModal'
+import { useToolbarAction } from '@/stores/toolbarActionStore'
 
 
 type ExpenseDetail = {
@@ -55,6 +56,17 @@ export default function ExpenseDetailPage() {
     if (res.ok) { toast.success('Expense approved'); mutateExpense() }
     else { const j = await res.json(); toast.error(j.error ?? 'Failed to approve') }
   }
+
+  // "Approve" moved to the unified Zone 2 toolbar (see 2026-08-19 toolbar
+  // redesign) — enabled only while this specific expense is pending, and
+  // briefly disabled again while the request is in flight to prevent a
+  // double-click double-approving. Called before the loading/not-found
+  // early returns below (Rules of Hooks) — safely false/no-op until
+  // `expense` actually loads.
+  useToolbarAction('approve-expense', {
+    enabled: isMgr && expense?.status === 'pending' && !approving,
+    onClick: handleApprove,
+  })
 
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -127,21 +139,11 @@ export default function ExpenseDetailPage() {
     )
   }
 
-  const isPending = expense.status === 'pending'
   const isVoided = expense.status === 'voided'
   const attachList = attachments ?? expense.attachments ?? []
 
   return (
-    <PortalPage
-      title={expense.refNumber}
-      actions={
-        <>
-          {isMgr && isPending && (
-            <Btn variant="primary" size="sm" icon={CheckCircle} loading={approving} onClick={handleApprove}>Approve</Btn>
-          )}
-        </>
-      }
-    >
+    <PortalPage title={expense.refNumber}>
       <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
 
         {/* Sub-header */}
