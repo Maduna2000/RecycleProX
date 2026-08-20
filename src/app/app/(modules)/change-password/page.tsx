@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -9,6 +9,7 @@ import { ChangePasswordSchema, type ChangePasswordInput } from '@/lib/schemas/au
 import { CheckCircle2, XCircle } from 'lucide-react'
 import { colors } from '@/lib/design-tokens'
 import { Btn, Field, inp, PortalPage } from '@/components/rpx'
+import { useWindowStore } from '@/stores/windowStore'
 
 function getStrength(pw: string): { label: string; color: string; score: number } {
   let score = 0
@@ -31,6 +32,8 @@ const rules = [
 
 export default function ChangePasswordPage() {
   const router = useRouter()
+  const pathname = usePathname()
+  const { windows, closeWindow } = useWindowStore()
   const { update } = useSession()
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -69,7 +72,15 @@ export default function ChangePasswordPage() {
     } catch {
       // Cookie is already correct server-side either way.
     }
-    router.push('/app/dashboard')
+    // Just pushing here would leave this page's taskbar entry registered in
+    // windowStore forever (nothing else ever removes it), so the "Change
+    // Password" window kept showing in the taskbar until the user closed it
+    // by hand even though they'd already left the page. Route through the
+    // same closeWindow() the taskbar's own X button uses so the entry is
+    // cleared and the navigation happens together.
+    const win = windows.find(w => w.href === pathname)
+    if (win) closeWindow(win.id, router.push)
+    else router.push('/app/dashboard')
     router.refresh()
   }
 

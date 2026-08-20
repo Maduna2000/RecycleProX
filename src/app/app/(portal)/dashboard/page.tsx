@@ -1,6 +1,8 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
+import { Suspense, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { toast } from 'sonner'
 import {
   Users, UserRound, ShoppingCart, AlertCircle,
   Tag, CreditCard, ImageIcon, Scale,
@@ -89,8 +91,18 @@ function glowBoxShadow(group: TileGroup): string {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-export default function DashboardPage() {
+function DashboardInner() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+
+  useEffect(() => {
+    if (searchParams.get('denied') === '1') {
+      toast.error("You don't have access to that module", {
+        description: 'Contact an admin or manager if you believe this is a mistake.',
+      })
+      router.replace('/app/dashboard')
+    }
+  }, [searchParams, router])
 
   return (
     <main
@@ -141,5 +153,13 @@ export default function DashboardPage() {
         )
       })}
     </main>
+  )
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense>
+      <DashboardInner />
+    </Suspense>
   )
 }
