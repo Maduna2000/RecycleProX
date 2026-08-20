@@ -32,6 +32,10 @@ export class ForbiddenError extends Error {
   constructor(msg = 'Forbidden') { super(msg); this.name = 'ForbiddenError' }
 }
 
+export class UserHasActivityError extends Error {
+  constructor() { super('This user has transaction history and cannot be deleted — deactivate the account instead'); this.name = 'UserHasActivityError' }
+}
+
 // ─── Service ──────────────────────────────────────────────────────────────────
 
 // tenantSlug is resolved from the login subdomain by middleware.ts (see
@@ -304,6 +308,66 @@ export async function unlockAccount(userId: string, adminId: string) {
     data: { failedAttempts: 0, lockedAt: null },
   })
   logger.info({ userId, adminId }, 'Account unlocked')
+}
+
+/**
+ * A user with any real transaction/audit footprint can never be hard-deleted
+ * — most of the "createdByUserId" columns across the app (purchases, sales,
+ * payments, expenses, cash-ups, journal entries…) are plain string columns
+ * rather than foreign keys, so deleting the row wouldn't even fail at the DB
+ * level, it would just silently orphan that attribution on every record they
+ * ever touched. Checked here up front (Stocktake/ScaleOrder/GateEntry are
+ * real FKs and would throw a P2003 regardless, but checking them the same
+ * way keeps this one consistent error message instead of a raw DB error).
+ * Deactivate (already available) is the correct action for any user who has
+ * actually used the system — delete is only for a mistakenly created,
+ * never-used account.
+ */
+export async function deleteUser(userId: string, adminId: string) {
+  if (userId === adminId) throw new ForbiddenError('Cannot delete your own account')
+
+  const [
+    purchases, sales, payments, expenses, cashUps,
+    stocktakesCreated, stocktakesVoided,
+    scaleOrdersOperated, scaleOrdersVoided,
+    gateEntriesOperated, gateEntriesExited,
+    journalEntries,
+  ] = await Promise.all([
+    prisma.purchase.count({ where: { createdByUserId: userId } }),
+    prisma.sale.count({ where: { createdByUserId: userId } }),
+    prisma.payment.count({ where: { createdByUserId: userId } }),
+    prisma.expense.count({ where: { createdByUserId: userId } }),
+    prisma.cashUp.count({ where: { approvedByUserId: userId } }),
+    prisma.stocktake.count({ where: { createdByUserId: userId } }),
+    prisma.stocktake.count({ where: { voidedByUserId: userId } }),
+    prisma.scaleOrder.count({ where: { operatorId: userId } }),
+    prisma.scaleOrder.count({ where: { voidedById: userId } }),
+    prisma.gateEntry.count({ where: { operatorId: userId } }),
+    prisma.gateEntry.count({ where: { exitedById: userId } }),
+    prisma.journalEntry.count({ where: { createdByUserId: userId } }),
+  ])
+
+  const hasActivity = [
+    purchases, sales, payments, expenses, cashUps,
+    stocktakesCreated, stocktakesVoided,
+    scaleOrdersOperated, scaleOrdersVoided,
+    gateEntriesOperated, gateEntriesExited,
+    journalEntries,
+  ].some((count) => count > 0)
+
+  if (hasActivity) throw new UserHasActivityError()
+
+  try {
+    await prisma.user.delete({ where: { id: userId } })
+  } catch (err) {
+    // Backstop for any foreign-key relation not covered by the checks
+    // above — surfaces as the same clear error rather than a raw P2003.
+    if (err instanceof Error && 'code' in err && (err as { code?: string }).code === 'P2003') {
+      throw new UserHasActivityError()
+    }
+    throw err
+  }
+  logger.info({ userId, adminId }, 'User deleted')
 }
 
 export async function updateUserModuleAccess(

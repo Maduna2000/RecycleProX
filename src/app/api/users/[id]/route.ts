@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
-import { getUser, updateUser } from '@/lib/services/authService'
+import { getUser, updateUser, deleteUser, ForbiddenError, UserHasActivityError } from '@/lib/services/authService'
 import { CreateUserSchema } from '@/lib/schemas/auth'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
 import logger from '@/lib/logger'
@@ -43,5 +43,23 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   } catch (err) {
     logger.error({ err }, 'PUT /api/users/[id] failed')
     return NextResponse.json({ error: 'Failed to update user' }, { status: 500 })
+  }
+}
+
+export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+  const session = await auth()
+  if (!session) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+  if (session.user.role !== 'admin') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  try {
+    await runWithRequestTenant(req, () => deleteUser(params.id, session.user.id))
+    return NextResponse.json({ success: true })
+  } catch (err) {
+    if (err instanceof ForbiddenError) return NextResponse.json({ error: err.message }, { status: 400 })
+    if (err instanceof UserHasActivityError) return NextResponse.json({ error: err.message }, { status: 409 })
+    logger.error({ err }, 'DELETE /api/users/[id] failed')
+    return NextResponse.json({ error: 'Failed to delete user' }, { status: 500 })
   }
 }

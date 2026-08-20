@@ -8,12 +8,13 @@ import { CreateUserModal } from '@/components/users/CreateUserModal'
 import { EditUserModal } from '@/components/users/EditUserModal'
 import { ResetPasswordModal } from '@/components/users/ResetPasswordModal'
 import { SetPinModal } from '@/components/users/SetPinModal'
-import { Search, Unlock, UserCheck, UserX, KeyRound, Pencil } from 'lucide-react'
+import { Search, Unlock, UserCheck, UserX, KeyRound, Pencil, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { colors, badgeStyle } from '@/lib/design-tokens'
 import { inp, Field, PortalPage, FilterBar } from '@/components/rpx'
 import { DataTable, type Column, type RowAction, StatusBadge as SharedStatusBadge } from '@/components/ui/DataTable'
 import { fetcher } from '@/lib/swrFetcher'
+import { useConfirm } from '@/components/ui/ConfirmDialog'
 
 
 type User = {
@@ -65,6 +66,7 @@ export default function UsersPage() {
   const { data: session } = useSession()
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { confirm } = useConfirm()
   const [search, setSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
@@ -139,6 +141,20 @@ export default function UsersPage() {
     else toast.error('Failed to reset PIN')
   }
 
+  async function handleDelete(user: User) {
+    const confirmed = await confirm({
+      title: 'Delete User',
+      message: `Permanently delete ${user.fullName} (${user.username})? This cannot be undone. Users with any purchase, sale, expense, cash-up, stocktake, scale, or gate history can't be deleted — deactivate them instead.`,
+      variant: 'danger',
+      confirmLabel: 'Delete',
+    })
+    if (!confirmed) return
+
+    const res = await fetch(`/api/users/${user.id}`, { method: 'DELETE' })
+    if (res.ok) { toast.success(`${user.fullName} deleted`); mutate(`/api/users?${query}`) }
+    else { const j = await res.json().catch(() => ({})); toast.error(j.error ?? 'Failed to delete user') }
+  }
+
   const columns: Column<User>[] = [
     { key: 'fullName', header: 'Full Name', render: (u) => <span style={{ fontWeight: 600 }}>{u.fullName}</span> },
     { key: 'username', header: 'Username', render: (u) => <span style={{ color: '#6C757D' }}>{u.username}</span> },
@@ -159,6 +175,7 @@ export default function UsersPage() {
     { label: 'Deactivate', icon: UserX, hidden: (u) => !u.isActive, onClick: handleToggleActive },
     { label: 'Activate', icon: UserCheck, hidden: (u) => u.isActive, onClick: handleToggleActive },
     { label: 'Unlock', icon: Unlock, hidden: (u) => !u.lockedAt, onClick: handleUnlock },
+    { label: 'Delete', icon: Trash2, danger: true, hidden: (u) => u.id === session?.user?.id, onClick: handleDelete },
   ]
 
   return (
