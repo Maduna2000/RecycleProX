@@ -47,7 +47,7 @@ export default function ExpensesPage() {
   const { data: session } = useSession()
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
 
-  const [tab,              setTab]              = useState<PageTab>('All')
+  const [statusTab,        setStatusTab]        = useState<PageTab>('All')
   const [addOpen,          setAddOpen]          = useState(false)
   const [addTypeOpen,      setAddTypeOpen]      = useState(false)
   const [settlingExpense,  setSettlingExpense]  = useState<Expense | null>(null)
@@ -70,15 +70,15 @@ export default function ExpensesPage() {
     }
   }, [searchParams, router])
 
-  const hasFilters = !!(search || from || to)
-  function clearFilters() { setSearch(''); setFrom(''); setTo('') }
+  const hasFilters = !!(search || from || to || statusTab !== 'All')
+  function clearFilters() { setSearch(''); setFrom(''); setTo(''); setStatusTab('All') }
 
   const statusMap: Record<PageTab, string | undefined> = {
     Pending:  'pending',
     Approved: 'approved',
     All:      undefined,
   }
-  const statusFilter = statusMap[tab]
+  const statusFilter = statusMap[statusTab]
   const query = new URLSearchParams({
     ...(statusFilter && { status: statusFilter }),
     ...(hideVoided   && { hideVoided: 'true' }),
@@ -95,7 +95,7 @@ export default function ExpensesPage() {
   // narrowed result set (e.g. going from page 3 of "All" to "Pending" with
   // only 1 page) — reset to page 1 whenever the filter shape changes,
   // matching the same fix already applied to Stock Movements.
-  useEffect(() => { setPage(1) }, [tab, hideVoided, search, from, to])
+  useEffect(() => { setPage(1) }, [statusTab, hideVoided, search, from, to])
   const expenses = data?.expenses ?? []
 
   const totalApproved = expenses
@@ -250,20 +250,13 @@ export default function ExpensesPage() {
     },
   ]
 
-  const pageTabs = PAGE_TABS.map((t) => ({ value: t, label: t }))
-
   return (
     // maxWidth matches src/lib/pageWidthCaps.ts, which PageTitleBar reads to
     // cap/border itself to match — the Description column previously had no
     // width so its cell stretched to fill whatever was left even though the
     // text inside it was already truncated, same pattern already fixed on
     // Purchases/Sales/Payments.
-    <PortalPage
-      tabs={pageTabs}
-      active={tab}
-      onChange={(v) => setTab(v as PageTab)}
-      maxWidth={1150}
-    >
+    <PortalPage maxWidth={1150}>
       <FilterBar>
         <Field label="Search" width={220}>
           <div style={{ position: 'relative' }}>
@@ -275,6 +268,18 @@ export default function ExpensesPage() {
               style={{ ...inp, paddingLeft: 24 }}
             />
           </div>
+        </Field>
+        <Field label="Status" width={140}>
+          <Select value={statusTab} onValueChange={(v) => setStatusTab(v as PageTab)}>
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PAGE_TABS.map((t) => (
+                <SelectItem key={t} value={t}>{t}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </Field>
         <Field label="From" width={145}>
           <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} style={inp} title="From date" />
@@ -303,7 +308,7 @@ export default function ExpensesPage() {
       </FilterBar>
 
       {/* Approved total banner */}
-      {tab === 'Approved' && data && (
+      {statusTab === 'Approved' && data && (
         <div
           className="flex items-center gap-3 px-4 py-2.5 shrink-0"
           style={{ margin: '10px 10px 0', background: colors.actionBg, border: `1px solid ${colors.action}30`, borderRadius: 2 }}

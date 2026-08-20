@@ -11,6 +11,7 @@ import {
 import { colors, fontSize } from '@/lib/design-tokens'
 import type { PhotoRecord } from '@/app/api/photos/search/route'
 import { inp, Btn, Field, PortalPage, FilterBar, RpxDialogContent, RpxDialogFooter, BAR_GRAD, winBevel } from '@/components/rpx'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 
 type PhotosResponse = {
@@ -237,8 +238,10 @@ function ViewerDialog({
 
 function PhotoGrid({
   queryType,
+  onQueryTypeChange,
 }: {
   queryType?: string
+  onQueryTypeChange: (value: typeof TABS[number]['value']) => void
 }) {
   const [search, setSearch] = useState('')
   const [from,   setFrom]   = useState('')
@@ -313,6 +316,21 @@ function PhotoGrid({
                 style={{ ...inp, paddingLeft: 24 }}
               />
             </div>
+          </Field>
+          <Field label="Type" width={160}>
+            <Select
+              value={queryType ?? 'all'}
+              onValueChange={(v) => { onQueryTypeChange(v as typeof TABS[number]['value']); setPage(1) }}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {TABS.map((t) => (
+                  <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </Field>
           <Field label="From" width={145}>
             <input type="date" value={from} onChange={(e) => { setFrom(e.target.value); setPage(1) }} style={inp} />
@@ -431,9 +449,12 @@ export default function PhotosPage() {
   const [activeTab, setActiveTab] = useState<typeof TABS[number]['value']>('purchase')
 
   return (
-    <PortalPage tabs={[...TABS]} active={activeTab} onChange={(v) => setActiveTab(v as typeof activeTab)}>
+    <PortalPage>
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-        <PhotoGrid queryType={activeTab === 'all' ? undefined : activeTab} />
+        <PhotoGrid
+          queryType={activeTab === 'all' ? undefined : activeTab}
+          onQueryTypeChange={setActiveTab}
+        />
       </div>
     </PortalPage>
   )
