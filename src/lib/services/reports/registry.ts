@@ -52,6 +52,7 @@ import {
 import {
   buildCashupHistory,
   buildExpensesReport,
+  buildExpensesReceiptsReport,
   buildFloatLog,
   buildCashOnHand,
   buildLoansOutstanding,
@@ -132,6 +133,10 @@ export const REPORT_REGISTRY: Record<string, ReportDefinition> = {
   'expenses': {
     paramsSchema: ExpensesReportParamsSchema,
     build: buildExpensesReport,
+  },
+  'expenses-receipts': {
+    paramsSchema: ExpensesReportParamsSchema,
+    build: buildExpensesReceiptsReport,
   },
   'float-log': {
     paramsSchema: BaseReportParamsSchema,

@@ -185,6 +185,23 @@ export const REPORT_CATALOG: ReportCatalogEntry[] = [
     ],
   },
   {
+    id: 'expenses-receipts',
+    label: 'Expenses Report with Receipts',
+    description:
+      'Every expense in the period, one row each with category, description, payment method and VAT, plus the receipt/slip photo on file for it — shows "No image" where none was uploaded.',
+    area: 'cash',
+    filters: [
+      {
+        key: 'status', label: 'Status', type: 'select',
+        options: [
+          { value: 'approved', label: 'Approved' },
+          { value: 'pending', label: 'Pending' },
+          { value: 'all', label: 'All (not voided)' },
+        ],
+      },
+    ],
+  },
+  {
     id: 'float-log',
     label: 'Float Log Report',
     description:

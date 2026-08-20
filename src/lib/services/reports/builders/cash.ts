@@ -6,6 +6,7 @@
 import Decimal from 'decimal.js'
 import { prisma } from '@/lib/db/prisma'
 import { getRangeBoundsSAST, sastDateLabelToUTCDate, sastDayLabelOfInstant } from '@/lib/utils/dayBounds'
+import { getViewUrl } from '@/lib/r2'
 import { purchaseHeaderAmounts } from '@/lib/utils/vat'
 import { getProfitSummary } from '@/lib/services/reportService'
 import { getCustomerLoanStatement } from '@/lib/services/loanService'
@@ -299,6 +300,110 @@ export async function buildExpensesReport(
     groups,
     grandTotal,
     meta: { ...meta, rowCount: countDataRows(groups) },
+  }
+}
+
+// ─── Expenses with Receipts ─────────────────────────────────────────────────
+
+/** View-URL generation must never break a report (e.g. R2 unconfigured locally). */
+async function safeExpenseReceiptUrl(key: string | null | undefined): Promise<string | null> {
+  if (!key) return null
+  try {
+    return await getViewUrl(key)
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Same period/status filter as the plain Expenses Report, plus the
+ * receipt/slip photo for each expense (its earliest attachment, if any) —
+ * a flat chronological list rather than grouped bands, since the point of
+ * this one is verifying/auditing receipts row by row, not subtotals. An
+ * expense with no attachment on file renders "No image" rather than being
+ * dropped or erroring — same pattern as the Police Copper Report with
+ * Images for a purchase with no scale-order photo.
+ */
+export async function buildExpensesReceiptsReport(
+  params: ExpensesReportParams,
+  meta: MetaBase
+): Promise<ReportDocument> {
+  const { start, end } = getRangeBoundsSAST(params.from, params.to)
+  const status = params.status ?? 'approved'
+
+  const expenses = await prisma.expense.findMany({
+    where: {
+      createdAt: { gte: start, lte: end },
+      ...(status === 'all' ? { status: { not: 'voided' as const } } : { status }),
+    },
+    select: {
+      id: true,
+      refNumber: true,
+      description: true,
+      amount: true,
+      vatAmount: true,
+      includesVat: true,
+      paymentMethod: true,
+      status: true,
+      createdAt: true,
+      expenseType: { select: { name: true, parent: { select: { name: true } } } },
+      attachments: {
+        select: { r2Key: true },
+        orderBy: { uploadedAt: 'asc' },
+        take: 1,
+      },
+    },
+    orderBy: { createdAt: 'asc' },
+  })
+
+  const rows: ReportRow[] = await Promise.all(
+    expenses.map(async (e) => {
+      const receiptKey = e.attachments[0]?.r2Key ?? null
+      return {
+        cells: {
+          date: e.createdAt.toISOString(),
+          ref: e.refNumber,
+          category: e.expenseType.parent
+            ? `${e.expenseType.parent.name.toUpperCase()} — ${e.expenseType.name}`
+            : e.expenseType.name.toUpperCase(),
+          description: e.description,
+          method: e.paymentMethod.toUpperCase(),
+          status: e.status.toUpperCase(),
+          vat: e.includesVat ? D(e.vatAmount).toFixed(2) : null,
+          amount: D(e.amount).toFixed(2),
+        },
+        imageR2Key: receiptKey,
+        imageUrl: await safeExpenseReceiptUrl(receiptKey),
+      }
+    })
+  )
+
+  const grandAmount = expenses.reduce((acc, e) => acc.plus(D(e.amount)), new Decimal(0))
+  const grandVat = expenses.reduce(
+    (acc, e) => acc.plus(e.includesVat ? D(e.vatAmount) : new Decimal(0)),
+    new Decimal(0)
+  )
+
+  return {
+    reportId: 'expenses-receipts',
+    title: 'Expenses Report with Receipts',
+    subtitle: status === 'all' ? 'All (pending + approved)' : `Status: ${status}`,
+    orientation: 'landscape',
+    params: { from: params.from, to: params.to, filters: { status } },
+    columns: [
+      { key: 'date', label: 'Date', width: 0.1, format: 'datetime', excelWidth: 16 },
+      { key: 'ref', label: 'Ref', width: 0.08, format: 'text', excelWidth: 12 },
+      { key: 'category', label: 'Category', width: 0.15, format: 'text', excelWidth: 24 },
+      { key: 'description', label: 'Description', width: 0.19, format: 'text', excelWidth: 30 },
+      { key: 'method', label: 'Payment', width: 0.07, format: 'text', excelWidth: 10 },
+      { key: 'status', label: 'Status', width: 0.07, format: 'text', excelWidth: 10 },
+      { key: 'vat', label: 'VAT', width: 0.09, align: 'right', format: 'money', excelWidth: 12 },
+      { key: 'amount', label: 'Amount', width: 0.1, align: 'right', format: 'money', excelWidth: 13 },
+      { key: 'receipt', label: 'Receipt', width: 0.15, isImage: true },
+    ],
+    groups: [{ level: 0, label: '', rows }],
+    grandTotal: { vat: grandVat.toFixed(2), amount: grandAmount.toFixed(2) },
+    meta: { ...meta, rowCount: rows.length },
   }
 }
 
