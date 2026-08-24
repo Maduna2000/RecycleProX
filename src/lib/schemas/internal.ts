@@ -39,3 +39,13 @@ export const KpiExportRequestSchema = z.object({
 })
 
 export type KpiExportRequestInput = z.infer<typeof KpiExportRequestSchema>
+
+// Pushed by the Portal's webSyncClient.ts on payment verification and via
+// its daily cron — see POST /api/internal/tenants/by-slug/[slug]/subscription-sync.
+export const SubscriptionSyncSchema = z.object({
+  subscriptionStatus: z.string().min(1),
+  subscriptionEndDate: z.coerce.date(),
+  gracePeriodDays: z.number().int().min(0),
+})
+
+export type SubscriptionSyncInput = z.infer<typeof SubscriptionSyncSchema>

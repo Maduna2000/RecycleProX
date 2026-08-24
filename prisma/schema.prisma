@@ -29,9 +29,18 @@ model Tenant {
   status       TenantStatus @default(active)
   planCode     String?
   featureFlags Json?
-  graceEndsAt  DateTime?
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+  // Populated by POST /api/internal/tenants/by-slug/[slug]/subscription-sync
+  // — the Portal pushes these on payment verification and via its daily
+  // cron (see webSyncClient.ts / syncAllSubscriptionsToWeb on that side), so
+  // the tenant layout can render the pre-expiry countdown banner and the
+  // post-grace lockout gate from this row directly, no live Portal call on
+  // every page load.
+  subscriptionEndDate DateTime?
+  subscriptionStatus  String?
+  gracePeriodDays     Int?
+  graceEndsAt         DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   // Cache of the last successful Portal access check (companyAccessClient.ts)
   // — backs login()'s bounded fail-open window when the Portal is
