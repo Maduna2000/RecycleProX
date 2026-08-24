@@ -81,57 +81,6 @@ function currentPeriod(): string {
 // the business money (matches the reference tool's "Amount Due: R -198.50").
 const moneyColor = (v: string) => (new Decimal(v).isNegative() ? '#D97706' : colors.action)
 
-// Display-only grouping for this tab's ledger: if a customer has more than
-// one advance or more than one repayment on the same calendar day — even
-// across separate transactions made hours apart — collapse those rows into
-// one combined line instead of one row per transaction (e.g. a R500
-// stock-repayment and a later R400 one both read as a single R900
-// repayment for the day; two advances the same day read as one combined
-// advance). Doesn't touch the server-computed balances, doesn't mix
-// advances with repayments or touch the opening row, and has no effect on
-// the Reports module, which builds its own statement separately.
-function aggregateSameDayEntries(rows: LedgerRow[]): LedgerRow[] {
-  const kindOf = (row: LedgerRow): 'advance' | 'repayment' | null => {
-    if (row.id === 'opening') return null
-    if (row.advance != null) return 'advance'
-    if (row.repayment != null) return 'repayment'
-    return null
-  }
-  const dayKey = (row: LedgerRow) => `${kindOf(row)}:${new Date(row.date).toDateString()}`
-
-  const lastIndexByGroup = new Map<string, number>()
-  rows.forEach((row, i) => {
-    if (kindOf(row)) lastIndexByGroup.set(dayKey(row), i)
-  })
-
-  const result: LedgerRow[] = []
-  rows.forEach((row, i) => {
-    const kind = kindOf(row)
-    if (!kind) {
-      result.push(row)
-      return
-    }
-    // Earlier same-day/same-kind entries are folded into the last one below.
-    if (i !== lastIndexByGroup.get(dayKey(row))) return
-
-    const group = rows.filter((r) => kindOf(r) === kind && dayKey(r) === dayKey(row))
-    if (group.length === 1) {
-      result.push(row)
-      return
-    }
-    const field = kind === 'advance' ? 'advance' : 'repayment'
-    const total = group.reduce((sum, r) => sum.plus(r[field] ?? '0'), new Decimal(0))
-    const transactions = Array.from(new Set(group.map((r) => r.transaction).filter(Boolean)))
-    result.push({
-      ...row,
-      description: kind === 'advance' ? 'Advance - loan' : 'Loan Repayment',
-      transaction: transactions.length === 1 ? transactions[0]! : 'Multiple',
-      [field]: total.toFixed(2),
-    })
-  })
-  return result
-}
-
 function getLedgerColumns(sym: string): Column<LedgerRow>[] {
   return [
   {
@@ -212,7 +161,7 @@ export function LoansTab({ customerId, customerName, userRole, userAllowedModule
   }
 
   const closingBalance = data ? new Decimal(data.closingBalance) : new Decimal(0)
-  const ledgerRows = aggregateSameDayEntries(data?.rows ?? [])
+  const ledgerRows = data?.rows ?? []
   const ledgerPageRows = ledgerRows.slice((ledgerPage - 1) * LEDGER_PAGE_SIZE, ledgerPage * LEDGER_PAGE_SIZE)
 
   return (
