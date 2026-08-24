@@ -8,15 +8,12 @@ import { useState, useEffect, useCallback } from 'react'
 import useSWR from 'swr'
 import Decimal from 'decimal.js'
 import {
-  Plus,
-  ClipboardCheck,
-  Download, LogOut, Settings, Settings2, TrendingUp,
-  Users, UserPlus, ChevronRight,
+  LogOut, Settings,
+  Users, ChevronRight,
   Wifi, WifiOff,
   PrinterX,
   RefreshCw,
-  Scale, ClipboardList, ReceiptText,
-  Boxes, ArrowLeftRight, Grid3X3, SlidersHorizontal,
+  Scale, ClipboardList,
   ShieldCheck, History, LifeBuoy, DoorOpen,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -26,199 +23,10 @@ import { useUpdateStore } from '@/stores/updateStore'
 import { useConfigStore } from '@/stores/configStore'
 import { getModuleName } from '@/lib/module-names'
 import { WindowTaskbar } from '@/components/ui/WindowTaskbar'
+import { Toolbar } from '@/components/layout/Toolbar'
 import { useRecordTitle } from '@/hooks/useRecordTitle'
 import { useFeatureFlag } from '@/hooks/useFeatureFlags'
-import { Btn, BtnMenu, type BtnVariant, type BtnMenuItem, NAVY_GLOSS_GRAD, NAVY_GLOSS_BEVEL, winBevel } from '@/components/rpx'
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface ToolbarButton {
-  label:    string
-  icon:     React.ElementType
-  href?:    string
-  onClick?: () => void
-  variant:  'primary' | 'secondary' | 'danger' | 'ghost'
-  iconOnly?: boolean
-  /** When present, renders as a dropdown menu of these items. */
-  items?:   BtnMenuItem[]
-}
-
-// ─── Toolbar configs ──────────────────────────────────────────────────────────
-
-function useToolbarButtons(pathname: string, role: string): ToolbarButton[] {
-  const isMgr  = role === 'admin' || role === 'manager'
-  const isAdmin = role === 'admin'
-
-  // Exact match only — the list page gets "Add Account", but a customer's
-  // own profile (/app/customers/[id]) or the add-account page itself
-  // (/app/customers/new) shouldn't show a button that just re-opens the
-  // same or a redundant "add" flow.
-  if (pathname === '/app/customers')
-    return [
-      { label: 'Add Account', icon: Plus, href: '/app/customers/new', variant: 'primary' },
-    ]
-
-  if (pathname === '/app/casual' || pathname.startsWith('/app/casual/'))
-    return []
-
-  if (pathname === '/app/purchases' || pathname.startsWith('/app/purchases/'))
-    return []
-
-  // "Unpaid Sales" now lives only inside the Pending Sales panel on the
-  // new-sale page itself, not the top nav bar — was a duplicate entry point.
-  if (pathname === '/app/sales' || pathname.startsWith('/app/sales/'))
-    return []
-
-  // "Account Balances" now lives only inside the Pending Purchases panel on
-  // the new-purchase page itself, not the top nav bar — was a duplicate entry point.
-  if (pathname === '/app/payments' || pathname.startsWith('/app/payments/'))
-    return []
-
-  if (pathname === '/app/expenses' || pathname.startsWith('/app/expenses/'))
-    return pathname === '/app/expenses' ? [
-      { label: 'Add Expense', icon: Plus, href: '/app/expenses?add=1', variant: 'primary' },
-    ] : []
-
-  if (pathname === '/app/cashup' || pathname.startsWith('/app/cashup/'))
-    return []
-
-  if (pathname === '/app/float' || pathname.startsWith('/app/float/'))
-    return []
-
-  if (pathname === '/app/stocktake' || pathname.startsWith('/app/stocktake/'))
-    return isMgr ? [
-      { label: 'Start Stocktake', icon: ClipboardCheck, href: '/app/stocktake?create=1', variant: 'primary' },
-    ] : []
-
-  if (pathname === '/app/gate' || pathname.startsWith('/app/gate/')) {
-    const isEntries = pathname === '/app/gate'
-    const isGuards  = pathname === '/app/gate/guards'
-    const isConfig  = pathname === '/app/gate/config'
-    return [
-      { label: 'Entries',        icon: ClipboardList, href: '/app/gate',         variant: isEntries ? 'primary' : 'secondary' as const },
-      { label: 'Guards',         icon: Users,         href: '/app/gate/guards',  variant: isGuards  ? 'primary' : 'secondary' as const },
-      { label: 'Purpose Config', icon: Settings2,     href: '/app/gate/config',  variant: isConfig  ? 'primary' : 'secondary' as const },
-    ]
-  }
-
-  if (pathname === '/app/scale' || pathname.startsWith('/app/scale/')) {
-    const isOrders    = pathname === '/app/scale'
-    const isOperators = pathname === '/app/scale/operators'
-    const isConfig    = pathname === '/app/scale/config'
-    return [
-      { label: 'Orders',      icon: ClipboardList, href: '/app/scale',           variant: isOrders    ? 'primary' : 'secondary' as const },
-      { label: 'Operators',   icon: Users,         href: '/app/scale/operators', variant: isOperators ? 'primary' : 'secondary' as const },
-      { label: 'Step Config', icon: Settings2,     href: '/app/scale/config',    variant: isConfig    ? 'primary' : 'secondary' as const },
-    ]
-  }
-
-  if (pathname === '/app/police-register' || pathname.startsWith('/app/police-register/')) {
-    const isGenerate = pathname === '/app/police-register'
-    const isHistory  = pathname === '/app/police-register/history'
-    return [
-      { label: 'Generate Register', icon: ClipboardList, href: '/app/police-register',         variant: isGenerate ? 'primary' : 'secondary' as const },
-      { label: 'Visit History',     icon: History,       href: '/app/police-register/history', variant: isHistory  ? 'primary' : 'secondary' as const },
-      { label: 'Officer Portal',    icon: ShieldCheck,   href: '/police',                       variant: 'ghost' as const },
-    ]
-  }
-
-  if (pathname === '/app/stock' || pathname.startsWith('/app/stock/')) {
-    const isOnHand    = pathname === '/app/stock'
-    const isMovements = pathname === '/app/stock/movements'
-    const isGrid      = pathname === '/app/stock/grid'
-    return [
-      { label: 'Stock On Hand', icon: Boxes,             href: '/app/stock',           variant: isOnHand    ? 'primary' : 'secondary' as const },
-      { label: 'Movements',     icon: ArrowLeftRight,    href: '/app/stock/movements', variant: isMovements ? 'primary' : 'secondary' as const },
-      { label: 'Grid',          icon: Grid3X3,           href: '/app/stock/grid',      variant: isGrid      ? 'primary' : 'secondary' as const },
-      ...(isMgr ? [
-        { label: 'Manual Adjustment', icon: SlidersHorizontal, href: '/app/stock?adjust=1', variant: 'ghost' as const },
-      ] : []),
-    ]
-  }
-
-  // Price list builder pages get their own toolbar (New + back to Products),
-  // matching the Stock module's sibling-page pattern.
-  if (pathname === '/app/products/price-lists' || pathname.startsWith('/app/products/price-lists/'))
-    return isMgr ? [
-      { label: 'New Price List', icon: Plus,          href: '/app/products/price-lists/new', variant: 'primary' },
-      { label: 'Products',       icon: ClipboardList, href: '/app/products',                 variant: 'secondary' },
-    ] : []
-
-  if (pathname === '/app/products' || pathname.startsWith('/app/products/'))
-    return isMgr ? [
-      { label: 'Add Product', icon: Plus,        href: '/app/products?add=1',        variant: 'primary' },
-      { label: 'Categories',  icon: Settings2,   href: '/app/products?categories=1', variant: 'secondary' },
-      { label: 'Bulk Price',  icon: TrendingUp,  href: '/app/products?bulk=1',       variant: 'secondary' },
-      { label: 'Price Lists', icon: ReceiptText, href: '/app/products/price-lists',  variant: 'secondary' },
-    ] : []
-
-  if (pathname === '/app/price-groups' || pathname.startsWith('/app/price-groups/'))
-    return isMgr ? [
-      { label: 'Add Price Group', icon: Plus, href: '/app/price-groups?create=1', variant: 'primary' },
-    ] : []
-
-  // Reports has its own in-page Run/Download controls — no toolbar actions
-  if (pathname === '/app/reports' || pathname.startsWith('/app/reports/'))
-    return []
-
-  if (pathname === '/app/audit-log' || pathname.startsWith('/app/audit-log/'))
-    return isAdmin ? [
-      { label: 'Download', icon: Download, href: '/app/audit-log?export=1', variant: 'secondary' },
-    ] : []
-
-  if (pathname === '/app/settings' || pathname.startsWith('/app/settings/'))
-    // "Add User" stays even on the Users page itself (it drives ?create=1,
-    // opening the modal — genuinely useful there). "Users" is a plain
-    // navigation shortcut and shouldn't point at the page you're already on.
-    return !isAdmin ? [] : [
-      { label: 'Add User', icon: UserPlus, href: '/app/settings/users?create=1', variant: 'primary' },
-      ...(pathname === '/app/settings/users' ? [] : [
-        { label: 'Users', icon: Users, href: '/app/settings/users', variant: 'secondary' as const },
-      ]),
-    ]
-
-  if (pathname === '/app/support' || pathname.startsWith('/app/support/'))
-    return isAdmin ? [
-      { label: 'New Ticket', icon: Plus, href: '/app/support?new=1', variant: 'primary' },
-    ] : []
-
-  return []
-}
-
-// ─── ToolbarBtn ───────────────────────────────────────────────────────────────
-
-const TOOLBAR_VARIANT: Record<ToolbarButton['variant'], BtnVariant> = {
-  primary:   'primary',
-  secondary: 'secondary',
-  danger:    'danger',
-  ghost:     'secondary',
-}
-
-function ToolbarBtn({ btn }: { btn: ToolbarButton }) {
-  if (btn.items) {
-    return (
-      <BtnMenu
-        size="sm"
-        variant={TOOLBAR_VARIANT[btn.variant]}
-        icon={btn.icon}
-        label={btn.label}
-        items={btn.items}
-      />
-    )
-  }
-  return (
-    <Btn
-      size="sm"
-      variant={TOOLBAR_VARIANT[btn.variant]}
-      icon={btn.icon}
-      href={btn.href}
-      onClick={btn.onClick}
-      title={btn.iconOnly ? btn.label : undefined}
-    >
-      {!btn.iconOnly && btn.label}
-    </Btn>
-  )
-}
+import { NAVY_GLOSS_GRAD, NAVY_GLOSS_BEVEL, winBevel } from '@/components/rpx'
 
 // ─── UserMenu ─────────────────────────────────────────────────────────────────
 
@@ -760,7 +568,6 @@ export function AppShell({
 }) {
   const pathname    = usePathname()
   const router      = useRouter()
-  const toolbarBtns = useToolbarButtons(pathname, role)
   const moduleName  = getModuleName(pathname)
 
   // Dynamic route title (for detail pages like /app/purchases/[id])
@@ -859,25 +666,33 @@ export function AppShell({
       </header>
 
       {/* ── ZONE 2: Contextual Toolbar ────────────────────────── */}
-      {(() => {
-        const isDashboard   = pathname === '/app/dashboard'
-        const showDashBar   = isDashboard   // all app roles get welcome + police portal access
-        const showToolbar   = toolbarBtns.length > 0 || showDashBar
-        if (!showToolbar) return null
-        return (
-          <div
-            className="flex items-center gap-1 px-3 shrink-0 border-b"
-            style={{
-              height:      'var(--rpx-toolbar-h, 32px)',
-              background:  'rgba(27,58,107,0.09)',
-              borderColor: 'var(--rpx-border, #E0E0E0)',
-            }}
-          >
-            {toolbarBtns.map((btn, i) => <ToolbarBtn key={i} btn={btn} />)}
-            {showDashBar && <DashboardStatsBar fullName={fullName} role={role} allowedModules={allowedModules} />}
-          </div>
-        )
-      })()}
+      {/* Dashboard keeps its own bespoke content (welcome stats + quick-
+          launch popups) — none of the unified toolbar's actions are
+          dashboard actions, so it stays excluded from this system, same as
+          every other "Dashboard is the one exception" pattern in this app. */}
+      {pathname === '/app/dashboard' ? (
+        <div
+          className="flex items-center gap-1 px-3 shrink-0 border-b"
+          style={{
+            height:      'var(--rpx-toolbar-h, 32px)',
+            background:  'rgba(27,58,107,0.09)',
+            borderColor: 'var(--rpx-border, #E0E0E0)',
+          }}
+        >
+          <DashboardStatsBar fullName={fullName} role={role} allowedModules={allowedModules} />
+        </div>
+      ) : (
+        <div
+          className="flex items-center gap-1 px-3 shrink-0 border-b"
+          style={{
+            height:      42,
+            background:  'rgba(27,58,107,0.09)',
+            borderColor: 'var(--rpx-border, #E0E0E0)',
+          }}
+        >
+          <Toolbar role={role} allowedModules={allowedModules} />
+        </div>
+      )}
 
       {/* ── ZONE 3: Content Area ──────────────────────────────── */}
       {/* `relative` is the positioning anchor FloatingWindowFrame's

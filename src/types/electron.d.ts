@@ -6,7 +6,6 @@
 
 interface ElectronAPI {
   isElectron:       boolean
-  readScale:        (scaleNum: number) => Promise<{ weight: number; unit: string }>
   // `id` looks up a synced record server-side; `data` prints directly from
   // client-supplied fields with no DB lookup, for a purchase/sale created
   // offline that has no server id yet — see src/app/api/print/slip/route.ts.

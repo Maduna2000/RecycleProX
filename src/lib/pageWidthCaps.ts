@@ -56,11 +56,11 @@ const PAGE_WIDTH_CAPS: { test: RegExp; width: number }[] = [
   // already has an explicit width (no unbounded stretch column), so on an
   // uncapped page the fixed-width table just sat flush-left with a large
   // dead gutter beside it, and the filter bar's wide empty middle looked
-  // similarly sparse. One shared width across all three tabs (Orders,
-  // Operators, Config) since they're a single route with client-side tab
-  // switching, not separate pages — sized for Orders' 8 columns (the
-  // widest tab).
-  { test: /^\/app\/scale$/, width: 1100 },
+  // similarly sparse. One shared width across all three routes (Orders,
+  // Operators, Config — now separate pages sharing a `tabs` strip, not
+  // client-side tab state within one route) — sized for Orders' 8 columns
+  // (the widest tab).
+  { test: /^\/app\/scale(\/(operators|config))?$/, width: 1100 },
 ]
 
 export function getPageWidthCap(pathname: string): number | null {

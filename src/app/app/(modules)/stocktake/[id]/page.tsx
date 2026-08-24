@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog } from '@/components/ui/dialog'
-import { Loader2, CheckCircle, Ban, Scale, RefreshCw, Camera, ExternalLink } from 'lucide-react'
+import { Loader2, Scale, RefreshCw, Camera, ExternalLink } from 'lucide-react'
 import { toast } from 'sonner'
 import Decimal from 'decimal.js'
 import { format } from '@/lib/utils/format'
@@ -21,6 +21,7 @@ import {
   RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter,
 } from '@/components/rpx'
 import { DataTable, type Column, StatusBadge } from '@/components/ui/DataTable'
+import { useToolbarAction } from '@/stores/toolbarActionStore'
 
 
 type Product = { id: string; code: string; name: string; unit: string; category: string }
@@ -103,6 +104,19 @@ export default function StocktakeDetailPage() {
   function patchEntryWeigh(entryId: string, patch: Partial<EntryWeighState>) {
     setEntryWeigh((prev) => ({ ...prev, [entryId]: { ...getEntryWeigh(entryId), ...patch } }))
   }
+
+  // "Complete Stocktake"/"Void" moved to the unified Zone 2 toolbar (see
+  // 2026-08-19 toolbar redesign) — both just open their confirm dialog,
+  // same as before. Called before the early returns below (Rules of
+  // Hooks) — safely false/no-op until `stocktake` actually loads.
+  useToolbarAction('complete-stocktake', {
+    enabled: stocktake?.status === 'open' && (stocktake?.entries.length ?? 0) > 0,
+    onClick: () => setShowCompleteDialog(true),
+  })
+  useToolbarAction('void-stocktake', {
+    enabled: stocktake?.status === 'completed',
+    onClick: () => setShowVoidDialog(true),
+  })
 
   if (!isManager) {
     return (
@@ -373,21 +387,7 @@ export default function StocktakeDetailPage() {
 
   return (
     <>
-    <PortalPage
-      title={stocktake.refNumber}
-      actions={
-        <>
-          {isOpen && (
-            <Btn variant="primary" size="sm" icon={CheckCircle} loading={completing} disabled={entries.length === 0} onClick={() => setShowCompleteDialog(true)}>
-              Complete Stocktake
-            </Btn>
-          )}
-          {stocktake.status === 'completed' && (
-            <Btn variant="danger" size="sm" icon={Ban} onClick={() => setShowVoidDialog(true)}>Void</Btn>
-          )}
-        </>
-      }
-    >
+    <PortalPage title={stocktake.refNumber}>
         {/* Sub-header: status */}
         <div style={{ padding: '6px 10px', borderBottom: '1px solid #E0E0E0', flexShrink: 0 }}>
           <StatusBadge status={stocktake.status} />

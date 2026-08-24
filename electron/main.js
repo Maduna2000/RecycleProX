@@ -648,18 +648,6 @@ ipcMain.handle('license-activate', async (_event, activationCode) => {
 
 ipcMain.handle('license-status', () => licenseManager.getAccessState())
 
-// ─── IPC: Scale reading ───────────────────────────────────────────────────────
-
-ipcMain.handle('read-scale', async (_event, scaleNum) => {
-  try {
-    const res = await fetch(`http://127.0.0.1:${PORT}/api/scale/read?scale=${scaleNum}`)
-    if (!res.ok) throw new Error(`Scale API returned ${res.status}`)
-    return await res.json()
-  } catch (err) {
-    throw new Error(`Scale read failed: ${err.message}`)
-  }
-})
-
 // ─── IPC: Thermal print ───────────────────────────────────────────────────────
 
 ipcMain.handle('print-slip', async (_event, data) => {

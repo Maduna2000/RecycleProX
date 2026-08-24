@@ -9,7 +9,7 @@ import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { CheckCircle2, Calculator, Clock, Lock, RefreshCw, FolderOpen, ChevronLeft, ChevronRight, Upload, Loader2, History } from 'lucide-react'
+import { CheckCircle2, Calculator, Clock, Lock, FolderOpen, ChevronLeft, ChevronRight, Upload, Loader2, History } from 'lucide-react'
 import { Dialog } from '@/components/ui/dialog'
 import { DENOMINATIONS, DENOMINATION_LABELS, type Denomination, CURRENCY_SYMBOLS, CURRENCY_LABELS, type Currency } from '@/lib/schemas/cashup'
 import { colors } from '@/lib/design-tokens'
@@ -21,7 +21,7 @@ import { PreviousReportsModal } from './_components/PreviousReportsModal'
 import { CARD_BORDER } from '@/components/rpx/styles'
 import { Btn, PortalPage, PANEL, PANEL_HEAD, HEADER_GRAD, inp, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
 import { fetcher } from '@/lib/swrFetcher'
-import { useTitleBarActions } from '@/hooks/useTitleBarActions'
+import { useToolbarAction } from '@/stores/toolbarActionStore'
 
 
 type CashUp = {
@@ -854,29 +854,15 @@ export default function CashUpPage() {
   const expenses = expensesData?.expenses ?? []
   const momoStatement = momoData?.statement ?? null
 
-  // Rendered into the shared windowed title bar (see PageTitleBar) instead
-  // of PortalPage's own actions row — that row had nothing else in it on
-  // this page (no tabs), leaving a mostly-empty white strip between the
-  // title bar and the content below with just this cluster squeezed into
-  // its far right edge.
+  // Status pill still renders in PortalPage's own actions row (see the
+  // main PortalPage call below) — it's a text readout, not a button, so it
+  // doesn't belong in the unified Zone 2 toolbar. "Refresh" itself does —
+  // moved there as a dynamic action (2026-08-19 toolbar redesign).
   const isPreviousDay = cashUp && cashUp.status === 'open' && sessionDate !== todayISO
-  useTitleBarActions(
-    cashUp && (
-      <>
-        <span className="text-xs" style={{ color: colors.textMuted }}>{sessionDate}</span>
-        {cashUp.status === 'open' && isPreviousDay && <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: colors.dangerBg, color: colors.danger }}>Previous Day — Submit Required</span>}
-        {cashUp.status === 'open' && !isPreviousDay && <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: colors.warningBg, color: colors.warning }}>Open</span>}
-        {cashUp.status === 'submitted' && <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: colors.processBg, color: colors.process }}>Submitted — Awaiting Approval</span>}
-        {cashUp.status === 'approved'  && <span className="flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium" style={{ background: colors.actionBg, color: colors.action }}><CheckCircle2 className="w-3 h-3" />Approved</span>}
-        {cashUp.approvedAt && <span className="text-xs" style={{ color: colors.textMuted }}>{new Date(cashUp.approvedAt).toLocaleString('en-ZA')}</span>}
-        {cashUp.status === 'open' && (
-          <button onClick={() => refreshStats()} className="flex items-center gap-1 text-xs font-medium" style={{ color: colors.textSecondary }}>
-            <RefreshCw className="w-3.5 h-3.5" /> Refresh
-          </button>
-        )}
-      </>
-    )
-  )
+  useToolbarAction('cashup-refresh', {
+    enabled: cashUp?.status === 'open',
+    onClick: () => refreshStats(),
+  })
 
   const EXPENSES_PAGE_SIZE = 3
   const [expensePage, setExpensePage] = useState(1)
@@ -1182,11 +1168,23 @@ export default function CashUpPage() {
     // actually growing when the window is manually resized wider (only the
     // window's border moved) — PortalPage's own cap already relaxes once
     // the window is floating (see useIsWindowFloating), so this wrapper
-    // just needs to fill whatever width it's given now. The date/status/
-    // Refresh cluster now lives in the title bar itself (useTitleBarActions
-    // above) instead of here, so there's no more actions prop / near-empty
-    // row between the title bar and the content.
-    <PortalPage title="Cash-Up" maxWidth={1152}>
+    // just needs to fill whatever width it's given now.
+    <PortalPage
+      title="Cash-Up"
+      maxWidth={1152}
+      actions={
+        cashUp && (
+          <>
+            <span className="text-xs" style={{ color: colors.textMuted }}>{sessionDate}</span>
+            {cashUp.status === 'open' && isPreviousDay && <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: colors.dangerBg, color: colors.danger }}>Previous Day — Submit Required</span>}
+            {cashUp.status === 'open' && !isPreviousDay && <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: colors.warningBg, color: colors.warning }}>Open</span>}
+            {cashUp.status === 'submitted' && <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: colors.processBg, color: colors.process }}>Submitted — Awaiting Approval</span>}
+            {cashUp.status === 'approved'  && <span className="flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium" style={{ background: colors.actionBg, color: colors.action }}><CheckCircle2 className="w-3 h-3" />Approved</span>}
+            {cashUp.approvedAt && <span className="text-xs" style={{ color: colors.textMuted }}>{new Date(cashUp.approvedAt).toLocaleString('en-ZA')}</span>}
+          </>
+        )
+      }
+    >
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
       <div className="w-full space-y-2 pb-2" style={{ padding: '6px 8px 0' }}>
 
