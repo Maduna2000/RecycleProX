@@ -648,6 +648,11 @@ ipcMain.handle('license-activate', async (_event, activationCode) => {
 
 ipcMain.handle('license-status', () => licenseManager.getAccessState())
 
+// Lets the login screen show/pre-fill the company code this device was
+// activated for, instead of making the operator remember and type it —
+// licenseManager.js already stores it locally at activation time.
+ipcMain.handle('license-info', () => licenseManager.getStoredLicense())
+
 // Unlike license-status (a pure cache read), this forces a real heartbeat
 // round-trip to the Portal first — used after the LicenseGate's "Retry" and
 // its activation-key form (a redeemed reactivation code doesn't itself

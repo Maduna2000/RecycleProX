@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { signIn, signOut, getSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
@@ -21,10 +21,29 @@ export function LoginForm({ tenantSlug }: { tenantSlug?: string }) {
   const [loading, setLoading] = useState(false)
   const [showCompanyCode, setShowCompanyCode] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  // The company code this specific device was activated for — already
+  // known locally (licenseManager.js stores it at activation), so on
+  // desktop there's no reason to make the operator remember and type it
+  // themselves the way the web fallback below requires.
+  const [deviceCompanySlug, setDeviceCompanySlug] = useState<string | null>(null)
 
-  const { register, handleSubmit, formState: { errors } } = useForm<LoginInput>({
+  const { register, handleSubmit, setValue, formState: { errors } } = useForm<LoginInput>({
     resolver: zodResolver(LoginSchema),
   })
+
+  useEffect(() => {
+    if (!window.electronAPI?.getLicenseInfo) return
+    let cancelled = false
+    window.electronAPI.getLicenseInfo().then((info) => {
+      if (cancelled || !info.companySlug) return
+      setDeviceCompanySlug(info.companySlug)
+      setValue('tenantSlug', info.companySlug)
+      setShowCompanyCode(true)
+    }).catch(() => {
+      // No stored license yet (not activated) — leave the field manual, same as web.
+    })
+    return () => { cancelled = true }
+  }, [setValue])
 
   async function onSubmit(data: LoginInput) {
     setLoading(true)
@@ -144,14 +163,16 @@ export function LoginForm({ tenantSlug }: { tenantSlug?: string }) {
               <Input
                 id="tenantSlug"
                 autoComplete="off"
-                autoFocus
+                autoFocus={!deviceCompanySlug}
                 {...register('tenantSlug')}
                 className="mt-1"
                 style={{ borderColor: colors.border }}
                 disabled={loading}
               />
               <p className="text-xs mt-1" style={{ color: colors.textSecondary }}>
-                Provided by your administrator
+                {deviceCompanySlug
+                  ? 'This device is registered to this company — change it only if you’re sure.'
+                  : 'Provided by your administrator'}
               </p>
             </div>
           ) : (

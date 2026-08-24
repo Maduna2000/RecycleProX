@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   activateDevice: (activationCode) => ipcRenderer.invoke('license-activate', activationCode),
   getLicenseStatus: ()             => ipcRenderer.invoke('license-status'),
   recheckLicense: ()               => ipcRenderer.invoke('license-recheck'),
+  getLicenseInfo: ()               => ipcRenderer.invoke('license-info'),
 
   // Auto-updater — main process pushes status changes (checking / available /
   // downloading / ready / none), renderer never polls for this itself.
