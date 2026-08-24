@@ -4,9 +4,11 @@ import { SessionProvider } from 'next-auth/react'
 import { AppShell } from '@/components/layout/AppShell'
 import { BannerBar } from '@/components/BannerBar'
 import { PinLockOverlay } from '@/components/PinLockOverlay'
+import { SubscriptionGate } from '@/components/SubscriptionGate'
 import { OfflineProvider } from '@/components/OfflineProvider'
 import { Toaster } from '@/components/ui/sonner'
 import { fetchActiveBanners } from '@/lib/services/bannerClient'
+import { getTenantSubscriptionAccess } from '@/lib/subscriptionAccess'
 
 // Deliberately narrower than (modules)/layout.tsx: this route wraps only
 // the dashboard, which WindowedContent.tsx already special-cases as "the
@@ -19,24 +21,31 @@ export default async function PortalLayout({ children }: { children: React.React
   const session = await auth()
   if (!session) redirect('/login')
 
-  const banners = session.user.tenantSlug
-    ? await fetchActiveBanners(session.user.tenantSlug)
-    : []
+  const [banners, subscriptionAccess] = session.user.tenantSlug
+    ? await Promise.all([
+        fetchActiveBanners(session.user.tenantSlug),
+        getTenantSubscriptionAccess(session.user.tenantSlug),
+      ])
+    : [[], { blocked: false, banner: null, dueDateLabel: null }]
+
+  const allBanners = subscriptionAccess.banner ? [subscriptionAccess.banner, ...banners] : banners
 
   return (
     <SessionProvider session={session}>
       <OfflineProvider>
-        <BannerBar banners={banners} />
-        <PinLockOverlay>
-          <AppShell
-            role={session.user.role}
-            fullName={session.user.fullName ?? session.user.username ?? 'User'}
-            allowedModules={session.user.allowedModules}
-          >
-            {children}
-          </AppShell>
-          <Toaster richColors />
-        </PinLockOverlay>
+        <BannerBar banners={allBanners} />
+        <SubscriptionGate blocked={subscriptionAccess.blocked} dueDateLabel={subscriptionAccess.dueDateLabel}>
+          <PinLockOverlay>
+            <AppShell
+              role={session.user.role}
+              fullName={session.user.fullName ?? session.user.username ?? 'User'}
+              allowedModules={session.user.allowedModules}
+            >
+              {children}
+            </AppShell>
+            <Toaster richColors />
+          </PinLockOverlay>
+        </SubscriptionGate>
       </OfflineProvider>
     </SessionProvider>
   )
