@@ -6,6 +6,7 @@ import { fetcher } from '@/lib/swrFetcher'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
 import { PortalPage, TH, TD, HEADER_GRAD } from '@/components/rpx'
 import { DateRangeFilter } from '../_components/DateRangeFilter'
+import { StatCard } from '../_components/StatCard'
 import { formatMoney } from '../_lib/money'
 import type { ProfitAndLossReport } from '@/lib/services/ledgerReportService'
 
@@ -50,6 +51,15 @@ export default function ProfitAndLossPage() {
         <p style={{ fontSize: fontSize.base, color: colors.textSecondary, marginTop: 2 }}>Revenue minus cost of goods sold and operating expenses, for a period.</p>
       </div>
       <DateRangeFilter from={from} to={to} onChange={(f, t) => { setFrom(f); setTo(t) }} />
+
+      {data && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <StatCard label="Revenue" value={formatMoney(data.totalRevenue)} tone="action" />
+          <StatCard label="Cost of Goods Sold" value={formatMoney(data.totalCogs)} />
+          <StatCard label="Gross Profit" value={formatMoney(data.grossProfit)} tone="action" />
+          <StatCard label="Net Profit" value={formatMoney(data.netProfit)} tone={Number(data.netProfit) < 0 ? 'danger' : 'action'} />
+        </div>
+      )}
 
       <PortalPage title="Profit & Loss">
         <div style={{ overflow: 'auto', flex: 1 }}>

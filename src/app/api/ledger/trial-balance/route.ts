@@ -11,9 +11,10 @@ export async function GET(req: NextRequest) {
   if (!session) return response
 
   const asOf = req.nextUrl.searchParams.get('asOf') ?? todaySASTDateStr()
+  const page = Number(req.nextUrl.searchParams.get('page') ?? '1') || 1
 
   try {
-    const report = await runWithRequestTenant(req, () => getTrialBalance(asOf))
+    const report = await runWithRequestTenant(req, () => getTrialBalance(asOf, { page }))
     return NextResponse.json(report)
   } catch (err) {
     logger.error({ err }, 'GET /api/ledger/trial-balance failed')

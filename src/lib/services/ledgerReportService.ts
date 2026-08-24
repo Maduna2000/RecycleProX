@@ -106,17 +106,28 @@ export interface TrialBalanceReport {
   totalDebit: string
   totalCredit: string
   balanced: boolean
+  accountCount: number
+  page: number
+  pageSize: number
+  pageCount: number
 }
 
-/** Every account with any activity, own-lines only — the real debits==credits self-check. */
-export async function getTrialBalance(asOfLabel: string): Promise<TrialBalanceReport> {
+/**
+ * Every account with any activity, own-lines only — the real
+ * debits==credits self-check. totalDebit/totalCredit/balanced are always
+ * computed over every account (never just the current page) since that's
+ * the actual self-check; only the displayed `rows` are paginated.
+ */
+export async function getTrialBalance(asOfLabel: string, opts?: { page?: number; pageSize?: number }): Promise<TrialBalanceReport> {
   const asOf = getDayBoundsSAST(sastDateLabelToUTCDate(asOfLabel)).end
+  const page = opts?.page ?? 1
+  const pageSize = opts?.pageSize ?? 50
   const [accounts, sums] = await Promise.all([
     prisma.account.findMany({ orderBy: [{ code: 'asc' }] }),
     sumLinesByAccount({ entryDate: { lte: asOf } }),
   ])
 
-  const rows: TrialBalanceRow[] = []
+  const allRows: TrialBalanceRow[] = []
   let totalDebit = new Decimal(0)
   let totalCredit = new Decimal(0)
 
@@ -126,10 +137,14 @@ export async function getTrialBalance(asOfLabel: string): Promise<TrialBalanceRe
     const balance = ownBalance(s, a.normalBalance)
     const debit = a.normalBalance === 'debit' ? Decimal.max(balance, 0) : Decimal.max(balance.negated(), 0)
     const credit = a.normalBalance === 'credit' ? Decimal.max(balance, 0) : Decimal.max(balance.negated(), 0)
-    rows.push({ accountId: a.id, code: a.code, name: a.name, debit: debit.toFixed(2), credit: credit.toFixed(2) })
+    allRows.push({ accountId: a.id, code: a.code, name: a.name, debit: debit.toFixed(2), credit: credit.toFixed(2) })
     totalDebit = totalDebit.plus(debit)
     totalCredit = totalCredit.plus(credit)
   }
+
+  const pageCount = Math.max(1, Math.ceil(allRows.length / pageSize))
+  const safePage = Math.min(page, pageCount)
+  const rows = allRows.slice((safePage - 1) * pageSize, safePage * pageSize)
 
   return {
     asOf: asOfLabel,
@@ -137,6 +152,10 @@ export async function getTrialBalance(asOfLabel: string): Promise<TrialBalanceRe
     totalDebit: totalDebit.toFixed(2),
     totalCredit: totalCredit.toFixed(2),
     balanced: totalDebit.equals(totalCredit),
+    accountCount: allRows.length,
+    page: safePage,
+    pageSize,
+    pageCount,
   }
 }
 
@@ -453,11 +472,31 @@ export interface GeneralLedgerReport {
   openingBalance: string
   rows: GeneralLedgerRow[]
   closingBalance: string
+  totalDebit: string
+  totalCredit: string
+  entryCount: number
+  page: number
+  pageSize: number
+  pageCount: number
 }
 
-export async function getGeneralLedger(accountId: string, fromLabel: string, toLabel: string): Promise<GeneralLedgerReport> {
+/**
+ * Running balance depends on processing every line in date order from the
+ * opening balance forward, so pagination can't be pushed down into the SQL
+ * query (a LIMIT/OFFSET page would have no correct starting balance of its
+ * own) — the full period's lines are always fetched and walked in order to
+ * build the true running balance, then the resulting rows array is sliced
+ * for display. totalDebit/totalCredit/entryCount are over the whole period,
+ * not just the returned page, so the summary stat cards stay accurate
+ * regardless of which page is showing.
+ */
+export async function getGeneralLedger(
+  accountId: string, fromLabel: string, toLabel: string, opts?: { page?: number; pageSize?: number }
+): Promise<GeneralLedgerReport> {
   const account = await prisma.account.findUniqueOrThrow({ where: { id: accountId } })
   const { start, end } = getRangeBoundsSAST(fromLabel, toLabel)
+  const page = opts?.page ?? 1
+  const pageSize = opts?.pageSize ?? 50
 
   const [openingSums, lines] = await Promise.all([
     sumLinesByAccount({ entryDate: { lte: new Date(start.getTime() - 1) } }),
@@ -470,9 +509,13 @@ export async function getGeneralLedger(accountId: string, fromLabel: string, toL
 
   let balance = ownBalance(openingSums.get(accountId), account.normalBalance)
   const opening = balance
-  const rows: GeneralLedgerRow[] = lines.map((l) => {
+  let totalDebit = new Decimal(0)
+  let totalCredit = new Decimal(0)
+  const allRows: GeneralLedgerRow[] = lines.map((l) => {
     const debit = new Decimal(l.debit.toString())
     const credit = new Decimal(l.credit.toString())
+    totalDebit = totalDebit.plus(debit)
+    totalCredit = totalCredit.plus(credit)
     balance = account.normalBalance === 'debit' ? balance.plus(debit).minus(credit) : balance.plus(credit).minus(debit)
     return {
       journalLineId: l.id,
@@ -487,11 +530,21 @@ export async function getGeneralLedger(accountId: string, fromLabel: string, toL
     }
   })
 
+  const pageCount = Math.max(1, Math.ceil(allRows.length / pageSize))
+  const safePage = Math.min(page, pageCount)
+  const rows = allRows.slice((safePage - 1) * pageSize, safePage * pageSize)
+
   return {
     account: { id: account.id, code: account.code, name: account.name, normalBalance: account.normalBalance },
     openingBalance: opening.toFixed(2),
     rows,
     closingBalance: balance.toFixed(2),
+    totalDebit: totalDebit.toFixed(2),
+    totalCredit: totalCredit.toFixed(2),
+    entryCount: allRows.length,
+    page: safePage,
+    pageSize,
+    pageCount,
   }
 }
 
@@ -506,7 +559,7 @@ export interface JournalEntryRow {
   lines: { accountCode: string; accountName: string; debit: string; credit: string }[]
 }
 
-export async function getJournal(opts: { fromLabel: string; toLabel: string; sourceType?: string; page?: number; pageSize?: number }): Promise<{ entries: JournalEntryRow[]; total: number; page: number; pageSize: number; pageCount: number }> {
+export async function getJournal(opts: { fromLabel: string; toLabel: string; sourceType?: string; page?: number; pageSize?: number }): Promise<{ entries: JournalEntryRow[]; total: number; totalDebit: string; totalCredit: string; page: number; pageSize: number; pageCount: number }> {
   const { start, end } = getRangeBoundsSAST(opts.fromLabel, opts.toLabel)
   const page = opts.page ?? 1
   const pageSize = opts.pageSize ?? 50
@@ -515,7 +568,11 @@ export async function getJournal(opts: { fromLabel: string; toLabel: string; sou
     ...(opts.sourceType ? { sourceType: opts.sourceType } : {}),
   }
 
-  const [entries, total] = await Promise.all([
+  // totalDebit/totalCredit sum every line across the whole filtered range
+  // (not just the current page) — the stat-card summary above the paginated
+  // table needs the true total, and the two always match since every entry
+  // is posted balanced.
+  const [entries, total, lineSums] = await Promise.all([
     prisma.journalEntry.findMany({
       where,
       include: { lines: { include: { account: true } } },
@@ -524,6 +581,7 @@ export async function getJournal(opts: { fromLabel: string; toLabel: string; sou
       take: pageSize,
     }),
     prisma.journalEntry.count({ where }),
+    prisma.journalLine.aggregate({ where: { journalEntry: where }, _sum: { debit: true, credit: true } }),
   ])
 
   return {
@@ -541,6 +599,8 @@ export async function getJournal(opts: { fromLabel: string; toLabel: string; sou
       })),
     })),
     total,
+    totalDebit: new Decimal(lineSums._sum.debit?.toString() ?? '0').toFixed(2),
+    totalCredit: new Decimal(lineSums._sum.credit?.toString() ?? '0').toFixed(2),
     page,
     pageSize,
     pageCount: Math.ceil(total / pageSize),

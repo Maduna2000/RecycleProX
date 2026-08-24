@@ -7,6 +7,7 @@ import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
 import { PortalPage, TD, Field, inp, HEADER_GRAD } from '@/components/rpx'
 import { CheckCircle2, AlertTriangle } from 'lucide-react'
 import { formatMoney } from '../_lib/money'
+import { StatCard } from '../_components/StatCard'
 import type { BalanceSheetReport } from '@/lib/services/ledgerReportService'
 
 function todayLabel(): string {
@@ -66,6 +67,14 @@ export default function BalanceSheetPage() {
         >
           {data.balanced ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
           {data.balanced ? 'Balanced.' : 'Not balanced — this indicates a bug in posting logic.'}
+        </div>
+      )}
+
+      {data && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <StatCard label="Total Assets" value={formatMoney(data.assets.total)} tone="action" />
+          <StatCard label="Total Liabilities" value={formatMoney(data.liabilities.total)} tone="danger" />
+          <StatCard label="Total Equity" value={formatMoney(data.equity.total)} />
         </div>
       )}
 

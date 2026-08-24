@@ -14,9 +14,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ acco
   const today = todaySASTDateStr()
   const from = req.nextUrl.searchParams.get('from') ?? `${today.slice(0, 7)}-01`
   const to = req.nextUrl.searchParams.get('to') ?? today
+  const page = Number(req.nextUrl.searchParams.get('page') ?? '1') || 1
 
   try {
-    const report = await runWithRequestTenant(req, () => getGeneralLedger(accountId, from, to))
+    const report = await runWithRequestTenant(req, () => getGeneralLedger(accountId, from, to, { page }))
     return NextResponse.json(report)
   } catch (err) {
     logger.error({ err, accountId }, 'GET /api/ledger/general-ledger/[accountId] failed')

@@ -7,6 +7,8 @@ import { fetcher } from '@/lib/swrFetcher'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
 import { PortalPage, TH, TD, Field, inp } from '@/components/rpx'
 import { DateRangeFilter } from '../_components/DateRangeFilter'
+import { StatCard } from '../_components/StatCard'
+import { Pagination } from '../_components/Pagination'
 import { formatMoney } from '../_lib/money'
 import type { AccountTreeNode } from '@/lib/services/ledgerReportService'
 import type { GeneralLedgerReport } from '@/lib/services/ledgerReportService'
@@ -30,6 +32,7 @@ function GeneralLedgerInner() {
   const [accountId, setAccountId] = useState(searchParams.get('accountId') ?? '')
   const [from, setFrom] = useState(monthStartLabel())
   const [to, setTo] = useState(todayLabel())
+  const [page, setPage] = useState(1)
 
   const { data: accountsData } = useSWR<{ accounts: AccountTreeNode[] }>('/api/ledger/accounts', fetcher)
   const options = useMemo(() => (accountsData ? flatten(accountsData.accounts) : []), [accountsData])
@@ -41,7 +44,7 @@ function GeneralLedgerInner() {
   }, [accountId, options])
 
   const { data, isLoading } = useSWR<GeneralLedgerReport>(
-    accountId ? `/api/ledger/general-ledger/${accountId}?from=${from}&to=${to}` : null,
+    accountId ? `/api/ledger/general-ledger/${accountId}?from=${from}&to=${to}&page=${page}` : null,
     fetcher
   )
 
@@ -54,12 +57,21 @@ function GeneralLedgerInner() {
 
       <div className="flex items-end flex-wrap gap-4">
         <Field label="Account" width={320}>
-          <select value={accountId} onChange={(e) => setAccountId(e.target.value)} style={{ ...inp, width: '100%' }}>
+          <select value={accountId} onChange={(e) => { setAccountId(e.target.value); setPage(1) }} style={{ ...inp, width: '100%' }}>
             {options.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
           </select>
         </Field>
-        <DateRangeFilter from={from} to={to} onChange={(f, t) => { setFrom(f); setTo(t) }} />
+        <DateRangeFilter from={from} to={to} onChange={(f, t) => { setFrom(f); setTo(t); setPage(1) }} />
       </div>
+
+      {data && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <StatCard label="Opening Balance" value={formatMoney(data.openingBalance)} />
+          <StatCard label="Total Debit" value={formatMoney(data.totalDebit)} />
+          <StatCard label="Total Credit" value={formatMoney(data.totalCredit)} />
+          <StatCard label="Closing Balance" value={formatMoney(data.closingBalance)} tone="action" />
+        </div>
+      )}
 
       <PortalPage title="General Ledger">
         <div style={{ overflow: 'auto', flex: 1 }}>
@@ -80,10 +92,16 @@ function GeneralLedgerInner() {
                 </tr>
               </thead>
               <tbody>
-                <tr style={{ borderBottom: `1px solid ${colors.rowDivider}`, background: colors.bg }}>
-                  <td colSpan={5} style={{ ...TD, fontWeight: fontWeight.semibold }}>Opening Balance</td>
-                  <td style={{ ...TD, fontFamily: 'monospace', textAlign: 'right', fontWeight: fontWeight.semibold }}>{formatMoney(data.openingBalance)}</td>
-                </tr>
+                {/* Opening/closing balance rows are for the whole filtered
+                    period (see the stat cards above), not just this page —
+                    only shown on the page that's actually adjacent to them,
+                    so they don't look like they belong to a mid-list page. */}
+                {data.page === 1 && (
+                  <tr style={{ borderBottom: `1px solid ${colors.rowDivider}`, background: colors.bg }}>
+                    <td colSpan={5} style={{ ...TD, fontWeight: fontWeight.semibold }}>Opening Balance</td>
+                    <td style={{ ...TD, fontFamily: 'monospace', textAlign: 'right', fontWeight: fontWeight.semibold }}>{formatMoney(data.openingBalance)}</td>
+                  </tr>
+                )}
                 {data.rows.length === 0 ? (
                   <tr><td colSpan={6} style={{ ...TD, textAlign: 'center', color: colors.textMuted, padding: 24 }}>No activity in this period.</td></tr>
                 ) : data.rows.map((r) => (
@@ -97,15 +115,18 @@ function GeneralLedgerInner() {
                   </tr>
                 ))}
               </tbody>
-              <tfoot>
-                <tr style={{ borderTop: `2px solid ${colors.border}`, background: colors.bg }}>
-                  <td colSpan={5} style={{ ...TD, textAlign: 'right', fontWeight: fontWeight.bold }}>Closing Balance</td>
-                  <td style={{ ...TD, fontFamily: 'monospace', fontWeight: fontWeight.bold, textAlign: 'right' }}>{formatMoney(data.closingBalance)}</td>
-                </tr>
-              </tfoot>
+              {data.page === data.pageCount && (
+                <tfoot>
+                  <tr style={{ borderTop: `2px solid ${colors.border}`, background: colors.bg }}>
+                    <td colSpan={5} style={{ ...TD, textAlign: 'right', fontWeight: fontWeight.bold }}>Closing Balance</td>
+                    <td style={{ ...TD, fontFamily: 'monospace', fontWeight: fontWeight.bold, textAlign: 'right' }}>{formatMoney(data.closingBalance)}</td>
+                  </tr>
+                </tfoot>
+              )}
             </table>
           )}
         </div>
+        {data && <Pagination page={data.page} pageCount={data.pageCount} total={data.entryCount} itemLabel="lines" onChange={setPage} />}
       </PortalPage>
     </div>
   )

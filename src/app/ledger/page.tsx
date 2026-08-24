@@ -15,6 +15,7 @@ import type {
 } from '@/lib/services/ledgerReportService'
 import { CategoryPieChart } from './_components/CategoryPieChart'
 import { CategoryProfitChart } from './_components/CategoryProfitChart'
+import { StatCard } from './_components/StatCard'
 
 function todayLabel(): string {
   return new Date().toISOString().split('T')[0]!
@@ -30,17 +31,6 @@ function findByCode(nodes: AccountTreeNode[], code: string): AccountTreeNode | u
     if (found) return found
   }
   return undefined
-}
-
-function StatCard({ label, value, tone }: { label: string; value: string; tone?: 'action' | 'danger' }) {
-  return (
-    <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 6, padding: '14px 16px' }}>
-      <div style={{ fontSize: fontSize.xs, fontWeight: fontWeight.semibold, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</div>
-      <div style={{ fontSize: 22, fontWeight: fontWeight.bold, color: tone === 'danger' ? colors.danger : tone === 'action' ? colors.action : colors.textPrimary, marginTop: 4, fontFamily: 'monospace' }}>
-        {value}
-      </div>
-    </div>
-  )
 }
 
 function Panel({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {

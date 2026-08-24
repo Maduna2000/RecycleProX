@@ -6,6 +6,8 @@ import { fetcher } from '@/lib/swrFetcher'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
 import { PortalPage, TH, TD, Field, inp } from '@/components/rpx'
 import { DateRangeFilter } from '../_components/DateRangeFilter'
+import { StatCard } from '../_components/StatCard'
+import { Pagination } from '../_components/Pagination'
 import { formatMoney } from '../_lib/money'
 import type { JournalEntryRow } from '@/lib/services/ledgerReportService'
 
@@ -29,7 +31,7 @@ export default function JournalPage() {
   const [page, setPage] = useState(1)
 
   const query = new URLSearchParams({ from, to, page: String(page), ...(sourceType ? { sourceType } : {}) })
-  const { data, isLoading } = useSWR<{ entries: JournalEntryRow[]; total: number; page: number; pageCount: number }>(
+  const { data, isLoading } = useSWR<{ entries: JournalEntryRow[]; total: number; totalDebit: string; totalCredit: string; page: number; pageCount: number }>(
     `/api/ledger/journal?${query.toString()}`,
     fetcher
   )
@@ -49,6 +51,14 @@ export default function JournalPage() {
           </select>
         </Field>
       </div>
+
+      {data && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <StatCard label="Entries" value={String(data.total)} />
+          <StatCard label="Total Debit" value={formatMoney(data.totalDebit)} />
+          <StatCard label="Total Credit" value={formatMoney(data.totalCredit)} />
+        </div>
+      )}
 
       <PortalPage title="Journal">
         <div style={{ overflow: 'auto', flex: 1 }}>
@@ -91,21 +101,8 @@ export default function JournalPage() {
             </table>
           )}
         </div>
-        {data && data.pageCount > 1 && (
-          <div className="flex items-center justify-between px-3 py-2" style={{ borderTop: `1px solid ${colors.border}` }}>
-            <span style={{ fontSize: fontSize.sm, color: colors.textSecondary }}>Page {data.page} of {data.pageCount} ({data.total} entries)</span>
-            <div className="flex gap-2">
-              <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1} style={pagerBtn} >Previous</button>
-              <button onClick={() => setPage((p) => Math.min(data.pageCount, p + 1))} disabled={page >= data.pageCount} style={pagerBtn}>Next</button>
-            </div>
-          </div>
-        )}
+        {data && <Pagination page={data.page} pageCount={data.pageCount} total={data.total} onChange={setPage} />}
       </PortalPage>
     </div>
   )
-}
-
-const pagerBtn: React.CSSProperties = {
-  fontSize: fontSize.sm, padding: '4px 12px', border: `1px solid ${colors.border}`, borderRadius: 3,
-  background: colors.surface, cursor: 'pointer',
 }

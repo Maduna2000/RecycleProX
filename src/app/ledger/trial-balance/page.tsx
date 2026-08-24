@@ -7,6 +7,8 @@ import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
 import { PortalPage, TH, TD, Field, inp, HEADER_GRAD } from '@/components/rpx'
 import { CheckCircle2, AlertTriangle } from 'lucide-react'
 import { formatMoney } from '../_lib/money'
+import { StatCard } from '../_components/StatCard'
+import { Pagination } from '../_components/Pagination'
 import type { TrialBalanceReport } from '@/lib/services/ledgerReportService'
 
 function todayLabel(): string {
@@ -15,7 +17,8 @@ function todayLabel(): string {
 
 export default function TrialBalancePage() {
   const [asOf, setAsOf] = useState(todayLabel())
-  const { data, isLoading } = useSWR<TrialBalanceReport>(`/api/ledger/trial-balance?asOf=${asOf}`, fetcher)
+  const [page, setPage] = useState(1)
+  const { data, isLoading } = useSWR<TrialBalanceReport>(`/api/ledger/trial-balance?asOf=${asOf}&page=${page}`, fetcher)
 
   return (
     <div className="flex flex-col gap-3 flex-1 min-h-0">
@@ -27,9 +30,17 @@ export default function TrialBalancePage() {
           </p>
         </div>
         <Field label="As of">
-          <input type="date" value={asOf} max={todayLabel()} onChange={(e) => setAsOf(e.target.value)} style={{ ...inp, width: 170 }} />
+          <input type="date" value={asOf} max={todayLabel()} onChange={(e) => { setAsOf(e.target.value); setPage(1) }} style={{ ...inp, width: 170 }} />
         </Field>
       </div>
+
+      {data && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <StatCard label="Accounts with Activity" value={String(data.accountCount)} />
+          <StatCard label="Total Debit" value={formatMoney(data.totalDebit)} />
+          <StatCard label="Total Credit" value={formatMoney(data.totalCredit)} />
+        </div>
+      )}
 
       {data && (
         <div
@@ -81,6 +92,7 @@ export default function TrialBalancePage() {
             </table>
           )}
         </div>
+        {data && <Pagination page={data.page} pageCount={data.pageCount} total={data.accountCount} itemLabel="accounts" onChange={setPage} />}
       </PortalPage>
     </div>
   )
