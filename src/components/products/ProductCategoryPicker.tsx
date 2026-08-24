@@ -22,12 +22,15 @@ export function ProductCategoryPicker({
   onChange,
   placeholder = 'Select…',
   style,
+  getBadge,
 }: {
   products: PickerProduct[]
   value: string
   onChange: (productId: string) => void
   placeholder?: string
   style?: React.CSSProperties
+  /** Optional per-product suffix rendered after the unit (e.g. a "Recount" flag). */
+  getBadge?: (product: PickerProduct) => React.ReactNode
 }) {
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState<{ top?: number; bottom?: number; left: number; width: number } | null>(null)
@@ -146,6 +149,7 @@ export function ProductCategoryPicker({
                         onMouseLeave={(e) => { if (p.id !== value) e.currentTarget.style.background = i % 2 === 1 ? '#FAFAFA' : '#fff' }}
                       >
                         {p.name} <span style={{ color: '#9CA3AF', fontSize: 10 }}>({p.unit})</span>
+                        {getBadge?.(p)}
                       </button>
                     ))}
                   </div>

@@ -22,6 +22,7 @@ import {
 } from '@/components/rpx'
 import { DataTable, type Column, StatusBadge } from '@/components/ui/DataTable'
 import { useToolbarAction } from '@/stores/toolbarActionStore'
+import { ProductCategoryPicker } from '@/components/products/ProductCategoryPicker'
 
 
 type Product = { id: string; code: string; name: string; unit: string; category: string }
@@ -114,7 +115,7 @@ export default function StocktakeDetailPage() {
     onClick: () => setShowCompleteDialog(true),
   })
   useToolbarAction('void-stocktake', {
-    enabled: stocktake?.status === 'completed',
+    enabled: stocktake?.status === 'open' || stocktake?.status === 'completed',
     onClick: () => setShowVoidDialog(true),
   })
 
@@ -258,7 +259,7 @@ export default function StocktakeDetailPage() {
         const j = await res.json() as { error?: string }
         throw new Error(j.error ?? 'Failed to void stocktake')
       }
-      toast.success('Stocktake voided — stock adjustments reversed')
+      toast.success(isOpen ? 'Stocktake cancelled' : 'Stocktake voided — stock adjustments reversed')
       setShowVoidDialog(false)
       setVoidReason('')
       mutate(`/api/stocktake/${id}`)
@@ -429,24 +430,19 @@ export default function StocktakeDetailPage() {
                 <span style={{ fontSize: 11, fontWeight: 700, color: colors.primary }}>Add Count Entry</span>
               </div>
               <div style={{ padding: 12 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 140px auto', gap: 12, alignItems: 'end' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 420px) 140px auto', gap: 12, alignItems: 'end' }}>
                   <div>
                     <Label htmlFor="add-product-select" style={{ fontSize: 11, fontWeight: 600, color: colors.textPrimary }}>Product</Label>
-                    <Select value={productId} onValueChange={(v) => setProductId(v ?? '')}>
-                      <SelectTrigger id="add-product-select" style={{ marginTop: 4, height: 28, fontSize: 12, width: '100%' }}>
-                        <SelectValue placeholder="Select product..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {products.map((p) => (
-                          <SelectItem key={p.id} value={p.id}>
-                            <span style={{ color: colors.textPrimary }}>
-                              {p.name} ({p.code})
-                              {countedIds.has(p.id) && <span style={{ color: colors.process, fontWeight: 600 }}> · Recount</span>}
-                            </span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <ProductCategoryPicker
+                      products={products}
+                      value={productId}
+                      onChange={setProductId}
+                      placeholder="Select product..."
+                      style={{ marginTop: 4, height: 28, fontSize: 12 }}
+                      getBadge={(p) => countedIds.has(p.id) && (
+                        <span style={{ color: colors.process, fontWeight: 600, fontSize: 10 }}> · Recount</span>
+                      )}
+                    />
                   </div>
                   <div>
                     <Label htmlFor="add-counted-qty" style={{ fontSize: 11, fontWeight: 600, color: colors.textPrimary }}>
@@ -592,23 +588,28 @@ export default function StocktakeDetailPage() {
         </Dialog>
       )}
 
-      {/* Void stocktake confirmation dialog */}
+      {/* Void/Cancel stocktake confirmation dialog — an 'open' stocktake
+          hasn't posted any stock movements yet, so cancelling it is just a
+          status flip; a 'completed' one reverses the stock adjustments it
+          already applied. Same backend action either way, different copy. */}
       {showVoidDialog && (
         <Dialog open onOpenChange={(o) => { if (!o) { setShowVoidDialog(false); setVoidReason('') } }}>
           <RpxDialogContent maxWidth={480}>
-            <RpxDialogHeader title="Void Stocktake?" onClose={() => { setShowVoidDialog(false); setVoidReason('') }} />
+            <RpxDialogHeader title={isOpen ? 'Cancel Stocktake?' : 'Void Stocktake?'} onClose={() => { setShowVoidDialog(false); setVoidReason('') }} />
             <RpxDialogBody>
             <div className="space-y-3">
               <div style={{ background: colors.warningBg, border: `1px solid ${colors.warning}`, borderRadius: 3, padding: '10px 12px', fontSize: 12, color: '#92610A' }}>
-                This will reverse every stock adjustment this stocktake applied. This action cannot be undone.
+                {isOpen
+                  ? 'This stocktake hasn’t been completed yet, so no stock adjustments have been made — cancelling it just discards this count. This action cannot be undone.'
+                  : 'This will reverse every stock adjustment this stocktake applied. This action cannot be undone.'}
               </div>
               <div>
-                <Label htmlFor="void-reason" style={{ fontSize: 11, fontWeight: 600, color: colors.textPrimary }}>Reason for voiding (required)</Label>
+                <Label htmlFor="void-reason" style={{ fontSize: 11, fontWeight: 600, color: colors.textPrimary }}>Reason for {isOpen ? 'cancelling' : 'voiding'} (required)</Label>
                 <Textarea
                   id="void-reason"
                   value={voidReason}
                   onChange={(e) => setVoidReason(e.target.value)}
-                  placeholder="e.g. Counted wrong products in category X, re-doing the stocktake"
+                  placeholder={isOpen ? 'e.g. Started by mistake' : 'e.g. Counted wrong products in category X, re-doing the stocktake'}
                   style={{ marginTop: 4, fontSize: 12, minHeight: 64 }}
                 />
                 <p style={{ fontSize: 10, color: colors.textSecondary, marginTop: 4 }}>
@@ -620,7 +621,7 @@ export default function StocktakeDetailPage() {
             <RpxDialogFooter>
               <Btn onClick={() => { setShowVoidDialog(false); setVoidReason('') }} disabled={voiding}>Cancel</Btn>
               <Btn variant="danger" loading={voiding} disabled={voidReason.trim().length < 5} onClick={performVoid}>
-                Void Stocktake
+                {isOpen ? 'Cancel Stocktake' : 'Void Stocktake'}
               </Btn>
             </RpxDialogFooter>
           </RpxDialogContent>

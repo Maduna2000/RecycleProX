@@ -247,33 +247,36 @@ export async function voidStocktake(id: string, userId: string, reason: string) 
       include: { entries: true },
     })
 
-    if (stocktake.status === 'open') {
-      throw new Error('Cannot void an open stocktake. Complete or delete it instead.')
-    }
     if (stocktake.status === 'voided') {
       throw new Error('Stocktake is already voided')
     }
 
-    // Reverse all stock movements created by this stocktake
-    for (const entry of stocktake.entries) {
-      const variance = new Decimal(entry.variance.toString())
-      if (variance.isZero()) continue
+    // An 'open' stocktake never posted any stock movements or ledger entries
+    // (those only happen in completeStocktake) — cancelling one is just a
+    // status flip, nothing to reverse. Only a 'completed' one has real stock
+    // effects to undo.
+    if (stocktake.status === 'completed') {
+      // Reverse all stock movements created by this stocktake
+      for (const entry of stocktake.entries) {
+        const variance = new Decimal(entry.variance.toString())
+        if (variance.isZero()) continue
 
-      // Reverse: if original was IN, void is OUT; if original was OUT, void is IN
-      await recordMovement(tx, {
-        productId:       entry.productId,
-        direction:       variance.isPositive() ? 'out' : 'in',
-        quantity:        variance.abs(),
-        source:          'void_reversal',
-        sourceId:        id,
-        notes:           `Void stocktake (${stocktake.refNumber}): reversing variance ${variance.toFixed(4)}. Reason: ${reason}`,
-        createdByUserId: userId,
-      })
+        // Reverse: if original was IN, void is OUT; if original was OUT, void is IN
+        await recordMovement(tx, {
+          productId:       entry.productId,
+          direction:       variance.isPositive() ? 'out' : 'in',
+          quantity:        variance.abs(),
+          source:          'void_reversal',
+          sourceId:        id,
+          notes:           `Void stocktake (${stocktake.refNumber}): reversing variance ${variance.toFixed(4)}. Reason: ${reason}`,
+          createdByUserId: userId,
+        })
 
-      logger.info(
-        { stocktakeId: id, productId: entry.productId, variance: variance.toFixed(4), userId },
-        'stocktake.variance.reversed'
-      )
+        logger.info(
+          { stocktakeId: id, productId: entry.productId, variance: variance.toFixed(4), userId },
+          'stocktake.variance.reversed'
+        )
+      }
     }
 
     // Update stocktake status
@@ -292,14 +295,16 @@ export async function voidStocktake(id: string, userId: string, reason: string) 
       },
     })
 
-    await reverseStocktakeAdjustmentLedger(
-      tx,
-      id,
-      stocktake.refNumber,
-      stocktake.entries.map((e) => ({ productId: e.productId, variance: new Decimal(e.variance.toString()) })),
-      reason,
-      userId
-    )
+    if (stocktake.status === 'completed') {
+      await reverseStocktakeAdjustmentLedger(
+        tx,
+        id,
+        stocktake.refNumber,
+        stocktake.entries.map((e) => ({ productId: e.productId, variance: new Decimal(e.variance.toString()) })),
+        reason,
+        userId
+      )
+    }
 
     return result
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, maxWait: 10000, timeout: 60000 }))
