@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useSearchParams } from 'next/navigation'
 import useSWR, { mutate } from 'swr'
 import { Dialog } from '@/components/ui/dialog'
-import { Search, Pencil, Eye, EyeOff, Trash2, X, Package, ChevronDown, ChevronRight } from 'lucide-react'
+import { Search, Pencil, Eye, EyeOff, Trash2, X, Package, ChevronDown, ChevronRight, Upload } from 'lucide-react'
 import * as LucideIcons from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { toast } from 'sonner'
@@ -25,6 +25,7 @@ import {
   RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter,
 } from '@/components/rpx'
 import { DataTable, type Column, type RowAction } from '@/components/ui/DataTable'
+import { ProductImportModal } from './_components/ProductImportModal'
 
 
 function calcMargin(buy: string, sell: string): { pct: string; color: string } {
@@ -69,6 +70,7 @@ export default function ProductsPage() {
   const [bulkDelOpen,   setBulkDelOpen]  = useState(false)
   const [bulkLoading,   setBulkLoading]  = useState<'deactivate' | 'reactivate' | null>(null)
   const [catManageOpen, setCatManageOpen] = useState(false)
+  const [importOpen,    setImportOpen]    = useState(false)
 
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
 
@@ -220,6 +222,9 @@ export default function ProductsPage() {
               <option value="all">All statuses</option>
             </select>
           </Field>
+          {isManager && (
+            <Btn icon={Upload} onClick={() => setImportOpen(true)}>Import CSV</Btn>
+          )}
         </FilterBar>
 
         {/* Bulk action bar */}
@@ -289,6 +294,13 @@ export default function ProductsPage() {
           categories={categories}
           onClose={() => setCatManageOpen(false)}
           onSuccess={() => mutateCats()}
+        />
+      )}
+      {importOpen && (
+        <ProductImportModal
+          categoryNames={allCategoryNames.map((c) => c.name)}
+          onClose={() => setImportOpen(false)}
+          onSuccess={() => revalidate()}
         />
       )}
       {bulkDelOpen && (
