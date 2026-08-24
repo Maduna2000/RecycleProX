@@ -135,7 +135,11 @@ export async function reverseRepaymentsForSale(
   voidedById: string | undefined,
   actionLabel: string = 'voided',
 ): Promise<void> {
-  const repayments = await tx.businessLoanRepayment.findMany({ where: { saleId } })
+  // reversedAt guard — without it, calling this twice for the same sale
+  // (e.g. reverseSalePayment first, then a later void of that same now-
+  // pending sale) would find the same original repayment row again and
+  // double-restore the loan balance.
+  const repayments = await tx.businessLoanRepayment.findMany({ where: { saleId, reversedAt: null } })
   if (repayments.length === 0) return
 
   const prefix = `BRP-${todaySASTDateStr().replace(/-/g, '')}`
@@ -162,6 +166,11 @@ export async function reverseRepaymentsForSale(
         notes:           `Reversal — sale ${saleRefNumber} ${actionLabel}`,
         createdByUserId: voidedById,
       },
+    })
+
+    await tx.businessLoanRepayment.update({
+      where: { id: r.id },
+      data: { reversedAt: new Date(), reversedById: voidedById },
     })
 
     logger.info({ businessLoanId: r.businessLoanId, reversedRepaymentId: r.id, amount: r.amount.toString(), restoredBalance: restoredBalance.toFixed(2), saleId, voidedById }, 'businessLoan.repayment.reversed')

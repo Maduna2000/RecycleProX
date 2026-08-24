@@ -1471,6 +1471,7 @@ export function SaleForm({ editingSale }: { editingSale?: EditingSale } = {}) {
         <SaleSettlementModal
           total={total}
           businessLoanAmount={businessLoanAmount}
+          onChangeAmount={setBusinessLoanAmount}
           outstanding={businessLoanSummary.outstanding}
           paymentType={paymentType === 'unpaid' ? 'cash' : paymentType}
           submitting={submitting}
@@ -1493,6 +1494,7 @@ export function SaleForm({ editingSale }: { editingSale?: EditingSale } = {}) {
 function SaleSettlementModal({
   total,
   businessLoanAmount,
+  onChangeAmount,
   outstanding,
   paymentType,
   submitting,
@@ -1501,14 +1503,16 @@ function SaleSettlementModal({
 }: {
   total: Decimal
   businessLoanAmount: string
+  onChangeAmount: (amount: string) => void
   outstanding: string
   paymentType: 'cash' | 'eft'
   submitting: boolean
   onCancel: () => void
   onConfirm: () => void
 }) {
-  const loanAmt    = new Decimal(businessLoanAmount || '0')
-  const remaining  = Decimal.max(total.minus(loanAmt), new Decimal(0))
+  const cap        = Decimal.min(new Decimal(outstanding), total)
+  const loanAmt     = new Decimal(businessLoanAmount || '0')
+  const remaining   = Decimal.max(total.minus(loanAmt), new Decimal(0))
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onCancel() }}>
@@ -1525,13 +1529,36 @@ function SaleSettlementModal({
 
             <div className="flex items-start gap-2 px-3 py-2" style={{ background: '#FFF3E0', border: '1px solid #FFCC80', borderRadius: 2 }}>
               <Lock className="w-4 h-4 shrink-0 mt-0.5" style={{ color: '#E65100' }} />
-              <div className="w-full">
-                <div className="flex justify-between" style={{ fontSize: 12, fontWeight: 600, color: '#E65100' }}>
+              <div className="w-full space-y-1.5">
+                <div className="flex items-center justify-between" style={{ fontSize: 12, fontWeight: 600, color: '#E65100' }}>
                   <span>Applied to business loan</span>
-                  <span className="font-mono">R {loanAmt.toFixed(2)}</span>
+                  <div className="flex items-center gap-1">
+                    <span className="font-mono">R</span>
+                    <input
+                      type="number"
+                      min={0}
+                      max={cap.toNumber()}
+                      step="0.01"
+                      value={businessLoanAmount}
+                      onChange={(e) => {
+                        const raw = e.target.value
+                        if (raw === '') { onChangeAmount(''); return }
+                        // Decimal() throws on an in-progress value like "12."
+                        // — let those through as typed and only clamp once
+                        // it parses to a real number.
+                        if (!/^\d*\.?\d*$/.test(raw)) return
+                        if (!/\d/.test(raw)) { onChangeAmount(raw); return }
+                        const parsed  = new Decimal(raw)
+                        const clamped = Decimal.min(Decimal.max(parsed, new Decimal(0)), cap)
+                        onChangeAmount(clamped.equals(parsed) ? raw : clamped.toString())
+                      }}
+                      style={{ width: 90, fontFamily: 'monospace', fontSize: 12, textAlign: 'right', padding: '2px 4px', border: '1px solid #FFCC80', borderRadius: 2, background: '#fff' }}
+                    />
+                  </div>
                 </div>
-                <p className="text-xs mt-0.5" style={{ color: '#EF6C00' }}>
-                  Outstanding balance: R {new Decimal(outstanding).toFixed(2)} — this amount is locked and mandatory.
+                <p className="text-xs" style={{ color: '#EF6C00' }}>
+                  Outstanding balance: R {new Decimal(outstanding).toFixed(2)} — enter how much of this sale to put
+                  toward the loan (up to R {cap.toFixed(2)}), or 0 to skip a deduction this time.
                 </p>
               </div>
             </div>

@@ -903,6 +903,11 @@ model BusinessLoanRepayment {
   createdByUserId String?
   createdAt       DateTime      @default(now())
   saleId          String?
+  // Guards reverseRepaymentsForSale against reversing the same sale-linked
+  // repayment twice (e.g. a payment-reversal followed later by a void of
+  // the same sale) — set the moment a reversal entry is posted for it.
+  reversedAt      DateTime?
+  reversedById    String?
   customer        Customer      @relation(fields: [customerId], references: [id])
   businessLoan    BusinessLoan  @relation(fields: [businessLoanId], references: [id], onDelete: Cascade)
   sale            Sale?         @relation(fields: [saleId], references: [id])
