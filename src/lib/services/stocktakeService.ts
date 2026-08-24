@@ -102,7 +102,7 @@ export async function upsertEntry(
   stocktakeId: string,
   productId: string,
   countedQty: string,
-  opts?: { grossQty?: string; tareQty?: string; photoR2Key?: string }
+  opts?: { grossQty?: string; tareQty?: string; photoR2Key?: string; includeTodayStock?: boolean }
 ) {
   const stocktake = await prisma.stocktake.findUniqueOrThrow({ where: { id: stocktakeId } })
   if (stocktake.status !== 'open') throw new Error('Stocktake is not open')
@@ -110,7 +110,17 @@ export async function upsertEntry(
   // Use snapshot if available, otherwise fall back to live query (for backward compat)
   let systemQty: Decimal
   const snapshot = stocktake.stockSnapshot as Record<string, string> | null
-  if (snapshot && snapshot[productId] !== undefined) {
+  if (opts?.includeTodayStock) {
+    // Deliberately re-queries live stock-on-hand instead of the frozen
+    // opening snapshot — this is what "Include today's stock" opts into:
+    // anything that moved (e.g. a purchase delivered) between the
+    // stocktake opening and right now is folded into systemQty here, so
+    // completeStocktake's variance-as-adjustment doesn't add it a second
+    // time on top of what the physical count already includes.
+    const stockRows = await getStockOnHand(productId)
+    const systemRow = stockRows.find((r) => r.product.id === productId)
+    systemQty = new Decimal(systemRow?.onHand ?? '0')
+  } else if (snapshot && snapshot[productId] !== undefined) {
     systemQty = new Decimal(snapshot[productId])
   } else {
     // Fallback: product added after stocktake started or no snapshot (legacy)
@@ -127,6 +137,7 @@ export async function upsertEntry(
     grossQty: opts?.grossQty ? new Decimal(opts.grossQty) : undefined,
     tareQty:  opts?.tareQty  ? new Decimal(opts.tareQty)  : undefined,
   }
+  const includedTodayStock = opts?.includeTodayStock ?? false
 
   const entry = await prisma.stocktakeEntry.upsert({
     where: { tenantId_stocktakeId_productId: { tenantId: requireTenantId(), stocktakeId, productId } },
@@ -137,6 +148,7 @@ export async function upsertEntry(
       systemQty:  systemQty,
       countedQty: counted,
       variance:   variance,
+      includedTodayStock,
       ...scaleData,
       ...(opts?.photoR2Key ? { photoR2Key: opts.photoR2Key } : {}),
     },
@@ -144,12 +156,13 @@ export async function upsertEntry(
       systemQty:  systemQty,
       countedQty: counted,
       variance:   variance,
+      includedTodayStock,
       ...scaleData,
       ...(opts?.photoR2Key ? { photoR2Key: opts.photoR2Key } : {}),
     },
     include: { product: true },
   })
-  logger.info({ stocktakeId, productId, variance: variance.toFixed(4) }, 'Stocktake entry upserted')
+  logger.info({ stocktakeId, productId, variance: variance.toFixed(4), includedTodayStock }, 'Stocktake entry upserted')
   return entry
 }
 

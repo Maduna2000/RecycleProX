@@ -762,6 +762,13 @@ model StocktakeEntry {
   grossQty    Decimal?  @db.Decimal(18, 4)
   tareQty     Decimal?  @db.Decimal(18, 4)
   photoR2Key  String?
+  // When true, systemQty was taken from live stock-on-hand at the moment this
+  // entry was counted (includes every movement up to right now, e.g. a
+  // purchase delivered after the stocktake was opened) rather than the
+  // frozen opening snapshot captured when the stocktake started. Needed so
+  // the counted figure can reflect stock that arrived mid-count without the
+  // completion adjustment double-counting it on top of what already arrived.
+  includedTodayStock Boolean @default(false)
   product     Product   @relation(fields: [productId], references: [id])
   stocktake   Stocktake @relation(fields: [stocktakeId], references: [id], onDelete: Cascade)
 

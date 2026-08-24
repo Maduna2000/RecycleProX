@@ -39,7 +39,12 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       params.id,
       parsed.data.productId,
       parsed.data.countedQty,
-      { grossQty: parsed.data.grossQty, tareQty: parsed.data.tareQty, photoR2Key: parsed.data.photoR2Key }
+      {
+        grossQty: parsed.data.grossQty,
+        tareQty: parsed.data.tareQty,
+        photoR2Key: parsed.data.photoR2Key,
+        includeTodayStock: parsed.data.includeTodayStock,
+      }
     ))
     return NextResponse.json(entry)
   } catch (err: unknown) {

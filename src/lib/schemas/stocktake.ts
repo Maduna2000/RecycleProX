@@ -29,6 +29,12 @@ export const UpsertEntrySchema = z.object({
   grossQty:   optionalNonNegativeQty,
   tareQty:    optionalNonNegativeQty,
   photoR2Key: z.string().max(500, 'Photo R2 key too long').optional(),
+  // Off by default = compare against the stocktake's frozen opening snapshot
+  // (existing behavior). On = compare against live stock-on-hand right now,
+  // so anything that arrived after the stocktake opened (e.g. a purchase
+  // delivered mid-count) isn't added a second time by the completion
+  // adjustment on top of what the counted figure already includes.
+  includeTodayStock: z.boolean().optional().default(false),
 }).superRefine((data, ctx) => {
   // If both gross and tare are provided, gross must be >= tare
   if (data.grossQty && data.tareQty) {

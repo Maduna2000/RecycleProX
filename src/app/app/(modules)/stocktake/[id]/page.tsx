@@ -36,6 +36,7 @@ type StocktakeEntry = {
   tareQty: string | null
   variance: string
   photoR2Key: string | null
+  includedTodayStock: boolean
 }
 type Stocktake = {
   id: string
@@ -85,6 +86,7 @@ export default function StocktakeDetailPage() {
 
   const [productId, setProductId] = useState('')
   const [countedQty, setCountedQty] = useState('')
+  const [includeTodayStock, setIncludeTodayStock] = useState(false)
   const [addWeigh, setAddWeigh] = useState<EntryWeighState>(defaultWeigh())
   const [saving, setSaving] = useState(false)
   const [completing, setCompleting] = useState(false)
@@ -145,7 +147,7 @@ export default function StocktakeDetailPage() {
     // Placeholder for future scale integration
   }
 
-  async function saveEntry(pid: string, qty: string, opts?: { grossQty?: string; tareQty?: string }) {
+  async function saveEntry(pid: string, qty: string, opts?: { grossQty?: string; tareQty?: string; includeTodayStock?: boolean }) {
     const res = await fetch(`/api/stocktake/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -225,10 +227,12 @@ export default function StocktakeDetailPage() {
       await saveEntry(productId, countedQty, {
         grossQty: addWeigh.grossQty || undefined,
         tareQty: addWeigh.tareQty || undefined,
+        includeTodayStock,
       })
       toast.success('Entry saved')
       setProductId('')
       setCountedQty('')
+      setIncludeTodayStock(false)
       setAddWeigh(defaultWeigh())
       setPendingRecount(null)
     } catch (e) {
@@ -311,7 +315,14 @@ export default function StocktakeDetailPage() {
     },
     {
       key: 'systemQty', header: 'System Qty', width: '110px',
-      render: (e) => <span style={{ fontFamily: 'monospace' }}>{Number(e.systemQty).toFixed(2)} {e.product.unit}</span>,
+      render: (e) => (
+        <span style={{ fontFamily: 'monospace' }}>
+          {Number(e.systemQty).toFixed(2)} {e.product.unit}
+          {e.includedTodayStock && (
+            <span style={{ display: 'block', fontFamily: 'inherit', fontSize: 9, color: colors.process }}>incl. today</span>
+          )}
+        </span>
+      ),
     },
     {
       key: 'grossTare', header: 'Gross / Tare', width: '160px',
@@ -503,6 +514,31 @@ export default function StocktakeDetailPage() {
                     </div>
                   </div>
                 )}
+
+                {/* Include today's stock — off by default, comparing against
+                    the frozen opening snapshot (existing behavior). Turn it
+                    on when stock has moved (e.g. a purchase was delivered)
+                    since the stocktake opened and the counted figure already
+                    includes that, so the variance doesn't add it a second
+                    time on completion. */}
+                <label
+                  htmlFor="include-today-stock"
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, cursor: 'pointer', width: 'fit-content' }}
+                >
+                  <input
+                    id="include-today-stock"
+                    type="checkbox"
+                    checked={includeTodayStock}
+                    onChange={(e) => setIncludeTodayStock(e.target.checked)}
+                    style={{ width: 13, height: 13 }}
+                  />
+                  <span style={{ fontSize: 11, color: colors.textPrimary }}>
+                    Include today&apos;s stock movements
+                  </span>
+                  <span style={{ fontSize: 10, color: colors.textSecondary }}>
+                    — turn on if stock came in/out after this stocktake started, so it isn&apos;t counted twice
+                  </span>
+                </label>
 
                 <div style={{ marginTop: 12, display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
                   <Btn variant="danger" onClick={() => setShowVoidDialog(true)} disabled={saving}>Cancel Stocktake</Btn>
