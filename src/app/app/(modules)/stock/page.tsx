@@ -9,6 +9,7 @@ import { toast } from 'sonner'
 import { DataTable, type Column } from '@/components/ui/DataTable'
 import { Dialog } from '@/components/ui/dialog'
 import { CategoryFilterSelect, useProductCategories } from '@/components/products/CategoryFilterSelect'
+import { ProductCategoryPicker } from '@/components/products/ProductCategoryPicker'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
 import { fetcher } from '@/lib/swrFetcher'
 import {
@@ -417,16 +418,13 @@ function AdjustmentModal({
         <RpxDialogBody>
         <div className="space-y-4">
           <Field label="Product">
-            <select
-              style={{ ...inp, marginTop: 4 }}
+            <ProductCategoryPicker
+              products={stock.map((s) => s.product)}
               value={productId}
-              onChange={(e) => setProductId(e.target.value)}
-            >
-              <option value="">Select product…</option>
-              {stock.map((s) => (
-                <option key={s.product.id} value={s.product.id}>{s.product.name} ({s.product.code})</option>
-              ))}
-            </select>
+              onChange={setProductId}
+              placeholder="Select product…"
+              style={{ marginTop: 4 }}
+            />
           </Field>
 
           <Field label="Adjustment Type">
