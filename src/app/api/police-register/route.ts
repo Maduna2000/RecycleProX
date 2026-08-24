@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { generatePoliceRegister } from '@/lib/pdf/policeRegister'
 import { getPurchasesForRegister } from '@/lib/services/policeVisitService'
+import { currencySymbolFromSettings } from '@/lib/services/settingsService'
 import { DEFAULT_POLICE_SERVICE_NAME } from '@/lib/police-defaults'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
@@ -36,6 +37,7 @@ export async function GET(req: NextRequest) {
       dealerAddress:     settings['yardAddress'] ?? '—',
       policeServiceName: settings['police_service_name'] ?? DEFAULT_POLICE_SERVICE_NAME,
       generatedAt:       new Date(),
+      currencySymbol:    currencySymbolFromSettings(settings),
     })
 
     const filename = `police-register-${dateParam}.pdf`

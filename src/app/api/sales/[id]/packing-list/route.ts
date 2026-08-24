@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { getSale, SaleNotFoundError } from '@/lib/services/saleService'
-import { getAllSettings } from '@/lib/services/settingsService'
+import { getAllSettings, currencySymbolFromSettings } from '@/lib/services/settingsService'
 import { generateTransactionSlip } from '@/lib/pdf/slip'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
@@ -45,6 +45,7 @@ export async function GET(
       companyAddress: settings.yardAddress,
       companyPhone:   settings.yardPhone,
       vatNumber:      settings.vatNumber,
+      currencySymbol: currencySymbolFromSettings(settings),
     })
 
     return new NextResponse(pdfBytes.buffer as ArrayBuffer, {

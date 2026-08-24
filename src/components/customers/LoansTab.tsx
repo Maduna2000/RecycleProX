@@ -15,6 +15,7 @@ import { format } from '@/lib/utils/format'
 import { colors } from '@/lib/design-tokens'
 import { HEADER_GRAD, NAVY, lbl, Btn, winBevel, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
 import { fetcher } from '@/lib/swrFetcher'
+import { useSystemCurrency } from '@/hooks/useSystemCurrency'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -131,7 +132,8 @@ function aggregateSameDayEntries(rows: LedgerRow[]): LedgerRow[] {
   return result
 }
 
-const ledgerColumns: Column<LedgerRow>[] = [
+function getLedgerColumns(sym: string): Column<LedgerRow>[] {
+  return [
   {
     key: 'description',
     header: 'Description',
@@ -158,14 +160,14 @@ const ledgerColumns: Column<LedgerRow>[] = [
     header: 'Advance',
     width: '95px',
     align: 'right',
-    render: (row) => <span style={{ fontFamily: 'monospace' }}>{format.currency(row.advance ?? '0')}</span>,
+    render: (row) => <span style={{ fontFamily: 'monospace' }}>{format.currency(row.advance ?? '0', sym)}</span>,
   },
   {
     key: 'repayment',
     header: 'Repayment',
     width: '95px',
     align: 'right',
-    render: (row) => <span style={{ fontFamily: 'monospace' }}>{format.currency(row.repayment ?? '0')}</span>,
+    render: (row) => <span style={{ fontFamily: 'monospace' }}>{format.currency(row.repayment ?? '0', sym)}</span>,
   },
   {
     key: 'balance',
@@ -174,11 +176,12 @@ const ledgerColumns: Column<LedgerRow>[] = [
     align: 'right',
     render: (row) => (
       <span style={{ fontFamily: 'monospace', fontWeight: 600, color: moneyColor(row.balance) }}>
-        {format.currency(row.balance)}
+        {format.currency(row.balance, sym)}
       </span>
     ),
   },
-]
+  ]
+}
 
 // ─── LoansTab ─────────────────────────────────────────────────────────────────
 
@@ -188,6 +191,8 @@ export function LoansTab({ customerId, customerName, userRole, userAllowedModule
   const [addRepaymentOpen, setAddRepaymentOpen] = useState(false)
   const [deleteLastOpen,   setDeleteLastOpen]   = useState(false)
   const [ledgerPage,       setLedgerPage]       = useState(1)
+  const { symbol } = useSystemCurrency()
+  const ledgerColumns = getLedgerColumns(symbol)
 
   const statementKey = `/api/customers/${customerId}/loans/statement?period=${period}`
   const { data, isLoading, error } = useSWR<StatementResponse>(statementKey, fetcher)
@@ -298,7 +303,7 @@ export function LoansTab({ customerId, customerName, userRole, userAllowedModule
       >
         <span style={lbl}>Amount Due</span>
         <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 14, color: moneyColor(closingBalance.toString()) }}>
-          {format.currency(closingBalance.toString())}
+          {format.currency(closingBalance.toString(), symbol)}
         </span>
       </div>
 
@@ -350,6 +355,7 @@ function AddLoanDialog({
   const [method, setMethod] = useState('cash')
   const [notes, setNotes] = useState('')
   const [loading, setLoading] = useState(false)
+  const { symbol: currSym } = useSystemCurrency()
 
   async function onSubmit() {
     if (!amount) return
@@ -385,7 +391,7 @@ function AddLoanDialog({
         <RpxDialogBody>
         <div className="space-y-4">
           <div>
-            <Label>Amount (R) *</Label>
+            <Label>Amount ({currSym}) *</Label>
             <Input
               placeholder="0.00"
               value={amount}
@@ -455,6 +461,7 @@ function AddRepaymentDialog({
   const [method, setMethod] = useState('cash')
   const [notes, setNotes] = useState('')
   const [loading, setLoading] = useState(false)
+  const { symbol: currSym } = useSystemCurrency()
 
   async function onSubmit() {
     if (!amount) return
@@ -492,7 +499,7 @@ function AddRepaymentDialog({
             Pays down the oldest outstanding loan first, then the next, until the amount is used up.
           </p>
           <div>
-            <Label>Amount (R) *</Label>
+            <Label>Amount ({currSym}) *</Label>
             <Input
               placeholder="0.00"
               value={amount}
@@ -548,6 +555,7 @@ function DeleteLastDialog({
 }) {
   const [reason, setReason] = useState('')
   const [loading, setLoading] = useState(false)
+  const { symbol } = useSystemCurrency()
 
   async function onSubmit() {
     if (reason.trim().length < 5) return
@@ -578,7 +586,7 @@ function DeleteLastDialog({
         <div className="space-y-4">
           <div className="rounded p-3 text-sm" style={{ background: '#FEF2F2', border: '1px solid #FECACA' }}>
             <p className="font-medium" style={{ color: '#DC2626' }}>
-              {lastEntry.description} of {format.currency(lastEntry.amount)} on{' '}
+              {lastEntry.description} of {format.currency(lastEntry.amount, symbol)} on{' '}
               {new Date(lastEntry.date).toLocaleDateString('en-ZA')}
             </p>
             <p className="text-xs mt-1" style={{ color: '#DC2626' }}>

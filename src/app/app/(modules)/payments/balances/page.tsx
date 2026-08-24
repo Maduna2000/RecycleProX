@@ -8,6 +8,7 @@ import { DataTable, Avatar, type Column } from '@/components/ui/DataTable'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
 import { PortalPage } from '@/components/rpx'
 import { fetcher } from '@/lib/swrFetcher'
+import { useSystemCurrency } from '@/hooks/useSystemCurrency'
 
 
 type AccountBalance = {
@@ -22,6 +23,7 @@ type AccountBalance = {
 }
 
 export default function AccountBalancesPage() {
+  const { symbol: currSym } = useSystemCurrency()
   const { data: balancesData, isLoading: balancesLoading, error: balancesError } = useSWR<{ balances: AccountBalance[] }>(
     '/api/payments/balances',
     fetcher,
@@ -61,7 +63,7 @@ export default function AccountBalancesPage() {
       width: '140px',
       render: (r) => (
         <span className="font-mono" style={{ color: colors.textSecondary }}>
-          R {new Decimal(r.totalPurchases).toFixed(2)}
+          {currSym} {new Decimal(r.totalPurchases).toFixed(2)}
         </span>
       ),
     },
@@ -71,7 +73,7 @@ export default function AccountBalancesPage() {
       width: '120px',
       render: (r) => (
         <span className="font-mono" style={{ color: colors.action }}>
-          R {new Decimal(r.totalPaid).toFixed(2)}
+          {currSym} {new Decimal(r.totalPaid).toFixed(2)}
         </span>
       ),
     },
@@ -86,7 +88,7 @@ export default function AccountBalancesPage() {
           <div className="flex items-center gap-1.5">
             {isPos && <AlertCircle className="w-3.5 h-3.5 shrink-0" style={{ color: colors.warning }} />}
             <span className="font-mono font-semibold" style={{ color: isPos ? colors.warning : colors.textSecondary }}>
-              R {outstanding.toFixed(2)}
+              {currSym} {outstanding.toFixed(2)}
             </span>
           </div>
         )
@@ -98,7 +100,7 @@ export default function AccountBalancesPage() {
     <PortalPage title="Account Balances">
       {outstandingCount > 0 && (
         <p className="shrink-0" style={{ fontSize: 11, color: '#6C757D', padding: '8px 10px 0' }}>
-          {outstandingCount} with outstanding balance · R {totalOutstanding.toFixed(2)} total
+          {outstandingCount} with outstanding balance · {currSym} {totalOutstanding.toFixed(2)} total
         </p>
       )}
       <div className="flex-1 min-h-0" style={{ padding: 10 }}>

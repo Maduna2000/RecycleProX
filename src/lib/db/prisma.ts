@@ -142,6 +142,22 @@ async function pinTenantContext(tx: Prisma.TransactionClient, tenantId: string):
 // createStocktake, which needs Serializable isolation to prevent two
 // near-simultaneous requests both passing its "no open stocktake" check)
 // depend on this actually reaching Postgres, not being silently dropped.
+//
+// EVERY prisma.<model>.<method>() call — including a single-row SELECT —
+// goes through here, because the RLS tenant pin (pinTenantContext) has to
+// run as the first statement of the same transaction as the query it's
+// scoping. Prisma's own interactive-transaction defaults (maxWait 2000ms,
+// timeout 5000ms) assume a transaction is a deliberate, occasional thing;
+// here it's the shape of every request. Against Neon's pooled endpoint —
+// which can take several seconds to wake a suspended compute, and which
+// this app hits with 15-20 concurrent requests on a single dashboard
+// load — that 2-second window to even acquire a connection was the
+// direct cause of the P2028 "unable to start a transaction in the given
+// time" flood seen in the desktop app's logs. Callers that need something
+// different (the Serializable writes above) still override via `options`;
+// this is only the floor for everyone else.
+const DEFAULT_TENANT_TX_OPTIONS = { maxWait: 10_000, timeout: 20_000 }
+
 export async function withTenantScope<T>(
   fn: (tx: Prisma.TransactionClient) => Promise<T>,
   options?: { maxWait?: number; timeout?: number; isolationLevel?: Prisma.TransactionIsolationLevel },
@@ -154,7 +170,7 @@ export async function withTenantScope<T>(
     await pinTenantContext(tx, tenantId)
     const scopedTx = wrapAsTenantScoped(tx, tenantId) as Prisma.TransactionClient
     return activeTenantId.run(tenantId, () => activeTenantTx.run(scopedTx, () => fn(scopedTx)))
-  }, options)
+  }, options ?? DEFAULT_TENANT_TX_OPTIONS)
 }
 
 function dispatch(prop: string, method: string, args: unknown[]): unknown {

@@ -9,6 +9,7 @@ import { colors } from '@/lib/design-tokens'
 import { Btn, inp, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
 import { useOfflineMutation } from '@/hooks/useOfflineFetch'
 import { autoPrintReceipt } from '@/lib/print/autoPrintClient'
+import { useSystemCurrency } from '@/hooks/useSystemCurrency'
 
 export type SplitPayTarget = {
   id: string
@@ -34,6 +35,7 @@ function PaymentInput({
   disabled: boolean
   highlight?: boolean
 }) {
+  const { symbol: currSym } = useSystemCurrency()
   return (
     <div className="flex items-center gap-2">
       <div className="w-28 flex items-center gap-1.5" style={{ color: highlight ? colors.alertIcon : '#6C757D' }}>
@@ -41,7 +43,7 @@ function PaymentInput({
         <span className="text-xs font-medium">{label}</span>
       </div>
       <div className="flex-1 relative">
-        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs" style={{ color: '#6C757D' }}>R</span>
+        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs" style={{ color: '#6C757D' }}>{currSym}</span>
         <input
           type="text"
           inputMode="decimal"
@@ -80,6 +82,7 @@ export function SplitPaymentModal({
   const [loading, setLoading] = useState(false)
   const [error,   setError]   = useState<string | null>(null)
   const { mutate: offlineMutate } = useOfflineMutation()
+  const { symbol: currSym } = useSystemCurrency()
 
   // Calculate amounts
   const totalAmount     = new Decimal(purchase.totalAmount)
@@ -111,7 +114,7 @@ export function SplitPaymentModal({
     if (paymentTotal.isZero()) return 'Enter at least one payment amount'
     if (paymentTotal.greaterThan(pendingAmount)) return 'Total exceeds pending amount'
     if (loanAmt.greaterThan(outstandingDec)) return 'Loan amount exceeds outstanding loan'
-    if (remaining.greaterThan(0)) return `Full payment required. R ${remaining.toFixed(2)} still remaining.`
+    if (remaining.greaterThan(0)) return `Full payment required. ${currSym} ${remaining.toFixed(2)} still remaining.`
     return null
   }
 
@@ -180,7 +183,7 @@ export function SplitPaymentModal({
             <div className="flex justify-between items-center">
               <span className="text-xs font-medium" style={{ color: colors.alertIcon }}>Amount to Pay (Full Payment Required)</span>
               <span className="font-mono font-bold" style={{ fontSize: 16, color: colors.alertIcon }}>
-                R {pendingAmount.toFixed(2)}
+                {currSym} {pendingAmount.toFixed(2)}
               </span>
             </div>
           </div>
@@ -191,7 +194,7 @@ export function SplitPaymentModal({
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" style={{ color: colors.alertIcon }} />
               <div>
                 <p className="text-xs font-medium" style={{ color: colors.alertIcon }}>
-                  Outstanding Loan: R {outstandingDec.toFixed(2)}
+                  Outstanding Loan: {currSym} {outstandingDec.toFixed(2)}
                 </p>
                 <p className="text-xs" style={{ color: colors.alertText }}>
                   Pre-filled with the full amount — reduce it for a partial repayment and make up the difference with cash/EFT.
@@ -230,13 +233,13 @@ export function SplitPaymentModal({
           <div className="border-t pt-3 space-y-1">
             <div className="flex justify-between text-xs" style={{ color: '#6C757D' }}>
               <span>Payment Total</span>
-              <span className="font-mono">R {paymentTotal.toFixed(2)}</span>
+              <span className="font-mono">{currSym} {paymentTotal.toFixed(2)}</span>
             </div>
             <div className="flex justify-between text-xs font-medium" style={{
               color: remaining.isZero() ? colors.action : colors.danger
             }}>
               <span>{remaining.isZero() ? 'Fully Covered' : remaining.lessThan(0) ? 'Over-payment' : 'Remaining (Must be R 0.00)'}</span>
-              <span className="font-mono">{remaining.isZero() ? '✓' : `R ${remaining.abs().toFixed(2)}`}</span>
+              <span className="font-mono">{remaining.isZero() ? '✓' : `${currSym} ${remaining.abs().toFixed(2)}`}</span>
             </div>
           </div>
 

@@ -9,12 +9,11 @@ import { applyRepaymentTx, reverseRepaymentsForPurchase } from '@/lib/services/l
 import { isSessionDateApproved } from '@/lib/services/cashUpService'
 import { autoPromoteCasualIfEligible } from '@/lib/services/customerService'
 import { sastDayLabelOfInstant, sastDateLabelToUTCDate } from '@/lib/utils/dayBounds'
-import { getAllSettings } from '@/lib/services/settingsService'
+import { getAllSettings, currencySymbolFromSettings } from '@/lib/services/settingsService'
 import { postPurchase, reversePurchaseLedger, reversePurchasePaymentLedger, postPurchaseSettlement, reverseJournalEntry, reversePurchaseCost } from '@/lib/services/ledgerService'
 import { generateVat264 } from '@/lib/pdf/vat264'
 import { generatePurchaseReceiptPdf } from '@/lib/pdf/slip'
 import { uploadBytes, purchaseVat264Key, purchaseNoteKey } from '@/lib/r2'
-import { CURRENCY_SYMBOLS } from '@/lib/schemas/cashup'
 import { VAT_RATE, purchaseHeaderVat } from '@/lib/utils/vat'
 import { ScaleOrderNotFoundError, ScaleOrderAlreadyVoidedError } from '@/lib/services/scaleService'
 import type { CreatePurchaseInput, VoidPurchaseInput, ReversePurchasePaymentInput, UpdatePurchaseInput, PurchaseLineInput } from '@/lib/schemas/purchase'
@@ -124,12 +123,8 @@ type PurchaseWithCustomerAndLines = Prisma.PurchaseGetPayload<{
 }>
 
 async function generateAndStorePurchasePdfs(purchase: PurchaseWithCustomerAndLines): Promise<void> {
-  const [settings, latestCashUp] = await Promise.all([
-    getAllSettings(),
-    prisma.cashUp.findFirst({ orderBy: { sessionDate: 'desc' }, select: { currency: true } }),
-  ])
-  const currencySymbol =
-    CURRENCY_SYMBOLS[latestCashUp?.currency as keyof typeof CURRENCY_SYMBOLS] ?? 'R'
+  const settings = await getAllSettings()
+  const currencySymbol = currencySymbolFromSettings(settings)
 
   const vat264Lines = purchase.lines.map((l) => ({
     description: l.product.name,
@@ -202,6 +197,7 @@ async function generateAndStorePurchasePdfs(purchase: PurchaseWithCustomerAndLin
       companyAddress: settings.yardAddress,
       companyPhone:   settings.yardPhone,
       vatNumber:      settings.vatNumber,
+      currencySymbol,
     })
     const key = purchaseNoteKey(purchase.id)
     await uploadBytes(key, bytes, 'application/pdf')

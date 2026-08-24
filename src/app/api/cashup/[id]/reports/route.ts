@@ -2,9 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { CashupReportQuerySchema, type CashupReportType } from '@/lib/schemas/cashup'
-import { CURRENCY_SYMBOLS } from '@/lib/schemas/cashup'
 import { generateCashupReport, type ReportEntry } from '@/lib/pdf/cashupReport'
-import { getAllSettings } from '@/lib/services/settingsService'
+import { getAllSettings, currencySymbolFromSettings } from '@/lib/services/settingsService'
 import {
   getCashUp,
   getCashSalesForDate,
@@ -78,7 +77,7 @@ export async function GET(
       return { cashUp, settings, entries }
     })
 
-    const currencySymbol = CURRENCY_SYMBOLS[cashUp.currency as keyof typeof CURRENCY_SYMBOLS] ?? 'R'
+    const currencySymbol = currencySymbolFromSettings(settings)
 
     // Generate PDF
     const pdfBytes = await generateCashupReport({

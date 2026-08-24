@@ -9,6 +9,7 @@ import { SaleSplitPaymentModal } from './SaleSplitPaymentModal'
 import { colors } from '@/lib/design-tokens'
 import { Btn, inp, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
 import { useOfflineMutation } from '@/hooks/useOfflineFetch'
+import { useSystemCurrency } from '@/hooks/useSystemCurrency'
 
 export type PayTarget = {
   id: string
@@ -38,6 +39,7 @@ export function RecordPaymentModal({
   // the mandatory Split Payment gate below.
   const [hasOutstandingBusinessLoan, setHasOutstandingBusinessLoan] = useState<boolean | null>(null)
   const { mutate: offlineMutate } = useOfflineMutation()
+  const { symbol: currSym } = useSystemCurrency()
 
   const totalAmount = new Decimal(sale.totalAmount)
   const alreadyPaid = new Decimal(sale.amountPaid)
@@ -65,8 +67,8 @@ export function RecordPaymentModal({
     if (!raw.trim()) return 'Amount is required'
     if (!/^\d+(\.\d{1,2})?$/.test(raw)) return 'Enter a valid amount (e.g. 150.00)'
     const d = new Decimal(raw)
-    if (d.lt(new Decimal('0.01'))) return 'Minimum amount is R0.01'
-    if (d.gt(remaining)) return `Cannot exceed remaining balance of R ${remaining.toFixed(2)}`
+    if (d.lt(new Decimal('0.01'))) return `Minimum amount is ${currSym}0.01`
+    if (d.gt(remaining)) return `Cannot exceed remaining balance of ${currSym} ${remaining.toFixed(2)}`
     return null
   }
 
@@ -106,17 +108,17 @@ export function RecordPaymentModal({
             <p className="font-mono font-medium" style={{ fontSize: 12, color: '#212529' }}>{sale.ref}</p>
             <div className="flex justify-between" style={{ fontSize: 12, color: '#6C757D' }}>
               <span>Total amount</span>
-              <span className="font-mono">R {totalAmount.toFixed(2)}</span>
+              <span className="font-mono">{currSym} {totalAmount.toFixed(2)}</span>
             </div>
             {alreadyPaid.gt(0) && (
               <div className="flex justify-between" style={{ fontSize: 12, color: colors.action }}>
                 <span>Already paid</span>
-                <span className="font-mono">− R {alreadyPaid.toFixed(2)}</span>
+                <span className="font-mono">− {currSym} {alreadyPaid.toFixed(2)}</span>
               </div>
             )}
             <div className="flex justify-between pt-1 border-t border-[#E0E0E0] mt-1" style={{ fontSize: 13 }}>
               <span className="font-semibold" style={{ color: '#C9A020' }}>Remaining balance</span>
-              <span className="font-mono font-bold" style={{ color: '#C9A020' }}>R {remaining.toFixed(2)}</span>
+              <span className="font-mono font-bold" style={{ color: '#C9A020' }}>{currSym} {remaining.toFixed(2)}</span>
             </div>
           </div>
 

@@ -9,7 +9,9 @@ import { DataTable, type Column } from '@/components/ui/DataTable'
 import { CategoryFilterSelect } from '@/components/products/CategoryFilterSelect'
 import { colors, fontSize } from '@/lib/design-tokens'
 import { inp, BtnMenu, Field, PortalPage, FilterBar } from '@/components/rpx'
-import { fetcher } from '@/lib/swrFetcher'
+import { stockGridFetcher } from '@/lib/offline/fetchers/stock'
+import { OfflineDataBadge } from '@/components/ui/OfflineDataBadge'
+import { useSystemCurrency } from '@/hooks/useSystemCurrency'
 
 
 type GridRow = {
@@ -28,6 +30,7 @@ type GridRow = {
 }
 
 export default function StockGridPage() {
+  const { symbol: currSym } = useSystemCurrency()
   const today = new Date().toISOString().slice(0, 10)
   const [gridPeriod,   setGridPeriod]   = useState<'daily' | 'weekly' | 'mtd'>('mtd')
   const [gridDate,     setGridDate]     = useState(today)
@@ -36,7 +39,7 @@ export default function StockGridPage() {
   const [page,         setPage]         = useState(1)
 
   const gridKey = `/api/stock/grid?period=${gridPeriod}&date=${gridDate}${gridCategory ? `&category=${gridCategory}` : ''}`
-  const { data: gridData, isLoading: gridLoading, error: gridError } = useSWR<{ grid: GridRow[] }>(gridKey, fetcher)
+  const { data: gridData, isLoading: gridLoading, error: gridError } = useSWR<{ grid: GridRow[] }>(gridKey, stockGridFetcher)
 
   const gridRows   = gridData?.grid ?? []
   const PAGE_SIZE  = 30
@@ -141,11 +144,11 @@ export default function StockGridPage() {
     },
     {
       key: 'closingValue',
-      header: 'Value (R)',
+      header: `Value (${currSym})`,
       width: '96px',
       align: 'right',
       render: (r) => (
-        <span className="font-mono text-xs" style={{ color: colors.textPrimary }}>R {r.closingValue}</span>
+        <span className="font-mono text-xs" style={{ color: colors.textPrimary }}>{currSym} {r.closingValue}</span>
       ),
     },
   ]
@@ -154,7 +157,7 @@ export default function StockGridPage() {
     // maxWidth matches src/lib/pageWidthCaps.ts, which PageTitleBar reads to
     // cap/border itself to match — keeps the unbounded "Product" column from
     // stretching to fill the whole window.
-    <PortalPage title="Stock Grid" maxWidth={1000}>
+    <PortalPage title="Stock Grid" maxWidth={1000} actions={<OfflineDataBadge />}>
       <FilterBar>
         <Field label="Period" width={150}>
           <select value={gridPeriod} onChange={(e) => setGridPeriod(e.target.value as 'daily' | 'weekly' | 'mtd')} style={inp}>

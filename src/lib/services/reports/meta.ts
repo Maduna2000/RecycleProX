@@ -1,21 +1,14 @@
 /**
- * Shared ReportMeta assembly — company branding from SystemSettings and the
- * yard's operating currency symbol (taken from the most recent cash-up
- * session, since currency is configured per cash-up; defaults to R).
+ * Shared ReportMeta assembly — company branding and currency symbol, both
+ * from SystemSettings (see the "currency" key, the single system-wide
+ * currency every module reads from).
  */
-import { prisma } from '@/lib/db/prisma'
-import { getAllSettings } from '@/lib/services/settingsService'
-import { CURRENCY_SYMBOLS } from '@/lib/schemas/cashup'
+import { getAllSettings, currencySymbolFromSettings } from '@/lib/services/settingsService'
 import type { ReportMeta } from '@/lib/reports/types'
 
 export async function buildReportMeta(generatedBy: string): Promise<Omit<ReportMeta, 'rowCount'>> {
-  const [settings, latestCashUp] = await Promise.all([
-    getAllSettings(),
-    prisma.cashUp.findFirst({ orderBy: { sessionDate: 'desc' }, select: { currency: true } }),
-  ])
-
-  const currencySymbol =
-    CURRENCY_SYMBOLS[latestCashUp?.currency as keyof typeof CURRENCY_SYMBOLS] ?? 'R'
+  const settings = await getAllSettings()
+  const currencySymbol = currencySymbolFromSettings(settings)
 
   return {
     generatedAt: new Date().toISOString(),

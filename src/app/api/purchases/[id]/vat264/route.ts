@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
-import { prisma } from '@/lib/db/prisma'
 import { getPurchase } from '@/lib/services/purchaseService'
-import { getAllSettings } from '@/lib/services/settingsService'
-import { CURRENCY_SYMBOLS } from '@/lib/schemas/cashup'
+import { getAllSettings, currencySymbolFromSettings } from '@/lib/services/settingsService'
 import { generateVat264 } from '@/lib/pdf/vat264'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
@@ -19,18 +17,12 @@ export async function GET(
   const { id } = await context.params
 
   try {
-    const { purchase, settings, latestCashUp } = await runWithRequestTenant(req, async () => {
+    const { purchase, settings } = await runWithRequestTenant(req, async () => {
       const purchase = await getPurchase(id)
-
-      // Load yard settings + operating currency (from the latest cash-up)
-      const [settings, latestCashUp] = await Promise.all([
-        getAllSettings(),
-        prisma.cashUp.findFirst({ orderBy: { sessionDate: 'desc' }, select: { currency: true } }),
-      ])
-      return { purchase, settings, latestCashUp }
+      const settings = await getAllSettings()
+      return { purchase, settings }
     })
-    const currencySymbol =
-      CURRENCY_SYMBOLS[latestCashUp?.currency as keyof typeof CURRENCY_SYMBOLS] ?? 'R'
+    const currencySymbol = currencySymbolFromSettings(settings)
 
     // Load signature bytes if stored in R2
     let signatureBytes: Uint8Array | undefined

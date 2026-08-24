@@ -11,6 +11,7 @@ import { DataTable, type Column, type RowAction } from '@/components/ui/DataTabl
 import { format } from '@/lib/utils/format'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
 import { fetcher } from '@/lib/swrFetcher'
+import { useSystemCurrency } from '@/hooks/useSystemCurrency'
 import { Btn, PortalPage, FilterBar, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
 import { Dialog } from '@/components/ui/dialog'
 
@@ -34,6 +35,7 @@ export default function MomoStatementPage() {
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
   // Deleting a statement is admin-only — upload stays open to managers too.
   const isAdmin = session?.user?.role === 'admin'
+  const { symbol: currSym } = useSystemCurrency()
 
   const [page, setPage] = useState(1)
   const [uploading, setUploading] = useState(false)
@@ -98,7 +100,7 @@ export default function MomoStatementPage() {
       align: 'right',
       render: (row) => (
         <span className="font-mono" style={{ color: colors.process, fontWeight: fontWeight.semibold }}>
-          R {new Decimal(row.totalSent).toFixed(2)}
+          {currSym} {new Decimal(row.totalSent).toFixed(2)}
         </span>
       ),
     },
@@ -109,7 +111,7 @@ export default function MomoStatementPage() {
       align: 'right',
       render: (row) => (
         <span className="font-mono" style={{ color: colors.action, fontWeight: fontWeight.semibold }}>
-          R {new Decimal(row.totalReceived).toFixed(2)}
+          {currSym} {new Decimal(row.totalReceived).toFixed(2)}
         </span>
       ),
     },
@@ -120,7 +122,7 @@ export default function MomoStatementPage() {
       align: 'right',
       render: (row) => (
         <span className="font-mono" style={{ color: colors.textSecondary }}>
-          R {new Decimal(row.totalFees).toFixed(2)}
+          {currSym} {new Decimal(row.totalFees).toFixed(2)}
         </span>
       ),
     },
@@ -131,7 +133,7 @@ export default function MomoStatementPage() {
       align: 'right',
       render: (row) => (
         <span className="font-mono" style={{ color: colors.textSecondary }}>
-          {row.closingBalance != null ? `R ${new Decimal(row.closingBalance).toFixed(2)}` : '—'}
+          {row.closingBalance != null ? `${currSym} ${new Decimal(row.closingBalance).toFixed(2)}` : '—'}
         </span>
       ),
     },

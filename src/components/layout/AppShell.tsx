@@ -26,6 +26,7 @@ import { WindowTaskbar } from '@/components/ui/WindowTaskbar'
 import { Toolbar } from '@/components/layout/Toolbar'
 import { useRecordTitle } from '@/hooks/useRecordTitle'
 import { useFeatureFlag } from '@/hooks/useFeatureFlags'
+import { useSystemCurrency } from '@/hooks/useSystemCurrency'
 import { NAVY_GLOSS_GRAD, NAVY_GLOSS_BEVEL, winBevel } from '@/components/rpx'
 
 // ─── UserMenu ─────────────────────────────────────────────────────────────────
@@ -469,6 +470,7 @@ function OnSiteIndicator() {
 }
 
 function DashboardStatsBar({ fullName, role, allowedModules }: { fullName: string; role: string; allowedModules?: string[] }) {
+  const { symbol: currSym } = useSystemCurrency()
   const { data: stats, isLoading } = useSWR<TodayStats>('/api/reports/today', statsFetcher, {
     refreshInterval: 30_000,
   })
@@ -509,7 +511,7 @@ function DashboardStatsBar({ fullName, role, allowedModules }: { fullName: strin
             {isLoading
               ? <div className="h-3 w-16 rounded bg-gray-200 animate-pulse" />
               : <span className="text-[#1B3A6B] text-[12px] font-bold tabular-nums">
-                  R {new Decimal(stats?.purchases?.total ?? '0').toFixed(2)}
+                  {currSym} {new Decimal(stats?.purchases?.total ?? '0').toFixed(2)}
                 </span>
             }
           </div>
@@ -531,7 +533,7 @@ function DashboardStatsBar({ fullName, role, allowedModules }: { fullName: strin
             {isLoading
               ? <div className="h-3 w-16 rounded bg-gray-200 animate-pulse" />
               : <span className="text-[#1B3A6B] text-[12px] font-bold tabular-nums">
-                  R {new Decimal(stats?.sales?.total ?? '0').toFixed(2)}
+                  {currSym} {new Decimal(stats?.sales?.total ?? '0').toFixed(2)}
                 </span>
             }
           </div>

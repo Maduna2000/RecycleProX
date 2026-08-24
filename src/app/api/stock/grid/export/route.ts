@@ -8,6 +8,7 @@ import { Prisma } from '@prisma/client'
 import Decimal from 'decimal.js'
 import { expandCategoryNames } from '@/lib/services/productService'
 import { buildReportMeta } from '@/lib/services/reports/meta'
+import { getAllSettings, currencySymbolFromSettings } from '@/lib/services/settingsService'
 import { generateBusinessReportPdf } from '@/lib/pdf/businessReport'
 import type { ReportDocument, ReportGroup } from '@/lib/reports/types'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
@@ -101,6 +102,8 @@ export async function GET(req: NextRequest) {
       }
     })
 
+    const currencySymbol = currencySymbolFromSettings(await getAllSettings())
+
     logger.info({ userId: session.user.id, period, date: dateParam, format }, 'stock.grid.export')
 
     if (format === 'pdf') {
@@ -178,7 +181,7 @@ export async function GET(req: NextRequest) {
       'Adjusted':     r.adjusted,
       'Closing Qty':  r.closing,
       'Buy Price':    r.buyPrice.toNumber(),
-      'Closing Value (R)': Number(r.value.toFixed(2)),
+      [`Closing Value (${currencySymbol})`]: Number(r.value.toFixed(2)),
     }))
 
     const wb = XLSX.utils.book_new()

@@ -9,6 +9,7 @@ import Decimal from 'decimal.js'
 import { toast } from 'sonner'
 import { colors, fontSize } from '@/lib/design-tokens'
 import { fetcher } from '@/lib/swrFetcher'
+import { useSystemCurrency } from '@/hooks/useSystemCurrency'
 import {
   inp, lbl, Btn, PortalPage, PANEL, PANEL_HEAD,
   RpxDialogContent, RpxDialogHeader,
@@ -68,6 +69,7 @@ export default function PriceListEditorPage() {
   const { data: session } = useSession()
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
   const isNew = params.id === 'new'
+  const { symbol: currSym } = useSystemCurrency()
 
   const [title,      setTitle]      = useState("TODAY'S PRICES")
   const [listDate,   setListDate]   = useState(() => new Date().toISOString().slice(0, 10))
@@ -478,7 +480,7 @@ export default function PriceListEditorPage() {
             <span>Order</span>
             <span>Category</span>
             <span>Material</span>
-            <span style={{ textAlign: 'right' }}>Ex VAT (R)</span>
+            <span style={{ textAlign: 'right' }}>Ex VAT ({currSym})</span>
             <span style={{ textAlign: 'right' }}>Inc VAT</span>
             <span />
           </div>

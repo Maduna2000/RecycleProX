@@ -12,6 +12,7 @@ import { format } from '@/lib/utils/format'
 import { colors, fontWeight, layout } from '@/lib/design-tokens'
 import { fetcher } from '@/lib/swrFetcher'
 import { StatusBadge } from '@/components/ui/DataTable'
+import { useSystemCurrency } from '@/hooks/useSystemCurrency'
 import {
   TH, TD, HEADER_GRAD, NAVY,
   Btn, PortalPage,
@@ -54,6 +55,7 @@ export default function MomoStatementDetailPage() {
   // Deleting a statement is admin-only.
   const isAdmin = session?.user?.role === 'admin'
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const { symbol: currSym } = useSystemCurrency()
 
   const { data: statement, isLoading, error } = useSWR<MomoDetail>(`/api/momo-statements/${id}`, fetcher)
 
@@ -94,14 +96,14 @@ export default function MomoStatementDetailPage() {
         <div style={{ flex: 1, overflow: 'auto', padding: layout.contentPadding }}>
           {/* Summary tiles */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, marginBottom: 10 }}>
-            <SummaryTile label="Total Sent" value={`R ${new Decimal(statement.totalSent).toFixed(2)}`} color={colors.process} />
-            <SummaryTile label="Total Received" value={`R ${new Decimal(statement.totalReceived).toFixed(2)}`} color={colors.action} />
-            <SummaryTile label="Total Fees" value={`R ${new Decimal(statement.totalFees).toFixed(2)}`} color={colors.textSecondary} />
+            <SummaryTile label="Total Sent" value={`${currSym} ${new Decimal(statement.totalSent).toFixed(2)}`} color={colors.process} />
+            <SummaryTile label="Total Received" value={`${currSym} ${new Decimal(statement.totalReceived).toFixed(2)}`} color={colors.action} />
+            <SummaryTile label="Total Fees" value={`${currSym} ${new Decimal(statement.totalFees).toFixed(2)}`} color={colors.textSecondary} />
             <SummaryTile
               label="Opening → Closing"
               value={
                 statement.openingBalance != null && statement.closingBalance != null
-                  ? `R ${new Decimal(statement.openingBalance).toFixed(2)} → R ${new Decimal(statement.closingBalance).toFixed(2)}`
+                  ? `${currSym} ${new Decimal(statement.openingBalance).toFixed(2)} → ${currSym} ${new Decimal(statement.closingBalance).toFixed(2)}`
                   : '—'
               }
               color={colors.textPrimary}
@@ -150,13 +152,13 @@ export default function MomoStatementDetailPage() {
                         {line.toMessage && <span style={{ color: colors.textSecondary }}> · {line.toMessage}</span>}
                       </td>
                       <td style={{ ...TD, fontFamily: 'monospace', fontWeight: 600, textAlign: 'right', color: amt.isNegative() ? colors.process : colors.action }}>
-                        {amt.isNegative() ? '−' : '+'}R {amt.abs().toFixed(2)}
+                        {amt.isNegative() ? '−' : '+'}{currSym} {amt.abs().toFixed(2)}
                       </td>
                       <td style={{ ...TD, fontFamily: 'monospace', textAlign: 'right', color: colors.textSecondary }}>
-                        {new Decimal(line.fee).gt(0) ? `R ${new Decimal(line.fee).toFixed(2)}` : '—'}
+                        {new Decimal(line.fee).gt(0) ? `${currSym} ${new Decimal(line.fee).toFixed(2)}` : '—'}
                       </td>
                       <td style={{ ...TD, fontFamily: 'monospace', textAlign: 'right', color: colors.textSecondary }}>
-                        {line.balance != null ? `R ${new Decimal(line.balance).toFixed(2)}` : '—'}
+                        {line.balance != null ? `${currSym} ${new Decimal(line.balance).toFixed(2)}` : '—'}
                       </td>
                       <td style={TD}><StatusBadge status={line.status === 'Successful' ? 'completed' : 'voided'} /></td>
                     </tr>

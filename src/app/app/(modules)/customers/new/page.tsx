@@ -235,7 +235,7 @@ export default function NewAccountPage() {
 
               {/* Cell Number */}
               <Field label="Cell Number" required>
-                <input {...register('phone')} style={inp} placeholder="+268XXXXXXXX" disabled={loading} />
+                <input {...register('phone')} style={inp} placeholder="76123456 or +27821234567" disabled={loading} />
                 {errors.phone && <p style={{ fontSize: 10, color: colors.danger, marginTop: 2 }}>{errors.phone.message}</p>}
               </Field>
 

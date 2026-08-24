@@ -4,6 +4,7 @@ import logger from '@/lib/logger'
 import { GoodsSearchSchema } from '@/lib/schemas/police'
 import { getGoodsTraceReport, PoliceVisitNotActiveError } from '@/lib/services/policeVisitService'
 import { generateGoodsTraceReport } from '@/lib/pdf/policeSearchReport'
+import { currencySymbolFromSettings } from '@/lib/services/settingsService'
 import { DEFAULT_POLICE_SERVICE_NAME } from '@/lib/police-defaults'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
@@ -52,6 +53,7 @@ export async function GET(req: NextRequest) {
         stationName: visit.stationName,
       },
       generatedAt: new Date(),
+      currencySymbol: currencySymbolFromSettings(settings),
       productName: product.name,
       unit:        product.unit,
       from:        parsed.data.from ?? null,

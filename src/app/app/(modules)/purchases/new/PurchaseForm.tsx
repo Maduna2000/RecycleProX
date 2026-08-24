@@ -19,6 +19,7 @@ import { useOfflineMutation } from '@/hooks/useOfflineFetch'
 import { useOfflineLookup } from '@/hooks/useOfflineLookup'
 import { offlineDB } from '@/lib/offline/db'
 import { fetcher } from '@/lib/swrFetcher'
+import { useSystemCurrency } from '@/hooks/useSystemCurrency'
 import { canAutoPrint, autoPrintReceipt } from '@/lib/print/autoPrintClient'
 
 
@@ -133,6 +134,7 @@ export function PurchaseForm({ editingPurchase }: { editingPurchase?: EditingPur
   const { mutate: offlineMutate } = useOfflineMutation()
   const { getActiveProducts, resolveProductPrice } = useOfflineLookup()
   const { confirm } = useConfirm()
+  const { symbol: currSym } = useSystemCurrency()
 
   // ── Core purchase state ──────────────────────────────────────────────────
   const [customer,        setCustomer]        = useState<SelectedCustomer | null>(null)
@@ -957,7 +959,7 @@ export function PurchaseForm({ editingPurchase }: { editingPurchase?: EditingPur
             <div style={{ flexShrink: 0, margin: '0 10px 4px', padding: '5px 8px', border: '1px solid #F59E0B', borderRadius: 2, background: '#FFFBEB' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, color: '#92400E' }}>
                 <AlertTriangle style={{ width: 12, height: 12 }} />
-                Outstanding loan: R {new Decimal(outstandingLoanAmount).toFixed(2)}
+                Outstanding loan: {currSym} {new Decimal(outstandingLoanAmount).toFixed(2)}
               </div>
               <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#78350F', cursor: 'pointer', marginTop: 3 }}>
                 <input
@@ -1036,7 +1038,7 @@ export function PurchaseForm({ editingPurchase }: { editingPurchase?: EditingPur
                 flexShrink: 0,
               }}
             >
-              {['Product', 'Qty (kg)', 'Price (R)', 'Sub Total', 'VAT', 'Total', '', ''].map((h, i) => (
+              {['Product', 'Qty (kg)', `Price (${currSym})`, 'Sub Total', 'VAT', 'Total', '', ''].map((h, i) => (
                 <span key={i} style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#374151' }}>{h}</span>
               ))}
             </div>
@@ -1103,10 +1105,10 @@ export function PurchaseForm({ editingPurchase }: { editingPurchase?: EditingPur
 
                       {/* Sub Total */}
                       <span
-                        title={qty.gt(0) ? `R ${lineSub.toFixed(2)}` : undefined}
+                        title={qty.gt(0) ? `${currSym} ${lineSub.toFixed(2)}` : undefined}
                         style={{ fontSize: 11, fontFamily: 'monospace', padding: '0 4px', color: isDeduction ? '#DC2626' : qty.gt(0) ? '#212529' : '#9CA3AF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}
                       >
-                        {qty.gt(0) ? `R ${lineSub.toFixed(2)}` : '—'}
+                        {qty.gt(0) ? `${currSym} ${lineSub.toFixed(2)}` : '—'}
                       </span>
 
                       {/* VAT — read-only indicator; applicability follows the account's VAT
@@ -1124,20 +1126,20 @@ export function PurchaseForm({ editingPurchase }: { editingPurchase?: EditingPur
                         </span>
                         {qty.gt(0) && lineVat.gt(0) && (
                           <span
-                            title={`R ${lineVat.toFixed(2)}`}
+                            title={`${currSym} ${lineVat.toFixed(2)}`}
                             style={{ fontSize: 11, fontFamily: 'monospace', color: '#212529', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}
                           >
-                            R {lineVat.toFixed(2)}
+                            {currSym} {lineVat.toFixed(2)}
                           </span>
                         )}
                       </div>
 
                       {/* Total */}
                       <span
-                        title={qty.gt(0) ? `R ${lineTot.toFixed(2)}` : undefined}
+                        title={qty.gt(0) ? `${currSym} ${lineTot.toFixed(2)}` : undefined}
                         style={{ fontSize: 11, fontFamily: 'monospace', fontWeight: 600, padding: '0 4px', color: isDeduction ? '#DC2626' : qty.gt(0) ? colors.action : '#9CA3AF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}
                       >
-                        {qty.gt(0) ? `R ${lineTot.toFixed(2)}` : '—'}
+                        {qty.gt(0) ? `${currSym} ${lineTot.toFixed(2)}` : '—'}
                       </span>
 
                       {/* Scale toggle */}
@@ -1371,9 +1373,9 @@ export function PurchaseForm({ editingPurchase }: { editingPurchase?: EditingPur
                     <span style={{ fontSize: 10, fontFamily: 'monospace', color: '#1B3A6B', fontWeight: 600 }}>{p.refNumber}</span>
                     <span style={{ fontSize: 11, color: '#212529', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.customer.firstName} {p.customer.lastName}</span>
                     <span style={{ fontSize: 10, color: '#6C757D', textAlign: 'center' }}>{p.lines.length}</span>
-                    <span title={`R ${new Decimal(p.totalAmount).toFixed(2)}`} style={{ fontSize: 10, fontFamily: 'monospace', color: colors.action, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>R {new Decimal(p.totalAmount).toFixed(2)}</span>
-                    {(() => { const paid = new Decimal(p.amountPaid ?? '0'); return <span title={paid.gt(0) ? `R ${paid.toFixed(2)}` : undefined} style={{ fontSize: 10, fontFamily: 'monospace', color: paid.gt(0) ? colors.action : '#9CA3AF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{paid.gt(0) ? `R ${paid.toFixed(2)}` : '—'}</span> })()}
-                    {(() => { const bal = new Decimal(p.totalAmount).minus(new Decimal(p.loanDeductionAmount ?? '0')).minus(new Decimal(p.amountPaid ?? '0')); const partial = new Decimal(p.amountPaid ?? '0').gt(0); return <span title={`R ${bal.toFixed(2)}`} style={{ fontSize: 10, fontFamily: 'monospace', fontWeight: 600, color: partial ? '#C9A020' : colors.action, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>R {bal.toFixed(2)}</span> })()}
+                    <span title={`${currSym} ${new Decimal(p.totalAmount).toFixed(2)}`} style={{ fontSize: 10, fontFamily: 'monospace', color: colors.action, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{currSym} {new Decimal(p.totalAmount).toFixed(2)}</span>
+                    {(() => { const paid = new Decimal(p.amountPaid ?? '0'); return <span title={paid.gt(0) ? `${currSym} ${paid.toFixed(2)}` : undefined} style={{ fontSize: 10, fontFamily: 'monospace', color: paid.gt(0) ? colors.action : '#9CA3AF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{paid.gt(0) ? `${currSym} ${paid.toFixed(2)}` : '—'}</span> })()}
+                    {(() => { const bal = new Decimal(p.totalAmount).minus(new Decimal(p.loanDeductionAmount ?? '0')).minus(new Decimal(p.amountPaid ?? '0')); const partial = new Decimal(p.amountPaid ?? '0').gt(0); return <span title={`${currSym} ${bal.toFixed(2)}`} style={{ fontSize: 10, fontFamily: 'monospace', fontWeight: 600, color: partial ? '#C9A020' : colors.action, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{currSym} {bal.toFixed(2)}</span> })()}
                     <span style={{ fontSize: 10, color: '#9CA3AF' }}>{timeAgo(p.createdAt)}</span>
 
                     {/* ⋮ action menu */}
@@ -1451,26 +1453,26 @@ export function PurchaseForm({ editingPurchase }: { editingPurchase?: EditingPur
             <div style={{ minWidth: 220, display: 'flex', flexDirection: 'column', gap: 2 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
                 <span style={{ color: '#6C757D' }}>Sub Total</span>
-                <span style={{ fontFamily: 'monospace', color: '#212529' }}>R {subTotal.toFixed(2)}</span>
+                <span style={{ fontFamily: 'monospace', color: '#212529' }}>{currSym} {subTotal.toFixed(2)}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
                 <span style={{ color: '#6C757D' }}>VAT ({customer?.zeroRated ? '0%' : '15%'})</span>
-                <span style={{ fontFamily: 'monospace', color: '#6C757D' }}>R {vatAmount.toFixed(2)}</span>
+                <span style={{ fontFamily: 'monospace', color: '#6C757D' }}>{currSym} {vatAmount.toFixed(2)}</span>
               </div>
               <div style={{ height: 1, background: '#C0C0C0', margin: '2px 0' }} />
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 700 }}>
                 <span style={{ color: '#212529' }}>Total</span>
-                <span style={{ fontFamily: 'monospace', color: colors.action }}>R {grandTotal.toFixed(2)}</span>
+                <span style={{ fontFamily: 'monospace', color: colors.action }}>{currSym} {grandTotal.toFixed(2)}</span>
               </div>
               {deductLoan && loanDeduct.gt(0) && (
                 <>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
                     <span style={{ color: '#92400E' }}>Loan Deduction</span>
-                    <span style={{ fontFamily: 'monospace', color: '#92400E' }}>− R {loanDeduct.toFixed(2)}</span>
+                    <span style={{ fontFamily: 'monospace', color: '#92400E' }}>− {currSym} {loanDeduct.toFixed(2)}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 700 }}>
                     <span style={{ color: '#1B3A6B' }}>Cash to Pay</span>
-                    <span style={{ fontFamily: 'monospace', color: '#185ABD' }}>R {cashToPay.toFixed(2)}</span>
+                    <span style={{ fontFamily: 'monospace', color: '#185ABD' }}>{currSym} {cashToPay.toFixed(2)}</span>
                   </div>
                 </>
               )}
@@ -1540,7 +1542,7 @@ export function PurchaseForm({ editingPurchase }: { editingPurchase?: EditingPur
         >
           {submitting
             ? (editingPurchase ? 'Saving…' : 'Submitting…')
-            : editingPurchase ? 'Save Changes' : paymentType === 'unpaid' ? 'Submit' : `Submit · R ${cashToPay.toFixed(2)}`}
+            : editingPurchase ? 'Save Changes' : paymentType === 'unpaid' ? 'Submit' : `Submit · ${currSym} ${cashToPay.toFixed(2)}`}
         </Btn>
       </div>
 

@@ -4,6 +4,7 @@ import logger from '@/lib/logger'
 import { z } from 'zod'
 import { getPersonRecordReport, PoliceVisitNotActiveError } from '@/lib/services/policeVisitService'
 import { generatePersonRecordReport } from '@/lib/pdf/policeSearchReport'
+import { currencySymbolFromSettings } from '@/lib/services/settingsService'
 import { DEFAULT_POLICE_SERVICE_NAME } from '@/lib/police-defaults'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
@@ -51,6 +52,7 @@ export async function GET(
         stationName: visit.stationName,
       },
       generatedAt: new Date(),
+      currencySymbol: currencySymbolFromSettings(settings),
       person: {
         fullName:        `${customer.firstName} ${customer.lastName}`,
         idNumber:        customer.idNumber,

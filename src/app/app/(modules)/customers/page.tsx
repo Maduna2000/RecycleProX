@@ -9,7 +9,8 @@ import { Dialog } from '@/components/ui/dialog'
 import { colors, badgeStyle } from '@/lib/design-tokens'
 import { toast } from 'sonner'
 import { useSession } from 'next-auth/react'
-import { fetcher } from '@/lib/swrFetcher'
+import { customersListFetcher } from '@/lib/offline/fetchers/customers'
+import { OfflineDataBadge } from '@/components/ui/OfflineDataBadge'
 import {
   inp, lbl, Btn, Field, FilterBar, PortalPage,
   RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter,
@@ -128,7 +129,7 @@ function AccountsList() {
   })
 
   const { data, isLoading, error } = useSWR<{ customers: Customer[]; total: number }>(
-    `/api/customers?${query}`, fetcher,
+    `/api/customers?${query}`, customersListFetcher,
   )
   const customers = data?.customers ?? []
 
@@ -502,7 +503,7 @@ function AccountsList() {
 // ─── Page ──────────────────────────────────────────────────────────────────────
 export default function AccountsPage() {
   return (
-    <PortalPage title="Accounts">
+    <PortalPage title="Accounts" actions={<OfflineDataBadge />}>
       <AccountsList />
     </PortalPage>
   )

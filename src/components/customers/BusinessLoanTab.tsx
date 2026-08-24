@@ -15,6 +15,7 @@ import { format } from '@/lib/utils/format'
 import { colors } from '@/lib/design-tokens'
 import { HEADER_GRAD, lbl, Btn, winBevel, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
 import { fetcher } from '@/lib/swrFetcher'
+import { useSystemCurrency } from '@/hooks/useSystemCurrency'
 
 
 // This tab is the mirror image of the "Loans" tab: Loans is money the
@@ -106,7 +107,8 @@ function currentPeriod(): string {
 // for-customer-owes-us convention — see businessLoanService.ts's comment).
 const moneyColor = (v: string) => (new Decimal(v).gt(0) ? colors.violet : colors.action)
 
-const ledgerColumns: Column<LedgerRow>[] = [
+function getLedgerColumns(sym: string): Column<LedgerRow>[] {
+  return [
   {
     key: 'description',
     header: 'Description',
@@ -133,14 +135,14 @@ const ledgerColumns: Column<LedgerRow>[] = [
     header: 'Borrowed',
     width: '110px',
     align: 'right',
-    render: (row) => <span style={{ fontFamily: 'monospace' }}>{format.currency(row.advance ?? '0')}</span>,
+    render: (row) => <span style={{ fontFamily: 'monospace' }}>{format.currency(row.advance ?? '0', sym)}</span>,
   },
   {
     key: 'repayment',
     header: 'Repayment',
     width: '110px',
     align: 'right',
-    render: (row) => <span style={{ fontFamily: 'monospace' }}>{format.currency(row.repayment ?? '0')}</span>,
+    render: (row) => <span style={{ fontFamily: 'monospace' }}>{format.currency(row.repayment ?? '0', sym)}</span>,
   },
   {
     key: 'balance',
@@ -149,11 +151,12 @@ const ledgerColumns: Column<LedgerRow>[] = [
     align: 'right',
     render: (row) => (
       <span style={{ fontFamily: 'monospace', fontWeight: 600, color: moneyColor(row.balance) }}>
-        {format.currency(row.balance)}
+        {format.currency(row.balance, sym)}
       </span>
     ),
   },
-]
+  ]
+}
 
 // ─── BusinessLoanTab ────────────────────────────────────────────────────────
 
@@ -163,6 +166,8 @@ export function BusinessLoanTab({ customerId, customerName, userRole }: Business
   const [repayOpen,        setRepayOpen]        = useState(false)
   const [deleteLastOpen,   setDeleteLastOpen]   = useState(false)
   const [voidTarget,       setVoidTarget]       = useState<BusinessLoan | null>(null)
+  const { symbol } = useSystemCurrency()
+  const ledgerColumns = getLedgerColumns(symbol)
 
   const isAdmin = userRole === 'admin'
 
@@ -304,7 +309,7 @@ export function BusinessLoanTab({ customerId, customerName, userRole }: Business
       >
         <span style={lbl}>You Owe {customerName}</span>
         <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 14, color: moneyColor(closingBalance.toString()) }}>
-          {format.currency(closingBalance.toString())}
+          {format.currency(closingBalance.toString(), symbol)}
         </span>
       </div>
 
@@ -362,6 +367,7 @@ function CreateBusinessLoanDialog({
   const [method, setMethod] = useState('cash')
   const [notes, setNotes] = useState('')
   const [loading, setLoading] = useState(false)
+  const { symbol: currSym } = useSystemCurrency()
 
   async function onSubmit() {
     if (!amount) return
@@ -401,7 +407,7 @@ function CreateBusinessLoanDialog({
               {customerName} (via Split Payment in the Sales module).
             </p>
             <div>
-              <Label>Amount Borrowed (R) *</Label>
+              <Label>Amount Borrowed ({currSym}) *</Label>
               <Input
                 placeholder="0.00"
                 value={amount}
@@ -456,6 +462,7 @@ function VoidBusinessLoanDialog({
 }) {
   const [reason, setReason] = useState('')
   const [loading, setLoading] = useState(false)
+  const { symbol } = useSystemCurrency()
 
   async function onSubmit() {
     if (reason.length < 5) return
@@ -484,7 +491,7 @@ function VoidBusinessLoanDialog({
             <div className="rounded p-3 text-sm" style={{ background: '#FEF2F2', border: '1px solid #FECACA' }}>
               <p className="font-medium" style={{ color: '#DC2626' }}>{customerName} — {loan.refNumber}</p>
               <p className="text-xs mt-1" style={{ color: '#DC2626' }}>
-                This removes the record that the business borrowed {format.currency(loan.principalAmount)}
+                This removes the record that the business borrowed {format.currency(loan.principalAmount, symbol)}
                 {' '}from {customerName}. Use this only to correct a mistaken entry — this action cannot be undone.
               </p>
             </div>
@@ -529,6 +536,7 @@ function RepayPaymentInput({
   onChange: (v: string) => void
   disabled: boolean
 }) {
+  const { symbol } = useSystemCurrency()
   return (
     <div className="flex items-center gap-2">
       <div className="w-20 flex items-center gap-1.5" style={{ color: '#6C757D' }}>
@@ -536,7 +544,7 @@ function RepayPaymentInput({
         <span className="text-xs font-medium">{label}</span>
       </div>
       <div className="flex-1 relative">
-        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs" style={{ color: '#6C757D' }}>R</span>
+        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs" style={{ color: '#6C757D' }}>{symbol}</span>
         <Input
           type="text"
           inputMode="decimal"
@@ -568,6 +576,7 @@ function RecordBusinessLoanRepaymentDialog({
   const [notes, setNotes] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const { symbol } = useSystemCurrency()
 
   const loan = loans.find((l) => l.id === loanId) ?? loans[0]!
   const balance = new Decimal(loan.balanceAmount)
@@ -628,7 +637,7 @@ function RecordBusinessLoanRepaymentDialog({
                   <SelectContent>
                     {loans.map((l) => (
                       <SelectItem key={l.id} value={l.id}>
-                        {l.refNumber} — R {new Decimal(l.balanceAmount).toFixed(2)} outstanding
+                        {l.refNumber} — {symbol} {new Decimal(l.balanceAmount).toFixed(2)} outstanding
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -642,7 +651,7 @@ function RecordBusinessLoanRepaymentDialog({
                   {loan.refNumber} — Still Owed
                 </span>
                 <span className="font-mono font-bold" style={{ fontSize: 16, color: colors.violet }}>
-                  R {balance.toFixed(2)}
+                  {symbol} {balance.toFixed(2)}
                 </span>
               </div>
             </div>
@@ -655,11 +664,11 @@ function RecordBusinessLoanRepaymentDialog({
             <div className="border-t pt-3 space-y-1">
               <div className="flex justify-between text-xs" style={{ color: '#6C757D' }}>
                 <span>Payment Total</span>
-                <span className="font-mono">R {paymentTotal.toFixed(2)}</span>
+                <span className="font-mono">{symbol} {paymentTotal.toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-xs font-medium" style={{ color: remaining.isZero() ? '#217346' : '#6C757D' }}>
                 <span>{remaining.isZero() ? 'Loan Fully Settled' : 'Balance Remaining After This Payment'}</span>
-                <span className="font-mono">{remaining.isZero() ? '✓' : `R ${remaining.toFixed(2)}`}</span>
+                <span className="font-mono">{remaining.isZero() ? '✓' : `${symbol} ${remaining.toFixed(2)}`}</span>
               </div>
             </div>
 
@@ -697,6 +706,7 @@ function DeleteLastDialog({
 }) {
   const [reason, setReason] = useState('')
   const [loading, setLoading] = useState(false)
+  const { symbol } = useSystemCurrency()
 
   async function onSubmit() {
     if (reason.trim().length < 5) return
@@ -727,7 +737,7 @@ function DeleteLastDialog({
           <div className="space-y-4">
             <div className="rounded p-3 text-sm" style={{ background: '#FEF2F2', border: '1px solid #FECACA' }}>
               <p className="font-medium" style={{ color: '#DC2626' }}>
-                {lastEntry.description} of {format.currency(lastEntry.amount)} on{' '}
+                {lastEntry.description} of {format.currency(lastEntry.amount, symbol)} on{' '}
                 {new Date(lastEntry.date).toLocaleDateString('en-ZA')}
               </p>
               <p className="text-xs mt-1" style={{ color: '#DC2626' }}>

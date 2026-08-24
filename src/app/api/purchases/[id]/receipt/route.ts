@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { getPurchase } from '@/lib/services/purchaseService'
-import { getAllSettings } from '@/lib/services/settingsService'
+import { getAllSettings, currencySymbolFromSettings } from '@/lib/services/settingsService'
 import { generatePurchaseReceiptPdf } from '@/lib/pdf/slip'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
@@ -31,6 +31,8 @@ export async function GET(
       ])
       return { purchase, settings }
     })
+
+    const currencySymbol = currencySymbolFromSettings(settings)
 
     const thermalLines = purchase.lines.map((l) => ({
       productCode: l.product.code,
@@ -74,6 +76,7 @@ export async function GET(
         footerText:     settings.purchaseNoteDeclaration,
         loanDeduction:  purchase.loanDeductionAmount ? { amount: purchase.loanDeductionAmount.toString() } : undefined,
         splitPayments:  splitPayments ?? undefined,
+        currencySymbol,
       })
       return new NextResponse(buf.buffer as ArrayBuffer, {
         headers: {
@@ -112,6 +115,7 @@ export async function GET(
       companyAddress: settings.yardAddress,
       companyPhone:   settings.yardPhone,
       vatNumber:      settings.vatNumber,
+      currencySymbol,
     })
 
     return new NextResponse(pdfBytes.buffer as ArrayBuffer, {

@@ -16,7 +16,10 @@ import { z } from 'zod'
 import { inp, lbl, Btn, PortalPage, PANEL, PANEL_HEAD, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
 import { Dialog } from '@/components/ui/dialog'
 import { DataTable, type Column } from '@/components/ui/DataTable'
-import { fetcher } from '@/lib/swrFetcher'
+import { offlineFetcher } from '@/lib/offline/responseCache'
+import { floatHistoryFetcher } from '@/lib/offline/fetchers/float'
+import { OfflineDataBadge } from '@/components/ui/OfflineDataBadge'
+import { useSystemCurrency } from '@/hooks/useSystemCurrency'
 
 
 const TopUpFormSchema = z.object({
@@ -82,12 +85,13 @@ export default function FloatPage() {
   const router = useRouter()
   const { data: session } = useSession()
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
+  const { symbol: currSym } = useSystemCurrency()
 
-  const { isLoading: loadingToday } = useSWR<TodayFloatResponse>('/api/float/today', fetcher)
-  const { data: history, isLoading: loadingHistory } = useSWR<CashFloat[]>('/api/float', fetcher)
-  const { data: currentData, mutate: mutateCurrentFloat } = useSWR<CurrentFloatResponse>('/api/float/current', fetcher, { refreshInterval: 5000 })
+  const { isLoading: loadingToday } = useSWR<TodayFloatResponse>('/api/float/today', offlineFetcher)
+  const { data: history, isLoading: loadingHistory } = useSWR<CashFloat[]>('/api/float', floatHistoryFetcher)
+  const { data: currentData, mutate: mutateCurrentFloat } = useSWR<CurrentFloatResponse>('/api/float/current', offlineFetcher, { refreshInterval: 5000 })
   const cashUpKey = '/api/cashup?today=1'
-  const { data: cashUpData, mutate: mutateCashUp } = useSWR<{ cashUp: CashUp | null }>(cashUpKey, fetcher, { refreshInterval: 5000 })
+  const { data: cashUpData, mutate: mutateCashUp } = useSWR<{ cashUp: CashUp | null }>(cashUpKey, offlineFetcher, { refreshInterval: 5000 })
   // Between a session being approved and the next one being opened, no
   // open/submitted session exists for /api/cashup?today=1 to return — fall
   // back to the same carry-forward preview openCashUp itself would use
@@ -95,14 +99,14 @@ export default function FloatPage() {
   // Balance don't drop to R 0.00 during that gap.
   const { data: openingPreview } = useSWR<{ canOpen: boolean; safeOpeningBalance?: string }>(
     cashUpData && !cashUpData.cashUp ? '/api/cashup/opening-balance-preview' : null,
-    fetcher,
+    offlineFetcher,
     { refreshInterval: 5000 },
   )
   // Use the cashup session date for live-stats, not today's date
   // This ensures we get stats for the actual cashup session (which may span past midnight)
   const cashUpSessionDate = cashUpData?.cashUp?.sessionDate?.split('T')[0] ?? todayISO()
   const liveStatsKey = `/api/cashup/live-stats?date=${cashUpSessionDate}`
-  const { data: liveStats, mutate: mutateLiveStats } = useSWR<LiveStats>(liveStatsKey, fetcher, { refreshInterval: 5000 })
+  const { data: liveStats, mutate: mutateLiveStats } = useSWR<LiveStats>(liveStatsKey, offlineFetcher, { refreshInterval: 5000 })
   const [saving, setSaving] = useState(false)
   const [reversingMovement, setReversingMovement] = useState(false)
   const [reversingTarget, setReversingTarget] = useState<FloatMovement | null>(null)
@@ -152,7 +156,7 @@ export default function FloatPage() {
         const err = await res.json().catch(() => ({}))
         throw new Error((err as { error?: string }).error ?? 'Top-up failed')
       }
-      toast.success(`Float topped up by R ${new Decimal(data.amount).toFixed(2)}`)
+      toast.success(`Float topped up by ${currSym} ${new Decimal(data.amount).toFixed(2)}`)
       topUpForm.reset({ amount: '', note: '' })
       // Instantly refresh all float-related data
       await Promise.all([
@@ -185,14 +189,14 @@ export default function FloatPage() {
     },
     {
       key: 'openingAmount', header: 'Opening Float', width: '130px',
-      render: (f) => <span className="font-mono font-semibold" style={{ fontSize: 12, color: colors.textPrimary }}>R {new Decimal(f.openingAmount).toFixed(2)}</span>,
+      render: (f) => <span className="font-mono font-semibold" style={{ fontSize: 12, color: colors.textPrimary }}>{currSym} {new Decimal(f.openingAmount).toFixed(2)}</span>,
     },
     {
       key: 'currentBalance', header: 'Current Float', width: '150px',
       render: (f) => (
         <>
           <span className="font-mono font-semibold" style={{ fontSize: 12, color: f.closingAmount ? colors.textSecondary : colors.action }}>
-            R {new Decimal(f.currentBalance).toFixed(2)}
+            {currSym} {new Decimal(f.currentBalance).toFixed(2)}
           </span>
           {f.closingAmount && <span className="ml-1" style={{ fontSize: 11, color: colors.textSecondary }}>(closed)</span>}
         </>
@@ -220,7 +224,7 @@ export default function FloatPage() {
     },
     {
       key: 'amount', header: 'Amount', width: '100px',
-      render: (m) => <span style={{ fontSize: 12, fontFamily: 'monospace', fontWeight: 600, color: colors.action }}>+R {new Decimal(m.amount).toFixed(2)}</span>,
+      render: (m) => <span style={{ fontSize: 12, fontFamily: 'monospace', fontWeight: 600, color: colors.action }}>+{currSym} {new Decimal(m.amount).toFixed(2)}</span>,
     },
     {
       key: 'expected', header: 'Expected in Drawer', width: '140px',
@@ -239,7 +243,7 @@ export default function FloatPage() {
                   .minus(new Decimal(liveStats.loanAdvance ?? '0'))
                   .plus(new Decimal(liveStats.loanRepayment ?? '0'))
               : floatBalanceAfter)
-        return <span style={{ fontSize: 12, fontFamily: 'monospace', color: colors.action }}>R {expectedInDrawer.toFixed(2)}</span>
+        return <span style={{ fontSize: 12, fontFamily: 'monospace', color: colors.action }}>{currSym} {expectedInDrawer.toFixed(2)}</span>
       },
     },
     {
@@ -292,7 +296,7 @@ export default function FloatPage() {
   // floating (see useIsWindowFloating), so this wrapper just needs to fill
   // whatever width it's given now.
   return (
-    <PortalPage title="Cash Float" maxWidth={768}>
+    <PortalPage title="Cash Float" maxWidth={768} actions={<OfflineDataBadge />}>
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
       <div className="w-full space-y-2.5 pb-4" style={{ padding: '8px 8px 0' }}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
@@ -315,12 +319,12 @@ export default function FloatPage() {
                   {/* Opening Balance from Cashup (carry-forward from previous day) */}
                   <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: colors.textSecondary }}>Opening Balance</p>
                   <p className="font-mono font-bold mt-1" style={{ fontSize: 20, color: colors.textPrimary }}>
-                    R {cashUpOpeningBalance?.toFixed(2) ?? '0.00'}
+                    {currSym} {cashUpOpeningBalance?.toFixed(2) ?? '0.00'}
                   </p>
                   {/* Current Balance (Expected in Drawer) */}
                   <p className="text-xs font-semibold uppercase tracking-wide mt-2.5" style={{ color: colors.action }}>Current Balance (Expected in Drawer)</p>
                   <p className="font-mono font-bold" style={{ fontSize: 20, color: colors.action }}>
-                    R {calFloat?.toFixed(2) ?? '0.00'}
+                    {currSym} {calFloat?.toFixed(2) ?? '0.00'}
                   </p>
                   <p className="text-xs mt-1" style={{ color: colors.textSecondary }}>
                     {new Date().toLocaleDateString('en-ZA', { dateStyle: 'full' })}
@@ -336,7 +340,7 @@ export default function FloatPage() {
                     </div>
                     <form onSubmit={topUpForm.handleSubmit(onTopUp)} className="space-y-2">
                       <div>
-                        <Label className="text-xs" style={{ color: colors.textSecondary }}>Amount (R)</Label>
+                        <Label className="text-xs" style={{ color: colors.textSecondary }}>Amount ({currSym})</Label>
                         <Input
                           {...topUpForm.register('amount')}
                           type="number"
@@ -440,6 +444,7 @@ function ReverseFloatMovementModal({
   onConfirm: (reason: string) => void
 }) {
   const [reason, setReason] = useState('')
+  const { symbol: currSym } = useSystemCurrency()
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
@@ -448,7 +453,7 @@ function ReverseFloatMovementModal({
         <RpxDialogBody>
           <p style={{ fontSize: 12.5, color: colors.textSecondary, margin: '0 0 12px' }}>
             You are about to reverse a <span style={{ fontWeight: 600, color: colors.textPrimary }}>{movement.movementType}</span> of{' '}
-            <span style={{ fontWeight: 600, color: colors.textPrimary }}>R {new Decimal(movement.amount).toFixed(2)}</span>.
+            <span style={{ fontWeight: 600, color: colors.textPrimary }}>{currSym} {new Decimal(movement.amount).toFixed(2)}</span>.
             This action cannot be undone.
           </p>
           <span style={lbl}>Reason for reversal</span>

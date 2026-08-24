@@ -29,9 +29,18 @@ model Tenant {
   status       TenantStatus @default(active)
   planCode     String?
   featureFlags Json?
-  graceEndsAt  DateTime?
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+  // Populated by POST /api/internal/tenants/by-slug/[slug]/subscription-sync
+  // — the Portal pushes these on payment verification and via its daily
+  // cron (see webSyncClient.ts / syncAllSubscriptionsToWeb on that side), so
+  // the tenant layout can render the pre-expiry countdown banner and the
+  // post-grace lockout gate from this row directly, no live Portal call on
+  // every page load.
+  subscriptionEndDate DateTime?
+  subscriptionStatus  String?
+  gracePeriodDays     Int?
+  graceEndsAt         DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   // Cache of the last successful Portal access check (companyAccessClient.ts)
   // — backs login()'s bounded fail-open window when the Portal is
@@ -766,7 +775,13 @@ model CashUp {
   id                  String       @id @default(uuid())
   tenantId            String
   sessionDate         DateTime     @db.Date
-  currency            Currency     @default(ZAR)
+  // ISO 4217 code (e.g. "ZAR", "SZL", "USD") — was a 2-value enum until the
+  // system-wide currency selector in Settings replaced the per-session
+  // cash-up currency picker; see SystemSettings "currency" key, the single
+  // source of truth every module (cashup, reports, receipts, float) reads
+  // from. Kept on this row so a historical session still records what
+  // currency was active when it was opened.
+  currency            String       @default("ZAR") @db.VarChar(3)
   openedByUserId      String
   openedAt            DateTime     @default(now())
   closedByUserId      String?
@@ -1402,11 +1417,6 @@ enum CashUpStatus {
   submitted
   approved
   voided
-}
-
-enum Currency {
-  ZAR // South African Rand (R)
-  SZL // Eswatini Lilangeni (E)
 }
 
 enum StocktakeStatus {

@@ -3,7 +3,7 @@ import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { z } from 'zod'
 import { generateCashupReport, type ReportEntry } from '@/lib/pdf/cashupReport'
-import { getAllSettings } from '@/lib/services/settingsService'
+import { getAllSettings, currencyCodeFromSettings, currencySymbolFromSettings } from '@/lib/services/settingsService'
 import { getUnpaidPurchases } from '@/lib/services/cashUpService'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
@@ -67,8 +67,8 @@ export async function GET(req: NextRequest) {
     const pdfBytes = await generateCashupReport({
       reportType,
       sessionDate: reportDate,
-      currency: 'ZAR',
-      currencySymbol: 'R',
+      currency: currencyCodeFromSettings(settings),
+      currencySymbol: currencySymbolFromSettings(settings),
       companyName: settings['yardName'] ?? 'Renovo Pro',
       companyAddress: settings['yardAddress'] ?? '',
       companyPhone: settings['yardPhone'] ?? undefined,

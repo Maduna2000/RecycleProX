@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { prisma } from '@/lib/db/prisma'
-import { getAllSettings } from '@/lib/services/settingsService'
+import { getAllSettings, currencySymbolFromSettings } from '@/lib/services/settingsService'
 import { buildPurchaseReceipt, buildSaleReceipt, type PurchaseReceiptData, type SaleReceiptData } from '@/lib/print/thermal'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
 import { resolvePrinterInterface } from '@/lib/print/printerInterface'
@@ -41,6 +41,7 @@ export async function POST(req: Request) {
   if (!cfg.printerType || cfg.printerType === 'none') {
     return NextResponse.json({ error: 'No printer configured' }, { status: 400 })
   }
+  const currencySymbol = currencySymbolFromSettings(cfg)
 
   try {
     let receiptBuffer: Buffer
@@ -57,6 +58,7 @@ export async function POST(req: Request) {
         cashierName: session.user.name ?? 'Cashier',
         provisional: true,
         createdAt: new Date((directData as { createdAt: string }).createdAt),
+        currencySymbol,
       }
       receiptBuffer = type === 'purchase'
         ? await buildPurchaseReceipt({ ...(directData as PurchaseReceiptData), ...overrides })
@@ -113,6 +115,7 @@ export async function POST(req: Request) {
         footerText: cfg.purchaseNoteDeclaration,
         loanDeduction: purchase.loanDeductionAmount ? { amount: purchase.loanDeductionAmount.toString() } : undefined,
         splitPayments: splitPayments ?? undefined,
+        currencySymbol,
       })
     } else {
       // Fetch sale with related data
@@ -164,6 +167,7 @@ export async function POST(req: Request) {
         footerText: cfg.saleNoteDeclaration,
         businessLoanDeduction: sale.businessLoanDeductionAmount ? { amount: sale.businessLoanDeductionAmount.toString() } : undefined,
         splitPayments: saleSplitPayments ?? undefined,
+        currencySymbol,
       })
     }
 

@@ -16,6 +16,7 @@ import { Btn, PortalPage } from '@/components/rpx'
 import { StatusBadge } from '@/components/ui/DataTable'
 import { DocumentViewerModal } from '@/components/ui/DocumentViewerModal'
 import { useToolbarAction } from '@/stores/toolbarActionStore'
+import { useSystemCurrency } from '@/hooks/useSystemCurrency'
 
 
 type ExpenseDetail = {
@@ -36,6 +37,7 @@ export default function ExpenseDetailPage() {
   const { data: session } = useSession()
   const { confirm } = useConfirm()
   const isMgr = ['admin', 'manager'].includes(session?.user?.role ?? '')
+  const { symbol: currSym } = useSystemCurrency()
 
   const { data: expense, mutate: mutateExpense, isLoading } =
     useSWR<ExpenseDetail>(`/api/expenses/${id}`, fetcher)
@@ -199,10 +201,10 @@ export default function ExpenseDetailPage() {
               <div style={{ fontSize: 10, fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', marginBottom: 6 }}>Amount</div>
               <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '3px 12px', fontSize: 12 }}>
                 <span style={{ color: colors.textSecondary }}>Amount:</span>
-                <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 14, color: colors.action }}>R {new Decimal(expense.amount).toFixed(2)}</span>
+                <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 14, color: colors.action }}>{currSym} {new Decimal(expense.amount).toFixed(2)}</span>
                 <span style={{ color: colors.textSecondary }}>VAT:</span>
                 <span style={{ fontFamily: 'monospace', color: colors.textPrimary }}>
-                  {expense.includesVat ? `R ${new Decimal(expense.vatAmount).toFixed(2)}` : '—'}
+                  {expense.includesVat ? `${currSym} ${new Decimal(expense.vatAmount).toFixed(2)}` : '—'}
                 </span>
                 <span style={{ color: colors.textSecondary }}>Cash-Up:</span>
                 <span style={{ fontFamily: 'monospace', color: expense.cashUpId ? colors.textPrimary : colors.textSecondary, fontSize: 10 }}>

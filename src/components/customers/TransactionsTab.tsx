@@ -4,23 +4,28 @@ import { useState } from 'react'
 import useSWR from 'swr'
 import { DataTable, type Column } from '@/components/ui/DataTable'
 import { fetcher } from '@/lib/swrFetcher'
+import { useSystemCurrency } from '@/hooks/useSystemCurrency'
 
 
 type Transaction = { id: string; type: string; reference: string; date: string; amount: string; status: string }
 
-const columns: Column<Transaction>[] = [
-  { key: 'date', header: 'Date', width: '110px', render: (tx) => new Date(tx.date).toLocaleDateString('en-ZA') },
-  { key: 'reference', header: 'Reference', render: (tx) => <span style={{ fontFamily: 'monospace', fontSize: 11 }}>{tx.reference}</span> },
-  { key: 'type', header: 'Type', width: '110px', render: (tx) => <span style={{ textTransform: 'capitalize' }}>{tx.type}</span> },
-  { key: 'amount', header: 'Amount', width: '110px', render: (tx) => <span style={{ fontFamily: 'monospace' }}>R {tx.amount}</span> },
-  { key: 'status', header: 'Status', width: '110px', render: (tx) => <span style={{ textTransform: 'capitalize' }}>{tx.status}</span> },
-]
+function getColumns(sym: string): Column<Transaction>[] {
+  return [
+    { key: 'date', header: 'Date', width: '110px', render: (tx) => new Date(tx.date).toLocaleDateString('en-ZA') },
+    { key: 'reference', header: 'Reference', render: (tx) => <span style={{ fontFamily: 'monospace', fontSize: 11 }}>{tx.reference}</span> },
+    { key: 'type', header: 'Type', width: '110px', render: (tx) => <span style={{ textTransform: 'capitalize' }}>{tx.type}</span> },
+    { key: 'amount', header: 'Amount', width: '110px', render: (tx) => <span style={{ fontFamily: 'monospace' }}>{sym} {tx.amount}</span> },
+    { key: 'status', header: 'Status', width: '110px', render: (tx) => <span style={{ textTransform: 'capitalize' }}>{tx.status}</span> },
+  ]
+}
 
 const PAGE_SIZE = 30
 
 /** Shared between the account and casual customer profile pages — both list the same transaction history. */
 export function TransactionsTab({ customerId }: { customerId: string }) {
   const [page, setPage] = useState(1)
+  const { symbol } = useSystemCurrency()
+  const columns = getColumns(symbol)
   const { data, isLoading, error } = useSWR<{ transactions: Transaction[] }>(`/api/customers/${customerId}/transactions`, fetcher)
   const transactions = data?.transactions ?? []
   // The API returns full history in one shot — paginate client-side so a

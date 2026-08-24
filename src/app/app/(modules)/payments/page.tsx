@@ -11,7 +11,9 @@ import { Dialog } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { format } from '@/lib/utils/format'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
-import { fetcher } from '@/lib/swrFetcher'
+import { paymentsListFetcher } from '@/lib/offline/fetchers/payments'
+import { OfflineDataBadge } from '@/components/ui/OfflineDataBadge'
+import { useSystemCurrency } from '@/hooks/useSystemCurrency'
 import {
   inp, Btn, Field, PortalPage, FilterBar,
   RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter,
@@ -39,6 +41,7 @@ type Payment = {
 export default function PaymentsPage() {
   const { data: session } = useSession()
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
+  const { symbol: currSym } = useSystemCurrency()
 
   const [search,         setSearch]         = useState('')
   const [paymentMethod,  setPaymentMethod]  = useState('')
@@ -76,7 +79,7 @@ export default function PaymentsPage() {
     payments: Payment[]; total: number; totalReceived: string; totalPaidOut: string
   }>(
     `/api/payments?${query}`,
-    fetcher,
+    paymentsListFetcher,
   )
 
   const payments = paymentsData?.payments ?? []
@@ -127,7 +130,7 @@ export default function PaymentsPage() {
       align: 'right',
       render: (r) => (
         <span className="font-mono font-semibold" style={{ color: colors.textPrimary }}>
-          R {new Decimal(r.amount).toFixed(2)}
+          {currSym} {new Decimal(r.amount).toFixed(2)}
         </span>
       ),
     },
@@ -181,7 +184,7 @@ export default function PaymentsPage() {
     // from stretching to fill the whole window, same fix already applied to
     // Purchases/Sales (same row shape: a few fixed-width columns plus one
     // unbounded name column).
-    <PortalPage title="Sales Payments" maxWidth={1050}>
+    <PortalPage title="Sales Payments" maxWidth={1050} actions={<OfflineDataBadge />}>
       <FilterBar>
         <Field label="Search" width={200}>
           <div style={{ position: 'relative' }}>
@@ -230,7 +233,7 @@ export default function PaymentsPage() {
         >
           <p style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>Total Received</p>
           <p className="font-mono font-semibold" style={{ fontSize: fontSize.md, color: colors.action }}>
-            R {new Decimal(paymentsData?.totalReceived ?? '0').toFixed(2)}
+            {currSym} {new Decimal(paymentsData?.totalReceived ?? '0').toFixed(2)}
           </p>
         </div>
       </div>
@@ -265,6 +268,7 @@ export default function PaymentsPage() {
 function VoidPaymentModal({ payment, onClose, onSuccess }: { payment: Payment; onClose: () => void; onSuccess: () => void }) {
   const [reason,  setReason]  = useState('')
   const [loading, setLoading] = useState(false)
+  const { symbol: currSym } = useSystemCurrency()
 
   async function onConfirm() {
     if (reason.trim().length < 5) { toast.error('Reason must be at least 5 characters'); return }
@@ -287,7 +291,7 @@ function VoidPaymentModal({ payment, onClose, onSuccess }: { payment: Payment; o
           <p style={{ fontSize: 12, color: colors.textSecondary, marginBottom: 12 }}>
             Void{' '}
             <span className="font-semibold" style={{ color: colors.textPrimary }}>{payment.refNumber}</span>
-            {' '}(R {new Decimal(payment.amount).toFixed(2)}) to{' '}
+            {' '}({currSym} {new Decimal(payment.amount).toFixed(2)}) to{' '}
             <span className="font-semibold" style={{ color: colors.textPrimary }}>
               {payment.customer ? `${payment.customer.firstName} ${payment.customer.lastName}` : 'Unknown'}
             </span>? This cannot be undone.

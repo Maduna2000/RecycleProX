@@ -18,6 +18,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { colors, fontSize } from '@/lib/design-tokens'
 import { fetcher } from '@/lib/swrFetcher'
+import { useSystemCurrency } from '@/hooks/useSystemCurrency'
 import { useOfflineMutation } from '@/hooks/useOfflineFetch'
 import { useOfflineLookup } from '@/hooks/useOfflineLookup'
 import { offlineDB } from '@/lib/offline/db'
@@ -46,6 +47,7 @@ export default function ExpensesPage() {
   const searchParams  = useSearchParams()
   const { data: session } = useSession()
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
+  const { symbol: currSym } = useSystemCurrency()
 
   const [statusTab,        setStatusTab]        = useState<PageTab>('All')
   const [addOpen,          setAddOpen]          = useState(false)
@@ -159,7 +161,7 @@ export default function ExpensesPage() {
       align: 'right',
       render: (r) => (
         <span className="font-mono font-semibold" style={{ color: colors.textPrimary }}>
-          R {new Decimal(r.amount).toFixed(2)}
+          {currSym} {new Decimal(r.amount).toFixed(2)}
         </span>
       ),
     },
@@ -170,7 +172,7 @@ export default function ExpensesPage() {
       align: 'right',
       render: (r) => (
         <span className="font-mono" style={{ fontSize: fontSize.sm, color: colors.textSecondary }}>
-          {r.includesVat ? `R ${new Decimal(r.vatAmount).toFixed(2)}` : '—'}
+          {r.includesVat ? `${currSym} ${new Decimal(r.vatAmount).toFixed(2)}` : '—'}
         </span>
       ),
     },
@@ -318,7 +320,7 @@ export default function ExpensesPage() {
               Total Approved Expenses (current view)
             </p>
             <p className="font-mono font-bold" style={{ fontSize: fontSize.lg, color: '#1a5c38' }}>
-              R {totalApproved.toFixed(2)}
+              {currSym} {totalApproved.toFixed(2)}
             </p>
           </div>
         </div>
@@ -393,6 +395,7 @@ function AddExpenseModal({ mode, expense, onClose, onSuccess }: AddExpenseModalP
   const [slipFile,    setSlipFile]    = useState<File | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const { mutate: offlineMutate } = useOfflineMutation()
+  const { symbol: currSym } = useSystemCurrency()
   const { getExpenseTypes } = useOfflineLookup()
   const { data: types } = useSWR<ExpenseType[]>('/api/expense-types', () => getExpenseTypes())
 
@@ -580,7 +583,7 @@ function AddExpenseModal({ mode, expense, onClose, onSuccess }: AddExpenseModalP
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               <div>
-                <Label style={{ display: 'block', marginBottom: 4, fontSize: fontSize.sm, fontWeight: 600, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Amount (R)</Label>
+                <Label style={{ display: 'block', marginBottom: 4, fontSize: fontSize.sm, fontWeight: 600, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Amount ({currSym})</Label>
                 <Input
                   {...register('amount')}
                   type="number"
@@ -718,6 +721,7 @@ function UpdatePendingExpenseModal({ expense, onClose, onSuccess }: UpdatePendin
   const [changeReceived, setChangeReceived] = useState('')
   const [slipFile, setSlipFile] = useState<File | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  const { symbol: currSym } = useSystemCurrency()
 
   const estimatedAmount = new Decimal(expense.estimatedAmount ?? expense.amount)
   const changeDecimal = changeReceived ? new Decimal(changeReceived || '0') : new Decimal(0)
@@ -793,7 +797,7 @@ function UpdatePendingExpenseModal({ expense, onClose, onSuccess }: UpdatePendin
                 <span style={{ color: colors.textPrimary }}>{expense.description}</span>
                 <span style={{ color: colors.textSecondary }}>Estimated:</span>
                 <span style={{ fontFamily: 'monospace', fontWeight: 700, color: colors.warning }}>
-                  R {estimatedAmount.toFixed(2)}
+                  {currSym} {estimatedAmount.toFixed(2)}
                 </span>
               </div>
             </div>
@@ -801,7 +805,7 @@ function UpdatePendingExpenseModal({ expense, onClose, onSuccess }: UpdatePendin
             {/* Change received input */}
             <div>
               <Label style={{ display: 'block', marginBottom: 4, fontSize: fontSize.sm, fontWeight: 600, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                Change Received (R)
+                Change Received ({currSym})
               </Label>
               <Input
                 type="number"
@@ -833,7 +837,7 @@ function UpdatePendingExpenseModal({ expense, onClose, onSuccess }: UpdatePendin
                   Actual Expense:
                 </span>
                 <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 16, color: isValidChange ? colors.action : colors.danger }}>
-                  R {isValidChange ? actualAmount.toFixed(2) : '—'}
+                  {currSym} {isValidChange ? actualAmount.toFixed(2) : '—'}
                 </span>
               </div>
               {!isValidChange && changeReceived && (
@@ -907,6 +911,7 @@ function UpdatePendingExpenseModal({ expense, onClose, onSuccess }: UpdatePendin
 function VoidExpenseModal({ expense, onClose, onSuccess }: { expense: Expense; onClose: () => void; onSuccess: () => void }) {
   const [reason, setReason] = useState('')
   const [loading, setLoading] = useState(false)
+  const { symbol: currSym } = useSystemCurrency()
 
   async function onConfirm() {
     if (reason.trim().length < 5) { toast.error('Reason must be at least 5 characters'); return }
@@ -927,7 +932,7 @@ function VoidExpenseModal({ expense, onClose, onSuccess }: { expense: Expense; o
         <RpxDialogHeader title="Void Expense" onClose={onClose} />
         <RpxDialogBody>
           <p style={{ fontSize: 12.5, color: colors.textSecondary, margin: '0 0 12px' }}>
-            You are about to void <span style={{ fontWeight: 600, color: colors.textPrimary }}>{expense.refNumber}</span> (R {Number(expense.amount).toFixed(2)}).
+            You are about to void <span style={{ fontWeight: 600, color: colors.textPrimary }}>{expense.refNumber}</span> ({currSym} {Number(expense.amount).toFixed(2)}).
             This action cannot be undone.
           </p>
           <span style={lbl}>Reason for void</span>

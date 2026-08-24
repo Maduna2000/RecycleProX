@@ -10,5 +10,8 @@ const datetimeFormatter = new Intl.DateTimeFormat('en-ZA', {
 export const format = {
   date: (value: string | Date) => dateFormatter.format(new Date(value)),
   datetime: (value: string | Date) => datetimeFormatter.format(new Date(value)),
-  currency: (value: string | number) => `R ${Number(value).toFixed(2)}`,
+  // Defaults to 'R' only for callers that haven't been updated to pass the
+  // tenant's configured symbol yet (see useSystemCurrency) — never hardcode
+  // a call site to a specific currency going forward.
+  currency: (value: string | number, symbol = 'R') => `${symbol} ${Number(value).toFixed(2)}`,
 }

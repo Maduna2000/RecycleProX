@@ -7,7 +7,8 @@ import { DataTable, type Column } from '@/components/ui/DataTable'
 import { format } from '@/lib/utils/format'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
 import { inp, Btn, Field, PortalPage, FilterBar } from '@/components/rpx'
-import { fetcher } from '@/lib/swrFetcher'
+import { stockMovementsFetcher } from '@/lib/offline/fetchers/stock'
+import { OfflineDataBadge } from '@/components/ui/OfflineDataBadge'
 
 
 type Movement = {
@@ -58,7 +59,7 @@ export default function StockMovementsPage() {
 
   const { data: movementsData, isLoading: movLoading, error: movError } = useSWR<{ movements: Movement[]; total: number }>(
     `/api/stock/movements?${movementsQuery}`,
-    fetcher,
+    stockMovementsFetcher,
   )
 
   const movements = movementsData?.movements ?? []
@@ -139,7 +140,7 @@ export default function StockMovementsPage() {
     // maxWidth matches src/lib/pageWidthCaps.ts, which PageTitleBar reads to
     // cap/border itself to match — keeps the unbounded Product/Notes columns
     // from stretching to fill the whole window.
-    <PortalPage title="Stock Movements" maxWidth={950}>
+    <PortalPage title="Stock Movements" maxWidth={950} actions={<OfflineDataBadge />}>
       <FilterBar>
         <Field label="Direction" width={130}>
           <select value={movDirection} onChange={(e) => setMovDirection(e.target.value)} style={inp}>

@@ -34,6 +34,7 @@ export interface PoliceRegisterData {
   dealerAddress: string
   policeServiceName: string
   generatedAt: Date
+  currencySymbol?: string
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -76,6 +77,7 @@ function colX(key: keyof typeof COLS): number {
 
 // ─── Main export ──────────────────────────────────────────────────────────────
 export async function generatePoliceRegister(data: PoliceRegisterData): Promise<Uint8Array> {
+  const sym = data.currencySymbol ?? 'R'
   const doc = await PDFDocument.create()
   const bold = await doc.embedFont(StandardFonts.HelveticaBold)
   const reg  = await doc.embedFont(StandardFonts.Helvetica)
@@ -139,7 +141,7 @@ export async function generatePoliceRegister(data: PoliceRegisterData): Promise<
       ['dob',     'Date of Birth'],
       ['address', 'Address'],
       ['items',   'Items Purchased'],
-      ['total',   'Amount (R)'],
+      ['total',   `Amount (${sym})`],
       ['photo',   'ID Photo'],
     ]
 
@@ -170,7 +172,7 @@ export async function generatePoliceRegister(data: PoliceRegisterData): Promise<
         ['dob',     dobStr],
         ['address', truncate(entry.address, 20)],
         ['items',   truncate(entry.items, 22)],
-        ['total',   `R ${new Decimal(entry.totalAmount).toFixed(2)}`],
+        ['total',   `${sym} ${new Decimal(entry.totalAmount).toFixed(2)}`],
       ]
 
       for (const [key, val] of cells) {
@@ -230,8 +232,8 @@ export async function generatePoliceRegister(data: PoliceRegisterData): Promise<
       page.drawText(`Total transactions: ${data.entries.length}`, {
         x: MARGIN, y, size: 8, font: reg, color: GRAY,
       })
-      page.drawText(`Grand Total Paid Out: R ${grandTotal.toFixed(2)}`, {
-        x: PAGE_W - MARGIN - bold.widthOfTextAtSize(`Grand Total Paid Out: R ${grandTotal.toFixed(2)}`, 9),
+      page.drawText(`Grand Total Paid Out: ${sym} ${grandTotal.toFixed(2)}`, {
+        x: PAGE_W - MARGIN - bold.widthOfTextAtSize(`Grand Total Paid Out: ${sym} ${grandTotal.toFixed(2)}`, 9),
         y, size: 9, font: bold, color: RED,
       })
       y -= 20

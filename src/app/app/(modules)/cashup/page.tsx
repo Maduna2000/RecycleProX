@@ -11,23 +11,26 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { CheckCircle2, Calculator, Clock, Lock, FolderOpen, ChevronLeft, ChevronRight, Upload, Loader2, History } from 'lucide-react'
 import { Dialog } from '@/components/ui/dialog'
-import { DENOMINATIONS, DENOMINATION_LABELS, type Denomination, CURRENCY_SYMBOLS, CURRENCY_LABELS, type Currency } from '@/lib/schemas/cashup'
+import { DENOMINATIONS, DENOMINATION_LABELS, type Denomination } from '@/lib/schemas/cashup'
 import { colors } from '@/lib/design-tokens'
+import { useSystemCurrency } from '@/hooks/useSystemCurrency'
 import { useOfflineMutation } from '@/hooks/useOfflineFetch'
 import { useOfflineStore } from '@/stores/offlineStore'
 import { offlineDB } from '@/lib/offline/db'
 import { ReportButton } from './_components/ReportButton'
 import { PreviousReportsModal } from './_components/PreviousReportsModal'
 import { CARD_BORDER } from '@/components/rpx/styles'
-import { Btn, PortalPage, PANEL, PANEL_HEAD, HEADER_GRAD, inp, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
+import { Btn, PortalPage, PANEL, PANEL_HEAD, HEADER_GRAD, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
 import { fetcher } from '@/lib/swrFetcher'
+import { offlineFetcher } from '@/lib/offline/responseCache'
+import { OfflineDataBadge } from '@/components/ui/OfflineDataBadge'
 import { useToolbarAction } from '@/stores/toolbarActionStore'
 
 
 type CashUp = {
   id: string
   sessionDate: string
-  currency: Currency
+  currency: string
   status: 'open' | 'submitted' | 'approved' | 'voided'
   openedByUserId: string
   openedAt: string
@@ -835,7 +838,8 @@ export default function CashUpPage() {
   })()
 
   const CASHUP_KEY = '/api/cashup?today=1'
-  const { data, isLoading } = useSWR<{ cashUp: CashUp | null }>(CASHUP_KEY, fetcher)
+  const { data, isLoading } = useSWR<{ cashUp: CashUp | null }>(CASHUP_KEY, offlineFetcher)
+  const { code: systemCurrencyCode, symbol: currSym } = useSystemCurrency()
 
   // Use the cashup session date for stats/expenses, not today's date
   // This ensures we get data for the actual cashup session (which may span past midnight)
@@ -845,8 +849,8 @@ export default function CashUpPage() {
   const EXPENSES_KEY = `/api/expenses?from=${sessionDate}&to=${sessionDate}&page=1`
   const MOMO_KEY     = `/api/momo-statements/by-date?date=${sessionDate}`
 
-  const { data: statsData, mutate: refreshStats }    = useSWR<LiveStats>(STATS_KEY, fetcher)
-  const { data: expensesData, mutate: refreshExpenses } = useSWR<{ expenses: ExpenseItem[] }>(EXPENSES_KEY, fetcher)
+  const { data: statsData, mutate: refreshStats }    = useSWR<LiveStats>(STATS_KEY, offlineFetcher)
+  const { data: expensesData, mutate: refreshExpenses } = useSWR<{ expenses: ExpenseItem[] }>(EXPENSES_KEY, offlineFetcher)
   const { data: momoData } = useSWR<{ statement: MomoStatementSummary | null }>(MOMO_KEY, fetcher)
 
   const cashUp   = data?.cashUp ?? null
@@ -938,7 +942,7 @@ export default function CashUpPage() {
   const isAdmin = session?.user?.role === 'admin'
 
   // Fetch all open sessions to show count
-  const { data: openSessionsData, mutate: refreshOpenSessions } = useSWR<{ sessions: CashUp[] }>('/api/cashup/open-sessions', fetcher)
+  const { data: openSessionsData, mutate: refreshOpenSessions } = useSWR<{ sessions: CashUp[] }>('/api/cashup/open-sessions', offlineFetcher)
   const openSessions = openSessionsData?.sessions ?? []
   const openSessionsCount = openSessions.length
 
@@ -998,7 +1002,7 @@ export default function CashUpPage() {
           const provisional: CashUp = {
             id: `local_cashup_${todayISO}`,
             sessionDate: todayISO,
-            currency: 'ZAR',
+            currency: systemCurrencyCode,
             status: 'open',
             openedByUserId: session?.user?.id ?? '',
             openedAt: new Date().toISOString(),
@@ -1033,26 +1037,6 @@ export default function CashUpPage() {
       }
     } catch { toast.error('Failed to open session') }
     finally { setOpening(false) }
-  }
-
-  async function handleCurrencyChange(newCurrency: Currency) {
-    if (!cashUp) return
-    try {
-      const res = await fetch(`/api/cashup/${cashUp.id}/currency`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ currency: newCurrency }),
-      })
-      if (res.ok) {
-        await swrMutate(CASHUP_KEY)
-        toast.success(`Currency changed to ${CURRENCY_LABELS[newCurrency]}`)
-      } else {
-        const j = await res.json()
-        toast.error(j.error ?? 'Failed to update currency')
-      }
-    } catch {
-      toast.error('Failed to update currency')
-    }
   }
 
   async function handleSubmit(momoOverrideReason?: string) {
@@ -1152,7 +1136,7 @@ export default function CashUpPage() {
 
   if (isLoading) {
     return (
-      <PortalPage title="Cash-Up" maxWidth={1152}>
+      <PortalPage title="Cash-Up" maxWidth={1152} actions={<OfflineDataBadge />}>
         <div className="flex items-center justify-center h-40 text-sm" style={{ color: colors.textSecondary }}>
           Loading…
         </div>
@@ -1173,16 +1157,19 @@ export default function CashUpPage() {
       title="Cash-Up"
       maxWidth={1152}
       actions={
-        cashUp && (
-          <>
-            <span className="text-xs" style={{ color: colors.textMuted }}>{sessionDate}</span>
-            {cashUp.status === 'open' && isPreviousDay && <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: colors.dangerBg, color: colors.danger }}>Previous Day — Submit Required</span>}
-            {cashUp.status === 'open' && !isPreviousDay && <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: colors.warningBg, color: colors.warning }}>Open</span>}
-            {cashUp.status === 'submitted' && <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: colors.processBg, color: colors.process }}>Submitted — Awaiting Approval</span>}
-            {cashUp.status === 'approved'  && <span className="flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium" style={{ background: colors.actionBg, color: colors.action }}><CheckCircle2 className="w-3 h-3" />Approved</span>}
-            {cashUp.approvedAt && <span className="text-xs" style={{ color: colors.textMuted }}>{new Date(cashUp.approvedAt).toLocaleString('en-ZA')}</span>}
-          </>
-        )
+        <>
+          <OfflineDataBadge />
+          {cashUp && (
+            <>
+              <span className="text-xs" style={{ color: colors.textMuted }}>{sessionDate}</span>
+              {cashUp.status === 'open' && isPreviousDay && <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: colors.dangerBg, color: colors.danger }}>Previous Day — Submit Required</span>}
+              {cashUp.status === 'open' && !isPreviousDay && <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: colors.warningBg, color: colors.warning }}>Open</span>}
+              {cashUp.status === 'submitted' && <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: colors.processBg, color: colors.process }}>Submitted — Awaiting Approval</span>}
+              {cashUp.status === 'approved'  && <span className="flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium" style={{ background: colors.actionBg, color: colors.action }}><CheckCircle2 className="w-3 h-3" />Approved</span>}
+              {cashUp.approvedAt && <span className="text-xs" style={{ color: colors.textMuted }}>{new Date(cashUp.approvedAt).toLocaleString('en-ZA')}</span>}
+            </>
+          )}
+        </>
       }
     >
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
@@ -1276,7 +1263,7 @@ export default function CashUpPage() {
             {/* Zero-float warning */}
             {cashUp.status === 'open' && new Decimal(cashUp.openingBalance ?? '0').isZero() && (
               <div className="flex items-center gap-2 rounded px-3 py-2 text-sm" style={{ background: colors.warningBg, color: colors.warning }}>
-                <span className="font-semibold">⚠ Opening balance is {CURRENCY_SYMBOLS[cashUp.currency ?? 'ZAR']} 0.00.</span>
+                <span className="font-semibold">⚠ Opening balance is {currSym} 0.00.</span>
                 <span>Set today&apos;s float in the</span>
                 <a href="/app/float" className="underline font-medium">Float module</a>
                 <span>before submitting.</span>
@@ -1286,7 +1273,6 @@ export default function CashUpPage() {
             {/* ── 2-column layout: left = reconciliation, right = count + panels ── */}
             {(() => {
               const isOpen    = cashUp.status === 'open'
-              const currSym   = CURRENCY_SYMBOLS[cashUp.currency ?? 'ZAR']
               const opening   = new Decimal(cashUp.openingBalance ?? '0')
               const draw      = new Decimal(isOpen ? (stats?.floatTopUps ?? '0') : (cashUp.drawingsReceived ?? '0'))
               const totalCash = opening.plus(draw)
@@ -1326,29 +1312,15 @@ export default function CashUpPage() {
 
                     <table className="w-full" style={{ borderCollapse: 'collapse' }}>
                       <tbody>
-                        {/* Currency selector — first row */}
+                        {/* Currency — first row. Read-only: the system now runs on a
+                            single tenant-wide currency, changed only from Settings. */}
                         <tr style={{ borderBottom: '2px solid #B0B0B0' }}>
                           <td style={{ height: 26, padding: '2px 8px', fontSize: 12, color: colors.textSecondary }}>Currency</td>
                           <td colSpan={2} style={{ padding: '2px 8px', textAlign: 'right' }}>
-                            {isOpen && !isProvisional ? (
-                              <select
-                                value={cashUp.currency ?? 'ZAR'}
-                                onChange={(e) => handleCurrencyChange(e.target.value as Currency)}
-                                style={{ ...inp, width: 'auto', height: 26, fontFamily: 'monospace', fontWeight: 600, cursor: 'pointer' }}
-                              >
-                                <option value="ZAR">R - South African Rand</option>
-                                <option value="SZL">E - Eswatini Lilangeni</option>
-                              </select>
-                            ) : (
-                              <span className="inline-flex items-center gap-2">
-                                <span className="font-mono font-semibold" style={{ color: colors.textPrimary }}>
-                                  {CURRENCY_SYMBOLS[cashUp.currency ?? 'ZAR']}
-                                </span>
-                                <span className="text-xs" style={{ color: colors.textSecondary }}>
-                                  ({CURRENCY_LABELS[cashUp.currency ?? 'ZAR']})
-                                </span>
-                              </span>
-                            )}
+                            <span className="inline-flex items-center gap-2">
+                              <span className="font-mono font-semibold" style={{ color: colors.textPrimary }}>{currSym}</span>
+                              <span className="text-xs" style={{ color: colors.textSecondary }}>({systemCurrencyCode})</span>
+                            </span>
                           </td>
                         </tr>
 
@@ -1684,7 +1656,6 @@ export default function CashUpPage() {
 
       {countCashOpen && (() => {
         // Calculate expected cash in drawer for the modal
-        const currSym   = CURRENCY_SYMBOLS[cashUp?.currency ?? 'ZAR']
         const opening   = new Decimal(cashUp?.openingBalance ?? '0')
         const draw      = new Decimal(stats?.floatTopUps ?? '0')
         const totalCash = opening.plus(draw)
@@ -1717,7 +1688,7 @@ export default function CashUpPage() {
           submitting={submitting}
           onOverride={(reason) => { void handleSubmit(reason) }}
           onClose={() => setMomoMismatch(null)}
-          currencySymbol={CURRENCY_SYMBOLS[cashUp?.currency ?? 'ZAR']}
+          currencySymbol={currSym}
         />
       )}
 
@@ -1728,7 +1699,7 @@ export default function CashUpPage() {
           onVoided={async () => {
             await Promise.all([refreshOpenSessions(), swrMutate(CASHUP_KEY)])
           }}
-          currencySymbol={CURRENCY_SYMBOLS[cashUp?.currency ?? 'ZAR']}
+          currencySymbol={currSym}
         />
       )}
 
@@ -1739,7 +1710,7 @@ export default function CashUpPage() {
       {momoModalOpen && (
         <MomoStatementModal
           sessionDate={sessionDate}
-          currSym={CURRENCY_SYMBOLS[cashUp?.currency ?? 'ZAR']}
+          currSym={currSym}
           onClose={() => setMomoModalOpen(false)}
           onUploaded={() => swrMutate(MOMO_KEY)}
         />
