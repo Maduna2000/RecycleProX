@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { getSale } from '@/lib/services/saleService'
-import { getAllSettings } from '@/lib/services/settingsService'
+import { getAllSettings, currencySymbolFromSettings } from '@/lib/services/settingsService'
 import { generateSaleReceiptPdf } from '@/lib/pdf/slip'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
@@ -25,6 +25,8 @@ export async function GET(
       getSale(params.id),
       getAllSettings(),
     ]))
+
+    const currencySymbol = currencySymbolFromSettings(settings)
 
     const thermalLines = sale.lines.map((l) => ({
       productCode: l.product.code,
@@ -63,6 +65,7 @@ export async function GET(
         footerText:     settings.saleNoteDeclaration,
         businessLoanDeduction: sale.businessLoanDeductionAmount ? { amount: sale.businessLoanDeductionAmount.toString() } : undefined,
         splitPayments:  splitPayments ?? undefined,
+        currencySymbol,
       })
       return new NextResponse(buf.buffer as ArrayBuffer, {
         headers: {
@@ -96,6 +99,7 @@ export async function GET(
       companyAddress: settings.yardAddress,
       companyPhone:   settings.yardPhone,
       vatNumber:      settings.vatNumber,
+      currencySymbol,
     })
 
     return new NextResponse(pdfBytes.buffer as ArrayBuffer, {

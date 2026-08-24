@@ -766,7 +766,13 @@ model CashUp {
   id                  String       @id @default(uuid())
   tenantId            String
   sessionDate         DateTime     @db.Date
-  currency            Currency     @default(ZAR)
+  // ISO 4217 code (e.g. "ZAR", "SZL", "USD") — was a 2-value enum until the
+  // system-wide currency selector in Settings replaced the per-session
+  // cash-up currency picker; see SystemSettings "currency" key, the single
+  // source of truth every module (cashup, reports, receipts, float) reads
+  // from. Kept on this row so a historical session still records what
+  // currency was active when it was opened.
+  currency            String       @default("ZAR") @db.VarChar(3)
   openedByUserId      String
   openedAt            DateTime     @default(now())
   closedByUserId      String?
@@ -1402,11 +1408,6 @@ enum CashUpStatus {
   submitted
   approved
   voided
-}
-
-enum Currency {
-  ZAR // South African Rand (R)
-  SZL // Eswatini Lilangeni (E)
 }
 
 enum StocktakeStatus {

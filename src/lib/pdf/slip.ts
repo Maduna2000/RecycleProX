@@ -53,6 +53,7 @@ export interface TransactionSlipData {
   companyPhone?:  string
   vatNumber?:     string
   receiptFooter?: string
+  currencySymbol?: string
 }
 
 // ─── Layout constants (80 mm paper @ 72 dpi) ─────────────────────────────────
@@ -155,6 +156,7 @@ function center(
 
 // ─── Main export ──────────────────────────────────────────────────────────────
 export async function generateTransactionSlip(data: TransactionSlipData): Promise<Uint8Array> {
+  const sym = data.currencySymbol ?? 'E'
   const docHeight = estimateHeight(data)
   const doc  = await PDFDocument.create()
   const page = doc.addPage([W, docHeight])
@@ -242,7 +244,7 @@ export async function generateTransactionSlip(data: TransactionSlipData): Promis
       : line.productName
 
     // Row 1: name + qty in column + total
-    const lineTotal = `E${new Decimal(line.lineTotal).toFixed(2)}`
+    const lineTotal = `${sym}${new Decimal(line.lineTotal).toFixed(2)}`
     const lw      = bold.widthOfTextAtSize(lineTotal, NORMAL)
     const qtyStr  = new Decimal(line.qty).toFixed(2)
     const qw      = reg.widthOfTextAtSize(qtyStr, NORMAL)
@@ -252,7 +254,7 @@ export async function generateTransactionSlip(data: TransactionSlipData): Promis
     nextLine(NORMAL, 1)
 
     // Row 2: unit price only (qty already shown in column above)
-    const qtyLabel = `  @ E${new Decimal(line.unitPrice).toFixed(2)}`
+    const qtyLabel = `  @ ${sym}${new Decimal(line.unitPrice).toFixed(2)}`
     page.drawText(qtyLabel, { x: MARGIN, y: cursor, size: SMALL, font: reg, color: GRAY })
     nextLine(SMALL)
 
@@ -281,16 +283,16 @@ export async function generateTransactionSlip(data: TransactionSlipData): Promis
   cursor -= 8
 
   // ── Totals ────────────────────────────────────────────────────────────────
-  const grossTotal = `E${new Decimal(data.totalAmount).toFixed(2)}`
+  const grossTotal = `${sym}${new Decimal(data.totalAmount).toFixed(2)}`
 
   if (data.vatAmount && new Decimal(data.vatAmount).greaterThan(0) && data.subtotalAmount) {
-    const subStr = `E${new Decimal(data.subtotalAmount).toFixed(2)}`
+    const subStr = `${sym}${new Decimal(data.subtotalAmount).toFixed(2)}`
     const sw = reg.widthOfTextAtSize(subStr, NORMAL)
     page.drawText('Subtotal:', { x: MARGIN,          y: cursor, size: NORMAL, font: reg, color: DGRAY })
     page.drawText(subStr,      { x: W - MARGIN - sw,  y: cursor, size: NORMAL, font: reg, color: DGRAY })
     nextLine(NORMAL, 2)
 
-    const vatStr = `E${new Decimal(data.vatAmount).toFixed(2)}`
+    const vatStr = `${sym}${new Decimal(data.vatAmount).toFixed(2)}`
     const vw = reg.widthOfTextAtSize(vatStr, NORMAL)
     page.drawText('VAT (15%):', { x: MARGIN,          y: cursor, size: NORMAL, font: reg, color: DGRAY })
     page.drawText(vatStr,       { x: W - MARGIN - vw,  y: cursor, size: NORMAL, font: reg, color: DGRAY })
@@ -305,7 +307,7 @@ export async function generateTransactionSlip(data: TransactionSlipData): Promis
     nextLine(NORMAL, 2)
 
     // Loan deduction — label reg/gray, amount bold/black
-    const deductionStr = `- E${new Decimal(data.loanDeduction).toFixed(2)}`
+    const deductionStr = `- ${sym}${new Decimal(data.loanDeduction).toFixed(2)}`
     const dw = bold.widthOfTextAtSize(deductionStr, NORMAL)
     page.drawText('Loan Deduction:', { x: MARGIN,          y: cursor, size: NORMAL, font: reg,  color: DGRAY })
     page.drawText(deductionStr,      { x: W - MARGIN - dw, y: cursor, size: NORMAL, font: bold, color: BLACK })
@@ -313,7 +315,7 @@ export async function generateTransactionSlip(data: TransactionSlipData): Promis
 
     // Loan balance remaining — only when outstanding > 0
     if (data.remainingLoanBalance && new Decimal(data.remainingLoanBalance).greaterThan(0)) {
-      const remStr = `E${new Decimal(data.remainingLoanBalance).toFixed(2)}`
+      const remStr = `${sym}${new Decimal(data.remainingLoanBalance).toFixed(2)}`
       const rw = reg.widthOfTextAtSize(remStr, SMALL)
       page.drawText('Loan Bal. Remaining:', { x: MARGIN,          y: cursor, size: SMALL, font: reg, color: DGRAY })
       page.drawText(remStr,                 { x: W - MARGIN - rw, y: cursor, size: SMALL, font: reg, color: DGRAY })
@@ -322,7 +324,7 @@ export async function generateTransactionSlip(data: TransactionSlipData): Promis
 
     // Cash to pay — label reg/gray, amount bold/LARGE/black
     const cashPaid = new Decimal(data.totalAmount).minus(new Decimal(data.loanDeduction))
-    const cashStr  = `E${cashPaid.toFixed(2)}`
+    const cashStr  = `${sym}${cashPaid.toFixed(2)}`
     const cw = bold.widthOfTextAtSize(cashStr, LARGE)
     page.drawText('CASH TO PAY:', { x: MARGIN,          y: cursor, size: NORMAL, font: reg,  color: DGRAY })
     page.drawText(cashStr,        { x: W - MARGIN - cw, y: cursor, size: LARGE,  font: bold, color: BLACK })
@@ -338,7 +340,7 @@ export async function generateTransactionSlip(data: TransactionSlipData): Promis
       : isPartial   ? 'TOTAL PAID:'
       : 'TOTAL:'
     const primaryAmount = isPartial
-      ? `E${new Decimal(data.amountPaid!).toFixed(2)}`
+      ? `${sym}${new Decimal(data.amountPaid!).toFixed(2)}`
       : grossTotal
 
     const tw = bold.widthOfTextAtSize(primaryAmount, LARGE)
@@ -349,7 +351,7 @@ export async function generateTransactionSlip(data: TransactionSlipData): Promis
     // Partial: also show balance due
     if (isPartial) {
       const balanceDue = new Decimal(data.totalAmount).minus(new Decimal(data.amountPaid!))
-      const balStr = `E${balanceDue.toFixed(2)}`
+      const balStr = `${sym}${balanceDue.toFixed(2)}`
       const bw = bold.widthOfTextAtSize(balStr, LARGE)
       page.drawText('BALANCE DUE:', { x: MARGIN,          y: cursor, size: NORMAL, font: reg,  color: DGRAY })
       page.drawText(balStr,         { x: W - MARGIN - bw, y: cursor, size: LARGE,  font: bold, color: BLACK })
@@ -372,28 +374,28 @@ export async function generateTransactionSlip(data: TransactionSlipData): Promis
     const loanAmt   = new Decimal(data.splitPayments.loan   || '0')
 
     if (cashAmt.greaterThan(0)) {
-      const cashStr = `E${cashAmt.toFixed(2)}`
+      const cashStr = `${sym}${cashAmt.toFixed(2)}`
       const cw = reg.widthOfTextAtSize(cashStr, SMALL)
       page.drawText('  Cash:', { x: MARGIN, y: cursor, size: SMALL, font: reg, color: GRAY })
       page.drawText(cashStr, { x: W - MARGIN - cw, y: cursor, size: SMALL, font: reg, color: DGRAY })
       nextLine(SMALL)
     }
     if (eftAmt.greaterThan(0)) {
-      const eftStr = `E${eftAmt.toFixed(2)}`
+      const eftStr = `${sym}${eftAmt.toFixed(2)}`
       const ew = reg.widthOfTextAtSize(eftStr, SMALL)
       page.drawText('  EFT:', { x: MARGIN, y: cursor, size: SMALL, font: reg, color: GRAY })
       page.drawText(eftStr, { x: W - MARGIN - ew, y: cursor, size: SMALL, font: reg, color: DGRAY })
       nextLine(SMALL)
     }
     if (chequeAmt.greaterThan(0)) {
-      const chequeStr = `E${chequeAmt.toFixed(2)}`
+      const chequeStr = `${sym}${chequeAmt.toFixed(2)}`
       const qw = reg.widthOfTextAtSize(chequeStr, SMALL)
       page.drawText('  Cheque:', { x: MARGIN, y: cursor, size: SMALL, font: reg, color: GRAY })
       page.drawText(chequeStr, { x: W - MARGIN - qw, y: cursor, size: SMALL, font: reg, color: DGRAY })
       nextLine(SMALL)
     }
     if (loanAmt.greaterThan(0)) {
-      const loanStr = `E${loanAmt.toFixed(2)}`
+      const loanStr = `${sym}${loanAmt.toFixed(2)}`
       const lw = reg.widthOfTextAtSize(loanStr, SMALL)
       page.drawText('  Loan Deduction:', { x: MARGIN, y: cursor, size: SMALL, font: reg, color: GRAY })
       page.drawText(loanStr, { x: W - MARGIN - lw, y: cursor, size: SMALL, font: reg, color: DGRAY })
@@ -484,6 +486,7 @@ export interface PurchaseSlipData {
     cheque: string
     loan:   string
   }
+  currencySymbol?: string
 }
 
 type Font = Awaited<ReturnType<PDFDocument['embedFont']>>
@@ -636,6 +639,7 @@ export async function generatePurchaseReceiptPdf(data: PurchaseSlipData): Promis
   // measurements below, which must match what's actually drawn.
   const bold = await doc.embedFont(StandardFonts.HelveticaBold)
   const reg  = bold
+  const sym  = data.currencySymbol ?? 'E'
 
   const footerLines = data.footerText ? wrapText(data.footerText, NORMAL, reg, PBODY_W) : []
   const docHeight = estimatePurchaseHeight(data, footerLines.length)
@@ -732,11 +736,11 @@ export async function generatePurchaseReceiptPdf(data: PurchaseSlipData): Promis
 
   pLeftRight(page, 'Nett Total', nettTotal.toFixed(1), cursor, NORMAL, bold, BLACK)
   nextLine(NORMAL, 2)
-  pLeftRight(page, 'Total', `E ${total.toFixed(2)}`, cursor, NORMAL, bold, BLACK)
+  pLeftRight(page, 'Total', `${sym} ${total.toFixed(2)}`, cursor, NORMAL, bold, BLACK)
   nextLine(NORMAL, 2)
-  pLeftRight(page, '15% VAT', `E ${vat.toFixed(2)}`, cursor, NORMAL, bold, BLACK)
+  pLeftRight(page, '15% VAT', `${sym} ${vat.toFixed(2)}`, cursor, NORMAL, bold, BLACK)
   nextLine(NORMAL, 2)
-  pLeftRight(page, 'Grand Total', `E ${grandTotal.toFixed(2)}`, cursor, NORMAL, bold, BLACK)
+  pLeftRight(page, 'Grand Total', `${sym} ${grandTotal.toFixed(2)}`, cursor, NORMAL, bold, BLACK)
   nextLine(NORMAL, 3)
 
   // ── Payment split ──────────────────────────────────────────────────────
@@ -751,19 +755,19 @@ export async function generatePurchaseReceiptPdf(data: PurchaseSlipData): Promis
     page.drawText('Payment Split:', { x: PMARGIN, y: cursor, size: NORMAL, font: bold, color: BLACK })
     nextLine(NORMAL, 2)
     if (cashAmt.gt(0)) {
-      pLeftRight(page, 'Cash', `E ${cashAmt.toFixed(2)}`, cursor, NORMAL, bold, BLACK)
+      pLeftRight(page, 'Cash', `${sym} ${cashAmt.toFixed(2)}`, cursor, NORMAL, bold, BLACK)
       nextLine(NORMAL)
     }
     if (eftAmt.gt(0)) {
-      pLeftRight(page, 'EFT', `E ${eftAmt.toFixed(2)}`, cursor, NORMAL, bold, BLACK)
+      pLeftRight(page, 'EFT', `${sym} ${eftAmt.toFixed(2)}`, cursor, NORMAL, bold, BLACK)
       nextLine(NORMAL)
     }
     if (chequeAmt.gt(0)) {
-      pLeftRight(page, 'Cheque', `E ${chequeAmt.toFixed(2)}`, cursor, NORMAL, bold, BLACK)
+      pLeftRight(page, 'Cheque', `${sym} ${chequeAmt.toFixed(2)}`, cursor, NORMAL, bold, BLACK)
       nextLine(NORMAL)
     }
     if (loanAmt.gt(0)) {
-      pLeftRight(page, 'Loans', `E ${loanAmt.toFixed(2)}${loanRef ? ` #${loanRef}` : ''}`, cursor, NORMAL, bold, BLACK)
+      pLeftRight(page, 'Loans', `${sym} ${loanAmt.toFixed(2)}${loanRef ? ` #${loanRef}` : ''}`, cursor, NORMAL, bold, BLACK)
       nextLine(NORMAL)
     }
   }
@@ -839,6 +843,7 @@ export interface SaleSlipData {
     eft:          string
     businessLoan: string
   }
+  currencySymbol?: string
 }
 
 function estimateSaleHeight(data: SaleSlipData, footerLineCount: number): number {
@@ -897,6 +902,7 @@ export async function generateSaleReceiptPdf(data: SaleSlipData): Promise<Uint8A
   // only for wrapText's width measurements, which must match what's drawn.
   const bold = await doc.embedFont(StandardFonts.HelveticaBold)
   const reg  = bold
+  const sym  = data.currencySymbol ?? 'E'
 
   const footerLines = data.footerText ? wrapText(data.footerText, NORMAL, reg, PBODY_W) : []
   const docHeight = estimateSaleHeight(data, footerLines.length)
@@ -989,11 +995,11 @@ export async function generateSaleReceiptPdf(data: SaleSlipData): Promise<Uint8A
 
   pLeftRight(page, 'Nett Total', nettTotal.toFixed(1), cursor, NORMAL, bold, BLACK)
   nextLine(NORMAL, 2)
-  pLeftRight(page, 'Total', `E ${total.toFixed(2)}`, cursor, NORMAL, bold, BLACK)
+  pLeftRight(page, 'Total', `${sym} ${total.toFixed(2)}`, cursor, NORMAL, bold, BLACK)
   nextLine(NORMAL, 2)
-  pLeftRight(page, '15% VAT', `E ${vat.toFixed(2)}`, cursor, NORMAL, bold, BLACK)
+  pLeftRight(page, '15% VAT', `${sym} ${vat.toFixed(2)}`, cursor, NORMAL, bold, BLACK)
   nextLine(NORMAL, 2)
-  pLeftRight(page, 'Grand Total', `E ${grandTotal.toFixed(2)}`, cursor, NORMAL, bold, BLACK)
+  pLeftRight(page, 'Grand Total', `${sym} ${grandTotal.toFixed(2)}`, cursor, NORMAL, bold, BLACK)
   nextLine(NORMAL, 3)
 
   // ── Payment split ──────────────────────────────────────────────────────
@@ -1006,15 +1012,15 @@ export async function generateSaleReceiptPdf(data: SaleSlipData): Promise<Uint8A
     page.drawText('Payment Split:', { x: PMARGIN, y: cursor, size: NORMAL, font: bold, color: BLACK })
     nextLine(NORMAL, 2)
     if (cashAmt.gt(0)) {
-      pLeftRight(page, 'Cash', `E ${cashAmt.toFixed(2)}`, cursor, NORMAL, bold, BLACK)
+      pLeftRight(page, 'Cash', `${sym} ${cashAmt.toFixed(2)}`, cursor, NORMAL, bold, BLACK)
       nextLine(NORMAL)
     }
     if (eftAmt.gt(0)) {
-      pLeftRight(page, 'EFT', `E ${eftAmt.toFixed(2)}`, cursor, NORMAL, bold, BLACK)
+      pLeftRight(page, 'EFT', `${sym} ${eftAmt.toFixed(2)}`, cursor, NORMAL, bold, BLACK)
       nextLine(NORMAL)
     }
     if (loanAmt.gt(0)) {
-      pLeftRight(page, 'Business Loan', `E ${loanAmt.toFixed(2)}`, cursor, NORMAL, bold, BLACK)
+      pLeftRight(page, 'Business Loan', `${sym} ${loanAmt.toFixed(2)}`, cursor, NORMAL, bold, BLACK)
       nextLine(NORMAL)
     }
   }

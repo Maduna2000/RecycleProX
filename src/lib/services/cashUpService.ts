@@ -2,7 +2,8 @@ import Decimal from 'decimal.js'
 import { prisma } from '@/lib/db/prisma'
 import { requireTenantId } from '@/lib/db/tenantContext'
 import logger from '@/lib/logger'
-import { SubmitCashUpInput, ApproveCashUpInput, type Currency } from '@/lib/schemas/cashup'
+import { SubmitCashUpInput, ApproveCashUpInput } from '@/lib/schemas/cashup'
+import { getCurrencyCode } from './settingsService'
 import { getMostRecentFloatAsOf, updateClosingAmount, getDrawingsReceivedForDate } from './floatService'
 import { getExpenseTotalsForDate } from './expenseService'
 import { getLoanTotalsForDate, formatTransactionMethod } from './loanService'
@@ -57,7 +58,7 @@ const MOMO_OVERRIDE_PREFIX = 'MoMo override'
 // and backed by a partial unique DB index (see migration
 // 20260724000000_cashup_multi_session_per_day) so a race between two opens
 // can't slip both through.
-export async function openCashUp(openedByUserId: string, sessionDateStr?: string, currency: Currency = 'ZAR') {
+export async function openCashUp(openedByUserId: string, sessionDateStr?: string) {
   const dateStr = sessionDateStr ?? todayStr()
   const sessionDate = toDate(dateStr)
 
@@ -165,7 +166,7 @@ export async function openCashUp(openedByUserId: string, sessionDateStr?: string
       data: {
         tenantId: requireTenantId(),
         sessionDate,
-        currency,
+        currency: await getCurrencyCode(),
         openedByUserId,
         status: 'open',
         openingBalance: openingBalance,

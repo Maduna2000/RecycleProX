@@ -1,23 +1,46 @@
 import { z } from 'zod'
+import { parsePhoneNumberFromString } from 'libphonenumber-js'
 import { validateSaId } from '@/lib/utils/saId'
 
-// Coerce phone to E.164 (+268XXXXXXXX) — Eswatini (+268, 8-digit local numbers)
-function toE164(phone: string): string {
-  const digits = phone.replace(/\D/g, '')
-  // Already has country code: +268XXXXXXXX or 268XXXXXXXX
-  if (digits.startsWith('268') && digits.length === 11) return `+${digits}`
-  // 8-digit local number (standard Eswatini format)
-  if (digits.length === 8) return `+268${digits}`
-  // Leading zero variant (non-standard but tolerate)
-  if (digits.startsWith('0') && digits.length === 9) return `+268${digits.slice(1)}`
-  return `+${digits}`
+// International phone validation — accepts any country's number in correct
+// E.164 format. A bare local number (no leading +, no country code) is
+// assumed to be Eswatini (this yard's home country) so existing 8-digit
+// entries like "76123456" keep working without staff having to type +268.
+// Any number that already includes a country code (+27..., +44..., 268...)
+// is validated against THAT country's own numbering rules instead — the
+// requirement is a correctly formatted number, not a specific country.
+function toE164(phone: string): string | null {
+  const trimmed = phone.trim()
+  const withPlus = trimmed.startsWith('+') ? trimmed : `+${trimmed.replace(/\D/g, '')}`
+  // Try as an already-international number first (e.g. +27821234567).
+  const intl = parsePhoneNumberFromString(withPlus)
+  if (intl?.isValid()) return intl.number
+  // Fall back to treating it as a local Eswatini number (e.g. 76123456 or
+  // 268 76123456 without the +).
+  const local = parsePhoneNumberFromString(trimmed, 'SZ')
+  if (local?.isValid()) return local.number
+  // Eswatini's own numbering plan has no leading-trunk-zero convention, but
+  // staff have long typed local numbers as "076123456" out of habit (the
+  // pattern used elsewhere in the region) — strip a single leading zero and
+  // retry rather than rejecting an otherwise-correct local number over it.
+  if (trimmed.startsWith('0')) {
+    const unzeroed = parsePhoneNumberFromString(trimmed.slice(1), 'SZ')
+    if (unzeroed?.isValid()) return unzeroed.number
+  }
+  return null
 }
 
 const phoneSchema = z
   .string()
   .min(1, 'Phone number is required')
-  .transform(toE164)
-  .refine((v) => /^\+268\d{8}$/.test(v), 'Phone must be a valid Eswatini number (+268 followed by 8 digits)')
+  .transform((v, ctx) => {
+    const e164 = toE164(v)
+    if (!e164) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Enter a valid phone number, e.g. +268 7612 3456 or +27 82 123 4567' })
+      return z.NEVER
+    }
+    return e164
+  })
 
 const idNumberSchema = z
   .string()
@@ -89,18 +112,20 @@ export const CreateCustomerSchema = z.object({
   confirmDifferentPerson: z.boolean().optional(),
 })
 
-// Lenient phone for casual quick-create: normalise Eswatini numbers, accept any ≥7-digit number as-is
+// Quick-create (casual, on-the-fly at Scale/Gate/Purchases): same
+// international validation as phoneSchema, kept as a separate export only
+// because QuickCreateSchema has its own distinct error message.
 const quickCreatePhoneSchema = z
   .string()
   .min(1, 'Phone number is required')
-  .transform((v) => {
-    const digits = v.replace(/\D/g, '')
-    if (digits.startsWith('268') && digits.length === 11) return `+${digits}`
-    if (digits.length === 8) return `+268${digits}`
-    if (digits.startsWith('0') && digits.length === 9) return `+268${digits.slice(1)}`
-    return v.trim()
+  .transform((v, ctx) => {
+    const e164 = toE164(v)
+    if (!e164) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Enter a valid phone number, e.g. +268 7612 3456 or +27 82 123 4567' })
+      return z.NEVER
+    }
+    return e164
   })
-  .refine((v) => v.replace(/\D/g, '').length >= 7, 'Phone number must have at least 7 digits')
 
 export const QuickCreateSchema = z.object({
   idNumber:        idNumberSchema.optional(),

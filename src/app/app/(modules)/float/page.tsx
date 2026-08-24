@@ -17,6 +17,7 @@ import { inp, lbl, Btn, PortalPage, PANEL, PANEL_HEAD, RpxDialogContent, RpxDial
 import { Dialog } from '@/components/ui/dialog'
 import { DataTable, type Column } from '@/components/ui/DataTable'
 import { fetcher } from '@/lib/swrFetcher'
+import { useSystemCurrency } from '@/hooks/useSystemCurrency'
 
 
 const TopUpFormSchema = z.object({
@@ -82,6 +83,7 @@ export default function FloatPage() {
   const router = useRouter()
   const { data: session } = useSession()
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
+  const { symbol: currSym } = useSystemCurrency()
 
   const { isLoading: loadingToday } = useSWR<TodayFloatResponse>('/api/float/today', fetcher)
   const { data: history, isLoading: loadingHistory } = useSWR<CashFloat[]>('/api/float', fetcher)
@@ -152,7 +154,7 @@ export default function FloatPage() {
         const err = await res.json().catch(() => ({}))
         throw new Error((err as { error?: string }).error ?? 'Top-up failed')
       }
-      toast.success(`Float topped up by R ${new Decimal(data.amount).toFixed(2)}`)
+      toast.success(`Float topped up by ${currSym} ${new Decimal(data.amount).toFixed(2)}`)
       topUpForm.reset({ amount: '', note: '' })
       // Instantly refresh all float-related data
       await Promise.all([
@@ -185,14 +187,14 @@ export default function FloatPage() {
     },
     {
       key: 'openingAmount', header: 'Opening Float', width: '130px',
-      render: (f) => <span className="font-mono font-semibold" style={{ fontSize: 12, color: colors.textPrimary }}>R {new Decimal(f.openingAmount).toFixed(2)}</span>,
+      render: (f) => <span className="font-mono font-semibold" style={{ fontSize: 12, color: colors.textPrimary }}>{currSym} {new Decimal(f.openingAmount).toFixed(2)}</span>,
     },
     {
       key: 'currentBalance', header: 'Current Float', width: '150px',
       render: (f) => (
         <>
           <span className="font-mono font-semibold" style={{ fontSize: 12, color: f.closingAmount ? colors.textSecondary : colors.action }}>
-            R {new Decimal(f.currentBalance).toFixed(2)}
+            {currSym} {new Decimal(f.currentBalance).toFixed(2)}
           </span>
           {f.closingAmount && <span className="ml-1" style={{ fontSize: 11, color: colors.textSecondary }}>(closed)</span>}
         </>
@@ -220,7 +222,7 @@ export default function FloatPage() {
     },
     {
       key: 'amount', header: 'Amount', width: '100px',
-      render: (m) => <span style={{ fontSize: 12, fontFamily: 'monospace', fontWeight: 600, color: colors.action }}>+R {new Decimal(m.amount).toFixed(2)}</span>,
+      render: (m) => <span style={{ fontSize: 12, fontFamily: 'monospace', fontWeight: 600, color: colors.action }}>+{currSym} {new Decimal(m.amount).toFixed(2)}</span>,
     },
     {
       key: 'expected', header: 'Expected in Drawer', width: '140px',
@@ -239,7 +241,7 @@ export default function FloatPage() {
                   .minus(new Decimal(liveStats.loanAdvance ?? '0'))
                   .plus(new Decimal(liveStats.loanRepayment ?? '0'))
               : floatBalanceAfter)
-        return <span style={{ fontSize: 12, fontFamily: 'monospace', color: colors.action }}>R {expectedInDrawer.toFixed(2)}</span>
+        return <span style={{ fontSize: 12, fontFamily: 'monospace', color: colors.action }}>{currSym} {expectedInDrawer.toFixed(2)}</span>
       },
     },
     {
@@ -315,12 +317,12 @@ export default function FloatPage() {
                   {/* Opening Balance from Cashup (carry-forward from previous day) */}
                   <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: colors.textSecondary }}>Opening Balance</p>
                   <p className="font-mono font-bold mt-1" style={{ fontSize: 20, color: colors.textPrimary }}>
-                    R {cashUpOpeningBalance?.toFixed(2) ?? '0.00'}
+                    {currSym} {cashUpOpeningBalance?.toFixed(2) ?? '0.00'}
                   </p>
                   {/* Current Balance (Expected in Drawer) */}
                   <p className="text-xs font-semibold uppercase tracking-wide mt-2.5" style={{ color: colors.action }}>Current Balance (Expected in Drawer)</p>
                   <p className="font-mono font-bold" style={{ fontSize: 20, color: colors.action }}>
-                    R {calFloat?.toFixed(2) ?? '0.00'}
+                    {currSym} {calFloat?.toFixed(2) ?? '0.00'}
                   </p>
                   <p className="text-xs mt-1" style={{ color: colors.textSecondary }}>
                     {new Date().toLocaleDateString('en-ZA', { dateStyle: 'full' })}
@@ -336,7 +338,7 @@ export default function FloatPage() {
                     </div>
                     <form onSubmit={topUpForm.handleSubmit(onTopUp)} className="space-y-2">
                       <div>
-                        <Label className="text-xs" style={{ color: colors.textSecondary }}>Amount (R)</Label>
+                        <Label className="text-xs" style={{ color: colors.textSecondary }}>Amount ({currSym})</Label>
                         <Input
                           {...topUpForm.register('amount')}
                           type="number"
@@ -440,6 +442,7 @@ function ReverseFloatMovementModal({
   onConfirm: (reason: string) => void
 }) {
   const [reason, setReason] = useState('')
+  const { symbol: currSym } = useSystemCurrency()
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
@@ -448,7 +451,7 @@ function ReverseFloatMovementModal({
         <RpxDialogBody>
           <p style={{ fontSize: 12.5, color: colors.textSecondary, margin: '0 0 12px' }}>
             You are about to reverse a <span style={{ fontWeight: 600, color: colors.textPrimary }}>{movement.movementType}</span> of{' '}
-            <span style={{ fontWeight: 600, color: colors.textPrimary }}>R {new Decimal(movement.amount).toFixed(2)}</span>.
+            <span style={{ fontWeight: 600, color: colors.textPrimary }}>{currSym} {new Decimal(movement.amount).toFixed(2)}</span>.
             This action cannot be undone.
           </p>
           <span style={lbl}>Reason for reversal</span>

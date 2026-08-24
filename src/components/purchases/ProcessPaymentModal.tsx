@@ -10,6 +10,7 @@ import { colors } from '@/lib/design-tokens'
 import { Btn, inp, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
 import { useOfflineMutation } from '@/hooks/useOfflineFetch'
 import { useOfflineStore } from '@/stores/offlineStore'
+import { useSystemCurrency } from '@/hooks/useSystemCurrency'
 
 export type PayTarget = {
   id: string
@@ -38,6 +39,7 @@ export function ProcessPaymentModal({
   const [outstandingLoan, setOutstandingLoan] = useState<string | null>(null)
   const [checkedAt,       setCheckedAt]       = useState<Date | null>(null)
   const { mutate: offlineMutate } = useOfflineMutation()
+  const { symbol: currSym } = useSystemCurrency()
   const isOnline = useOfflineStore((s) => s.isOnline)
 
   const totalAmount   = new Decimal(purchase.totalAmount)
@@ -99,23 +101,23 @@ export function ProcessPaymentModal({
             <p className="font-mono font-medium" style={{ fontSize: 12, color: '#212529' }}>{purchase.ref}</p>
             <div className="flex justify-between" style={{ fontSize: 12, color: '#6C757D' }}>
               <span>Total amount</span>
-              <span className="font-mono">R {totalAmount.toFixed(2)}</span>
+              <span className="font-mono">{currSym} {totalAmount.toFixed(2)}</span>
             </div>
             {loanDeduction.gt(0) && (
               <div className="flex justify-between" style={{ fontSize: 12, color: '#6C757D' }}>
                 <span>Loan deduction</span>
-                <span className="font-mono">− R {loanDeduction.toFixed(2)}</span>
+                <span className="font-mono">− {currSym} {loanDeduction.toFixed(2)}</span>
               </div>
             )}
             {alreadyPaid.gt(0) && (
               <div className="flex justify-between" style={{ fontSize: 12, color: colors.action }}>
                 <span>Already paid</span>
-                <span className="font-mono">− R {alreadyPaid.toFixed(2)}</span>
+                <span className="font-mono">− {currSym} {alreadyPaid.toFixed(2)}</span>
               </div>
             )}
             <div className="flex justify-between pt-1 border-t border-[#E0E0E0] mt-1" style={{ fontSize: 13 }}>
               <span className="font-semibold" style={{ color: '#C9A020' }}>Remaining balance</span>
-              <span className="font-mono font-bold" style={{ color: '#C9A020' }}>R {remaining.toFixed(2)}</span>
+              <span className="font-mono font-bold" style={{ color: '#C9A020' }}>{currSym} {remaining.toFixed(2)}</span>
             </div>
           </div>
 
@@ -125,7 +127,7 @@ export function ProcessPaymentModal({
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" style={{ color: colors.alertIcon }} />
               <div>
                 <p className="text-xs font-medium" style={{ color: colors.alertIcon }}>
-                  Outstanding Loan: R {outstandingDec.toFixed(2)}
+                  Outstanding Loan: {currSym} {outstandingDec.toFixed(2)}
                 </p>
                 <p className="text-xs" style={{ color: colors.alertText }}>
                   Use Split Payment to deduct loan from this payment.
@@ -161,7 +163,7 @@ export function ProcessPaymentModal({
               className="h-8 flex items-center px-3 rounded border text-[12px] font-mono font-semibold"
               style={{ background: '#F5F5F5', borderColor: '#E0E0E0', color: colors.action }}
             >
-              R {remaining.toFixed(2)}
+              {currSym} {remaining.toFixed(2)}
             </div>
           </div>
 

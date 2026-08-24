@@ -14,6 +14,7 @@ import { format } from '@/lib/utils/format'
 import { toast } from 'sonner'
 import { useSession } from 'next-auth/react'
 import { fetcher } from '@/lib/swrFetcher'
+import { useSystemCurrency } from '@/hooks/useSystemCurrency'
 import {
   inp, lbl, Btn, Field, PortalPage, FilterBar,
   RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter,
@@ -70,6 +71,7 @@ export default function UnpaidSalesPage() {
   const router = useRouter()
   const { data: session } = useSession()
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
+  const { symbol: currSym } = useSystemCurrency()
 
   const [search,     setSearch]     = useState('')
   const [from,       setFrom]       = useState('')
@@ -166,7 +168,7 @@ export default function UnpaidSalesPage() {
       width:  '110px',
       render: (row) => (
         <span className="font-mono font-semibold" style={{ color: colors.textPrimary }}>
-          R {new Decimal(row.totalAmount).toFixed(2)}
+          {currSym} {new Decimal(row.totalAmount).toFixed(2)}
         </span>
       ),
     },
@@ -178,7 +180,7 @@ export default function UnpaidSalesPage() {
         const paid = new Decimal(row.amountPaid ?? '0')
         return (
           <span className="font-mono" style={{ color: paid.gt(0) ? colors.action : colors.textSecondary }}>
-            {paid.gt(0) ? `R ${paid.toFixed(2)}` : '—'}
+            {paid.gt(0) ? `${currSym} ${paid.toFixed(2)}` : '—'}
           </span>
         )
       },
@@ -189,7 +191,7 @@ export default function UnpaidSalesPage() {
       width:  '110px',
       render: (row) => (
         <span className="font-mono font-semibold" style={{ color: colors.warning }}>
-          R {outstanding(row).toFixed(2)}
+          {currSym} {outstanding(row).toFixed(2)}
         </span>
       ),
     },
@@ -254,7 +256,7 @@ export default function UnpaidSalesPage() {
               Total Outstanding
             </p>
             <p className="font-mono font-bold" style={{ fontSize: fontSize['2xl'], color: colors.alertText }}>
-              R {grandTotal.toFixed(2)}
+              {currSym} {grandTotal.toFixed(2)}
             </p>
           </div>
           <p className="ml-4 text-xs" style={{ color: colors.alertIcon }}>
@@ -336,7 +338,7 @@ export default function UnpaidSalesPage() {
               <div>
                 <p className="uppercase tracking-wide font-semibold mb-0.5" style={{ fontSize: 10, color: colors.textSecondary }}>Balance Due</p>
                 <p className="font-mono font-bold" style={{ fontSize: fontSize.base, color: colors.warning }}>
-                  R {outstanding(detail).toFixed(2)}
+                  {currSym} {outstanding(detail).toFixed(2)}
                 </p>
               </div>
               <div>
@@ -372,10 +374,10 @@ export default function UnpaidSalesPage() {
                         {new Decimal(line.quantity).toFixed(2)} {line.product.unit}
                       </td>
                       <td className="font-mono" style={{ padding: '4px 12px 4px 0', color: colors.textSecondary }}>
-                        R {new Decimal(line.unitPrice).toFixed(2)}
+                        {currSym} {new Decimal(line.unitPrice).toFixed(2)}
                       </td>
                       <td className="font-mono font-semibold" style={{ padding: '4px 0', color: colors.textPrimary }}>
-                        R {new Decimal(line.lineTotal).toFixed(2)}
+                        {currSym} {new Decimal(line.lineTotal).toFixed(2)}
                       </td>
                     </tr>
                   ))}
@@ -384,7 +386,7 @@ export default function UnpaidSalesPage() {
                   <tr style={{ borderTop: `1px solid ${colors.border}` }}>
                     <td colSpan={3} className="text-right font-semibold" style={{ padding: '6px 12px 0 0', color: colors.textSecondary }}>Total</td>
                     <td className="font-mono font-bold" style={{ padding: '6px 0 0', fontSize: fontSize.base, color: colors.textPrimary }}>
-                      R {new Decimal(detail.totalAmount).toFixed(2)}
+                      {currSym} {new Decimal(detail.totalAmount).toFixed(2)}
                     </td>
                   </tr>
                 </tfoot>
@@ -427,6 +429,7 @@ function VoidDialog({
 }) {
   const [reason,  setReason]  = useState('')
   const [loading, setLoading] = useState(false)
+  const { symbol: currSym } = useSystemCurrency()
 
   async function onConfirm() {
     if (reason.trim().length < 5) { toast.error('Reason must be at least 5 characters'); return }
@@ -449,7 +452,7 @@ function VoidDialog({
           <p style={{ fontSize: 12.5, color: colors.textSecondary, margin: '0 0 12px' }}>
             You are about to reverse{' '}
             <span style={{ fontWeight: 600, color: colors.textPrimary }}>{sale.refNumber}</span>
-            {' '}(R {new Decimal(sale.totalAmount).toFixed(2)}). This cannot be undone.
+            {' '}({currSym} {new Decimal(sale.totalAmount).toFixed(2)}). This cannot be undone.
           </p>
           <span style={lbl}>Reason for reversal</span>
           <input

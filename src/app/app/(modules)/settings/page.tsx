@@ -13,6 +13,7 @@ import { DEFAULT_POLICE_SERVICE_NAME, DEFAULT_POLICE_LEGAL_NOTE } from '@/lib/po
 import { inp, HEADER_GRAD, NAVY, Btn, Field, PortalPage, winBevel } from '@/components/rpx'
 import { TradeCommoditiesModal } from './_components/TradeCommoditiesModal'
 import { fetcher } from '@/lib/swrFetcher'
+import { WORLD_CURRENCIES, DEFAULT_CURRENCY_CODE } from '@/lib/constants/currencies'
 
 
 type ScaleType   = 'none' | 'tcp' | 'serial'
@@ -20,6 +21,7 @@ type PrinterType = 'none' | 'serial' | 'tcp' | 'windows'
 
 type SettingsMap = {
   yardName?: string; yardAddress?: string; yardPhone?: string
+  currency?: string
   vatNumber?: string; vatRate?: string; receiptFooter?: string
   purchaseNoteDeclaration?: string; saleNoteDeclaration?: string
   companyLogoR2Key?: string
@@ -314,6 +316,13 @@ export default function SettingsPage() {
                   </Field>
                   <Field label="Phone Number">
                     <input value={form.yardPhone ?? ''} onChange={(e) => set('yardPhone', e.target.value)} placeholder="+27 12 345 6789" style={inp} />
+                  </Field>
+                  <Field label="Currency" hint="Used everywhere money is shown — cash-up, reports, receipts, float.">
+                    <select value={form.currency ?? DEFAULT_CURRENCY_CODE} onChange={(e) => set('currency', e.target.value)} style={inp}>
+                      {WORLD_CURRENCIES.map((c) => (
+                        <option key={c.code} value={c.code}>{c.symbol} — {c.name} ({c.code})</option>
+                      ))}
+                    </select>
                   </Field>
                 </div>
               </div>

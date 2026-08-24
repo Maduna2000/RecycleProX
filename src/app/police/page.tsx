@@ -14,6 +14,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import useSWR from 'swr'
 import { fetcher } from '@/lib/swrFetcher'
+import { useSystemCurrency } from '@/hooks/useSystemCurrency'
 import {
   ShieldCheck, Loader2, Search, FileDown, Pen, CheckCircle, RotateCcw,
   ArrowLeft, Clock, AlertTriangle, User as UserIcon, Package, CalendarDays,
@@ -528,6 +529,7 @@ async function downloadPdf(guardedFetch: GuardedFetch, url: string, filename: st
 // ─── Register by Date tab ─────────────────────────────────────────────────────
 
 function RegisterTab({ visitId, guardedFetch }: { visitId: string; guardedFetch: GuardedFetch }) {
+  const { symbol: currSym } = useSystemCurrency()
   const [from, setFrom]       = useState(todayYMD())
   const [to, setTo]           = useState(todayYMD())
   const [rows, setRows]       = useState<RegisterRow[] | null>(null)
@@ -583,7 +585,7 @@ function RegisterTab({ visitId, guardedFetch }: { visitId: string; guardedFetch:
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
               <tr style={{ background: HEADER_GRAD, borderBottom: '1px solid #C0C0C0' }}>
-                {['Date / Time', 'Ref No.', 'Seller', 'ID Number', 'Goods', 'Amount (R)', ''].map((h) => (
+                {['Date / Time', 'Ref No.', 'Seller', 'ID Number', 'Goods', `Amount (${currSym})`, ''].map((h) => (
                   <th key={h} style={TH}>{h}</th>
                 ))}
               </tr>
@@ -622,7 +624,7 @@ function RegisterTab({ visitId, guardedFetch }: { visitId: string; guardedFetch:
             ['ID number',   detail.idNumber ?? '—'],
             ['Date of birth', fmtDate(detail.dateOfBirth)],
             ['Address',     detail.address],
-            ['Total paid',  `R ${Number(detail.totalAmount).toFixed(2)}`],
+            ['Total paid',  `${currSym} ${Number(detail.totalAmount).toFixed(2)}`],
           ]} />
           {detail.blacklisted && <BlacklistNotice reason={null} />}
 
@@ -660,6 +662,7 @@ function RegisterTab({ visitId, guardedFetch }: { visitId: string; guardedFetch:
 // ─── Person Search tab ────────────────────────────────────────────────────────
 
 function PersonTab({ visitId, guardedFetch }: { visitId: string; guardedFetch: GuardedFetch }) {
+  const { symbol: currSym } = useSystemCurrency()
   const [q, setQ]                   = useState('')
   const [rows, setRows]             = useState<PersonRow[] | null>(null)
   const [loading, setLoading]       = useState(false)
@@ -809,7 +812,7 @@ function PersonTab({ visitId, guardedFetch }: { visitId: string; guardedFetch: G
                 <p style={{ margin: '0 0 4px', fontSize: 12, color: '#212529' }}>
                   {p.lines.map((l) => `${l.productName} (${l.quantity}${l.unit})`).join(', ')}
                 </p>
-                <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: '#212529' }}>R {Number(p.totalAmount).toFixed(2)}</p>
+                <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: '#212529' }}>{currSym} {Number(p.totalAmount).toFixed(2)}</p>
                 <PhotoStrip urls={p.photoUrls} label={null} />
               </div>
             ))
@@ -823,6 +826,7 @@ function PersonTab({ visitId, guardedFetch }: { visitId: string; guardedFetch: G
 // ─── Goods Search tab ─────────────────────────────────────────────────────────
 
 function GoodsTab({ visitId, guardedFetch }: { visitId: string; guardedFetch: GuardedFetch }) {
+  const { symbol: currSym } = useSystemCurrency()
   const { data: productsData } = useSWR<{ products: Product[] }>('/api/products', fetcher)
   const products = productsData?.products ?? []
 
@@ -916,7 +920,7 @@ function GoodsTab({ visitId, guardedFetch }: { visitId: string; guardedFetch: Gu
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
               <tr style={{ background: HEADER_GRAD, borderBottom: '1px solid #C0C0C0' }}>
-                {['Date / Time', 'Ref No.', 'Seller', 'ID Number', 'Quantity', 'Line Total (R)', 'Photos', ''].map((h) => (
+                {['Date / Time', 'Ref No.', 'Seller', 'ID Number', 'Quantity', `Line Total (${currSym})`, 'Photos', ''].map((h) => (
                   <th key={h} style={TH}>{h}</th>
                 ))}
               </tr>
@@ -953,7 +957,7 @@ function GoodsTab({ visitId, guardedFetch }: { visitId: string; guardedFetch: Gu
             ['Seller',      detail.supplierName],
             ['ID number',   detail.idNumber ?? '—'],
             ['Quantity',    `${detail.quantity} ${detail.unit}`],
-            ['Line total',  `R ${Number(detail.lineTotal).toFixed(2)}`],
+            ['Line total',  `${currSym} ${Number(detail.lineTotal).toFixed(2)}`],
           ]} />
           {detail.blacklisted && <BlacklistNotice reason={null} />}
           <PhotoStrip urls={detail.photoUrls} label="Transaction photos" />

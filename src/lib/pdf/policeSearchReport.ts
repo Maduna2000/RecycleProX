@@ -37,6 +37,7 @@ interface ReportBase {
   dealerAddress:     string
   officer:           ReportOfficer
   generatedAt:       Date
+  currencySymbol?:   string
 }
 
 function drawHeader(page: PDFPage, bold: PDFFont, reg: PDFFont, title: string, serviceName: string, pageLabel: string) {
@@ -108,6 +109,7 @@ export interface PersonRecordReportData extends ReportBase {
 }
 
 export async function generatePersonRecordReport(data: PersonRecordReportData): Promise<Uint8Array> {
+  const sym  = data.currencySymbol ?? 'R'
   const doc  = await PDFDocument.create()
   const bold = await doc.embedFont(StandardFonts.HelveticaBold)
   const reg  = await doc.embedFont(StandardFonts.Helvetica)
@@ -192,7 +194,7 @@ export async function generatePersonRecordReport(data: PersonRecordReportData): 
       page.drawText('Date / Time', { x: MARGIN + 6,   y, size: 8, font: bold, color: GRAY })
       page.drawText('Ref No.',     { x: MARGIN + 95,  y, size: 8, font: bold, color: GRAY })
       page.drawText('Goods',       { x: MARGIN + 200, y, size: 8, font: bold, color: GRAY })
-      page.drawText('Amount (R)',  { x: PAGE_W - MARGIN - 70, y, size: 8, font: bold, color: GRAY })
+      page.drawText(`Amount (${sym})`,  { x: PAGE_W - MARGIN - 70, y, size: 8, font: bold, color: GRAY })
       y -= 14
       for (let i = 0; i < rows.length; i++) {
         const r = rows[i]!
@@ -203,7 +205,7 @@ export async function generatePersonRecordReport(data: PersonRecordReportData): 
         page.drawText(when,                     { x: MARGIN + 6,   y, size: 8, font: reg,  color: DARK })
         page.drawText(r.refNumber,              { x: MARGIN + 95,  y, size: 8, font: bold, color: DARK })
         page.drawText(truncate(r.items, 40),    { x: MARGIN + 200, y, size: 8, font: reg,  color: DARK })
-        const amt = `R ${new Decimal(r.totalAmount).toFixed(2)}`
+        const amt = `${sym} ${new Decimal(r.totalAmount).toFixed(2)}`
         page.drawText(amt, { x: PAGE_W - MARGIN - 6 - reg.widthOfTextAtSize(amt, 8), y, size: 8, font: reg, color: DARK })
         y -= 15
       }
@@ -214,7 +216,7 @@ export async function generatePersonRecordReport(data: PersonRecordReportData): 
       const total = data.purchases.reduce((acc, p) => acc.plus(new Decimal(p.totalAmount)), new Decimal(0))
       y -= 6
       page.drawLine({ start: { x: MARGIN, y: y + 10 }, end: { x: PAGE_W - MARGIN, y: y + 10 }, thickness: 0.5, color: GRAY })
-      const label = `Total paid to this person: R ${total.toFixed(2)}`
+      const label = `Total paid to this person: ${sym} ${total.toFixed(2)}`
       page.drawText(label, {
         x: PAGE_W - MARGIN - bold.widthOfTextAtSize(label, 9), y: y - 2, size: 9, font: bold, color: RED,
       })
@@ -246,6 +248,7 @@ export interface GoodsTraceReportData extends ReportBase {
 }
 
 export async function generateGoodsTraceReport(data: GoodsTraceReportData): Promise<Uint8Array> {
+  const sym  = data.currencySymbol ?? 'R'
   const doc  = await PDFDocument.create()
   const bold = await doc.embedFont(StandardFonts.HelveticaBold)
   const reg  = await doc.embedFont(StandardFonts.Helvetica)
@@ -303,7 +306,7 @@ export async function generateGoodsTraceReport(data: GoodsTraceReportData): Prom
       page.drawText('Seller',      { x: MARGIN + 195, y, size: 8, font: bold, color: GRAY })
       page.drawText('ID Number',   { x: MARGIN + 320, y, size: 8, font: bold, color: GRAY })
       page.drawText('Qty',         { x: MARGIN + 400, y, size: 8, font: bold, color: GRAY })
-      page.drawText('Amount (R)',  { x: PAGE_W - MARGIN - 70, y, size: 8, font: bold, color: GRAY })
+      page.drawText(`Amount (${sym})`,  { x: PAGE_W - MARGIN - 70, y, size: 8, font: bold, color: GRAY })
       y -= 14
       for (let i = 0; i < rows.length; i++) {
         const r = rows[i]!
@@ -318,7 +321,7 @@ export async function generateGoodsTraceReport(data: GoodsTraceReportData): Prom
         })
         page.drawText(r.idNumber ?? '—', { x: MARGIN + 320, y, size: 8, font: reg, color: DARK })
         page.drawText(`${r.quantity}${data.unit}`, { x: MARGIN + 400, y, size: 8, font: reg, color: DARK })
-        const amt = `R ${new Decimal(r.lineTotal).toFixed(2)}`
+        const amt = `${sym} ${new Decimal(r.lineTotal).toFixed(2)}`
         page.drawText(amt, { x: PAGE_W - MARGIN - 6 - reg.widthOfTextAtSize(amt, 8), y, size: 8, font: reg, color: DARK })
         y -= 15
       }
@@ -330,7 +333,7 @@ export async function generateGoodsTraceReport(data: GoodsTraceReportData): Prom
       y -= 6
       page.drawLine({ start: { x: MARGIN, y: y + 10 }, end: { x: PAGE_W - MARGIN, y: y + 10 }, thickness: 0.5, color: GRAY })
       page.drawText(`Total quantity: ${totalQty.toString()}${data.unit}`, { x: MARGIN + 6, y: y - 2, size: 9, font: bold, color: DARK })
-      const amtLabel = `Total paid: R ${totalAmt.toFixed(2)}`
+      const amtLabel = `Total paid: ${sym} ${totalAmt.toFixed(2)}`
       page.drawText(amtLabel, {
         x: PAGE_W - MARGIN - bold.widthOfTextAtSize(amtLabel, 9), y: y - 2, size: 9, font: bold, color: RED,
       })

@@ -12,6 +12,7 @@ import { format } from '@/lib/utils/format'
 import { PhotoUploader, PhotoViewer } from '@/components/PhotoUploader'
 import { colors, layout } from '@/lib/design-tokens'
 import { fetcher } from '@/lib/swrFetcher'
+import { useSystemCurrency } from '@/hooks/useSystemCurrency'
 import {
   inp, lbl, TH, TD, HEADER_GRAD, NAVY,
   Btn, PortalPage,
@@ -73,6 +74,7 @@ export default function PurchaseDetailPage() {
   const router = useRouter()
   const { data: session } = useSession()
   const [voidOpen, setVoidOpen] = useState(false)
+  const { symbol: currSym } = useSystemCurrency()
 
   const { data: purchase, isLoading, error } = useSWR<Purchase>(`/api/purchases/${id}`, fetcher)
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
@@ -198,8 +200,8 @@ export default function PurchaseDetailPage() {
                           </div>
                         )}
                       </td>
-                      <td style={{ ...TD, fontFamily: 'monospace' }}>R {Number(line.unitPrice).toFixed(2)}</td>
-                      <td style={{ ...TD, fontFamily: 'monospace', fontWeight: 600, textAlign: 'right' }}>R {Number(line.lineTotal).toFixed(2)}</td>
+                      <td style={{ ...TD, fontFamily: 'monospace' }}>{currSym} {Number(line.unitPrice).toFixed(2)}</td>
+                      <td style={{ ...TD, fontFamily: 'monospace', fontWeight: 600, textAlign: 'right' }}>{currSym} {Number(line.lineTotal).toFixed(2)}</td>
                     </tr>
                   )
                 })}
@@ -210,19 +212,19 @@ export default function PurchaseDetailPage() {
                     <tr style={{ borderTop: `1px solid ${colors.border}`, background: colors.surface }}>
                       <td colSpan={3} style={{ ...TD, textAlign: 'right', color: colors.textSecondary }}>Gross payout</td>
                       <td style={{ ...TD, fontFamily: 'monospace', textAlign: 'right', color: colors.textSecondary }}>
-                        R {Number(purchase.totalAmount).toFixed(2)}
+                        {currSym} {Number(purchase.totalAmount).toFixed(2)}
                       </td>
                     </tr>
                     <tr style={{ background: colors.surface }}>
                       <td colSpan={3} style={{ ...TD, textAlign: 'right', fontWeight: 500, color: colors.warning }}>Loan deduction</td>
                       <td style={{ ...TD, fontFamily: 'monospace', textAlign: 'right', fontWeight: 500, color: colors.warning }}>
-                        − R {Number(purchase.loanDeductionAmount).toFixed(2)}
+                        − {currSym} {Number(purchase.loanDeductionAmount).toFixed(2)}
                       </td>
                     </tr>
                     <tr style={{ borderTop: `2px solid ${colors.border}`, background: HEADER_GRAD }}>
                       <td colSpan={3} style={{ ...TD, textAlign: 'right', fontWeight: 600, color: colors.textPrimary }}>Cash Paid Out</td>
                       <td style={{ ...TD, fontFamily: 'monospace', fontWeight: 700, fontSize: 14, textAlign: 'right', color: colors.action }}>
-                        R {netPayout.toFixed(2)}
+                        {currSym} {netPayout.toFixed(2)}
                       </td>
                     </tr>
                   </>
@@ -230,7 +232,7 @@ export default function PurchaseDetailPage() {
                   <tr style={{ borderTop: `2px solid ${colors.border}`, background: HEADER_GRAD }}>
                     <td colSpan={3} style={{ ...TD, textAlign: 'right', fontWeight: 600, color: colors.textSecondary }}>Total Payout</td>
                     <td style={{ ...TD, fontFamily: 'monospace', fontWeight: 700, fontSize: 14, textAlign: 'right', color: colors.action }}>
-                      R {Number(purchase.totalAmount).toFixed(2)}
+                      {currSym} {Number(purchase.totalAmount).toFixed(2)}
                     </td>
                   </tr>
                 )}
@@ -346,6 +348,7 @@ function PurchasePhotos({ purchaseId, initialKeys }: { purchaseId: string; initi
 function VoidModal({ purchase, onClose, onSuccess }: { purchase: Purchase; onClose: () => void; onSuccess: () => void }) {
   const [reason, setReason] = useState('')
   const [loading, setLoading] = useState(false)
+  const { symbol: currSym } = useSystemCurrency()
 
   async function onConfirm() {
     if (reason.trim().length < 5) { toast.error('Reason must be at least 5 characters'); return }
@@ -366,7 +369,7 @@ function VoidModal({ purchase, onClose, onSuccess }: { purchase: Purchase; onClo
         <RpxDialogHeader title="Void Purchase" onClose={onClose} />
         <RpxDialogBody>
           <p style={{ fontSize: 12.5, color: colors.textSecondary, margin: '0 0 12px' }}>
-            You are about to void <span style={{ fontWeight: 600, color: colors.textPrimary }}>{purchase.refNumber}</span> (R {Number(purchase.totalAmount).toFixed(2)}).
+            You are about to void <span style={{ fontWeight: 600, color: colors.textPrimary }}>{purchase.refNumber}</span> ({currSym} {Number(purchase.totalAmount).toFixed(2)}).
             This action cannot be undone.
           </p>
           <span style={lbl}>Reason for void</span>

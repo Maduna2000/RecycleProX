@@ -12,6 +12,7 @@ import Decimal from 'decimal.js'
 import { PhotoViewer } from '@/components/PhotoUploader'
 import { colors, layout } from '@/lib/design-tokens'
 import { fetcher } from '@/lib/swrFetcher'
+import { useSystemCurrency } from '@/hooks/useSystemCurrency'
 import {
   inp, lbl, TH, TD, HEADER_GRAD, NAVY,
   Btn, PortalPage,
@@ -67,6 +68,7 @@ export default function SaleDetailPage() {
   const router = useRouter()
   const { data: session } = useSession()
   const [voidOpen, setVoidOpen] = useState(false)
+  const { symbol: currSym } = useSystemCurrency()
 
   const { data: sale, isLoading, error } = useSWR<Sale>(`/api/sales/${id}`, fetcher)
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
@@ -122,9 +124,9 @@ export default function SaleDetailPage() {
           <div style={{ padding: '6px 10px', background: colors.warningBg, borderBottom: `1px solid ${colors.warning}`, flexShrink: 0 }}>
             <p style={{ fontSize: 12, fontWeight: 600, color: colors.warning }}>Payment outstanding</p>
             <p style={{ fontSize: 11, color: colors.warning, marginTop: 2 }}>
-              Balance due: <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>R {outstanding.toFixed(2)}</span>
+              Balance due: <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{currSym} {outstanding.toFixed(2)}</span>
               {sale.amountPaid && new Decimal(sale.amountPaid).gt(0) && (
-                <span style={{ marginLeft: 12, opacity: 0.8 }}>({`R ${new Decimal(sale.amountPaid).toFixed(2)} paid`})</span>
+                <span style={{ marginLeft: 12, opacity: 0.8 }}>({`${currSym} ${new Decimal(sale.amountPaid).toFixed(2)} paid`})</span>
               )}
             </p>
           </div>
@@ -196,8 +198,8 @@ export default function SaleDetailPage() {
                         </div>
                       )}
                     </td>
-                    <td style={{ ...TD, fontFamily: 'monospace' }}>R {Number(line.unitPrice).toFixed(2)}</td>
-                    <td style={{ ...TD, fontFamily: 'monospace', fontWeight: 600, textAlign: 'right' }}>R {Number(line.lineTotal).toFixed(2)}</td>
+                    <td style={{ ...TD, fontFamily: 'monospace' }}>{currSym} {Number(line.unitPrice).toFixed(2)}</td>
+                    <td style={{ ...TD, fontFamily: 'monospace', fontWeight: 600, textAlign: 'right' }}>{currSym} {Number(line.lineTotal).toFixed(2)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -207,13 +209,13 @@ export default function SaleDetailPage() {
                     <tr style={{ background: HEADER_GRAD }}>
                       <td colSpan={3} style={{ ...TD, textAlign: 'right', color: colors.textSecondary }}>Sub Total</td>
                       <td style={{ ...TD, fontFamily: 'monospace', textAlign: 'right', color: colors.textPrimary }}>
-                        R {(Number(sale.totalAmount) - Number(sale.vatAmount)).toFixed(2)}
+                        {currSym} {(Number(sale.totalAmount) - Number(sale.vatAmount)).toFixed(2)}
                       </td>
                     </tr>
                     <tr style={{ background: HEADER_GRAD }}>
                       <td colSpan={3} style={{ ...TD, textAlign: 'right', color: colors.textSecondary }}>VAT</td>
                       <td style={{ ...TD, fontFamily: 'monospace', textAlign: 'right', color: colors.textSecondary }}>
-                        R {Number(sale.vatAmount).toFixed(2)}
+                        {currSym} {Number(sale.vatAmount).toFixed(2)}
                       </td>
                     </tr>
                   </>
@@ -221,7 +223,7 @@ export default function SaleDetailPage() {
                 <tr style={{ borderTop: `2px solid ${colors.border}`, background: HEADER_GRAD }}>
                   <td colSpan={3} style={{ ...TD, textAlign: 'right', fontWeight: 600, color: colors.textSecondary }}>Total</td>
                   <td style={{ ...TD, fontFamily: 'monospace', fontWeight: 700, fontSize: 14, textAlign: 'right', color: colors.action }}>
-                    R {Number(sale.totalAmount).toFixed(2)}
+                    {currSym} {Number(sale.totalAmount).toFixed(2)}
                   </td>
                 </tr>
               </tfoot>
@@ -296,6 +298,7 @@ export default function SaleDetailPage() {
 function VoidModal({ sale, onClose, onSuccess }: { sale: Sale; onClose: () => void; onSuccess: () => void }) {
   const [reason, setReason] = useState('')
   const [loading, setLoading] = useState(false)
+  const { symbol: currSym } = useSystemCurrency()
 
   async function onConfirm() {
     if (reason.trim().length < 5) { toast.error('Reason must be at least 5 characters'); return }
@@ -316,7 +319,7 @@ function VoidModal({ sale, onClose, onSuccess }: { sale: Sale; onClose: () => vo
         <RpxDialogHeader title="Void Sale" onClose={onClose} />
         <RpxDialogBody>
           <p style={{ fontSize: 12.5, color: colors.textSecondary, margin: '0 0 12px' }}>
-            You are about to void <span style={{ fontWeight: 600, color: colors.textPrimary }}>{sale.refNumber}</span> (R {Number(sale.totalAmount).toFixed(2)}).
+            You are about to void <span style={{ fontWeight: 600, color: colors.textPrimary }}>{sale.refNumber}</span> ({currSym} {Number(sale.totalAmount).toFixed(2)}).
             This action cannot be undone.
           </p>
           <span style={lbl}>Reason for void</span>

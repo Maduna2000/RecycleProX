@@ -15,6 +15,7 @@ import { useSession } from 'next-auth/react'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { colors } from '@/lib/design-tokens'
 import { fetcher } from '@/lib/swrFetcher'
+import { useSystemCurrency } from '@/hooks/useSystemCurrency'
 import { useOfflineLookup } from '@/hooks/useOfflineLookup'
 import {
   TH, TD, HEADER_GRAD,
@@ -279,6 +280,7 @@ function ManagePriceGroupModal({ groupId, onClose, onChanged }: {
 }) {
   const { data: session } = useSession()
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
+  const { symbol: currSym } = useSystemCurrency()
 
   const { data: group, isLoading: groupLoading } = useSWR<PriceGroupDetail>(`/api/price-groups/${groupId}`, fetcher)
   // Fetched via getActiveProducts (same as Purchases/Sales/the price-list
@@ -492,8 +494,8 @@ function ManagePriceGroupModal({ groupId, onClose, onChanged }: {
                                 <span style={{ fontWeight: 600 }}>{p.name}</span>
                                 <span style={{ fontSize: 10, color: '#6C757D', fontFamily: 'monospace', marginLeft: 6 }}>{p.code} · {p.unit}</span>
                               </td>
-                              <td style={{ ...TD, padding: '1px 8px', fontFamily: 'monospace', color: '#6C757D' }}>R {Number(p.defaultBuyPrice).toFixed(2)}</td>
-                              <td style={{ ...TD, padding: '1px 8px', fontFamily: 'monospace', color: '#6C757D' }}>R {Number(p.defaultSellPrice).toFixed(2)}</td>
+                              <td style={{ ...TD, padding: '1px 8px', fontFamily: 'monospace', color: '#6C757D' }}>{currSym} {Number(p.defaultBuyPrice).toFixed(2)}</td>
+                              <td style={{ ...TD, padding: '1px 8px', fontFamily: 'monospace', color: '#6C757D' }}>{currSym} {Number(p.defaultSellPrice).toFixed(2)}</td>
                               <td style={{ ...TD, padding: '1px 8px', width: 120 }}>
                                 {isEnabled ? (
                                   <Input

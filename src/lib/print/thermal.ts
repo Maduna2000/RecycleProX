@@ -28,6 +28,7 @@ interface CompanyInfo {
   companyAddress?: string
   companyPhone?:   string
   vatNumber?:      string
+  currencySymbol?: string
 }
 
 export interface PurchaseReceiptData extends CompanyInfo {
@@ -167,7 +168,7 @@ function addLines(printer: ThermalPrinter, lines: ReceiptLine[]) {
   }
 }
 
-function addTotals(printer: ThermalPrinter, lines: ReceiptLine[], totalAmount: string, vatAmount: string | undefined) {
+function addTotals(printer: ThermalPrinter, lines: ReceiptLine[], totalAmount: string, vatAmount: string | undefined, sym: string) {
   const nettTotal = lines.reduce((acc, l) => acc.plus(l.qty || 0), new Decimal(0))
   const total = new Decimal(totalAmount)
   const vat = new Decimal(vatAmount ?? '0')
@@ -175,14 +176,15 @@ function addTotals(printer: ThermalPrinter, lines: ReceiptLine[], totalAmount: s
 
   printer.drawLine()
   printer.leftRight('Nett Total', nettTotal.toFixed(1))
-  printer.leftRight('Total', `E ${total.toFixed(2)}`)
-  printer.leftRight('15% VAT', `E ${vat.toFixed(2)}`)
-  printer.leftRight('Grand Total', `E ${grandTotal.toFixed(2)}`)
+  printer.leftRight('Total', `${sym} ${total.toFixed(2)}`)
+  printer.leftRight('15% VAT', `${sym} ${vat.toFixed(2)}`)
+  printer.leftRight('Grand Total', `${sym} ${grandTotal.toFixed(2)}`)
 }
 
 function addSplitPayments(
   printer: ThermalPrinter,
   splitPayments: { cash: string; eft: string; cheque?: string; loan: string },
+  sym: string,
   // Sales use "Business Loan" (the reverse-direction feature, see
   // BusinessLoan) rather than purchases' "Loans" — kept distinct per
   // feedback_differentiate_mirrored_features rather than reusing one label.
@@ -201,10 +203,10 @@ function addSplitPayments(
   printer.newLine()
   printer.println('Payment Split:')
 
-  if (cashAmt.greaterThan(0))   printer.leftRight('Cash', `E ${cashAmt.toFixed(2)}`)
-  if (eftAmt.greaterThan(0))    printer.leftRight('EFT', `E ${eftAmt.toFixed(2)}`)
-  if (chequeAmt.greaterThan(0)) printer.leftRight('Cheque', `E ${chequeAmt.toFixed(2)}`)
-  if (loanAmt.greaterThan(0))   printer.leftRight(loanLabel, `E ${loanAmt.toFixed(2)}${loanReference ? ` #${loanReference}` : ''}`)
+  if (cashAmt.greaterThan(0))   printer.leftRight('Cash', `${sym} ${cashAmt.toFixed(2)}`)
+  if (eftAmt.greaterThan(0))    printer.leftRight('EFT', `${sym} ${eftAmt.toFixed(2)}`)
+  if (chequeAmt.greaterThan(0)) printer.leftRight('Cheque', `${sym} ${chequeAmt.toFixed(2)}`)
+  if (loanAmt.greaterThan(0))   printer.leftRight(loanLabel, `${sym} ${loanAmt.toFixed(2)}${loanReference ? ` #${loanReference}` : ''}`)
 }
 
 function addFooter(printer: ThermalPrinter, slipNo: string | number | undefined, footerText: string | undefined, includeSignature = false) {
@@ -260,14 +262,15 @@ export async function buildPurchaseReceipt(data: PurchaseReceiptData): Promise<B
   if (data.customerIdNo) printer.println(`ID: ${data.customerIdNo}`)
   if (data.customerPhone) printer.println(`Phone: ${data.customerPhone}`)
 
+  const sym = data.currencySymbol ?? 'E'
   addLines(printer, data.lines)
-  addTotals(printer, data.lines, data.totalAmount, data.vatAmount)
+  addTotals(printer, data.lines, data.totalAmount, data.vatAmount, sym)
   if (data.splitPayments) {
-    addSplitPayments(printer, data.splitPayments, 'Loans', data.loanDeduction?.reference)
+    addSplitPayments(printer, data.splitPayments, sym, 'Loans', data.loanDeduction?.reference)
   } else if (data.loanDeduction && new Decimal(data.loanDeduction.amount).greaterThan(0)) {
     printer.newLine()
     printer.println('Payment Split:')
-    printer.leftRight('Loans', `E ${new Decimal(data.loanDeduction.amount).toFixed(2)}${data.loanDeduction.reference ? ` #${data.loanDeduction.reference}` : ''}`)
+    printer.leftRight('Loans', `${sym} ${new Decimal(data.loanDeduction.amount).toFixed(2)}${data.loanDeduction.reference ? ` #${data.loanDeduction.reference}` : ''}`)
   }
   addFooter(printer, data.slipNo, data.footerText, true)
 
@@ -295,14 +298,15 @@ export async function buildSaleReceipt(data: SaleReceiptData): Promise<Buffer> {
   if (data.buyerIdNumber) printer.println(`ID: ${data.buyerIdNumber}`)
   if (data.buyerPhone)    printer.println(`Phone: ${data.buyerPhone}`)
 
+  const sym = data.currencySymbol ?? 'E'
   addLines(printer, data.lines)
-  addTotals(printer, data.lines, data.totalAmount, data.vatAmount)
+  addTotals(printer, data.lines, data.totalAmount, data.vatAmount, sym)
   if (data.splitPayments) {
-    addSplitPayments(printer, { cash: data.splitPayments.cash, eft: data.splitPayments.eft, loan: data.splitPayments.businessLoan }, 'Business Loan')
+    addSplitPayments(printer, { cash: data.splitPayments.cash, eft: data.splitPayments.eft, loan: data.splitPayments.businessLoan }, sym, 'Business Loan')
   } else if (data.businessLoanDeduction && new Decimal(data.businessLoanDeduction.amount).greaterThan(0)) {
     printer.newLine()
     printer.println('Payment Split:')
-    printer.leftRight('Business Loan', `E ${new Decimal(data.businessLoanDeduction.amount).toFixed(2)}`)
+    printer.leftRight('Business Loan', `${sym} ${new Decimal(data.businessLoanDeduction.amount).toFixed(2)}`)
   }
   addFooter(printer, data.slipNo, data.footerText)
 

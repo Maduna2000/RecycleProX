@@ -5,9 +5,8 @@ import { withSerializableRetry } from '@/lib/db/withSerializableRetry'
 import Decimal from 'decimal.js'
 import logger from '@/lib/logger'
 import { incVatPrice } from '@/lib/utils/vat'
-import { getAllSettings } from '@/lib/services/settingsService'
+import { getAllSettings, currencySymbolFromSettings } from '@/lib/services/settingsService'
 import { fetchR2Bytes } from '@/lib/r2'
-import { CURRENCY_SYMBOLS } from '@/lib/schemas/cashup'
 import { generatePriceListPdf } from '@/lib/pdf/priceList'
 import { resolvePrice } from '@/lib/services/productService'
 import type { CreatePriceListInput, UpdatePriceListInput, PriceListItemInput, PriceListColors } from '@/lib/schemas/priceList'
@@ -40,14 +39,10 @@ export interface PriceListPdfSource {
  * lookup is tenant-scoped).
  */
 export async function buildPriceListPdfBytes(source: PriceListPdfSource): Promise<Uint8Array> {
-  const [settings, latestCashUp] = await Promise.all([
-    getAllSettings(),
-    prisma.cashUp.findFirst({ orderBy: { sessionDate: 'desc' }, select: { currency: true } }),
-  ])
+  const settings = await getAllSettings()
   const logoKey = source.showLogo ? settings[PRICE_LIST_LOGO_SETTING_KEY] : undefined
   const logoBytes = logoKey ? await fetchR2Bytes(logoKey) : null
-  const currencySymbol =
-    CURRENCY_SYMBOLS[latestCashUp?.currency as keyof typeof CURRENCY_SYMBOLS] ?? 'R'
+  const currencySymbol = currencySymbolFromSettings(settings)
 
   return generatePriceListPdf({
     title: source.title,

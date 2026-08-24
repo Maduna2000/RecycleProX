@@ -14,6 +14,7 @@ import { toast } from 'sonner'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { fetcher } from '@/lib/swrFetcher'
+import { useSystemCurrency } from '@/hooks/useSystemCurrency'
 import {
   UpdateCustomerSchema,
   BlacklistSchema,
@@ -295,9 +296,10 @@ function Field({ label, value, mono, span2, span3 }: { label: string; value?: st
 // ─── Overview Tab ─────────────────────────────────────────────────────────────
 
 function OverviewTab({ customer }: { customer: Customer }) {
+  const { symbol: currSym } = useSystemCurrency()
   const fmt      = (v?: string | null) => v || null
   const fmtDate  = (v?: string | null) => v ? new Date(v).toLocaleDateString('en-ZA') : null
-  const fmtMoney = (v?: string | null) => v ? `R ${parseFloat(v).toFixed(2)}` : null
+  const fmtMoney = (v?: string | null) => v ? `${currSym} ${parseFloat(v).toFixed(2)}` : null
   const isCasual = customer.customerType === 'casual'
 
   return (
@@ -364,6 +366,7 @@ function OverviewTab({ customer }: { customer: Customer }) {
 // ─── Transactions Tab ─────────────────────────────────────────────────────────
 
 function TransactionsTab({ customerId }: { customerId: string }) {
+  const { symbol: currSym } = useSystemCurrency()
   const { data } = useSWR(`/api/customers/${customerId}/transactions`, fetcher)
   if (!data?.transactions?.length) {
     return (
@@ -391,7 +394,7 @@ function TransactionsTab({ customerId }: { customerId: string }) {
               <td style={{ padding: '5px 12px', color: '#6C757D' }}>{new Date(tx.date).toLocaleDateString('en-ZA')}</td>
               <td style={{ padding: '5px 12px', fontFamily: 'monospace', color: '#212529' }}>{tx.reference}</td>
               <td style={{ padding: '5px 12px', textTransform: 'capitalize', color: '#212529' }}>{tx.type}</td>
-              <td style={{ padding: '5px 12px', color: '#212529' }}>R {tx.amount}</td>
+              <td style={{ padding: '5px 12px', color: '#212529' }}>{currSym} {tx.amount}</td>
               <td style={{ padding: '5px 12px', textTransform: 'capitalize', color: '#6C757D' }}>{tx.status}</td>
             </tr>
           ))}
@@ -602,6 +605,7 @@ function EditCustomerModal({ customer, onClose, onSuccess }: {
   const { data: session } = useSession()
   const isAdmin = session?.user?.role === 'admin'
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
+  const { symbol: currSym } = useSystemCurrency()
   const [loading, setLoading] = useState(false)
   const [editTab, setEditTab] = useState<typeof EDIT_TABS[number]>('Personal')
   const { data: pgData } = useSWR<{ groups: { id: string; name: string; isActive: boolean }[] }>('/api/price-groups', fetcher)
@@ -893,7 +897,7 @@ function EditCustomerModal({ customer, onClose, onSuccess }: {
                 </div>
               </div>
               <div>
-                <Label>Credit Limit (R)</Label>
+                <Label>Credit Limit ({currSym})</Label>
                 <Input {...register('creditLimit')} type="number" step="0.01" min="0" className="mt-1" disabled={loading} />
               </div>
               <div>

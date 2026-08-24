@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
-import { getAllSettings, upsertUserSettings, upsertGlobalSettings } from '@/lib/services/settingsService'
+import { getAllSettings, upsertUserSettings, upsertGlobalSettings, InvalidCurrencyCodeError } from '@/lib/services/settingsService'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 /**
@@ -65,6 +65,9 @@ export async function PUT(req: NextRequest) {
     await runWithRequestTenant(req, () => upsertGlobalSettings(body, session.user.id))
     return NextResponse.json({ ok: true })
   } catch (err) {
+    if (err instanceof InvalidCurrencyCodeError) {
+      return NextResponse.json({ error: err.message }, { status: 422 })
+    }
     logger.error({ err }, 'PUT /api/settings failed')
     return NextResponse.json({ error: 'Failed to save settings' }, { status: 500 })
   }

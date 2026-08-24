@@ -16,6 +16,7 @@ import { toast } from 'sonner'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { fetcher } from '@/lib/swrFetcher'
+import { useSystemCurrency } from '@/hooks/useSystemCurrency'
 import {
   UpdateCustomerSchema,
   BlacklistSchema,
@@ -83,6 +84,7 @@ export default function CustomerDetailPage() {
   const [isEditing, setIsEditing] = useState(false)
   const [saving, setSaving] = useState(false)
   const [blacklistOpen, setBlacklistOpen] = useState(false)
+  const { symbol: currSym } = useSystemCurrency()
 
   const { data: customer, isLoading } = useSWR<Customer>(`/api/customers/${id}`, fetcher)
   const { data: pgData } = useSWR<{ groups: { id: string; name: string; isActive: boolean }[] }>('/api/price-groups', fetcher)
@@ -397,7 +399,7 @@ export default function CustomerDetailPage() {
                   />
                 </div>
                 <div>
-                  <span style={lbl}>Credit Limit (R)</span>
+                  <span style={lbl}>Credit Limit ({currSym})</span>
                   <input {...register('creditLimit')} type="number" step="0.01" min="0" disabled={!isEditing || saving} style={isEditing ? inp : inpDisabled} />
                 </div>
               </div>
@@ -545,7 +547,7 @@ export default function CustomerDetailPage() {
               <div>
                 <span style={lbl}>Loan Balance</span>
                 <span style={{ fontSize: 11, fontFamily: 'monospace', fontWeight: 600, color: '#D97706' }}>
-                  R {parseFloat(loanOutstanding).toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {currSym} {parseFloat(loanOutstanding).toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
             )}

@@ -41,23 +41,12 @@ export const ApproveCashUpSchema = z.object({
   notes: z.string().max(500).optional(),
 })
 
-// Currency options
-export const CURRENCIES = ['ZAR', 'SZL'] as const
-export type Currency = (typeof CURRENCIES)[number]
-
-export const CURRENCY_SYMBOLS: Record<Currency, string> = {
-  ZAR: 'R',   // South African Rand
-  SZL: 'E',   // Eswatini Lilangeni
-}
-
-export const CURRENCY_LABELS: Record<Currency, string> = {
-  ZAR: 'South African Rand (R)',
-  SZL: 'Eswatini Lilangeni (E)',
-}
-
+// Currency is no longer chosen per cash-up session — it's a single
+// tenant-wide setting (see src/lib/constants/currencies.ts and
+// SystemSettings key "currency"), applied automatically when a session
+// opens. See openCashUp in cashUpService.ts.
 export const OpenCashUpSchema = z.object({
   sessionDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD'),
-  currency: z.enum(CURRENCIES).optional().default('ZAR'),
 })
 
 export type SubmitCashUpInput  = z.infer<typeof SubmitCashUpSchema>

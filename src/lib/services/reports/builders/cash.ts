@@ -13,7 +13,7 @@ import { getCustomerLoanStatement } from '@/lib/services/loanService'
 import { getCustomerBusinessLoanStatement } from '@/lib/services/businessLoanService'
 import { groupRows } from '@/lib/services/reports/grouping'
 import { countDataRows } from '@/lib/reports/flatten'
-import { DENOMINATION_LABELS, DENOMINATIONS, CURRENCY_SYMBOLS } from '@/lib/schemas/cashup'
+import { DENOMINATION_LABELS, DENOMINATIONS } from '@/lib/schemas/cashup'
 import {
   getCashUp,
   getCashSalesForDate,
@@ -207,7 +207,7 @@ export async function buildCashupSnapshot(
   }
 
   const rowCount = groups.reduce((n, g) => n + (g.rows?.length ?? 0), 0)
-  const currencySymbol = CURRENCY_SYMBOLS[cashUp.currency as keyof typeof CURRENCY_SYMBOLS] ?? meta.currencySymbol
+  const currencySymbol = meta.currencySymbol
 
   return {
     reportId: 'cashup-snapshot',

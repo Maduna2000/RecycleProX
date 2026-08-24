@@ -10,6 +10,7 @@ import { CategoryFilterSelect } from '@/components/products/CategoryFilterSelect
 import { colors, fontSize } from '@/lib/design-tokens'
 import { inp, BtnMenu, Field, PortalPage, FilterBar } from '@/components/rpx'
 import { fetcher } from '@/lib/swrFetcher'
+import { useSystemCurrency } from '@/hooks/useSystemCurrency'
 
 
 type GridRow = {
@@ -28,6 +29,7 @@ type GridRow = {
 }
 
 export default function StockGridPage() {
+  const { symbol: currSym } = useSystemCurrency()
   const today = new Date().toISOString().slice(0, 10)
   const [gridPeriod,   setGridPeriod]   = useState<'daily' | 'weekly' | 'mtd'>('mtd')
   const [gridDate,     setGridDate]     = useState(today)
@@ -141,11 +143,11 @@ export default function StockGridPage() {
     },
     {
       key: 'closingValue',
-      header: 'Value (R)',
+      header: `Value (${currSym})`,
       width: '96px',
       align: 'right',
       render: (r) => (
-        <span className="font-mono text-xs" style={{ color: colors.textPrimary }}>R {r.closingValue}</span>
+        <span className="font-mono text-xs" style={{ color: colors.textPrimary }}>{currSym} {r.closingValue}</span>
       ),
     },
   ]

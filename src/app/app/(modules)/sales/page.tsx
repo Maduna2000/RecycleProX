@@ -13,6 +13,7 @@ import { Dialog } from '@/components/ui/dialog'
 import { format } from '@/lib/utils/format'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
 import { fetcher } from '@/lib/swrFetcher'
+import { useSystemCurrency } from '@/hooks/useSystemCurrency'
 import { canAutoPrint, autoPrintReceipt } from '@/lib/print/autoPrintClient'
 import {
   inp, lbl, Btn, Field, PortalPage, FilterBar,
@@ -60,6 +61,7 @@ export default function SalesPage() {
   const router = useRouter()
   const { data: session } = useSession()
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
+  const { symbol: currSym } = useSystemCurrency()
 
   const [search,        setSearch]        = useState('')
   const [status,        setStatus]        = useState('')
@@ -145,7 +147,7 @@ export default function SalesPage() {
       align: 'right',
       render: (row) => (
         <span className="font-mono font-semibold" style={{ color: colors.textPrimary }}>
-          R {new Decimal(row.totalAmount).toFixed(2)}
+          {currSym} {new Decimal(row.totalAmount).toFixed(2)}
         </span>
       ),
     },
@@ -375,10 +377,10 @@ export default function SalesPage() {
                         {new Decimal(line.quantity).toFixed(2)} {line.product.unit}
                       </td>
                       <td className="font-mono" style={{ padding: '4px 12px 4px 0', color: colors.textSecondary }}>
-                        R {new Decimal(line.unitPrice).toFixed(2)}
+                        {currSym} {new Decimal(line.unitPrice).toFixed(2)}
                       </td>
                       <td className="font-mono font-semibold" style={{ padding: '4px 0', color: colors.textPrimary }}>
-                        R {new Decimal(line.lineTotal).toFixed(2)}
+                        {currSym} {new Decimal(line.lineTotal).toFixed(2)}
                       </td>
                     </tr>
                   ))}
@@ -389,7 +391,7 @@ export default function SalesPage() {
                       Total
                     </td>
                     <td className="font-mono font-bold" style={{ padding: '6px 0 0', fontSize: fontSize.base, color: colors.textPrimary }}>
-                      R {new Decimal(detail.totalAmount).toFixed(2)}
+                      {currSym} {new Decimal(detail.totalAmount).toFixed(2)}
                     </td>
                   </tr>
                 </tfoot>
@@ -441,6 +443,7 @@ function VoidDialog({
 }) {
   const [reason,  setReason]  = useState('')
   const [loading, setLoading] = useState(false)
+  const { symbol: currSym } = useSystemCurrency()
 
   async function onConfirm() {
     if (reason.trim().length < 5) { toast.error('Reason must be at least 5 characters'); return }
@@ -468,7 +471,7 @@ function VoidDialog({
           <p style={{ fontSize: 12.5, color: colors.textSecondary, margin: '0 0 12px' }}>
             You are about to void{' '}
             <span style={{ fontWeight: 600, color: colors.textPrimary }}>{sale.refNumber}</span>
-            {' '}(R {new Decimal(sale.totalAmount).toFixed(2)}). This cannot be undone.
+            {' '}({currSym} {new Decimal(sale.totalAmount).toFixed(2)}). This cannot be undone.
           </p>
           <span style={lbl}>Reason for void</span>
           <input
@@ -507,6 +510,7 @@ function ReversePaymentDialog({
 }) {
   const [reason,  setReason]  = useState('')
   const [loading, setLoading] = useState(false)
+  const { symbol: currSym } = useSystemCurrency()
 
   async function onConfirm() {
     if (reason.trim().length < 5) { toast.error('Reason must be at least 5 characters'); return }
@@ -534,7 +538,7 @@ function ReversePaymentDialog({
           <p style={{ fontSize: 12.5, color: colors.textSecondary, margin: '0 0 12px' }}>
             Send{' '}
             <span style={{ fontWeight: 600, color: colors.textPrimary }}>{sale.refNumber}</span>
-            {' '}(R {new Decimal(sale.totalAmount).toFixed(2)}) back to unpaid. The sale and its stock stay as-is —
+            {' '}({currSym} {new Decimal(sale.totalAmount).toFixed(2)}) back to unpaid. The sale and its stock stay as-is —
             only the payment is undone, and it will need to be settled again.
           </p>
           <span style={lbl}>Reason for reversal</span>

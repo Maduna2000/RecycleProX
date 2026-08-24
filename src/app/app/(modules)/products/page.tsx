@@ -16,6 +16,7 @@ import { useSession } from 'next-auth/react'
 import Decimal from 'decimal.js'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
 import { fetcher } from '@/lib/swrFetcher'
+import { useSystemCurrency } from '@/hooks/useSystemCurrency'
 import {
   inp,
   Btn, Field, PortalPage, FilterBar,
@@ -54,6 +55,7 @@ export default function ProductsPage() {
   const router       = useRouter()
   const searchParams = useSearchParams()
   const { data: session } = useSession()
+  const { symbol: currSym } = useSystemCurrency()
   const [search,        setSearch]       = useState('')
   const [category,      setCategory]     = useState('')
   const [statusFilter,  setStatus]       = useState('active')
@@ -157,8 +159,8 @@ export default function ProductsPage() {
       },
     },
     { key: 'unit', header: 'Unit', width: '64px', render: (p) => <span style={{ textTransform: 'uppercase', color: '#6C757D', fontSize: 11 }}>{p.unit}</span> },
-    { key: 'buyPrice', header: 'Buy Price', width: '90px', align: 'right', render: (p) => <span style={{ fontFamily: 'monospace', color: colors.action }}>R {new Decimal(p.defaultBuyPrice).toFixed(2)}</span> },
-    { key: 'sellPrice', header: 'Sell Price', width: '90px', align: 'right', render: (p) => <span style={{ fontFamily: 'monospace', color: colors.process }}>R {new Decimal(p.defaultSellPrice).toFixed(2)}</span> },
+    { key: 'buyPrice', header: 'Buy Price', width: '90px', align: 'right', render: (p) => <span style={{ fontFamily: 'monospace', color: colors.action }}>{currSym} {new Decimal(p.defaultBuyPrice).toFixed(2)}</span> },
+    { key: 'sellPrice', header: 'Sell Price', width: '90px', align: 'right', render: (p) => <span style={{ fontFamily: 'monospace', color: colors.process }}>{currSym} {new Decimal(p.defaultSellPrice).toFixed(2)}</span> },
     {
       key: 'margin', header: 'Margin', width: '70px', align: 'right',
       render: (p) => { const m = calcMargin(p.defaultBuyPrice, p.defaultSellPrice); return <span style={{ fontFamily: 'monospace', fontWeight: 600, color: m.color }}>{m.pct}</span> },
@@ -303,6 +305,7 @@ export default function ProductsPage() {
 function CreateProductModal({ categories, onClose, onSuccess }: { categories: CategoryItem[]; onClose: () => void; onSuccess: () => void }) {
   const [loading, setLoading] = useState(false)
   const [category, setCategory] = useState('')
+  const { symbol: currSym } = useSystemCurrency()
   const { register, handleSubmit, setValue, formState: { errors } } = useForm<CreateProductFormInput, unknown, CreateProductInput>({
     resolver: zodResolver(CreateProductSchema),
     defaultValues: { unit: 'kg', isActive: true, sortOrder: 0 },
@@ -364,11 +367,11 @@ function CreateProductModal({ categories, onClose, onSuccess }: { categories: Ca
             {errors.category && <p className="text-xs text-red-600 mt-1">{errors.category.message}</p>}
           </Field>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Buy Price (R)">
+            <Field label={`Buy Price (${currSym})`}>
               <input {...register('defaultBuyPrice')} style={{ ...inp, marginTop: 4 }} placeholder="0.00" disabled={loading} />
               {errors.defaultBuyPrice && <p className="text-xs text-red-600 mt-1">{errors.defaultBuyPrice.message}</p>}
             </Field>
-            <Field label="Sell Price (R)">
+            <Field label={`Sell Price (${currSym})`}>
               <input {...register('defaultSellPrice')} style={{ ...inp, marginTop: 4 }} placeholder="0.00" disabled={loading} />
               {errors.defaultSellPrice && <p className="text-xs text-red-600 mt-1">{errors.defaultSellPrice.message}</p>}
             </Field>
@@ -389,6 +392,7 @@ function CreateProductModal({ categories, onClose, onSuccess }: { categories: Ca
 function EditProductModal({ product, categories, onClose, onSuccess }: { product: Product; categories: CategoryItem[]; onClose: () => void; onSuccess: () => void }) {
   const [loading, setLoading] = useState(false)
   const [category, setCategory] = useState(product.category)
+  const { symbol: currSym } = useSystemCurrency()
   const { register, handleSubmit, setValue, formState: { errors } } = useForm<UpdateProductInput>({
     resolver: zodResolver(UpdateProductSchema),
     defaultValues: {
@@ -452,11 +456,11 @@ function EditProductModal({ product, categories, onClose, onSuccess }: { product
             </Field>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Buy Price (R)">
+            <Field label={`Buy Price (${currSym})`}>
               <input {...register('defaultBuyPrice')} style={{ ...inp, marginTop: 4 }} disabled={loading} />
               {errors.defaultBuyPrice && <p className="text-xs text-red-600 mt-1">{errors.defaultBuyPrice.message}</p>}
             </Field>
-            <Field label="Sell Price (R)">
+            <Field label={`Sell Price (${currSym})`}>
               <input {...register('defaultSellPrice')} style={{ ...inp, marginTop: 4 }} disabled={loading} />
               {errors.defaultSellPrice && <p className="text-xs text-red-600 mt-1">{errors.defaultSellPrice.message}</p>}
             </Field>
@@ -529,6 +533,7 @@ function BulkPriceModal({ products, categoryOrder, onClose, onSuccess }: {
   const [loading, setLoading] = useState(false)
   const [preview, setPreview] = useState(false)
   const [reason,  setReason]  = useState('')
+  const { symbol: currSym } = useSystemCurrency()
   const [prices, setPrices]   = useState<Record<string, { buy: string; sell: string }>>(() =>
     Object.fromEntries(products.map((p) => [p.id, {
       buy:  Number(p.defaultBuyPrice).toFixed(2),
@@ -613,7 +618,7 @@ function BulkPriceModal({ products, categoryOrder, onClose, onSuccess }: {
             <table className="w-full" style={{ fontSize: fontSize.sm, borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ borderBottom: `1px solid ${colors.border}` }}>
-                  {['Product', 'Buy Price (R)', 'Sell Price (R)'].map((h) => (
+                  {['Product', `Buy Price (${currSym})`, `Sell Price (${currSym})`].map((h) => (
                     <th key={h} className="text-left px-2 py-1.5 uppercase" style={{ fontSize: fontSize.xs, fontWeight: fontWeight.semibold, color: colors.textSecondary }}>
                       {h}
                     </th>
@@ -705,10 +710,10 @@ function BulkPriceModal({ products, categoryOrder, onClose, onSuccess }: {
                       <p style={{ fontWeight: fontWeight.medium, color: colors.textPrimary }}>{p.name}</p>
                       <p className="font-mono" style={{ fontSize: fontSize.xs, color: colors.textMuted }}>{p.code}</p>
                     </td>
-                    <td className="px-3 py-2 font-mono" style={{ color: colors.textSecondary }}>R {Number(p.defaultBuyPrice).toFixed(2)}</td>
-                    <td className="px-3 py-2 font-mono font-semibold" style={{ color: colors.action }}>R {Number(prices[p.id]?.buy).toFixed(2)}</td>
-                    <td className="px-3 py-2 font-mono" style={{ color: colors.textSecondary }}>R {Number(p.defaultSellPrice).toFixed(2)}</td>
-                    <td className="px-3 py-2 font-mono font-semibold" style={{ color: colors.process }}>R {Number(prices[p.id]?.sell).toFixed(2)}</td>
+                    <td className="px-3 py-2 font-mono" style={{ color: colors.textSecondary }}>{currSym} {Number(p.defaultBuyPrice).toFixed(2)}</td>
+                    <td className="px-3 py-2 font-mono font-semibold" style={{ color: colors.action }}>{currSym} {Number(prices[p.id]?.buy).toFixed(2)}</td>
+                    <td className="px-3 py-2 font-mono" style={{ color: colors.textSecondary }}>{currSym} {Number(p.defaultSellPrice).toFixed(2)}</td>
+                    <td className="px-3 py-2 font-mono font-semibold" style={{ color: colors.process }}>{currSym} {Number(prices[p.id]?.sell).toFixed(2)}</td>
                   </tr>
                 ))}
               </tbody>

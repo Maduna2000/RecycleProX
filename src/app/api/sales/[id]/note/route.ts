@@ -3,10 +3,9 @@ import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import Decimal from 'decimal.js'
 import { prisma } from '@/lib/db/prisma'
-import { getAllSettings, LOGO_SETTING_KEY } from '@/lib/services/settingsService'
+import { getAllSettings, LOGO_SETTING_KEY, currencySymbolFromSettings } from '@/lib/services/settingsService'
 import { fetchR2Bytes } from '@/lib/r2'
 import { saleLineVat } from '@/lib/utils/vat'
-import { CURRENCY_SYMBOLS } from '@/lib/schemas/cashup'
 import { generateTransactionNote, type NoteLine } from '@/lib/pdf/transactionNote'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
@@ -27,7 +26,7 @@ export async function GET(
   const download = req.nextUrl.searchParams.get('download') === '1'
 
   try {
-    const { sale, settings, doneByUser, latestCashUp } = await runWithRequestTenant(req, async () => {
+    const { sale, settings, doneByUser } = await runWithRequestTenant(req, async () => {
       const sale = await prisma.sale.findUnique({
         where: { id },
         include: {
@@ -37,19 +36,17 @@ export async function GET(
       })
       if (!sale) throw new SaleNotFoundForNoteError()
 
-      const [settings, doneByUser, latestCashUp] = await Promise.all([
+      const [settings, doneByUser] = await Promise.all([
         getAllSettings(),
         sale.createdByUserId
           ? prisma.user.findUnique({ where: { id: sale.createdByUserId }, select: { fullName: true } })
           : null,
-        prisma.cashUp.findFirst({ orderBy: { sessionDate: 'desc' }, select: { currency: true } }),
       ])
-      return { sale, settings, doneByUser, latestCashUp }
+      return { sale, settings, doneByUser }
     })
     const logoKey = settings[LOGO_SETTING_KEY]
     const logoPng = logoKey ? await fetchR2Bytes(logoKey) : null
-    const currencySymbol =
-      CURRENCY_SYMBOLS[latestCashUp?.currency as keyof typeof CURRENCY_SYMBOLS] ?? 'R'
+    const currencySymbol = currencySymbolFromSettings(settings)
 
     const saleHasVat = new Decimal(sale.vatAmount.toString()).greaterThan(0)
     const lines: NoteLine[] = sale.lines.map((l) => {

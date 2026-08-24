@@ -7,7 +7,8 @@ import { toast } from 'sonner'
 import { Dialog } from '@/components/ui/dialog'
 import { colors } from '@/lib/design-tokens'
 import Decimal from 'decimal.js'
-import { CASHUP_REPORT_LABELS, type CashupReportType, CURRENCY_SYMBOLS } from '@/lib/schemas/cashup'
+import { CASHUP_REPORT_LABELS, type CashupReportType } from '@/lib/schemas/cashup'
+import { currencySymbolFor } from '@/lib/constants/currencies'
 import { Btn, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
 
 async function fetcher(url: string) {
@@ -175,7 +176,7 @@ export function PreviousReportsModal({ onClose }: PreviousReportsModalProps) {
                   {sessions.map((s, i) => {
                     const dateStr = s.sessionDate.split('T')[0]
                     const variance = s.variance ? new Decimal(s.variance) : null
-                    const currSym = CURRENCY_SYMBOLS[s.currency as keyof typeof CURRENCY_SYMBOLS] ?? 'R'
+                    const currSym = currencySymbolFor(s.currency)
                     const isSelected = selectedSession === s.id
 
                     return (

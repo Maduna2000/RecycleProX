@@ -9,6 +9,7 @@ import { colors } from '@/lib/design-tokens'
 import { Btn, inp, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
 import { AdminPinUnlockModal, type BusinessLoanFullSummary } from '@/components/business-loans/AdminPinUnlockModal'
 import { useOfflineMutation } from '@/hooks/useOfflineFetch'
+import { useSystemCurrency } from '@/hooks/useSystemCurrency'
 
 export type SaleSplitPayTarget = {
   id: string
@@ -40,6 +41,7 @@ function PaymentInput({
   onUnlockClick?: () => void
   highlight?: boolean
 }) {
+  const { symbol: currSym } = useSystemCurrency()
   return (
     <div className="flex items-center gap-2">
       <div className="w-32 flex items-center gap-1.5" style={{ color: highlight ? colors.alertIcon : '#6C757D' }}>
@@ -59,7 +61,7 @@ function PaymentInput({
           </button>
         ) : (
           <>
-            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs" style={{ color: '#6C757D' }}>R</span>
+            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs" style={{ color: '#6C757D' }}>{currSym}</span>
             <input
               type="text"
               inputMode="decimal"
@@ -102,6 +104,7 @@ export function SaleSplitPaymentModal({
   const [pinModalOpen, setPinModalOpen] = useState(false)
   const [unlockedSummary, setUnlockedSummary] = useState<BusinessLoanFullSummary | null>(null)
   const { mutate: offlineMutate } = useOfflineMutation()
+  const { symbol: currSym } = useSystemCurrency()
 
   const totalAmount        = new Decimal(sale.totalAmount)
   const existingDeduction  = new Decimal(sale.businessLoanDeductionAmount || '0')
@@ -129,7 +132,7 @@ export function SaleSplitPaymentModal({
     if (paymentTotal.isZero()) return 'Enter at least one payment amount'
     if (paymentTotal.greaterThan(pendingAmount)) return 'Total exceeds pending amount'
     if (businessLoanAmt.greaterThan(maxLoanDeduction)) return 'Business loan deduction exceeds outstanding balance'
-    if (remaining.greaterThan(0)) return `Full payment required. R ${remaining.toFixed(2)} still remaining.`
+    if (remaining.greaterThan(0)) return `Full payment required. ${currSym} ${remaining.toFixed(2)} still remaining.`
     return null
   }
 
@@ -184,7 +187,7 @@ export function SaleSplitPaymentModal({
                 <div className="flex justify-between items-center">
                   <span className="text-xs font-medium" style={{ color: colors.alertIcon }}>Amount to Pay (Full Payment Required)</span>
                   <span className="font-mono font-bold" style={{ fontSize: 16, color: colors.alertIcon }}>
-                    R {pendingAmount.toFixed(2)}
+                    {currSym} {pendingAmount.toFixed(2)}
                   </span>
                 </div>
               </div>
@@ -198,7 +201,7 @@ export function SaleSplitPaymentModal({
                     </p>
                     <p className="text-xs" style={{ color: colors.alertText }}>
                       {unlockedSummary
-                        ? `Outstanding: R ${new Decimal(unlockedSummary.outstanding).toFixed(2)} — you may apply some or all of this sale toward it.`
+                        ? `Outstanding: ${currSym} ${new Decimal(unlockedSummary.outstanding).toFixed(2)} — you may apply some or all of this sale toward it.`
                         : 'Enter an admin PIN to view the balance and apply it toward this sale.'}
                     </p>
                   </div>
@@ -226,11 +229,11 @@ export function SaleSplitPaymentModal({
               <div className="border-t pt-3 space-y-1">
                 <div className="flex justify-between text-xs" style={{ color: '#6C757D' }}>
                   <span>Payment Total</span>
-                  <span className="font-mono">R {paymentTotal.toFixed(2)}</span>
+                  <span className="font-mono">{currSym} {paymentTotal.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-xs font-medium" style={{ color: remaining.isZero() ? colors.action : colors.danger }}>
                   <span>{remaining.isZero() ? 'Fully Covered' : remaining.lessThan(0) ? 'Over-payment' : 'Remaining (Must be R 0.00)'}</span>
-                  <span className="font-mono">{remaining.isZero() ? '✓' : `R ${remaining.abs().toFixed(2)}`}</span>
+                  <span className="font-mono">{remaining.isZero() ? '✓' : `${currSym} ${remaining.abs().toFixed(2)}`}</span>
                 </div>
               </div>
 
