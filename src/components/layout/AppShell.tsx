@@ -112,6 +112,16 @@ function useToolbarButtons(pathname: string, role: string): ToolbarButton[] {
     ]
   }
 
+  if (pathname === '/app/police-register' || pathname.startsWith('/app/police-register/')) {
+    const isGenerate = pathname === '/app/police-register'
+    const isHistory  = pathname === '/app/police-register/history'
+    return [
+      { label: 'Generate Register', icon: ClipboardList, href: '/app/police-register',         variant: isGenerate ? 'primary' : 'secondary' as const },
+      { label: 'Visit History',     icon: History,       href: '/app/police-register/history', variant: isHistory  ? 'primary' : 'secondary' as const },
+      { label: 'Officer Portal',    icon: ShieldCheck,   href: '/police',                       variant: 'ghost' as const },
+    ]
+  }
+
   if (pathname === '/app/stock' || pathname.startsWith('/app/stock/')) {
     const isOnHand    = pathname === '/app/stock'
     const isMovements = pathname === '/app/stock/movements'

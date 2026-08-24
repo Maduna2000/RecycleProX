@@ -13,6 +13,7 @@ const PAGE_WIDTH_CAPS: { test: RegExp; width: number }[] = [
   // detail page above (760 main + 200 sidebar), so same width.
   { test: /^\/app\/casual\/[^/]+$/, width: 960 },
   { test: /^\/app\/police-register$/, width: 960 },
+  { test: /^\/app\/police-register\/history$/, width: 960 },
   // Matches Float's own `max-w-3xl` (768px) content wrapper.
   { test: /^\/app\/float$/, width: 768 },
   // Matches Cash-Up's own `max-w-6xl` (1152px) content wrapper.

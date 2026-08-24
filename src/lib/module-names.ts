@@ -35,6 +35,7 @@ export const MODULE_NAMES: Record<string, string> = {
   '/app/loans':            'Loans',
   '/app/photos':           'Photo Viewer',
   '/app/police-register':  'Police Register',
+  '/app/police-register/history': 'Visit History',
   '/app/audit-log':        'Audit Log',
   '/app/change-password':  'Change Password',
   '/app/scale':            'Scale Station',

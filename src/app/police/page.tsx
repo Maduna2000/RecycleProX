@@ -23,7 +23,7 @@ import { DEFAULT_POLICE_SERVICE_NAME, DEFAULT_POLICE_LEGAL_NOTE } from '@/lib/po
 import { colors } from '@/lib/design-tokens'
 import {
   NAVY, HEADER_GRAD, inp, lbl, TH, TD,
-  Btn, Field, TabStrip, EmptyHint, SectionLabel, DL, Drawer,
+  Btn, Field, EmptyHint, SectionLabel, DL, Drawer,
   RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter,
 } from '@/components/rpx'
 import { Dialog } from '@/components/ui/dialog'
@@ -460,16 +460,29 @@ function ActiveSession({
         <Btn variant="danger" icon={Pen} onClick={() => setSigOpen(true)}>End Inspection &amp; Sign</Btn>
       </div>
 
-      {/* Tabs */}
-      <TabStrip
-        tabs={TABS}
-        active={tab}
-        onChange={(v) => setTab(v as SearchTab)}
-        style={{ padding: '8px 16px 0' }}
-      />
+      {/* Search mode — buttons rather than folder tabs, matching the
+          toolbar-button navigation used everywhere else in the system
+          (e.g. Gate/Scale/Police Register) now that folder tabs have been
+          phased out in favor of consistent, always-visible nav buttons. */}
+      <div style={{ display: 'flex', gap: 6, padding: '8px 16px 0' }}>
+        {TABS.map((t) => (
+          <Btn
+            key={t.value}
+            size="sm"
+            variant={tab === t.value ? 'primary' : 'secondary'}
+            icon={t.icon}
+            onClick={() => setTab(t.value)}
+          >
+            {t.label}
+          </Btn>
+        ))}
+      </div>
 
-      {/* Tab content */}
-      <div style={{ flex: 1, minHeight: 0, margin: '0 16px 16px', background: '#fff', border: '1px solid #B0B0B0', borderRadius: '0 3px 3px 3px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      {/* Tab content — margin-top matches the button row's own gap above,
+          since the content card no longer shares a seam with an attached
+          folder tab (uniform radius, not the asymmetric "attached" shape
+          that used to fuse with TabStrip's square top-left corner). */}
+      <div style={{ flex: 1, minHeight: 0, margin: '10px 16px 16px', background: '#fff', border: '1px solid #B0B0B0', borderRadius: 3, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         {tab === 'register' && <RegisterTab visitId={visit.id} guardedFetch={guardedFetch} />}
         {tab === 'person'   && <PersonTab   visitId={visit.id} guardedFetch={guardedFetch} />}
         {tab === 'goods'    && <GoodsTab    visitId={visit.id} guardedFetch={guardedFetch} />}

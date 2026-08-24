@@ -3,9 +3,9 @@
 import { useSession } from 'next-auth/react'
 import { colors } from '@/lib/design-tokens'
 import { PortalPage } from '@/components/rpx'
-import { GenerateRegisterTab } from './PoliceRegisterTabs'
+import { VisitHistoryTab } from '../PoliceRegisterTabs'
 
-export default function PoliceRegisterPage() {
+export default function PoliceVisitHistoryPage() {
   const { data: session } = useSession()
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
 
@@ -17,11 +17,9 @@ export default function PoliceRegisterPage() {
     )
   }
 
-  // Capped and centered (see src/lib/pageWidthCaps.ts, which PageTitleBar
-  // reads to cap/border itself to match).
   return (
     <PortalPage maxWidth={960}>
-      <GenerateRegisterTab />
+      <VisitHistoryTab />
     </PortalPage>
   )
 }
