@@ -20,7 +20,12 @@ const STYLES: Record<ActiveBanner['type'], { bg: string; fg: string; icon: React
 // permanently suppressed.
 export function BannerBar({ banners }: { banners: ActiveBanner[] }) {
   const [dismissed, setDismissed] = useState<Set<string>>(new Set())
-  const visible = banners.filter((b) => !dismissed.has(b.id))
+  // LicenseGate already renders its own subscription-expiry countdown
+  // banner inside Electron (computed offline from licenseManager.js's
+  // cache) — this one comes from a live Server Component DB read, so
+  // showing both here would just duplicate it.
+  const isElectron = typeof window !== 'undefined' && !!window.electronAPI
+  const visible = banners.filter((b) => !dismissed.has(b.id) && !(isElectron && b.id === 'subscription-expiry-countdown'))
   if (visible.length === 0) return null
 
   return (

@@ -13,6 +13,9 @@ interface ElectronAPI {
   openCashDrawer:   () => Promise<boolean>
   activateDevice:   (activationCode: string) => Promise<unknown>
   getLicenseStatus: () => Promise<LicenseStatus>
+  // Unlike getLicenseStatus (a pure cache read), forces a real heartbeat to
+  // the Portal first — falls back to the cached state if unreachable.
+  recheckLicense:   () => Promise<LicenseStatus>
   // Auto-updater — see electron/main.js's setupAutoUpdater. Returns an
   // unsubscribe function, matching the addEventListener-style convention.
   onUpdateStatus:   (callback: (status: UpdateStatus) => void) => () => void
@@ -34,6 +37,14 @@ declare global {
     reason?:         string
     daysSinceCheck?: number
     offlineGraceDays?: number
+    // Whether the 'blocked' state can be cleared by redeeming an activation
+    // key (a lapsed subscription) vs. only by an admin (a manual suspend).
+    canReactivate?: boolean
+    // Both computed purely from cached data (see licenseManager.js's
+    // computeSubscriptionCountdown) — subscriptionDaysUntilDue is only
+    // non-null inside the 7-day pre-expiry window, never once truly expired.
+    subscriptionDaysUntilDue?: number | null
+    subscriptionDueDate?: string | null
   }
 
   // Mirrors electron/main.js's sendUpdateStatus() payload shape.

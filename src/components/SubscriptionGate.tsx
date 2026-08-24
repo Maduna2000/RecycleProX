@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { KeyRound, ShieldAlert } from 'lucide-react'
 import { Dialog } from '@/components/ui/dialog'
@@ -13,16 +13,24 @@ interface SubscriptionGateProps {
   children: React.ReactNode
 }
 
-// The web counterpart of LicenseGate's blocking dialog (that one only runs
-// inside Electron) — locked once the subscription is past its grace period
-// (see subscriptionAccess.ts / graceEndsAt on the Tenant row). Same
-// non-dismissable modal pattern: children stay mounted underneath, the
-// dialog can't be closed except by a successful reactivation.
+// The web counterpart of LicenseGate's blocking dialog. Deliberately a
+// no-op inside Electron (window.electronAPI defined) — LicenseGate already
+// covers this there, from licenseManager.js's offline-cached state, which
+// this component's live `blocked` prop (a Server Component's DB read) can't
+// match: it fails open on a connectivity hiccup rather than staying locked,
+// the opposite of what a lapsed-subscription gate should do offline. Two
+// gates independently deciding whether to show a blocking dialog would also
+// just stack two modals on top of each other for no benefit.
 export function SubscriptionGate({ blocked, dueDateLabel, children }: SubscriptionGateProps) {
   const router = useRouter()
   const [code, setCode] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [isElectron, setIsElectron] = useState(false)
+
+  useEffect(() => {
+    setIsElectron(!!window.electronAPI)
+  }, [])
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -52,7 +60,7 @@ export function SubscriptionGate({ blocked, dueDateLabel, children }: Subscripti
     <>
       {children}
 
-      <Dialog open={blocked} modal onOpenChange={() => {}}>
+      <Dialog open={blocked && !isElectron} modal onOpenChange={() => {}}>
         <RpxDialogContent maxWidth={380} style={{ textAlign: 'center' }}>
           <RpxDialogHeader title="Subscription expired" icon={ShieldAlert} />
           <RpxDialogBody>

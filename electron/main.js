@@ -648,6 +648,22 @@ ipcMain.handle('license-activate', async (_event, activationCode) => {
 
 ipcMain.handle('license-status', () => licenseManager.getAccessState())
 
+// Unlike license-status (a pure cache read), this forces a real heartbeat
+// round-trip to the Portal first — used after the LicenseGate's "Retry" and
+// its activation-key form (a redeemed reactivation code doesn't itself
+// touch electron-store; only a fresh heartbeat's response does, via the
+// same store.set('lastKnownStatus', ...) activate()/heartbeat() already do).
+// Falls back to the last cached state if the Portal is unreachable, same as
+// the background heartbeat loop's own error handling.
+ipcMain.handle('license-recheck', async () => {
+  try {
+    await licenseManager.heartbeat(PORTAL_BASE_URL, app.getVersion())
+  } catch {
+    // Offline or Portal unreachable — fall through to whatever's cached.
+  }
+  return licenseManager.getAccessState()
+})
+
 // ─── IPC: Thermal print ───────────────────────────────────────────────────────
 
 ipcMain.handle('print-slip', async (_event, data) => {

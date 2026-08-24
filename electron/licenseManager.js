@@ -147,30 +147,66 @@ async function reportFatalError(portalBaseUrl, appVersion, reason, message) {
   }
 }
 
+const SUBSCRIPTION_COUNTDOWN_WINDOW_DAYS = 7
+
+// Same day-math as Web's subscriptionAccess.ts computeSubscriptionAccess(),
+// duplicated rather than imported since this file is plain CJS running in
+// Electron's main process — kept in sync by hand, small enough that drift
+// would be obvious in review. Purely a function of subscriptionEndDate/
+// gracePeriodDays, both already cached in lastKnownStatus (heartbeat/activate
+// responses — see deviceService.ts's buildLicenseCheckResult on the Portal
+// side), so this needs no network or DB access either.
+function computeSubscriptionCountdown(lastKnownStatus) {
+  const endDateStr = lastKnownStatus?.subscriptionEndDate
+  if (!endDateStr) return { subscriptionDaysUntilDue: null, subscriptionDueDate: null }
+
+  const endDate = new Date(endDateStr)
+  const daysUntilDue = Math.ceil((endDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+  const inCountdownWindow = lastKnownStatus.effectiveStatus !== 'expired' && daysUntilDue >= 0 && daysUntilDue <= SUBSCRIPTION_COUNTDOWN_WINDOW_DAYS
+
+  return {
+    subscriptionDaysUntilDue: inCountdownWindow ? daysUntilDue : null,
+    subscriptionDueDate: endDateStr,
+  }
+}
+
 // Computed purely from local state — callable while offline. One of:
 //   'not_activated' | 'blocked' | 'normal' | 'grace_warning' | 'read_only'
 // 'blocked' reflects the last known server verdict (subscription/company
 // suspended etc.) — that state persists offline on purpose, so a suspended
-// customer can't dodge suspension by disconnecting.
+// customer can't dodge suspension by disconnecting. Every state also carries
+// subscriptionDaysUntilDue/subscriptionDueDate (both possibly null) so the
+// renderer can show the pre-expiry countdown banner regardless of which
+// state above is active.
 function getAccessState(offlineGraceDays = DEFAULT_OFFLINE_GRACE_DAYS) {
   if (!isActivated()) return { state: 'not_activated' }
 
   const lastKnownStatus = store.get('lastKnownStatus')
+  const countdown = computeSubscriptionCountdown(lastKnownStatus)
+
   if (lastKnownStatus && lastKnownStatus.allowed === false) {
-    return { state: 'blocked', reason: lastKnownStatus.reason }
+    return {
+      state: 'blocked',
+      reason: lastKnownStatus.reason,
+      // Only offer the "enter activation key" path when the block is
+      // actually a lapsed subscription — a company/device suspended by an
+      // admin has no reactivation code to redeem.
+      canReactivate: lastKnownStatus.effectiveStatus === 'expired',
+      ...countdown,
+    }
   }
 
   const lastCheckAt = store.get('lastCheckAt')
-  if (!lastCheckAt) return { state: 'normal' }
+  if (!lastCheckAt) return { state: 'normal', ...countdown }
 
   const daysSinceCheck = (Date.now() - new Date(lastCheckAt).getTime()) / (1000 * 60 * 60 * 24)
   if (daysSinceCheck > offlineGraceDays) {
-    return { state: 'read_only', daysSinceCheck }
+    return { state: 'read_only', daysSinceCheck, ...countdown }
   }
   if (daysSinceCheck > offlineGraceDays - 3) {
-    return { state: 'grace_warning', daysSinceCheck, offlineGraceDays }
+    return { state: 'grace_warning', daysSinceCheck, offlineGraceDays, ...countdown }
   }
-  return { state: 'normal' }
+  return { state: 'normal', ...countdown }
 }
 
 function startHeartbeatLoop(portalBaseUrl, appVersion, onResult) {
