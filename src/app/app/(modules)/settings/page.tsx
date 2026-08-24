@@ -14,6 +14,7 @@ import { inp, HEADER_GRAD, NAVY, Btn, Field, PortalPage, winBevel } from '@/comp
 import { TradeCommoditiesModal } from './_components/TradeCommoditiesModal'
 import { fetcher } from '@/lib/swrFetcher'
 import { WORLD_CURRENCIES, DEFAULT_CURRENCY_CODE } from '@/lib/constants/currencies'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 
 type ScaleType   = 'none' | 'tcp' | 'serial'
@@ -318,11 +319,16 @@ export default function SettingsPage() {
                     <input value={form.yardPhone ?? ''} onChange={(e) => set('yardPhone', e.target.value)} placeholder="+27 12 345 6789" style={inp} />
                   </Field>
                   <Field label="Currency" hint="Used everywhere money is shown — cash-up, reports, receipts, float.">
-                    <select value={form.currency ?? DEFAULT_CURRENCY_CODE} onChange={(e) => set('currency', e.target.value)} style={inp}>
-                      {WORLD_CURRENCIES.map((c) => (
-                        <option key={c.code} value={c.code}>{c.symbol} — {c.name} ({c.code})</option>
-                      ))}
-                    </select>
+                    <Select value={form.currency ?? DEFAULT_CURRENCY_CODE} onValueChange={(v) => v && set('currency', v)}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {WORLD_CURRENCIES.map((c) => (
+                          <SelectItem key={c.code} value={c.code}>{c.symbol} — {c.name} ({c.code})</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </Field>
                 </div>
               </div>
