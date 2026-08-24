@@ -8,7 +8,7 @@ import { toast } from 'sonner'
 import { Loader2 } from 'lucide-react'
 import Decimal from 'decimal.js'
 import { colors } from '@/lib/design-tokens'
-import { fetcher } from '@/lib/swrFetcher'
+import { saleDetailFetcher } from '@/lib/offline/fetchers/sales'
 import { SaleForm, type EditingSale } from '../../new/SaleForm'
 
 type FetchedSale = {
@@ -35,7 +35,7 @@ export default function EditSalePage() {
   const { data: session, status: sessionStatus } = useSession()
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
 
-  const { data: sale, isLoading, error } = useSWR<FetchedSale>(`/api/sales/${id}`, fetcher)
+  const { data: sale, isLoading, error } = useSWR<FetchedSale>(`/api/sales/${id}`, saleDetailFetcher)
 
   const canEdit = !!sale && sale.status === 'pending' && new Decimal(sale.amountPaid ?? '0').isZero()
 

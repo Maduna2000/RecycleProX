@@ -11,7 +11,8 @@ import { useSession } from 'next-auth/react'
 import { format } from '@/lib/utils/format'
 import { PhotoUploader, PhotoViewer } from '@/components/PhotoUploader'
 import { colors, layout } from '@/lib/design-tokens'
-import { fetcher } from '@/lib/swrFetcher'
+import { purchaseDetailFetcher } from '@/lib/offline/fetchers/purchases'
+import { OfflineDataBadge } from '@/components/ui/OfflineDataBadge'
 import { useSystemCurrency } from '@/hooks/useSystemCurrency'
 import {
   inp, lbl, TH, TD, HEADER_GRAD, NAVY,
@@ -76,7 +77,7 @@ export default function PurchaseDetailPage() {
   const [voidOpen, setVoidOpen] = useState(false)
   const { symbol: currSym } = useSystemCurrency()
 
-  const { data: purchase, isLoading, error } = useSWR<Purchase>(`/api/purchases/${id}`, fetcher)
+  const { data: purchase, isLoading, error } = useSWR<Purchase>(`/api/purchases/${id}`, purchaseDetailFetcher)
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
 
   if (isLoading) {
@@ -108,7 +109,7 @@ export default function PurchaseDetailPage() {
 
   return (
     <>
-    <PortalPage title={purchase.refNumber}>
+    <PortalPage title={purchase.refNumber} actions={<OfflineDataBadge />}>
         {/* Sub-header: status + payment method */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderBottom: '1px solid #E0E0E0', flexShrink: 0 }}>
           <StatusBadge status={purchase.status} />

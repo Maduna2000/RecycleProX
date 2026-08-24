@@ -13,7 +13,8 @@ import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
 import { format } from '@/lib/utils/format'
 import { toast } from 'sonner'
 import { useSession } from 'next-auth/react'
-import { fetcher } from '@/lib/swrFetcher'
+import { salesListFetcher, saleDetailFetcher } from '@/lib/offline/fetchers/sales'
+import { OfflineDataBadge } from '@/components/ui/OfflineDataBadge'
 import { useSystemCurrency } from '@/hooks/useSystemCurrency'
 import {
   inp, lbl, Btn, Field, PortalPage, FilterBar,
@@ -90,7 +91,7 @@ export default function UnpaidSalesPage() {
   if (to)     query.set('to',     to)
 
   const KEY = `/api/sales?${query}`
-  const { data, isLoading, error } = useSWR<{ sales: Sale[] }>(KEY, fetcher)
+  const { data, isLoading, error } = useSWR<{ sales: Sale[] }>(KEY, salesListFetcher)
   const sales = data?.sales ?? []
 
   const PAGE_SIZE  = 30
@@ -100,7 +101,7 @@ export default function UnpaidSalesPage() {
 
   const { data: detail, isLoading: detailLoading } = useSWR<SaleDetail>(
     selectedId ? `/api/sales/${selectedId}` : null,
-    fetcher,
+    saleDetailFetcher,
   )
 
   // Whether each row's linked customer has an outstanding business loan —
@@ -243,7 +244,7 @@ export default function UnpaidSalesPage() {
     // cap/border itself to match — keeps the unbounded "Buyer" column from
     // stretching to fill the whole window. Same width as Unpaid Purchases,
     // since it's the same table shape.
-    <PortalPage title="Unpaid Sales" maxWidth={1050}>
+    <PortalPage title="Unpaid Sales" maxWidth={1050} actions={<OfflineDataBadge />}>
 
       {/* Grand total banner */}
       {!isLoading && sales.length > 0 && (

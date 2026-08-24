@@ -10,7 +10,8 @@ import { toast } from 'sonner'
 import { useSession } from 'next-auth/react'
 import { DataTable, StatusBadge, Column, RowAction } from '@/components/ui/DataTable'
 import { colors, fontSize } from '@/lib/design-tokens'
-import { fetcher } from '@/lib/swrFetcher'
+import { customersListFetcher } from '@/lib/offline/fetchers/customers'
+import { OfflineDataBadge } from '@/components/ui/OfflineDataBadge'
 import {
   inp, Btn, BtnMenu, Field, FilterBar, PortalPage,
   RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter,
@@ -56,7 +57,7 @@ export default function CasualsPage() {
   if (primaryFunction) params.set('primaryFunction', primaryFunction)
   const { data, isLoading, error } = useSWR<{ customers: Customer[]; total: number }>(
     `/api/customers?${params}`,
-    fetcher,
+    customersListFetcher,
   )
 
   async function handleToolbarExport(format: 'xlsx' | 'pdf') {
@@ -240,7 +241,7 @@ export default function CasualsPage() {
   ]
 
   return (
-    <PortalPage title="Casual Sellers">
+    <PortalPage title="Casual Sellers" actions={<OfflineDataBadge />}>
       <div className="flex flex-col flex-1 min-h-0">
 
         {/* Filter bar */}

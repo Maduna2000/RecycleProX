@@ -13,7 +13,8 @@ import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
 import { format } from '@/lib/utils/format'
 import { toast } from 'sonner'
 import { useSession } from 'next-auth/react'
-import { fetcher } from '@/lib/swrFetcher'
+import { purchasesListFetcher, purchaseDetailFetcher } from '@/lib/offline/fetchers/purchases'
+import { OfflineDataBadge } from '@/components/ui/OfflineDataBadge'
 import { useSystemCurrency } from '@/hooks/useSystemCurrency'
 import {
   inp, lbl, Btn, Field, PortalPage, FilterBar,
@@ -84,7 +85,7 @@ export default function UnpaidPurchasesPage() {
   if (to)     query.set('to',     to)
 
   const KEY = `/api/purchases?${query}`
-  const { data, isLoading, error } = useSWR<{ purchases: Purchase[] }>(KEY, fetcher)
+  const { data, isLoading, error } = useSWR<{ purchases: Purchase[] }>(KEY, purchasesListFetcher)
   const purchases = data?.purchases ?? []
 
   const PAGE_SIZE      = 30
@@ -94,7 +95,7 @@ export default function UnpaidPurchasesPage() {
 
   const { data: detail, isLoading: detailLoading } = useSWR<PurchaseDetail>(
     selectedId ? `/api/purchases/${selectedId}` : null,
-    fetcher,
+    purchaseDetailFetcher,
   )
 
   const grandTotal = purchases.reduce((acc, p) => acc.plus(balance(p)), new Decimal(0))
@@ -209,7 +210,7 @@ export default function UnpaidPurchasesPage() {
     // maxWidth matches src/lib/pageWidthCaps.ts, which PageTitleBar reads to
     // cap/border itself to match — keeps the unbounded "Customer" column
     // from stretching to fill the whole window.
-    <PortalPage title="Unpaid Purchases" maxWidth={1050}>
+    <PortalPage title="Unpaid Purchases" maxWidth={1050} actions={<OfflineDataBadge />}>
 
       {/* Filter bar */}
       <FilterBar>

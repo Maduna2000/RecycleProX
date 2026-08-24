@@ -15,7 +15,9 @@ import { CreateProductSchema, UpdateProductSchema, BulkPriceUpdateSchema, type C
 import { useSession } from 'next-auth/react'
 import Decimal from 'decimal.js'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
-import { fetcher } from '@/lib/swrFetcher'
+import { offlineFetcher } from '@/lib/offline/responseCache'
+import { productsListFetcher } from '@/lib/offline/fetchers/products'
+import { OfflineDataBadge } from '@/components/ui/OfflineDataBadge'
 import { useSystemCurrency } from '@/hooks/useSystemCurrency'
 import {
   inp,
@@ -93,7 +95,7 @@ export default function ProductsPage() {
   })
 
   const swrKey = `/api/products?${query}`
-  const { data, isLoading, error } = useSWR<{ products: Product[] }>(swrKey, fetcher)
+  const { data, isLoading, error } = useSWR<{ products: Product[] }>(swrKey, productsListFetcher)
   const products = data?.products ?? []
 
   const [page, setPage] = useState(1)
@@ -102,7 +104,7 @@ export default function ProductsPage() {
   const safePage   = Math.min(page, totalPages)
   const pagedProducts = products.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
 
-  const { data: catData, mutate: mutateCats } = useSWR<{ categories: CategoryItem[] }>('/api/product-categories', fetcher)
+  const { data: catData, mutate: mutateCats } = useSWR<{ categories: CategoryItem[] }>('/api/product-categories', offlineFetcher)
   const categories: CategoryItem[] = catData?.categories ?? []
   // Flat list of all category names (parents + children) for lookup helpers
   const allCategoryNames: SubCategoryItem[] = categories.flatMap(c => [c, ...c.children])
@@ -186,7 +188,7 @@ export default function ProductsPage() {
     // maxWidth matches src/lib/pageWidthCaps.ts, which PageTitleBar reads to
     // cap/border itself to match — keeps the unbounded "Name" column from
     // stretching to fill the whole window. Same width as Stock On Hand.
-    <PortalPage title={`Products (${products.length})`} maxWidth={1100}>
+    <PortalPage title={`Products (${products.length})`} maxWidth={1100} actions={<OfflineDataBadge />}>
         {/* Filter toolbar */}
         <FilterBar>
           <Field label="Search" width={200}>

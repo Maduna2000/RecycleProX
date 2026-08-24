@@ -11,7 +11,8 @@ import { Dialog } from '@/components/ui/dialog'
 import { CategoryFilterSelect, useProductCategories } from '@/components/products/CategoryFilterSelect'
 import { ProductCategoryPicker } from '@/components/products/ProductCategoryPicker'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
-import { fetcher } from '@/lib/swrFetcher'
+import { offlineFetcher } from '@/lib/offline/responseCache'
+import { OfflineDataBadge } from '@/components/ui/OfflineDataBadge'
 import {
   inp, Btn, Field, PortalPage, FilterBar, BAR_GRAD, winBevel,
   RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter,
@@ -72,7 +73,7 @@ export default function StockPage() {
   // All Time = live levels; a period scopes In/Out to that window with an
   // opening balance carried in
   const stockKey = `/api/stock/on-hand${period ? `?period=${period}&date=${periodDate}` : ''}`
-  const { data: stockData, error: stockError } = useSWR<{ stock: StockEntry[] }>(stockKey, fetcher)
+  const { data: stockData, error: stockError } = useSWR<{ stock: StockEntry[] }>(stockKey, offlineFetcher)
   const { expandCategory } = useProductCategories()
 
   const allStock = stockData?.stock ?? []
@@ -211,7 +212,7 @@ export default function StockPage() {
     // maxWidth matches src/lib/pageWidthCaps.ts, which PageTitleBar reads to
     // cap/border itself to match — keeps the unbounded "Product" column from
     // stretching to fill the whole window.
-    <PortalPage title="Stock On Hand" maxWidth={1100}>
+    <PortalPage title="Stock On Hand" maxWidth={1100} actions={<OfflineDataBadge />}>
       <FilterBar>
         <Field label="Search" width={180}>
           <div style={{ position: 'relative' }}>

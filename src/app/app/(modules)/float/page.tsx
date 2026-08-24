@@ -16,7 +16,9 @@ import { z } from 'zod'
 import { inp, lbl, Btn, PortalPage, PANEL, PANEL_HEAD, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
 import { Dialog } from '@/components/ui/dialog'
 import { DataTable, type Column } from '@/components/ui/DataTable'
-import { fetcher } from '@/lib/swrFetcher'
+import { offlineFetcher } from '@/lib/offline/responseCache'
+import { floatHistoryFetcher } from '@/lib/offline/fetchers/float'
+import { OfflineDataBadge } from '@/components/ui/OfflineDataBadge'
 import { useSystemCurrency } from '@/hooks/useSystemCurrency'
 
 
@@ -85,11 +87,11 @@ export default function FloatPage() {
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
   const { symbol: currSym } = useSystemCurrency()
 
-  const { isLoading: loadingToday } = useSWR<TodayFloatResponse>('/api/float/today', fetcher)
-  const { data: history, isLoading: loadingHistory } = useSWR<CashFloat[]>('/api/float', fetcher)
-  const { data: currentData, mutate: mutateCurrentFloat } = useSWR<CurrentFloatResponse>('/api/float/current', fetcher, { refreshInterval: 5000 })
+  const { isLoading: loadingToday } = useSWR<TodayFloatResponse>('/api/float/today', offlineFetcher)
+  const { data: history, isLoading: loadingHistory } = useSWR<CashFloat[]>('/api/float', floatHistoryFetcher)
+  const { data: currentData, mutate: mutateCurrentFloat } = useSWR<CurrentFloatResponse>('/api/float/current', offlineFetcher, { refreshInterval: 5000 })
   const cashUpKey = '/api/cashup?today=1'
-  const { data: cashUpData, mutate: mutateCashUp } = useSWR<{ cashUp: CashUp | null }>(cashUpKey, fetcher, { refreshInterval: 5000 })
+  const { data: cashUpData, mutate: mutateCashUp } = useSWR<{ cashUp: CashUp | null }>(cashUpKey, offlineFetcher, { refreshInterval: 5000 })
   // Between a session being approved and the next one being opened, no
   // open/submitted session exists for /api/cashup?today=1 to return — fall
   // back to the same carry-forward preview openCashUp itself would use
@@ -97,14 +99,14 @@ export default function FloatPage() {
   // Balance don't drop to R 0.00 during that gap.
   const { data: openingPreview } = useSWR<{ canOpen: boolean; safeOpeningBalance?: string }>(
     cashUpData && !cashUpData.cashUp ? '/api/cashup/opening-balance-preview' : null,
-    fetcher,
+    offlineFetcher,
     { refreshInterval: 5000 },
   )
   // Use the cashup session date for live-stats, not today's date
   // This ensures we get stats for the actual cashup session (which may span past midnight)
   const cashUpSessionDate = cashUpData?.cashUp?.sessionDate?.split('T')[0] ?? todayISO()
   const liveStatsKey = `/api/cashup/live-stats?date=${cashUpSessionDate}`
-  const { data: liveStats, mutate: mutateLiveStats } = useSWR<LiveStats>(liveStatsKey, fetcher, { refreshInterval: 5000 })
+  const { data: liveStats, mutate: mutateLiveStats } = useSWR<LiveStats>(liveStatsKey, offlineFetcher, { refreshInterval: 5000 })
   const [saving, setSaving] = useState(false)
   const [reversingMovement, setReversingMovement] = useState(false)
   const [reversingTarget, setReversingTarget] = useState<FloatMovement | null>(null)
@@ -294,7 +296,7 @@ export default function FloatPage() {
   // floating (see useIsWindowFloating), so this wrapper just needs to fill
   // whatever width it's given now.
   return (
-    <PortalPage title="Cash Float" maxWidth={768}>
+    <PortalPage title="Cash Float" maxWidth={768} actions={<OfflineDataBadge />}>
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
       <div className="w-full space-y-2.5 pb-4" style={{ padding: '8px 8px 0' }}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">

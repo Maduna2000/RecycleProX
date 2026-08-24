@@ -12,7 +12,8 @@ import { InlineDetailPanel } from '@/components/ui/InlineDetailPanel'
 import { Dialog } from '@/components/ui/dialog'
 import { format } from '@/lib/utils/format'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
-import { fetcher } from '@/lib/swrFetcher'
+import { purchasesListFetcher, purchaseDetailFetcher } from '@/lib/offline/fetchers/purchases'
+import { OfflineDataBadge } from '@/components/ui/OfflineDataBadge'
 import { useSystemCurrency } from '@/hooks/useSystemCurrency'
 import { canAutoPrint, autoPrintReceipt } from '@/lib/print/autoPrintClient'
 import {
@@ -95,7 +96,7 @@ export default function PurchasesPage() {
 
   const { data, isLoading, error } = useSWR<{ purchases: Purchase[]; total: number; totalSum: string }>(
     `/api/purchases?${query}`,
-    fetcher,
+    purchasesListFetcher,
   )
   const purchases = data?.purchases ?? []
 
@@ -106,7 +107,7 @@ export default function PurchasesPage() {
 
   const { data: detail, isLoading: detailLoading } = useSWR<PurchaseDetail>(
     selectedId ? `/api/purchases/${selectedId}` : null,
-    fetcher,
+    purchaseDetailFetcher,
   )
 
   const handleSort = useCallback((key: string, dir: SortDir) => {
@@ -250,7 +251,7 @@ export default function PurchasesPage() {
     // cap/border itself to match — keeps the unbounded "Customer" column
     // from stretching to fill the whole window. Same width as Unpaid
     // Purchases so the columns line up between the two views.
-    <PortalPage title="All Purchases" maxWidth={1050}>
+    <PortalPage title="All Purchases" maxWidth={1050} actions={<OfflineDataBadge />}>
       {/* Filters */}
       <FilterBar>
         <Field label="Search" width={230}>

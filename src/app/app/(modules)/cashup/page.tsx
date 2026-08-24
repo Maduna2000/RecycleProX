@@ -22,6 +22,8 @@ import { PreviousReportsModal } from './_components/PreviousReportsModal'
 import { CARD_BORDER } from '@/components/rpx/styles'
 import { Btn, PortalPage, PANEL, PANEL_HEAD, HEADER_GRAD, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
 import { fetcher } from '@/lib/swrFetcher'
+import { offlineFetcher } from '@/lib/offline/responseCache'
+import { OfflineDataBadge } from '@/components/ui/OfflineDataBadge'
 import { useToolbarAction } from '@/stores/toolbarActionStore'
 
 
@@ -836,7 +838,7 @@ export default function CashUpPage() {
   })()
 
   const CASHUP_KEY = '/api/cashup?today=1'
-  const { data, isLoading } = useSWR<{ cashUp: CashUp | null }>(CASHUP_KEY, fetcher)
+  const { data, isLoading } = useSWR<{ cashUp: CashUp | null }>(CASHUP_KEY, offlineFetcher)
   const { code: systemCurrencyCode, symbol: currSym } = useSystemCurrency()
 
   // Use the cashup session date for stats/expenses, not today's date
@@ -847,8 +849,8 @@ export default function CashUpPage() {
   const EXPENSES_KEY = `/api/expenses?from=${sessionDate}&to=${sessionDate}&page=1`
   const MOMO_KEY     = `/api/momo-statements/by-date?date=${sessionDate}`
 
-  const { data: statsData, mutate: refreshStats }    = useSWR<LiveStats>(STATS_KEY, fetcher)
-  const { data: expensesData, mutate: refreshExpenses } = useSWR<{ expenses: ExpenseItem[] }>(EXPENSES_KEY, fetcher)
+  const { data: statsData, mutate: refreshStats }    = useSWR<LiveStats>(STATS_KEY, offlineFetcher)
+  const { data: expensesData, mutate: refreshExpenses } = useSWR<{ expenses: ExpenseItem[] }>(EXPENSES_KEY, offlineFetcher)
   const { data: momoData } = useSWR<{ statement: MomoStatementSummary | null }>(MOMO_KEY, fetcher)
 
   const cashUp   = data?.cashUp ?? null
@@ -940,7 +942,7 @@ export default function CashUpPage() {
   const isAdmin = session?.user?.role === 'admin'
 
   // Fetch all open sessions to show count
-  const { data: openSessionsData, mutate: refreshOpenSessions } = useSWR<{ sessions: CashUp[] }>('/api/cashup/open-sessions', fetcher)
+  const { data: openSessionsData, mutate: refreshOpenSessions } = useSWR<{ sessions: CashUp[] }>('/api/cashup/open-sessions', offlineFetcher)
   const openSessions = openSessionsData?.sessions ?? []
   const openSessionsCount = openSessions.length
 
@@ -1134,7 +1136,7 @@ export default function CashUpPage() {
 
   if (isLoading) {
     return (
-      <PortalPage title="Cash-Up" maxWidth={1152}>
+      <PortalPage title="Cash-Up" maxWidth={1152} actions={<OfflineDataBadge />}>
         <div className="flex items-center justify-center h-40 text-sm" style={{ color: colors.textSecondary }}>
           Loading…
         </div>
@@ -1155,16 +1157,19 @@ export default function CashUpPage() {
       title="Cash-Up"
       maxWidth={1152}
       actions={
-        cashUp && (
-          <>
-            <span className="text-xs" style={{ color: colors.textMuted }}>{sessionDate}</span>
-            {cashUp.status === 'open' && isPreviousDay && <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: colors.dangerBg, color: colors.danger }}>Previous Day — Submit Required</span>}
-            {cashUp.status === 'open' && !isPreviousDay && <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: colors.warningBg, color: colors.warning }}>Open</span>}
-            {cashUp.status === 'submitted' && <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: colors.processBg, color: colors.process }}>Submitted — Awaiting Approval</span>}
-            {cashUp.status === 'approved'  && <span className="flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium" style={{ background: colors.actionBg, color: colors.action }}><CheckCircle2 className="w-3 h-3" />Approved</span>}
-            {cashUp.approvedAt && <span className="text-xs" style={{ color: colors.textMuted }}>{new Date(cashUp.approvedAt).toLocaleString('en-ZA')}</span>}
-          </>
-        )
+        <>
+          <OfflineDataBadge />
+          {cashUp && (
+            <>
+              <span className="text-xs" style={{ color: colors.textMuted }}>{sessionDate}</span>
+              {cashUp.status === 'open' && isPreviousDay && <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: colors.dangerBg, color: colors.danger }}>Previous Day — Submit Required</span>}
+              {cashUp.status === 'open' && !isPreviousDay && <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: colors.warningBg, color: colors.warning }}>Open</span>}
+              {cashUp.status === 'submitted' && <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: colors.processBg, color: colors.process }}>Submitted — Awaiting Approval</span>}
+              {cashUp.status === 'approved'  && <span className="flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium" style={{ background: colors.actionBg, color: colors.action }}><CheckCircle2 className="w-3 h-3" />Approved</span>}
+              {cashUp.approvedAt && <span className="text-xs" style={{ color: colors.textMuted }}>{new Date(cashUp.approvedAt).toLocaleString('en-ZA')}</span>}
+            </>
+          )}
+        </>
       }
     >
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>

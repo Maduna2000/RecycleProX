@@ -11,7 +11,8 @@ import { format } from '@/lib/utils/format'
 import Decimal from 'decimal.js'
 import { PhotoViewer } from '@/components/PhotoUploader'
 import { colors, layout } from '@/lib/design-tokens'
-import { fetcher } from '@/lib/swrFetcher'
+import { saleDetailFetcher } from '@/lib/offline/fetchers/sales'
+import { OfflineDataBadge } from '@/components/ui/OfflineDataBadge'
 import { useSystemCurrency } from '@/hooks/useSystemCurrency'
 import {
   inp, lbl, TH, TD, HEADER_GRAD, NAVY,
@@ -70,7 +71,7 @@ export default function SaleDetailPage() {
   const [voidOpen, setVoidOpen] = useState(false)
   const { symbol: currSym } = useSystemCurrency()
 
-  const { data: sale, isLoading, error } = useSWR<Sale>(`/api/sales/${id}`, fetcher)
+  const { data: sale, isLoading, error } = useSWR<Sale>(`/api/sales/${id}`, saleDetailFetcher)
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
 
   if (isLoading) {
@@ -101,7 +102,7 @@ export default function SaleDetailPage() {
 
   return (
     <>
-    <PortalPage title={sale.refNumber}>
+    <PortalPage title={sale.refNumber} actions={<OfflineDataBadge />}>
         {/* Sub-header: status + payment method */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderBottom: '1px solid #E0E0E0', flexShrink: 0 }}>
           <StatusBadge status={sale.status} />

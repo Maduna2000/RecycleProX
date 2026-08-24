@@ -35,6 +35,13 @@ export interface OfflineCustomer {
   zeroRated?: boolean
   contactPerson?: string | null
   physicalAddress?: string | null
+  // Added for the Customers list page's own offline replica (Phase 2) — the
+  // fields above predate that and were only ever needed by the till-form
+  // lookups in useOfflineLookup.ts.
+  createdAt?: string
+  dealerCategory?: string | null
+  email?: string | null
+  landline?: string | null
 }
 
 export interface OfflinePriceGroup {
@@ -54,21 +61,59 @@ export interface OfflinePriceOverride {
 
 // ─── Offline transaction shapes ───────────────────────────────────────────────
 
+// Line items embed product name/code/unit directly (rather than just a
+// productId FK) so a purchase/sale detail page can render fully offline
+// without a follow-up join against the products table — mirrors what the
+// bulk-sync API routes send (src/app/api/offline-sync/*), which denormalize
+// for exactly this reason. Optional so records written by the OFFLINE-CREATE
+// path (which doesn't have all this yet at creation time) still satisfy the
+// type; the reader functions treat missing fields as "unknown", not an error.
+export interface OfflinePurchaseLineEmbedded {
+  id: string
+  productId: string
+  productName?: string
+  productCode?: string
+  unit?: string
+  quantity: string
+  grossQty?: string
+  tareQty?: string
+  tareReason?: string
+  unitPrice: string
+  lineTotal: string
+  priceSource?: string
+}
+
 export interface OfflinePurchase {
   id: string              // local_ prefixed UUID when created offline
   refNumber: string
   customerId: string
+  // Split (not a combined display string) so the offline reader can
+  // reconstruct the exact { id, firstName, lastName, idNumber } shape the
+  // live list API returns, rather than guessing where to split a
+  // pre-joined name back apart.
+  customerFirstName?: string
+  customerLastName?: string
+  customerIdNumber?: string | null
   status: string
   totalAmount: string
+  amountPaid?: string
+  vatAmount?: string
+  subTotal?: string
   paymentMethod: string
   notes?: string
   loanDeductionAmount?: string
+  scaleOperatorName?: string
   createdByUserId?: string
   createdAt: string       // ISO string
+  lines?: OfflinePurchaseLineEmbedded[]  // full detail — present once bulk-synced or individually fetched
   _offlineCreated?: boolean
   _cloudId?: string       // set after sync
 }
 
+// Kept as a separate table (write-queue path still creates rows here one at
+// a time before a purchase has synced) — the bulk-synced/read path instead
+// embeds lines directly on OfflinePurchase.lines above, which is what the
+// offline readers (src/lib/offline/readers/) actually consume.
 export interface OfflinePurchaseLine {
   id: string
   purchaseId: string      // local_ ref until synced
@@ -82,6 +127,17 @@ export interface OfflinePurchaseLine {
   priceSource: string
 }
 
+export interface OfflineSaleLineEmbedded {
+  id: string
+  productId: string
+  productName?: string
+  productCode?: string
+  unit?: string
+  quantity: string
+  unitPrice: string
+  lineTotal: string
+}
+
 export interface OfflineSale {
   id: string
   refNumber: string
@@ -92,10 +148,14 @@ export interface OfflineSale {
   customerId?: string
   status: string
   totalAmount: string
+  amountPaid?: string
+  vatAmount?: string
+  businessLoanDeductionAmount?: string
   paymentMethod: string
   notes?: string
   createdByUserId?: string
   createdAt: string
+  lines?: OfflineSaleLineEmbedded[]
   _offlineCreated?: boolean
   _cloudId?: string
 }
@@ -107,6 +167,75 @@ export interface OfflineSaleLine {
   quantity: string
   unitPrice: string
   lineTotal: string
+}
+
+// ─── Payments (read-only replica — Payments module unions Sale+Payment rows,
+// see paymentService.ts's listPayments; the offline reader replicates that
+// same union + admin-visibility rule against the sales/payments tables) ────
+
+export interface OfflinePayment {
+  id: string
+  refNumber?: string | null
+  customerId: string | null
+  customerName?: string | null
+  source: 'sale' | 'purchase'
+  saleId?: string | null
+  purchaseId?: string | null
+  saleCreatedByUserId?: string | null  // needed to replicate the admin-sale-hiding rule offline
+  amount: string
+  paymentMethod: string
+  voidedAt?: string | null
+  createdByUserId?: string | null
+  createdAt: string
+}
+
+// ─── Cash-up session history (read-only replica) ──────────────────────────
+
+export interface OfflineCashUpSession {
+  id: string
+  sessionDate: string
+  status: string
+  currency: string
+  openingBalance: string
+  systemCashSales: string
+  systemCashPurchases: string
+  systemCashPayments: string
+  systemCashExpected: string
+  declaredCash?: string | null
+  variance?: string | null
+  openedByUserId: string
+  closedAt?: string | null      // when the session was submitted
+  approvedAt?: string | null
+  notes?: string | null
+  createdAt: string
+}
+
+// ─── Stock movements (read-only replica) ──────────────────────────────────
+
+export interface OfflineStockMovement {
+  id: string
+  productId: string
+  productName?: string
+  direction: 'in' | 'out'
+  quantity: string
+  source: string
+  sourceId?: string | null
+  createdAt: string
+}
+
+// ─── Generic last-known-response cache ─────────────────────────────────────
+// Backs src/lib/offline/responseCache.ts's cache-aside SWR fetcher — used
+// for computed/aggregate endpoints (Float's live balance, Cash-up's "today"
+// session + live-stats) that are deliberately NOT re-derived locally from
+// the structured tables above; see the offline-mode plan for why. Also
+// serves as a broad safety net for any other page's fetcher: whatever the
+// last successful response for an exact URL was, shown with its timestamp
+// rather than nothing.
+
+export interface OfflineResponseCacheEntry {
+  url: string      // exact request URL (including query string) — the cache key
+  json: string      // JSON.stringify(response body)
+  cachedAt: string  // ISO timestamp — surfaced to the UI as "as of HH:MM"
 }
 
 export interface OfflineCashFloat {
@@ -297,6 +426,10 @@ class RecycleProXDB extends Dexie {
   cashFloats!: Table<OfflineCashFloat>
   expenses!: Table<OfflineExpense>
   expenseTypes!: Table<OfflineExpenseType>
+  payments!: Table<OfflinePayment>
+  cashUps!: Table<OfflineCashUpSession>
+  stockMovements!: Table<OfflineStockMovement>
+  responseCache!: Table<OfflineResponseCacheEntry>
 
   scaleOrders!: Table<OfflineScaleOrder>
   photoCache!: Table<OfflinePhoto>
@@ -409,6 +542,41 @@ class RecycleProXDB extends Dexie {
       cashFloats:     'id, floatDate',
       expenses:       'id, status, createdAt',
       expenseTypes:   'id, parentId',
+
+      scaleOrders:    '++seq, id, syncStatus, createdAt',
+      photoCache:     'id, orderId, syncStatus',
+      scaleDraft:     'id',
+
+      syncQueue:      '++seq, id, status, createdAt',
+      meta:           'key',
+    })
+
+    // Version 6: Full-history offline replica for the core till modules
+    // (Float, Purchases, Sales, Payments, Cash-up, Customers, Products,
+    // Stock) — see docs plan "Desktop offline mode — make it actually
+    // work". Existing tables keep their same index signature (only the
+    // TypeScript shape of their rows grew richer, which Dexie doesn't
+    // version on); new tables added for Payments, Cash-up history, Stock
+    // movements, and the generic last-known-response cache.
+    this.version(6).stores({
+      products:       'id, category, isActive',
+      customers:      'id, idNumber, lastName, customerType, isActive',
+      priceGroups:    'id, isDefault',
+      priceOverrides: 'id, priceGroupId, productId, [priceGroupId+productId]',
+      categories:     'id, parentId, name',
+      stepConfigs:    'categoryId',
+
+      purchases:      'id, customerId, status, createdAt',
+      purchaseLines:  'id, purchaseId, productId',
+      sales:          'id, customerId, status, createdAt',
+      saleLines:      'id, saleId, productId',
+      cashFloats:     'id, floatDate',
+      expenses:       'id, status, createdAt',
+      expenseTypes:   'id, parentId',
+      payments:       'id, customerId, source, createdAt',
+      cashUps:        'id, sessionDate, status',
+      stockMovements: 'id, productId, direction, source, createdAt',
+      responseCache:  'url, cachedAt',
 
       scaleOrders:    '++seq, id, syncStatus, createdAt',
       photoCache:     'id, orderId, syncStatus',

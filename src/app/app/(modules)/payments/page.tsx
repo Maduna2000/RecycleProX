@@ -11,7 +11,8 @@ import { Dialog } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { format } from '@/lib/utils/format'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
-import { fetcher } from '@/lib/swrFetcher'
+import { paymentsListFetcher } from '@/lib/offline/fetchers/payments'
+import { OfflineDataBadge } from '@/components/ui/OfflineDataBadge'
 import { useSystemCurrency } from '@/hooks/useSystemCurrency'
 import {
   inp, Btn, Field, PortalPage, FilterBar,
@@ -78,7 +79,7 @@ export default function PaymentsPage() {
     payments: Payment[]; total: number; totalReceived: string; totalPaidOut: string
   }>(
     `/api/payments?${query}`,
-    fetcher,
+    paymentsListFetcher,
   )
 
   const payments = paymentsData?.payments ?? []
@@ -183,7 +184,7 @@ export default function PaymentsPage() {
     // from stretching to fill the whole window, same fix already applied to
     // Purchases/Sales (same row shape: a few fixed-width columns plus one
     // unbounded name column).
-    <PortalPage title="Sales Payments" maxWidth={1050}>
+    <PortalPage title="Sales Payments" maxWidth={1050} actions={<OfflineDataBadge />}>
       <FilterBar>
         <Field label="Search" width={200}>
           <div style={{ position: 'relative' }}>

@@ -8,7 +8,7 @@ import { toast } from 'sonner'
 import { Loader2 } from 'lucide-react'
 import Decimal from 'decimal.js'
 import { colors } from '@/lib/design-tokens'
-import { fetcher } from '@/lib/swrFetcher'
+import { purchaseDetailFetcher } from '@/lib/offline/fetchers/purchases'
 import { PurchaseForm, type EditingPurchase } from '../../new/PurchaseForm'
 
 type FetchedPurchase = {
@@ -32,7 +32,7 @@ export default function EditPurchasePage() {
   const { data: session, status: sessionStatus } = useSession()
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
 
-  const { data: purchase, isLoading, error } = useSWR<FetchedPurchase>(`/api/purchases/${id}`, fetcher)
+  const { data: purchase, isLoading, error } = useSWR<FetchedPurchase>(`/api/purchases/${id}`, purchaseDetailFetcher)
 
   const canEdit = !!purchase && purchase.status === 'pending' && new Decimal(purchase.amountPaid).isZero()
 

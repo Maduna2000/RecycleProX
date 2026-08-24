@@ -12,7 +12,8 @@ import { InlineDetailPanel } from '@/components/ui/InlineDetailPanel'
 import { Dialog } from '@/components/ui/dialog'
 import { format } from '@/lib/utils/format'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
-import { fetcher } from '@/lib/swrFetcher'
+import { salesListFetcher, saleDetailFetcher } from '@/lib/offline/fetchers/sales'
+import { OfflineDataBadge } from '@/components/ui/OfflineDataBadge'
 import { useSystemCurrency } from '@/hooks/useSystemCurrency'
 import { canAutoPrint, autoPrintReceipt } from '@/lib/print/autoPrintClient'
 import {
@@ -94,13 +95,13 @@ export default function SalesPage() {
 
   const { data, isLoading, error } = useSWR<{ sales: Sale[]; total: number }>(
     `/api/sales?${query}`,
-    fetcher,
+    salesListFetcher,
   )
   const sales = data?.sales ?? []
 
   const { data: detail, isLoading: detailLoading } = useSWR<SaleDetail>(
     selectedId ? `/api/sales/${selectedId}` : null,
-    fetcher,
+    saleDetailFetcher,
   )
 
   const handleSort = useCallback((key: string, dir: SortDir) => {
@@ -240,7 +241,7 @@ export default function SalesPage() {
     // cap/border itself to match — keeps the unbounded "Buyer" column from
     // stretching to fill the whole window. Same width as Unpaid Sales so the
     // columns line up between the two views.
-    <PortalPage title="All Sales" maxWidth={1050}>
+    <PortalPage title="All Sales" maxWidth={1050} actions={<OfflineDataBadge />}>
       {/* Filters */}
       <FilterBar>
         <Field label="Search" width={210}>

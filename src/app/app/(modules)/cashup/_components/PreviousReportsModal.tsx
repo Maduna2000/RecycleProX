@@ -9,16 +9,9 @@ import { colors } from '@/lib/design-tokens'
 import Decimal from 'decimal.js'
 import { CASHUP_REPORT_LABELS, type CashupReportType } from '@/lib/schemas/cashup'
 import { currencySymbolFor } from '@/lib/constants/currencies'
+import { cashUpHistoryFetcher } from '@/lib/offline/fetchers/cashups'
+import { OfflineDataBadge } from '@/components/ui/OfflineDataBadge'
 import { Btn, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
-
-async function fetcher(url: string) {
-  const res = await fetch(url)
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}))
-    throw new Error(body.error ?? `Failed to load sessions (${res.status})`)
-  }
-  return res.json()
-}
 
 interface SessionRecord {
   id: string
@@ -53,7 +46,7 @@ const AVAILABLE_REPORT_TYPES: CashupReportType[] = [
 export function PreviousReportsModal({ onClose }: PreviousReportsModalProps) {
   const { data, isLoading, error, mutate } = useSWR<{ sessions: SessionRecord[]; total: number }>(
     '/api/cashup/history?take=50',
-    fetcher
+    cashUpHistoryFetcher
   )
 
   const [selectedSession, setSelectedSession] = useState<string | null>(null)
@@ -132,6 +125,7 @@ export function PreviousReportsModal({ onClose }: PreviousReportsModalProps) {
         <RpxDialogHeader title="Previous Session Reports" onClose={onClose} />
         <RpxDialogBody>
         <div className="space-y-4">
+          <OfflineDataBadge />
           {isLoading && (
             <div className="flex items-center justify-center py-8 text-sm" style={{ color: colors.textSecondary }}>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
