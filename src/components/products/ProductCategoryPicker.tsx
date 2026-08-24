@@ -33,7 +33,7 @@ export function ProductCategoryPicker({
   getBadge?: (product: PickerProduct) => React.ReactNode
 }) {
   const [open, setOpen] = useState(false)
-  const [pos, setPos] = useState<{ top?: number; bottom?: number; left: number; width: number } | null>(null)
+  const [pos, setPos] = useState<{ top?: number; bottom?: number; left: number; width: number; maxHeight: number } | null>(null)
   const [expandedCat, setExpandedCat] = useState<string | null>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
 
@@ -49,13 +49,23 @@ export function ProductCategoryPicker({
   function handleOpen() {
     const rect = triggerRef.current?.getBoundingClientRect()
     if (rect) {
-      const estimatedH = 320
-      const openUpward = rect.bottom + estimatedH > window.innerHeight - 8
+      const preferredH = 320
+      const spaceBelow  = window.innerHeight - rect.bottom - 8
+      const spaceAbove  = rect.top - 8
+      // Prefer dropping down (matches every other dropdown in the app) —
+      // only flip upward when there genuinely isn't enough room below to
+      // show a usable list AND there's more room above. Otherwise it opens
+      // downward and just scrolls within whatever space is actually there,
+      // instead of flipping up any time the trigger isn't near the very top
+      // of the window.
+      const openUpward = spaceBelow < 160 && spaceAbove > spaceBelow
+      const maxHeight   = Math.max(160, Math.min(preferredH, openUpward ? spaceAbove : spaceBelow))
       setPos({
         top:    openUpward ? undefined : rect.bottom + 2,
         bottom: openUpward ? window.innerHeight - rect.top + 2 : undefined,
         left:   rect.left,
         width:  Math.max(rect.width, 240),
+        maxHeight,
       })
     }
     // Auto-expand the selected product's category so it's visible immediately
@@ -102,7 +112,7 @@ export function ProductCategoryPicker({
             style={{
               position: 'fixed', top: pos.top, bottom: pos.bottom, left: pos.left, width: pos.width,
               zIndex: 50, background: '#fff', borderRadius: 3,
-              boxShadow: '2px 2px 6px rgba(0,0,0,0.3)', maxHeight: 320, overflowY: 'auto',
+              boxShadow: '2px 2px 6px rgba(0,0,0,0.3)', maxHeight: pos.maxHeight, overflowY: 'auto',
               ...winBevel(),
             }}
           >

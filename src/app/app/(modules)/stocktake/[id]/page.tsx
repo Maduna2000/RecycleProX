@@ -115,7 +115,7 @@ export default function StocktakeDetailPage() {
     onClick: () => setShowCompleteDialog(true),
   })
   useToolbarAction('void-stocktake', {
-    enabled: stocktake?.status === 'open' || stocktake?.status === 'completed',
+    enabled: stocktake?.status === 'completed',
     onClick: () => setShowVoidDialog(true),
   })
 
@@ -504,7 +504,8 @@ export default function StocktakeDetailPage() {
                   </div>
                 )}
 
-                <div style={{ marginTop: 12, display: 'flex', justifyContent: 'flex-end' }}>
+                <div style={{ marginTop: 12, display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                  <Btn variant="danger" onClick={() => setShowVoidDialog(true)} disabled={saving}>Cancel Stocktake</Btn>
                   <Btn variant="primary" onClick={handleAddEntryClick} loading={saving}>Save Entry</Btn>
                 </div>
               </div>
