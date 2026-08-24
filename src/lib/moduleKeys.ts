@@ -16,7 +16,6 @@ export const MODULE_KEYS = [
   '/app/cashup',
   '/app/float',
   '/app/stock',
-  '/app/stocktake',
   '/app/products',
   '/app/price-groups',
   '/app/reports',
@@ -33,6 +32,10 @@ export const MODULE_KEYS = [
  * those are never restricted by allowedModules.
  */
 export function findModuleKey(pathname: string): string | null {
+  // Stocktake now folds under the Stock permission grant — it doesn't share
+  // Stock's URL prefix, so it needs its own explicit mapping here rather
+  // than falling out of the prefix match below.
+  if (pathname === '/app/stocktake' || pathname.startsWith('/app/stocktake/')) return '/app/stock'
   if ((MODULE_KEYS as readonly string[]).includes(pathname)) return pathname
   return MODULE_KEYS.find((key) => pathname.startsWith(key + '/')) ?? null
 }

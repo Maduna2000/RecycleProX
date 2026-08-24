@@ -19,7 +19,6 @@ const MODULE_OPTIONS = [
   { key: '/app/cashup', label: 'Cash Up' },
   { key: '/app/float', label: 'Float' },
   { key: '/app/stock', label: 'Stock' },
-  { key: '/app/stocktake', label: 'Stocktake' },
   { key: '/app/products', label: 'Products' },
   { key: '/app/price-groups', label: 'Price Groups' },
   { key: '/app/reports', label: 'Reports' },
