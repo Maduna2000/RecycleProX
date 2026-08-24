@@ -182,7 +182,11 @@ export async function generateTransactionNote(data: TransactionNoteData): Promis
   }
 
   const left: [string, string | undefined][] = [
-    ['Account Name', data.accountLabel ?? data.partyName],
+    // Always the party's real name, never the system-generated account
+    // code/type label (e.g. "344 - CASUAL") — this document is used for
+    // real tax purposes, so it must show the same name as "Name" below,
+    // not an internal account reference.
+    ['Account Name', data.partyName],
     ['Address', data.partyAddress],
     ['Vat Number', data.partyVatNumber ?? 'None'],
     ['Reg Number', data.partyRegNumber],
