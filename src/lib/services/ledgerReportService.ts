@@ -183,6 +183,171 @@ async function periodLinesUnder(parentCode: string, from: Date, to: Date): Promi
   return { lines, total }
 }
 
+// ─── Profit by Category ─────────────────────────────────────────────────────
+// Same posted-entry source as getProfitAndLoss (Sales Revenue–[category] and
+// COGS–[category] sub-accounts, auto-vivified per real category by
+// categoryAccountId in ledgerService.ts) — just re-keyed by category name
+// instead of rolled into one P&L total, for the Ledger dashboard's
+// profit-by-category chart/card.
+
+/** categoryName -> this account's own period balance, for every category sub-account under `parentCode`. */
+async function categoryLinesUnder(parentCode: string, start: Date, end: Date): Promise<Map<string, Decimal>> {
+  const parent = await prisma.account.findFirst({ where: { code: parentCode } })
+  const map = new Map<string, Decimal>()
+  if (!parent) return map
+
+  const children = await prisma.account.findMany({
+    where: { parentAccountId: parent.id, sourceCategoryName: { not: null } },
+  })
+  const sums = await sumLinesByAccount({ entryDate: { gte: start, lte: end } })
+
+  for (const acc of children) {
+    if (!acc.sourceCategoryName) continue
+    const amount = ownBalance(sums.get(acc.id), parent.normalBalance)
+    if (amount.isZero()) continue
+    map.set(acc.sourceCategoryName, amount)
+  }
+  return map
+}
+
+export interface CategoryProfitRow {
+  category: string
+  revenue: string
+  cogs: string
+  profit: string
+}
+export interface ProfitByCategoryReport {
+  from: string
+  to: string
+  rows: CategoryProfitRow[]
+  totalRevenue: string
+  totalCogs: string
+  totalProfit: string
+}
+
+export async function getProfitByCategory(fromLabel: string, toLabel: string): Promise<ProfitByCategoryReport> {
+  const { start, end } = getRangeBoundsSAST(fromLabel, toLabel)
+  const zero = new Decimal(0)
+
+  const [revenueByCategory, cogsByCategory] = await Promise.all([
+    categoryLinesUnder(LEDGER_CODES.SALES_REVENUE, start, end),
+    categoryLinesUnder(LEDGER_CODES.COGS, start, end),
+  ])
+
+  const categories = new Set([...revenueByCategory.keys(), ...cogsByCategory.keys()])
+  const rows: CategoryProfitRow[] = []
+  let totalRevenue = zero
+  let totalCogs = zero
+
+  for (const category of categories) {
+    const revenue = revenueByCategory.get(category) ?? zero
+    const cogs = cogsByCategory.get(category) ?? zero
+    totalRevenue = totalRevenue.plus(revenue)
+    totalCogs = totalCogs.plus(cogs)
+    rows.push({ category, revenue: revenue.toFixed(2), cogs: cogs.toFixed(2), profit: revenue.minus(cogs).toFixed(2) })
+  }
+  rows.sort((a, b) => new Decimal(b.profit).minus(a.profit).toNumber())
+
+  return {
+    from: fromLabel,
+    to: toLabel,
+    rows,
+    totalRevenue: totalRevenue.toFixed(2),
+    totalCogs: totalCogs.toFixed(2),
+    totalProfit: totalRevenue.minus(totalCogs).toFixed(2),
+  }
+}
+
+// ─── Stock Value by Category ────────────────────────────────────────────────
+// Current stock on hand valued two ways per category: at cost (average cost
+// per ProductAverageCost — the same moving-average figure ledgerService.ts
+// uses to post COGS) and at its current sale value (Product.defaultSellPrice)
+// — the gap between them is the *potential* profit still sitting in stock,
+// distinct from getProfitByCategory's *realized* profit from what's already
+// sold. "Total stock" is summed in kg — tons are converted (×1000); a
+// category whose products are counted in `each`/`litre` instead of a weight
+// unit gets its own separate non-weight quantity so it's never silently
+// folded into a meaningless kg figure.
+export interface CategoryStockRow {
+  category: string
+  totalKg: string
+  otherQty: string | null // e.g. "12 each" when the category has non-weight-unit products
+  costValue: string
+  saleValue: string
+  potentialProfit: string
+}
+export interface StockValueByCategoryReport {
+  asOf: string
+  rows: CategoryStockRow[]
+  totalCostValue: string
+  totalSaleValue: string
+  totalPotentialProfit: string
+}
+
+export async function getStockValueByCategory(): Promise<StockValueByCategoryReport> {
+  const zero = new Decimal(0)
+
+  const [movements, products, costs] = await Promise.all([
+    prisma.stockMovement.groupBy({ by: ['productId', 'direction'], _sum: { quantity: true } }),
+    prisma.product.findMany({ where: { isActive: true } }),
+    prisma.productAverageCost.findMany(),
+  ])
+
+  const onHandByProduct = new Map<string, Decimal>()
+  for (const m of movements) {
+    const qty = new Decimal(m._sum.quantity?.toString() ?? '0')
+    const prev = onHandByProduct.get(m.productId) ?? zero
+    onHandByProduct.set(m.productId, m.direction === 'in' ? prev.plus(qty) : prev.minus(qty))
+  }
+  const costByProduct = new Map(costs.map((c) => [c.productId, new Decimal(c.averageCost.toString())]))
+
+  interface Acc { kg: Decimal; otherByUnit: Map<string, Decimal>; costValue: Decimal; saleValue: Decimal }
+  const byCategory = new Map<string, Acc>()
+
+  for (const p of products) {
+    const onHand = onHandByProduct.get(p.id) ?? zero
+    if (onHand.isZero()) continue
+
+    const acc = byCategory.get(p.category) ?? { kg: zero, otherByUnit: new Map(), costValue: zero, saleValue: zero }
+    if (p.unit === 'kg') acc.kg = acc.kg.plus(onHand)
+    else if (p.unit === 'ton') acc.kg = acc.kg.plus(onHand.times(1000))
+    else acc.otherByUnit.set(p.unit, (acc.otherByUnit.get(p.unit) ?? zero).plus(onHand))
+
+    const avgCost = costByProduct.get(p.id) ?? zero
+    acc.costValue = acc.costValue.plus(onHand.times(avgCost))
+    acc.saleValue = acc.saleValue.plus(onHand.times(new Decimal(p.defaultSellPrice.toString())))
+    byCategory.set(p.category, acc)
+  }
+
+  const rows: CategoryStockRow[] = []
+  let totalCostValue = zero
+  let totalSaleValue = zero
+  for (const [category, acc] of byCategory) {
+    totalCostValue = totalCostValue.plus(acc.costValue)
+    totalSaleValue = totalSaleValue.plus(acc.saleValue)
+    const otherQty = acc.otherByUnit.size > 0
+      ? [...acc.otherByUnit].map(([unit, qty]) => `${qty.toFixed(2)} ${unit}`).join(' + ')
+      : null
+    rows.push({
+      category,
+      totalKg: acc.kg.toFixed(2),
+      otherQty,
+      costValue: acc.costValue.toFixed(2),
+      saleValue: acc.saleValue.toFixed(2),
+      potentialProfit: acc.saleValue.minus(acc.costValue).toFixed(2),
+    })
+  }
+  rows.sort((a, b) => new Decimal(b.costValue).minus(a.costValue).toNumber())
+
+  return {
+    asOf: new Date().toISOString(),
+    rows,
+    totalCostValue: totalCostValue.toFixed(2),
+    totalSaleValue: totalSaleValue.toFixed(2),
+    totalPotentialProfit: totalSaleValue.minus(totalCostValue).toFixed(2),
+  }
+}
+
 export async function getProfitAndLoss(fromLabel: string, toLabel: string): Promise<ProfitAndLossReport> {
   const { start, end } = getRangeBoundsSAST(fromLabel, toLabel)
 
