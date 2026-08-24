@@ -65,19 +65,28 @@ export const TOOLBAR_ACTIONS: ToolbarAction[] = [
   // of which view you're looking at — matches the original behavior.
   { id: 'stock-adjust', label: 'Manual Adjustment', icon: SlidersHorizontal, group: 'Stock',
     routes: ['/app/stock/'], roles: ['admin', 'manager'], href: '/app/stock?adjust=1' },
-
-  // ── Stocktake ─────────────────────────────────────────────────────────
+  // Stocktake used to be a standalone module with no link pointing at it
+  // from anywhere reachable (no dashboard tile, nothing in Stock's own
+  // toolbar group) — the only way in was typing the URL directly. Folded
+  // into the Stock cluster instead of being its own separate island, since
+  // it's conceptually a stock-reconciliation view same as On Hand/Movements/
+  // Grid, and its completion already posts real StockMovement adjustments
+  // against the same stock the other three views show.
+  { id: 'stocktake', label: 'Stocktake', icon: ClipboardCheck, group: 'Stock',
+    routes: ['/app/stock/'], roles: ['admin', 'manager'], href: '/app/stocktake' },
   // Exact match only (list page) — every other module excludes its detail
   // page from a "create new" action; stocktake's old toolbar logic didn't,
   // which showed "Start Stocktake" on an existing session's own detail
-  // page too. Fixed here to match the consistent pattern.
-  { id: 'start-stocktake', label: 'Start Stocktake', icon: ClipboardCheck, group: 'Stocktake',
-    routes: ['/app/stocktake'], roles: ['admin', 'manager'], href: '/app/stocktake?create=1' },
+  // page too. Fixed here to match the consistent pattern. Also enabled from
+  // any Stock page now, not just the stocktake list itself, so a new count
+  // can be started in one click without detouring through the list first.
+  { id: 'start-stocktake', label: 'Start Stocktake', icon: Plus, group: 'Stock',
+    routes: ['/app/stock/', '/app/stocktake'], roles: ['admin', 'manager'], href: '/app/stocktake?create=1' },
   // No role gate on these two — matches the original stocktake/[id] page,
   // which never checked isMgr for either (unlike "Start Stocktake" above).
-  { id: 'complete-stocktake', label: 'Complete Stocktake', icon: CheckCircle, group: 'Stocktake',
+  { id: 'complete-stocktake', label: 'Complete Stocktake', icon: CheckCircle, group: 'Stock',
     routes: ['/app/stocktake/'] },
-  { id: 'void-stocktake', label: 'Void', icon: Ban, group: 'Stocktake',
+  { id: 'void-stocktake', label: 'Void', icon: Ban, group: 'Stock',
     routes: ['/app/stocktake/'] },
 
   // ── Gate ──────────────────────────────────────────────────────────────

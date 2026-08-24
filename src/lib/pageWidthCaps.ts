@@ -24,6 +24,11 @@ const PAGE_WIDTH_CAPS: { test: RegExp; width: number }[] = [
   { test: /^\/app\/stock$/, width: 1100 },
   { test: /^\/app\/stock\/movements$/, width: 950 },
   { test: /^\/app\/stock\/grid$/, width: 1000 },
+  // Stocktake — folded into the Stock cluster; same unbounded "Ref #" column
+  // problem on the list page. Detail page shares the width too, since it's
+  // the same counting-grid shape as Stock Grid.
+  { test: /^\/app\/stocktake$/, width: 1100 },
+  { test: /^\/app\/stocktake\/[^/]+$/, width: 1100 },
   // Products — the unbounded "Name" column stretched to fill whatever width
   // was left. Same width as Stock On Hand.
   { test: /^\/app\/products$/, width: 1100 },
