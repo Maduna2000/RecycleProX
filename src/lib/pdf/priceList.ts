@@ -14,6 +14,7 @@
  */
 import { PDFDocument, rgb, StandardFonts, PDFPage, PDFFont, PDFImage } from 'pdf-lib'
 import Decimal from 'decimal.js'
+import { splitCompanyNameLines } from './companyNameLines'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -215,8 +216,15 @@ export async function generatePriceListPdf(data: PriceListPdfData): Promise<Uint
       // ── Rounded header card: logo/company, subtitle, date pill ──────────
       // card()'s y anchor is the shape's TOP edge (drawSvgPath convention —
       // verified empirically, opposite of drawRectangle's bottom-left).
-      const cardBottom = y - HEADER_CARD_H
-      card(page, MARGIN, y, COL_W, HEADER_CARD_H)
+      // A "T/A <trading name>" clause gets its own line — the card grows
+      // taller by one line height so the title/date pill below it don't
+      // get crowded.
+      const nameSize = 16
+      const nameLineGap = 16
+      const companyNameLines = splitCompanyNameLines(data.company.name)
+      const headerCardH = HEADER_CARD_H + (companyNameLines.length - 1) * nameLineGap
+      const cardBottom = y - headerCardH
+      card(page, MARGIN, y, COL_W, headerCardH)
 
       let contentX = MARGIN + CARD_PAD
       const rowTopY = y - CARD_PAD
@@ -227,10 +235,12 @@ export async function generatePriceListPdf(data: PriceListPdfData): Promise<Uint
         page.drawImage(logo, { x: contentX, y: rowTopY - h, width: w, height: h })
         contentX += w + 10
       }
-      const nameSize = 16
       const nameBaselineY = rowTopY - nameSize + 2
-      page.drawText(sanitize(data.company.name).toUpperCase(), { x: contentX, y: nameBaselineY, size: nameSize, font: bold, color: HEADER_TX })
-      drawSpaced(page, sanitize(data.title).toUpperCase(), contentX, nameBaselineY - 16, 9, bold, HEADER_TX, 1.8, 0.85)
+      companyNameLines.forEach((line, i) => {
+        page.drawText(sanitize(line).toUpperCase(), { x: contentX, y: nameBaselineY - i * nameLineGap, size: nameSize, font: bold, color: HEADER_TX })
+      })
+      const titleY = nameBaselineY - companyNameLines.length * nameLineGap
+      drawSpaced(page, sanitize(data.title).toUpperCase(), contentX, titleY, 9, bold, HEADER_TX, 1.8, 0.85)
 
       // Date pill, top-right, fully rounded ends
       const pillH = 18

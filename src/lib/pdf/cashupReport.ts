@@ -19,6 +19,7 @@ import { PDFDocument, rgb, StandardFonts, PDFPage, PDFFont } from 'pdf-lib'
 import Decimal from 'decimal.js'
 import type { CashupReportType } from '@/lib/schemas/cashup'
 import { CASHUP_REPORT_LABELS } from '@/lib/schemas/cashup'
+import { splitCompanyNameLines } from './companyNameLines'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface CashupReportData {
@@ -302,14 +303,17 @@ function drawCompanyInfo(
   data: CashupReportData,
   y: number
 ): number {
-  page.drawText(data.companyName, {
-    x: MARGIN,
-    y,
-    size: 10,
-    font: bold,
-    color: BLACK,
-  })
-  y -= 12
+  // A "T/A <trading name>" clause gets its own line
+  for (const line of splitCompanyNameLines(data.companyName)) {
+    page.drawText(line, {
+      x: MARGIN,
+      y,
+      size: 10,
+      font: bold,
+      color: BLACK,
+    })
+    y -= 12
+  }
 
   page.drawText(data.companyAddress, {
     x: MARGIN,

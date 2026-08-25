@@ -7,6 +7,7 @@
  */
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
 import Decimal from 'decimal.js'
+import { splitCompanyNameLines } from './companyNameLines'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -74,7 +75,8 @@ const GRAY   = rgb(0.45, 0.45, 0.45)
 function estimateHeight(data: TransactionSlipData): number {
   let h = 0
   h += 14                           // top margin
-  h += HUGE + 4                     // company name
+  // A "T/A <trading name>" clause prints on its own line
+  h += (HUGE + 4) * splitCompanyNameLines(data.companyName || 'Renovo Pro').length
   if (data.companyAddress) h += LINE_H
   if (data.companyPhone)   h += LINE_H
   if (data.vatNumber)      h += LINE_H
@@ -172,9 +174,11 @@ export async function generateTransactionSlip(data: TransactionSlipData): Promis
   }
 
   // ── Company header (centered) ─────────────────────────────────────────────
-  const companyName = data.companyName || 'Renovo Pro'
-  center(page, companyName, cursor, HUGE, bold, BLACK)
-  nextLine(HUGE, 4)
+  // A "T/A <trading name>" clause gets its own centered line.
+  for (const line of splitCompanyNameLines(data.companyName || 'Renovo Pro')) {
+    center(page, line, cursor, HUGE, bold, BLACK)
+    nextLine(HUGE, 4)
+  }
 
   if (data.companyAddress) {
     center(page, data.companyAddress, cursor, SMALL, reg, GRAY)
@@ -577,7 +581,9 @@ function formatSlipDate(d: Date): string {
 
 function estimatePurchaseHeight(data: PurchaseSlipData, footerLineCount: number): number {
   let h = 14                                     // top margin
-  h += LINE_H * 2                                // PAID + company name
+  h += LINE_H                                    // PAID
+  // Company name — a "T/A <trading name>" clause prints on its own line
+  h += LINE_H * splitCompanyNameLines((data.companyName || 'Golden Key Investments (Pty) Ltd').toUpperCase()).length
   h += LINE_H                                    // PN No
   h += LINE_H                                    // Date
   h += LINE_H                                    // blank
@@ -651,8 +657,11 @@ export async function generatePurchaseReceiptPdf(data: PurchaseSlipData): Promis
   // ── Header ─────────────────────────────────────────────────────────────
   center(page, statusBannerLabel(data.status), cursor, NORMAL, bold, BLACK)
   nextLine(NORMAL, 2)
-  center(page, (data.companyName || 'Golden Key Investments (Pty) Ltd').toUpperCase(), cursor, NORMAL, bold, BLACK)
-  nextLine(NORMAL, 2)
+  // A "T/A <trading name>" clause gets its own centered line.
+  for (const line of splitCompanyNameLines((data.companyName || 'Golden Key Investments (Pty) Ltd').toUpperCase())) {
+    center(page, line, cursor, NORMAL, bold, BLACK)
+    nextLine(NORMAL, 2)
+  }
 
   page.drawText(`PN No: ${data.refNumber}`, { x: PMARGIN, y: cursor, size: NORMAL, font: bold, color: BLACK })
   nextLine(NORMAL)
@@ -848,7 +857,9 @@ export interface SaleSlipData {
 
 function estimateSaleHeight(data: SaleSlipData, footerLineCount: number): number {
   let h = 14                                     // top margin
-  h += LINE_H * 2                                // PAID + company name
+  h += LINE_H                                    // PAID
+  // Company name — a "T/A <trading name>" clause prints on its own line
+  h += LINE_H * splitCompanyNameLines((data.companyName || 'Golden Key Investments (Pty) Ltd').toUpperCase()).length
   h += LINE_H                                    // PN No
   h += LINE_H                                    // Date
   h += LINE_H                                    // blank
@@ -914,8 +925,11 @@ export async function generateSaleReceiptPdf(data: SaleSlipData): Promise<Uint8A
   // ── Header ─────────────────────────────────────────────────────────────
   center(page, statusBannerLabel(data.status), cursor, NORMAL, bold, BLACK)
   nextLine(NORMAL, 2)
-  center(page, (data.companyName || 'Golden Key Investments (Pty) Ltd').toUpperCase(), cursor, NORMAL, bold, BLACK)
-  nextLine(NORMAL, 2)
+  // A "T/A <trading name>" clause gets its own centered line.
+  for (const line of splitCompanyNameLines((data.companyName || 'Golden Key Investments (Pty) Ltd').toUpperCase())) {
+    center(page, line, cursor, NORMAL, bold, BLACK)
+    nextLine(NORMAL, 2)
+  }
 
   page.drawText(`PN No: ${data.refNumber}`, { x: PMARGIN, y: cursor, size: NORMAL, font: bold, color: BLACK })
   nextLine(NORMAL)

@@ -18,6 +18,7 @@ import { PDFDocument, rgb, StandardFonts, PDFPage, PDFFont, PDFImage } from 'pdf
 import sharp from 'sharp'
 import type { FlatRow, ReportDocument } from '@/lib/reports/types'
 import { flattenReportDocument } from '@/lib/reports/flatten'
+import { splitCompanyNameLines } from './companyNameLines'
 import { formatCell, formatDateSAST, formatDateTimeSAST } from '@/lib/reports/format'
 import { fetchR2Bytes } from '@/lib/r2'
 
@@ -250,10 +251,12 @@ function drawPageHeader(ctx: Ctx, first: boolean): void {
     page.drawText(rangeLine, { x: MARGIN, y, size: 8, font: bold, color: DARK_GRAY })
     y -= 12
 
-    // Company info
+    // Company info — a "T/A <trading name>" clause gets its own line
     const { company } = report.meta
-    page.drawText(sanitize(company.name), { x: MARGIN, y, size: 9, font: bold, color: BLACK })
-    y -= 10
+    for (const line of splitCompanyNameLines(company.name)) {
+      page.drawText(sanitize(line), { x: MARGIN, y, size: 9, font: bold, color: BLACK })
+      y -= 10
+    }
     if (company.address) {
       page.drawText(sanitize(company.address), { x: MARGIN, y, size: 7.5, font: ctx.reg, color: DARK_GRAY })
       y -= 9

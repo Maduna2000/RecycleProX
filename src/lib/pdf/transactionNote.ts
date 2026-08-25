@@ -8,6 +8,7 @@
  */
 import { PDFDocument, rgb, StandardFonts, PDFPage, PDFFont, PDFImage } from 'pdf-lib'
 import Decimal from 'decimal.js'
+import { splitCompanyNameLines } from './companyNameLines'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -142,12 +143,18 @@ export async function generateTransactionNote(data: TransactionNoteData): Promis
     page.drawImage(logo, { x: MARGIN, y: y - h, width: w, height: h })
     y -= h + 14
   } else {
-    // No logo — company name takes its place
-    page.drawText(sanitize(data.company.name), { x: MARGIN, y: y - 14, size: 15, font: bold, color: DARK })
+    // No logo — company name takes its place. A "T/A <trading name>" clause
+    // gets its own second line rather than running the full legal name +
+    // trading name together across the header.
+    const nameLines = splitCompanyNameLines(data.company.name)
+    nameLines.forEach((line, i) => {
+      page.drawText(sanitize(line), { x: MARGIN, y: y - 14 - i * 13, size: 15, font: bold, color: DARK })
+    })
+    const addressY = y - 14 - nameLines.length * 13
     if (data.company.address) {
-      page.drawText(sanitize(data.company.address), { x: MARGIN, y: y - 27, size: 8, font: reg, color: GRAY })
+      page.drawText(sanitize(data.company.address), { x: MARGIN, y: addressY, size: 8, font: reg, color: GRAY })
     }
-    y -= 42
+    y -= 42 + (nameLines.length - 1) * 13
   }
 
   // ── Title row: "PURCHASE NOTE  COPY" together on one line ───────────────────
