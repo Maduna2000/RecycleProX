@@ -21,6 +21,8 @@ import { useOfflineMutation } from '@/hooks/useOfflineFetch'
 import { useOfflineLookup } from '@/hooks/useOfflineLookup'
 import { offlineDB } from '@/lib/offline/db'
 import { fetcher } from '@/lib/swrFetcher'
+import { offlineFetcher } from '@/lib/offline/responseCache'
+import { salesListFetcher } from '@/lib/offline/fetchers/sales'
 import { useSystemCurrency } from '@/hooks/useSystemCurrency'
 import { canAutoPrint, autoPrintReceipt } from '@/lib/print/autoPrintClient'
 
@@ -181,14 +183,14 @@ export function SaleForm({ editingSale }: { editingSale?: EditingSale } = {}) {
 
   // ── Data fetching ─────────────────────────────────────────────────────────
   const { data: productsData } = useSWR<Product[]>('/api/products?active=true', () => getActiveProducts())
-  const { data: stockData }    = useSWR<{ stock: StockRow[] }>('/api/stock/on-hand', fetcher)
+  const { data: stockData }    = useSWR<{ stock: StockRow[] }>('/api/stock/on-hand', offlineFetcher)
 
   const buyerKey = buyerMode === 'account' && customer
     ? `/api/sales?status=pending&pageSize=20&search=${encodeURIComponent(`${customer.firstName} ${customer.lastName}`)}`
     : null
   const { data: pendingData, mutate: mutatePending } = useSWR<{ sales: PendingSale[] }>(
     buyerKey ?? '/api/sales?status=pending&pageSize=20',
-    fetcher,
+    salesListFetcher,
     { refreshInterval: 30_000 },
   )
   const pendingSales = pendingData?.sales ?? []

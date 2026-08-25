@@ -3,7 +3,7 @@
 import useSWR from 'swr'
 import { ReceiptText } from 'lucide-react'
 import Decimal from 'decimal.js'
-import { fetcher } from '@/lib/swrFetcher'
+import { offlineFetcher } from '@/lib/offline/responseCache'
 import { incVatPrice } from '@/lib/utils/vat'
 
 type ActivePriceList = {
@@ -25,7 +25,7 @@ type ActivePriceList = {
 export function TodaysPricesPanel({ priceGroupId }: { priceGroupId?: string | null }) {
   const { data } = useSWR<{ priceList: ActivePriceList | null }>(
     `/api/price-lists/active${priceGroupId ? `?priceGroupId=${priceGroupId}` : ''}`,
-    fetcher,
+    offlineFetcher,
     { refreshInterval: 5 * 60_000 }, // catch a mid-shift list swap without a reload
   )
   const priceList = data?.priceList
