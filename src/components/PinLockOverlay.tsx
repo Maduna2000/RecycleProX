@@ -42,6 +42,44 @@ export function PinLockOverlay({ children }: { children: React.ReactNode }) {
     return () => clearInterval(interval)
   }, [isLocked, lastActivity, lock])
 
+  // Shared by both failure paths below (a thrown fetch exception, and an
+  // HTTP response that isn't a definitive "server said no") — checks the
+  // PIN against the last known-good hash cached locally from a prior
+  // online verification, rather than leaving the till stuck. `reachable`
+  // only affects the wording of the final toast.
+  async function tryOfflineFallback(userId: string, pin: string, reachable: boolean): Promise<boolean> {
+    const offlineMatch = await verifyPinOffline(userId, pin)
+    if (offlineMatch) {
+      unlock()
+      toast.success('Unlocked offline — will re-verify once reconnected')
+      return true
+    }
+
+    if (hasOfflinePinFallback(userId)) {
+      // A real cached PIN to compare against, and it didn't match — this
+      // is a genuine wrong guess, so it counts toward the lockout the
+      // same as a real 401 would (being offline isn't a brute-force
+      // exemption).
+      incrementFailedAttempts()
+      if (failedPinAttempts + 1 >= 3) {
+        await signOut({ callbackUrl: '/login' })
+        return true
+      }
+      toast.error(
+        reachable
+          ? 'Network error, and that PIN didn\'t match the last one used offline — try again'
+          : 'Request timed out, and that PIN didn\'t match the last one used offline — try again'
+      )
+    } else {
+      // No successful online unlock has ever happened on this device, so
+      // there's nothing to compare against — don't count this toward the
+      // lockout (locking someone out with no way to unlock offline either
+      // would only strand them harder), just explain why it can't work yet.
+      toast.error('Offline with no cached PIN for this device yet — reconnect at least once before this works offline')
+    }
+    return true
+  }
+
   async function handlePin(pin: string) {
     if (!session?.user?.id || verifying) return
 
@@ -66,54 +104,33 @@ export function PinLockOverlay({ children }: { children: React.ReactNode }) {
       }
 
       // A real "wrong PIN" response from the server — this counts toward
-      // the 3-attempt auto-logout. Anything else (network error, timeout,
-      // 5xx) below is a failed *request*, not a failed *PIN*, and must not
-      // count against the user or lock them out for a connectivity blip.
+      // the 3-attempt auto-logout, and only this counts: it's the one case
+      // where the server was actually reached and gave a definitive answer.
       if (res.status === 401) {
         incrementFailedAttempts()
         if (failedPinAttempts + 1 >= 3) {
           await signOut({ callbackUrl: '/login' })
           return
         }
-      } else {
-        toast.error('Could not verify PIN — please try again')
-      }
-    } catch (err) {
-      // The request never reached the server (offline, or timed out trying)
-      // — this is exactly the scenario the offline queue exists for
-      // elsewhere in the app, so the lock screen needs the same fallback:
-      // check the PIN against the last known-good hash cached locally from
-      // a prior online verification, rather than leaving the till stuck.
-      const offlineMatch = await verifyPinOffline(session.user.id, pin)
-      if (offlineMatch) {
-        unlock()
-        toast.success('Unlocked offline — will re-verify once reconnected')
         return
       }
 
+      // Any other status (500 etc.) is a failed *request*, not a failed
+      // *PIN* — and critically, in this app's actual desktop architecture
+      // "offline" looks exactly like this: the Electron-spawned server is
+      // still reachable on localhost even with real internet down, only
+      // its own outbound DB connection fails, which surfaces as a normal
+      // HTTP 500 response here, never a thrown fetch() exception. The
+      // offline fallback below must run for this case too, not just the
+      // catch block — a plain error toast here previously left the till
+      // stuck exactly during a real outage, the one time it mattered.
+      await tryOfflineFallback(session.user.id, pin, true)
+    } catch (err) {
+      // A genuine network-level failure (fetch() itself threw) — same
+      // fallback as above, just a different reason it couldn't get an
+      // answer from the server.
       const reachable = !(err instanceof Error && err.name === 'AbortError')
-      if (hasOfflinePinFallback(session.user.id)) {
-        // A real cached PIN to compare against, and it didn't match — this
-        // is a genuine wrong guess, so it counts toward the lockout the
-        // same as a real 401 would (being offline isn't a brute-force
-        // exemption).
-        incrementFailedAttempts()
-        if (failedPinAttempts + 1 >= 3) {
-          await signOut({ callbackUrl: '/login' })
-          return
-        }
-        toast.error(
-          reachable
-            ? 'Network error, and that PIN didn\'t match the last one used offline — try again'
-            : 'Request timed out, and that PIN didn\'t match the last one used offline — try again'
-        )
-      } else {
-        // No successful online unlock has ever happened on this device, so
-        // there's nothing to compare against — don't count this toward the
-        // lockout (locking someone out with no way to unlock offline either
-        // would only strand them harder), just explain why it can't work yet.
-        toast.error('Offline with no cached PIN for this device yet — reconnect at least once before this works offline')
-      }
+      await tryOfflineFallback(session.user.id, pin, reachable)
     } finally {
       clearTimeout(timer)
       setVerifying(false)
