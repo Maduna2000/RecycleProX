@@ -96,7 +96,7 @@
       "runAfterFinish": true,
       "license": "electron/LICENSE.txt",
       "perMachine": true,
-      "include": "build/installer.nsh"
+      "include": "electron/installer.nsh"
     }
   },
   "prisma": {
