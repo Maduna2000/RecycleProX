@@ -97,7 +97,25 @@ export default function ProductsPage() {
   })
 
   const swrKey = `/api/products?${query}`
-  const { data, isLoading, error } = useSWR<{ products: Product[] }>(swrKey, productsListFetcher)
+  // A bare-string key here would collide with every other page that reads
+  // this exact URL (Purchases/Sales/Price List editor/Stocktake/Price
+  // Groups) via getActiveProducts() — SWR's cache is keyed on the URL
+  // alone, shared app-wide regardless of which fetcher populates it, and
+  // this page's fetcher resolves to the wrapped { products: [...] } shape
+  // where those pages expect a bare array. That exact collision already
+  // crashed production once (see the comments in price-lists/[id]/page.tsx
+  // and stocktake/[id]/page.tsx, which moved to getActiveProducts()
+  // specifically to stop writing this shape under the shared key) — this
+  // page still needs the wrapped/paginated shape, so instead of changing
+  // its shape, it gets a key SWR can never confuse with the plain URL.
+  // SWR v2 passes an array key to the fetcher as one single argument (not
+  // spread) — destructure the real URL back out before handing it to a
+  // fetcher that still just takes a plain string.
+  const productsCacheKey = [swrKey, 'products-list-page'] as const
+  const { data, isLoading, error } = useSWR<{ products: Product[] }>(
+    productsCacheKey,
+    ([url]) => productsListFetcher(url),
+  )
   const products = data?.products ?? []
 
   const [page, setPage] = useState(1)
@@ -111,7 +129,7 @@ export default function ProductsPage() {
   // Flat list of all category names (parents + children) for lookup helpers
   const allCategoryNames: SubCategoryItem[] = categories.flatMap(c => [c, ...c.children])
 
-  const revalidate = () => mutate(swrKey)
+  const revalidate = () => mutate(productsCacheKey)
 
   useEffect(() => { setSelectedKeys(new Set()); setPage(1) }, [swrKey])
 
