@@ -65,7 +65,7 @@ function main() {
   // resolves its prebuilt binary path dynamically at runtime via
   // node-gyp-build (not statically analyzable), so static tracing has
   // nothing to follow.
-  for (const mod of ['.prisma', '@prisma/client', 'serialport', '@serialport', 'node-thermal-printer']) {
+  for (const mod of ['.prisma', '@prisma/client', 'serialport', '@serialport', 'node-thermal-printer', 'sharp', '@img/sharp-win32-x64', '@img/colour']) {
     copyIfExists(path.join(ROOT, 'node_modules', mod), path.join(STANDALONE_DIR, 'node_modules', mod))
   }
 

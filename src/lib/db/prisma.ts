@@ -4,6 +4,32 @@ import { activeTenantId, activeTenantTx, requireTenantId } from './tenantContext
 
 const globalForPrisma = globalThis as unknown as { rawPrisma: PrismaClient }
 
+// Prisma's own client-side connection pool defaults to `numCPUs*2+1` —
+// on a 2-core desktop install that computed to just 5, and a single
+// dashboard page mount fires 15-20 concurrent requests (see
+// withTenantScope below — every one of them opens its own transaction).
+// That's not a timing problem the wider maxWait/timeout below can fix on
+// its own: most of those requests were queuing for a connection that
+// never freed up in the 10s default pool_timeout, failing with Prisma's
+// P2024 "Timed out fetching a new connection from the connection pool".
+// Neon's pooled endpoint (the "-pooler" hostname every deployment target
+// already uses) is PgBouncer underneath, built to multiplex far more
+// app-side connections than that default — raising the ceiling here is
+// safe. Only applied when the URL doesn't already specify these, so an
+// operator who's deliberately tuned a connection string isn't overridden.
+function withPoolParams(url: string): string {
+  try {
+    const u = new URL(url)
+    if (!u.searchParams.has('connection_limit')) u.searchParams.set('connection_limit', '20')
+    if (!u.searchParams.has('pool_timeout')) u.searchParams.set('pool_timeout', '20')
+    return u.toString()
+  } catch {
+    return url
+  }
+}
+
+const RAW_DB_URL = process.env.APP_RUNTIME_DATABASE_URL || process.env.DATABASE_URL
+
 // The single underlying connection — every tenant's data lives in these
 // same tables now (see i-need-you-to-vectorized-pumpkin.md Section 2-4).
 // Isolation comes from Postgres Row-Level Security (prisma/migrations/
@@ -25,7 +51,7 @@ const rawClient =
   globalForPrisma.rawPrisma ||
   attachAuditMiddleware(
     new PrismaClient({
-      datasourceUrl: process.env.APP_RUNTIME_DATABASE_URL || process.env.DATABASE_URL,
+      datasourceUrl: RAW_DB_URL ? withPoolParams(RAW_DB_URL) : RAW_DB_URL,
       log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
     }),
   )

@@ -148,7 +148,7 @@ export default function PriceListEditorPage() {
 
   const categories = useMemo(() => {
     const set = new Set<string>()
-    for (const p of products ?? []) set.add(p.category)
+    for (const p of Array.isArray(products) ? products : []) set.add(p.category)
     return Array.from(set).sort()
   }, [products])
 

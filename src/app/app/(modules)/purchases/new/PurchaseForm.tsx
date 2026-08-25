@@ -19,6 +19,8 @@ import { useOfflineMutation } from '@/hooks/useOfflineFetch'
 import { useOfflineLookup } from '@/hooks/useOfflineLookup'
 import { offlineDB } from '@/lib/offline/db'
 import { fetcher } from '@/lib/swrFetcher'
+import { offlineFetcher } from '@/lib/offline/responseCache'
+import { purchasesListFetcher } from '@/lib/offline/fetchers/purchases'
 import { useSystemCurrency } from '@/hooks/useSystemCurrency'
 import { canAutoPrint, autoPrintReceipt } from '@/lib/print/autoPrintClient'
 
@@ -218,7 +220,7 @@ export function PurchaseForm({ editingPurchase }: { editingPurchase?: EditingPur
   // Trade Commodities toggles real categories on/off). Selecting a parent
   // category covers its sub-categories too, mirroring productService.ts's
   // expandCategoryNames.
-  const { data: categoriesData } = useSWR<{ categories: CategoryNode[] }>('/api/product-categories', fetcher)
+  const { data: categoriesData } = useSWR<{ categories: CategoryNode[] }>('/api/product-categories', offlineFetcher)
   const categoryExpansion = (() => {
     const map: Record<string, string[]> = {}
     for (const parent of categoriesData?.categories ?? []) {
@@ -230,7 +232,7 @@ export function PurchaseForm({ editingPurchase }: { editingPurchase?: EditingPur
 
   const { data: pendingData, mutate: mutatePending } = useSWR<{ purchases: PendingPurchase[] }>(
     '/api/purchases?status=pending&pageSize=20',
-    fetcher,
+    purchasesListFetcher,
     { refreshInterval: 30_000 },
   )
   const pendingPurchases = pendingData?.purchases ?? []
@@ -250,7 +252,7 @@ export function PurchaseForm({ editingPurchase }: { editingPurchase?: EditingPur
   const priceGroupId = customer?.priceGroupId ?? null
   const { data: activePriceListData } = useSWR<{ priceList: { items: { productId: string | null; priceExVat: string }[] } | null }>(
     `/api/price-lists/active${priceGroupId ? `?priceGroupId=${priceGroupId}` : ''}`,
-    fetcher,
+    offlineFetcher,
     { refreshInterval: 5 * 60_000 },
   )
   function todaysListPrice(productId: string): string | null {
