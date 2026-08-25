@@ -76,6 +76,14 @@
       {
         "from": ".next/standalone/node_modules/next",
         "to": "app/.next/standalone/node_modules/next"
+      },
+      {
+        "from": ".next/standalone/node_modules/sharp",
+        "to": "app/.next/standalone/node_modules/sharp"
+      },
+      {
+        "from": ".next/standalone/node_modules/@img",
+        "to": "app/.next/standalone/node_modules/@img"
       }
     ],
     "win": {

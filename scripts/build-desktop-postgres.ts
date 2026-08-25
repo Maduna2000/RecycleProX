@@ -88,7 +88,16 @@ function main() {
   // the loop below needs its own matching extraResources entry in
   // package.json — this copy step just makes sure something real exists at
   // .next/standalone/node_modules/<mod> for that entry's `from` to pick up.
-  for (const mod of ['.prisma', '@prisma/client', '@prisma/engines', 'serialport', '@serialport', 'node-thermal-printer', 'next']) {
+  for (const mod of [
+    '.prisma', '@prisma/client', '@prisma/engines', 'serialport', '@serialport', 'node-thermal-printer', 'next',
+    // sharp (businessReport.ts's report-photo downscaling) resolves its
+    // platform binary dynamically at runtime — the same tracing gap as the
+    // modules above, confirmed by the same class of GitHub issues against
+    // Next's standalone output. Only the Windows x64 binary is installed
+    // here (npm's optionalDependencies already picked it for this CI
+    // runner's platform), so only that one needs shipping.
+    'sharp', '@img/sharp-win32-x64', '@img/colour',
+  ]) {
     copyIfExists(path.join(ROOT, 'node_modules', mod), path.join(standaloneDir, 'node_modules', mod))
   }
 
