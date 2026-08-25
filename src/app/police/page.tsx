@@ -13,7 +13,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import useSWR from 'swr'
-import { fetcher } from '@/lib/swrFetcher'
+import { offlineFetcher } from '@/lib/offline/responseCache'
 import { useSystemCurrency } from '@/hooks/useSystemCurrency'
 import {
   ShieldCheck, Loader2, Search, FileDown, Pen, CheckCircle, RotateCcw,
@@ -137,7 +137,7 @@ const STORAGE_KEY = 'police-visit-id'
 type Phase = 'loading' | 'begin' | 'active' | 'done' | 'expired'
 
 export default function PolicePortalPage() {
-  const { data: settings } = useSWR<SettingsMap>('/api/settings', fetcher)
+  const { data: settings } = useSWR<SettingsMap>('/api/settings', offlineFetcher)
   const serviceName = settings?.police_service_name ?? DEFAULT_POLICE_SERVICE_NAME
   const legalNote   = settings?.police_legal_note ?? DEFAULT_POLICE_LEGAL_NOTE
   const yardName = settings?.yardName ?? 'Renovo Pro'
@@ -827,7 +827,7 @@ function PersonTab({ visitId, guardedFetch }: { visitId: string; guardedFetch: G
 
 function GoodsTab({ visitId, guardedFetch }: { visitId: string; guardedFetch: GuardedFetch }) {
   const { symbol: currSym } = useSystemCurrency()
-  const { data: productsData } = useSWR<{ products: Product[] }>('/api/products', fetcher)
+  const { data: productsData } = useSWR<{ products: Product[] }>('/api/products', offlineFetcher)
   const products = productsData?.products ?? []
 
   const [productId, setProductId] = useState('')

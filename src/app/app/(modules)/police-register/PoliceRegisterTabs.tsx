@@ -8,7 +8,7 @@ import { toast } from 'sonner'
 import { colors } from '@/lib/design-tokens'
 import { DEFAULT_POLICE_SERVICE_NAME, DEFAULT_POLICE_LEGAL_NOTE } from '@/lib/police-defaults'
 import { StatusBadge as SharedStatusBadge } from '@/components/ui/DataTable'
-import { fetcher } from '@/lib/swrFetcher'
+import { offlineFetcher } from '@/lib/offline/responseCache'
 import {
   inp, lbl, TH, TD, HEADER_GRAD, NAVY,
   Btn, Field, EmptyHint, winBevel,
@@ -69,7 +69,7 @@ export function GenerateRegisterTab() {
   const [pendingVisitId, setPendingVisitId] = useState<string | null>(null)
   const [sigDialogOpen, setSigDialogOpen]   = useState(false)
 
-  const { data: settings } = useSWR<Record<string, string | undefined>>('/api/settings', fetcher)
+  const { data: settings } = useSWR<Record<string, string | undefined>>('/api/settings', offlineFetcher)
   const serviceName = settings?.police_service_name ?? DEFAULT_POLICE_SERVICE_NAME
   const legalNote   = settings?.police_legal_note   ?? DEFAULT_POLICE_LEGAL_NOTE
 

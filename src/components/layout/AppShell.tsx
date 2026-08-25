@@ -17,6 +17,7 @@ import {
   ShieldCheck, History, LifeBuoy, DoorOpen,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { offlineFetcher } from '@/lib/offline/responseCache'
 import { useOfflineStore } from '@/stores/offlineStore'
 import { usePrinterStatusStore } from '@/stores/printerStatusStore'
 import { useUpdateStore } from '@/stores/updateStore'
@@ -411,7 +412,13 @@ type TodayStats = {
   cashUpStatus: 'open' | 'submitted' | 'approved' | null
 }
 
-const statsFetcher = (url: string) => fetch(url).then(r => r.json())
+// Was a bare fetch with no offline fallback and no error handling at all
+// (didn't even check r.ok) — every till on the dashboard polls both of
+// these every 30s, so going offline meant an unbroken stream of failed
+// requests and console noise forever. offlineFetcher (already used
+// elsewhere for exactly this "no deeper structured reader needed yet"
+// case) serves the last-known response instead once the live fetch fails.
+const statsFetcher = offlineFetcher
 
 type OnSiteData = {
   count:   number
