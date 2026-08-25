@@ -95,7 +95,8 @@
       "createDesktopShortcut": true,
       "runAfterFinish": true,
       "license": "electron/LICENSE.txt",
-      "perMachine": true
+      "perMachine": true,
+      "include": "build/installer.nsh"
     }
   },
   "prisma": {
