@@ -10,7 +10,7 @@ import {
 } from '@/components/rpx'
 
 type ImportError = { row: number; code: string; reason: string }
-type ImportResult = { imported: number; skipped: number; errors: ImportError[] }
+type ImportResult = { imported: number; updated: number; skipped: number; errors: ImportError[] }
 
 const TEMPLATE_HEADER = 'code,name,category,unit,defaultBuyPrice,defaultSellPrice,minStockLevel'
 
@@ -52,11 +52,16 @@ export function ProductImportModal({
       }
       const r = json as ImportResult
       setResult(r)
-      if (r.imported > 0) {
-        toast.success(`Imported ${r.imported} product${r.imported === 1 ? '' : 's'}${r.skipped > 0 ? ` — ${r.skipped} skipped` : ''}`)
+      if (r.imported > 0 || r.updated > 0) {
+        const parts = [
+          r.imported > 0 ? `${r.imported} added` : null,
+          r.updated > 0 ? `${r.updated} updated` : null,
+          r.skipped > 0 ? `${r.skipped} skipped` : null,
+        ].filter(Boolean)
+        toast.success(parts.join(', '))
         onSuccess()
       } else {
-        toast.error('No products were imported — see the errors below')
+        toast.error('Nothing was imported — see the errors below')
       }
     } catch {
       toast.error('Failed to import — check your connection and try again')
@@ -72,8 +77,10 @@ export function ProductImportModal({
         <RpxDialogBody>
           <div className="space-y-4">
             <p style={{ fontSize: fontSize.sm, color: colors.textSecondary }}>
-              Upload a CSV file to add many products at once. The category for each row must already
-              exist (Products → Categories) — rows with an unknown category are skipped, not created.
+              Upload a CSV file to add or update many products at once. A code that already exists gets
+              every field in the row applied to it — including prices — so re-importing is also how you
+              bulk-refresh prices. The category for each row must already exist (Products → Categories) —
+              rows with an unknown category are skipped, not created.
             </p>
 
             <div style={{ background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 3, padding: '10px 12px' }}>
@@ -120,11 +127,11 @@ export function ProductImportModal({
               <div className="space-y-2">
                 <div className="flex items-center gap-2" style={{
                   padding: '8px 10px', borderRadius: 3, fontSize: fontSize.sm,
-                  background: result.imported > 0 ? colors.actionBg : colors.dangerBg,
-                  color: result.imported > 0 ? colors.action : colors.danger,
+                  background: (result.imported > 0 || result.updated > 0) ? colors.actionBg : colors.dangerBg,
+                  color: (result.imported > 0 || result.updated > 0) ? colors.action : colors.danger,
                 }}>
                   <CheckCircle2 size={14} />
-                  {result.imported} imported, {result.skipped} skipped
+                  {result.imported} added, {result.updated} updated, {result.skipped} skipped
                 </div>
                 {result.errors.length > 0 && (
                   <div style={{ maxHeight: 200, overflowY: 'auto', border: `1px solid ${colors.border}`, borderRadius: 3 }}>

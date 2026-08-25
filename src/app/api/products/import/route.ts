@@ -38,6 +38,12 @@ type ImportError = { row: number; code: string; reason: string }
  * Expected columns (case-insensitive, a few common variants accepted):
  * code, name, category, unit, defaultBuyPrice (or buyPrice), defaultSellPrice
  * (or sellPrice), minStockLevel (optional).
+ *
+ * Upsert by code: a code that already exists gets every field in the row
+ * (including prices) applied to it rather than being skipped — this is
+ * also how a re-import bulk-refreshes prices. Only a genuinely unresolvable
+ * row (bad data, or a category that doesn't exist yet) is skipped.
+ *
  * Manager/admin only. Mirrors /api/casual/import's shape and conventions.
  */
 export async function POST(req: NextRequest) {
@@ -100,30 +106,19 @@ export async function POST(req: NextRequest) {
   }
 
   if (validRows.length === 0) {
-    return NextResponse.json({ imported: 0, skipped: 0, errors }, { status: 422 })
+    return NextResponse.json({ imported: 0, updated: 0, skipped: 0, errors }, { status: 422 })
   }
 
   let imported = 0
+  let updated = 0
   let skipped = errors.length
 
   await runWithRequestTenant(req, () => prisma.$transaction(async (tx) => {
     const tenantId = requireTenantId()
     const categories = await tx.productCategory.findMany({ where: { tenantId }, select: { id: true, name: true } })
     const categoryByName = new Map(categories.map((c) => [c.name, c.id]))
-    const seenCodes = new Set<string>()
 
     for (const { row, data } of validRows) {
-      if (seenCodes.has(data.code)) {
-        skipped++
-        errors.push({ row, code: data.code, reason: 'Duplicate code within this file' })
-        continue
-      }
-      const existing = await tx.product.findUnique({ where: { tenantId_code: { tenantId, code: data.code } } })
-      if (existing) {
-        skipped++
-        errors.push({ row, code: data.code, reason: 'Product code already exists' })
-        continue
-      }
       const categoryId = categoryByName.get(data.category)
       if (!categoryId) {
         skipped++
@@ -131,25 +126,30 @@ export async function POST(req: NextRequest) {
         continue
       }
 
-      await tx.product.create({
-        data: {
-          tenantId,
-          code: data.code,
-          name: data.name,
-          category: data.category,
-          categoryId,
-          unit: data.unit,
-          defaultBuyPrice: new Decimal(data.defaultBuyPrice),
-          defaultSellPrice: new Decimal(data.defaultSellPrice),
-          minStockLevel: data.minStockLevel ? new Decimal(data.minStockLevel) : undefined,
-          isActive: true,
-        },
-      })
-      seenCodes.add(data.code)
-      imported++
+      const productData = {
+        name: data.name,
+        category: data.category,
+        categoryId,
+        unit: data.unit,
+        defaultBuyPrice: new Decimal(data.defaultBuyPrice),
+        defaultSellPrice: new Decimal(data.defaultSellPrice),
+        minStockLevel: data.minStockLevel ? new Decimal(data.minStockLevel) : null,
+      }
+
+      // Existing product with this code → update every field (including
+      // price) from the row instead of skipping it, so a CSV re-import is
+      // also how prices get bulk-refreshed. New code → create it.
+      const existing = await tx.product.findUnique({ where: { tenantId_code: { tenantId, code: data.code } } })
+      if (existing) {
+        await tx.product.update({ where: { id: existing.id }, data: productData })
+        updated++
+      } else {
+        await tx.product.create({ data: { tenantId, code: data.code, isActive: true, ...productData } })
+        imported++
+      }
     }
   }))
 
-  logger.info({ userId: session.user.id, imported, skipped, errors: errors.length }, 'product.import')
-  return NextResponse.json({ imported, skipped, errors })
+  logger.info({ userId: session.user.id, imported, updated, skipped, errors: errors.length }, 'product.import')
+  return NextResponse.json({ imported, updated, skipped, errors })
 }
