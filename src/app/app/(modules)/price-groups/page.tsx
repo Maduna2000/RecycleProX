@@ -368,7 +368,7 @@ function ManagePriceGroupModal({ groupId, onClose, onChanged }: {
   // that pattern exists to avoid.
   const grouped = useMemo(() => {
     const map = new Map<string, ManageProduct[]>()
-    for (const p of products ?? []) {
+    for (const p of Array.isArray(products) ? products : []) {
       const key = p.category || 'Uncategorized'
       if (!map.has(key)) map.set(key, [])
       map.get(key)!.push(p)
