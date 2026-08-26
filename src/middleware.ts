@@ -125,6 +125,31 @@ export default auth(async (req: NextRequest & { auth: { user?: SessionUser } | n
     return next()
   }
 
+  // A session with no tenantId is never valid post-migration (every login
+  // path — online, offline-cache, mobile bearer token — attaches one; see
+  // auth.ts/authService.ts) but can still exist on disk from before this
+  // was true, or from any future bug in one of those paths. Left alone,
+  // every downstream tenant-scoped query 500s (MissingTenantContextError)
+  // for this token's entire 12h lifetime with nothing to notice — the
+  // production incident this comment is here to prevent required a manual
+  // logout to clear. Catch it here instead: force a clean re-login the
+  // very first request, automatically, no user/developer intervention
+  // needed. Clearing the cookie (not just redirecting) stops the same
+  // stale token from being replayed on the very next request.
+  if (session?.user && !session.user.tenantId) {
+    // console, not the pino logger — this file runs in the Edge runtime
+    // (see the file-header comment) and pino is Node-only.
+    console.error('middleware: session has no tenantId, forcing re-login', { userId: session.user.id })
+    if (pathname.startsWith('/api/')) {
+      const res = NextResponse.json({ error: 'Session invalid — please log in again' }, { status: 401 })
+      res.cookies.delete(sessionSalt(req))
+      return res
+    }
+    const res = NextResponse.redirect(new URL('/login', req.url))
+    res.cookies.delete(sessionSalt(req))
+    return res
+  }
+
   // Tenant-consistency guardrail — stops a session for one company's
   // subdomain being reused on another company's subdomain tab. Only
   // enforced when THIS request actually resolved a real subdomain-derived

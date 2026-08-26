@@ -72,6 +72,18 @@ const {
           logger.warn({ err, username }, 'authorize(): database unreachable, trying offline login fallback')
           const offline = await tryOfflineLogin(username, password, tenantSlug)
           if (!offline) return null
+          // A cache entry written before tenantId was part of this payload
+          // (an older install, or any future field this shape gains) would
+          // otherwise mint a session that looks valid but has no tenantId —
+          // every tenant-scoped query then 500s for this token's whole 12h
+          // lifetime with nothing to notice or self-correct, since there's
+          // no online round-trip here to catch it. Reject it outright
+          // instead: the cashier gets a clear "log in once online" failure
+          // now, rather than a silently broken session later.
+          if (!offline.tenantId) {
+            logger.error({ username }, 'authorize(): offline login cache entry missing tenantId — rejecting, needs a fresh online login')
+            return null
+          }
           logger.info({ username }, 'authorize(): offline login accepted')
           return { ...offline, name: offline.fullName, email: offline.username }
         }
