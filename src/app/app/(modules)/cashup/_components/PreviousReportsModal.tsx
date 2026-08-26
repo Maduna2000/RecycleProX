@@ -214,6 +214,8 @@ export function PreviousReportsModal({ onClose }: PreviousReportsModalProps) {
                                   <CheckCircle2 className="w-3 h-3" style={{ color: colors.action }} />
                                   Approved
                                 </span>
+                              ) : s.status === 'voided' ? (
+                                <span style={{ color: colors.danger }}>Voided</span>
                               ) : (
                                 'Submitted'
                               )}

@@ -22,7 +22,6 @@ import { prisma } from '@/lib/db/prisma'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 class CashUpNotFoundForReportError extends Error {}
-class CashUpNotReportableError extends Error {}
 
 /**
  * GET /api/cashup/[id]/reports?type=cash-sales
@@ -59,9 +58,9 @@ export async function GET(
       if (!cashUp) throw new CashUpNotFoundForReportError()
 
       // Reports are date-scoped queries, not a read of the finalized cashup
-      // totals, so they work for the currently-running (open) session too —
-      // only a voided session has no meaningful report to generate.
-      if (cashUp.status === 'voided') throw new CashUpNotReportableError()
+      // totals, so they work for any session status, including 'voided' —
+      // the sales/purchases/stock transactions that happened during a
+      // voided session are still real and still need to be reportable.
 
       // Get settings for company info
       const settings = await getAllSettings()
@@ -105,12 +104,6 @@ export async function GET(
   } catch (err) {
     if (err instanceof CashUpNotFoundForReportError) {
       return NextResponse.json({ error: 'Cash-up session not found' }, { status: 404 })
-    }
-    if (err instanceof CashUpNotReportableError) {
-      return NextResponse.json(
-        { error: 'Reports are not available for a voided session' },
-        { status: 400 }
-      )
     }
     logger.error({ err, cashUpId: id, reportType }, 'GET /api/cashup/[id]/reports failed')
     return NextResponse.json({ error: 'Failed to generate report' }, { status: 500 })

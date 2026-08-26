@@ -15,7 +15,9 @@ const QuerySchema = z.object({
  * GET /api/cashup/history?status=submitted,approved&skip=0&take=50
  *
  * Returns a list of past cashup sessions for the Previous Reports modal.
- * Only returns submitted and approved sessions by default.
+ * Returns submitted, approved and voided sessions by default — a voided
+ * session's own totals are discarded, but the sales/purchases/stock
+ * transactions that happened during it are still real and reportable.
  */
 export async function GET(req: NextRequest) {
   const session = await auth()
@@ -46,7 +48,7 @@ export async function GET(req: NextRequest) {
   // Parse status filter
   const statusFilter = status
     ? status.split(',').map((s) => s.trim()).filter(Boolean)
-    : ['submitted', 'approved']
+    : ['submitted', 'approved', 'voided']
 
   try {
     const { items, total } = await runWithRequestTenant(req, () => getCashUpHistory({

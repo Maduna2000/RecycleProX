@@ -1353,9 +1353,9 @@ export async function getCashUpHistory(opts: {
   take?: number
   status?: string[]
 } = {}): Promise<{ items: CashUpHistoryRecord[]; total: number }> {
-  const { skip = 0, take = 50, status = ['submitted', 'approved'] } = opts
+  const { skip = 0, take = 50, status = ['submitted', 'approved', 'voided'] } = opts
 
-  const whereClause = { status: { in: status as ('submitted' | 'approved')[] } }
+  const whereClause = { status: { in: status as ('submitted' | 'approved' | 'voided')[] } }
 
   const [items, total] = await Promise.all([
     prisma.cashUp.findMany({
