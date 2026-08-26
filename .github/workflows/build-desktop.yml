@@ -70,6 +70,44 @@ jobs:
           # that secret is added, same no-op-until-configured pattern as
           # signing.
 
+      - name: Smoke-test native modules under the packaged Electron runtime
+        # sharp/serialport/node-thermal-printer are copied into
+        # .next/standalone/node_modules by scripts/build-desktop-postgres.ts
+        # as prebuilt binaries from THIS RUNNER's plain Node 24 (see that
+        # script's own comment on why the copy exists) — but main.js loads
+        # them by spawning the packaged Electron.exe itself with
+        # ELECTRON_RUN_AS_NODE=1, not plain node. electron-builder's
+        # automatic native-module rebuild only walks the real dependency
+        # tree resolved through node_modules at the project root (which is
+        # why build.files above doesn't even list node_modules/**) — it has
+        # no visibility into this manually-copied standalone tree, so
+        # whether these binaries actually work under Electron's own ABI
+        # depends entirely on them being N-API-based (cross-runtime-safe by
+        # design) rather than something never verified. Load them here
+        # exactly the way main.js does — same exe, same flag, same relative
+        # position next to node_modules — so a real ABI mismatch fails this
+        # build loudly instead of shipping an installer where printing or
+        # report-photo generation silently breaks on a customer's PC.
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem -Path dist -Filter "Renovo Pro.exe" -Recurse | Select-Object -First 1
+          if (-not $exe) { throw "Could not find the packaged Renovo Pro.exe under dist/ (unpacked electron-builder output) — packaging must have failed silently." }
+          $appDir = Join-Path $exe.Directory.FullName "resources\app\.next\standalone"
+          if (-not (Test-Path $appDir)) { throw "Expected standalone app dir not found at $appDir" }
+          $smokeTestPath = Join-Path $appDir "__native-smoketest.js"
+          # A single line, not a PowerShell here-string — this run block's
+          # indentation is literal script content, and a here-string's
+          # closing "@ must sit at column zero or it fails to parse.
+          "require('sharp'); require('serialport'); require('node-thermal-printer'); console.log('native modules loaded OK under the packaged Electron runtime');" | Set-Content -Path $smokeTestPath -Encoding utf8
+
+          $env:ELECTRON_RUN_AS_NODE = "1"
+          & $exe.FullName $smokeTestPath
+          $exitCode = $LASTEXITCODE
+          Remove-Item -Path $smokeTestPath -ErrorAction SilentlyContinue
+          if ($exitCode -ne 0) {
+            throw "Native module smoke test failed under the packaged Electron runtime (likely a native-module ABI mismatch — sharp/serialport/node-thermal-printer built for plain Node, not Electron). See output above."
+          }
+
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
         with:
