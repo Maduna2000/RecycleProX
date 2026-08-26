@@ -94,16 +94,26 @@ jobs:
           if (-not $exe) { throw "Could not find the packaged Renovo Pro.exe under dist/ (unpacked electron-builder output) — packaging must have failed silently." }
           $appDir = Join-Path $exe.Directory.FullName "resources\app\.next\standalone"
           if (-not (Test-Path $appDir)) { throw "Expected standalone app dir not found at $appDir" }
-          $smokeTestPath = Join-Path $appDir "__native-smoketest.js"
-          # A single line, not a PowerShell here-string — this run block's
-          # indentation is literal script content, and a here-string's
-          # closing "@ must sit at column zero or it fails to parse.
+
+          # The script file previously lived inside dist\win-unpacked\...\standalone
+          # itself (so a bare require('sharp') would resolve via that folder's
+          # own node_modules) — but electron-builder/signtool had just finished
+          # touching every file in that same tree, and Node then failed to find
+          # the freshly-written script at all (likely a real-time-AV/signing
+          # race on this runner). Writing it to a completely separate temp
+          # directory and pointing NODE_PATH at the app's node_modules instead
+          # avoids touching that just-signed tree a second time.
+          $smokeTestDir = Join-Path $env:RUNNER_TEMP "native-smoketest"
+          New-Item -ItemType Directory -Path $smokeTestDir -Force | Out-Null
+          $smokeTestPath = Join-Path $smokeTestDir "smoketest.js"
           "require('sharp'); require('serialport'); require('node-thermal-printer'); console.log('native modules loaded OK under the packaged Electron runtime');" | Set-Content -Path $smokeTestPath -Encoding utf8
+          if (-not (Test-Path $smokeTestPath)) { throw "Failed to write the smoke-test script to $smokeTestPath" }
 
           $env:ELECTRON_RUN_AS_NODE = "1"
+          $env:NODE_PATH = Join-Path $appDir "node_modules"
           & $exe.FullName $smokeTestPath
           $exitCode = $LASTEXITCODE
-          Remove-Item -Path $smokeTestPath -ErrorAction SilentlyContinue
+          Remove-Item -Path $smokeTestDir -Recurse -ErrorAction SilentlyContinue
           if ($exitCode -ne 0) {
             throw "Native module smoke test failed under the packaged Electron runtime (likely a native-module ABI mismatch — sharp/serialport/node-thermal-printer built for plain Node, not Electron). See output above."
           }
