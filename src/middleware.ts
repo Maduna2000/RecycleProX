@@ -38,6 +38,7 @@ async function resolveMobileSession(req: NextRequest): Promise<{ user: SessionUs
     if (!decoded?.id || typeof decoded.id !== 'string') return null
     return {
       user: {
+        id: decoded.id,
         role: (decoded.role as string) ?? '',
         forcePasswordChange: (decoded.forcePasswordChange as boolean) ?? false,
         allowedModules: (decoded.allowedModules as string[]) ?? [],
@@ -53,6 +54,7 @@ async function resolveMobileSession(req: NextRequest): Promise<{ user: SessionUs
 }
 
 type SessionUser = {
+  id?: string
   role?: string
   forcePasswordChange?: boolean
   allowedModules?: string[]
