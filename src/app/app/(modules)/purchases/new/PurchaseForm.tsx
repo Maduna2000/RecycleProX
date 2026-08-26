@@ -683,8 +683,8 @@ export function PurchaseForm({ editingPurchase }: { editingPurchase?: EditingPur
           }
         }
       }
-    } catch {
-      toast.error('Failed to create purchase')
+    } catch (err) {
+      toast.error(err instanceof Error && err.message ? err.message : 'Failed to create purchase')
     } finally {
       setSubmitting(false)
     }

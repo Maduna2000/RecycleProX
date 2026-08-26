@@ -14,6 +14,10 @@ export function useOnlineStatus() {
   const syncIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const wasOfflineRef = useRef(false)
   const initialCheckDoneRef = useRef(false)
+  // Interval callbacks close over stale state, so the live value used inside
+  // startPolling's setInterval is tracked here instead of via `isOnline`.
+  const isOnlineRef = useRef(isOnline)
+  isOnlineRef.current = isOnline
 
   async function checkConnectivity(): Promise<boolean> {
     try {
@@ -56,16 +60,26 @@ export function useOnlineStatus() {
     }, SYNC_INTERVAL_MS)
   }
 
+  // Runs for the whole lifetime of the hook, not just while believed offline —
+  // navigator.onLine only reflects the local network adapter, not whether the
+  // upstream DB is actually reachable (see api/ping/route.ts). If the adapter
+  // stays "up" while Postgres becomes unreachable, the browser never fires an
+  // 'offline' event, so without this always-on poll the app would keep
+  // believing it's online forever and every mutation would hard-fail instead
+  // of falling back to the offline queue.
   function startPolling() {
     stopPolling()
     pollRef.current = setInterval(async () => {
       const alive = await checkConnectivity()
-      if (alive) {
-        stopPolling()
+      if (alive && !isOnlineRef.current) {
         setOnline(true)
         wasOfflineRef.current = false
         startSyncInterval()
         triggerSync()
+      } else if (!alive && isOnlineRef.current) {
+        setOnline(false)
+        wasOfflineRef.current = true
+        stopSyncInterval()
       }
     }, POLL_INTERVAL_MS)
   }
@@ -78,7 +92,6 @@ export function useOnlineStatus() {
       const alive = await checkConnectivity()
       if (alive) {
         setOnline(true)
-        stopPolling()
         startSyncInterval()
         // Always try to sync when coming online or on focus
         triggerSync()
@@ -90,7 +103,6 @@ export function useOnlineStatus() {
       setOnline(false)
       wasOfflineRef.current = true
       stopSyncInterval()
-      startPolling()
     }
 
     // Initial check - verify actual connectivity and sync if online
@@ -115,6 +127,9 @@ export function useOnlineStatus() {
     }
 
     initialCheck()
+    // Keep polling for the whole session — see startPolling's comment for
+    // why this can't be limited to only while already believed offline.
+    startPolling()
 
     window.addEventListener('online', handleOnline)
     window.addEventListener('offline', handleOffline)
