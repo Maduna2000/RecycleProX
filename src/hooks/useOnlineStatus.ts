@@ -5,7 +5,16 @@ import { useOfflineStore } from '@/stores/offlineStore'
 import { offlineDB } from '@/lib/offline/db'
 import { triggerSync } from '@/lib/offline/sync'
 
-const POLL_INTERVAL_MS = 15_000
+// 60s, not something snappier — every tick hits /api/ping, which touches
+// Postgres (see checkDatabaseConnection). Neon's free tier bills compute by
+// how long it stays awake, not by data volume — a shorter interval here
+// keeps the compute from ever idling long enough to auto-suspend, burning
+// through the monthly compute-hour allowance much faster than actual usage
+// would. The per-mutation fallback (useOfflineFetch.ts) still queues a
+// failed write instantly regardless of this interval, so a slower poll only
+// delays how quickly the "you're offline"/"syncing" indicators catch up to
+// reality — it never risks losing data.
+const POLL_INTERVAL_MS = 60_000
 const SYNC_INTERVAL_MS = 30_000 // Sync pending orders every 30 seconds when online
 
 export function useOnlineStatus() {
