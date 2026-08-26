@@ -1,7 +1,7 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import React, { Suspense, useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import useSWR, { mutate as swrMutate } from 'swr'
 import { useSession } from 'next-auth/react'
 import Decimal from 'decimal.js'
@@ -826,8 +826,15 @@ function MomoSummaryTile({ label, value, color }: { label: string; value: string
 }
 
 // ─── Main page ────────────────────────────────────────────────────────────────
-export default function CashUpPage() {
+function CashUpPageInner() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  // A manager opening a specific past session from Previous Reports (e.g. to
+  // reject a submitted-but-wrong day for correction) navigates here with
+  // ?date=YYYY-MM-DD — /api/cashup?today=1&date=... resolves that exact
+  // day's open-or-submitted session instead of always the current one.
+  // Omit the param entirely and behavior is unchanged from before.
+  const viewDate = searchParams.get('date')
   const { data: session } = useSession()
   const isManager = ['admin', 'manager'].includes(session?.user?.role ?? '')
   const { mutate: offlineMutate } = useOfflineMutation()
@@ -837,7 +844,7 @@ export default function CashUpPage() {
     return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`
   })()
 
-  const CASHUP_KEY = '/api/cashup?today=1'
+  const CASHUP_KEY = viewDate ? `/api/cashup?today=1&date=${viewDate}` : '/api/cashup?today=1'
   const { data, isLoading } = useSWR<{ cashUp: CashUp | null }>(CASHUP_KEY, offlineFetcher)
   const { code: systemCurrencyCode, symbol: currSym } = useSystemCurrency()
 
@@ -1194,6 +1201,20 @@ export default function CashUpPage() {
 
         {cashUp && (
           <>
+            {/* Opened via ?date= from Previous Reports — makes it obvious this
+                isn't today's session, since the page otherwise always shows
+                "the" current session with no date picker of its own. */}
+            {viewDate && (
+              <div style={{ border: `1px solid ${colors.process}`, borderRadius: 3, overflow: 'hidden', background: colors.processBg }}>
+                <div className="px-3 py-2.5 flex items-center justify-between gap-3">
+                  <p className="text-sm" style={{ color: colors.process }}>
+                    Viewing the <strong>{sessionDate}</strong> session (not today&apos;s) — opened from Previous Reports.
+                  </p>
+                  <Btn size="sm" onClick={() => router.push('/app/cashup')}>Back to Today</Btn>
+                </div>
+              </div>
+            )}
+
             {/* Provisional (opened offline, not yet synced) — full totals need
                 a live sync, so this session stays view-only until then. */}
             {isProvisional && (
@@ -1738,5 +1759,13 @@ export default function CashUpPage() {
         />
       )}
     </PortalPage>
+  )
+}
+
+export default function CashUpPage() {
+  return (
+    <Suspense fallback={null}>
+      <CashUpPageInner />
+    </Suspense>
   )
 }

@@ -1,8 +1,9 @@
 'use client'
 
 import React, { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import useSWR from 'swr'
-import { FileText, Loader2, CheckCircle2, Calendar } from 'lucide-react'
+import { FileText, Loader2, CheckCircle2, Calendar, ArrowUpRight } from 'lucide-react'
 import { toast } from 'sonner'
 import { Dialog } from '@/components/ui/dialog'
 import { colors } from '@/lib/design-tokens'
@@ -44,6 +45,7 @@ const AVAILABLE_REPORT_TYPES: CashupReportType[] = [
 ]
 
 export function PreviousReportsModal({ onClose }: PreviousReportsModalProps) {
+  const router = useRouter()
   const { data, isLoading, error, mutate } = useSWR<{ sessions: SessionRecord[]; total: number }>(
     '/api/cashup/history?take=50',
     cashUpHistoryFetcher
@@ -174,52 +176,76 @@ export function PreviousReportsModal({ onClose }: PreviousReportsModalProps) {
                     const isSelected = selectedSession === s.id
 
                     return (
-                      <button
+                      <div
                         key={s.id}
-                        onClick={() => {
-                          setSelectedSession(s.id)
-                          setSelectedReports(new Set())
-                        }}
                         style={{
                           display: 'flex',
                           alignItems: 'center',
-                          gap: 8,
                           width: '100%',
-                          padding: '8px 12px',
                           background: isSelected ? colors.processBg : i % 2 === 0 ? '#fff' : '#FAFAFA',
                           borderTop: i > 0 ? `1px solid ${colors.border}` : undefined,
                           borderLeft: isSelected ? `3px solid ${colors.process}` : '3px solid transparent',
-                          cursor: 'pointer',
-                          textAlign: 'left',
                         }}
                       >
-                        <Calendar className="w-4 h-4 flex-shrink-0" style={{ color: colors.textSecondary }} />
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-sm" style={{ color: colors.textPrimary }}>
-                            {dateStr}
-                          </p>
-                          <p className="text-xs" style={{ color: colors.textSecondary }}>
-                            {s.status === 'approved' ? (
-                              <span className="flex items-center gap-1">
-                                <CheckCircle2 className="w-3 h-3" style={{ color: colors.action }} />
-                                Approved
-                              </span>
-                            ) : (
-                              'Submitted'
-                            )}
-                            {variance && (
-                              <span
-                                className="ml-2"
-                                style={{
-                                  color: variance.isZero() ? colors.action : variance.gt(0) ? colors.process : colors.danger,
-                                }}
-                              >
-                                {variance.gt(0) ? '+' : ''}{currSym} {variance.toFixed(2)}
-                              </span>
-                            )}
-                          </p>
-                        </div>
-                      </button>
+                        <button
+                          onClick={() => {
+                            setSelectedSession(s.id)
+                            setSelectedReports(new Set())
+                          }}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 8,
+                            flex: 1,
+                            minWidth: 0,
+                            padding: '8px 12px',
+                            cursor: 'pointer',
+                            textAlign: 'left',
+                          }}
+                        >
+                          <Calendar className="w-4 h-4 flex-shrink-0" style={{ color: colors.textSecondary }} />
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-sm" style={{ color: colors.textPrimary }}>
+                              {dateStr}
+                            </p>
+                            <p className="text-xs" style={{ color: colors.textSecondary }}>
+                              {s.status === 'approved' ? (
+                                <span className="flex items-center gap-1">
+                                  <CheckCircle2 className="w-3 h-3" style={{ color: colors.action }} />
+                                  Approved
+                                </span>
+                              ) : (
+                                'Submitted'
+                              )}
+                              {variance && (
+                                <span
+                                  className="ml-2"
+                                  style={{
+                                    color: variance.isZero() ? colors.action : variance.gt(0) ? colors.process : colors.danger,
+                                  }}
+                                >
+                                  {variance.gt(0) ? '+' : ''}{currSym} {variance.toFixed(2)}
+                                </span>
+                              )}
+                            </p>
+                          </div>
+                        </button>
+                        {/* Opens the actual Cash-Up session for this date — the
+                            only way to reach a submitted session's Approve/
+                            Reject buttons, since the main Cash-Up page has no
+                            date picker of its own and otherwise only ever
+                            shows "the" current session. */}
+                        {s.status === 'submitted' && (
+                          <button
+                            onClick={() => { router.push(`/app/cashup?date=${dateStr}`); onClose() }}
+                            title="Open this session to approve or reject it"
+                            className="flex items-center gap-1 flex-shrink-0 mr-2 px-2 py-1 rounded text-xs font-medium"
+                            style={{ color: colors.process, background: colors.processBg, cursor: 'pointer' }}
+                          >
+                            Review <ArrowUpRight className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
                     )
                   })}
                 </div>
