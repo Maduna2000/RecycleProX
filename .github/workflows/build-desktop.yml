@@ -1,6 +1,8 @@
 name: Build Desktop Installer
 
 on:
+  push:
+    branches: [master]
   workflow_dispatch:
     inputs:
       branch:
@@ -27,7 +29,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.inputs.branch }}
+          # workflow_dispatch supplies its own branch input; a plain push
+          # trigger has no such input (github.event.inputs.branch is empty
+          # there), so fall back to whatever ref actually triggered this run.
+          ref: ${{ github.event.inputs.branch || github.ref }}
 
       - name: Setup Node.js 24
         uses: actions/setup-node@v4
