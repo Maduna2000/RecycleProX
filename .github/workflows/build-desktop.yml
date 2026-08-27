@@ -95,25 +95,27 @@ jobs:
           $appDir = Join-Path $exe.Directory.FullName "resources\app\.next\standalone"
           if (-not (Test-Path $appDir)) { throw "Expected standalone app dir not found at $appDir" }
 
-          # The script file previously lived inside dist\win-unpacked\...\standalone
-          # itself (so a bare require('sharp') would resolve via that folder's
-          # own node_modules) — but electron-builder/signtool had just finished
-          # touching every file in that same tree, and Node then failed to find
-          # the freshly-written script at all (likely a real-time-AV/signing
-          # race on this runner). Writing it to a completely separate temp
-          # directory and pointing NODE_PATH at the app's node_modules instead
-          # avoids touching that just-signed tree a second time.
-          $smokeTestDir = Join-Path $env:RUNNER_TEMP "native-smoketest"
-          New-Item -ItemType Directory -Path $smokeTestDir -Force | Out-Null
-          $smokeTestPath = Join-Path $smokeTestDir "smoketest.js"
-          "require('sharp'); require('serialport'); require('node-thermal-printer'); console.log('native modules loaded OK under the packaged Electron runtime');" | Set-Content -Path $smokeTestPath -Encoding utf8
-          if (-not (Test-Path $smokeTestPath)) { throw "Failed to write the smoke-test script to $smokeTestPath" }
-
-          $env:ELECTRON_RUN_AS_NODE = "1"
-          $env:NODE_PATH = Join-Path $appDir "node_modules"
-          & $exe.FullName $smokeTestPath
-          $exitCode = $LASTEXITCODE
-          Remove-Item -Path $smokeTestDir -Recurse -ErrorAction SilentlyContinue
+          # Two earlier attempts wrote a .js file to disk and passed its path
+          # as an argv script — both failed with Node's own module loader
+          # reporting "Cannot find module <that exact path>" moments after
+          # confirming (Test-Path) the file was there, in two different
+          # directories (once inside the just-signed standalone tree, once in
+          # a brand-new $RUNNER_TEMP dir) — pointing at some transient
+          # file-visibility race on this runner (signing/AV activity) rather
+          # than anything about the destination folder. Passing the whole
+          # test as inline code via -e removes the file from the equation
+          # entirely — nothing for a race to hit. Node resolves require() for
+          # -e against the current working directory, so cd into $appDir
+          # first so the bare require() calls find its node_modules the same
+          # way they would from a real script placed there.
+          Push-Location $appDir
+          try {
+            $env:ELECTRON_RUN_AS_NODE = "1"
+            & $exe.FullName -e "require('sharp'); require('serialport'); require('node-thermal-printer'); console.log('native modules loaded OK under the packaged Electron runtime');"
+            $exitCode = $LASTEXITCODE
+          } finally {
+            Pop-Location
+          }
           if ($exitCode -ne 0) {
             throw "Native module smoke test failed under the packaged Electron runtime (likely a native-module ABI mismatch — sharp/serialport/node-thermal-printer built for plain Node, not Electron). See output above."
           }
