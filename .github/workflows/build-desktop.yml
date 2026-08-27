@@ -95,7 +95,7 @@ jobs:
           $appDir = Join-Path $exe.Directory.FullName "resources\app\.next\standalone"
           if (-not (Test-Path $appDir)) { throw "Expected standalone app dir not found at $appDir" }
 
-          # Three earlier attempts all failed for different plumbing reasons,
+          # Four earlier attempts all failed for different plumbing reasons,
           # none of them a real native-module problem:
           #  1) Wrote a .js file to disk, passed its path as an argv script —
           #     failed with "Cannot find module <that exact path>" moments
@@ -106,33 +106,44 @@ jobs:
           #     output with `$output = & $exe.FullName ... 2>&1`. One run
           #     printed the success marker and STILL threw (an unreliable
           #     $LASTEXITCODE). The very next run came back with `$output`
-          #     completely empty — no marker, no error text at all — even
-          #     though nothing about the packaging changed. Renovo Pro.exe is
-          #     a GUI-subsystem (non-console) binary; PowerShell's `&
-          #     ... 2>&1` pipeline capture of such a process's inherited
-          #     stdio handles is exactly the kind of thing that's flaky
-          #     rather than a genuine module-loading failure.
-          # Start-Process with explicit -RedirectStandardOutput/-Error files
-          # sidesteps that: it's the standard, reliable way to capture a
-          # native (including GUI-subsystem) process's output in PowerShell,
-          # independent of pipeline/console-handle quirks.
+          #     completely empty — no marker, no error text at all.
+          #  3) Switched to Start-Process with explicit
+          #     -RedirectStandardOutput/-Error files, on the theory that
+          #     Renovo Pro.exe (a GUI-subsystem binary) wasn't handing its
+          #     console output back through PowerShell's pipeline capture.
+          #     Result: exit code 0, but BOTH the redirected stdout and
+          #     stderr files came back completely empty — no marker, no
+          #     error, nothing at all. That rules out console-capture
+          #     semantics as the culprit; something about how the -e code
+          #     reaches (or doesn't reach) the process, or how a
+          #     GUI-subsystem process's stdio behaves under any capture
+          #     method, is the real problem — not the modules themselves.
+          # Removing stdio from the equation entirely: the script now writes
+          # its own pass/fail result straight to a file via fs.writeFileSync,
+          # wrapped in try/catch so a genuine native-module load failure
+          # still produces a readable result instead of an uncaught
+          # exception with unpredictable stdio behavior. Test-Path/Get-Content
+          # against a file on disk is the one mechanism already proven
+          # reliable earlier in this very step (locating dist/Renovo Pro.exe
+          # itself), so this sidesteps stdio and process-exit-code quirks
+          # completely.
           $marker = "native modules loaded OK under the packaged Electron runtime"
-          $stdoutFile = Join-Path $env:RUNNER_TEMP "native-smoketest-stdout.txt"
-          $stderrFile = Join-Path $env:RUNNER_TEMP "native-smoketest-stderr.txt"
-          Remove-Item $stdoutFile, $stderrFile -ErrorAction SilentlyContinue
+          $resultFile = Join-Path $env:RUNNER_TEMP "native-smoketest-result.txt"
+          Remove-Item $resultFile -ErrorAction SilentlyContinue
 
           $env:ELECTRON_RUN_AS_NODE = "1"
-          $code = "require('sharp'); require('serialport'); require('node-thermal-printer'); console.log('$marker');"
-          $proc = Start-Process -FilePath $exe.FullName -ArgumentList @('-e', $code) -WorkingDirectory $appDir `
-            -NoNewWindow -PassThru -Wait -RedirectStandardOutput $stdoutFile -RedirectStandardError $stderrFile
+          $resultFileJs = $resultFile.Replace('\', '\\')
+          $code = "try { require('sharp'); require('serialport'); require('node-thermal-printer'); require('fs').writeFileSync('$resultFileJs', '$marker'); } catch (e) { require('fs').writeFileSync('$resultFileJs', 'FAILED: ' + (e && e.stack ? e.stack : e)); }"
+          $proc = Start-Process -FilePath $exe.FullName -ArgumentList @('-e', $code) -WorkingDirectory $appDir -NoNewWindow -PassThru -Wait
 
-          $stdout = if (Test-Path $stdoutFile) { Get-Content $stdoutFile -Raw } else { "" }
-          $stderr = if (Test-Path $stderrFile) { Get-Content $stderrFile -Raw } else { "" }
           Write-Output "exit code: $($proc.ExitCode)"
-          Write-Output "stdout:`n$stdout"
-          Write-Output "stderr:`n$stderr"
+          $result = if (Test-Path $resultFile) { Get-Content $resultFile -Raw } else { $null }
+          Write-Output "result file contents: $result"
 
-          if (-not ($stdout -match [regex]::Escape($marker))) {
+          if (-not $result) {
+            throw "Native module smoke test produced no result file at all — the packaged Electron.exe likely never ran the -e code (exit code $($proc.ExitCode)). See output above."
+          }
+          if (-not ($result -match [regex]::Escape($marker))) {
             throw "Native module smoke test failed under the packaged Electron runtime (likely a native-module ABI mismatch — sharp/serialport/node-thermal-printer built for plain Node, not Electron). See output above."
           }
 
