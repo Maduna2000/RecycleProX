@@ -192,11 +192,19 @@ export async function withTenantScope<T>(
   if (existingTx) return fn(existingTx)
 
   const tenantId = requireTenantId()
+  // Merged, not `options ?? DEFAULT_TENANT_TX_OPTIONS` — a caller passing only
+  // `{ isolationLevel: Serializable }` (every purchase-mutation call site: create,
+  // void, reverse payment, update, settle, split payment) would otherwise replace
+  // the whole options object, silently reverting maxWait/timeout to Prisma's stock
+  // 2000ms/5000ms for exactly the highest-latency multi-step transactions that need
+  // the longer window most. This is what caused the P2028 "transaction already
+  // closed... timeout was 5000 ms" failures still seen in the desktop app's logs
+  // after the maxWait/timeout fix above already shipped.
   return rawClient.$transaction(async (tx) => {
     await pinTenantContext(tx, tenantId)
     const scopedTx = wrapAsTenantScoped(tx, tenantId) as Prisma.TransactionClient
     return activeTenantId.run(tenantId, () => activeTenantTx.run(scopedTx, () => fn(scopedTx)))
-  }, options ?? DEFAULT_TENANT_TX_OPTIONS)
+  }, { ...DEFAULT_TENANT_TX_OPTIONS, ...options })
 }
 
 function dispatch(prop: string, method: string, args: unknown[]): unknown {
