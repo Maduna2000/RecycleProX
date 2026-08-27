@@ -95,36 +95,44 @@ jobs:
           $appDir = Join-Path $exe.Directory.FullName "resources\app\.next\standalone"
           if (-not (Test-Path $appDir)) { throw "Expected standalone app dir not found at $appDir" }
 
-          # Two earlier attempts wrote a .js file to disk and passed its path
-          # as an argv script — both failed with Node's own module loader
-          # reporting "Cannot find module <that exact path>" moments after
-          # confirming (Test-Path) the file was there, in two different
-          # directories (once inside the just-signed standalone tree, once in
-          # a brand-new $RUNNER_TEMP dir) — pointing at some transient
-          # file-visibility race on this runner (signing/AV activity) rather
-          # than anything about the destination folder. Passing the whole
-          # test as inline code via -e removes the file from the equation
-          # entirely — nothing for a race to hit. Node resolves require() for
-          # -e against the current working directory, so cd into $appDir
-          # first so the bare require() calls find its node_modules the same
-          # way they would from a real script placed there.
+          # Three earlier attempts all failed for different plumbing reasons,
+          # none of them a real native-module problem:
+          #  1) Wrote a .js file to disk, passed its path as an argv script —
+          #     failed with "Cannot find module <that exact path>" moments
+          #     after Test-Path confirmed the file was there, in two
+          #     different directories (once in the just-signed standalone
+          #     tree, once in a fresh $RUNNER_TEMP dir).
+          #  2) Passed the test as inline code via -e instead, capturing
+          #     output with `$output = & $exe.FullName ... 2>&1`. One run
+          #     printed the success marker and STILL threw (an unreliable
+          #     $LASTEXITCODE). The very next run came back with `$output`
+          #     completely empty — no marker, no error text at all — even
+          #     though nothing about the packaging changed. Renovo Pro.exe is
+          #     a GUI-subsystem (non-console) binary; PowerShell's `&
+          #     ... 2>&1` pipeline capture of such a process's inherited
+          #     stdio handles is exactly the kind of thing that's flaky
+          #     rather than a genuine module-loading failure.
+          # Start-Process with explicit -RedirectStandardOutput/-Error files
+          # sidesteps that: it's the standard, reliable way to capture a
+          # native (including GUI-subsystem) process's output in PowerShell,
+          # independent of pipeline/console-handle quirks.
           $marker = "native modules loaded OK under the packaged Electron runtime"
-          Push-Location $appDir
-          try {
-            $env:ELECTRON_RUN_AS_NODE = "1"
-            # Checking $LASTEXITCODE alone isn't reliable here: an earlier run
-            # printed this exact marker (proving all three modules loaded
-            # without error) and STILL reported a non-zero exit code, with no
-            # further output explaining why — some Electron-internal exit
-            # path under this headless CI runner, unrelated to whether the
-            # requires actually succeeded. Checking the captured output for
-            # the marker directly tests the thing that actually matters.
-            $output = & $exe.FullName -e "require('sharp'); require('serialport'); require('node-thermal-printer'); console.log('$marker');" 2>&1
-          } finally {
-            Pop-Location
-          }
-          $output | ForEach-Object { Write-Output $_ }
-          if (-not ($output -match [regex]::Escape($marker))) {
+          $stdoutFile = Join-Path $env:RUNNER_TEMP "native-smoketest-stdout.txt"
+          $stderrFile = Join-Path $env:RUNNER_TEMP "native-smoketest-stderr.txt"
+          Remove-Item $stdoutFile, $stderrFile -ErrorAction SilentlyContinue
+
+          $env:ELECTRON_RUN_AS_NODE = "1"
+          $code = "require('sharp'); require('serialport'); require('node-thermal-printer'); console.log('$marker');"
+          $proc = Start-Process -FilePath $exe.FullName -ArgumentList @('-e', $code) -WorkingDirectory $appDir `
+            -NoNewWindow -PassThru -Wait -RedirectStandardOutput $stdoutFile -RedirectStandardError $stderrFile
+
+          $stdout = if (Test-Path $stdoutFile) { Get-Content $stdoutFile -Raw } else { "" }
+          $stderr = if (Test-Path $stderrFile) { Get-Content $stderrFile -Raw } else { "" }
+          Write-Output "exit code: $($proc.ExitCode)"
+          Write-Output "stdout:`n$stdout"
+          Write-Output "stderr:`n$stderr"
+
+          if (-not ($stdout -match [regex]::Escape($marker))) {
             throw "Native module smoke test failed under the packaged Electron runtime (likely a native-module ABI mismatch — sharp/serialport/node-thermal-printer built for plain Node, not Electron). See output above."
           }
 
