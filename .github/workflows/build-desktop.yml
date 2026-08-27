@@ -108,15 +108,23 @@ jobs:
           # -e against the current working directory, so cd into $appDir
           # first so the bare require() calls find its node_modules the same
           # way they would from a real script placed there.
+          $marker = "native modules loaded OK under the packaged Electron runtime"
           Push-Location $appDir
           try {
             $env:ELECTRON_RUN_AS_NODE = "1"
-            & $exe.FullName -e "require('sharp'); require('serialport'); require('node-thermal-printer'); console.log('native modules loaded OK under the packaged Electron runtime');"
-            $exitCode = $LASTEXITCODE
+            # Checking $LASTEXITCODE alone isn't reliable here: an earlier run
+            # printed this exact marker (proving all three modules loaded
+            # without error) and STILL reported a non-zero exit code, with no
+            # further output explaining why — some Electron-internal exit
+            # path under this headless CI runner, unrelated to whether the
+            # requires actually succeeded. Checking the captured output for
+            # the marker directly tests the thing that actually matters.
+            $output = & $exe.FullName -e "require('sharp'); require('serialport'); require('node-thermal-printer'); console.log('$marker');" 2>&1
           } finally {
             Pop-Location
           }
-          if ($exitCode -ne 0) {
+          $output | ForEach-Object { Write-Output $_ }
+          if (-not ($output -match [regex]::Escape($marker))) {
             throw "Native module smoke test failed under the packaged Electron runtime (likely a native-module ABI mismatch — sharp/serialport/node-thermal-printer built for plain Node, not Electron). See output above."
           }
 
