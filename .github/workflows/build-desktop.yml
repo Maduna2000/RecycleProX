@@ -118,15 +118,20 @@ jobs:
           #     reaches (or doesn't reach) the process, or how a
           #     GUI-subsystem process's stdio behaves under any capture
           #     method, is the real problem — not the modules themselves.
-          # Removing stdio from the equation entirely: the script now writes
-          # its own pass/fail result straight to a file via fs.writeFileSync,
-          # wrapped in try/catch so a genuine native-module load failure
-          # still produces a readable result instead of an uncaught
-          # exception with unpredictable stdio behavior. Test-Path/Get-Content
-          # against a file on disk is the one mechanism already proven
-          # reliable earlier in this very step (locating dist/Renovo Pro.exe
-          # itself), so this sidesteps stdio and process-exit-code quirks
-          # completely.
+          #  4) Kept the file-based result (no stdio reliance) but switched
+          #     invocation to Start-Process -ArgumentList @('-e', $code).
+          #     Root cause finally surfaced: Node's own eval error was
+          #     "[eval]:1 / try / Expected '{', got '<eof>'" — Start-Process
+          #     had mangled/truncated the $code argument (parens/semicolons/
+          #     quotes don't survive its array-to-command-line requoting)
+          #     down to just the bare word "try". Not a native-module issue
+          #     at all — Electron never even received the real script.
+          # The earlier attempt that DID get a full, correctly-quoted -e
+          # string through (773e168, which printed the success marker) used
+          # the `&` call operator, not Start-Process — PowerShell's own
+          # array-to-native-argv handling for `&` copes with this string
+          # fine. Combines that proven-working invocation with the
+          # file-based result check (no stdio reliance) from attempt 3/4.
           $marker = "native modules loaded OK under the packaged Electron runtime"
           $resultFile = Join-Path $env:RUNNER_TEMP "native-smoketest-result.txt"
           Remove-Item $resultFile -ErrorAction SilentlyContinue
@@ -134,14 +139,19 @@ jobs:
           $env:ELECTRON_RUN_AS_NODE = "1"
           $resultFileJs = $resultFile.Replace('\', '\\')
           $code = "try { require('sharp'); require('serialport'); require('node-thermal-printer'); require('fs').writeFileSync('$resultFileJs', '$marker'); } catch (e) { require('fs').writeFileSync('$resultFileJs', 'FAILED: ' + (e && e.stack ? e.stack : e)); }"
-          $proc = Start-Process -FilePath $exe.FullName -ArgumentList @('-e', $code) -WorkingDirectory $appDir -NoNewWindow -PassThru -Wait
 
-          Write-Output "exit code: $($proc.ExitCode)"
+          Push-Location $appDir
+          try {
+            & $exe.FullName -e $code | Out-Null
+          } finally {
+            Pop-Location
+          }
+
           $result = if (Test-Path $resultFile) { Get-Content $resultFile -Raw } else { $null }
           Write-Output "result file contents: $result"
 
           if (-not $result) {
-            throw "Native module smoke test produced no result file at all — the packaged Electron.exe likely never ran the -e code (exit code $($proc.ExitCode)). See output above."
+            throw "Native module smoke test produced no result file at all — the packaged Electron.exe likely never ran the -e code. See output above."
           }
           if (-not ($result -match [regex]::Escape($marker))) {
             throw "Native module smoke test failed under the packaged Electron runtime (likely a native-module ABI mismatch — sharp/serialport/node-thermal-printer built for plain Node, not Electron). See output above."
