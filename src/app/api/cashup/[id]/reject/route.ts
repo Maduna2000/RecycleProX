@@ -39,7 +39,7 @@ export async function POST(
   } catch (err: unknown) {
     if (err instanceof CashUpNotSubmittedError) return NextResponse.json({ error: err.message }, { status: 400 })
     if (err instanceof CashUpNewerSessionOpenError) return NextResponse.json({ error: err.message }, { status: 409 })
-    const msg = err instanceof Error ? err.message : 'Failed to reject cash-up'
+    const msg = 'Failed to reject cash-up'
     logger.error({ err, id: params.id }, 'POST /api/cashup/[id]/reject failed')
     return NextResponse.json({ error: msg }, { status: 400 })
   }

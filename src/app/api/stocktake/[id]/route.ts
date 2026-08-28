@@ -48,7 +48,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     ))
     return NextResponse.json(entry)
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : 'Failed to add entry'
+    const msg = 'Failed to add entry'
     logger.error({ err, id: params.id }, 'PUT /api/stocktake/[id] failed')
     return NextResponse.json({ error: msg }, { status: 400 })
   }
@@ -71,7 +71,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const entry = await runWithRequestTenant(req, () => updateEntryPhoto(params.id, parsed.data.productId, parsed.data.photoR2Key))
     return NextResponse.json(entry)
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : 'Failed to update photo'
+    const msg = 'Failed to update photo'
     logger.error({ err, id: params.id }, 'PATCH /api/stocktake/[id] failed')
     return NextResponse.json({ error: msg }, { status: 400 })
   }
@@ -89,7 +89,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const stocktake = await runWithRequestTenant(req, () => completeStocktake(params.id, session.user.id))
     return NextResponse.json(stocktake)
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : 'Failed to complete stocktake'
+    const msg = 'Failed to complete stocktake'
     logger.error({ err, id: params.id }, 'POST /api/stocktake/[id] failed')
     return NextResponse.json({ error: msg }, { status: 400 })
   }

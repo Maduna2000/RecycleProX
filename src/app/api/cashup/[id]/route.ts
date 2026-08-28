@@ -60,7 +60,7 @@ export async function PUT(
         { status: 422 }
       )
     }
-    const msg = err instanceof Error ? err.message : 'Failed to submit cash-up'
+    const msg = 'Failed to submit cash-up'
     logger.error({ err, id: params.id }, 'PUT /api/cashup/[id] failed')
     return NextResponse.json({ error: msg }, { status: 400 })
   }

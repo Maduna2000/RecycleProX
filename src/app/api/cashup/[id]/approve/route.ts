@@ -28,7 +28,7 @@ export async function POST(
     const cashUp = await runWithRequestTenant(req, () => approveCashUp(params.id, session.user.id, parsed.data))
     return NextResponse.json({ cashUp })
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : 'Failed to approve cash-up'
+    const msg = 'Failed to approve cash-up'
     logger.error({ err, id: params.id }, 'POST /api/cashup/[id]/approve failed')
     return NextResponse.json({ error: msg }, { status: 400 })
   }

@@ -24,7 +24,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     if (err instanceof SaleAlreadyVoidedError) return NextResponse.json({ error: err.message }, { status: 409 })
     if (err instanceof CashUpAlreadyApprovedError) return NextResponse.json({ error: err.message }, { status: 409 })
 
-    const message = err instanceof Error ? err.message : 'Failed to void sale'
+    const message = 'Failed to void sale'
     logger.error({ err }, 'POST /api/sales/[id]/void failed')
     return NextResponse.json({ error: message }, { status: 500 })
   }

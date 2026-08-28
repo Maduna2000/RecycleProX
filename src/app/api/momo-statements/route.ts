@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ import: importRow, skippedRows }, { status: 201 })
   } catch (err) {
     if (err instanceof MomoStatementEmptyError) return NextResponse.json({ error: err.message }, { status: 422 })
-    const message = err instanceof Error ? err.message : 'Failed to import MoMo statement'
+    const message = 'Failed to import MoMo statement'
     logger.error({ err }, 'POST /api/momo-statements failed')
     return NextResponse.json({ error: message }, { status: 500 })
   }

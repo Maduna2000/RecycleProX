@@ -199,7 +199,7 @@ export async function POST(req: Request) {
     if (err instanceof SlipRecordNotFoundError) return NextResponse.json({ error: err.message }, { status: 404 })
     logger.error({ err, type, id }, 'print-slip.failed')
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Print failed' },
+      { error: 'Print failed' },
       { status: 500 }
     )
   }

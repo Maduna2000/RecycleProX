@@ -49,7 +49,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (err instanceof ProductInactiveError) return NextResponse.json({ error: err.message }, { status: 422 })
     if (err instanceof InsufficientStockError) return NextResponse.json({ error: err.message }, { status: 422 })
 
-    const message = err instanceof Error ? err.message : 'Failed to update sale'
+    const message = 'Failed to update sale'
     logger.error({ err }, 'PATCH /api/sales/[id] failed')
     return NextResponse.json({ error: message }, { status: 500 })
   }

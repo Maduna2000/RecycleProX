@@ -22,7 +22,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const stocktake = await runWithRequestTenant(req, () => voidStocktake(params.id, session.user.id, parsed.data.reason))
     return NextResponse.json(stocktake)
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : 'Failed to void stocktake'
+    const msg = 'Failed to void stocktake'
     if (msg.includes('not found') || msg.includes('Not found')) {
       return NextResponse.json({ error: msg }, { status: 404 })
     }

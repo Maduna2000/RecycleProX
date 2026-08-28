@@ -19,7 +19,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const expense = await runWithRequestTenant(req, () => settlePendingExpense(params.id, session.user.id, session.user.role, parsed.data))
     return NextResponse.json(expense)
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Failed to settle expense'
+    const message = err instanceof Error ? err.message : ''
     logger.error({ err, expenseId: params.id }, 'POST /api/expenses/[id]/settle failed')
 
     if (message === 'Expense not found') {
@@ -37,6 +37,6 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     if (message.includes('Change received cannot exceed') || message.includes('Actual expense amount')) {
       return NextResponse.json({ error: message }, { status: 400 })
     }
-    return NextResponse.json({ error: message }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to settle expense' }, { status: 500 })
   }
 }

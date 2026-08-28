@@ -61,7 +61,7 @@ export async function PATCH(
     if (err instanceof CustomerInactiveError) return NextResponse.json({ error: err.message }, { status: 422 })
     if (err instanceof ProductInactiveError) return NextResponse.json({ error: err.message }, { status: 422 })
 
-    const message = err instanceof Error ? err.message : 'Failed to update purchase'
+    const message = 'Failed to update purchase'
     logger.error({ err, purchaseId: id }, 'PATCH /api/purchases/[id] failed')
     return NextResponse.json({ error: message }, { status: 500 })
   }

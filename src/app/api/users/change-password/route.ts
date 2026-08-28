@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
     if (err instanceof InvalidCurrentPasswordError) {
       return NextResponse.json({ error: 'Current password is incorrect' }, { status: 400 })
     }
-    const msg = err instanceof Error ? err.message : String(err)
+    const msg = err instanceof Error ? err.message : 'Failed to change password'
     logger.error({ err }, 'POST change-password failed')
     return NextResponse.json(
       { error: process.env.NODE_ENV === 'development' ? msg : 'Failed to change password' },

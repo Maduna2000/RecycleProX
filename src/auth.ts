@@ -8,6 +8,27 @@ import { LoginSchema } from '@/lib/schemas/auth'
 import { authConfig } from '@/auth.config'
 import logger from '@/lib/logger'
 
+// Set only on a licensed Electron desktop install — electron/main.js reads
+// the company this device was activated for (electron/licenseManager.js's
+// stored companySlug, populated by the Portal's /api/desktop/activate
+// response) and injects it into the standalone server's process env at
+// spawn time. Never set on Vercel/Web (genuinely multi-tenant, any company
+// may log in there) or on the local hardware-bridge server (scripts/
+// local-server/ — deliberately has no per-device license at all, see its
+// own README's "No separate device license" note).
+//
+// Without this check, a device's subscription/seat is billed per company
+// but nothing stops a DIFFERENT company's valid credentials from logging
+// into it — once more than one real tenant exists, that silently defeats
+// the entire per-device licensing model. undefined licensedTenantSlug (no
+// device lock configured) always passes — this is purely additive to
+// existing single-tenant deployments.
+function isLicensedTenantMismatch(loginTenantSlug: string | undefined): boolean {
+  const licensedTenantSlug = process.env.LICENSED_TENANT_SLUG
+  if (!licensedTenantSlug) return false
+  return loginTenantSlug !== licensedTenantSlug
+}
+
 const {
   handlers,
   signIn,
@@ -34,6 +55,14 @@ const {
 
         try {
           const result = await login(username, password, tenantSlug)
+          const resolvedTenantSlug = 'tenantSlug' in result ? result.tenantSlug : undefined
+          if (isLicensedTenantMismatch(resolvedTenantSlug)) {
+            logger.warn(
+              { username, resolvedTenantSlug, licensedTenantSlug: process.env.LICENSED_TENANT_SLUG },
+              'authorize() rejected: login tenant does not match this device\'s licensed company',
+            )
+            return null
+          }
           const { user, forcePasswordChange, allowedModules } = result
           const payload = {
             id: user.id,
@@ -44,7 +73,7 @@ const {
             allowedModules,
             tenantId: 'tenantId' in result ? result.tenantId : undefined,
             schemaName: 'schemaName' in result ? result.schemaName : undefined,
-            tenantSlug: 'tenantSlug' in result ? result.tenantSlug : undefined,
+            tenantSlug: resolvedTenantSlug,
             featureFlags: 'featureFlags' in result ? result.featureFlags : undefined,
           }
           // Refresh this device's offline login fallback on every successful
@@ -82,6 +111,19 @@ const {
           // now, rather than a silently broken session later.
           if (!offline.tenantId) {
             logger.error({ username }, 'authorize(): offline login cache entry missing tenantId — rejecting, needs a fresh online login')
+            return null
+          }
+          // Belt-and-suspenders: cacheOfflineLogin only ever persists an
+          // entry after this same check already passed online (see above),
+          // so this should never actually trip — kept anyway in case a
+          // device's LICENSED_TENANT_SLUG changes (reactivated for a
+          // different company) while an old cache entry for the previous
+          // company still sits on disk.
+          if (isLicensedTenantMismatch(offline.tenantSlug)) {
+            logger.warn(
+              { username, cachedTenantSlug: offline.tenantSlug, licensedTenantSlug: process.env.LICENSED_TENANT_SLUG },
+              'authorize() rejected offline login: cached tenant does not match this device\'s licensed company',
+            )
             return null
           }
           logger.info({ username }, 'authorize(): offline login accepted')

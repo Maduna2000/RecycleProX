@@ -17,6 +17,8 @@
  */
 const crypto = require('node:crypto')
 const os = require('node:os')
+const path = require('node:path')
+const { app } = require('electron')
 // electron-store v9+ ships ESM-only — `require('electron-store')` resolves
 // but returns the module namespace object ({ default: Store }), not the
 // class itself, so `new Store(...)` fails with "Store is not a constructor"
@@ -27,13 +29,25 @@ const { default: Store } = require('electron-store')
 const DEFAULT_OFFLINE_GRACE_DAYS = 7
 const HEARTBEAT_INTERVAL_MS = 8 * 60 * 60 * 1000 // 8h, within the plan's 6-12h range
 
+// Same per-machine (not per-Windows-user) directory as main.js's
+// getSharedDataDir() — duplicated rather than imported since this file is
+// required standalone and shouldn't take on a circular dependency on
+// main.js just for one path helper. package.json's nsis.perMachine=true
+// installs once for the whole PC; without this, the license/device-token
+// store would live under the CURRENT Windows account's own profile, so a
+// second account on the same till would see itself as never-activated
+// despite sharing the one machine-wide install.
+const SHARED_DATA_DIR = process.env.PROGRAMDATA
+  ? path.join(process.env.PROGRAMDATA, 'RenovoPro')
+  : app.getPath('userData')
+
 // electron-store's default encryption is obfuscation, not real security —
 // deliberately not the security boundary here. The deviceToken is a
 // per-device, server-revocable credential (Portal admin can block/deactivate
 // it any time), so "readable by someone with local disk access to this
 // specific machine" is an acceptable risk for Phase 1, same tier as any
 // desktop app's local session cache.
-const store = new Store({ name: 'renovo-license' })
+const store = new Store({ name: 'renovo-license', cwd: SHARED_DATA_DIR })
 
 function getMachineId() {
   let id = store.get('machineId')

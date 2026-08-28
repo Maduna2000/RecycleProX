@@ -37,7 +37,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     const updated = await runWithRequestTenant(req, () => updateCategory(params.id, parsed.data, session.user.id))
     return NextResponse.json(updated)
   } catch (err) {
-    const msg = err instanceof Error ? err.message : 'Failed to update category'
+    const msg = 'Failed to update category'
     const status = msg.includes('already exists') ? 409 : msg.includes('not found') ? 404 : msg.includes('levels') || msg.includes('Circular') || msg.includes('Cannot move') ? 422 : 500
     if (status === 500) logger.error({ err }, 'PUT /api/product-categories/[id] failed')
     return NextResponse.json({ error: msg }, { status })
@@ -55,7 +55,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     await runWithRequestTenant(req, () => deleteCategory(params.id))
     return NextResponse.json({ ok: true })
   } catch (err) {
-    const msg = err instanceof Error ? err.message : 'Failed to delete category'
+    const msg = 'Failed to delete category'
     const status = msg.includes('not found') ? 404 : 409
     return NextResponse.json({ error: msg }, { status })
   }

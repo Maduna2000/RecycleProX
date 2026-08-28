@@ -1,6 +1,7 @@
 import { PrismaClient, Prisma } from '@prisma/client'
 import { attachAuditMiddleware } from './auditMiddleware'
 import { activeTenantId, activeTenantTx, requireTenantId } from './tenantContext'
+import logger from '@/lib/logger'
 
 const globalForPrisma = globalThis as unknown as { rawPrisma: PrismaClient }
 
@@ -184,6 +185,56 @@ async function pinTenantContext(tx: Prisma.TransactionClient, tenantId: string):
 // this is only the floor for everyone else.
 const DEFAULT_TENANT_TX_OPTIONS = { maxWait: 10_000, timeout: 20_000 }
 
+// Neon's pooled endpoint drops idle connections and briefly refuses new ones
+// while a suspended compute wakes up — on the desktop till fleet (every
+// install runs its own standalone server hitting this same endpoint
+// directly, see electron/main.js) this surfaces as an instant, guaranteed
+// failure on whatever request happened to be running at that moment: P1001
+// ("Can't reach database server") if the connection couldn't even be
+// opened, P2024 if it timed out waiting for a free slot in Prisma's own
+// client-side pool, or P1017/P2028 with a disconnect-flavored message if the
+// connection was live and then cut mid-transaction. All three are transient
+// infrastructure hiccups lasting at most a few seconds, not business-logic
+// failures — retrying the whole transaction from scratch (nothing commits
+// until the end, so a failed attempt leaves no partial state to collide
+// with) turns what's currently a hard failure into a short, invisible delay.
+//
+// Deliberately NOT retried: a P2028 caused by the transaction's own
+// maxWait/timeout being exceeded by real work (message names how much time
+// "passed") — that's the resolvePurchaseLines-style slow-transaction problem,
+// and blindly retrying it would just repeat the same slow work rather than
+// fix anything. Only retry the shape that means "the connection itself was
+// unavailable," not "this specific transaction ran too long."
+const RETRYABLE_PRISMA_CODES = new Set(['P1001', 'P1002', 'P1008', 'P1017', 'P2024'])
+const CONNECTION_LOSS_PATTERNS = [
+  "can't reach database server",
+  'server has closed the connection',
+  'connection terminated',
+  'connection was lost',
+  'connection reset',
+  'econnreset',
+  'econnrefused',
+  'obtained before disconnecting',
+]
+const RETRY_DELAYS_MS = [300, 800]
+
+function isRetryableConnectionError(err: unknown): boolean {
+  const code = (err as { code?: string })?.code
+  if (code && RETRYABLE_PRISMA_CODES.has(code)) return true
+
+  const message = err instanceof Error ? err.message.toLowerCase() : ''
+  if (!message) return false
+  // A P2028 (or any other transaction error) that names how long it waited
+  // is a real timeout from actual work, not a dropped connection — never
+  // retry that shape even if it happens to also match a pattern above.
+  if (/\d+ms (passed|has passed)/.test(message)) return false
+  return CONNECTION_LOSS_PATTERNS.some((pattern) => message.includes(pattern))
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
 export async function withTenantScope<T>(
   fn: (tx: Prisma.TransactionClient) => Promise<T>,
   options?: { maxWait?: number; timeout?: number; isolationLevel?: Prisma.TransactionIsolationLevel },
@@ -200,11 +251,26 @@ export async function withTenantScope<T>(
   // the longer window most. This is what caused the P2028 "transaction already
   // closed... timeout was 5000 ms" failures still seen in the desktop app's logs
   // after the maxWait/timeout fix above already shipped.
-  return rawClient.$transaction(async (tx) => {
-    await pinTenantContext(tx, tenantId)
-    const scopedTx = wrapAsTenantScoped(tx, tenantId) as Prisma.TransactionClient
-    return activeTenantId.run(tenantId, () => activeTenantTx.run(scopedTx, () => fn(scopedTx)))
-  }, { ...DEFAULT_TENANT_TX_OPTIONS, ...options })
+  const runTransaction = () =>
+    rawClient.$transaction(async (tx) => {
+      await pinTenantContext(tx, tenantId)
+      const scopedTx = wrapAsTenantScoped(tx, tenantId) as Prisma.TransactionClient
+      return activeTenantId.run(tenantId, () => activeTenantTx.run(scopedTx, () => fn(scopedTx)))
+    }, { ...DEFAULT_TENANT_TX_OPTIONS, ...options })
+
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await runTransaction()
+    } catch (err) {
+      const delay = RETRY_DELAYS_MS[attempt]
+      if (delay === undefined || !isRetryableConnectionError(err)) throw err
+      logger.warn(
+        { err, attempt: attempt + 1 },
+        'withTenantScope: retrying after a transient database connection error',
+      )
+      await sleep(delay)
+    }
+  }
 }
 
 function dispatch(prop: string, method: string, args: unknown[]): unknown {

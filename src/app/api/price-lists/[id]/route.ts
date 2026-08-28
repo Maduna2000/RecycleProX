@@ -34,7 +34,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const priceList = await runWithRequestTenant(req, () => updatePriceList(params.id, parsed.data))
     return NextResponse.json(priceList)
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Failed to update price list'
+    const message = err instanceof Error ? err.message : ''
     logger.error({ err, priceListId: params.id }, 'PATCH /api/price-lists/[id] failed')
     if (message === 'Price list not found') {
       return NextResponse.json({ error: message }, { status: 404 })

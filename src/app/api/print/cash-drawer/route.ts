@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     logger.error({ err }, 'cash-drawer.failed')
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Cash drawer failed' },
+      { error: 'Cash drawer failed' },
       { status: 500 }
     )
   }

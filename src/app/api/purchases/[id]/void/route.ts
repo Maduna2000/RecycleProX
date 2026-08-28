@@ -37,7 +37,7 @@ export async function POST(
     if (err instanceof CashUpAlreadyApprovedError) return NextResponse.json({ error: err.message }, { status: 409 })
 
     // Return specific error messages for known error types
-    const message = err instanceof Error ? err.message : 'Failed to void purchase'
+    const message = 'Failed to void purchase'
     logger.error({ err, purchaseId: id }, 'POST /api/purchases/[id]/void failed')
     return NextResponse.json({ error: message }, { status: 500 })
   }

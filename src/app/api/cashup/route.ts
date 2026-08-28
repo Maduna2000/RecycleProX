@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
     const cashUp = await runWithRequestTenant(req, () => openCashUp(session.user.id, parsed.data.sessionDate))
     return NextResponse.json({ cashUp }, { status: 201 })
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Failed to open cash-up session'
+    const message = 'Failed to open cash-up session'
     logger.error({ err }, 'POST /api/cashup failed')
     // Return 409 Conflict if previous day's session is still open
     if (message.includes('previous day')) {

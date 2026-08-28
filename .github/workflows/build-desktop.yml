@@ -50,11 +50,27 @@ jobs:
       - name: Build desktop installer
         run: npm run electron:build
         env:
+          # Needed for real here (not a placeholder) — build:desktop now runs
+          # `prisma migrate deploy` before `next build` (see scripts/
+          # build-desktop-postgres.ts), so this must be a live, reachable
+          # connection string with DDL privileges, same role Vercel's own
+          # migration step uses (never the restricted app_runtime role — see
+          # src/lib/db/prisma.ts's comment on why those are different roles).
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
-          INTERNAL_API_SHARED_SECRET: ${{ secrets.INTERNAL_API_SHARED_SECRET }}
-          RENOVO_PORTAL_BASE_URL: ${{ secrets.RENOVO_PORTAL_BASE_URL }}
-          TENANT_BASE_DOMAIN: ${{ secrets.TENANT_BASE_DOMAIN }}
+          # AUTH_SECRET, INTERNAL_API_SHARED_SECRET, RENOVO_PORTAL_BASE_URL,
+          # and TENANT_BASE_DOMAIN are deliberately NOT set here. electron/
+          # main.js is copied into the installer verbatim (package.json's
+          # build.files — it is never bundled/processed by webpack or Next),
+          # so its own process.env reads only ever see whatever's set on the
+          # END USER's machine at runtime, never a value from this CI build
+          # step. Setting them here silently does nothing to the shipped
+          # app — every install's Portal URL, for example, is controlled
+          # entirely by electron/main.js's own hardcoded PORTAL_BASE_URL
+          # fallback (or a real RENOVO_PORTAL_BASE_URL in that machine's own
+          # desktop.env) — not by this workflow. Confirmed while auditing the
+          # desktop pipeline; removed rather than left as misleading dead
+          # configuration that looks like it configures the installer.
+          #
           # electron-builder signs automatically once these are present —
           # see electron/README.md's "Code signing" section. Unset repo
           # secrets resolve to empty strings, so this is a no-op (installer

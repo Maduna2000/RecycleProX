@@ -49,13 +49,28 @@ function main() {
     )
   }
 
-  console.log('--- 1/4: regenerating the Postgres Prisma client (defends against a stale SQLite-build client swap) ---')
+  // Same two safety checks `npm run build` (the Web/Vercel build script,
+  // see package.json) runs before `next build` — this script used to skip
+  // both, which was fine as long as every desktop build happened to be cut
+  // from a commit Vercel had already deployed (migrations applied,
+  // tenant-wrapping already clean). .github/workflows/build-desktop.yml lets
+  // an operator pick an arbitrary branch to build from, so that assumption
+  // doesn't always hold — building from a branch with an undeployed
+  // migration used to ship an installer that hard-fails at runtime with a
+  // raw "column does not exist" Prisma error and no build-time warning.
+  console.log('--- 1/6: tenant-wrapping guardrail (same check the Web build runs) ---')
+  run('npx', ['ts-node', '--project', 'tsconfig.scripts.json', 'scripts/check-tenant-wrapping.ts'])
+
+  console.log('--- 2/6: applying pending migrations (same DATABASE_URL-owner-role deploy the Web build runs) ---')
+  run('npx', ['prisma', 'migrate', 'deploy'])
+
+  console.log('--- 3/6: regenerating the Postgres Prisma client (defends against a stale SQLite-build client swap) ---')
   run('npx', ['prisma', 'generate'])
 
-  console.log('--- 2/4: next build ---')
+  console.log('--- 4/6: next build ---')
   run('npx', ['next', 'build'])
 
-  console.log('--- 3/4: copying static assets Next.js standalone output does not include ---')
+  console.log('--- 5/6: copying static assets Next.js standalone output does not include ---')
   // This is the script npm run build:desktop / electron:build actually
   // invokes (see package.json) — build-desktop.ts (SQLite variant) is not
   // currently wired up to anything. Next.js's own docs call this out
@@ -72,7 +87,7 @@ function main() {
   copyIfExists(path.join(ROOT, '.next', 'static'), path.join(standaloneDir, '.next', 'static'))
   copyIfExists(path.join(ROOT, 'public'), path.join(standaloneDir, 'public'))
 
-  console.log('--- 4/4: defensively re-copying native/dynamically-resolved modules ---')
+  console.log('--- 6/6: defensively re-copying native/dynamically-resolved modules ---')
   // Populates .next/standalone/node_modules/ with modules Next's own
   // standalone tracing gets wrong or misses — confirmed by actually running
   // the packaged server.js repeatedly, not by inspecting file lists.

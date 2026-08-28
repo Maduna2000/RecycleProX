@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
     const category = await runWithRequestTenant(req, () => createCategory(parsed.data))
     return NextResponse.json(category, { status: 201 })
   } catch (err) {
-    const msg = err instanceof Error ? err.message : 'Failed to create category'
+    const msg = 'Failed to create category'
     const status = msg.includes('already exists') ? 409 : msg.includes('not found') ? 404 : msg.includes('levels') ? 422 : 500
     if (status === 500) logger.error({ err }, 'POST /api/product-categories failed')
     return NextResponse.json({ error: msg }, { status })

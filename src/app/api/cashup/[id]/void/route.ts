@@ -34,7 +34,7 @@ export async function POST(
     const updated = await runWithRequestTenant(req, () => voidCashUp(params.id, session.user.id, parsed.data.reason))
     return NextResponse.json({ cashUp: updated })
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Failed to void cash-up'
+    const message = 'Failed to void cash-up'
     logger.error({ err, cashUpId: params.id }, 'POST /api/cashup/[id]/void failed')
     return NextResponse.json({ error: message }, { status: 500 })
   }

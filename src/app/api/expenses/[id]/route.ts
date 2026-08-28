@@ -31,7 +31,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const expense = await runWithRequestTenant(req, () => updateExpense(params.id, session.user.id, session.user.role, parsed.data))
     return NextResponse.json(expense)
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Failed to update expense'
+    const message = err instanceof Error ? err.message : ''
     logger.error({ err, expenseId: params.id }, 'PATCH /api/expenses/[id] failed')
 
     if (message === 'Expense not found') {
@@ -46,7 +46,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (message === 'Expense was modified by another user') {
       return NextResponse.json({ error: message }, { status: 409 })
     }
-    return NextResponse.json({ error: message }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to update expense' }, { status: 500 })
   }
 }
 

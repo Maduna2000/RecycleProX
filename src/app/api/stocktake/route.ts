@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
     const stocktake = await runWithRequestTenant(req, () => createStocktake(session.user.id, parsed.data.notes))
     return NextResponse.json(stocktake, { status: 201 })
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : 'Failed to create stocktake'
+    const msg = 'Failed to create stocktake'
     logger.error({ err }, 'POST /api/stocktake failed')
     return NextResponse.json({ error: msg }, { status: 500 })
   }

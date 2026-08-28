@@ -36,6 +36,24 @@ let activeDesktopEnv = null
 const isDev = !app.isPackaged
 const PORT = process.env.PORT || 3100 // distinct from Web's 3000 so both can run side by side during dev
 
+// ─── Shared (per-machine, not per-Windows-user) data directory ─────────────
+//
+// package.json's nsis.perMachine=true installs this app once for the whole
+// PC, but app.getPath('userData') resolves under the CURRENT Windows
+// account's own profile (%APPDATA%\renovopro) — per-user, not per-machine.
+// On a till where two Windows accounts share one install (e.g. separate
+// day/night-shift logins), that mismatch meant each account needed its own
+// activation and kept entirely separate desktop.env/license state/logs,
+// defeating the point of a per-machine install and the shared "View Logs"
+// support flow below. %ProgramData% is Windows' actual per-machine
+// equivalent of %APPDATA% — falls back to the old per-user path only if
+// that env var is ever unset (never true on real Windows, but keeps this
+// from throwing on an unexpected platform).
+function getSharedDataDir() {
+  const base = process.env.PROGRAMDATA || app.getPath('userData')
+  return process.env.PROGRAMDATA ? path.join(base, 'RenovoPro') : base
+}
+
 // ─── Diagnostics ────────────────────────────────────────────────────────────
 //
 // A packaged Windows app built with the default `win` subsystem has no
@@ -46,7 +64,7 @@ const PORT = process.env.PORT || 3100 // distinct from Web's 3000 so both can ru
 // silently discarded. Everything below routes that same output to a real
 // file instead, so a support request can be answered from evidence instead
 // of "it says error 500".
-const LOG_DIR = path.join(app.getPath('userData'), 'logs')
+const LOG_DIR = path.join(getSharedDataDir(), 'logs')
 const LOG_FILE = path.join(LOG_DIR, 'main.log')
 
 function logToFile(line) {
@@ -115,7 +133,7 @@ if (!gotLock) {
 // into the installer, never committed, filled in once per install from the
 // same Vercel "Sensitive" values.
 function getDesktopEnvPath() {
-  return path.join(app.getPath('userData'), 'desktop.env')
+  return path.join(getSharedDataDir(), 'desktop.env')
 }
 
 // Minimal KEY=VALUE parser — deliberately not a dependency on the `dotenv`
@@ -241,6 +259,15 @@ function startStandaloneServer(desktopEnv) {
   console.log(`[server] starting standalone server: ${standaloneServer}`)
   serverExitInfo = null
 
+  // The company this device was activated for (electron/licenseManager.js's
+  // stored companySlug, populated by the Portal on activation/heartbeat) —
+  // read fresh at every spawn rather than cached, so a reactivation for a
+  // different company takes effect on the next restart without any other
+  // wiring. Read via getStoredLicense() (not activeDesktopEnv/desktopEnv,
+  // neither of which carries tenant identity) — see src/auth.ts's
+  // isLicensedTenantMismatch() for the enforcement this feeds.
+  const licensedTenantSlug = licenseManager.getStoredLicense().companySlug
+
   serverProcess = spawn(process.execPath, [standaloneServer], {
     env: {
       ...process.env,
@@ -252,6 +279,7 @@ function startStandaloneServer(desktopEnv) {
       PORT: String(PORT),
       HOSTNAME: '127.0.0.1',
       NODE_ENV: 'production',
+      ...(licensedTenantSlug ? { LICENSED_TENANT_SLUG: licensedTenantSlug } : {}),
     },
     // 'inherit' would previously pipe this straight into a console window
     // that doesn't exist in a packaged GUI app (see LOG_FILE above) —

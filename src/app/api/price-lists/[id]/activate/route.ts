@@ -16,7 +16,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const priceList = await runWithRequestTenant(req, () => activatePriceList(params.id, session.user.id))
     return NextResponse.json(priceList)
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Failed to activate price list'
+    const message = err instanceof Error ? err.message : ''
     logger.error({ err, priceListId: params.id }, 'POST /api/price-lists/[id]/activate failed')
     if (message === 'Price list not found') {
       return NextResponse.json({ error: message }, { status: 404 })

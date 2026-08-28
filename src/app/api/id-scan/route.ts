@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
     logger.info({ userId: session.user.id, scanR2Key, bytes: file.size }, 'id-scan upload ok')
     return NextResponse.json({ scanR2Key })
   } catch (err) {
-    const errMsg = err instanceof Error ? err.message : String(err)
+    const errMsg = 'Failed to scan ID document'
     logger.error({ err, scanR2Key }, 'POST /api/id-scan — R2 upload failed')
     return NextResponse.json({ error: `Photo upload failed: ${errMsg}` }, { status: 500 })
   }

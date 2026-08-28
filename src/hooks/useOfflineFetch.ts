@@ -45,8 +45,14 @@ export function useOfflineMutation() {
         return { queued: true }
       }
       if (!res.ok) {
-        const errText = await res.text().catch(() => String(res.status))
-        const err = new Error(errText)
+        // The API always responds with { error: "<friendly message>" } on
+        // failure (see e.g. src/app/api/purchases/route.ts) — parse that
+        // out rather than surfacing the raw response body, which for an
+        // unhandled 500 can be a bare technical string with no JSON shape
+        // at all. A customer-facing till screen showing that text verbatim
+        // instead of "Something went wrong" is the actual bug this fixes.
+        const body = await res.json().catch(() => null) as { error?: string } | null
+        const err = new Error(body?.error || 'Something went wrong — please try again')
         opts.onError?.(err)
         throw err
       }

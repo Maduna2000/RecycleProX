@@ -35,7 +35,7 @@ export async function POST(
     if (err instanceof PurchaseNotCompletedError) return NextResponse.json({ error: err.message }, { status: 409 })
     if (err instanceof CashUpAlreadyApprovedError) return NextResponse.json({ error: err.message }, { status: 409 })
 
-    const message = err instanceof Error ? err.message : 'Failed to reverse purchase payment'
+    const message = 'Failed to reverse purchase payment'
     logger.error({ err, purchaseId: id }, 'POST /api/purchases/[id]/reverse-payment failed')
     return NextResponse.json({ error: message }, { status: 500 })
   }
