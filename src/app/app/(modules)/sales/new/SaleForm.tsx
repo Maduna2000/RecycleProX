@@ -584,8 +584,8 @@ export function SaleForm({ editingSale }: { editingSale?: EditingSale } = {}) {
           setPrintDialog({ id: sale.id, refNumber: sale.refNumber })
         }
       }
-    } catch {
-      toast.error('Failed to create sale')
+    } catch (err) {
+      toast.error(err instanceof Error && err.message ? err.message : 'Failed to create sale')
     } finally {
       setSubmitting(false)
     }
