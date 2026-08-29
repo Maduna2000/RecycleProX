@@ -36,9 +36,9 @@ export async function POST(req: NextRequest) {
     const option = await runWithRequestTenant(req, () => createSellOption(parsed.data))
     return NextResponse.json(option, { status: 201 })
   } catch (err) {
-    const msg = 'Failed to create sell option'
+    const msg = err instanceof Error ? err.message : ''
     const status = msg.includes('already exists') ? 409 : 500
     if (status === 500) logger.error({ err }, 'POST /api/gate/sell-options failed')
-    return NextResponse.json({ error: msg }, { status })
+    return NextResponse.json({ error: status === 500 ? 'Failed to create sell option' : msg }, { status })
   }
 }

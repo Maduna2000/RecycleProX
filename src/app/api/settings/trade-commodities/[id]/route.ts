@@ -28,9 +28,9 @@ export async function PUT(req: NextRequest, context: RouteContext) {
     const category = await runWithRequestTenant(req, () => setTradeCommodityFlag(id, parsed.data.isActive))
     return NextResponse.json(category)
   } catch (err) {
-    const msg = 'Failed to update category'
+    const msg = err instanceof Error ? err.message : ''
     if (msg.includes('not found')) return NextResponse.json({ error: msg }, { status: 404 })
     logger.error({ err, id }, 'PUT /api/settings/trade-commodities/[id] failed')
-    return NextResponse.json({ error: msg }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to update category' }, { status: 500 })
   }
 }

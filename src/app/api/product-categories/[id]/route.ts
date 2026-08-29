@@ -37,10 +37,10 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     const updated = await runWithRequestTenant(req, () => updateCategory(params.id, parsed.data, session.user.id))
     return NextResponse.json(updated)
   } catch (err) {
-    const msg = 'Failed to update category'
+    const msg = err instanceof Error ? err.message : ''
     const status = msg.includes('already exists') ? 409 : msg.includes('not found') ? 404 : msg.includes('levels') || msg.includes('Circular') || msg.includes('Cannot move') ? 422 : 500
     if (status === 500) logger.error({ err }, 'PUT /api/product-categories/[id] failed')
-    return NextResponse.json({ error: msg }, { status })
+    return NextResponse.json({ error: status === 500 ? 'Failed to update category' : msg }, { status })
   }
 }
 
@@ -55,8 +55,16 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     await runWithRequestTenant(req, () => deleteCategory(params.id))
     return NextResponse.json({ ok: true })
   } catch (err) {
-    const msg = 'Failed to delete category'
-    const status = msg.includes('not found') ? 404 : 409
-    return NextResponse.json({ error: msg }, { status })
+    const msg = err instanceof Error ? err.message : ''
+    if (msg.includes('not found')) return NextResponse.json({ error: msg }, { status: 404 })
+    // deleteCategory only ever throws these two hand-written conflict
+    // messages besides "not found" — anything else (a dropped connection,
+    // etc.) falls through to the generic 500 below instead of echoing an
+    // unrecognised message straight to the client.
+    if (msg.includes('sub-categor') || msg.includes('use this category')) {
+      return NextResponse.json({ error: msg }, { status: 409 })
+    }
+    logger.error({ err }, 'DELETE /api/product-categories/[id] failed')
+    return NextResponse.json({ error: 'Failed to delete category' }, { status: 500 })
   }
 }

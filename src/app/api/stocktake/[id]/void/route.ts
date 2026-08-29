@@ -22,7 +22,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const stocktake = await runWithRequestTenant(req, () => voidStocktake(params.id, session.user.id, parsed.data.reason))
     return NextResponse.json(stocktake)
   } catch (err: unknown) {
-    const msg = 'Failed to void stocktake'
+    const msg = err instanceof Error ? err.message : ''
     if (msg.includes('not found') || msg.includes('Not found')) {
       return NextResponse.json({ error: msg }, { status: 404 })
     }
@@ -30,6 +30,6 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       return NextResponse.json({ error: msg }, { status: 409 })
     }
     logger.error({ err, id: params.id }, 'POST /api/stocktake/[id]/void failed')
-    return NextResponse.json({ error: msg }, { status: 400 })
+    return NextResponse.json({ error: 'Failed to void stocktake' }, { status: 400 })
   }
 }

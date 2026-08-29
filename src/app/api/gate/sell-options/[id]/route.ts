@@ -20,10 +20,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const option = await runWithRequestTenant(req, () => updateSellOption(params.id, parsed.data))
     return NextResponse.json(option)
   } catch (err) {
-    const msg = 'Failed to update sell option'
+    const msg = err instanceof Error ? err.message : ''
     const status = msg.includes('already exists') ? 409 : msg.includes('not found') ? 404 : 500
     if (status === 500) logger.error({ err }, 'PATCH /api/gate/sell-options/[id] failed')
-    return NextResponse.json({ error: msg }, { status })
+    return NextResponse.json({ error: status === 500 ? 'Failed to update sell option' : msg }, { status })
   }
 }
 
@@ -38,9 +38,9 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     await runWithRequestTenant(req, () => deleteSellOption(params.id))
     return NextResponse.json({ ok: true })
   } catch (err) {
-    const msg = 'Failed to delete sell option'
+    const msg = err instanceof Error ? err.message : ''
     const status = msg.includes('not found') ? 404 : 500
     if (status === 500) logger.error({ err }, 'DELETE /api/gate/sell-options/[id] failed')
-    return NextResponse.json({ error: msg }, { status })
+    return NextResponse.json({ error: status === 500 ? 'Failed to delete sell option' : msg }, { status })
   }
 }
