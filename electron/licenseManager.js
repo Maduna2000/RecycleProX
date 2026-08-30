@@ -18,6 +18,7 @@
 const crypto = require('node:crypto')
 const os = require('node:os')
 const path = require('node:path')
+const fs = require('node:fs')
 const { app } = require('electron')
 // electron-store v9+ ships ESM-only — `require('electron-store')` resolves
 // but returns the module namespace object ({ default: Store }), not the
@@ -40,6 +41,30 @@ const HEARTBEAT_INTERVAL_MS = 8 * 60 * 60 * 1000 // 8h, within the plan's 6-12h 
 const SHARED_DATA_DIR = process.env.PROGRAMDATA
   ? path.join(process.env.PROGRAMDATA, 'RenovoPro')
   : app.getPath('userData')
+
+// Every till activated before the %ProgramData% migration above has its
+// real deviceToken/companySlug sitting in electron-store's file at the OLD
+// per-user cwd (electron-store's default before this file started passing
+// its own `cwd`) — moving where the store reads from without also moving
+// that file would make an already-activated till look never-activated,
+// kicking a live production install back to the activation-code screen
+// with no way for a cashier to self-recover. Runs once, synchronously,
+// before the store below is even constructed — a no-op the instant the new
+// location has its own file.
+function migrateLegacyStoreFile() {
+  const newPath = path.join(SHARED_DATA_DIR, 'renovo-license.json')
+  if (fs.existsSync(newPath)) return
+  const legacyPath = path.join(app.getPath('userData'), 'renovo-license.json')
+  if (!fs.existsSync(legacyPath)) return
+  try {
+    fs.mkdirSync(SHARED_DATA_DIR, { recursive: true })
+    fs.copyFileSync(legacyPath, newPath)
+  } catch {
+    // Falls through to a normal fresh/empty store — worst case this
+    // specific till re-activates, not a crash.
+  }
+}
+migrateLegacyStoreFile()
 
 // electron-store's default encryption is obfuscation, not real security —
 // deliberately not the security boundary here. The deviceToken is a

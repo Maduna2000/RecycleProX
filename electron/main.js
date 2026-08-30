@@ -136,6 +136,30 @@ function getDesktopEnvPath() {
   return path.join(getSharedDataDir(), 'desktop.env')
 }
 
+// Every till that was ever activated before the %ProgramData% migration
+// (see getSharedDataDir above) has a real, working desktop.env sitting at
+// the OLD per-user path — moving where this app looks without also moving
+// that file would silently orphan it, forcing every already-installed till
+// straight into "Setup Required" on its next launch with no way for a
+// cashier (who has no access to ProgramData, let alone a production
+// database credential) to recover on their own. Runs once per launch,
+// before anything else reads getDesktopEnvPath() — a no-op the moment the
+// new location has its own file, so this never overwrites a legitimately
+// newer/rotated desktop.env with a stale copy.
+function migrateLegacyDesktopEnv() {
+  const newPath = getDesktopEnvPath()
+  if (fs.existsSync(newPath)) return
+  const legacyPath = path.join(app.getPath('userData'), 'desktop.env')
+  if (!fs.existsSync(legacyPath)) return
+  try {
+    fs.mkdirSync(path.dirname(newPath), { recursive: true })
+    fs.copyFileSync(legacyPath, newPath)
+    console.log(`[migrate] copied desktop.env from legacy path ${legacyPath} to ${newPath}`)
+  } catch (err) {
+    console.error('[migrate] failed to copy legacy desktop.env:', err.message)
+  }
+}
+
 // Minimal KEY=VALUE parser — deliberately not a dependency on the `dotenv`
 // package (only present today as an undeclared transitive/hoisted module,
 // not a real package.json dependency); this mirrors local-server/launcher.ps1's
@@ -524,6 +548,8 @@ async function startApp() {
     createActivationWindow()
     return
   }
+
+  migrateLegacyDesktopEnv()
 
   let desktopEnv
   try {
