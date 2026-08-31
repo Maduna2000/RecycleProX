@@ -753,10 +753,20 @@ async function fetchWithSession(url, options = {}) {
   ])
   const cookies = [...cookiesIp, ...cookiesLocalhost]
   const cookieHeader = cookies.map((c) => `${c.name}=${c.value}`).join('; ')
-  return fetch(url, {
+  // Names only, never values — this ends up in main.log, which a support
+  // request might hand over wholesale; a session-token value has no
+  // business sitting in a log file even locally. If a third round of this
+  // bug turns up, this line is what tells us whether the fix's own cookie
+  // lookup is the problem (nothing found, or the wrong name) versus
+  // something failing further down (a fine Cookie header but still a
+  // non-401 failure at the actual print/printer layer).
+  console.log(`[print] fetchWithSession ${url} — cookies found: ip=${cookiesIp.length} localhost=${cookiesLocalhost.length} names=[${cookies.map((c) => c.name).join(',')}]`)
+  const res = await fetch(url, {
     ...options,
     headers: { ...options.headers, ...(cookieHeader ? { Cookie: cookieHeader } : {}) },
   })
+  console.log(`[print] fetchWithSession ${url} — response status=${res.status}`)
+  return res
 }
 
 ipcMain.handle('print-slip', async (_event, data) => {
