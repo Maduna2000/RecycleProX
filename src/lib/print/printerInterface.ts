@@ -89,6 +89,29 @@ export interface PrinterSettingsLike {
   printerSerialPort?:      string
   printerBaudRate?:        string
   printerWindowsQueueName?: string
+  printerPaperWidth?:      string
+}
+
+// node-thermal-printer defaults to a 48-character line width
+// (lib/core.js: `width: parseInt(initConfig.width) || 48`) unless a real
+// physical width is passed in — nothing in this app ever did, on any of
+// the 4 ThermalPrinter construction sites (thermal.ts's two receipt
+// builders, print/slip, settings/test-print). Plain println() text
+// tolerates that mismatch fine, but addLines()'s tableCustom() in
+// thermal.ts computes each column's width as a fraction of the configured
+// line width — on the far more common 58mm/32-character USB printers this
+// app is built around (see windowsQueuePrinter.ts's own "POS-58-class"
+// comment, and the settings UI's own "POS-58 Printer" placeholder), every
+// row comes out wider than the paper and gets hard-wrapped mid-line by the
+// printer's own firmware — exactly the "oversized, badly spaced, columns
+// don't line up" look confirmed on a real till, while the test-print
+// button's plain short lines never revealed it. Defaults to 58mm/32 to
+// match that same already-assumed common case when unset, rather than
+// silently inheriting node-thermal-printer's own wider 48-column default.
+export const PAPER_WIDTH_COLUMNS: Record<string, number> = { '58mm': 32, '80mm': 48 }
+
+export function resolvePrinterWidth(cfg: Pick<PrinterSettingsLike, 'printerPaperWidth'>): number {
+  return PAPER_WIDTH_COLUMNS[cfg.printerPaperWidth ?? '58mm'] ?? 32
 }
 
 /**

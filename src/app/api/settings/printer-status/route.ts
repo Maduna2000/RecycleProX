@@ -3,7 +3,7 @@ import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { getAllSettings } from '@/lib/services/settingsService'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
-import { resolvePrinterInterface } from '@/lib/print/printerInterface'
+import { resolvePrinterInterface, resolvePrinterWidth } from '@/lib/print/printerInterface'
 
 // GET /api/settings/printer-status
 // Lightweight connectivity check for the configured thermal printer — opens
@@ -32,6 +32,7 @@ export async function GET(req: NextRequest) {
       characterSet: CharacterSet.PC850_MULTILINGUAL,
       removeSpecialCharacters: false,
       lineCharacter: '-',
+      width:        resolvePrinterWidth(cfg),
     })
 
     const connected = await printer.isPrinterConnected()

@@ -184,7 +184,7 @@ export default function SalesPage() {
       onClick: (row) => router.push(`/app/sales/${row.id}`),
     },
     {
-      label:   'Print Receipt',
+      label:   'Print PDF Slip',
       icon:    Printer,
       // A voided sale never actually happened as far as the books are
       // concerned — printing/downloading its official documents is at best

@@ -3,7 +3,7 @@ import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { getAllSettings } from '@/lib/services/settingsService'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
-import { resolvePrinterInterface } from '@/lib/print/printerInterface'
+import { resolvePrinterInterface, resolvePrinterWidth } from '@/lib/print/printerInterface'
 
 // POST /api/settings/test-print
 // Sends a small test page to the configured thermal printer.
@@ -26,12 +26,14 @@ export async function POST(req: NextRequest) {
 
     const iface = resolvePrinterInterface(cfg)
 
+    const printerWidth = resolvePrinterWidth(cfg)
     const printer = new ThermalPrinter({
       type:         PrinterTypes.EPSON,
       interface:    iface,
       characterSet: CharacterSet.PC850_MULTILINGUAL,
       removeSpecialCharacters: false,
       lineCharacter: '-',
+      width:        printerWidth,
     })
 
     const connected = await printer.isPrinterConnected()
@@ -46,7 +48,26 @@ export async function POST(req: NextRequest) {
     printer.drawLine()
     printer.println('Test Print')
     printer.println(new Date().toLocaleString('en-ZA'))
+    printer.println(`Paper width: ${cfg.printerPaperWidth ?? '58mm'} (${printerWidth} chars)`)
     printer.drawLine()
+    // A real tableCustom() row, not just plain text — this is the exact
+    // layout mechanism the real receipts use (thermal.ts's addLines), and a
+    // wrong paper-width setting only ever showed up there, never on this
+    // test print's previous all-plain-text content. If this row's columns
+    // don't line up on the actual paper, the width setting above is wrong.
+    printer.tableCustom([
+      { text: 'Item', align: 'LEFT', width: 0.4 },
+      { text: 'Qty', align: 'RIGHT', width: 0.3 },
+      { text: 'Total', align: 'RIGHT', width: 0.3 },
+    ])
+    printer.tableCustom([
+      { text: 'Sample', align: 'LEFT', width: 0.4 },
+      { text: '1.00', align: 'RIGHT', width: 0.3 },
+      { text: '10.00', align: 'RIGHT', width: 0.3 },
+    ])
+    printer.drawLine()
+    printer.println('If the row above lines up with')
+    printer.println('the headers, width is correct.')
     printer.println('Printer is working correctly.')
     printer.newLine()
     printer.cut()

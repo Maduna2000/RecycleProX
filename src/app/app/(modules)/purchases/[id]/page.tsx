@@ -14,6 +14,7 @@ import { colors, layout } from '@/lib/design-tokens'
 import { purchaseDetailFetcher } from '@/lib/offline/fetchers/purchases'
 import { OfflineDataBadge } from '@/components/ui/OfflineDataBadge'
 import { useSystemCurrency } from '@/hooks/useSystemCurrency'
+import { canAutoPrint, autoPrintReceipt } from '@/lib/print/autoPrintClient'
 import {
   inp, lbl, TH, TD, HEADER_GRAD, NAVY,
   Btn, PortalPage,
@@ -260,8 +261,21 @@ export default function PurchaseDetailPage() {
           <div style={{ display: 'flex', gap: 6 }}>
             {purchase.status !== 'voided' && (
               <>
+                {canAutoPrint() && (
+                  <Btn
+                    size="sm"
+                    icon={Printer}
+                    onClick={() => {
+                      autoPrintReceipt({ type: 'purchase', id: purchase.id }, { openDrawer: false })
+                        .then(() => toast.success(`Reprinted ${purchase.refNumber}`))
+                        .catch((err) => toast.error(err instanceof Error ? err.message : 'Reprint failed'))
+                    }}
+                  >
+                    Reprint to Printer
+                  </Btn>
+                )}
                 <Btn size="sm" icon={Printer} onClick={() => window.open(`/api/purchases/${purchase.id}/receipt?format=pdf`, '_blank')}>
-                  Print Receipt
+                  Print PDF Slip
                 </Btn>
                 <Btn size="sm" icon={FileText} onClick={() => window.open(`/api/purchases/${purchase.id}/vat264`, '_blank')}>
                   Download VAT264

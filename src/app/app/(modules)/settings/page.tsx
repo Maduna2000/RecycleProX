@@ -30,7 +30,7 @@ type SettingsMap = {
   police_service_name?: string; police_legal_note?: string
   printerType?: PrinterType; printerSerialPort?: string; printerBaudRate?: string
   printerIp?: string; printerTcpPort?: string; cashDrawerAttached?: string
-  printerWindowsQueueName?: string
+  printerWindowsQueueName?: string; printerPaperWidth?: '58mm' | '80mm'
   scale1Type?: ScaleType; scale1Ip?: string; scale1Port?: string; scale1SerialPort?: string; scale1BaudRate?: string
   scale2Type?: ScaleType; scale2Ip?: string; scale2Port?: string; scale2SerialPort?: string; scale2BaudRate?: string
   scale3Type?: ScaleType; scale3Ip?: string; scale3Port?: string; scale3SerialPort?: string; scale3BaudRate?: string
@@ -435,6 +435,18 @@ export default function SettingsPage() {
                   <option value="windows">Windows Print Queue (USB)</option>
                 </select>
               </Field>
+
+              {form.printerType && form.printerType !== 'none' && (
+                <Field label="Paper Width">
+                  <select value={form.printerPaperWidth ?? '58mm'} onChange={(e) => set('printerPaperWidth', e.target.value)} style={inp}>
+                    <option value="58mm">58mm (32 characters) — most USB/POS-58 printers</option>
+                    <option value="80mm">80mm (48 characters)</option>
+                  </select>
+                  <p style={{ fontSize: 10, color: '#6C757D', marginTop: 2 }}>
+                    Must match the actual paper in the printer — the wrong width makes receipts print oversized, oddly spaced, or with misaligned columns.
+                  </p>
+                </Field>
+              )}
 
               {form.printerType === 'serial' && (
                 <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>

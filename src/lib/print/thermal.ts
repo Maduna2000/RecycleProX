@@ -242,13 +242,14 @@ function addFooter(printer: ThermalPrinter, slipNo: string | number | undefined,
  * Build a Buffer containing the ESC/POS bytes for a purchase receipt.
  * Does NOT send to printer — caller decides transport.
  */
-export async function buildPurchaseReceipt(data: PurchaseReceiptData): Promise<Buffer> {
+export async function buildPurchaseReceipt(data: PurchaseReceiptData, printerWidth = 32): Promise<Buffer> {
   const printer = new ThermalPrinter({
     type:         PrinterTypes.EPSON,
     interface:    'buffer',   // not sending to a device — just building the ESC/POS buffer
     characterSet: CharacterSet.PC850_MULTILINGUAL,
     removeSpecialCharacters: false,
     lineCharacter: '-',
+    width:        printerWidth,
   })
   // Bold for the entire receipt, never toggled off below — thin regular-
   // weight text prints too faint on thermal paper to read reliably (fades
@@ -280,13 +281,14 @@ export async function buildPurchaseReceipt(data: PurchaseReceiptData): Promise<B
 /**
  * Build a Buffer containing the ESC/POS bytes for a sale receipt.
  */
-export async function buildSaleReceipt(data: SaleReceiptData): Promise<Buffer> {
+export async function buildSaleReceipt(data: SaleReceiptData, printerWidth = 32): Promise<Buffer> {
   const printer = new ThermalPrinter({
     type:         PrinterTypes.EPSON,
     interface:    'buffer',   // not sending to a device — just building the ESC/POS buffer
     characterSet: CharacterSet.PC850_MULTILINGUAL,
     removeSpecialCharacters: false,
     lineCharacter: '-',
+    width:        printerWidth,
   })
   // See buildPurchaseReceipt's comment — bold for the whole receipt, never
   // toggled off.

@@ -14,6 +14,7 @@ import { colors, layout } from '@/lib/design-tokens'
 import { saleDetailFetcher } from '@/lib/offline/fetchers/sales'
 import { OfflineDataBadge } from '@/components/ui/OfflineDataBadge'
 import { useSystemCurrency } from '@/hooks/useSystemCurrency'
+import { canAutoPrint, autoPrintReceipt } from '@/lib/print/autoPrintClient'
 import {
   inp, lbl, TH, TD, HEADER_GRAD, NAVY,
   Btn, PortalPage,
@@ -265,9 +266,24 @@ export default function SaleDetailPage() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', borderTop: '1px solid #E0E0E0', background: '#F8F9FA', flexShrink: 0 }}>
           <div style={{ display: 'flex', gap: 6 }}>
             {sale.status !== 'voided' && (
-              <Btn size="sm" icon={Printer} onClick={() => window.open(`/api/sales/${sale.id}/receipt?format=pdf`, '_blank')}>
-                Print Receipt
-              </Btn>
+              <>
+                {canAutoPrint() && (
+                  <Btn
+                    size="sm"
+                    icon={Printer}
+                    onClick={() => {
+                      autoPrintReceipt({ type: 'sale', id: sale.id }, { openDrawer: false })
+                        .then(() => toast.success(`Reprinted ${sale.refNumber}`))
+                        .catch((err) => toast.error(err instanceof Error ? err.message : 'Reprint failed'))
+                    }}
+                  >
+                    Reprint to Printer
+                  </Btn>
+                )}
+                <Btn size="sm" icon={Printer} onClick={() => window.open(`/api/sales/${sale.id}/receipt?format=pdf`, '_blank')}>
+                  Print PDF Slip
+                </Btn>
+              </>
             )}
           </div>
           <div style={{ display: 'flex', gap: 6 }}>

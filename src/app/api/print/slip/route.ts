@@ -4,7 +4,7 @@ import { prisma } from '@/lib/db/prisma'
 import { getAllSettings, currencySymbolFromSettings } from '@/lib/services/settingsService'
 import { buildPurchaseReceipt, buildSaleReceipt, type PurchaseReceiptData, type SaleReceiptData } from '@/lib/print/thermal'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
-import { resolvePrinterInterface } from '@/lib/print/printerInterface'
+import { resolvePrinterInterface, resolvePrinterWidth } from '@/lib/print/printerInterface'
 import logger from '@/lib/logger'
 import Decimal from 'decimal.js'
 
@@ -42,6 +42,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'No printer configured' }, { status: 400 })
   }
   const currencySymbol = currencySymbolFromSettings(cfg)
+  const printerWidth = resolvePrinterWidth(cfg)
 
   try {
     let receiptBuffer: Buffer
@@ -61,8 +62,8 @@ export async function POST(req: Request) {
         currencySymbol,
       }
       receiptBuffer = type === 'purchase'
-        ? await buildPurchaseReceipt({ ...(directData as PurchaseReceiptData), ...overrides })
-        : await buildSaleReceipt({ ...(directData as SaleReceiptData), ...overrides })
+        ? await buildPurchaseReceipt({ ...(directData as PurchaseReceiptData), ...overrides }, printerWidth)
+        : await buildSaleReceipt({ ...(directData as SaleReceiptData), ...overrides }, printerWidth)
     } else if (type === 'purchase') {
       // Fetch purchase with related data
       const purchase = await runWithRequestTenant(req, async () => {
@@ -116,7 +117,7 @@ export async function POST(req: Request) {
         loanDeduction: purchase.loanDeductionAmount ? { amount: purchase.loanDeductionAmount.toString() } : undefined,
         splitPayments: splitPayments ?? undefined,
         currencySymbol,
-      })
+      }, printerWidth)
     } else {
       // Fetch sale with related data
       const sale = await runWithRequestTenant(req, async () => {
@@ -168,7 +169,7 @@ export async function POST(req: Request) {
         businessLoanDeduction: sale.businessLoanDeductionAmount ? { amount: sale.businessLoanDeductionAmount.toString() } : undefined,
         splitPayments: saleSplitPayments ?? undefined,
         currencySymbol,
-      })
+      }, printerWidth)
     }
 
     // Connect to printer and send
@@ -182,6 +183,7 @@ export async function POST(req: Request) {
       characterSet: CharacterSet.PC850_MULTILINGUAL,
       removeSpecialCharacters: false,
       lineCharacter: '-',
+      width: printerWidth,
     })
 
     const connected = await printer.isPrinterConnected()
