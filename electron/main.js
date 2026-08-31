@@ -724,10 +724,32 @@ ipcMain.handle('license-recheck', async () => {
 })
 
 // ─── IPC: Thermal print ───────────────────────────────────────────────────────
+//
+// /api/print/slip and /api/print/cash-drawer both require a signed-in
+// session (auth() in the route handler reads it from the request's Cookie
+// header). The renderer's BrowserWindow holds that cookie in its own
+// session store the moment the operator logs in — but a fetch() issued
+// from THIS file runs in the Electron main process, an entirely separate
+// HTTP client with no cookie jar of its own, so it always sent these
+// requests with no Cookie header at all and every call 401'd regardless of
+// printer configuration (confirmed live: "Print API returned 401" was the
+// actual failure behind what looked like a printer-setup problem).
+// session.defaultSession is the same session the renderer's webContents
+// uses by default (see createMainWindow — no separate `partition` is ever
+// set), so reading its cookies for this origin and forwarding them
+// manually closes the gap.
+async function fetchWithSession(url, options = {}) {
+  const cookies = await session.defaultSession.cookies.get({ url: `http://127.0.0.1:${PORT}` })
+  const cookieHeader = cookies.map((c) => `${c.name}=${c.value}`).join('; ')
+  return fetch(url, {
+    ...options,
+    headers: { ...options.headers, ...(cookieHeader ? { Cookie: cookieHeader } : {}) },
+  })
+}
 
 ipcMain.handle('print-slip', async (_event, data) => {
   try {
-    const res = await fetch(`http://127.0.0.1:${PORT}/api/print/slip`, {
+    const res = await fetchWithSession(`http://127.0.0.1:${PORT}/api/print/slip`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -741,7 +763,7 @@ ipcMain.handle('print-slip', async (_event, data) => {
 
 ipcMain.handle('open-cash-drawer', async () => {
   try {
-    const res = await fetch(`http://127.0.0.1:${PORT}/api/print/cash-drawer`, { method: 'POST' })
+    const res = await fetchWithSession(`http://127.0.0.1:${PORT}/api/print/cash-drawer`, { method: 'POST' })
     return res.ok
   } catch {
     return false
