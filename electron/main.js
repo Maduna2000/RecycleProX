@@ -738,8 +738,20 @@ ipcMain.handle('license-recheck', async () => {
 // uses by default (see createMainWindow — no separate `partition` is ever
 // set), so reading its cookies for this origin and forwarding them
 // manually closes the gap.
+//
+// Queries BOTH 127.0.0.1 and localhost — confirmed live on a real till that
+// the session cookie can end up stored under the `localhost` origin even
+// though every navigation in this file targets 127.0.0.1 explicitly (Auth.js
+// cookie-domain handling and Chromium's loopback resolution both factor in
+// here in ways that weren't fully pinned down; querying both origins fixes
+// the actual symptom regardless of exactly which one holds it, and merging
+// is safe since cookies are deduplicated by name/value pair anyway).
 async function fetchWithSession(url, options = {}) {
-  const cookies = await session.defaultSession.cookies.get({ url: `http://127.0.0.1:${PORT}` })
+  const [cookiesIp, cookiesLocalhost] = await Promise.all([
+    session.defaultSession.cookies.get({ url: `http://127.0.0.1:${PORT}` }),
+    session.defaultSession.cookies.get({ url: `http://localhost:${PORT}` }),
+  ])
+  const cookies = [...cookiesIp, ...cookiesLocalhost]
   const cookieHeader = cookies.map((c) => `${c.name}=${c.value}`).join('; ')
   return fetch(url, {
     ...options,
