@@ -1209,7 +1209,15 @@ export function SaleForm({ editingSale }: { editingSale?: EditingSale } = {}) {
                           <div style={{ position: 'fixed', right: window.innerWidth - actionMenuRect.right, bottom: window.innerHeight - actionMenuRect.top + 2, zIndex: 9999, background: '#fff', border: '1px solid #C0C0C0', borderRadius: 3, boxShadow: '0 4px 12px rgba(0,0,0,0.15)', minWidth: 180 }}>
                             {([
                               { label: 'Process Payment',    action: () => { setPayTarget({ id: s.id, ref: s.refNumber, totalAmount: s.totalAmount, amountPaid: s.amountPaid ?? '0', customerId: s.customerId ?? null }); setActionMenuId(null) } },
-                              { label: 'Print Slip',         action: () => { router.push(`/app/sales/${s.id}`); setActionMenuId(null) } },
+                              ...(canAutoPrint() ? [{
+                                label: 'Print Receipt',
+                                action: () => {
+                                  setActionMenuId(null)
+                                  autoPrintReceipt({ type: 'sale' as const, id: s.id }, { openDrawer: false })
+                                    .then(() => toast.success(`Reprinted ${s.refNumber}`))
+                                    .catch((err: unknown) => toast.error(err instanceof Error ? err.message : 'Reprint failed'))
+                                },
+                              }] : []),
                               { label: 'View Full Details',  action: () => { router.push(`/app/sales/${s.id}`); setActionMenuId(null) } },
                               { label: 'Void Sale',          destructive: true, action: () => { setVoidId(s.id); setActionMenuId(null) } },
                             ] as { label: string; action: () => void; destructive?: boolean }[]).map((item, idx) => (

@@ -79,8 +79,8 @@ export function PrintResultModal({ type, id, refNumber, onClose, onViewPurchase,
                 {printing ? 'Printing...' : 'Print Receipt'}
               </Btn>
             )}
-            <Btn icon={Printer} onClick={() => openPdf(receiptUrl)} style={{ width: '100%', justifyContent: 'center' }}>
-              Print PDF Slip
+            <Btn icon={FileText} onClick={() => openPdf(receiptUrl)} style={{ width: '100%', justifyContent: 'center' }}>
+              View Slip
             </Btn>
             <Btn icon={Download} onClick={printThermal} style={{ width: '100%', justifyContent: 'center' }}>
               Download Thermal Receipt

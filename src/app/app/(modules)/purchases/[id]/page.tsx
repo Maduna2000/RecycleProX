@@ -271,11 +271,11 @@ export default function PurchaseDetailPage() {
                         .catch((err) => toast.error(err instanceof Error ? err.message : 'Reprint failed'))
                     }}
                   >
-                    Reprint to Printer
+                    Print Receipt
                   </Btn>
                 )}
-                <Btn size="sm" icon={Printer} onClick={() => window.open(`/api/purchases/${purchase.id}/receipt?format=pdf`, '_blank')}>
-                  Print PDF Slip
+                <Btn size="sm" icon={FileText} onClick={() => window.open(`/api/purchases/${purchase.id}/receipt?format=pdf`, '_blank')}>
+                  View Slip
                 </Btn>
                 <Btn size="sm" icon={FileText} onClick={() => window.open(`/api/purchases/${purchase.id}/vat264`, '_blank')}>
                   Download VAT264

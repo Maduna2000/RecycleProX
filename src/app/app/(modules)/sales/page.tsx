@@ -184,24 +184,24 @@ export default function SalesPage() {
       onClick: (row) => router.push(`/app/sales/${row.id}`),
     },
     {
-      label:   'Print PDF Slip',
+      label:   'Print Receipt',
       icon:    Printer,
       // A voided sale never actually happened as far as the books are
-      // concerned — printing/downloading its official documents is at best
+      // concerned — printing/viewing its official documents is at best
       // confusing and at worst a document someone could pass off as still
-      // valid, so all of these are hidden here.
-      hidden:  (row) => row.status === 'voided',
-      onClick: (row) => window.open(`/api/sales/${row.id}/receipt?format=pdf`, '_blank'),
-    },
-    {
-      label:   'Reprint to Printer',
-      icon:    Printer,
+      // valid, so it's hidden here too.
       hidden:  (row) => !canAutoPrint() || row.status === 'voided',
       onClick: (row) => {
         autoPrintReceipt({ type: 'sale', id: row.id }, { openDrawer: false })
           .then(() => toast.success(`Reprinted ${row.refNumber}`))
           .catch((err) => toast.error(err instanceof Error ? err.message : 'Reprint failed'))
       },
+    },
+    {
+      label:   'View Slip',
+      icon:    FileText,
+      hidden:  (row) => row.status === 'voided',
+      onClick: (row) => window.open(`/api/sales/${row.id}/receipt?format=pdf`, '_blank'),
     },
     {
       label:   'Sale Note',

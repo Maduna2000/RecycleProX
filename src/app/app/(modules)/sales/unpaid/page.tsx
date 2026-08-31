@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import useSWR, { mutate } from 'swr'
-import { Search, Printer, Ban, HandCoins, Loader2, X, AlertCircle, Pencil } from 'lucide-react'
+import { Search, Printer, Ban, HandCoins, Loader2, X, AlertCircle, Pencil, FileText } from 'lucide-react'
 import Decimal from 'decimal.js'
 import { DataTable, Avatar, type Column, type RowAction } from '@/components/ui/DataTable'
 import { InlineDetailPanel } from '@/components/ui/InlineDetailPanel'
@@ -221,7 +221,7 @@ export default function UnpaidSalesPage() {
       }),
     },
     {
-      label:   'Reprint to Printer',
+      label:   'Print Receipt',
       icon:    Printer,
       hidden:  () => !canAutoPrint(),
       onClick: (row) => {
@@ -231,8 +231,8 @@ export default function UnpaidSalesPage() {
       },
     },
     {
-      label:   'Print PDF Slip',
-      icon:    Printer,
+      label:   'View Slip',
+      icon:    FileText,
       onClick: (row) => window.open(`/api/sales/${row.id}/receipt?format=pdf`, '_blank'),
     },
     {

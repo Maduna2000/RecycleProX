@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import useSWR, { mutate } from 'swr'
 import { Dialog } from '@/components/ui/dialog'
-import { Ban, Loader2, Printer, Camera, Pencil } from 'lucide-react'
+import { Ban, Loader2, Printer, Camera, Pencil, FileText } from 'lucide-react'
 import { toast } from 'sonner'
 import { useSession } from 'next-auth/react'
 import { format } from '@/lib/utils/format'
@@ -277,11 +277,11 @@ export default function SaleDetailPage() {
                         .catch((err) => toast.error(err instanceof Error ? err.message : 'Reprint failed'))
                     }}
                   >
-                    Reprint to Printer
+                    Print Receipt
                   </Btn>
                 )}
-                <Btn size="sm" icon={Printer} onClick={() => window.open(`/api/sales/${sale.id}/receipt?format=pdf`, '_blank')}>
-                  Print PDF Slip
+                <Btn size="sm" icon={FileText} onClick={() => window.open(`/api/sales/${sale.id}/receipt?format=pdf`, '_blank')}>
+                  View Slip
                 </Btn>
               </>
             )}

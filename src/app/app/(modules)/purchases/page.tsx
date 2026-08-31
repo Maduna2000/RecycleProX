@@ -185,27 +185,27 @@ export default function PurchasesPage() {
 
   const rowActions: RowAction<Purchase>[] = [
     {
-      label:   'Print Slip',
-      icon:    Printer,
-      // A voided purchase never actually happened as far as the books are
-      // concerned — printing/downloading its official documents (slip,
-      // VAT264, tax invoice) is at best confusing and at worst a document
-      // someone could pass off as still valid, so all four are hidden here.
-      hidden:  (row) => row.status === 'voided',
-      onClick: (row) => window.open(`/api/purchases/${row.id}/receipt?format=pdf`, '_blank'),
-    },
-    {
-      label:   'Reprint to Printer',
+      label:   'Print Receipt',
       icon:    Printer,
       // Only where a receipt printer could plausibly be attached (Electron
       // or a local-server install) — same gate autoPrintReceipt itself
-      // relies on elsewhere. Never opens the cash drawer for a reprint.
+      // relies on elsewhere. Never opens the cash drawer for a reprint. A
+      // voided purchase never actually happened as far as the books are
+      // concerned — printing/viewing its official documents (slip, VAT264,
+      // tax invoice) is at best confusing and at worst a document someone
+      // could pass off as still valid, so it's hidden here too.
       hidden:  (row) => !canAutoPrint() || row.status === 'voided',
       onClick: (row) => {
         autoPrintReceipt({ type: 'purchase', id: row.id }, { openDrawer: false })
           .then(() => toast.success(`Reprinted ${row.refNumber}`))
           .catch((err) => toast.error(err instanceof Error ? err.message : 'Reprint failed'))
       },
+    },
+    {
+      label:   'View Slip',
+      icon:    FileText,
+      hidden:  (row) => row.status === 'voided',
+      onClick: (row) => window.open(`/api/purchases/${row.id}/receipt?format=pdf`, '_blank'),
     },
     {
       label:   'Purchase Note',
