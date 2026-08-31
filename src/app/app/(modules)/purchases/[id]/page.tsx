@@ -274,8 +274,13 @@ export default function PurchaseDetailPage() {
                     Print Receipt
                   </Btn>
                 )}
-                <Btn size="sm" icon={FileText} onClick={() => window.open(`/api/purchases/${purchase.id}/receipt?format=pdf`, '_blank')}>
-                  View Slip
+                {/* On a plain remote browser (hosted web, no local printer)
+                  * canAutoPrint() is false and the button above never
+                  * renders — this is the only print-adjacent action there,
+                  * so it's honestly labeled "Print Receipt" in that case
+                  * rather than "View Slip". */}
+                <Btn size="sm" icon={canAutoPrint() ? FileText : Printer} onClick={() => window.open(`/api/purchases/${purchase.id}/receipt?format=pdf`, '_blank')}>
+                  {canAutoPrint() ? 'View Slip' : 'Print Receipt'}
                 </Btn>
                 <Btn size="sm" icon={FileText} onClick={() => window.open(`/api/purchases/${purchase.id}/vat264`, '_blank')}>
                   Download VAT264

@@ -280,8 +280,13 @@ export default function SaleDetailPage() {
                     Print Receipt
                   </Btn>
                 )}
-                <Btn size="sm" icon={FileText} onClick={() => window.open(`/api/sales/${sale.id}/receipt?format=pdf`, '_blank')}>
-                  View Slip
+                {/* On a plain remote browser (hosted web, no local printer)
+                  * canAutoPrint() is false and the button above never
+                  * renders — this is the only print-adjacent action there,
+                  * so it's honestly labeled "Print Receipt" in that case
+                  * rather than "View Slip". */}
+                <Btn size="sm" icon={canAutoPrint() ? FileText : Printer} onClick={() => window.open(`/api/sales/${sale.id}/receipt?format=pdf`, '_blank')}>
+                  {canAutoPrint() ? 'View Slip' : 'Print Receipt'}
                 </Btn>
               </>
             )}

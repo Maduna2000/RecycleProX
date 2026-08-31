@@ -158,26 +158,50 @@ function addPartyLines(printer: ThermalPrinter, label: string, code: string | un
 // which tableCustom's single per-call bold state can't selectively apply to
 // just one cell, so rows here are kept fully regular rather than bolding an
 // entire row for one column).
+// Column widths below are exact character counts divided by 32 (the 58mm
+// paper width — see resolvePrinterWidth), not the rough round-number
+// fractions this used to have. tableCustom() packs columns edge-to-edge
+// with no gap of its own (lib/core.js) and, worse, when a cell's text is
+// longer than its own column, it truncates that cell for the current line
+// and pushes the remainder into a second tableCustom() call where every
+// OTHER column prints blank — which is exactly the "fields cluster, then
+// spill onto another line" symptom this fixes. The old fractions (0.22/
+// 0.16/0.14/0.12/0.14/0.22 -> ~7/~5/~4.5/~4/~4.5/~7 raw characters at 32
+// chars wide) were too narrow for their own header words: "InPrice" (7
+// chars) didn't fit a ~5-char column, and "Gross"/"Tare" (5/4 chars)
+// didn't fit their own ~4.5/~4-char columns either. "InPrice" is
+// shortened to "Price" (still distinct from the line-item Total further
+// right); "Product" stays as-is per instruction. Every header word below
+// now fits its column exactly, with the 2 characters this frees up handed
+// to Total so it keeps the most room for a large multi-digit amount:
+// Product=7, Price=5, Gross=5, Tare=4, Nett=4, Total=7 (sums to 32).
+const PRODUCT_COL = 7 / 32
+const PRICE_COL   = 5 / 32
+const GROSS_COL   = 5 / 32
+const TARE_COL    = 4 / 32
+const NETT_COL    = 4 / 32
+const TOTAL_COL   = 7 / 32
+
 function addLines(printer: ThermalPrinter, lines: ReceiptLine[]) {
   printer.bold(true)
   printer.tableCustom([
-    { text: 'Product', align: 'LEFT',  width: 0.22 },
-    { text: 'InPrice', align: 'RIGHT', width: 0.16 },
-    { text: 'Gross',   align: 'RIGHT', width: 0.14 },
-    { text: 'Tare',    align: 'RIGHT', width: 0.12 },
-    { text: 'Nett',    align: 'RIGHT', width: 0.14 },
-    { text: 'Total',   align: 'RIGHT', width: 0.22 },
+    { text: 'Product', align: 'LEFT',  width: PRODUCT_COL },
+    { text: 'Price',   align: 'RIGHT', width: PRICE_COL },
+    { text: 'Gross',   align: 'RIGHT', width: GROSS_COL },
+    { text: 'Tare',    align: 'RIGHT', width: TARE_COL },
+    { text: 'Nett',    align: 'RIGHT', width: NETT_COL },
+    { text: 'Total',   align: 'RIGHT', width: TOTAL_COL },
   ])
   printer.bold(false)
 
   for (const line of lines) {
     printer.tableCustom([
-      { text: (line.productCode ?? '').substring(0, 10), align: 'LEFT',  width: 0.22 },
-      { text: new Decimal(line.unitPrice).toFixed(2),    align: 'RIGHT', width: 0.16 },
-      { text: line.grossQty ?? '',                       align: 'RIGHT', width: 0.14 },
-      { text: line.tareQty ?? '0',                        align: 'RIGHT', width: 0.12 },
-      { text: String(line.qty),                          align: 'RIGHT', width: 0.14 },
-      { text: new Decimal(line.lineTotal).toFixed(2),    align: 'RIGHT', width: 0.22 },
+      { text: (line.productCode ?? '').substring(0, 10), align: 'LEFT',  width: PRODUCT_COL },
+      { text: new Decimal(line.unitPrice).toFixed(2),    align: 'RIGHT', width: PRICE_COL },
+      { text: line.grossQty ?? '',                       align: 'RIGHT', width: GROSS_COL },
+      { text: line.tareQty ?? '0',                        align: 'RIGHT', width: TARE_COL },
+      { text: String(line.qty),                          align: 'RIGHT', width: NETT_COL },
+      { text: new Decimal(line.lineTotal).toFixed(2),    align: 'RIGHT', width: TOTAL_COL },
     ])
     // Product name wraps to its own line below the code/numbers row,
     // matching the legacy slip's own wrapping (e.g. "08002" / "ally o/r").

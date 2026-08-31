@@ -198,8 +198,12 @@ export default function UnpaidPurchasesPage() {
       },
     },
     {
-      label:   'View Slip',
-      icon:    FileText,
+      // A plain remote browser (hosted web, no local printer) never shows
+      // the "Print Receipt" action above — this is the only print-adjacent
+      // action there, so it's honestly labeled "Print Receipt" in that
+      // case rather than "View Slip".
+      label:   canAutoPrint() ? 'View Slip' : 'Print Receipt',
+      icon:    canAutoPrint() ? FileText : Printer,
       onClick: (row) => window.open(`/api/purchases/${row.id}/receipt?format=pdf`, '_blank'),
     },
     {

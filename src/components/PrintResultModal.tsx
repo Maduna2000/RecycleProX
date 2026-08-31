@@ -79,8 +79,16 @@ export function PrintResultModal({ type, id, refNumber, onClose, onViewPurchase,
                 {printing ? 'Printing...' : 'Print Receipt'}
               </Btn>
             )}
-            <Btn icon={FileText} onClick={() => openPdf(receiptUrl)} style={{ width: '100%', justifyContent: 'center' }}>
-              View Slip
+            {/* When there's no direct-print button above (a plain remote
+              * browser with no local printer — the hosted web app), this is
+              * the only print-adjacent action available, so it's honestly
+              * labeled "Print Receipt" there — opening the PDF IS how
+              * printing works for someone with an ordinary office printer.
+              * Once a real direct-print button exists (Electron/local-server
+              * PWA), this becomes "View Slip" so it's never confused with
+              * the button that actually prints directly. */}
+            <Btn icon={showDirectPrint ? FileText : Printer} onClick={() => openPdf(receiptUrl)} style={{ width: '100%', justifyContent: 'center' }}>
+              {showDirectPrint ? 'View Slip' : 'Print Receipt'}
             </Btn>
             <Btn icon={Download} onClick={printThermal} style={{ width: '100%', justifyContent: 'center' }}>
               Download Thermal Receipt
