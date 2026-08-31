@@ -114,8 +114,10 @@ function statusLabelFor(status: 'completed' | 'pending' | 'voided'): string {
 
 function addHeader(printer: ThermalPrinter, refNumber: string, date: Date, info: CompanyInfo, provisional?: boolean, statusLabel = 'PAID') {
   printer.alignCenter()
+  printer.bold(true)
   printer.println(statusLabel)
   printer.println((info.companyName || 'GOLDEN KEY INVESTMENTS (PTY) LTD').toUpperCase())
+  printer.bold(false)
   printer.alignLeft()
   printer.println(`PN No: ${refNumber}`)
   printer.println(`Date: ${date.toLocaleString('en-ZA')}`)
@@ -124,7 +126,9 @@ function addHeader(printer: ThermalPrinter, refNumber: string, date: Date, info:
   if (info.companyPhone) printer.println(`Tel: ${info.companyPhone}`)
   if (info.vatNumber)    printer.println(`VAT No.: ${info.vatNumber}`)
   if (provisional) {
+    printer.bold(true)
     printer.println('*** PROVISIONAL - PENDING SYNC ***')
+    printer.bold(false)
   }
   printer.drawLine()
 }
@@ -136,14 +140,26 @@ function addPeopleLines(printer: ThermalPrinter, cashierName: string, scaleOpera
   printer.newLine()
 }
 
+// Bolds just the "Cust:"/"Buyer:" name line — matching slip.ts's PDF layout,
+// which bolds that one line (font: bold at line ~217) but keeps the VAT
+// sub-line in the regular weight below it.
 function addPartyLines(printer: ThermalPrinter, label: string, code: string | undefined, name: string, vatNumber?: string) {
   const custLine = code ? `${code}-${name}` : name
+  printer.bold(true)
   printer.println(`${label}: ${custLine}`)
+  printer.bold(false)
   printer.println(`${label} VAT: ${vatNumber ?? ''}`)
   printer.newLine()
 }
 
+// Table header bolded, matching slip.ts's PDF header row (font: bold at
+// line ~237-239) — each item row stays regular, same as the PDF's line-item
+// rows (font: reg for name/qty; only the PDF's own line-total cell is bold,
+// which tableCustom's single per-call bold state can't selectively apply to
+// just one cell, so rows here are kept fully regular rather than bolding an
+// entire row for one column).
 function addLines(printer: ThermalPrinter, lines: ReceiptLine[]) {
+  printer.bold(true)
   printer.tableCustom([
     { text: 'Product', align: 'LEFT',  width: 0.22 },
     { text: 'InPrice', align: 'RIGHT', width: 0.16 },
@@ -152,6 +168,7 @@ function addLines(printer: ThermalPrinter, lines: ReceiptLine[]) {
     { text: 'Nett',    align: 'RIGHT', width: 0.14 },
     { text: 'Total',   align: 'RIGHT', width: 0.22 },
   ])
+  printer.bold(false)
 
   for (const line of lines) {
     printer.tableCustom([
@@ -178,7 +195,12 @@ function addTotals(printer: ThermalPrinter, lines: ReceiptLine[], totalAmount: s
   printer.leftRight('Nett Total', nettTotal.toFixed(1))
   printer.leftRight('Total', `${sym} ${total.toFixed(2)}`)
   printer.leftRight('15% VAT', `${sym} ${vat.toFixed(2)}`)
+  // Only the final figure bolded, matching slip.ts's PDF pattern of a
+  // regular-weight label with a bold amount for the headline total (e.g.
+  // "Gross Payout:" at line ~309-310) — every sub-total above stays regular.
+  printer.bold(true)
   printer.leftRight('Grand Total', `${sym} ${grandTotal.toFixed(2)}`)
+  printer.bold(false)
 }
 
 function addSplitPayments(
@@ -251,12 +273,13 @@ export async function buildPurchaseReceipt(data: PurchaseReceiptData, printerWid
     lineCharacter: '-',
     width:        printerWidth,
   })
-  // Bold for the entire receipt, never toggled off below — thin regular-
-  // weight text prints too faint on thermal paper to read reliably (fades
-  // fast too), so the whole slip prints in emphasis mode rather than mixing
-  // weights section by section.
-  printer.bold(true)
-
+  // Bold is toggled section-by-section below (headers, party name, and the
+  // final Grand Total only) to match slip.ts's PDF layout — see that file's
+  // mixed bold/regular font usage. This used to bold the entire receipt
+  // unconditionally on the theory that thin text fades on thermal paper,
+  // but confirmed on real hardware that reads worse, not better — an
+  // all-bold receipt looks oversized and harder to scan than the
+  // mixed-weight PDF/test-print style it was compared against.
   addHeader(printer, data.refNumber, data.createdAt, data, data.provisional, statusLabelFor(data.status))
   addPeopleLines(printer, data.cashierName, data.scaleOperatorName)
   addPartyLines(printer, 'Cust', data.customerCode, data.customerName, data.customerVatNumber)
@@ -290,9 +313,8 @@ export async function buildSaleReceipt(data: SaleReceiptData, printerWidth = 32)
     lineCharacter: '-',
     width:        printerWidth,
   })
-  // See buildPurchaseReceipt's comment — bold for the whole receipt, never
-  // toggled off.
-  printer.bold(true)
+  // See buildPurchaseReceipt's comment — bold is toggled section-by-section
+  // to match slip.ts's PDF styling, not applied to the whole receipt.
 
   addHeader(printer, data.refNumber, data.createdAt, data, data.provisional, statusLabelFor(data.status))
   addPeopleLines(printer, data.cashierName)

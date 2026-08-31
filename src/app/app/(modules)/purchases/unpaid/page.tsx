@@ -16,6 +16,7 @@ import { useSession } from 'next-auth/react'
 import { purchasesListFetcher, purchaseDetailFetcher } from '@/lib/offline/fetchers/purchases'
 import { OfflineDataBadge } from '@/components/ui/OfflineDataBadge'
 import { useSystemCurrency } from '@/hooks/useSystemCurrency'
+import { canAutoPrint, autoPrintReceipt } from '@/lib/print/autoPrintClient'
 import {
   inp, lbl, Btn, Field, PortalPage, FilterBar,
   RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter,
@@ -187,7 +188,17 @@ export default function UnpaidPurchasesPage() {
       }),
     },
     {
-      label:   'Print Slip',
+      label:   'Reprint to Printer',
+      icon:    Printer,
+      hidden:  () => !canAutoPrint(),
+      onClick: (row) => {
+        autoPrintReceipt({ type: 'purchase', id: row.id }, { openDrawer: false })
+          .then(() => toast.success(`Reprinted ${row.refNumber}`))
+          .catch((err) => toast.error(err instanceof Error ? err.message : 'Reprint failed'))
+      },
+    },
+    {
+      label:   'Print PDF Slip',
       icon:    Printer,
       onClick: (row) => window.open(`/api/purchases/${row.id}/receipt?format=pdf`, '_blank'),
     },
