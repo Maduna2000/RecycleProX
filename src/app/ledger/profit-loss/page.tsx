@@ -7,6 +7,8 @@ import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
 import { PortalPage, TH, TD, HEADER_GRAD } from '@/components/rpx'
 import { DateRangeFilter } from '../_components/DateRangeFilter'
 import { StatCard } from '../_components/StatCard'
+import { Panel } from '../_components/Panel'
+import { PLBridgeChart, type BridgeStep } from '../_components/PLBridgeChart'
 import { formatMoney } from '../_lib/money'
 import type { ProfitAndLossReport } from '@/lib/services/ledgerReportService'
 
@@ -59,6 +61,18 @@ export default function ProfitAndLossPage() {
           <StatCard label="Gross Profit" value={formatMoney(data.grossProfit)} tone="action" />
           <StatCard label="Net Profit" value={formatMoney(data.netProfit)} tone={Number(data.netProfit) < 0 ? 'danger' : 'action'} />
         </div>
+      )}
+
+      {data && (
+        <Panel title="The Bridge from Revenue to Net Profit" subtitle="Each step scaled to the same baseline — how much COGS and expenses take out along the way.">
+          <PLBridgeChart steps={[
+            { label: 'Revenue', value: Number(data.totalRevenue), kind: 'total' },
+            { label: 'Cost of Goods Sold', value: Number(data.totalCogs), kind: 'reduction' },
+            { label: 'Gross Profit', value: Number(data.grossProfit), kind: 'result' },
+            { label: 'Operating Expenses', value: Number(data.totalOperatingExpenses), kind: 'reduction' },
+            { label: 'Net Profit', value: Number(data.netProfit), kind: 'result' },
+          ] satisfies BridgeStep[]} />
+        </Panel>
       )}
 
       <PortalPage title="Profit & Loss">

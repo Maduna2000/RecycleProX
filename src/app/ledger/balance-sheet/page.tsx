@@ -8,6 +8,8 @@ import { PortalPage, TD, Field, inp, HEADER_GRAD } from '@/components/rpx'
 import { CheckCircle2, AlertTriangle } from 'lucide-react'
 import { formatMoney } from '../_lib/money'
 import { StatCard } from '../_components/StatCard'
+import { Panel } from '../_components/Panel'
+import { BalanceBar } from '../_components/BalanceBar'
 import type { BalanceSheetReport } from '@/lib/services/ledgerReportService'
 
 function todayLabel(): string {
@@ -76,6 +78,12 @@ export default function BalanceSheetPage() {
           <StatCard label="Total Liabilities" value={formatMoney(data.liabilities.total)} tone="danger" />
           <StatCard label="Total Equity" value={formatMoney(data.equity.total)} />
         </div>
+      )}
+
+      {data && (
+        <Panel title="Assets vs. Liabilities + Equity" subtitle="Same scale, side by side — balanced means the two bars are visibly the same length.">
+          <BalanceBar assets={Number(data.assets.total)} liabilities={Number(data.liabilities.total)} equity={Number(data.equity.total)} />
+        </Panel>
       )}
 
       <PortalPage title="Balance Sheet">

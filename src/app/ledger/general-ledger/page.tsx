@@ -9,6 +9,7 @@ import { PortalPage, TH, TD, Field, inp } from '@/components/rpx'
 import { DateRangeFilter } from '../_components/DateRangeFilter'
 import { StatCard } from '../_components/StatCard'
 import { Pagination } from '../_components/Pagination'
+import { Sparkline } from '../_components/Sparkline'
 import { formatMoney } from '../_lib/money'
 import type { AccountTreeNode } from '@/lib/services/ledgerReportService'
 import type { GeneralLedgerReport } from '@/lib/services/ledgerReportService'
@@ -70,6 +71,15 @@ function GeneralLedgerInner() {
           <StatCard label="Total Debit" value={formatMoney(data.totalDebit)} />
           <StatCard label="Total Credit" value={formatMoney(data.totalCredit)} />
           <StatCard label="Closing Balance" value={formatMoney(data.closingBalance)} tone="action" />
+        </div>
+      )}
+
+      {data && data.rows.length > 1 && (
+        <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 6, padding: '10px 16px' }}>
+          <div style={{ fontSize: fontSize.sm, color: colors.textSecondary, marginBottom: 4 }}>
+            Running balance across the rows shown below{data.pageCount > 1 ? ` (page ${data.page} of ${data.pageCount})` : ''}
+          </div>
+          <Sparkline values={[Number(data.openingBalance), ...data.rows.map((r) => Number(r.runningBalance))]} />
         </div>
       )}
 

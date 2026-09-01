@@ -16,6 +16,7 @@ import type {
 import { CategoryPieChart } from './_components/CategoryPieChart'
 import { CategoryProfitChart } from './_components/CategoryProfitChart'
 import { StatCard } from './_components/StatCard'
+import { Panel, PanelRow, SectionHeading } from './_components/Panel'
 
 function todayLabel(): string {
   return new Date().toISOString().split('T')[0]!
@@ -33,16 +34,8 @@ function findByCode(nodes: AccountTreeNode[], code: string): AccountTreeNode | u
   return undefined
 }
 
-function Panel({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
-  return (
-    <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 6, overflow: 'hidden' }}>
-      <div style={{ padding: '12px 16px', borderBottom: `1px solid ${colors.border}` }}>
-        <div style={{ fontSize: fontSize.md, fontWeight: fontWeight.semibold, color: colors.mainInstruction }}>{title}</div>
-        <div style={{ fontSize: fontSize.sm, color: colors.textSecondary, marginTop: 2 }}>{subtitle}</div>
-      </div>
-      {children}
-    </div>
-  )
+function money(v: Decimal): string {
+  return `${v.isNegative() ? '−' : ''}${formatMoney(v.abs().toFixed(2))}`
 }
 
 // ─── Trading Breakdown ──────────────────────────────────────────────────────
@@ -59,34 +52,13 @@ function TradingBreakdownCard({
   totalExpenses: Decimal
   netAfterExpenses: Decimal
 }) {
-  const row = (label: string, value: Decimal, opts?: { subtotal?: boolean; tone?: 'action' | 'danger' }) => (
-    <div
-      key={label}
-      style={{
-        display: 'flex', justifyContent: 'space-between', padding: '8px 0',
-        borderTop: opts?.subtotal ? `2px solid ${colors.border}` : `1px solid ${colors.rowDivider}`,
-        fontWeight: opts?.subtotal ? fontWeight.bold : fontWeight.regular,
-      }}
-    >
-      <span style={{ color: colors.textPrimary, fontSize: fontSize.base }}>{label}</span>
-      <span style={{
-        fontFamily: 'monospace', fontSize: fontSize.base,
-        color: opts?.tone === 'danger' ? colors.danger : opts?.tone === 'action' ? colors.action : colors.textPrimary,
-      }}>
-        {value.isNegative() ? '−' : ''}{formatMoney(value.abs().toFixed(2))}
-      </span>
-    </div>
-  )
-
   return (
     <Panel title="Trading Breakdown" subtitle="Cash on hand plus this period's stock profit, before and after operating expenses.">
-      <div style={{ padding: '4px 16px 16px' }}>
-        {row('Cash on Hand', cashOnHand, { tone: 'action' })}
-        {row("Stock Profit (this period's gross profit)", stockProfit, { tone: stockProfit.isNegative() ? 'danger' : 'action' })}
-        {row('Available Before Expenses', availableBeforeExpenses, { subtotal: true })}
-        {row('Total Expenses', totalExpenses.negated(), { tone: 'danger' })}
-        {row('Net After Expenses', netAfterExpenses, { subtotal: true, tone: netAfterExpenses.isNegative() ? 'danger' : 'action' })}
-      </div>
+      <PanelRow first label="Cash on Hand" value={money(cashOnHand)} tone="action" />
+      <PanelRow label="Stock Profit (this period's gross profit)" value={money(stockProfit)} tone={stockProfit.isNegative() ? 'danger' : 'action'} />
+      <PanelRow label="Available Before Expenses" value={money(availableBeforeExpenses)} subtotal />
+      <PanelRow label="Total Expenses" value={money(totalExpenses.negated())} tone="danger" />
+      <PanelRow label="Net After Expenses" value={money(netAfterExpenses)} subtotal tone={netAfterExpenses.isNegative() ? 'danger' : 'action'} />
     </Panel>
   )
 }
@@ -108,38 +80,17 @@ function CashReconciliationCard({ cashUpCash, ledgerCash, ledgerBank, variance }
 }) {
   const balanced = variance.abs().lessThanOrEqualTo(RECONCILIATION_TOLERANCE)
 
-  const row = (label: string, value: Decimal, opts?: { subtotal?: boolean; tone?: 'action' | 'danger' }) => (
-    <div
-      key={label}
-      style={{
-        display: 'flex', justifyContent: 'space-between', padding: '8px 0',
-        borderTop: opts?.subtotal ? `2px solid ${colors.border}` : `1px solid ${colors.rowDivider}`,
-        fontWeight: opts?.subtotal ? fontWeight.bold : fontWeight.regular,
-      }}
-    >
-      <span style={{ color: colors.textPrimary, fontSize: fontSize.base }}>{label}</span>
-      <span style={{
-        fontFamily: 'monospace', fontSize: fontSize.base,
-        color: opts?.tone === 'danger' ? colors.danger : opts?.tone === 'action' ? colors.action : colors.textPrimary,
-      }}>
-        {value.isNegative() ? '−' : ''}{formatMoney(value.abs().toFixed(2))}
-      </span>
-    </div>
-  )
-
   return (
     <Panel title="Cash Reconciliation" subtitle="Cashup's operational cash figure vs. what's actually posted to the ledger's Cash account.">
-      <div style={{ padding: '4px 16px 16px' }}>
-        {row('Cash-up (operational)', cashUpCash)}
-        {row('Ledger (posted, account 1000)', ledgerCash)}
-        {row('Ledger Bank (posted, account 1010)', ledgerBank)}
-        {row('Variance', variance, { subtotal: true, tone: balanced ? 'action' : 'danger' })}
-        {!balanced && (
-          <div style={{ marginTop: 8, fontSize: fontSize.sm, color: colors.danger }}>
-            Cash-up and the posted ledger disagree by more than {formatMoney(RECONCILIATION_TOLERANCE)}.
-          </div>
-        )}
-      </div>
+      <PanelRow first label="Cash-up (operational)" value={money(cashUpCash)} />
+      <PanelRow label="Ledger (posted, account 1000)" value={money(ledgerCash)} />
+      <PanelRow label="Ledger Bank (posted, account 1010)" value={money(ledgerBank)} />
+      <PanelRow label="Variance" value={money(variance)} subtotal tone={balanced ? 'action' : 'danger'} />
+      {!balanced && (
+        <div style={{ marginTop: 8, fontSize: fontSize.sm, color: colors.danger }}>
+          Cash-up and the posted ledger disagree by more than {formatMoney(RECONCILIATION_TOLERANCE)}.
+        </div>
+      )}
     </Panel>
   )
 }
@@ -149,26 +100,24 @@ function CashReconciliationCard({ cashUpCash, ledgerCash, ledgerBank, variance }
 function ProfitByCategoryCard({ report, loading, from, to }: { report?: ProfitByCategoryReport; loading: boolean; from: string; to: string }) {
   return (
     <Panel title="Profit by Category" subtitle={`Realized revenue minus cost of goods sold, per category (${from} – ${to}).`}>
-      <div style={{ padding: 16 }}>
-        {loading ? (
-          <div style={{ padding: 24, textAlign: 'center', color: colors.textSecondary }}>Loading…</div>
-        ) : !report || report.rows.length === 0 ? (
-          <div style={{ padding: 24, textAlign: 'center', color: colors.textSecondary }}>No category activity in this period yet.</div>
-        ) : (
-          <>
-            <CategoryProfitChart data={report.rows.map((r) => ({ label: r.category, value: Number(r.profit) }))} />
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 16, paddingTop: 12, borderTop: `2px solid ${colors.border}` }}>
-              <span style={{ fontWeight: fontWeight.semibold, color: colors.textPrimary }}>Overall Profit</span>
-              <span style={{
-                fontFamily: 'monospace', fontWeight: fontWeight.bold,
-                color: Number(report.totalProfit) < 0 ? colors.danger : colors.action,
-              }}>
-                {formatMoney(report.totalProfit)}
-              </span>
-            </div>
-          </>
-        )}
-      </div>
+      {loading ? (
+        <div style={{ padding: 24, textAlign: 'center', color: colors.textSecondary }}>Loading…</div>
+      ) : !report || report.rows.length === 0 ? (
+        <div style={{ padding: 24, textAlign: 'center', color: colors.textSecondary }}>No category activity in this period yet.</div>
+      ) : (
+        <>
+          <CategoryProfitChart data={report.rows.map((r) => ({ label: r.category, value: Number(r.profit) }))} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 16, paddingTop: 12, borderTop: `2px solid ${colors.border}` }}>
+            <span style={{ fontWeight: fontWeight.semibold, color: colors.textPrimary }}>Overall Profit</span>
+            <span style={{
+              fontFamily: 'monospace', fontWeight: fontWeight.bold,
+              color: Number(report.totalProfit) < 0 ? colors.danger : colors.action,
+            }}>
+              {formatMoney(report.totalProfit)}
+            </span>
+          </div>
+        </>
+      )}
     </Panel>
   )
 }
@@ -178,18 +127,16 @@ function ProfitByCategoryCard({ report, loading, from, to }: { report?: ProfitBy
 function StockByCategoryCard({ report, loading }: { report?: StockValueByCategoryReport; loading: boolean }) {
   return (
     <Panel title="Stock Value by Category" subtitle="Current stock on hand, valued at cost (average purchase cost).">
-      <div style={{ padding: 16 }}>
-        {loading ? (
-          <div style={{ padding: 24, textAlign: 'center', color: colors.textSecondary }}>Loading…</div>
-        ) : !report || report.rows.length === 0 ? (
-          <div style={{ padding: 24, textAlign: 'center', color: colors.textSecondary }}>No stock on hand.</div>
-        ) : (
-          <CategoryPieChart
-            title="Stock value by category"
-            data={report.rows.map((r) => ({ label: r.category, value: Number(r.costValue) }))}
-          />
-        )}
-      </div>
+      {loading ? (
+        <div style={{ padding: 24, textAlign: 'center', color: colors.textSecondary }}>Loading…</div>
+      ) : !report || report.rows.length === 0 ? (
+        <div style={{ padding: 24, textAlign: 'center', color: colors.textSecondary }}>No stock on hand.</div>
+      ) : (
+        <CategoryPieChart
+          title="Stock value by category"
+          data={report.rows.map((r) => ({ label: r.category, value: Number(r.costValue) }))}
+        />
+      )}
     </Panel>
   )
 }
@@ -197,7 +144,7 @@ function StockByCategoryCard({ report, loading }: { report?: StockValueByCategor
 /** Detail table backing the pie chart above — kg on hand, cost basis, current sale value, and the profit still sitting in that stock if sold at list price. */
 function StockByCategoryTable({ report, loading }: { report?: StockValueByCategoryReport; loading: boolean }) {
   return (
-    <Panel title="Stock on Hand — Detail" subtitle="Per category: quantity, what it cost, what it's worth at current sale prices, and the profit margin still in it.">
+    <Panel title="Stock on Hand — Detail" subtitle="Per category: quantity, what it cost, what it's worth at current sale prices, and the profit margin still in it." bodyStyle={{ padding: 0 }}>
       {loading ? (
         <div style={{ padding: 24, textAlign: 'center', color: colors.textSecondary }}>Loading…</div>
       ) : !report || report.rows.length === 0 ? (
@@ -254,7 +201,7 @@ function PendingPaymentsSection() {
   const { data, isLoading } = useSWR<{ rows: PendingSalePaymentRow[]; total: string }>('/api/ledger/pending-payments', fetcher)
 
   return (
-    <Panel title="Pending Payments" subtitle="Unpaid sales — money expected but not yet received, from any method.">
+    <Panel title="Pending Payments" subtitle="Unpaid sales — money expected but not yet received, from any method." bodyStyle={{ padding: 0 }}>
       {isLoading ? (
         <div style={{ padding: 24, textAlign: 'center', color: colors.textSecondary }}>Loading…</div>
       ) : !data || data.rows.length === 0 ? (
@@ -321,7 +268,7 @@ function EftReceivablesSection() {
   }
 
   return (
-    <Panel title="Accounts Receivable — EFT Awaiting Confirmation" subtitle="Completed EFT sales still sitting as receivable until you confirm the transfer actually landed in the bank.">
+    <Panel title="Accounts Receivable — EFT Awaiting Confirmation" subtitle="Completed EFT sales still sitting as receivable until you confirm the transfer actually landed in the bank." bodyStyle={{ padding: 0 }}>
       {isLoading ? (
         <div style={{ padding: 24, textAlign: 'center', color: colors.textSecondary }}>Loading…</div>
       ) : !data || data.rows.length === 0 ? (
@@ -394,7 +341,7 @@ export default function LedgerDashboardPage() {
   const netAfterExpenses        = availableBeforeExpenses.minus(totalExpenses)
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-8">
       <div>
         <h1 style={{ fontSize: fontSize.lg, fontWeight: fontWeight.semibold, color: colors.mainInstruction }}>Ledger Dashboard</h1>
         <p style={{ fontSize: fontSize.base, color: colors.textSecondary, marginTop: 2 }}>
@@ -406,74 +353,83 @@ export default function LedgerDashboardPage() {
         <div style={{ padding: 40, textAlign: 'center', color: colors.textSecondary }}>Loading…</div>
       ) : (
         <>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-            <StatCard label="Cash on Hand" value={formatMoney(cashOnHandData?.cashOnHand ?? '0')} tone="action" />
-            <StatCard label="Bank" value={formatMoney(bank?.totalBalance ?? '0')} tone="action" />
-            <StatCard label="Accounts Receivable" value={formatMoney(ar?.totalBalance ?? '0')} />
-            <StatCard label="Inventory" value={formatMoney(inventory?.totalBalance ?? '0')} />
-            <StatCard label="Accounts Payable" value={formatMoney(ap?.totalBalance ?? '0')} tone="danger" />
+          <div className="flex flex-col gap-3">
+            <SectionHeading>Cash Position</SectionHeading>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+              <StatCard label="Cash on Hand" value={formatMoney(cashOnHandData?.cashOnHand ?? '0')} tone="action" />
+              <StatCard label="Bank" value={formatMoney(bank?.totalBalance ?? '0')} tone="action" />
+              <StatCard label="Accounts Receivable" value={formatMoney(ar?.totalBalance ?? '0')} />
+              <StatCard label="Inventory" value={formatMoney(inventory?.totalBalance ?? '0')} />
+              <StatCard label="Accounts Payable" value={formatMoney(ap?.totalBalance ?? '0')} tone="danger" />
+            </div>
+            <CashReconciliationCard
+              cashUpCash={cashOnHand}
+              ledgerCash={new Decimal(cashOnHandData?.ledgerCash ?? '0')}
+              ledgerBank={new Decimal(cashOnHandData?.ledgerBank ?? '0')}
+              variance={new Decimal(cashOnHandData?.variance ?? '0')}
+            />
           </div>
 
-          <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 6, padding: 20 }}>
-            <div style={{ fontSize: fontSize.md, fontWeight: fontWeight.semibold, color: colors.mainInstruction, marginBottom: 12 }}>
-              This Month ({from} – {to})
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="flex flex-col gap-3">
+            <SectionHeading>This Month ({from} – {to})</SectionHeading>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <StatCard label="Revenue" value={formatMoney(pl?.totalRevenue ?? '0')} tone="action" />
               <StatCard label="Cost of Goods Sold" value={formatMoney(pl?.totalCogs ?? '0')} />
               <StatCard label="Gross Profit" value={formatMoney(pl?.grossProfit ?? '0')} tone="action" />
               <StatCard label="Net Profit" value={formatMoney(pl?.netProfit ?? '0')} tone={pl && Number(pl.netProfit) < 0 ? 'danger' : 'action'} />
             </div>
+            <TradingBreakdownCard
+              cashOnHand={cashOnHand}
+              stockProfit={stockProfit}
+              availableBeforeExpenses={availableBeforeExpenses}
+              totalExpenses={totalExpenses}
+              netAfterExpenses={netAfterExpenses}
+            />
           </div>
+        </>
+      )}
 
-          <TradingBreakdownCard
-            cashOnHand={cashOnHand}
-            stockProfit={stockProfit}
-            availableBeforeExpenses={availableBeforeExpenses}
-            totalExpenses={totalExpenses}
-            netAfterExpenses={netAfterExpenses}
-          />
+      <div className="flex flex-col gap-3">
+        <SectionHeading>Needs Attention</SectionHeading>
+        <PendingPaymentsSection />
+        <EftReceivablesSection />
+      </div>
 
-          <CashReconciliationCard
-            cashUpCash={cashOnHand}
-            ledgerCash={new Decimal(cashOnHandData?.ledgerCash ?? '0')}
-            ledgerBank={new Decimal(cashOnHandData?.ledgerBank ?? '0')}
-            variance={new Decimal(cashOnHandData?.variance ?? '0')}
-          />
-
+      {!loading && (
+        <div className="flex flex-col gap-3">
+          <SectionHeading>Stock &amp; Category Breakdown</SectionHeading>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <ProfitByCategoryCard report={profitByCategory} loading={pbcLoading} from={from} to={to} />
             <StockByCategoryCard report={stockByCategory} loading={sbcLoading} />
           </div>
-
           <StockByCategoryTable report={stockByCategory} loading={sbcLoading} />
-        </>
+        </div>
       )}
 
-      <PendingPaymentsSection />
-      <EftReceivablesSection />
-
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        {[
-          { href: '/ledger/accounts', label: 'Chart of Accounts', desc: 'Every account and its balance' },
-          { href: '/ledger/general-ledger', label: 'General Ledger', desc: "One account's full activity" },
-          { href: '/ledger/trial-balance', label: 'Trial Balance', desc: 'Debits vs credits self-check' },
-          { href: '/ledger/profit-loss', label: 'Profit & Loss', desc: 'Revenue, COGS, expenses' },
-          { href: '/ledger/balance-sheet', label: 'Balance Sheet', desc: 'Assets = Liabilities + Equity' },
-          { href: '/ledger/journal', label: 'Journal', desc: 'Raw chronological entry feed' },
-          { href: '/ledger/journal/new', label: 'New Journal Entry', desc: 'Post a manual/adjusting entry' },
-          { href: '/ledger/opening-balance', label: 'Opening Balances', desc: 'One-time starting figures for a new ledger' },
-        ].map((l) => (
-          <Link
-            key={l.href}
-            href={l.href}
-            style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 6, padding: '14px 16px', textDecoration: 'none' }}
-            className="hover:shadow-sm transition-shadow"
-          >
-            <div style={{ fontSize: fontSize.base, fontWeight: fontWeight.semibold, color: colors.link }}>{l.label}</div>
-            <div style={{ fontSize: fontSize.sm, color: colors.textSecondary, marginTop: 2 }}>{l.desc}</div>
-          </Link>
-        ))}
+      <div className="flex flex-col gap-3">
+        <SectionHeading>Reports</SectionHeading>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {[
+            { href: '/ledger/accounts', label: 'Chart of Accounts', desc: 'Every account and its balance' },
+            { href: '/ledger/general-ledger', label: 'General Ledger', desc: "One account's full activity" },
+            { href: '/ledger/trial-balance', label: 'Trial Balance', desc: 'Debits vs credits self-check' },
+            { href: '/ledger/profit-loss', label: 'Profit & Loss', desc: 'Revenue, COGS, expenses' },
+            { href: '/ledger/balance-sheet', label: 'Balance Sheet', desc: 'Assets = Liabilities + Equity' },
+            { href: '/ledger/journal', label: 'Journal', desc: 'Raw chronological entry feed' },
+            { href: '/ledger/journal/new', label: 'New Journal Entry', desc: 'Post a manual/adjusting entry' },
+            { href: '/ledger/opening-balance', label: 'Opening Balances', desc: 'One-time starting figures for a new ledger' },
+          ].map((l) => (
+            <Link
+              key={l.href}
+              href={l.href}
+              style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 6, padding: '14px 16px', textDecoration: 'none' }}
+              className="hover:shadow-sm transition-shadow"
+            >
+              <div style={{ fontSize: fontSize.base, fontWeight: fontWeight.semibold, color: colors.link }}>{l.label}</div>
+              <div style={{ fontSize: fontSize.sm, color: colors.textSecondary, marginTop: 2 }}>{l.desc}</div>
+            </Link>
+          ))}
+        </div>
       </div>
     </div>
   )
