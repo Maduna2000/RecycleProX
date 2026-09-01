@@ -4,6 +4,7 @@ import { Prisma } from '@prisma/client'
 import logger from '@/lib/logger'
 import Decimal from 'decimal.js'
 import { withSerializableRetry } from '@/lib/db/withSerializableRetry'
+import { postManualStockAdjustmentLedger } from '@/lib/services/ledgerService'
 
 // ─── Typed Errors ─────────────────────────────────────────────────────────────
 
@@ -258,7 +259,7 @@ export async function manualAdjustment(opts: {
   if (!product) throw new ProductNotFoundError(opts.productId)
 
   const movement = await prisma.$transaction(async (tx) => {
-    return recordMovement(tx, {
+    const movement = await recordMovement(tx, {
       productId: opts.productId,
       direction: opts.direction,
       quantity: new Decimal(opts.quantity),
@@ -266,6 +267,16 @@ export async function manualAdjustment(opts: {
       notes: opts.notes,
       createdByUserId: opts.createdByUserId,
     })
+    const variance = opts.direction === 'in' ? new Decimal(opts.quantity) : new Decimal(opts.quantity).negated()
+    await postManualStockAdjustmentLedger(tx, {
+      movementId: movement.id,
+      productId: opts.productId,
+      productCategory: product.category,
+      variance,
+      entryDate: movement.createdAt,
+      userId: opts.createdByUserId,
+    })
+    return movement
   })
 
   logger.info({
@@ -311,7 +322,7 @@ export async function manualCountAdjustment(opts: {
     const quantity = diff.abs()
     const notes = `Physical count: system ${onHand.toFixed(3)}, counted ${counted.toFixed(3)}, diff ${diff.isPositive() ? '+' : '-'}${quantity.toFixed(3)}. ${opts.notes.trim()}`
 
-    return recordMovement(tx, {
+    const movement = await recordMovement(tx, {
       productId: opts.productId,
       direction,
       quantity,
@@ -319,6 +330,15 @@ export async function manualCountAdjustment(opts: {
       notes,
       createdByUserId: opts.createdByUserId,
     })
+    await postManualStockAdjustmentLedger(tx, {
+      movementId: movement.id,
+      productId: opts.productId,
+      productCategory: product.category,
+      variance: diff,
+      entryDate: movement.createdAt,
+      userId: opts.createdByUserId,
+    })
+    return movement
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }))
 
   logger.info({

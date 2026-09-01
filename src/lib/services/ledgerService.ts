@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db/prisma'
 import { requireTenantId } from '@/lib/db/tenantContext'
 import Decimal from 'decimal.js'
 import logger from '@/lib/logger'
+import { randomUUID } from 'crypto'
 import type { AccountType, AccountNormalBalance, PaymentMethod } from '@prisma/client'
 
 // Only 'cash' is physical drawer money — eft/cheque/card all settle through
@@ -1027,9 +1028,15 @@ export interface StocktakeAdjustmentLine {
  * Same "single account absorbs both directions" shape as
  * postCashUpVariance's Cash Over/Short.
  */
-export async function postStocktakeAdjustment(
+/**
+ * Shared core behind postStocktakeAdjustment and postManualStockAdjustmentLedger — both post
+ * an inventory quantity correction the same way (valued at each product's current average cost,
+ * average cost itself untouched, only quantity moves), differing only in what they're labeled as
+ * and what source record they attach to.
+ */
+async function postInventoryQuantityAdjustment(
   tx: TxClient,
-  opts: { stocktakeId: string; refNumber: string; entryDate: Date; lines: StocktakeAdjustmentLine[]; userId?: string }
+  opts: { sourceType: string; sourceId: string; description: string; entryDate: Date; lines: StocktakeAdjustmentLine[]; userId?: string }
 ): Promise<void> {
   await ensureStructuralAccounts(tx)
 
@@ -1066,11 +1073,46 @@ export async function postStocktakeAdjustment(
 
   await postJournalEntry(tx, {
     entryDate: opts.entryDate,
-    description: `Stocktake adjustment ${opts.refNumber}`,
-    sourceType: 'stocktake_adjustment',
-    sourceId: opts.stocktakeId,
+    description: opts.description,
+    sourceType: opts.sourceType,
+    sourceId: opts.sourceId,
     createdByUserId: opts.userId,
     lines: inventoryLines,
+  })
+}
+
+export async function postStocktakeAdjustment(
+  tx: TxClient,
+  opts: { stocktakeId: string; refNumber: string; entryDate: Date; lines: StocktakeAdjustmentLine[]; userId?: string }
+): Promise<void> {
+  await postInventoryQuantityAdjustment(tx, {
+    sourceType: 'stocktake_adjustment',
+    sourceId: opts.stocktakeId,
+    description: `Stocktake adjustment ${opts.refNumber}`,
+    entryDate: opts.entryDate,
+    lines: opts.lines,
+    userId: opts.userId,
+  })
+}
+
+/**
+ * Posts a single manual stock adjustment (from the Stock module's "Adjust Stock" action) to the
+ * ledger the same way a stocktake count adjustment is posted — same valuation, same
+ * Inventory/Stock Count Variance accounts. Keeps ProductAverageCost.quantityOnHand (the figure
+ * getStockValueByCategory and consumeCostForSale both rely on) in sync with the StockMovement
+ * this accompanies, closing the one gap where quantity could silently drift from the movement log.
+ */
+export async function postManualStockAdjustmentLedger(
+  tx: TxClient,
+  opts: { movementId: string; productId: string; productCategory: string; variance: Decimal; entryDate: Date; refNumber?: string; userId?: string }
+): Promise<void> {
+  await postInventoryQuantityAdjustment(tx, {
+    sourceType: 'manual_stock_adjustment',
+    sourceId: opts.movementId,
+    description: `Manual stock adjustment${opts.refNumber ? ' ' + opts.refNumber : ''}`,
+    entryDate: opts.entryDate,
+    lines: [{ productId: opts.productId, productCategory: opts.productCategory, variance: opts.variance }],
+    userId: opts.userId,
   })
 }
 
@@ -1147,4 +1189,75 @@ export async function postOpeningBalanceOnce(opts: { entryDate: Date; lines: Ope
 export async function hasOpeningBalance(): Promise<boolean> {
   const existing = await prisma.journalEntry.findFirst({ where: { sourceType: 'opening_balance' } })
   return !!existing
+}
+
+// ─── Manual / adjusting journal entry ──────────────────────────────────────
+// Free-form entries (accruals, bank fees, depreciation, write-offs,
+// corrections) that don't map to any existing purchase/sale/expense/etc.
+// event type. The one gap opening-balance's own "already posted" screen
+// points admins at ("post a dated adjusting journal entry instead") without
+// this existing yet.
+
+export interface ManualJournalLineInput {
+  accountId: string
+  debit?: Decimal.Value
+  credit?: Decimal.Value
+}
+
+/**
+ * Self-transacting, admin-facing. Generates its own synthetic sourceId (a
+ * fresh UUID) up front rather than leaving it undefined the way
+ * postOpeningBalance does — reverseJournalEntry looks entries up by
+ * (sourceType, sourceId), and multiple manual entries all sharing a null
+ * sourceId would be indistinguishable to its findFirst. This gives each
+ * manual entry the same addressability every domain entity's own id already
+ * gives its journal entries, so it can be looked up and reversed
+ * individually later via reverseManualJournalEntry.
+ */
+export async function postManualJournalEntry(opts: {
+  entryDate: Date
+  description: string
+  lines: ManualJournalLineInput[]
+  userId?: string
+}): Promise<{ sourceId: string }> {
+  const sourceId = randomUUID()
+  await prisma.$transaction(async (tx) => {
+    await ensureStructuralAccounts(tx)
+    await postJournalEntry(tx, {
+      entryDate: opts.entryDate,
+      description: opts.description,
+      sourceType: 'manual_adjustment',
+      sourceId,
+      createdByUserId: opts.userId,
+      lines: opts.lines,
+    })
+  })
+  logger.info({ sourceId, entryDate: opts.entryDate, userId: opts.userId }, 'ledger.manualJournalEntry.posted')
+  return { sourceId }
+}
+
+export class ManualJournalEntryNotFoundError extends Error {
+  constructor(sourceId: string) { super(`No manual journal entry found for id "${sourceId}"`); this.name = 'ManualJournalEntryNotFoundError' }
+}
+
+export class ManualJournalEntryAlreadyReversedError extends Error {
+  constructor(sourceId: string) { super(`Manual journal entry "${sourceId}" has already been reversed`); this.name = 'ManualJournalEntryAlreadyReversedError' }
+}
+
+/**
+ * Self-transacting, admin-facing reversal — mirrors confirmEftReceived's
+ * shape. Guards against double-reversal since reverseJournalEntry itself
+ * isn't idempotent for repeat calls against the same sourceId (it would
+ * just post a second offsetting entry).
+ */
+export async function reverseManualJournalEntry(sourceId: string, reason: string, userId?: string): Promise<void> {
+  await prisma.$transaction(async (tx) => {
+    const tenantId = requireTenantId()
+    const original = await tx.journalEntry.findFirst({ where: { tenantId, sourceType: 'manual_adjustment', sourceId } })
+    if (!original) throw new ManualJournalEntryNotFoundError(sourceId)
+    const alreadyReversed = await tx.journalEntry.findFirst({ where: { tenantId, sourceType: 'manual_adjustment_reversal', sourceId } })
+    if (alreadyReversed) throw new ManualJournalEntryAlreadyReversedError(sourceId)
+    await reverseJournalEntry(tx, 'manual_adjustment', sourceId, `Reversed — Manual entry: ${reason}`, userId)
+  })
+  logger.info({ sourceId, userId }, 'ledger.manualJournalEntry.reversed')
 }

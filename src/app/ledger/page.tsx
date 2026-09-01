@@ -91,6 +91,59 @@ function TradingBreakdownCard({
   )
 }
 
+// ─── Cash Reconciliation ────────────────────────────────────────────────────
+// Compares the Cashup module's operational cash figure against what the
+// ledger itself has posted to the Cash account. They're two independent
+// calculations that should agree in principle but can drift (unposted float
+// top-ups, timing differences, an unrecorded till discrepancy) — this is a
+// read-only diagnostic, not a correction; nothing here posts anything.
+
+const RECONCILIATION_TOLERANCE = '0.01'
+
+function CashReconciliationCard({ cashUpCash, ledgerCash, ledgerBank, variance }: {
+  cashUpCash: Decimal
+  ledgerCash: Decimal
+  ledgerBank: Decimal
+  variance: Decimal
+}) {
+  const balanced = variance.abs().lessThanOrEqualTo(RECONCILIATION_TOLERANCE)
+
+  const row = (label: string, value: Decimal, opts?: { subtotal?: boolean; tone?: 'action' | 'danger' }) => (
+    <div
+      key={label}
+      style={{
+        display: 'flex', justifyContent: 'space-between', padding: '8px 0',
+        borderTop: opts?.subtotal ? `2px solid ${colors.border}` : `1px solid ${colors.rowDivider}`,
+        fontWeight: opts?.subtotal ? fontWeight.bold : fontWeight.regular,
+      }}
+    >
+      <span style={{ color: colors.textPrimary, fontSize: fontSize.base }}>{label}</span>
+      <span style={{
+        fontFamily: 'monospace', fontSize: fontSize.base,
+        color: opts?.tone === 'danger' ? colors.danger : opts?.tone === 'action' ? colors.action : colors.textPrimary,
+      }}>
+        {value.isNegative() ? '−' : ''}{formatMoney(value.abs().toFixed(2))}
+      </span>
+    </div>
+  )
+
+  return (
+    <Panel title="Cash Reconciliation" subtitle="Cashup's operational cash figure vs. what's actually posted to the ledger's Cash account.">
+      <div style={{ padding: '4px 16px 16px' }}>
+        {row('Cash-up (operational)', cashUpCash)}
+        {row('Ledger (posted, account 1000)', ledgerCash)}
+        {row('Ledger Bank (posted, account 1010)', ledgerBank)}
+        {row('Variance', variance, { subtotal: true, tone: balanced ? 'action' : 'danger' })}
+        {!balanced && (
+          <div style={{ marginTop: 8, fontSize: fontSize.sm, color: colors.danger }}>
+            Cash-up and the posted ledger disagree by more than {formatMoney(RECONCILIATION_TOLERANCE)}.
+          </div>
+        )}
+      </div>
+    </Panel>
+  )
+}
+
 // ─── Profit by Category ─────────────────────────────────────────────────────
 
 function ProfitByCategoryCard({ report, loading, from, to }: { report?: ProfitByCategoryReport; loading: boolean; from: string; to: string }) {
@@ -323,7 +376,7 @@ export default function LedgerDashboardPage() {
   // now" figure (Opening Balance + today's live movements), not the ledger's
   // own journal-posted Cash account balance — the two are different
   // calculations and the posted balance drifts from the operational one.
-  const { data: cashOnHandData, isLoading: cashLoading } = useSWR<{ date: string; cashOnHand: string }>('/api/ledger/cash-on-hand', fetcher)
+  const { data: cashOnHandData, isLoading: cashLoading } = useSWR<{ date: string; cashOnHand: string; ledgerCash: string; ledgerBank: string; variance: string }>('/api/ledger/cash-on-hand', fetcher)
   const { data: profitByCategory, isLoading: pbcLoading } = useSWR<ProfitByCategoryReport>(`/api/ledger/profit-by-category?from=${from}&to=${to}`, fetcher)
   const { data: stockByCategory, isLoading: sbcLoading } = useSWR<StockValueByCategoryReport>('/api/ledger/stock-by-category', fetcher)
 
@@ -381,6 +434,13 @@ export default function LedgerDashboardPage() {
             netAfterExpenses={netAfterExpenses}
           />
 
+          <CashReconciliationCard
+            cashUpCash={cashOnHand}
+            ledgerCash={new Decimal(cashOnHandData?.ledgerCash ?? '0')}
+            ledgerBank={new Decimal(cashOnHandData?.ledgerBank ?? '0')}
+            variance={new Decimal(cashOnHandData?.variance ?? '0')}
+          />
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <ProfitByCategoryCard report={profitByCategory} loading={pbcLoading} from={from} to={to} />
             <StockByCategoryCard report={stockByCategory} loading={sbcLoading} />
@@ -401,6 +461,7 @@ export default function LedgerDashboardPage() {
           { href: '/ledger/profit-loss', label: 'Profit & Loss', desc: 'Revenue, COGS, expenses' },
           { href: '/ledger/balance-sheet', label: 'Balance Sheet', desc: 'Assets = Liabilities + Equity' },
           { href: '/ledger/journal', label: 'Journal', desc: 'Raw chronological entry feed' },
+          { href: '/ledger/journal/new', label: 'New Journal Entry', desc: 'Post a manual/adjusting entry' },
           { href: '/ledger/opening-balance', label: 'Opening Balances', desc: 'One-time starting figures for a new ledger' },
         ].map((l) => (
           <Link

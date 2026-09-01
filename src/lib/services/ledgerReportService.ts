@@ -1,7 +1,7 @@
 import Decimal from 'decimal.js'
 import { prisma } from '@/lib/db/prisma'
 import { sastDateLabelToUTCDate, getDayBoundsSAST, getRangeBoundsSAST } from '@/lib/utils/dayBounds'
-import { computeSaleEftAmount } from '@/lib/services/ledgerService'
+import { computeSaleEftAmount, LEDGER_ACCOUNTS } from '@/lib/services/ledgerService'
 import type { AccountType, AccountNormalBalance } from '@prisma/client'
 
 // ─── Design ──────────────────────────────────────────────────────────────────
@@ -88,6 +88,29 @@ export async function getChartOfAccounts(asOfLabel?: string): Promise<AccountTre
   }
 
   return build(null)
+}
+
+/** Posted (ledger) balances for Cash and Bank — for reconciling against the operational
+ * cash-up figure from cashUpService.getCurrentCashOnHand, which is derived independently. */
+export async function getPostedCashAndBankBalances(asOfLabel?: string): Promise<{
+  asOf: string | null
+  cash: string
+  bank: string
+}> {
+  const asOf = asOfLabel ? getDayBoundsSAST(sastDateLabelToUTCDate(asOfLabel)).end : undefined
+  const [accounts, sums] = await Promise.all([
+    prisma.account.findMany({ where: { code: { in: [LEDGER_ACCOUNTS.CASH, LEDGER_ACCOUNTS.BANK] } } }),
+    sumLinesByAccount(asOf ? { entryDate: { lte: asOf } } : {}),
+  ])
+
+  const cashAccount = accounts.find((a) => a.code === LEDGER_ACCOUNTS.CASH)
+  const bankAccount = accounts.find((a) => a.code === LEDGER_ACCOUNTS.BANK)
+
+  return {
+    asOf: asOfLabel ?? null,
+    cash: cashAccount ? ownBalance(sums.get(cashAccount.id), cashAccount.normalBalance).toFixed(2) : '0.00',
+    bank: bankAccount ? ownBalance(sums.get(bankAccount.id), bankAccount.normalBalance).toFixed(2) : '0.00',
+  }
 }
 
 // ─── Trial Balance ──────────────────────────────────────────────────────────
@@ -556,6 +579,7 @@ export interface JournalEntryRow {
   description: string
   sourceType: string
   sourceId: string | null
+  reversed: boolean
   lines: { accountCode: string; accountName: string; debit: string; credit: string }[]
 }
 
@@ -584,6 +608,20 @@ export async function getJournal(opts: { fromLabel: string; toLabel: string; sou
     prisma.journalLine.aggregate({ where: { journalEntry: where }, _sum: { debit: true, credit: true } }),
   ])
 
+  // Only manual entries are individually reversible today (see
+  // reverseManualJournalEntry) — one extra lookup of already-reversed
+  // sourceIds, same "id set" shape as getEftAwaitingConfirmation's
+  // confirmedSaleIds, rather than a per-row query.
+  const manualSourceIds = entries.filter((e) => e.sourceType === 'manual_adjustment' && e.sourceId).map((e) => e.sourceId as string)
+  const reversedSourceIds = manualSourceIds.length
+    ? new Set(
+        (await prisma.journalEntry.findMany({
+          where: { sourceType: 'manual_adjustment_reversal', sourceId: { in: manualSourceIds } },
+          select: { sourceId: true },
+        })).map((e) => e.sourceId)
+      )
+    : new Set<string | null>()
+
   return {
     entries: entries.map((e) => ({
       id: e.id,
@@ -591,6 +629,7 @@ export async function getJournal(opts: { fromLabel: string; toLabel: string; sou
       description: e.description,
       sourceType: e.sourceType,
       sourceId: e.sourceId,
+      reversed: e.sourceType === 'manual_adjustment' && !!e.sourceId && reversedSourceIds.has(e.sourceId),
       lines: e.lines.map((l) => ({
         accountCode: l.account.code,
         accountName: l.account.name,

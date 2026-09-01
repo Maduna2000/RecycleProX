@@ -1243,9 +1243,10 @@ model JournalEntry {
   description     String
   // e.g. 'purchase' | 'sale' | 'purchase_settlement' | 'expense' |
   // 'loan_advance' | 'business_loan' | 'cashup_variance' |
-  // 'opening_balance' | 'void_reversal' | 'edit_reversal' — a plain string
-  // (not an enum) so a new source type never needs a migration, matching
-  // StockMovement.source's own convention.
+  // 'stocktake_adjustment' | 'manual_stock_adjustment' | 'manual_adjustment' |
+  // 'manual_adjustment_reversal' | 'opening_balance' | 'void_reversal' |
+  // 'edit_reversal' — a plain string (not an enum) so a new source type never
+  // needs a migration, matching StockMovement.source's own convention.
   sourceType      String
   sourceId        String?
   createdByUserId String?
