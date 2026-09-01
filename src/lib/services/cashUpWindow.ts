@@ -32,6 +32,20 @@ type PrismaLike = Pick<typeof prisma, 'cashUp'>
  * 20260724000000_cashup_multi_session_per_day) — the previous session is
  * always closed (closedAt set, by submit or void) by the time a new session
  * is allowed to open.
+ *
+ * The previous session lookup skips voided ones. A voided session never
+ * produced a real reconciliation — its closedAt is just whenever someone
+ * got around to voiding it, which can be long after it stopped being the
+ * "current" session (e.g. a shift opened and left running, voided days
+ * later once someone noticed). Treating that void timestamp as a window
+ * boundary would trap any float movement recorded between "should have been
+ * closed" and "actually got voided" inside the dead session — invisible to
+ * every live session's reconciliation, since a voided session's own figures
+ * are zeroed and ignored (confirmed against real data: a top-up landed
+ * while a two-day-stale session was still open, and the window boundary
+ * from that session's later void swallowed it). Looking past voided
+ * sessions to the last genuinely closed (submitted/approved) one restores
+ * the true unbroken chain.
  */
 export async function getSessionWindow(
   client: PrismaLike,
@@ -39,7 +53,7 @@ export async function getSessionWindow(
 ): Promise<DateWindow> {
   const { start: dayStart } = getDayBoundsSAST(cashUp.sessionDate)
   const prev = await client.cashUp.findFirst({
-    where:   { openedAt: { lt: cashUp.openedAt } },
+    where:   { openedAt: { lt: cashUp.openedAt }, status: { not: 'voided' } },
     orderBy: { openedAt: 'desc' },
     select:  { closedAt: true },
   })

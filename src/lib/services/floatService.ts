@@ -197,6 +197,17 @@ export async function getDrawingsReceivedForDate(window: DateWindow): Promise<De
  * local midnight but before the previous day's session was approved, the
  * same SAST/UTC boundary case getSessionWindow's own start-of-window
  * handling already has to account for).
+ *
+ * "Most recent" approval means most recent BUSINESS session (sessionDate,
+ * then openedAt as same-day tiebreaker) — never `orderBy: approvedAt desc`.
+ * Approval is a manual click that can happen late: a session opened and
+ * approved on day N can sit unapproved and only get approved on day N+2,
+ * after a day-N+1 session has already been opened and approved. Ordering by
+ * approvedAt would then surface the stale day-N approval as "latest" and
+ * clobber day-N+1's already-correct closing balance with day-N's older,
+ * lower figure (confirmed against real data: a 2-day-late approval of an
+ * older session inflated the next float's opening balance by the difference
+ * between the two declaredCash amounts).
  */
 async function resolveCurrentFloatBalance(
   tenantId: string,
@@ -206,7 +217,7 @@ async function resolveCurrentFloatBalance(
 ): Promise<Decimal> {
   const lastApproval = await tx.cashUp.findFirst({
     where:   { tenantId, status: 'approved', declaredCash: { not: null } },
-    orderBy: { approvedAt: 'desc' },
+    orderBy: [{ sessionDate: 'desc' }, { openedAt: 'desc' }],
   })
 
   if (lastApproval?.approvedAt && lastApproval.declaredCash &&
