@@ -240,6 +240,16 @@ export default function UnpaidSalesPage() {
       onClick: (row) => window.open(`/api/sales/${row.id}/receipt?format=pdf`, '_blank'),
     },
     {
+      label:   'Sale Note',
+      icon:    FileText,
+      onClick: (row) => window.open(`/api/sales/${row.id}/note`, '_blank'),
+    },
+    {
+      label:   'Tax Invoice',
+      icon:    FileText,
+      onClick: (row) => window.open(`/api/sales/${row.id}/tax-invoice`, '_blank'),
+    },
+    {
       label:   'Edit',
       icon:    Pencil,
       hidden:  (row) => !isManager || new Decimal(row.amountPaid ?? '0').greaterThan(0),

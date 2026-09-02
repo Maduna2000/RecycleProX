@@ -288,6 +288,12 @@ export default function SaleDetailPage() {
                 <Btn size="sm" icon={canAutoPrint() ? FileText : Printer} onClick={() => window.open(`/api/sales/${sale.id}/receipt?format=pdf`, '_blank')}>
                   {canAutoPrint() ? 'View Slip' : 'Print Receipt'}
                 </Btn>
+                <Btn size="sm" icon={FileText} onClick={() => window.open(`/api/sales/${sale.id}/note`, '_blank')}>
+                  Sale Note
+                </Btn>
+                <Btn size="sm" icon={FileText} onClick={() => window.open(`/api/sales/${sale.id}/tax-invoice`, '_blank')}>
+                  Tax Invoice
+                </Btn>
               </>
             )}
           </div>
