@@ -9,6 +9,7 @@ import { colors } from '@/lib/design-tokens'
 import { DEFAULT_POLICE_SERVICE_NAME, DEFAULT_POLICE_LEGAL_NOTE } from '@/lib/police-defaults'
 import { StatusBadge as SharedStatusBadge } from '@/components/ui/DataTable'
 import { fetcher } from '@/lib/swrFetcher'
+import { downloadResponse } from '@/lib/download'
 import { offlineFetcher } from '@/lib/offline/responseCache'
 import {
   inp, lbl, TH, TD, HEADER_GRAD, NAVY,
@@ -90,13 +91,7 @@ export function GenerateRegisterTab() {
       return
     }
 
-    const blob = await res.blob()
-    const url  = URL.createObjectURL(blob)
-    const a    = document.createElement('a')
-    a.href     = url
-    a.download = `police-register-${date}.pdf`
-    a.click()
-    URL.revokeObjectURL(url)
+    await downloadResponse(res, `police-register-${date}.pdf`)
 
     const visitRes = await fetch('/api/police-visits', {
       method: 'POST',

@@ -9,6 +9,7 @@ import { ChevronLeft, ChevronRight, ChevronDown, Loader2, X } from 'lucide-react
 import { colors, fontSize, fontWeight, badgeStyle } from '@/lib/design-tokens'
 import { inp, Btn, Field, PortalPage, FilterBar, TH, HEADER_GRAD } from '@/components/rpx'
 import { fetcher } from '@/lib/swrFetcher'
+import { downloadResponse } from '@/lib/download'
 
 
 type AuditEntry = {
@@ -97,13 +98,7 @@ export default function AuditLogPage() {
       })
       const res = await fetch(`/api/audit-log/export?${exportQs}`)
       if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(j.error ?? 'Export failed') }
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `audit-log-${today}.xlsx`
-      a.click()
-      URL.revokeObjectURL(url)
+      await downloadResponse(res, `audit-log-${today}.xlsx`)
       toast.success('Export downloaded', { id: toastId })
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to export', { id: toastId })

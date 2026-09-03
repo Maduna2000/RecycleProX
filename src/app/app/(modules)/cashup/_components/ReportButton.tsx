@@ -5,6 +5,7 @@ import { FileText } from 'lucide-react'
 import { toast } from 'sonner'
 import type { CashupReportType } from '@/lib/schemas/cashup'
 import { Btn } from '@/components/rpx'
+import { downloadResponse } from '@/lib/download'
 
 interface ReportButtonProps {
   type: CashupReportType
@@ -42,16 +43,7 @@ export function ReportButton({
         throw new Error(data.error ?? 'Failed to generate report')
       }
 
-      // Download the PDF
-      const blob = await res.blob()
-      const blobUrl = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = blobUrl
-      a.download = `${type}-report.pdf`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(blobUrl)
+      await downloadResponse(res, `${type}-report.pdf`)
 
       toast.success('Report downloaded')
     } catch (err) {

@@ -8,6 +8,7 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { Download, Loader2, FileSpreadsheet } from 'lucide-react'
 import { ActionButton } from './ActionButton'
+import { downloadResponse } from '@/lib/download'
 
 interface DownloadButtonsProps {
   reportId: string
@@ -28,13 +29,7 @@ export function DownloadButtons({ reportId, params, disabled }: DownloadButtonsP
         const body = await res.json().catch(() => null)
         throw new Error(body?.error ?? `Download failed (${res.status})`)
       }
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `${reportId}_${params.from}_${params.to}.${format}`
-      a.click()
-      URL.revokeObjectURL(url)
+      await downloadResponse(res, `${reportId}_${params.from}_${params.to}.${format}`)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Download failed')
     } finally {

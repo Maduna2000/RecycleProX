@@ -18,6 +18,7 @@ import { ToggleSwitch } from '@/components/ui/ToggleSwitch'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
 import { Btn, BtnMenu, Field, FilterBar, inp, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
 import { Dialog } from '@/components/ui/dialog'
+import { downloadBlob } from '@/lib/download'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -505,10 +506,7 @@ export function OrdersTab() {
       const lines = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
       const csv = [EXPORT_HEADERS.join(','), ...lines].join('\n')
       const blob = new Blob([csv], { type: 'text/csv' })
-      const url  = URL.createObjectURL(blob)
-      const a    = Object.assign(document.createElement('a'), { href: url, download: `scale-orders-${Date.now()}.csv` })
-      a.click()
-      URL.revokeObjectURL(url)
+      downloadBlob(blob, `scale-orders-${Date.now()}.csv`)
     } catch {
       toast.error('Export failed')
     } finally {
@@ -569,10 +567,7 @@ export function OrdersTab() {
 
       const bytes = await doc.save()
       const blob  = new Blob([bytes as BlobPart], { type: 'application/pdf' })
-      const url   = URL.createObjectURL(blob)
-      const a     = Object.assign(document.createElement('a'), { href: url, download: `scale-orders-${Date.now()}.pdf` })
-      a.click()
-      URL.revokeObjectURL(url)
+      downloadBlob(blob, `scale-orders-${Date.now()}.pdf`)
     } catch {
       toast.error('PDF export failed')
     } finally {
