@@ -10,6 +10,7 @@ import { CategoryFilterSelect } from '@/components/products/CategoryFilterSelect
 import { colors, fontSize } from '@/lib/design-tokens'
 import { inp, BtnMenu, Field, PortalPage, FilterBar } from '@/components/rpx'
 import { stockGridFetcher } from '@/lib/offline/fetchers/stock'
+import { downloadResponse } from '@/lib/download'
 import { OfflineDataBadge } from '@/components/ui/OfflineDataBadge'
 import { useSystemCurrency } from '@/hooks/useSystemCurrency'
 
@@ -53,13 +54,7 @@ export default function StockGridPage() {
     const res = await fetch(exportUrl)
     setExporting(false)
     if (!res.ok) { toast.error('Export failed'); return }
-    const blob = await res.blob()
-    const url  = URL.createObjectURL(blob)
-    const a    = document.createElement('a')
-    a.href     = url
-    a.download = `stock-grid-${gridPeriod}-${gridDate}.${format}`
-    a.click()
-    URL.revokeObjectURL(url)
+    await downloadResponse(res, `stock-grid-${gridPeriod}-${gridDate}.${format}`)
   }
 
   const gridColumns: Column<GridRow>[] = [

@@ -11,6 +11,7 @@ import { useSession } from 'next-auth/react'
 import { DataTable, StatusBadge, Column, RowAction } from '@/components/ui/DataTable'
 import { colors, fontSize } from '@/lib/design-tokens'
 import { customersListFetcher } from '@/lib/offline/fetchers/customers'
+import { downloadResponse } from '@/lib/download'
 import { OfflineDataBadge } from '@/components/ui/OfflineDataBadge'
 import {
   inp, Btn, BtnMenu, Field, FilterBar, PortalPage,
@@ -70,13 +71,7 @@ export default function CasualsPage() {
       if (primaryFunction) qs.set('primaryFunction', primaryFunction)
       const res = await fetch(`/api/casual/export?${qs}`)
       if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(j.error ?? 'Export failed') }
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `casual-sellers-${new Date().toISOString().slice(0, 10)}.${format}`
-      a.click()
-      URL.revokeObjectURL(url)
+      await downloadResponse(res, `casual-sellers-${new Date().toISOString().slice(0, 10)}.${format}`)
       toast.success('Export downloaded', { id: toastId })
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to export', { id: toastId })

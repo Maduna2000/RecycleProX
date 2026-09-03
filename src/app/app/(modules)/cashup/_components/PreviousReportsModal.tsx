@@ -13,6 +13,7 @@ import { currencySymbolFor } from '@/lib/constants/currencies'
 import { cashUpHistoryFetcher } from '@/lib/offline/fetchers/cashups'
 import { OfflineDataBadge } from '@/components/ui/OfflineDataBadge'
 import { Btn, RpxDialogContent, RpxDialogHeader, RpxDialogBody, RpxDialogFooter } from '@/components/rpx'
+import { downloadResponse } from '@/lib/download'
 
 interface SessionRecord {
   id: string
@@ -93,15 +94,7 @@ export function PreviousReportsModal({ onClose }: PreviousReportsModalProps) {
           continue
         }
 
-        const blob = await res.blob()
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `${type}-report.pdf`
-        document.body.appendChild(a)
-        a.click()
-        document.body.removeChild(a)
-        URL.revokeObjectURL(url)
+        await downloadResponse(res, `${type}-report.pdf`)
         successCount++
 
         // Small delay between downloads to avoid browser issues

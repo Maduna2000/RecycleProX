@@ -15,6 +15,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { fetcher } from '@/lib/swrFetcher'
 import { useSystemCurrency } from '@/hooks/useSystemCurrency'
+import { isSafari, downloadResponse } from '@/lib/download'
 import {
   UpdateCustomerSchema,
   BlacklistSchema,
@@ -473,7 +474,16 @@ function DocumentsTab({ customer, onPhotoSaved }: { customer: Customer; onPhotoS
     else toast.error('Failed to delete document')
   }
 
-  async function handleDocView(r2Key: string) {
+  async function handleDocView(r2Key: string, fileName: string) {
+    // Safari renders a presigned R2 URL inline with no forced-download option
+    // (it's cross-origin, so the app can't set Content-Disposition on it) —
+    // proxy through a same-origin route instead so Safari saves the file.
+    if (isSafari()) {
+      const res = await fetch(`/api/r2/download?key=${encodeURIComponent(r2Key)}&filename=${encodeURIComponent(fileName)}`)
+      if (res.ok) await downloadResponse(res, fileName)
+      else toast.error('Failed to download document')
+      return
+    }
     const res = await fetch(`/api/r2/view-url?key=${encodeURIComponent(r2Key)}`)
     if (res.ok) { const { url } = await res.json(); window.open(url, '_blank') }
     else toast.error('Failed to get view URL')
@@ -520,7 +530,7 @@ function DocumentsTab({ customer, onPhotoSaved }: { customer: Customer; onPhotoS
                     <span style={{ fontSize: 9, color: '#9CA3AF' }}>{doc.fileName}</span>
                   </div>
                   <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                    <button onClick={() => handleDocView(doc.r2Key)} style={{ fontSize: 9, color: '#1B3A6B', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>View</button>
+                    <button onClick={() => handleDocView(doc.r2Key, doc.fileName)} style={{ fontSize: 9, color: '#1B3A6B', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>View</button>
                     {isManager && (
                       <button onClick={() => handleDocDelete(doc.id)} style={{ fontSize: 9, color: '#C53030', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>Delete</button>
                     )}
