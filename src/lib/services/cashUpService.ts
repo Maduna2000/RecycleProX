@@ -790,6 +790,13 @@ export async function approveCashUp(
     })
 
     return approved
+  }, {
+    // repropagateFinPeriodCumulative below updates every approved session
+    // from this one's date forward, one round trip each — the default 20s
+    // (DEFAULT_TENANT_TX_OPTIONS) isn't enough once a backlog of several
+    // weeks' unapproved sessions is finally approved, confirmed via a real
+    // P2028 timeout approving a month-old backlog against Neon's pooler.
+    timeout: 60_000,
   })
 
   logger.info({ cashUpId, userId: approvedByUserId }, 'Cash-up approved')
