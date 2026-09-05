@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { OpenCashUpSchema } from '@/lib/schemas/cashup'
-import { openCashUp, listCashUps, getOpenSession, getAnyOpenSession } from '@/lib/services/cashUpService'
+import { openCashUp, listCashUps, getOpenSession, getAnyOpenSession, getOldestUnapprovedSubmittedSession } from '@/lib/services/cashUpService'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 // GET /api/cashup — list history OR ?today=1 for the open session
@@ -24,10 +24,17 @@ export async function GET(req: NextRequest) {
       }
 
       // No explicit date — check for any open session (could be from a previous
-      // day that needs submission) before falling back to today's session.
+      // day that needs submission) before falling back to today's session. If
+      // today has no session of its own either, fall back further to the
+      // oldest still-unapproved submitted session so it doesn't silently drop
+      // out of view the day after it was submitted (see
+      // getOldestUnapprovedSubmittedSession's own comment).
       const cashUp = await runWithRequestTenant(req, async () => {
         const openSession = await getAnyOpenSession()
-        return openSession ?? await getOpenSession()
+        if (openSession) return openSession
+        const todaySession = await getOpenSession()
+        if (todaySession) return todaySession
+        return await getOldestUnapprovedSubmittedSession()
       })
       return NextResponse.json({ cashUp })
     }
@@ -54,7 +61,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
     }
 
-    const cashUp = await runWithRequestTenant(req, () => openCashUp(session.user.id, parsed.data.sessionDate))
+    // parsed.data.sessionDate is intentionally ignored — see the schema's
+    // comment. openCashUp() defaults to the server's own "today" (SAST) when
+    // no override is passed.
+    const cashUp = await runWithRequestTenant(req, () => openCashUp(session.user.id))
     return NextResponse.json({ cashUp }, { status: 201 })
   } catch (err) {
     const message = err instanceof Error ? err.message : ''

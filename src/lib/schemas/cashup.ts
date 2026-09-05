@@ -45,8 +45,16 @@ export const ApproveCashUpSchema = z.object({
 // tenant-wide setting (see src/lib/constants/currencies.ts and
 // SystemSettings key "currency"), applied automatically when a session
 // opens. See openCashUp in cashUpService.ts.
+//
+// sessionDate is optional and, if sent, ignored by the route (see
+// src/app/api/cashup/route.ts) — kept only so an old queued offline mutation
+// with this field still in its body still validates. The server always
+// computes "today" itself at the moment the session is actually created;
+// trusting a client-supplied date broke when a request sat in the offline
+// sync queue (src/lib/offline/sync.ts) across midnight and replayed hours
+// later still carrying the date string captured back when it was queued.
 export const OpenCashUpSchema = z.object({
-  sessionDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD'),
+  sessionDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD').optional(),
 })
 
 export type SubmitCashUpInput  = z.infer<typeof SubmitCashUpSchema>

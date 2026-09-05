@@ -274,6 +274,23 @@ export async function getAnyOpenSession() {
   })
 }
 
+// ─── Get the oldest submitted session still awaiting approval ────────────────
+// Only consulted when today has no session of its own (see the GET
+// /api/cashup?today=1 route) — a submitted (already closed by the cashier,
+// unlike 'open') session from an earlier day never blocks a new day's session
+// from being opened, so it was previously falling out of the main cash-up
+// page's view the day after it was submitted: no session exists for "today"
+// yet, so the page fell back to its empty "Open Session" state instead of
+// showing the still-pending approval, forcing whoever approves cash-ups to
+// dig it out of Previous Reports instead. Oldest first — that's the one
+// that's been waiting longest.
+export async function getOldestUnapprovedSubmittedSession() {
+  return prisma.cashUp.findFirst({
+    where: { status: 'submitted' },
+    orderBy: { sessionDate: 'asc' },
+  })
+}
+
 // ─── Get all open sessions ────────────────────────────────────────────────────
 // Returns all sessions that are still 'open' (not submitted), ordered by date
 export async function getAllOpenSessions() {
