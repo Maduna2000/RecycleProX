@@ -1072,22 +1072,24 @@ function CashUpPageInner() {
     } catch (err) {
       let msg = 'Failed to submit cash-up'
       if (err instanceof Error) {
-        try {
-          const parsed = JSON.parse(err.message) as {
-            error?: string; code?: string
-            expected?: string; statementBalance?: string; difference?: string; canOverride?: boolean
-          }
-          if (parsed.code === 'MOMO_BALANCE_MISMATCH' && parsed.expected && parsed.statementBalance && parsed.difference) {
-            setMomoMismatch({
-              expected: parsed.expected,
-              statementBalance: parsed.statementBalance,
-              difference: parsed.difference,
-              canOverride: !!parsed.canOverride,
-            })
-            return
-          }
-          if (parsed.error) msg = parsed.error
-        } catch { /* not JSON — keep default message */ }
+        msg = err.message || msg
+        // useOfflineMutation stashes the full parsed API response body on
+        // the thrown Error (err.message is only ever the friendly string) —
+        // read the MOMO_BALANCE_MISMATCH fields from there, not from
+        // JSON.parse(err.message), which would always fail since the
+        // message is plain text, not JSON.
+        const body = (err as Error & { body?: unknown }).body as {
+          code?: string; expected?: string; statementBalance?: string; difference?: string; canOverride?: boolean
+        } | undefined
+        if (body?.code === 'MOMO_BALANCE_MISMATCH' && body.expected && body.statementBalance && body.difference) {
+          setMomoMismatch({
+            expected: body.expected,
+            statementBalance: body.statementBalance,
+            difference: body.difference,
+            canOverride: !!body.canOverride,
+          })
+          return
+        }
       }
       toast.error(msg)
     }

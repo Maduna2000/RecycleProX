@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
   const parseResult = QuerySchema.safeParse({
     skip: skipParam ?? 0,
     take: takeParam ?? 50,
-    status: statusParam,
+    status: statusParam ?? undefined,
   })
 
   if (!parseResult.success) {

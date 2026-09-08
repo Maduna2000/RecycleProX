@@ -52,7 +52,12 @@ export function useOfflineMutation() {
         // at all. A customer-facing till screen showing that text verbatim
         // instead of "Something went wrong" is the actual bug this fixes.
         const body = await res.json().catch(() => null) as { error?: string } | null
-        const err = new Error(body?.error || 'Something went wrong — please try again')
+        const err = new Error(body?.error || 'Something went wrong — please try again') as Error & { body?: unknown }
+        // Some callers (e.g. cashup submit's MOMO_BALANCE_MISMATCH handling)
+        // need structured fields beyond the friendly message — stash the
+        // full parsed body rather than forcing them to re-derive it from
+        // err.message, which only ever carries the string.
+        err.body = body
         opts.onError?.(err)
         throw err
       }
