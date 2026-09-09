@@ -5,7 +5,7 @@ import { CreatePurchaseSchema } from '@/lib/schemas/purchase'
 import {
   createPurchase, listPurchases,
   CustomerBlacklistedError, CustomerInactiveError, ProductInactiveError,
-  ScaleOrderAlreadyLinkedError,
+  ScaleOrderAlreadyLinkedError, InsufficientFloatError,
 } from '@/lib/services/purchaseService'
 import { ScaleOrderNotFoundError, ScaleOrderAlreadyVoidedError } from '@/lib/services/scaleService'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
@@ -52,6 +52,7 @@ export async function POST(req: NextRequest) {
     if (err instanceof ScaleOrderNotFoundError) return NextResponse.json({ error: err.message }, { status: 404 })
     if (err instanceof ScaleOrderAlreadyVoidedError) return NextResponse.json({ error: err.message }, { status: 422 })
     if (err instanceof ScaleOrderAlreadyLinkedError) return NextResponse.json({ error: err.message }, { status: 409 })
+    if (err instanceof InsufficientFloatError) return NextResponse.json({ error: err.message }, { status: 422 })
     logger.error({ err }, 'POST /api/purchases failed')
     return NextResponse.json({ error: 'Failed to create purchase' }, { status: 500 })
   }

@@ -7,6 +7,7 @@ import {
   PurchaseNotPendingError,
   PaymentExceedsBalanceError,
   PartialPaymentNotAllowedError,
+  InsufficientFloatError,
 } from '@/lib/services/purchaseService'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
@@ -47,6 +48,9 @@ export async function POST(
       return NextResponse.json({ error: err.message }, { status: 422 })
     }
     if (err instanceof PartialPaymentNotAllowedError) {
+      return NextResponse.json({ error: err.message }, { status: 422 })
+    }
+    if (err instanceof InsufficientFloatError) {
       return NextResponse.json({ error: err.message }, { status: 422 })
     }
     logger.error({ err, purchaseId: id }, 'POST /api/purchases/[id]/split-payment failed')

@@ -3,7 +3,7 @@ import { auth } from '@/auth'
 import logger from '@/lib/logger'
 import { z } from 'zod'
 import Decimal from 'decimal.js'
-import { markPurchasePaid, PurchaseNotPendingError, PaymentExceedsBalanceError, PartialPaymentNotAllowedError } from '@/lib/services/purchaseService'
+import { markPurchasePaid, PurchaseNotPendingError, PaymentExceedsBalanceError, PartialPaymentNotAllowedError, InsufficientFloatError } from '@/lib/services/purchaseService'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
 const SettleSchema = z.object({
@@ -44,6 +44,9 @@ export async function PATCH(
       return NextResponse.json({ error: err.message }, { status: 422 })
     }
     if (err instanceof PartialPaymentNotAllowedError) {
+      return NextResponse.json({ error: err.message }, { status: 422 })
+    }
+    if (err instanceof InsufficientFloatError) {
       return NextResponse.json({ error: err.message }, { status: 422 })
     }
     logger.error({ err, purchaseId: id }, 'PATCH /api/purchases/[id]/mark-paid failed')

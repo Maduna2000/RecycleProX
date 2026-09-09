@@ -6,7 +6,7 @@ import Decimal from 'decimal.js'
 import { resolvePurchasePrice } from '@/lib/services/priceListService'
 import { recordMovement, recordVoidReversal } from '@/lib/services/stockService'
 import { applyRepaymentTx, reverseRepaymentsForPurchase } from '@/lib/services/loanService'
-import { isSessionDateApproved } from '@/lib/services/cashUpService'
+import { isSessionDateApproved, getCurrentCashOnHand } from '@/lib/services/cashUpService'
 import { autoPromoteCasualIfEligible } from '@/lib/services/customerService'
 import { sastDayLabelOfInstant, sastDateLabelToUTCDate } from '@/lib/utils/dayBounds'
 import { getAllSettings, currencySymbolFromSettings } from '@/lib/services/settingsService'
@@ -70,6 +70,25 @@ export class PaymentExceedsBalanceError extends Error {
 
 export class PartialPaymentNotAllowedError extends Error {
   constructor(paid: string, outstanding: string) { super(`Full payment required. Paid R ${paid} but R ${outstanding} is owed.`); this.name = 'PartialPaymentNotAllowedError' }
+}
+
+// Thrown when a cash payout (creating a purchase paid-now, settling a pending
+// one, or the cash leg of a split payment) would exceed the current expected
+// cash in the drawer (getCurrentCashOnHand — the same "Expected in Drawer"
+// figure the Float/Cash-up pages show). Purchases and payments have no
+// concept of "insufficient funds" the way FloatMovement withdrawals already
+// do (addFloatMovement blocks a withdrawal that would go negative) — without
+// this, a cashier could keep paying out cash purchases long after the float
+// was exhausted, silently driving the drawer negative with no warning until
+// someone happened to check the Float page. The purchase itself is never
+// lost — callers should retry with status:'pending' (or, for
+// markPurchasePaid/processSplitPayment, simply leave it pending) so it can
+// be settled once the float is topped up.
+export class InsufficientFloatError extends Error {
+  constructor(required: string, available: string) {
+    super(`This cash payout (R ${required}) exceeds the current expected cash in the drawer (R ${available}). Save as unpaid and settle once the float is topped up.`)
+    this.name = 'InsufficientFloatError'
+  }
 }
 
 // ─── Reference number generator ───────────────────────────────────────────────
@@ -294,6 +313,19 @@ export async function createPurchase(data: CreatePurchaseInput, createdByUserId?
   // Cap loan deduction at the total payout — never block the purchase
   const requestedDeduction = data.loanDeductionAmount ? new Decimal(data.loanDeductionAmount) : null
   const deduction = requestedDeduction ? Decimal.min(requestedDeduction, totalAmount) : null
+
+  // Only a purchase completing right now in cash actually pays cash out of
+  // the drawer — a 'pending' one or an 'eft' one doesn't touch the float at
+  // all, so neither needs this check.
+  if (data.status === 'completed' && data.paymentMethod === 'cash') {
+    const cashPayout = totalAmount.minus(deduction ?? 0)
+    if (cashPayout.greaterThan(0)) {
+      const available = new Decimal(await getCurrentCashOnHand())
+      if (cashPayout.greaterThan(available)) {
+        throw new InsufficientFloatError(cashPayout.toFixed(2), available.toFixed(2))
+      }
+    }
+  }
 
   const purchase = await withSerializableRetry(() =>
     prisma.$transaction(async (tx) => {
@@ -706,6 +738,14 @@ export async function markPurchasePaid(
   data: { amount: string; paymentMethod: string },
   userId: string
 ) {
+  if (data.paymentMethod === 'cash') {
+    const settleAmount = new Decimal(data.amount)
+    const available = new Decimal(await getCurrentCashOnHand())
+    if (settleAmount.greaterThan(available)) {
+      throw new InsufficientFloatError(settleAmount.toFixed(2), available.toFixed(2))
+    }
+  }
+
   const result = await withSerializableRetry(() =>
     prisma.$transaction(async (tx) => {
       // Lock the row inside the tx — re-read under serializable isolation
@@ -796,6 +836,14 @@ export async function processSplitPayment(
   data: ProcessSplitPaymentInput,
   userId: string
 ) {
+  const requestedCash = new Decimal(data.payments.cash || '0')
+  if (requestedCash.greaterThan(0)) {
+    const available = new Decimal(await getCurrentCashOnHand())
+    if (requestedCash.greaterThan(available)) {
+      throw new InsufficientFloatError(requestedCash.toFixed(2), available.toFixed(2))
+    }
+  }
+
   const result = await withSerializableRetry(() =>
     prisma.$transaction(async (tx) => {
       const purchase = await tx.purchase.findUniqueOrThrow({
