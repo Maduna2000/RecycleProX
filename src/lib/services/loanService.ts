@@ -109,40 +109,77 @@ export function formatTransactionMethod(method: string): string {
 
 // ─── Reference number generators ─────────────────────────────────────────────
 // Generated *inside* the caller's transaction (using `tx`, not the bare
-// `prisma` client) so the count-then-insert is atomic with the write —
-// mirrors purchaseService.ts/saleService.ts's own generateRefNumber. Reading
-// the count from a separate, already-committed transaction (the previous
-// shape here) left a TOCTOU window: two concurrent requests could both read
-// the same count and race to insert the same refNumber, and since only one
-// can win the (tenantId, refNumber) unique constraint, the loser surfaced as
-// an uncaught P2002 — a generic 500 ("Failed to create loan") to the client.
-// Paired with withSerializableRetry + Serializable isolation below so a
-// detected conflict is retried with a fresh count instead of failing.
+// `prisma` client) so the read-then-insert is atomic with the write —
+// mirrors purchaseService.ts/saleService.ts's own generateRefNumber.
+//
+// Keyed off the highest existing suffix for today's prefix (MAX), not a row
+// COUNT. COUNT is only correct while every row ever created for today is
+// still present — if any of today's loan/repayment rows were ever removed
+// (a cleanup script, a manual DB fix, a restore) while a higher-numbered
+// row for today survived, COUNT under-reports and every subsequent create
+// recomputes that same already-taken refNumber, hitting the (tenantId,
+// refNumber) unique constraint on every single attempt — not an occasional
+// race, a deterministic 100%-repro failure (confirmed live: 2026-09-18
+// production logs, POST /api/loans P2002 on prisma.loan.create()). Reading
+// the actual MAX in use is immune to that gap regardless of its cause.
+// Still paired with withSerializableRetry below for the genuine concurrent
+// case (two requests both reading the same MAX before either commits).
 type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
+
+function nextRefSuffix(lastRefNumber: string | undefined): number {
+  const lastSuffix = lastRefNumber ? parseInt(lastRefNumber.slice(lastRefNumber.lastIndexOf('-') + 1), 10) : 0
+  return (Number.isFinite(lastSuffix) ? lastSuffix : 0) + 1
+}
 
 async function generateLoanRef(tx: TxClient): Promise<string> {
   const prefix = `LOA-${todaySASTDateStr().replace(/-/g, '')}`
   const startOfDay = todaySASTDate()
-  const count = await tx.loan.count({ where: { createdAt: { gte: startOfDay } } })
-  return `${prefix}-${String(count + 1).padStart(4, '0')}`
+  const last = await tx.loan.findFirst({
+    where: { createdAt: { gte: startOfDay }, refNumber: { startsWith: prefix } },
+    orderBy: { refNumber: 'desc' },
+    select: { refNumber: true },
+  })
+  return `${prefix}-${String(nextRefSuffix(last?.refNumber)).padStart(4, '0')}`
 }
 
 async function generateRepaymentRef(tx: TxClient): Promise<string> {
   const prefix = `REP-${todaySASTDateStr().replace(/-/g, '')}`
   const startOfDay = todaySASTDate()
-  const count = await tx.loanRepayment.count({ where: { createdAt: { gte: startOfDay } } })
-  return `${prefix}-${String(count + 1).padStart(4, '0')}`
+  const last = await tx.loanRepayment.findFirst({
+    where: { createdAt: { gte: startOfDay }, refNumber: { startsWith: prefix } },
+    orderBy: { refNumber: 'desc' },
+    select: { refNumber: true },
+  })
+  return `${prefix}-${String(nextRefSuffix(last?.refNumber)).padStart(4, '0')}`
+}
+
+// Same MAX-based starting point as generateRepaymentRef, for the batch
+// callers below (applyRepaymentTx, reverseRepaymentsForPurchase,
+// createManualRepayment, reverseRepayment) that generate several sequential
+// refNumbers in one call by adding a local offset to this base — they can't
+// call generateRepaymentRef per-row since each row's insert would need to
+// happen before the next row's ref is computed.
+async function nextRepaymentBaseSeq(tx: TxClient, startOfDay: Date, prefix: string): Promise<number> {
+  const last = await tx.loanRepayment.findFirst({
+    where: { createdAt: { gte: startOfDay }, refNumber: { startsWith: prefix } },
+    orderBy: { refNumber: 'desc' },
+    select: { refNumber: true },
+  })
+  return nextRefSuffix(last?.refNumber) - 1
 }
 
 // Retries on PostgreSQL serialization failures (P2034 / 40001) — same
 // pattern as purchaseService.ts/saleService.ts's own withSerializableRetry.
+// Also retries a bare refNumber unique-constraint hit (P2002) — belt and
+// suspenders alongside the MAX-based generators above for the genuine
+// concurrent-insert case two requests can still race into.
 async function withSerializableRetry<T>(fn: () => Promise<T>): Promise<T> {
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
       return await fn()
     } catch (e: unknown) {
       const code = (e as { code?: string })?.code
-      if (attempt < 3 && (code === 'P2034' || code === '40001')) continue
+      if (attempt < 3 && (code === 'P2034' || code === '40001' || code === 'P2002')) continue
       throw e
     }
   }
@@ -164,8 +201,7 @@ export async function applyRepaymentTx(
   const prefix = `REP-${todaySASTDateStr().replace(/-/g, '')}`
   const startOfDay = todaySASTDate()
 
-  // Count existing repayments today (outside this tx scope) as base sequence
-  const baseCount = await tx.loanRepayment.count({ where: { createdAt: { gte: startOfDay } } })
+  const baseCount = await nextRepaymentBaseSeq(tx, startOfDay, prefix)
 
   // Fetch active loans FIFO (oldest first)
   const activeLoans = await tx.loan.findMany({
@@ -244,11 +280,11 @@ export async function reverseRepaymentsForPurchase(
       data: { balanceAmount: restoredBalance, status: 'active' },
     })
 
-    const count = await tx.loanRepayment.count({ where: { createdAt: { gte: startOfDay } } })
+    const baseSeq = await nextRepaymentBaseSeq(tx, startOfDay, prefix)
     await tx.loanRepayment.create({
       data: {
         tenantId:        requireTenantId(),
-        refNumber:       `${prefix}-${String(count + 1).padStart(4, '0')}`,
+        refNumber:       `${prefix}-${String(baseSeq + 1).padStart(4, '0')}`,
         loanId:          r.loanId,
         customerId:      r.customerId,
         // purchaseId carried over from the repayment being reversed — the
@@ -580,7 +616,7 @@ export async function createManualRepayment(
   const startOfDay = todaySASTDate()
 
   const created = await withSerializableRetry(() => prisma.$transaction(async (tx) => {
-    const baseCount = await tx.loanRepayment.count({ where: { createdAt: { gte: startOfDay } } })
+    const baseCount = await nextRepaymentBaseSeq(tx, startOfDay, prefix)
     let remaining = repayAmount
     let seqOffset = 0
     const repayments = []
@@ -669,8 +705,8 @@ export async function reverseRepayment(repaymentId: string, reason: string, user
   const prefix = `REP-${todaySASTDateStr().replace(/-/g, '')}`
   const startOfDay = todaySASTDate()
 
-  const reversals = await prisma.$transaction(async (tx) => {
-    const baseCount = await tx.loanRepayment.count({ where: { createdAt: { gte: startOfDay } } })
+  const reversals = await withSerializableRetry(() => prisma.$transaction(async (tx) => {
+    const baseCount = await nextRepaymentBaseSeq(tx, startOfDay, prefix)
     const created = []
     let seqOffset = 0
 
@@ -716,7 +752,7 @@ export async function reverseRepayment(repaymentId: string, reason: string, user
     }
 
     return created
-  })
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }))
 
   return reversals
 }
