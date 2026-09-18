@@ -2,7 +2,7 @@ import { prisma } from '@/lib/db/prisma'
 import { requireTenantId } from '@/lib/db/tenantContext'
 import logger from '@/lib/logger'
 import Decimal from 'decimal.js'
-import type { Prisma } from '@prisma/client'
+import { Prisma } from '@prisma/client'
 import type { CreateLoanInput, CreateRepaymentInput, VoidLoanInput } from '@/lib/schemas/loan'
 import { todaySASTDate, todaySASTDateStr, getRangeBoundsSAST, sastDateLabelToUTCDate } from '@/lib/utils/dayBounds'
 import type { DateWindow } from '@/lib/services/cashUpWindow'
@@ -108,19 +108,45 @@ export function formatTransactionMethod(method: string): string {
 }
 
 // ─── Reference number generators ─────────────────────────────────────────────
+// Generated *inside* the caller's transaction (using `tx`, not the bare
+// `prisma` client) so the count-then-insert is atomic with the write —
+// mirrors purchaseService.ts/saleService.ts's own generateRefNumber. Reading
+// the count from a separate, already-committed transaction (the previous
+// shape here) left a TOCTOU window: two concurrent requests could both read
+// the same count and race to insert the same refNumber, and since only one
+// can win the (tenantId, refNumber) unique constraint, the loser surfaced as
+// an uncaught P2002 — a generic 500 ("Failed to create loan") to the client.
+// Paired with withSerializableRetry + Serializable isolation below so a
+// detected conflict is retried with a fresh count instead of failing.
+type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
 
-async function generateLoanRef(): Promise<string> {
+async function generateLoanRef(tx: TxClient): Promise<string> {
   const prefix = `LOA-${todaySASTDateStr().replace(/-/g, '')}`
   const startOfDay = todaySASTDate()
-  const count = await prisma.loan.count({ where: { createdAt: { gte: startOfDay } } })
+  const count = await tx.loan.count({ where: { createdAt: { gte: startOfDay } } })
   return `${prefix}-${String(count + 1).padStart(4, '0')}`
 }
 
-async function generateRepaymentRef(): Promise<string> {
+async function generateRepaymentRef(tx: TxClient): Promise<string> {
   const prefix = `REP-${todaySASTDateStr().replace(/-/g, '')}`
   const startOfDay = todaySASTDate()
-  const count = await prisma.loanRepayment.count({ where: { createdAt: { gte: startOfDay } } })
+  const count = await tx.loanRepayment.count({ where: { createdAt: { gte: startOfDay } } })
   return `${prefix}-${String(count + 1).padStart(4, '0')}`
+}
+
+// Retries on PostgreSQL serialization failures (P2034 / 40001) — same
+// pattern as purchaseService.ts/saleService.ts's own withSerializableRetry.
+async function withSerializableRetry<T>(fn: () => Promise<T>): Promise<T> {
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      return await fn()
+    } catch (e: unknown) {
+      const code = (e as { code?: string })?.code
+      if (attempt < 3 && (code === 'P2034' || code === '40001')) continue
+      throw e
+    }
+  }
+  throw new Error('unreachable')
 }
 
 // ─── Apply Repayment inside an existing transaction ───────────────────────────
@@ -253,9 +279,9 @@ export async function createLoan(data: CreateLoanInput, createdByUserId?: string
   if (!customer.isActive) throw new CustomerInactiveError()
 
   const principal = new Decimal(data.principalAmount)
-  const refNumber = await generateLoanRef()
 
-  const loan = await prisma.$transaction(async (tx) => {
+  const loan = await withSerializableRetry(() => prisma.$transaction(async (tx) => {
+    const refNumber = await generateLoanRef(tx)
     const created = await tx.loan.create({
       data: {
         tenantId:        requireTenantId(),
@@ -283,9 +309,9 @@ export async function createLoan(data: CreateLoanInput, createdByUserId?: string
     })
 
     return created
-  })
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }))
 
-  logger.info({ loanId: loan.id, refNumber, customerId: data.customerId, principal: principal.toFixed(2), createdByUserId }, 'loan.created')
+  logger.info({ loanId: loan.id, refNumber: loan.refNumber, customerId: data.customerId, principal: principal.toFixed(2), createdByUserId }, 'loan.created')
   return loan
 }
 
@@ -309,9 +335,9 @@ export async function createRepayment(data: CreateRepaymentInput, createdByUserI
 
   const newBalance = currentBalance.minus(repayAmount)
   const isNowSettled = newBalance.isZero()
-  const refNumber = await generateRepaymentRef()
 
-  const result = await prisma.$transaction(async (tx) => {
+  const result = await withSerializableRetry(() => prisma.$transaction(async (tx) => {
+    const refNumber = await generateRepaymentRef(tx)
     const repayment = await tx.loanRepayment.create({
       data: {
         tenantId:        requireTenantId(),
@@ -343,9 +369,9 @@ export async function createRepayment(data: CreateRepaymentInput, createdByUserI
     })
 
     return repayment
-  })
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }))
 
-  logger.info({ repaymentId: result.id, refNumber, loanId: data.loanId, amount: repayAmount.toFixed(2), newBalance: newBalance.toFixed(2), settled: isNowSettled, createdByUserId }, 'loan.repayment.created')
+  logger.info({ repaymentId: result.id, refNumber: result.refNumber, loanId: data.loanId, amount: repayAmount.toFixed(2), newBalance: newBalance.toFixed(2), settled: isNowSettled, createdByUserId }, 'loan.repayment.created')
   return result
 }
 
@@ -553,7 +579,7 @@ export async function createManualRepayment(
   const prefix = `REP-${todaySASTDateStr().replace(/-/g, '')}`
   const startOfDay = todaySASTDate()
 
-  const created = await prisma.$transaction(async (tx) => {
+  const created = await withSerializableRetry(() => prisma.$transaction(async (tx) => {
     const baseCount = await tx.loanRepayment.count({ where: { createdAt: { gte: startOfDay } } })
     let remaining = repayAmount
     let seqOffset = 0
@@ -596,7 +622,7 @@ export async function createManualRepayment(
       remaining = remaining.minus(repayAmt)
     }
     return repayments
-  })
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }))
 
   logger.info(
     { customerId, amount: repayAmount.toFixed(2), paymentMethod: data.paymentMethod, repaymentCount: created.length, createdByUserId },
