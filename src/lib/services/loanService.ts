@@ -4,7 +4,7 @@ import logger from '@/lib/logger'
 import Decimal from 'decimal.js'
 import { Prisma } from '@prisma/client'
 import type { CreateLoanInput, CreateRepaymentInput, VoidLoanInput } from '@/lib/schemas/loan'
-import { todaySASTDate, todaySASTDateStr, getRangeBoundsSAST, sastDateLabelToUTCDate } from '@/lib/utils/dayBounds'
+import { todaySASTDateStr, getRangeBoundsSAST, sastDateLabelToUTCDate } from '@/lib/utils/dayBounds'
 import type { DateWindow } from '@/lib/services/cashUpWindow'
 import type { CreateManualRepaymentInput } from '@/lib/schemas/loan'
 import { postLoanAdvance, reverseLoanAdvanceLedger, postLoanRepayment, reverseLoanRepaymentLedger } from '@/lib/services/ledgerService'
@@ -112,18 +112,23 @@ export function formatTransactionMethod(method: string): string {
 // `prisma` client) so the read-then-insert is atomic with the write —
 // mirrors purchaseService.ts/saleService.ts's own generateRefNumber.
 //
-// Keyed off the highest existing suffix for today's prefix (MAX), not a row
-// COUNT. COUNT is only correct while every row ever created for today is
-// still present — if any of today's loan/repayment rows were ever removed
-// (a cleanup script, a manual DB fix, a restore) while a higher-numbered
-// row for today survived, COUNT under-reports and every subsequent create
-// recomputes that same already-taken refNumber, hitting the (tenantId,
-// refNumber) unique constraint on every single attempt — not an occasional
-// race, a deterministic 100%-repro failure (confirmed live: 2026-09-18
-// production logs, POST /api/loans P2002 on prisma.loan.create()). Reading
-// the actual MAX in use is immune to that gap regardless of its cause.
-// Still paired with withSerializableRetry below for the genuine concurrent
-// case (two requests both reading the same MAX before either commits).
+// Keyed off the highest existing suffix for today's prefix (MAX) via
+// refNumber alone — deliberately NOT combined with a createdAt >= start-of-
+// day filter the way the original count-based version was. todaySASTDate()
+// returns midnight UTC of today's date label, which is 2 hours AFTER the
+// true SAST-midnight instant (SAST is UTC+2, so the real day boundary is
+// 22:00 UTC the previous day — see getDayBoundsSAST, which subtracts the
+// offset correctly). Any loan/repayment created between 00:00-02:00 SAST
+// gets today's refNumber prefix (todaySASTDateStr() computes that correctly
+// for any instant) but a createdAt that falls BEFORE the buggy startOfDay
+// boundary — invisible to a createdAt-filtered "today" query for the rest
+// of the day, so every later attempt recomputed the same already-taken
+// refNumber and collided, deterministically, all day (confirmed live:
+// 2026-09-18 production logs, POST /api/loans P2002 persisting even after
+// switching count→MAX, traced to this exact boundary bug). The refNumber
+// prefix alone already scopes correctly to "today" — the date string is
+// fixed at each row's own creation time — so it needs no separate,
+// independently-computed day-boundary filter at all.
 type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
 
 function nextRefSuffix(lastRefNumber: string | undefined): number {
@@ -133,9 +138,8 @@ function nextRefSuffix(lastRefNumber: string | undefined): number {
 
 async function generateLoanRef(tx: TxClient): Promise<string> {
   const prefix = `LOA-${todaySASTDateStr().replace(/-/g, '')}`
-  const startOfDay = todaySASTDate()
   const last = await tx.loan.findFirst({
-    where: { createdAt: { gte: startOfDay }, refNumber: { startsWith: prefix } },
+    where: { refNumber: { startsWith: prefix } },
     orderBy: { refNumber: 'desc' },
     select: { refNumber: true },
   })
@@ -144,9 +148,8 @@ async function generateLoanRef(tx: TxClient): Promise<string> {
 
 async function generateRepaymentRef(tx: TxClient): Promise<string> {
   const prefix = `REP-${todaySASTDateStr().replace(/-/g, '')}`
-  const startOfDay = todaySASTDate()
   const last = await tx.loanRepayment.findFirst({
-    where: { createdAt: { gte: startOfDay }, refNumber: { startsWith: prefix } },
+    where: { refNumber: { startsWith: prefix } },
     orderBy: { refNumber: 'desc' },
     select: { refNumber: true },
   })
@@ -159,9 +162,9 @@ async function generateRepaymentRef(tx: TxClient): Promise<string> {
 // refNumbers in one call by adding a local offset to this base — they can't
 // call generateRepaymentRef per-row since each row's insert would need to
 // happen before the next row's ref is computed.
-async function nextRepaymentBaseSeq(tx: TxClient, startOfDay: Date, prefix: string): Promise<number> {
+async function nextRepaymentBaseSeq(tx: TxClient, prefix: string): Promise<number> {
   const last = await tx.loanRepayment.findFirst({
-    where: { createdAt: { gte: startOfDay }, refNumber: { startsWith: prefix } },
+    where: { refNumber: { startsWith: prefix } },
     orderBy: { refNumber: 'desc' },
     select: { refNumber: true },
   })
@@ -199,9 +202,8 @@ export async function applyRepaymentTx(
   purchaseId?: string,
 ): Promise<void> {
   const prefix = `REP-${todaySASTDateStr().replace(/-/g, '')}`
-  const startOfDay = todaySASTDate()
 
-  const baseCount = await nextRepaymentBaseSeq(tx, startOfDay, prefix)
+  const baseCount = await nextRepaymentBaseSeq(tx, prefix)
 
   // Fetch active loans FIFO (oldest first)
   const activeLoans = await tx.loan.findMany({
@@ -269,7 +271,6 @@ export async function reverseRepaymentsForPurchase(
   if (repayments.length === 0) return
 
   const prefix = `REP-${todaySASTDateStr().replace(/-/g, '')}`
-  const startOfDay = todaySASTDate()
 
   for (const r of repayments) {
     const loan = await tx.loan.findUniqueOrThrow({ where: { id: r.loanId } })
@@ -280,7 +281,7 @@ export async function reverseRepaymentsForPurchase(
       data: { balanceAmount: restoredBalance, status: 'active' },
     })
 
-    const baseSeq = await nextRepaymentBaseSeq(tx, startOfDay, prefix)
+    const baseSeq = await nextRepaymentBaseSeq(tx, prefix)
     await tx.loanRepayment.create({
       data: {
         tenantId:        requireTenantId(),
@@ -613,10 +614,9 @@ export async function createManualRepayment(
   }
 
   const prefix = `REP-${todaySASTDateStr().replace(/-/g, '')}`
-  const startOfDay = todaySASTDate()
 
   const created = await withSerializableRetry(() => prisma.$transaction(async (tx) => {
-    const baseCount = await nextRepaymentBaseSeq(tx, startOfDay, prefix)
+    const baseCount = await nextRepaymentBaseSeq(tx, prefix)
     let remaining = repayAmount
     let seqOffset = 0
     const repayments = []
@@ -703,10 +703,9 @@ export async function reverseRepayment(repaymentId: string, reason: string, user
   if (laterLoan || laterRepayment) throw new RepaymentNotLastEntryError()
 
   const prefix = `REP-${todaySASTDateStr().replace(/-/g, '')}`
-  const startOfDay = todaySASTDate()
 
   const reversals = await withSerializableRetry(() => prisma.$transaction(async (tx) => {
-    const baseCount = await nextRepaymentBaseSeq(tx, startOfDay, prefix)
+    const baseCount = await nextRepaymentBaseSeq(tx, prefix)
     const created = []
     let seqOffset = 0
 
