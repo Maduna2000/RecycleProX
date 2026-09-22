@@ -63,3 +63,16 @@ export function sastDayLabelOfInstant(date: Date): string {
   const d = shifted.getUTCDate()
   return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
 }
+
+// First/last day of the calendar month containing `date` (as a @db.Date
+// column, e.g. CashUp.sessionDate, encoded the same deterministic way as
+// sastDateLabelToUTCDate — read via UTC getters, so a plain calendar-date
+// column round-trips exactly rather than shifting by the SAST offset a
+// second time). For comparing against sessionDate: { gte: start, lte: end }.
+export function getMonthBoundsSAST(date: Date): { start: Date; end: Date } {
+  const y = date.getUTCFullYear()
+  const m = date.getUTCMonth()
+  const start = new Date(Date.UTC(y, m, 1, 0, 0, 0, 0))
+  const end = new Date(Date.UTC(y, m + 1, 0, 0, 0, 0, 0))
+  return { start, end }
+}

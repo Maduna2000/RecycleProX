@@ -9,7 +9,7 @@ import { getExpenseTotalsForDate } from './expenseService'
 import { getLoanTotalsForDate, formatTransactionMethod } from './loanService'
 import { getMomoStatementForDate } from './momoStatementService'
 import { getSessionWindow, type DateWindow } from './cashUpWindow'
-import { sastDateLabelToUTCDate, getDayBoundsSAST, todaySASTDateStr } from '@/lib/utils/dayBounds'
+import { sastDateLabelToUTCDate, getDayBoundsSAST, getMonthBoundsSAST, todaySASTDateStr } from '@/lib/utils/dayBounds'
 import { postCashUpVariance } from '@/lib/services/ledgerService'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -611,11 +611,16 @@ async function repropagateFinPeriodCumulative(
   fromDate: Date,
   override?: { cashUpId: string; variance: Decimal }
 ) {
+  // Scoped to fromDate's own calendar month, not all approved history —
+  // "Fin Period Cumulative" resets each period (see submitCashUp's own
+  // comment on this same figure).
+  const { start: monthStart } = getMonthBoundsSAST(fromDate)
   const priorApproved = await tx.cashUp.aggregate({
-    where: { status: 'approved', sessionDate: { lt: fromDate } },
+    where: { status: 'approved', sessionDate: { gte: monthStart, lt: fromDate } },
     _sum: { variance: true },
   })
   let running = new Decimal(priorApproved._sum.variance?.toString() ?? '0')
+  let runningMonthKey = `${fromDate.getUTCFullYear()}-${fromDate.getUTCMonth()}`
 
   const fromThisDateOnward = await tx.cashUp.findMany({
     where:   { status: 'approved', sessionDate: { gte: fromDate } },
@@ -623,6 +628,11 @@ async function repropagateFinPeriodCumulative(
   })
 
   for (const c of fromThisDateOnward) {
+    const monthKey = `${c.sessionDate.getUTCFullYear()}-${c.sessionDate.getUTCMonth()}`
+    if (monthKey !== runningMonthKey) {
+      running = new Decimal(0)
+      runningMonthKey = monthKey
+    }
     const v = override && c.id === override.cashUpId ? override.variance : new Decimal(c.variance?.toString() ?? '0')
     running = running.plus(v)
     await tx.cashUp.update({ where: { id: c.id }, data: { finPeriodCumulative: running } })
@@ -703,9 +713,14 @@ export async function submitCashUp(
     }
   }
 
-  // Cumulative variance = sum of all previously approved cash-up variances + this one
+  // Cumulative variance = sum of this calendar month's previously approved
+  // cash-up variances + this one. Scoped to the session's own month (not
+  // all-time) so "Fin Period Cumulative" actually resets each period, as
+  // its label promises, instead of a shortfall from months ago silently
+  // dragging on every later month's figure forever.
+  const { start: monthStart, end: monthEnd } = getMonthBoundsSAST(cashUp.sessionDate)
   const priorApproved = await prisma.cashUp.aggregate({
-    where: { status: 'approved' },
+    where: { status: 'approved', sessionDate: { gte: monthStart, lte: monthEnd } },
     _sum: { variance: true },
   })
   const priorCumulative = new Decimal(priorApproved._sum.variance?.toString() ?? '0')
@@ -818,6 +833,7 @@ export async function getLiveStats(
   sessionContext?: { openedAt: Date; closedAt: Date | null }
 ) {
   const { start: dayStart, end: dayEnd } = getDayBoundsSAST(sessionDate)
+  const { start: monthStart, end: monthEnd } = getMonthBoundsSAST(sessionDate)
   const { start, end } = sessionContext
     ? await getSessionWindow(prisma, { sessionDate, ...sessionContext })
     : { start: dayStart, end: dayEnd }
@@ -902,9 +918,11 @@ export async function getLiveStats(
       FROM "Purchase"
       WHERE status = 'pending'
     `,
+    // Scoped to sessionDate's own calendar month — "Fin Period Cumulative"
+    // resets each period, not all-time (see submitCashUp's own comment).
     prisma.cashUp.aggregate({
       _sum: { variance: true },
-      where: { status: 'approved' },
+      where: { status: 'approved', sessionDate: { gte: monthStart, lte: monthEnd } },
     }),
     // Drawings Received = only mid-day top-ups (FloatMovements), NOT the CashFloat.openingAmount
     // CashFloat.openingAmount is the drawer starting cash which is already in CashUp.openingBalance
