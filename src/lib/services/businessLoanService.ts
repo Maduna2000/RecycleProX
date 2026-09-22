@@ -3,9 +3,9 @@ import { requireTenantId } from '@/lib/db/tenantContext'
 import { verifyAdminPin } from '@/lib/services/authService'
 import logger from '@/lib/logger'
 import Decimal from 'decimal.js'
-import type { Prisma } from '@prisma/client'
+import { Prisma } from '@prisma/client'
 import type { CreateBusinessLoanInput, VoidBusinessLoanInput } from '@/lib/schemas/businessLoan'
-import { todaySASTDate, todaySASTDateStr, sastDateLabelToUTCDate, getRangeBoundsSAST } from '@/lib/utils/dayBounds'
+import { todaySASTDateStr, sastDateLabelToUTCDate, getRangeBoundsSAST } from '@/lib/utils/dayBounds'
 import { postBusinessLoanReceived, reverseBusinessLoanLedger, postBusinessLoanRepayment, reverseBusinessLoanRepaymentLedger } from '@/lib/services/ledgerService'
 
 // ─── Typed Errors ─────────────────────────────────────────────────────────────
@@ -55,12 +55,57 @@ export class BusinessLoanRepaymentNotLastEntryError extends Error {
 }
 
 // ─── Reference number generators ─────────────────────────────────────────────
+// Generated *inside* the caller's transaction (via `tx`, not the bare
+// `prisma` client), keyed off the highest existing refNumber suffix (MAX),
+// not a row COUNT scoped by createdAt >= todaySASTDate(). That combination
+// is the exact bug already found and fixed in loanService.ts/
+// expenseService.ts: todaySASTDate() returns midnight UTC of today's date
+// label — 2 hours AFTER the true SAST-midnight instant (SAST is UTC+2) — so
+// a loan/repayment created between 00:00-02:00 SAST gets today's refNumber
+// prefix but a createdAt that falls before that mistimed boundary, making
+// it invisible to every later "today" lookup and colliding with every
+// subsequent create() for the rest of the day. On top of that, COUNT alone
+// is separately vulnerable to any gap between the row count and the actual
+// highest refNumber in use. Matching refNumber's own date-stamped prefix
+// (fixed once, correctly, at each row's creation time) needs no separate,
+// independently-computed day boundary at all.
+type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
 
-async function generateBusinessLoanRef(): Promise<string> {
+function nextRefSuffix(lastRefNumber: string | undefined): number {
+  const lastSuffix = lastRefNumber ? parseInt(lastRefNumber.slice(lastRefNumber.lastIndexOf('-') + 1), 10) : 0
+  return (Number.isFinite(lastSuffix) ? lastSuffix : 0) + 1
+}
+
+async function generateBusinessLoanRef(tx: TxClient): Promise<string> {
   const prefix = `BLN-${todaySASTDateStr().replace(/-/g, '')}`
-  const startOfDay = todaySASTDate()
-  const count = await prisma.businessLoan.count({ where: { createdAt: { gte: startOfDay } } })
-  return `${prefix}-${String(count + 1).padStart(4, '0')}`
+  const last = await tx.businessLoan.findFirst({
+    where: { refNumber: { startsWith: prefix } },
+    orderBy: { refNumber: 'desc' },
+    select: { refNumber: true },
+  })
+  return `${prefix}-${String(nextRefSuffix(last?.refNumber)).padStart(4, '0')}`
+}
+
+async function nextBusinessLoanRepaymentBaseSeq(tx: TxClient, prefix: string): Promise<number> {
+  const last = await tx.businessLoanRepayment.findFirst({
+    where: { refNumber: { startsWith: prefix } },
+    orderBy: { refNumber: 'desc' },
+    select: { refNumber: true },
+  })
+  return nextRefSuffix(last?.refNumber) - 1
+}
+
+async function withSerializableRetry<T>(fn: () => Promise<T>): Promise<T> {
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      return await fn()
+    } catch (e: unknown) {
+      const code = (e as { code?: string })?.code
+      if (attempt < 3 && (code === 'P2034' || code === '40001' || code === 'P2002')) continue
+      throw e
+    }
+  }
+  throw new Error('unreachable')
 }
 
 // ─── Apply Repayment inside an existing transaction ───────────────────────────
@@ -76,9 +121,8 @@ export async function applyBusinessLoanRepaymentTx(
   saleId?: string,
 ): Promise<void> {
   const prefix = `BRP-${todaySASTDateStr().replace(/-/g, '')}`
-  const startOfDay = todaySASTDate()
 
-  const baseCount = await tx.businessLoanRepayment.count({ where: { createdAt: { gte: startOfDay } } })
+  const baseCount = await nextBusinessLoanRepaymentBaseSeq(tx, prefix)
 
   const activeLoans = await tx.businessLoan.findMany({
     where: { customerId, status: 'active' },
@@ -143,7 +187,6 @@ export async function reverseRepaymentsForSale(
   if (repayments.length === 0) return
 
   const prefix = `BRP-${todaySASTDateStr().replace(/-/g, '')}`
-  const startOfDay = todaySASTDate()
 
   for (const r of repayments) {
     const loan = await tx.businessLoan.findUniqueOrThrow({ where: { id: r.businessLoanId } })
@@ -154,7 +197,7 @@ export async function reverseRepaymentsForSale(
       data: { balanceAmount: restoredBalance, status: 'active' },
     })
 
-    const count = await tx.businessLoanRepayment.count({ where: { createdAt: { gte: startOfDay } } })
+    const count = await nextBusinessLoanRepaymentBaseSeq(tx, prefix)
     await tx.businessLoanRepayment.create({
       data: {
         tenantId:        requireTenantId(),
@@ -212,15 +255,14 @@ export async function recordBusinessLoanRepayment(
   const newBalance   = currentBalance.minus(total)
   const isNowSettled = newBalance.isZero()
 
-  const prefix     = `BRP-${todaySASTDateStr().replace(/-/g, '')}`
-  const startOfDay = todaySASTDate()
+  const prefix = `BRP-${todaySASTDateStr().replace(/-/g, '')}`
 
   const legs: { method: 'cash' | 'eft'; amount: Decimal }[] = []
   if (cash.greaterThan(0)) legs.push({ method: 'cash', amount: cash })
   if (eft.greaterThan(0))  legs.push({ method: 'eft', amount: eft })
 
-  const repayments = await prisma.$transaction(async (tx) => {
-    const baseCount = await tx.businessLoanRepayment.count({ where: { createdAt: { gte: startOfDay } } })
+  const repayments = await withSerializableRetry(() => prisma.$transaction(async (tx) => {
+    const baseCount = await nextBusinessLoanRepaymentBaseSeq(tx, prefix)
 
     const created = []
     for (let i = 0; i < legs.length; i++) {
@@ -258,7 +300,7 @@ export async function recordBusinessLoanRepayment(
     })
 
     return created
-  })
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }))
 
   logger.info(
     {
@@ -293,12 +335,11 @@ export async function reverseManualBusinessLoanRepayment(repaymentId: string, re
   const loan = await prisma.businessLoan.findUniqueOrThrow({ where: { id: repayment.businessLoanId } })
   const restoredBalance = new Decimal(loan.balanceAmount.toString()).plus(repayment.amount.toString())
 
-  const prefix     = `BRP-${todaySASTDateStr().replace(/-/g, '')}`
-  const startOfDay = todaySASTDate()
+  const prefix = `BRP-${todaySASTDateStr().replace(/-/g, '')}`
 
-  const reversal = await prisma.$transaction(async (tx) => {
+  const reversal = await withSerializableRetry(() => prisma.$transaction(async (tx) => {
     await tx.businessLoan.update({ where: { id: repayment.businessLoanId }, data: { balanceAmount: restoredBalance, status: 'active' } })
-    const count = await tx.businessLoanRepayment.count({ where: { createdAt: { gte: startOfDay } } })
+    const count = await nextBusinessLoanRepaymentBaseSeq(tx, prefix)
     const r = await tx.businessLoanRepayment.create({
       data: {
         tenantId:        requireTenantId(),
@@ -317,7 +358,7 @@ export async function reverseManualBusinessLoanRepayment(repaymentId: string, re
       await reverseBusinessLoanRepaymentLedger(tx, repayment.id, repayment.refNumber, reason, userId)
     }
     return r
-  })
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }))
 
   logger.info(
     { reversedRepaymentId: repayment.id, businessLoanId: repayment.businessLoanId, amount: repayment.amount.toString(), restoredBalance: restoredBalance.toFixed(2), userId },
@@ -481,9 +522,9 @@ export async function createBusinessLoan(data: CreateBusinessLoanInput, createdB
   if (customer.dealerCategory !== 'dealer_3') throw new CustomerNotDealerTierError()
 
   const principal = new Decimal(data.principalAmount)
-  const refNumber = await generateBusinessLoanRef()
 
-  const loan = await prisma.$transaction(async (tx) => {
+  const loan = await withSerializableRetry(() => prisma.$transaction(async (tx) => {
+    const refNumber = await generateBusinessLoanRef(tx)
     const created = await tx.businessLoan.create({
       data: {
         tenantId:        requireTenantId(),
@@ -511,9 +552,9 @@ export async function createBusinessLoan(data: CreateBusinessLoanInput, createdB
     })
 
     return created
-  })
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }))
 
-  logger.info({ businessLoanId: loan.id, refNumber, customerId: data.customerId, principal: principal.toFixed(2), createdByUserId }, 'businessLoan.created')
+  logger.info({ businessLoanId: loan.id, refNumber: loan.refNumber, customerId: data.customerId, principal: principal.toFixed(2), createdByUserId }, 'businessLoan.created')
   return loan
 }
 

@@ -36,6 +36,22 @@ export class GateRequiredPhotoMissingError extends Error {
 
 type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
 
+// Retries on PostgreSQL serialization failures (P2034 / 40001) and a bare
+// entryNumber unique-constraint hit (P2002) — same pattern as loanService.ts/
+// expenseService.ts/businessLoanService.ts's own withSerializableRetry.
+async function withSerializableRetry<T>(fn: () => Promise<T>): Promise<T> {
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      return await fn()
+    } catch (e: unknown) {
+      const code = (e as { code?: string })?.code
+      if (attempt < 3 && (code === 'P2034' || code === '40001' || code === 'P2002')) continue
+      throw e
+    }
+  }
+  throw new Error('unreachable')
+}
+
 export interface GateEntryFilters {
   purpose?:    GateEntryPurpose
   onSiteOnly?: boolean
@@ -49,20 +65,32 @@ export interface GateEntryFilters {
 const ALL_PURPOSES: GateEntryPurpose[] = ['sell', 'buy', 'visitor', 'other']
 
 // ─── Entry number generator (atomic inside transaction) ───────────────────────
+// MAX-based (highest existing refNumber suffix), not a row COUNT — same fix
+// as loanService.ts/expenseService.ts/businessLoanService.ts. COUNT is only
+// correct while every entry for today is still present; any gap (a deleted
+// row, a restore, or two requests racing on the same count before either
+// commits) makes every later create() recompute the same already-taken
+// entryNumber and collide on (tenantId, entryNumber) forever.
 
 async function generateEntryNumber(tx: TxClient, date: Date): Promise<string> {
   const y = date.getFullYear()
   const m = String(date.getMonth() + 1).padStart(2, '0')
   const d = String(date.getDate()).padStart(2, '0')
   const prefix = `GATE-${y}${m}${d}`
-  const startOfDay = new Date(y, date.getMonth(), date.getDate())
-  const count = await tx.gateEntry.count({ where: { createdAt: { gte: startOfDay } } })
-  return `${prefix}-${String(count + 1).padStart(4, '0')}`
+  const last = await tx.gateEntry.findFirst({
+    where: { entryNumber: { startsWith: prefix } },
+    orderBy: { entryNumber: 'desc' },
+    select: { entryNumber: true },
+  })
+  const lastSeq = last ? parseInt(last.entryNumber.slice(last.entryNumber.lastIndexOf('-') + 1), 10) : 0
+  return `${prefix}-${String((Number.isFinite(lastSeq) ? lastSeq : 0) + 1).padStart(4, '0')}`
 }
 
 // Queue number for the Scale Station — a short, callable-out-loud sequence
 // (1, 2, 3...) that resets each day, counted only against today's other
 // "sell" entries so it stays meaningful (only sell visits go to the scale).
+// Not uniquely constrained in the DB, so a COUNT-based gap here can't cause
+// a hard failure the way entryNumber's can — kept as a plain count.
 async function generateQueueNumber(tx: TxClient, date: Date): Promise<number> {
   const startOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate())
   const count = await tx.gateEntry.count({ where: { createdAt: { gte: startOfDay }, purpose: 'sell' } })
@@ -122,7 +150,7 @@ export async function createGateEntry(data: CreateGateEntryInput, operatorId: st
     throw new GateRequiredPhotoMissingError('vehicle')
   }
 
-  const entry = await prisma.$transaction(async (tx) => {
+  const entry = await withSerializableRetry(() => prisma.$transaction(async (tx) => {
     const now = new Date()
     const entryNumber = await generateEntryNumber(tx, now)
     const queueNumber  = data.purpose === 'sell' ? await generateQueueNumber(tx, now) : null
@@ -150,7 +178,7 @@ export async function createGateEntry(data: CreateGateEntryInput, operatorId: st
         operator: { select: { id: true, fullName: true } },
       },
     })
-  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }))
 
   logger.info({ entryId: entry.id, entryNumber: entry.entryNumber, operatorId, purpose: data.purpose }, 'gateEntry.created')
   return entry

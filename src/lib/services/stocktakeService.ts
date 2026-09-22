@@ -9,10 +9,20 @@ import { encodeJsonField } from '@/lib/db/queryHelpers'
 import { postStocktakeAdjustment, reverseStocktakeAdjustmentLedger } from '@/lib/services/ledgerService'
 
 // ─── Ref number ───────────────────────────────────────────────────────────────
+// MAX-based (highest existing refNumber suffix), not a row COUNT — same fix
+// as loanService.ts/expenseService.ts/businessLoanService.ts/gateService.ts/
+// scaleService.ts. COUNT is only correct while every Stocktake ever created
+// is still present; any gap makes every later create() recompute the same
+// already-taken refNumber and collide on (tenantId, refNumber) forever.
 
 async function nextRef(tx: Prisma.TransactionClient): Promise<string> {
-  const count = await tx.stocktake.count()
-  return `STK-${String(count + 1).padStart(5, '0')}`
+  const last = await tx.stocktake.findFirst({
+    where: { refNumber: { startsWith: 'STK-' } },
+    orderBy: { refNumber: 'desc' },
+    select: { refNumber: true },
+  })
+  const lastSeq = last ? parseInt(last.refNumber.slice(last.refNumber.lastIndexOf('-') + 1), 10) : 0
+  return `STK-${String((Number.isFinite(lastSeq) ? lastSeq : 0) + 1).padStart(5, '0')}`
 }
 
 // ─── Build stock snapshot ─────────────────────────────────────────────────────

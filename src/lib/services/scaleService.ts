@@ -97,10 +97,38 @@ export interface ScaleOrderFilters {
 }
 
 // ─── Order number generator (atomic inside transaction) ───────────────────────
+// MAX-based (highest existing orderNumber suffix), not a row COUNT — same fix
+// as loanService.ts/expenseService.ts/businessLoanService.ts/gateService.ts.
+// COUNT is only correct while every ScaleOrder ever created is still
+// present; any gap (a deleted row, a restore, or two requests racing on the
+// same count before either commits) makes every later create() recompute
+// the same already-taken orderNumber and collide on (tenantId, orderNumber)
+// forever.
 
 async function generateOrderNumber(tx: TxClient): Promise<string> {
-  const count = await tx.scaleOrder.count()
-  return `S${String(count + 1).padStart(5, '0')}`
+  const last = await tx.scaleOrder.findFirst({
+    where: { orderNumber: { startsWith: 'S' } },
+    orderBy: { orderNumber: 'desc' },
+    select: { orderNumber: true },
+  })
+  const lastSeq = last ? parseInt(last.orderNumber.slice(1), 10) : 0
+  return `S${String((Number.isFinite(lastSeq) ? lastSeq : 0) + 1).padStart(5, '0')}`
+}
+
+// Retries on PostgreSQL serialization failures (P2034 / 40001) and a bare
+// orderNumber unique-constraint hit (P2002) — same pattern used throughout
+// loanService.ts/expenseService.ts/businessLoanService.ts/gateService.ts.
+async function withSerializableRetry<T>(fn: () => Promise<T>): Promise<T> {
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      return await fn()
+    } catch (e: unknown) {
+      const code = (e as { code?: string })?.code
+      if (attempt < 3 && (code === 'P2034' || code === '40001' || code === 'P2002')) continue
+      throw e
+    }
+  }
+  throw new Error('unreachable')
 }
 
 // ─── Customer display helpers ─────────────────────────────────────────────────
@@ -178,7 +206,7 @@ export async function createScaleOrder(data: CreateScaleOrderInput, operatorId: 
   const firstLine   = data.lines[0]!
   const firstWeight = firstLine.weight ? new Decimal(firstLine.weight).toDecimalPlaces(3) : null
 
-  const order = await prisma.$transaction(async (tx) => {
+  const order = await withSerializableRetry(() => prisma.$transaction(async (tx) => {
     const tenantId = requireTenantId()
 
     // Consuming a queue number is atomic with the order it produces — a
@@ -231,7 +259,7 @@ export async function createScaleOrder(data: CreateScaleOrderInput, operatorId: 
         lines:    { include: { product: true }, orderBy: { createdAt: 'asc' } },
       },
     })
-  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }))
 
   logger.info({ orderId: order.id, orderNumber: order.orderNumber, operatorId, lineCount: data.lines.length }, 'scaleOrder.created')
   return order

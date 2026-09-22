@@ -27,23 +27,34 @@ export class PaymentExceedsBalanceError extends Error {
 
 type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
 
-// Generated inside the transaction so it's atomic with the insert
+// Generated inside the transaction so it's atomic with the insert.
+// MAX-based (highest existing refNumber suffix), not a row COUNT — same fix
+// as loanService.ts/expenseService.ts/businessLoanService.ts/gateService.ts/
+// scaleService.ts/stocktakeService.ts. COUNT is only correct while every
+// Payment row for today is still present; any gap makes every later
+// create() recompute the same already-taken refNumber and collide on
+// (tenantId, refNumber) forever.
 async function generateRefNumber(tx: TxClient): Promise<string> {
   const today = new Date()
   const prefix = `PAY-${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`
-  const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate())
-  const count = await tx.payment.count({ where: { createdAt: { gte: startOfDay } } })
-  return `${prefix}-${String(count + 1).padStart(4, '0')}`
+  const last = await tx.payment.findFirst({
+    where: { refNumber: { startsWith: prefix } },
+    orderBy: { refNumber: 'desc' },
+    select: { refNumber: true },
+  })
+  const lastSeq = last ? parseInt(last.refNumber.slice(last.refNumber.lastIndexOf('-') + 1), 10) : 0
+  return `${prefix}-${String((Number.isFinite(lastSeq) ? lastSeq : 0) + 1).padStart(4, '0')}`
 }
 
-// Retries on PostgreSQL serialization failures (P2034 / 40001)
+// Retries on PostgreSQL serialization failures (P2034 / 40001) and a bare
+// refNumber unique-constraint hit (P2002).
 async function withSerializableRetry<T>(fn: () => Promise<T>): Promise<T> {
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
       return await fn()
     } catch (e: unknown) {
       const code = (e as { code?: string })?.code
-      if (attempt < 3 && (code === 'P2034' || code === '40001')) continue
+      if (attempt < 3 && (code === 'P2034' || code === '40001' || code === 'P2002')) continue
       throw e
     }
   }
