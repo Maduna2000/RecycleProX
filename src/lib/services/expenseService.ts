@@ -2,16 +2,46 @@ import { prisma } from '@/lib/db/prisma'
 import { requireTenantId } from '@/lib/db/tenantContext'
 import Decimal from 'decimal.js'
 import logger from '@/lib/logger'
+import { Prisma } from '@prisma/client'
 import type { CreateExpenseInput, CreateExpenseTypeInput, UpdateExpenseInput, SettlePendingExpenseInput } from '@/lib/schemas/expense'
 import { todaySASTDate } from '@/lib/utils/dayBounds'
 import type { DateWindow } from '@/lib/services/cashUpWindow'
 import { postExpense, reverseExpenseLedger } from '@/lib/services/ledgerService'
 
 // ─── Ref number ───────────────────────────────────────────────────────────────
+// Generated *inside* the transaction (via `tx`, not the bare `prisma`
+// client) and keyed off the highest existing suffix (MAX), not a row COUNT —
+// same fix as loanService.ts's generateLoanRef/generateRepaymentRef. COUNT
+// is only correct while every Expense row ever created is still present;
+// any gap (a deleted row, a restore, or just two requests racing on the same
+// count before either commits) makes every later create() recompute the
+// same already-taken refNumber and collide on (tenantId, refNumber) forever
+// — confirmed live via production logs, POST /api/expenses P2002 on
+// prisma.expense.create(). Paired with a Serializable + retry wrapper for
+// the genuine concurrent case.
+type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
 
-async function nextRef(): Promise<string> {
-  const count = await prisma.expense.count()
-  return `EXP-${String(count + 1).padStart(5, '0')}`
+async function nextRef(tx: TxClient): Promise<string> {
+  const last = await tx.expense.findFirst({
+    where: { refNumber: { startsWith: 'EXP-' } },
+    orderBy: { refNumber: 'desc' },
+    select: { refNumber: true },
+  })
+  const lastSeq = last ? parseInt(last.refNumber.slice(last.refNumber.lastIndexOf('-') + 1), 10) : 0
+  return `EXP-${String((Number.isFinite(lastSeq) ? lastSeq : 0) + 1).padStart(5, '0')}`
+}
+
+async function withSerializableRetry<T>(fn: () => Promise<T>): Promise<T> {
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      return await fn()
+    } catch (e: unknown) {
+      const code = (e as { code?: string })?.code
+      if (attempt < 3 && (code === 'P2034' || code === '40001' || code === 'P2002')) continue
+      throw e
+    }
+  }
+  throw new Error('unreachable')
 }
 
 // ─── Expense Types ────────────────────────────────────────────────────────────
@@ -37,7 +67,6 @@ export async function listExpenseTypes() {
 
 export async function createExpense(data: CreateExpenseInput, userId: string) {
   const tenantId = requireTenantId()
-  const refNumber = await nextRef()
   const amount = new Decimal(data.amount)
 
   // Read VAT rate from SystemSettings; fall back to 15%
@@ -58,7 +87,8 @@ export async function createExpense(data: CreateExpenseInput, userId: string) {
   // If isPending is false (default), auto-approve; otherwise leave as pending
   const isPending = data.isPending ?? false
 
-  const expense = await prisma.$transaction(async (tx) => {
+  const expense = await withSerializableRetry(() => prisma.$transaction(async (tx) => {
+    const refNumber = await nextRef(tx)
     const created = await tx.expense.create({
       data: {
         tenantId,
@@ -93,7 +123,7 @@ export async function createExpense(data: CreateExpenseInput, userId: string) {
     }
 
     return created
-  })
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }))
   logger.info({ expenseId: expense.id, userId, cashUpId: openSession?.id, isPending }, 'Expense created')
   return expense
 }
