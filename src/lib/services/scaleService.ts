@@ -106,13 +106,24 @@ export interface ScaleOrderFilters {
 // forever.
 
 async function generateOrderNumber(tx: TxClient): Promise<string> {
-  const last = await tx.scaleOrder.findFirst({
-    where: { orderNumber: { startsWith: 'S' } },
-    orderBy: { orderNumber: 'desc' },
+  // Numeric MAX over well-formed "S<digits>" numbers only, computed here
+  // rather than via orderBy — orderBy sorts as TEXT, and the previous
+  // findFirst({ startsWith: 'S', orderBy: desc }) fell back to 0 on a
+  // non-numeric suffix, so a single existing orderNumber that starts with
+  // "S" but isn't "S<digits>" (it sorts above "S0...") made every create()
+  // compute "S00001" and hit P2002 forever after the first one. Plain
+  // findMany (no raw SQL) so the Desktop SQLite build keeps working.
+  const rows = await tx.scaleOrder.findMany({
+    where:  { orderNumber: { startsWith: 'S' } },
     select: { orderNumber: true },
   })
-  const lastSeq = last ? parseInt(last.orderNumber.slice(1), 10) : 0
-  return `S${String((Number.isFinite(lastSeq) ? lastSeq : 0) + 1).padStart(5, '0')}`
+  let lastSeq = 0
+  for (const { orderNumber } of rows) {
+    if (!/^S\d+$/.test(orderNumber)) continue
+    const seq = parseInt(orderNumber.slice(1), 10)
+    if (seq > lastSeq) lastSeq = seq
+  }
+  return `S${String(lastSeq + 1).padStart(5, '0')}`
 }
 
 // Retries on PostgreSQL serialization failures (P2034 / 40001) and a bare
