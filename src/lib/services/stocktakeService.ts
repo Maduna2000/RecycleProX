@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db/prisma'
+import { maxRefSeq } from '@/lib/db/refSequence'
 import { requireTenantId } from '@/lib/db/tenantContext'
 import Decimal from 'decimal.js'
 import logger from '@/lib/logger'
@@ -16,13 +17,11 @@ import { postStocktakeAdjustment, reverseStocktakeAdjustmentLedger } from '@/lib
 // already-taken refNumber and collide on (tenantId, refNumber) forever.
 
 async function nextRef(tx: Prisma.TransactionClient): Promise<string> {
-  const last = await tx.stocktake.findFirst({
-    where: { refNumber: { startsWith: 'STK-' } },
-    orderBy: { refNumber: 'desc' },
+  const rows = await tx.stocktake.findMany({
+    where:  { refNumber: { startsWith: 'STK-' } },
     select: { refNumber: true },
   })
-  const lastSeq = last ? parseInt(last.refNumber.slice(last.refNumber.lastIndexOf('-') + 1), 10) : 0
-  return `STK-${String((Number.isFinite(lastSeq) ? lastSeq : 0) + 1).padStart(5, '0')}`
+  return `STK-${String(maxRefSeq(rows.map(r => r.refNumber), 'STK-') + 1).padStart(5, '0')}`
 }
 
 // ─── Build stock snapshot ─────────────────────────────────────────────────────

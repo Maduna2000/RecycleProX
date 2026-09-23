@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db/prisma'
+import { maxRefSeq } from '@/lib/db/refSequence'
 import { requireTenantId } from '@/lib/db/tenantContext'
 import { verifyAdminPin } from '@/lib/services/authService'
 import logger from '@/lib/logger'
@@ -71,28 +72,26 @@ export class BusinessLoanRepaymentNotLastEntryError extends Error {
 // independently-computed day boundary at all.
 type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
 
-function nextRefSuffix(lastRefNumber: string | undefined): number {
-  const lastSuffix = lastRefNumber ? parseInt(lastRefNumber.slice(lastRefNumber.lastIndexOf('-') + 1), 10) : 0
-  return (Number.isFinite(lastSuffix) ? lastSuffix : 0) + 1
+// Next suffix after the numeric max of `<prefix>-<digits>` refs — see maxRefSeq.
+function nextRefSuffix(rows: { refNumber: string }[], prefix: string): number {
+  return maxRefSeq(rows.map(r => r.refNumber), `${prefix}-`) + 1
 }
 
 async function generateBusinessLoanRef(tx: TxClient): Promise<string> {
   const prefix = `BLN-${todaySASTDateStr().replace(/-/g, '')}`
-  const last = await tx.businessLoan.findFirst({
-    where: { refNumber: { startsWith: prefix } },
-    orderBy: { refNumber: 'desc' },
+  const rows = await tx.businessLoan.findMany({
+    where:  { refNumber: { startsWith: prefix } },
     select: { refNumber: true },
   })
-  return `${prefix}-${String(nextRefSuffix(last?.refNumber)).padStart(4, '0')}`
+  return `${prefix}-${String(nextRefSuffix(rows, prefix)).padStart(4, '0')}`
 }
 
 async function nextBusinessLoanRepaymentBaseSeq(tx: TxClient, prefix: string): Promise<number> {
-  const last = await tx.businessLoanRepayment.findFirst({
-    where: { refNumber: { startsWith: prefix } },
-    orderBy: { refNumber: 'desc' },
+  const rows = await tx.businessLoanRepayment.findMany({
+    where:  { refNumber: { startsWith: prefix } },
     select: { refNumber: true },
   })
-  return nextRefSuffix(last?.refNumber) - 1
+  return nextRefSuffix(rows, prefix) - 1
 }
 
 async function withSerializableRetry<T>(fn: () => Promise<T>): Promise<T> {

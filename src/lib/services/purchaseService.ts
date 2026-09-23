@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db/prisma'
+import { maxRefSeq } from '@/lib/db/refSequence'
 import { requireTenantId } from '@/lib/db/tenantContext'
 import { Prisma } from '@prisma/client'
 import logger from '@/lib/logger'
@@ -103,13 +104,11 @@ type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
 // every later create() recompute the same already-taken refNumber and
 // collide on (tenantId, refNumber) forever.
 async function generateRefNumber(tx: TxClient): Promise<string> {
-  const last = await tx.purchase.findFirst({
-    where: { refNumber: { startsWith: 'P' } },
-    orderBy: { refNumber: 'desc' },
+  const rows = await tx.purchase.findMany({
+    where:  { refNumber: { startsWith: 'P' } },
     select: { refNumber: true },
   })
-  const lastSeq = last ? parseInt(last.refNumber.slice(1), 10) : 0
-  return `P${String((Number.isFinite(lastSeq) ? lastSeq : 0) + 1).padStart(5, '0')}`
+  return `P${String(maxRefSeq(rows.map(r => r.refNumber), 'P') + 1).padStart(5, '0')}`
 }
 
 // ─── Cash-effect day (for the cash-up lock) ───────────────────────────────────
@@ -796,13 +795,12 @@ export async function markPurchasePaid(
       // MAX-based (not COUNT) — see generateRefNumber's comment above.
       const today = new Date()
       const prefix = `PAY-${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`
-      const lastPay = await tx.payment.findFirst({
-        where: { refNumber: { startsWith: prefix } },
-        orderBy: { refNumber: 'desc' },
+      const payRows = await tx.payment.findMany({
+        where:  { refNumber: { startsWith: prefix } },
         select: { refNumber: true },
       })
-      const lastPaySeq = lastPay ? parseInt(lastPay.refNumber.slice(lastPay.refNumber.lastIndexOf('-') + 1), 10) : 0
-      const refNumber = `${prefix}-${String((Number.isFinite(lastPaySeq) ? lastPaySeq : 0) + 1).padStart(4, '0')}`
+      const lastPaySeq = maxRefSeq(payRows.map(r => r.refNumber), `${prefix}-`)
+      const refNumber = `${prefix}-${String(lastPaySeq + 1).padStart(4, '0')}`
 
       await tx.payment.create({
         data: {
@@ -931,16 +929,15 @@ export async function processSplitPayment(
       if (eftAmt.greaterThan(0))  payments.push({ method: 'eft',  amount: eftAmt })
 
       for (const p of payments) {
-        const lastPay = await tx.payment.findFirst({
-          where: { refNumber: { startsWith: prefix } },
-          orderBy: { refNumber: 'desc' },
+        const payRows = await tx.payment.findMany({
+          where:  { refNumber: { startsWith: prefix } },
           select: { refNumber: true },
         })
-        const lastPaySeq = lastPay ? parseInt(lastPay.refNumber.slice(lastPay.refNumber.lastIndexOf('-') + 1), 10) : 0
+        const lastPaySeq = maxRefSeq(payRows.map(r => r.refNumber), `${prefix}-`)
         await tx.payment.create({
           data: {
             tenantId:        requireTenantId(),
-            refNumber:       `${prefix}-${String((Number.isFinite(lastPaySeq) ? lastPaySeq : 0) + 1).padStart(4, '0')}`,
+            refNumber:       `${prefix}-${String(lastPaySeq + 1).padStart(4, '0')}`,
             customerId:      purchase.customerId,
             amount:          p.amount,
             paymentMethod:   p.method,

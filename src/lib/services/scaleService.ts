@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db/prisma'
+import { maxRefSeq } from '@/lib/db/refSequence'
 import { requireTenantId } from '@/lib/db/tenantContext'
 import { Prisma } from '@prisma/client'
 import logger from '@/lib/logger'
@@ -106,24 +107,12 @@ export interface ScaleOrderFilters {
 // forever.
 
 async function generateOrderNumber(tx: TxClient): Promise<string> {
-  // Numeric MAX over well-formed "S<digits>" numbers only, computed here
-  // rather than via orderBy — orderBy sorts as TEXT, and the previous
-  // findFirst({ startsWith: 'S', orderBy: desc }) fell back to 0 on a
-  // non-numeric suffix, so a single existing orderNumber that starts with
-  // "S" but isn't "S<digits>" (it sorts above "S0...") made every create()
-  // compute "S00001" and hit P2002 forever after the first one. Plain
-  // findMany (no raw SQL) so the Desktop SQLite build keeps working.
+  // Numeric MAX over well-formed "S<digits>" only — see maxRefSeq.
   const rows = await tx.scaleOrder.findMany({
     where:  { orderNumber: { startsWith: 'S' } },
     select: { orderNumber: true },
   })
-  let lastSeq = 0
-  for (const { orderNumber } of rows) {
-    if (!/^S\d+$/.test(orderNumber)) continue
-    const seq = parseInt(orderNumber.slice(1), 10)
-    if (seq > lastSeq) lastSeq = seq
-  }
-  return `S${String(lastSeq + 1).padStart(5, '0')}`
+  return `S${String(maxRefSeq(rows.map(r => r.orderNumber), 'S') + 1).padStart(5, '0')}`
 }
 
 // Retries on PostgreSQL serialization failures (P2034 / 40001) and a bare

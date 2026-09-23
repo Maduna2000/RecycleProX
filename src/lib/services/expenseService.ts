@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db/prisma'
+import { maxRefSeq } from '@/lib/db/refSequence'
 import { requireTenantId } from '@/lib/db/tenantContext'
 import Decimal from 'decimal.js'
 import logger from '@/lib/logger'
@@ -22,13 +23,11 @@ import { postExpense, reverseExpenseLedger } from '@/lib/services/ledgerService'
 type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
 
 async function nextRef(tx: TxClient): Promise<string> {
-  const last = await tx.expense.findFirst({
-    where: { refNumber: { startsWith: 'EXP-' } },
-    orderBy: { refNumber: 'desc' },
+  const rows = await tx.expense.findMany({
+    where:  { refNumber: { startsWith: 'EXP-' } },
     select: { refNumber: true },
   })
-  const lastSeq = last ? parseInt(last.refNumber.slice(last.refNumber.lastIndexOf('-') + 1), 10) : 0
-  return `EXP-${String((Number.isFinite(lastSeq) ? lastSeq : 0) + 1).padStart(5, '0')}`
+  return `EXP-${String(maxRefSeq(rows.map(r => r.refNumber), 'EXP-') + 1).padStart(5, '0')}`
 }
 
 async function withSerializableRetry<T>(fn: () => Promise<T>): Promise<T> {

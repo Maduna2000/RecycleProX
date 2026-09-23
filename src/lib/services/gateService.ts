@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db/prisma'
+import { maxRefSeq } from '@/lib/db/refSequence'
 import { requireTenantId } from '@/lib/db/tenantContext'
 import { Prisma, type GateEntryPurpose } from '@prisma/client'
 import logger from '@/lib/logger'
@@ -77,13 +78,11 @@ async function generateEntryNumber(tx: TxClient, date: Date): Promise<string> {
   const m = String(date.getMonth() + 1).padStart(2, '0')
   const d = String(date.getDate()).padStart(2, '0')
   const prefix = `GATE-${y}${m}${d}`
-  const last = await tx.gateEntry.findFirst({
-    where: { entryNumber: { startsWith: prefix } },
-    orderBy: { entryNumber: 'desc' },
+  const rows = await tx.gateEntry.findMany({
+    where:  { entryNumber: { startsWith: prefix } },
     select: { entryNumber: true },
   })
-  const lastSeq = last ? parseInt(last.entryNumber.slice(last.entryNumber.lastIndexOf('-') + 1), 10) : 0
-  return `${prefix}-${String((Number.isFinite(lastSeq) ? lastSeq : 0) + 1).padStart(4, '0')}`
+  return `${prefix}-${String(maxRefSeq(rows.map(r => r.entryNumber), `${prefix}-`) + 1).padStart(4, '0')}`
 }
 
 // Queue number for the Scale Station — a short, callable-out-loud sequence

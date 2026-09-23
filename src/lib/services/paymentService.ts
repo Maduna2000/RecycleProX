@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db/prisma'
+import { maxRefSeq } from '@/lib/db/refSequence'
 import { requireTenantId } from '@/lib/db/tenantContext'
 import { Prisma } from '@prisma/client'
 import logger from '@/lib/logger'
@@ -37,13 +38,11 @@ type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
 async function generateRefNumber(tx: TxClient): Promise<string> {
   const today = new Date()
   const prefix = `PAY-${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`
-  const last = await tx.payment.findFirst({
-    where: { refNumber: { startsWith: prefix } },
-    orderBy: { refNumber: 'desc' },
+  const rows = await tx.payment.findMany({
+    where:  { refNumber: { startsWith: prefix } },
     select: { refNumber: true },
   })
-  const lastSeq = last ? parseInt(last.refNumber.slice(last.refNumber.lastIndexOf('-') + 1), 10) : 0
-  return `${prefix}-${String((Number.isFinite(lastSeq) ? lastSeq : 0) + 1).padStart(4, '0')}`
+  return `${prefix}-${String(maxRefSeq(rows.map(r => r.refNumber), `${prefix}-`) + 1).padStart(4, '0')}`
 }
 
 // Retries on PostgreSQL serialization failures (P2034 / 40001) and a bare
