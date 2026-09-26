@@ -463,17 +463,34 @@ async function calcSystemTotals(window: DateWindow, drawingsReceived = new Decim
 }
 
 // ─── Cash-up lock check ───────────────────────────────────────────────────────
-// Once a day's cash-up is approved, its books are closed — void/reverse-payment
-// must refuse to touch any transaction dated that day, full stop. No override.
-// Any approved session for the date is enough to lock it (a day can hold more
-// than one session for separate shifts; matching one is treated the same as
-// matching all — this is a hard block, not a precise per-shift boundary).
-export async function isSessionDateApproved(
+// Once a session's cash-up is approved, its books are closed — void/reverse-
+// payment must refuse to touch any transaction that session counted, full
+// stop. No override.
+//
+// The lock follows the session whose reconciliation window (getSessionWindow)
+// actually contains the transaction's cash-effect instant, not the calendar
+// date. A day can hold more than one session (separate shifts): approving the
+// morning shift must not freeze a purchase made after it closed, which belongs
+// to the afternoon session that nobody has counted yet.
+//
+// Sessions run strictly one after another (only one can be 'open' at a time),
+// and each window runs from the previous non-voided session's closedAt to its
+// own closedAt. So the session owning `instant` is the earliest non-voided one
+// that is still open or closed at/after it. Voided sessions are skipped, same
+// as getSessionWindow does. An instant before the very first session's window
+// start belongs to no session, so nothing locks it.
+export async function isInstantInApprovedSession(
   tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
-  sessionDate: Date
+  instant: Date
 ): Promise<boolean> {
-  const count = await tx.cashUp.count({ where: { sessionDate, status: 'approved' } })
-  return count > 0
+  const owner = await tx.cashUp.findFirst({
+    where:   { status: { not: 'voided' }, OR: [{ closedAt: null }, { closedAt: { gte: instant } }] },
+    orderBy: { openedAt: 'asc' },
+    select:  { status: true, sessionDate: true, openedAt: true, closedAt: true },
+  })
+  if (!owner || owner.status !== 'approved') return false
+  const { start } = await getSessionWindow(tx, owner)
+  return instant >= start
 }
 
 // ─── Recalculate an approved cash-up after a completed sale/purchase is voided ──

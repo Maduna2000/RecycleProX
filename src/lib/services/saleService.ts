@@ -6,8 +6,8 @@ import logger from '@/lib/logger'
 import Decimal from 'decimal.js'
 import { recordMovement, recordVoidReversal } from '@/lib/services/stockService'
 import { applyBusinessLoanRepaymentTx, reverseRepaymentsForSale } from '@/lib/services/businessLoanService'
-import { isSessionDateApproved } from '@/lib/services/cashUpService'
-import { sastDayLabelOfInstant, sastDateLabelToUTCDate } from '@/lib/utils/dayBounds'
+import { isInstantInApprovedSession } from '@/lib/services/cashUpService'
+import { sastDayLabelOfInstant } from '@/lib/utils/dayBounds'
 import type { CreateSaleInput, VoidSaleInput, ReverseSalePaymentInput, UpdateSaleInput } from '@/lib/schemas/sale'
 import type { ProcessSaleSplitPaymentInput } from '@/lib/schemas/splitPayment'
 import { encodeJsonField } from '@/lib/db/queryHelpers'
@@ -87,21 +87,21 @@ async function generateRefNumber(tx: TxClient): Promise<string> {
   return `${prefix}-${String(maxRefSeq(rows.map(r => r.refNumber), `${prefix}-`) + 1).padStart(4, '0')}`
 }
 
-// ─── Cash-effect day (for the cash-up lock) ───────────────────────────────────
-// A completed sale's cash was counted into whichever day's cash-up its
+// ─── Cash-effect instant (for the cash-up lock) ───────────────────────────────
+// A completed sale's cash was counted into whichever session's cash-up its
 // settlement Payment row (markSalePaid/processSaleSplitPayment) landed on —
 // see calcSystemTotals in cashUpService.ts, which buckets Payment rows by
 // their own createdAt, not the parent sale's. Only a sale that was completed
 // directly at creation, with no Payment row ever created, has its cash
 // counted on its own createdAt (the payments:{none:{}} branch there). Using
-// sale.createdAt unconditionally here would check the wrong day whenever a
+// sale.createdAt unconditionally here would check the wrong session whenever a
 // sale sat pending before being settled later.
-async function saleCashEffectDayLabel(tx: TxClient, sale: { id: string; createdAt: Date }): Promise<string> {
+async function saleCashEffectInstant(tx: TxClient, sale: { id: string; createdAt: Date }): Promise<Date> {
   const settlement = await tx.payment.findFirst({
     where: { saleId: sale.id, voidedAt: null },
     orderBy: { createdAt: 'desc' },
   })
-  return sastDayLabelOfInstant(settlement?.createdAt ?? sale.createdAt)
+  return settlement?.createdAt ?? sale.createdAt
 }
 
 // Retries on PostgreSQL serialization failures (P2034 / 40001) and a bare
@@ -285,15 +285,15 @@ export async function voidSale(id: string, data: VoidSaleInput, voidedById?: str
       if (!sale) throw new SaleNotFoundError(id)
       if (sale.status === 'voided') throw new SaleAlreadyVoidedError(sale.refNumber)
 
-      // Once the day this sale's cash was actually counted has an approved
+      // Once the session this sale's cash was actually counted in has an approved
       // cash-up, its books are closed — void is refused outright rather
       // than recalculating the approved totals. No override; a correction
       // becomes a fresh adjusting transaction instead. A still-pending sale
       // was never counted in any cash-up total, so there's nothing to
       // protect — only a completed one needs the check.
       if (sale.status === 'completed') {
-        const dayLabel = await saleCashEffectDayLabel(tx, sale)
-        if (await isSessionDateApproved(tx, sastDateLabelToUTCDate(dayLabel))) throw new CashUpAlreadyApprovedError(dayLabel)
+        const cashInstant = await saleCashEffectInstant(tx, sale)
+        if (await isInstantInApprovedSession(tx, cashInstant)) throw new CashUpAlreadyApprovedError(sastDayLabelOfInstant(cashInstant))
       }
 
       const s = await tx.sale.update({
@@ -361,12 +361,12 @@ export async function reverseSalePayment(id: string, data: ReverseSalePaymentInp
       if (!sale) throw new SaleNotFoundError(id)
       if (sale.status !== 'completed') throw new SaleNotCompletedError(sale.status)
 
-      // Once the day this sale's cash was actually counted has an approved
+      // Once the session this sale's cash was actually counted in has an approved
       // cash-up, its books are closed — a payment reversal is refused
       // outright. No override. Looked up before the settlement Payment row
       // is voided below, while it's still live.
-      const dayLabel = await saleCashEffectDayLabel(tx, sale)
-      if (await isSessionDateApproved(tx, sastDateLabelToUTCDate(dayLabel))) throw new CashUpAlreadyApprovedError(dayLabel)
+      const cashInstant = await saleCashEffectInstant(tx, sale)
+      if (await isInstantInApprovedSession(tx, cashInstant)) throw new CashUpAlreadyApprovedError(sastDayLabelOfInstant(cashInstant))
 
       const s = await tx.sale.update({
         where: { id },
