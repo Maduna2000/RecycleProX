@@ -33,7 +33,7 @@ vi.mock('@/lib/logger', () => ({
 // doesn't pull in their own dependency chains.
 vi.mock('@/lib/services/stockService', () => ({ recordMovement: vi.fn(), recordVoidReversal: vi.fn() }))
 vi.mock('@/lib/services/businessLoanService', () => ({ applyBusinessLoanRepaymentTx: vi.fn(), reverseRepaymentsForSale: vi.fn() }))
-vi.mock('@/lib/services/cashUpService', () => ({ isSessionDateApproved: vi.fn() }))
+vi.mock('@/lib/services/cashUpService', () => ({ isInstantInApprovedSession: vi.fn() }))
 vi.mock('@/lib/services/ledgerService', () => ({
   postSale: vi.fn(), reverseSaleLedger: vi.fn(), reverseSalePaymentLedger: vi.fn(),
   postSaleSettlement: vi.fn(), reverseJournalEntry: vi.fn(), reverseSaleCost: vi.fn(),
