@@ -14,6 +14,7 @@ import { format } from '@/lib/utils/format'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
 import { salesListFetcher, saleDetailFetcher } from '@/lib/offline/fetchers/sales'
 import { OfflineDataBadge } from '@/components/ui/OfflineDataBadge'
+import { TaxInvoiceDateDialog } from '@/components/TaxInvoiceDateDialog'
 import { useSystemCurrency } from '@/hooks/useSystemCurrency'
 import { canAutoPrint, autoPrintReceipt } from '@/lib/print/autoPrintClient'
 import {
@@ -74,6 +75,7 @@ export default function SalesPage() {
   const [sortDir,       setSortDir]       = useState<SortDir>(null)
   const [selectedId,    setSelectedId]    = useState<string | null>(null)
   const [voidTarget,    setVoidTarget]    = useState<Sale | null>(null)
+  const [invDateTarget, setInvDateTarget] = useState<Sale | null>(null)
   const [reverseTarget, setReverseTarget] = useState<Sale | null>(null)
 
   const hasFilters = !!(search || status || paymentMethod || from || to)
@@ -218,6 +220,12 @@ export default function SalesPage() {
       icon:    FileText,
       hidden:  (row) => row.status === 'voided',
       onClick: (row) => window.open(`/api/sales/${row.id}/tax-invoice`, '_blank'),
+    },
+    {
+      label:   'Tax Invoice Date',
+      icon:    Pencil,
+      hidden:  (row) => !isManager || row.status === 'voided',
+      onClick: (row) => setInvDateTarget(row),
     },
     {
       label:   'Reverse Payment',
@@ -407,6 +415,10 @@ export default function SalesPage() {
       </InlineDetailPanel>
 
       {/* Void dialog */}
+      {invDateTarget && (
+        <TaxInvoiceDateDialog kind="sale" id={invDateTarget.id} refNumber={invDateTarget.refNumber} onClose={() => setInvDateTarget(null)} />
+      )}
+
       {voidTarget && (
         <VoidDialog
           sale={voidTarget}

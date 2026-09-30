@@ -433,6 +433,9 @@ model Purchase {
   vehicleReg              String?
   wbTicketNumber          String?
   splitPayments           Json?
+  // Manual override for the Tax Invoice date. Null = derive it from the last
+  // payment (see resolveTaxInvoiceDate).
+  taxInvoiceDate          DateTime?
   scaleOrderId            String?                  @unique
   loanRepayments          LoanRepayment[]
   payments                Payment[]
@@ -500,6 +503,9 @@ model Sale {
   photoR2Keys                 String[]                @default([])
   businessLoanDeductionAmount Decimal?                @db.Decimal(18, 2)
   splitPayments               Json?
+  // Manual override for the Tax Invoice date. Null = derive it from the last
+  // payment (see resolveTaxInvoiceDate).
+  taxInvoiceDate              DateTime?
   customer                    Customer?               @relation("SaleCustomer", fields: [customerId], references: [id])
   lines                       SaleLine[]
   payments                    Payment[]

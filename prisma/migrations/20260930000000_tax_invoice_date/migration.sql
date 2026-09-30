@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Sale" ADD COLUMN IF NOT EXISTS "taxInvoiceDate" TIMESTAMP(3);
+ALTER TABLE "Purchase" ADD COLUMN IF NOT EXISTS "taxInvoiceDate" TIMESTAMP(3);

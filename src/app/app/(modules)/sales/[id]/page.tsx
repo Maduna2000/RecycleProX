@@ -13,6 +13,7 @@ import { PhotoViewer } from '@/components/PhotoUploader'
 import { colors, layout } from '@/lib/design-tokens'
 import { saleDetailFetcher } from '@/lib/offline/fetchers/sales'
 import { OfflineDataBadge } from '@/components/ui/OfflineDataBadge'
+import { TaxInvoiceDateDialog } from '@/components/TaxInvoiceDateDialog'
 import { useSystemCurrency } from '@/hooks/useSystemCurrency'
 import { canAutoPrint, autoPrintReceipt } from '@/lib/print/autoPrintClient'
 import {
@@ -70,6 +71,7 @@ export default function SaleDetailPage() {
   const router = useRouter()
   const { data: session } = useSession()
   const [voidOpen, setVoidOpen] = useState(false)
+  const [invDateOpen, setInvDateOpen] = useState(false)
   const { symbol: currSym } = useSystemCurrency()
 
   const { data: sale, isLoading, error } = useSWR<Sale>(`/api/sales/${id}`, saleDetailFetcher)
@@ -294,6 +296,11 @@ export default function SaleDetailPage() {
                 <Btn size="sm" icon={FileText} onClick={() => window.open(`/api/sales/${sale.id}/tax-invoice`, '_blank')}>
                   Tax Invoice
                 </Btn>
+                {isManager && (
+                  <Btn size="sm" icon={Pencil} onClick={() => setInvDateOpen(true)}>
+                    Invoice Date
+                  </Btn>
+                )}
               </>
             )}
           </div>
@@ -311,6 +318,10 @@ export default function SaleDetailPage() {
           </div>
         </div>
     </PortalPage>
+
+      {invDateOpen && (
+        <TaxInvoiceDateDialog kind="sale" id={sale.id} refNumber={sale.refNumber} onClose={() => setInvDateOpen(false)} />
+      )}
 
       {voidOpen && (
         <VoidModal
