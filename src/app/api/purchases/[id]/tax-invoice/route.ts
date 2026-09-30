@@ -8,6 +8,7 @@ import { fetchR2Bytes } from '@/lib/r2'
 import { purchaseLineAmounts, purchaseHeaderAmounts } from '@/lib/utils/vat'
 import { generateTransactionNote, type NoteLine } from '@/lib/pdf/transactionNote'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
+import { getTaxInvoiceDateInfo } from '@/lib/services/taxInvoiceDateService'
 
 class PurchaseNotFoundForTaxInvoiceError extends Error {}
 
@@ -38,7 +39,7 @@ export async function GET(
   const download = req.nextUrl.searchParams.get('download') === '1'
 
   try {
-    const { purchase, settings, doneByUser } = await runWithRequestTenant(req, async () => {
+    const { purchase, settings, doneByUser, invoiceDate } = await runWithRequestTenant(req, async () => {
       const purchase = await prisma.purchase.findUnique({
         where: { id },
         include: {
@@ -54,7 +55,8 @@ export async function GET(
           ? prisma.user.findUnique({ where: { id: purchase.createdByUserId }, select: { fullName: true } })
           : null,
       ])
-      return { purchase, settings, doneByUser }
+      const { effectiveDate: invoiceDate } = await getTaxInvoiceDateInfo('purchase', id)
+      return { purchase, settings, doneByUser, invoiceDate }
     })
     const logoKey = settings[LOGO_SETTING_KEY]
     const logoPng = logoKey ? await fetchR2Bytes(logoKey) : null
@@ -96,7 +98,7 @@ export async function GET(
     const pdfBytes = await generateTransactionNote({
       type: 'TAX INVOICE',
       refNumber: purchase.refNumber,
-      date: purchase.createdAt,
+      date: invoiceDate,
       status,
       currencySymbol,
       vatRatePercent: settings['vatRate'] ?? '15',
