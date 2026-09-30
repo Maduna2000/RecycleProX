@@ -2,6 +2,7 @@
 
 import { useOfflineStore } from '@/stores/offlineStore'
 import { enqueueMutation } from '@/lib/offline/sync'
+import { apiErrorMessage } from '@/lib/utils/apiError'
 
 export type OfflineMutationOpts = {
   method: 'POST' | 'PUT' | 'DELETE' | 'PATCH'
@@ -51,8 +52,9 @@ export function useOfflineMutation() {
         // unhandled 500 can be a bare technical string with no JSON shape
         // at all. A customer-facing till screen showing that text verbatim
         // instead of "Something went wrong" is the actual bug this fixes.
-        const body = await res.json().catch(() => null) as { error?: string } | null
-        const err = new Error(body?.error || 'Something went wrong — please try again') as Error & { body?: unknown }
+        const body = await res.json().catch(() => null) as { error?: unknown } | null
+        // error may be a string or (legacy routes) a Zod flatten() object.
+        const err = new Error(apiErrorMessage(body?.error, 'Something went wrong — please try again')) as Error & { body?: unknown }
         // Some callers (e.g. cashup submit's MOMO_BALANCE_MISMATCH handling)
         // need structured fields beyond the friendly message — stash the
         // full parsed body rather than forcing them to re-derive it from

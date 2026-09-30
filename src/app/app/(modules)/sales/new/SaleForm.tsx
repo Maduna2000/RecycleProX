@@ -455,6 +455,8 @@ export function SaleForm({ editingSale }: { editingSale?: EditingSale } = {}) {
     if (validLines.length === 0) { toast.error('Add at least one product line'); return }
     for (const l of validLines) {
       if (parseFloat(l.quantity) <= 0) { toast.error('Quantity must be greater than 0'); return }
+      if (!/^-?\d+(\.\d{1,2})?$/.test(l.unitPrice.trim())) { toast.error(`Sell price can have at most 2 decimal places (e.g. 227.24) — got ${l.unitPrice}`); return }
+      if (!/^\d+(\.\d{1,3})?$/.test(l.quantity.trim())) { toast.error(`Quantity can have at most 3 decimal places (e.g. 12.500) — got ${l.quantity}`); return }
       if (parseFloat(l.unitPrice) < 0)  { toast.error('Sell price cannot be negative'); return }
     }
 
@@ -610,6 +612,8 @@ export function SaleForm({ editingSale }: { editingSale?: EditingSale } = {}) {
     if (validLines.length === 0) { toast.error('Add at least one product line'); return }
     for (const l of validLines) {
       if (parseFloat(l.quantity) <= 0) { toast.error('Quantity must be greater than 0'); return }
+      if (!/^-?\d+(\.\d{1,2})?$/.test(l.unitPrice.trim())) { toast.error(`Sell price can have at most 2 decimal places (e.g. 227.24) — got ${l.unitPrice}`); return }
+      if (!/^\d+(\.\d{1,3})?$/.test(l.quantity.trim())) { toast.error(`Quantity can have at most 3 decimal places (e.g. 12.500) — got ${l.quantity}`); return }
       if (parseFloat(l.unitPrice) < 0)  { toast.error('Sell price cannot be negative'); return }
     }
 

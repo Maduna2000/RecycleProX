@@ -565,6 +565,8 @@ export function PurchaseForm({ editingPurchase }: { editingPurchase?: EditingPur
     if (validLines.length === 0) { toast.error('Add at least one product line'); return }
     for (const l of validLines) {
       if (parseFloat(l.quantity) <= 0) { toast.error('Quantity must be greater than 0'); return }
+      if (!/^-?\d+(\.\d{1,2})?$/.test(l.unitPrice.trim())) { toast.error(`Unit price can have at most 2 decimal places (e.g. 227.24) — got ${l.unitPrice}`); return }
+      if (!/^\d+(\.\d{1,3})?$/.test(l.quantity.trim())) { toast.error(`Quantity can have at most 3 decimal places (e.g. 12.500) — got ${l.quantity}`); return }
     }
 
     const deduction = deductLoan && deductionAmount && parseFloat(deductionAmount) > 0 && !isPending
@@ -715,6 +717,8 @@ export function PurchaseForm({ editingPurchase }: { editingPurchase?: EditingPur
     if (validLines.length === 0) { toast.error('Add at least one product line'); return }
     for (const l of validLines) {
       if (parseFloat(l.quantity) <= 0) { toast.error('Quantity must be greater than 0'); return }
+      if (!/^-?\d+(\.\d{1,2})?$/.test(l.unitPrice.trim())) { toast.error(`Unit price can have at most 2 decimal places (e.g. 227.24) — got ${l.unitPrice}`); return }
+      if (!/^\d+(\.\d{1,3})?$/.test(l.quantity.trim())) { toast.error(`Quantity can have at most 3 decimal places (e.g. 12.500) — got ${l.quantity}`); return }
     }
 
     const deduction = deductLoan && deductionAmount && parseFloat(deductionAmount) > 0

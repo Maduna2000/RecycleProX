@@ -3,13 +3,13 @@ import { z } from 'zod'
 const positiveQuantity = z
   .string()
   .min(1, 'Required')
-  .regex(/^\d+(\.\d{1,3})?$/, 'Must be a valid quantity (e.g. 12.500)')
+  .regex(/^\d+(\.\d{1,3})?$/, 'Quantity can have at most 3 decimal places (e.g. 12.500)')
   .refine((v) => parseFloat(v) > 0, 'Quantity must be greater than 0')
 
 const positivePrice = z
   .string()
   .min(1, 'Required')
-  .regex(/^\d+(\.\d{1,2})?$/, 'Must be a valid price')
+  .regex(/^\d+(\.\d{1,2})?$/, 'Price can have at most 2 decimal places (e.g. 227.24)')
   .refine((v) => parseFloat(v) >= 0, 'Price cannot be negative')
 
 const optionalDecimal = z.string().regex(/^\d+(\.\d{1,3})?$/).optional()
