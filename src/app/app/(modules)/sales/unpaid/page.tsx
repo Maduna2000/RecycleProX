@@ -15,6 +15,7 @@ import { toast } from 'sonner'
 import { useSession } from 'next-auth/react'
 import { salesListFetcher, saleDetailFetcher } from '@/lib/offline/fetchers/sales'
 import { OfflineDataBadge } from '@/components/ui/OfflineDataBadge'
+import { TaxInvoiceDateDialog } from '@/components/TaxInvoiceDateDialog'
 import { useSystemCurrency } from '@/hooks/useSystemCurrency'
 import { canAutoPrint, autoPrintReceipt } from '@/lib/print/autoPrintClient'
 import {
@@ -82,6 +83,7 @@ export default function UnpaidSalesPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [payTarget,  setPayTarget]  = useState<PayTarget | null>(null)
   const [voidTarget, setVoidTarget] = useState<Sale | null>(null)
+  const [invDateTarget, setInvDateTarget] = useState<Sale | null>(null)
 
   const hasFilters = !!(search || from || to)
   function clearFilters() { setSearch(''); setFrom(''); setTo(''); setPage(1) }
@@ -248,6 +250,12 @@ export default function UnpaidSalesPage() {
       label:   'Tax Invoice',
       icon:    FileText,
       onClick: (row) => window.open(`/api/sales/${row.id}/tax-invoice`, '_blank'),
+    },
+    {
+      label:   'Tax Invoice Date',
+      icon:    Pencil,
+      hidden:  () => !isManager,
+      onClick: (row) => setInvDateTarget(row),
     },
     {
       label:   'Edit',
@@ -428,6 +436,10 @@ export default function UnpaidSalesPage() {
           onClose={() => setPayTarget(null)}
           onSuccess={() => { mutate(KEY); setPayTarget(null) }}
         />
+      )}
+
+      {invDateTarget && (
+        <TaxInvoiceDateDialog kind="sale" id={invDateTarget.id} refNumber={invDateTarget.refNumber} onClose={() => setInvDateTarget(null)} />
       )}
 
       {voidTarget && (

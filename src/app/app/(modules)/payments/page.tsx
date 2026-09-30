@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import useSWR, { mutate } from 'swr'
 import { useSession } from 'next-auth/react'
-import { Search, Ban, X, FileText } from 'lucide-react'
+import { Search, Ban, X, FileText, Pencil } from 'lucide-react'
 import Decimal from 'decimal.js'
 import { toast } from 'sonner'
 import { DataTable, Avatar, StatusBadge, type Column, type RowAction } from '@/components/ui/DataTable'
@@ -13,6 +13,7 @@ import { format } from '@/lib/utils/format'
 import { colors, fontSize, fontWeight } from '@/lib/design-tokens'
 import { paymentsListFetcher } from '@/lib/offline/fetchers/payments'
 import { OfflineDataBadge } from '@/components/ui/OfflineDataBadge'
+import { TaxInvoiceDateDialog } from '@/components/TaxInvoiceDateDialog'
 import { useSystemCurrency } from '@/hooks/useSystemCurrency'
 import {
   inp, Btn, Field, PortalPage, FilterBar,
@@ -49,6 +50,7 @@ export default function PaymentsPage() {
   const [to,             setTo]             = useState('')
   const [includeVoided,  setIncludeVoided]  = useState(false)
   const [voidTarget,     setVoidTarget]     = useState<Payment | null>(null)
+  const [invDateSale,    setInvDateSale]    = useState<{ id: string; refNumber: string } | null>(null)
   const [page,           setPage]           = useState(1)
 
   const hasFilters = !!(search || paymentMethod || from || to)
@@ -170,6 +172,12 @@ export default function PaymentsPage() {
       onClick: (r) => window.open(`/api/sales/${r.sale!.id}/tax-invoice`, '_blank'),
     },
     {
+      label:   'Tax Invoice Date',
+      icon:    Pencil,
+      hidden:  (r) => !isManager || !r.sale,
+      onClick: (r) => setInvDateSale(r.sale),
+    },
+    {
       label:  'Void Payment',
       icon:   Ban,
       danger: true,
@@ -252,6 +260,10 @@ export default function PaymentsPage() {
           onPageChange={setPage}
         />
       </div>
+
+      {invDateSale && (
+        <TaxInvoiceDateDialog kind="sale" id={invDateSale.id} refNumber={invDateSale.refNumber} onClose={() => setInvDateSale(null)} />
+      )}
 
       {voidTarget && (
         <VoidPaymentModal
