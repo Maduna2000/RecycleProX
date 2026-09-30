@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
+import { zodErrorMessage } from '@/lib/utils/zodError'
 import { UpdatePurchaseSchema } from '@/lib/schemas/purchase'
 import {
   getPurchase, updatePurchase, PurchaseNotFoundError, PurchaseNotPendingError,
@@ -48,7 +49,7 @@ export async function PATCH(
   }
 
   const parsed = UpdatePurchaseSchema.safeParse(body)
-  if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
+  if (!parsed.success) return NextResponse.json({ error: zodErrorMessage(parsed.error), details: parsed.error.flatten() }, { status: 422 })
 
   try {
     const purchase = await runWithRequestTenant(req, () => updatePurchase(id, parsed.data, session.user.id))

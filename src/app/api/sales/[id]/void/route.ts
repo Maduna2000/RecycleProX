@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
+import { zodErrorMessage } from '@/lib/utils/zodError'
 import { VoidSaleSchema } from '@/lib/schemas/sale'
 import { voidSale, SaleNotFoundError, SaleAlreadyVoidedError, CashUpAlreadyApprovedError } from '@/lib/services/saleService'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
@@ -14,7 +15,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   const body = await req.json()
   const parsed = VoidSaleSchema.safeParse(body)
-  if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 })
+  if (!parsed.success) return NextResponse.json({ error: zodErrorMessage(parsed.error), details: parsed.error.flatten() }, { status: 422 })
 
   try {
     const sale = await runWithRequestTenant(req, () => voidSale(params.id, parsed.data, session.user.id))

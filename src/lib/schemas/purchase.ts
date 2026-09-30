@@ -3,12 +3,12 @@ import { z } from 'zod'
 const positiveQuantity = z
   .string()
   .min(1, 'Required')
-  .regex(/^\d+(\.\d{1,3})?$/, 'Must be a valid quantity (e.g. 12.500)')
+  .regex(/^\d+(\.\d{1,3})?$/, 'Quantity can have at most 3 decimal places (e.g. 12.500)')
   .refine((v) => parseFloat(v) > 0, 'Quantity must be greater than 0')
 
 const optionalQty = z
   .string()
-  .regex(/^\d+(\.\d{1,3})?$/, 'Must be a valid quantity')
+  .regex(/^\d+(\.\d{1,3})?$/, 'Quantity can have at most 3 decimal places (e.g. 12.500)')
   .optional()
 
 export const PurchaseLineSchema = z.object({
@@ -25,7 +25,7 @@ export const PurchaseLineSchema = z.object({
   unitPrice: z
     .string()
     .min(1, 'Required')
-    .regex(/^-?\d+(\.\d{1,2})?$/, 'Must be a valid price'),
+    .regex(/^-?\d+(\.\d{1,2})?$/, 'Price can have at most 2 decimal places (e.g. 227.24)'),
   // VAT is opt-in: a line has no VAT applied unless the cashier ticks it.
   vatApplied: z.boolean().default(false),
 }).superRefine((line, ctx) => {
