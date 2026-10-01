@@ -1,6 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { ChevronRight, ChevronDown } from 'lucide-react'
 import { winBevel } from '@/components/rpx'
 
@@ -105,13 +106,17 @@ export function ProductCategoryPicker({
         <ChevronDown style={{ width: 11, height: 11, color: '#6C757D', flexShrink: 0 }} />
       </button>
 
-      {open && pos && (
-        <>
-          <div style={{ position: 'fixed', inset: 0, zIndex: 49 }} onClick={handleClose} />
+      {/* Portaled to <body>: inside a dialog (which is CSS-transformed) a
+          position:fixed child is positioned relative to the dialog, not the
+          viewport, so the list landed offset and clipped. pointerEvents:auto
+          keeps it clickable while a modal locks the rest of the page. */}
+      {open && pos && createPortal(
+        <div style={{ pointerEvents: 'auto' }}>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 9998 }} onClick={handleClose} />
           <div
             style={{
               position: 'fixed', top: pos.top, bottom: pos.bottom, left: pos.left, width: pos.width,
-              zIndex: 50, background: '#fff', borderRadius: 3,
+              zIndex: 9999, background: '#fff', borderRadius: 3,
               boxShadow: '2px 2px 6px rgba(0,0,0,0.3)', maxHeight: pos.maxHeight, overflowY: 'auto',
               ...winBevel(),
             }}
@@ -167,7 +172,8 @@ export function ProductCategoryPicker({
               })
             )}
           </div>
-        </>
+        </div>,
+        document.body
       )}
     </div>
   )
