@@ -327,6 +327,41 @@ export const REPORT_CATALOG: ReportCatalogEntry[] = [
       },
     ],
   },
+  {
+    id: 'stock-variance',
+    label: 'Stock Variance (Counts & Adjustments)',
+    description:
+      'Every completed stocktake and manual stock adjustment in the period showing system quantity vs counted quantity and the variance, valued at buy price — negative variance is stock that was not there when counted. Product transfers are excluded.',
+    area: 'stock',
+    filters: [
+      { key: 'productId', label: 'Product', type: 'product' },
+      { key: 'category', label: 'Category contains', type: 'text' },
+      {
+        key: 'kind', label: 'Source', type: 'select',
+        options: [
+          { value: 'stocktake', label: 'Stocktakes' },
+          { value: 'manual_count', label: 'Manual physical counts' },
+          { value: 'manual_adjustment', label: 'Manual in/out adjustments' },
+        ],
+      },
+      {
+        key: 'direction', label: 'Variance', type: 'select',
+        options: [
+          { value: 'shortage', label: 'Shortages only (missing)' },
+          { value: 'surplus', label: 'Surpluses only' },
+        ],
+      },
+      { key: 'minVariance', label: 'Min variance (qty)', type: 'text' },
+      { key: 'user', label: 'Done by (name)', type: 'text' },
+      {
+        key: 'includeZero', label: 'Zero variance rows', type: 'select',
+        options: [
+          { value: 'no', label: 'Hide' },
+          { value: 'yes', label: 'Show' },
+        ],
+      },
+    ],
+  },
   // ── Accounts & Pricing ─────────────────────────────────────────────────────
   {
     id: 'dealers-price-list',

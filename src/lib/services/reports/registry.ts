@@ -29,6 +29,7 @@ import {
   StockOnHandParamsSchema,
   StockMovementParamsSchema,
   StocktakeReportParamsSchema,
+  StockVarianceParamsSchema,
   PoliceCopperReportParamsSchema,
   ScaleDiscrepancyParamsSchema,
 } from '@/lib/schemas/report'
@@ -64,6 +65,7 @@ import {
 } from './builders/cash'
 import { buildStockOnHand, buildStockMovement } from './builders/stock'
 import { buildStocktakeReport } from './builders/stocktake'
+import { buildStockVariance } from './builders/stockVariance'
 import { buildScaleDiscrepancy } from './builders/scale'
 import { buildDealersPriceList, buildAccountList, buildAccountIdUploadStatus, buildCasualList, buildCasualIdUploadStatus, buildSellerIdUploadStatus } from './builders/accounts'
 import {
@@ -181,6 +183,10 @@ export const REPORT_REGISTRY: Record<string, ReportDefinition> = {
   'stocktake-report': {
     paramsSchema: StocktakeReportParamsSchema,
     build: buildStocktakeReport,
+  },
+  'stock-variance': {
+    paramsSchema: StockVarianceParamsSchema,
+    build: buildStockVariance,
   },
   'dealers-price-list': {
     paramsSchema: BaseReportParamsSchema,

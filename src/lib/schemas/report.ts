@@ -133,12 +133,27 @@ export const StocktakeReportParamsSchema = rangeParams({
   status: z.enum(['open', 'completed', 'all']).optional(),
 })
 
+/**
+ * Stock variance — physical count / manual adjustment shortages and surpluses.
+ * `includeZero` is only meaningful for stocktake entries that matched exactly.
+ */
+export const StockVarianceParamsSchema = rangeParams({
+  productId: z.string().uuid().optional(),
+  category: z.string().trim().max(50).optional(),
+  kind: z.enum(['all', 'stocktake', 'manual_count', 'manual_adjustment']).optional(),
+  direction: z.enum(['all', 'shortage', 'surplus']).optional(),
+  minVariance: z.string().regex(/^\d+(\.\d{1,3})?$/, 'Enter a number like 5 or 2.5').optional(),
+  user: z.string().trim().max(50).optional(),
+  includeZero: z.enum(['yes', 'no']).optional().transform((v) => v === 'yes'),
+})
+
 // ── Police & Compliance ────────────────────────────────────────────────────────
 /** Copper purchases, optionally narrowed to a seller by partial ID number. */
 export const PoliceCopperReportParamsSchema = rangeParams({
   idNumber: z.string().trim().max(20).optional(),
 })
 
+export type StockVarianceParams = z.infer<typeof StockVarianceParamsSchema>
 export type BaseReportParams = z.infer<typeof BaseReportParamsSchema>
 export type ReportFormat = z.infer<typeof ReportFormatSchema>
 export type PurchasesByProductCategoryParams = z.infer<typeof PurchasesByProductCategoryParamsSchema>
