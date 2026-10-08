@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
+import { parseSASTDateRange } from '@/lib/utils/dayBounds'
 import { listAuditLogs } from '@/lib/services/auditLogService'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
@@ -26,8 +27,9 @@ export async function GET(req: NextRequest) {
   const page     = Math.max(1, parseInt(sp.get('page')     ?? '1',  10))
   const pageSize = Math.min(100, parseInt(sp.get('pageSize') ?? '50', 10))
 
-  const from = fromStr ? (() => { const d = new Date(fromStr); d.setHours(0,0,0,0); return d })() : undefined
-  const to   = toStr   ? (() => { const d = new Date(toStr);   d.setHours(23,59,59,999); return d })() : undefined
+  const range = parseSASTDateRange(fromStr, toStr)
+  if (!range) return NextResponse.json({ error: 'Invalid date filter' }, { status: 400 })
+  const { from, to } = range
 
   try {
     const result = await runWithRequestTenant(req, () => listAuditLogs({

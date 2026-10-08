@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
+import { parseSASTDateRange } from '@/lib/utils/dayBounds'
 import { CreateLoanSchema } from '@/lib/schemas/loan'
 import {
   createLoan, listLoans,
@@ -18,8 +19,9 @@ export async function GET(req: NextRequest) {
   const search     = searchParams.get('search') ?? undefined
   const page       = parseInt(searchParams.get('page')     ?? '1')
   const pageSize   = parseInt(searchParams.get('pageSize') ?? '50')
-  const from = searchParams.get('from') ? new Date(searchParams.get('from')!) : undefined
-  const to   = searchParams.get('to')   ? new Date(searchParams.get('to')!)   : undefined
+  const range = parseSASTDateRange(searchParams.get('from'), searchParams.get('to'))
+  if (!range) return NextResponse.json({ error: 'Invalid date filter' }, { status: 400 })
+  const { from, to } = range
 
   try {
     const result = await runWithRequestTenant(req, () => listLoans({ customerId, status, search, page, pageSize, from, to }))

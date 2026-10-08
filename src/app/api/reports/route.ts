@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
+import { parseSASTDateRange } from '@/lib/utils/dayBounds'
 import { getDateRangeReport } from '@/lib/services/reportService'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
@@ -24,10 +25,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'from and to params required (YYYY-MM-DD)' }, { status: 400 })
   }
 
-  const [fy, fm, fd] = fromParam.split('-').map(Number)
-  const [ty, tm, td] = toParam.split('-').map(Number)
-  const from = new Date(fy!, fm! - 1, fd!); from.setHours(0, 0, 0, 0)
-  const to   = new Date(ty!, tm! - 1, td!); to.setHours(23, 59, 59, 999)
+  const range = parseSASTDateRange(fromParam, toParam)
+  if (!range?.from || !range.to) {
+    return NextResponse.json({ error: 'Invalid date filter (YYYY-MM-DD)' }, { status: 400 })
+  }
+  const { from, to } = range
 
   try {
     const report = await runWithRequestTenant(req, () => getDateRangeReport(from, to))

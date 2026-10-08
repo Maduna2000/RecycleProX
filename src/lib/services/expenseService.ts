@@ -5,6 +5,7 @@ import Decimal from 'decimal.js'
 import logger from '@/lib/logger'
 import { Prisma } from '@prisma/client'
 import type { CreateExpenseInput, CreateExpenseTypeInput, UpdateExpenseInput, SettlePendingExpenseInput } from '@/lib/schemas/expense'
+import { resolveExpenseTypes } from '@/lib/services/expenseTypeLookup'
 import { todaySASTDate, getRangeBoundsSAST } from '@/lib/utils/dayBounds'
 import type { DateWindow } from '@/lib/services/cashUpWindow'
 import { postExpense, reverseExpenseLedger } from '@/lib/services/ledgerService'
@@ -157,11 +158,11 @@ export async function listExpenses(filters: {
       skip: (page - 1) * limit,
       take: limit,
       orderBy: { createdAt: 'desc' },
-      include: { expenseType: true, _count: { select: { attachments: true } } },
+      include: { _count: { select: { attachments: true } } },
     }),
     prisma.expense.count({ where }),
   ])
-  return { expenses, total, page, totalPages: Math.ceil(total / limit) }
+  return { expenses: await resolveExpenseTypes(expenses), total, page, totalPages: Math.ceil(total / limit) }
 }
 
 export async function getExpense(id: string) {
@@ -431,7 +432,7 @@ export async function deleteExpenseAttachment(
 // least one attachment, oldest first — the input to the bulk receipt download.
 export async function listExpensesWithReceipts(fromLabel: string, toLabel: string) {
   const { start, end } = getRangeBoundsSAST(fromLabel, toLabel)
-  return prisma.expense.findMany({
+  const expenses = await prisma.expense.findMany({
     where: {
       status:      { not: 'voided' },
       createdAt:   { gte: start, lte: end },
@@ -441,13 +442,16 @@ export async function listExpensesWithReceipts(fromLabel: string, toLabel: strin
     select: {
       id: true, refNumber: true, createdAt: true, description: true,
       amount: true, vatAmount: true, includesVat: true, paymentMethod: true, status: true,
-      expenseType: { select: { name: true } },
+      expenseTypeId: true,
       attachments: {
         orderBy: { uploadedAt: 'asc' },
         select: { id: true, r2Key: true, fileName: true },
       },
     },
   })
+  // Category resolved separately so one unreadable category can't fail the
+  // whole download (same approach as listExpenses).
+  return resolveExpenseTypes(expenses)
 }
 
 export async function getExpensesByCategory(from: Date, to: Date) {
