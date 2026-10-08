@@ -5,6 +5,7 @@ import Decimal from 'decimal.js'
 import logger from '@/lib/logger'
 import { Prisma } from '@prisma/client'
 import type { CreateExpenseInput, CreateExpenseTypeInput, UpdateExpenseInput, SettlePendingExpenseInput } from '@/lib/schemas/expense'
+import { resolveExpenseTypes } from '@/lib/services/expenseTypeLookup'
 import { todaySASTDate } from '@/lib/utils/dayBounds'
 import type { DateWindow } from '@/lib/services/cashUpWindow'
 import { postExpense, reverseExpenseLedger } from '@/lib/services/ledgerService'
@@ -157,11 +158,11 @@ export async function listExpenses(filters: {
       skip: (page - 1) * limit,
       take: limit,
       orderBy: { createdAt: 'desc' },
-      include: { expenseType: true, _count: { select: { attachments: true } } },
+      include: { _count: { select: { attachments: true } } },
     }),
     prisma.expense.count({ where }),
   ])
-  return { expenses, total, page, totalPages: Math.ceil(total / limit) }
+  return { expenses: await resolveExpenseTypes(expenses), total, page, totalPages: Math.ceil(total / limit) }
 }
 
 export async function getExpense(id: string) {

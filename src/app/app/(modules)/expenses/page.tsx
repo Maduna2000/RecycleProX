@@ -42,6 +42,12 @@ type Expense = {
 const PAGE_TABS = ['All', 'Pending', 'Approved'] as const
 type PageTab = typeof PAGE_TABS[number]
 
+// A date <input> emits partial values while the year is being typed (e.g. "0002-09-01");
+// only send complete, plausible dates to the API.
+function isCompleteDate(v: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(v) && v >= '2000-01-01'
+}
+
 export default function ExpensesPage() {
   const router        = useRouter()
   const searchParams  = useSearchParams()
@@ -85,13 +91,13 @@ export default function ExpensesPage() {
     ...(statusFilter && { status: statusFilter }),
     ...(hideVoided   && { hideVoided: 'true' }),
     ...(search       && { search }),
-    ...(from         && { from }),
-    ...(to           && { to }),
+    ...(isCompleteDate(from) && { from }),
+    ...(isCompleteDate(to)   && { to }),
     page:  String(page),
     limit: '30',
   })
   const key = `/api/expenses?${query}`
-  const { data, isLoading } = useSWR<{ expenses: Expense[]; total: number }>(key, fetcher)
+  const { data, isLoading, error } = useSWR<{ expenses: Expense[]; total: number }>(key, fetcher)
 
   // A filter/tab change can leave `page` pointing past the end of a newly
   // narrowed result set (e.g. going from page 3 of "All" to "Pending" with
@@ -323,6 +329,15 @@ export default function ExpensesPage() {
               {currSym} {totalApproved.toFixed(2)}
             </p>
           </div>
+        </div>
+      )}
+
+      {error && (
+        <div
+          role="alert"
+          style={{ margin: '10px 10px 0', padding: '8px 12px', background: '#fdecea', border: '1px solid #f5c2c0', borderRadius: 2, fontSize: 12, color: '#a12622' }}
+        >
+          Could not load expenses: {error.message}
         </div>
       )}
 
