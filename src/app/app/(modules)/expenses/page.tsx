@@ -88,7 +88,7 @@ export default function ExpensesPage() {
     if (!from || !to) { toast.error('Choose a From and To date first'); return }
     setZipping(true)
     try {
-      const res = await fetch(`/api/expenses/receipts-zip?${new URLSearchParams({ from, to })}`)
+      const res = await fetch(`/api/expenses/receipts-export?${new URLSearchParams({ from, to })}`)
       const body = await res.json().catch(() => null)
       if (!res.ok || !body?.url) {
         toast.error(body?.error ?? `Could not prepare the receipts download (HTTP ${res.status})`)

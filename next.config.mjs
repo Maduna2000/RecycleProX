@@ -26,6 +26,14 @@ const pwaConfig = withPWA({
         expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 * 6 },
       },
     },
+    // Receipt export — network-only. The reply is a short-lived download link
+    // for the requested date range; the 5s network-first fallback below would
+    // serve a previous range's (expired) link whenever a large export takes
+    // longer than that to build. Must stay above the /api/expenses rule.
+    {
+      urlPattern: /\/api\/expenses\/receipts-/,
+      handler: 'NetworkOnly',
+    },
     // Other API GET calls — network-first
     {
       urlPattern: /\/api\/(purchases|sales|expenses|stock)/,
