@@ -5,7 +5,7 @@ import { ExpenseReceiptsZipQuerySchema } from '@/lib/schemas/expense'
 import { listExpensesWithReceipts } from '@/lib/services/expenseService'
 import { planReceiptFiles, receiptZipEntries } from '@/lib/services/expenseReceiptExport'
 import { createZipStream } from '@/lib/zip/storedZip'
-import { fetchR2Bytes } from '@/lib/r2'
+import { fetchR2Bytes, uploadStream, getDownloadUrl, expenseReceiptsExportKey } from '@/lib/r2'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
 import { zodErrorMessage } from '@/lib/utils/zodError'
 
@@ -45,18 +45,25 @@ export async function GET(req: NextRequest) {
       )
     }
 
-    logger.info({ userId: session.user.id, from, to, expenses: rows.length, receipts: receiptCount }, 'expense.receipts.zip.started')
+    const userId = session.user.id
+    const startedAt = Date.now()
+    logger.info({ userId, from, to, expenses: rows.length, receipts: receiptCount }, 'expense.receipts.zip.started')
 
-    const entries = receiptZipEntries(rows, fetchR2Bytes, (r2Key, expenseRef) =>
-      logger.warn({ r2Key, expenseRef }, 'expense.receipts.zip.receipt_missing'),
-    )
-    return new Response(createZipStream(entries), {
-      headers: {
-        'Content-Type': 'application/zip',
-        'Content-Disposition': `attachment; filename="expense-receipts_${from}_to_${to}.zip"`,
-        'Cache-Control': 'no-store',
-      },
+    // Built straight into R2 and handed back as a download link: a ZIP this
+    // size would otherwise have to travel back through the function response,
+    // which is capped by the hosting platform.
+    let missing = 0
+    const entries = receiptZipEntries(rows, fetchR2Bytes, (r2Key, expenseRef) => {
+      missing++
+      logger.warn({ r2Key, expenseRef }, 'expense.receipts.zip.receipt_missing')
     })
+    const key = expenseReceiptsExportKey(userId)
+    const bytes = await uploadStream(key, createZipStream(entries), 'application/zip')
+
+    const fileName = `expense-receipts_${from}_to_${to}.zip`
+    const url = await getDownloadUrl(key, fileName, 'application/zip')
+    logger.info({ userId, from, to, receipts: receiptCount, missing, bytes, ms: Date.now() - startedAt }, 'expense.receipts.zip.ready')
+    return NextResponse.json({ url, fileName, receipts: receiptCount, missing, bytes })
   } catch (err) {
     logger.error({ err, from, to }, 'GET /api/expenses/receipts-zip failed')
     return NextResponse.json({ error: 'Failed to build the receipts download' }, { status: 500 })

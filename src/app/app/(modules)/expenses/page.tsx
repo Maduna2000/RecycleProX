@@ -82,29 +82,31 @@ export default function ExpensesPage() {
   const hasFilters = !!(search || from || to || statusTab !== 'All')
   function clearFilters() { setSearch(''); setFrom(''); setTo(''); setStatusTab('All') }
 
-  // Bundles every attached receipt in the chosen From/To range into one ZIP.
-  // Fetched (not navigated to) so a "no receipts" / "too many" answer shows as
-  // a toast instead of replacing the page with JSON.
+  // Asks the server to bundle every attached receipt in the chosen From/To
+  // range into one ZIP, then downloads it from the link it returns.
   async function downloadReceiptsZip() {
     if (!from || !to) { toast.error('Choose a From and To date first'); return }
     setZipping(true)
     try {
       const res = await fetch(`/api/expenses/receipts-zip?${new URLSearchParams({ from, to })}`)
-      if (!res.ok) {
-        const body = await res.json().catch(() => null)
-        toast.error(body?.error ?? 'Could not download receipts')
+      const body = await res.json().catch(() => null)
+      if (!res.ok || !body?.url) {
+        toast.error(body?.error ?? `Could not prepare the receipts download (HTTP ${res.status})`)
         return
       }
-      const url = URL.createObjectURL(await res.blob())
       const a = document.createElement('a')
-      a.href = url
-      a.download = `expense-receipts_${from}_to_${to}.zip`
+      a.href = body.url
+      a.download = body.fileName
       document.body.appendChild(a)
       a.click()
       a.remove()
-      URL.revokeObjectURL(url)
-    } catch {
-      toast.error('Could not download receipts')
+      toast.success(
+        body.missing > 0
+          ? `${body.receipts - body.missing} of ${body.receipts} receipts downloaded. ${body.missing} could not be read (see 00_index.csv).`
+          : `${body.receipts} receipts downloaded`,
+      )
+    } catch (err) {
+      toast.error(`Could not prepare the receipts download${err instanceof Error ? `: ${err.message}` : ''}`)
     } finally {
       setZipping(false)
     }
