@@ -1,4 +1,7 @@
-import { PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3'
+import {
+  PutObjectCommand, DeleteObjectCommand, GetObjectCommand,
+  CreateMultipartUploadCommand, UploadPartCommand, CompleteMultipartUploadCommand, AbortMultipartUploadCommand,
+} from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { getR2Client, R2_BUCKET } from '@/lib/r2/client'
 import { tenantContext } from '@/lib/db/tenantContext'
@@ -64,6 +67,12 @@ export function gateEntryPhotoKey(entryId: string, index: number, ext: string): 
   return `${tenantKeyPrefix()}gate-entries/${entryId}/photo-${index}-${randomUUID()}.${ext}`
 }
 
+// One export object per user, overwritten on each download, so temporary
+// ZIPs never pile up in the bucket.
+export function expenseReceiptsExportKey(userId: string): string {
+  return `${tenantKeyPrefix()}exports/expense-receipts/${userId}.zip`
+}
+
 export function momoStatementCsvKey(importId: string): string {
   return `${tenantKeyPrefix()}momo-statements/${importId}.csv`
 }
@@ -93,6 +102,97 @@ export async function getUploadUrl(opts: {
 export async function getViewUrl(key: string, expiresIn = 3600): Promise<string> {
   const client = getR2Client()
   const cmd = new GetObjectCommand({ Bucket: R2_BUCKET, Key: key })
+  return getSignedUrl(client, cmd, { expiresIn })
+}
+
+// ─── Streaming multipart upload ───────────────────────────────────────────────
+// Uploads a stream of unknown length without holding it all in memory. R2
+// needs every part except the last to be the same size, so parts are cut at a
+// fixed size. Returns the total bytes written. An upload that fails part-way
+// is aborted so no orphaned parts are left (and billed) in the bucket.
+
+const MULTIPART_PART_BYTES = 8 * 1024 * 1024
+
+export async function uploadStream(
+  key: string,
+  stream: ReadableStream<Uint8Array>,
+  contentType: string,
+): Promise<number> {
+  const client = getR2Client()
+  const reader = stream.getReader()
+  const pending: Uint8Array[] = []
+  let pendingBytes = 0
+  let total = 0
+  let uploadId: string | undefined
+  const parts: { ETag: string | undefined; PartNumber: number }[] = []
+
+  const takePart = (size: number): Uint8Array => {
+    const out = new Uint8Array(size)
+    let filled = 0
+    while (filled < size) {
+      const head = pending[0]!
+      const need = size - filled
+      if (head.length <= need) {
+        out.set(head, filled); filled += head.length; pending.shift()
+      } else {
+        out.set(head.subarray(0, need), filled); pending[0] = head.subarray(need); filled += need
+      }
+    }
+    pendingBytes -= size
+    return out
+  }
+
+  const sendPart = async (body: Uint8Array) => {
+    if (!uploadId) {
+      const created = await client.send(new CreateMultipartUploadCommand({ Bucket: R2_BUCKET, Key: key, ContentType: contentType }))
+      uploadId = created.UploadId
+      if (!uploadId) throw new Error('R2 did not return a multipart upload id')
+    }
+    const partNumber = parts.length + 1
+    const res = await client.send(new UploadPartCommand({
+      Bucket: R2_BUCKET, Key: key, UploadId: uploadId, PartNumber: partNumber, Body: body,
+    }))
+    parts.push({ ETag: res.ETag, PartNumber: partNumber })
+  }
+
+  try {
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (value?.length) { pending.push(value); pendingBytes += value.length; total += value.length }
+      while (pendingBytes >= MULTIPART_PART_BYTES) await sendPart(takePart(MULTIPART_PART_BYTES))
+      if (done) break
+    }
+    const rest = pendingBytes > 0 ? takePart(pendingBytes) : new Uint8Array(0)
+    if (!uploadId) {
+      // Small enough for a single request.
+      await client.send(new PutObjectCommand({ Bucket: R2_BUCKET, Key: key, Body: rest, ContentType: contentType }))
+      return total
+    }
+    if (rest.length > 0) await sendPart(rest)
+    await client.send(new CompleteMultipartUploadCommand({
+      Bucket: R2_BUCKET, Key: key, UploadId: uploadId, MultipartUpload: { Parts: parts },
+    }))
+    return total
+  } catch (err) {
+    if (uploadId) {
+      await client.send(new AbortMultipartUploadCommand({ Bucket: R2_BUCKET, Key: key, UploadId: uploadId })).catch(() => undefined)
+    }
+    throw err
+  } finally {
+    reader.releaseLock()
+  }
+}
+
+// ─── Presigned download URL (forces a file download) ─────────────────────────
+
+export async function getDownloadUrl(key: string, fileName: string, contentType: string, expiresIn = 600): Promise<string> {
+  const client = getR2Client()
+  const cmd = new GetObjectCommand({
+    Bucket: R2_BUCKET,
+    Key: key,
+    ResponseContentType: contentType,
+    ResponseContentDisposition: `attachment; filename="${fileName.replace(/[^A-Za-z0-9._-]/g, '_')}"`,
+  })
   return getSignedUrl(client, cmd, { expiresIn })
 }
 
