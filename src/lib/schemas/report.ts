@@ -95,6 +95,13 @@ export const SalesSplitPaymentsParamsSchema = rangeParams({
 })
 
 // ── Cash & Financial ──────────────────────────────────────────────────────────
+/** VAT on tax invoices (sales + purchases), by tax-invoice date; optional customer / account-type filters. */
+export const VatTaxInvoicesParamsSchema = rangeParams({
+  docType: z.enum(['sales', 'purchases']).optional(),
+  customerId: z.string().uuid().optional(),
+  customerType: z.enum(['account', 'casual']).optional(),
+})
+
 export const ExpensesReportParamsSchema = rangeParams({
   status: z.enum(['approved', 'pending', 'all']).optional(),
 })
@@ -165,6 +172,7 @@ export type PurchasesSplitPaymentsParams = z.infer<typeof PurchasesSplitPayments
 export type PurchasesByIdSearchParams = z.infer<typeof PurchasesByIdSearchParamsSchema>
 export type SalesDailyParams = z.infer<typeof SalesDailyParamsSchema>
 export type SalesByProductParams = z.infer<typeof SalesByProductParamsSchema>
+export type VatTaxInvoicesParams = z.infer<typeof VatTaxInvoicesParamsSchema>
 export type SalesByCustomerParams = z.infer<typeof SalesByCustomerParamsSchema>
 export type SalesSplitPaymentsParams = z.infer<typeof SalesSplitPaymentsParamsSchema>
 export type ExpensesReportParams = z.infer<typeof ExpensesReportParamsSchema>

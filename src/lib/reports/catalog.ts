@@ -250,6 +250,30 @@ export const REPORT_CATALOG: ReportCatalogEntry[] = [
     filters: [],
   },
   {
+    id: 'vat-tax-invoices',
+    label: 'VAT on Tax Invoices (Sales & Purchases)',
+    description:
+      'VAT on every tax invoice dated in the period — sales (output VAT) and purchases (input VAT) — grouped by document type and customer, with sub total, VAT and total per invoice. Filter by customer or account type.',
+    area: 'cash',
+    filters: [
+      {
+        key: 'docType', label: 'Invoices', type: 'select',
+        options: [
+          { value: 'sales', label: 'Sales only' },
+          { value: 'purchases', label: 'Purchases only' },
+        ],
+      },
+      { key: 'customerId', label: 'Customer / Account', type: 'customer' },
+      {
+        key: 'customerType', label: 'Customer Type', type: 'select',
+        options: [
+          { value: 'account', label: 'Account customers' },
+          { value: 'casual', label: 'Casual customers' },
+        ],
+      },
+    ],
+  },
+  {
     id: 'cancelled-transactions',
     label: 'Cancelled / Voided Transactions',
     description:
