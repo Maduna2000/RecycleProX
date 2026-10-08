@@ -6,7 +6,7 @@ import { useSearchParams } from 'next/navigation'
 import Decimal from 'decimal.js'
 import useSWR, { mutate } from 'swr'
 import { useSession } from 'next-auth/react'
-import { CheckCircle, Trash2, Receipt, Search, X, Paperclip, Upload, Eye, Pencil } from 'lucide-react'
+import { CheckCircle, Trash2, Receipt, Search, X, Paperclip, Upload, Eye, Pencil, Download } from 'lucide-react'
 import { toast } from 'sonner'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -58,6 +58,7 @@ export default function ExpensesPage() {
   const [from,           setFrom]           = useState('')
   const [to,             setTo]             = useState('')
   const [hideVoided,     setHideVoided]     = useState(false)
+  const [zipping,        setZipping]        = useState(false)
   const [page,           setPage]           = useState(1)
 
   // Open modal from toolbar query params
@@ -74,6 +75,34 @@ export default function ExpensesPage() {
 
   const hasFilters = !!(search || from || to || statusTab !== 'All')
   function clearFilters() { setSearch(''); setFrom(''); setTo(''); setStatusTab('All') }
+
+  // Bundles every attached receipt in the chosen From/To range into one ZIP.
+  // Fetched (not navigated to) so a "no receipts" / "too many" answer shows as
+  // a toast instead of replacing the page with JSON.
+  async function downloadReceiptsZip() {
+    if (!from || !to) { toast.error('Choose a From and To date first'); return }
+    setZipping(true)
+    try {
+      const res = await fetch(`/api/expenses/receipts-zip?${new URLSearchParams({ from, to })}`)
+      if (!res.ok) {
+        const body = await res.json().catch(() => null)
+        toast.error(body?.error ?? 'Could not download receipts')
+        return
+      }
+      const url = URL.createObjectURL(await res.blob())
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `expense-receipts_${from}_to_${to}.zip`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    } catch {
+      toast.error('Could not download receipts')
+    } finally {
+      setZipping(false)
+    }
+  }
 
   const statusMap: Record<PageTab, string | undefined> = {
     Pending:  'pending',
@@ -302,6 +331,18 @@ export default function ExpensesPage() {
         </label>
         {hasFilters && (
           <Btn size="sm" icon={X} onClick={clearFilters}>Clear</Btn>
+        )}
+        {isManager && (
+          <Btn
+            size="sm"
+            icon={Download}
+            loading={zipping}
+            disabled={!from || !to}
+            title={from && to ? 'Download every receipt in this date range as one ZIP' : 'Choose a From and To date to download receipts'}
+            onClick={downloadReceiptsZip}
+          >
+            Receipts (ZIP)
+          </Btn>
         )}
         <span style={{ marginLeft: 'auto', fontSize: 11, color: '#6C757D', paddingBottom: 8 }}>
           {data?.total ?? expenses.length} expenses

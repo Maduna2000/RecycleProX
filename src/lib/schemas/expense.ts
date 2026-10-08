@@ -60,3 +60,10 @@ export const UploadExpenseAttachmentSchema = z.object({
   notes:    z.string().max(500).optional(),
 })
 export type UploadExpenseAttachmentInput = z.infer<typeof UploadExpenseAttachmentSchema>
+
+// Bulk receipt download — an inclusive SAST calendar-day range ("YYYY-MM-DD").
+const dayLabel = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use the format YYYY-MM-DD')
+export const ExpenseReceiptsZipQuerySchema = z
+  .object({ from: dayLabel, to: dayLabel })
+  .refine((v) => v.from <= v.to, { message: '"From" must not be after "To"', path: ['from'] })
+export type ExpenseReceiptsZipQuery = z.infer<typeof ExpenseReceiptsZipQuerySchema>
