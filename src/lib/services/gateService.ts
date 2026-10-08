@@ -5,6 +5,7 @@ import { Prisma, type GateEntryPurpose } from '@prisma/client'
 import logger from '@/lib/logger'
 import { ciContains } from '@/lib/db/queryHelpers'
 import type { CreateGateEntryInput, UpdateGatePurposeConfigInput, CreateSellOptionInput, UpdateSellOptionInput } from '@/lib/schemas/gate'
+import { parseSASTDateRange } from '@/lib/utils/dayBounds'
 
 // ─── Typed Errors ─────────────────────────────────────────────────────────────
 
@@ -215,9 +216,11 @@ export async function listGateEntries(filters: GateEntryFilters) {
   if (filters.onSiteOnly) where.exitedAt = null
 
   if (filters.dateFrom || filters.dateTo) {
+    // Inclusive SAST calendar days; invalid labels are ignored (routes validate upstream).
+    const range = parseSASTDateRange(filters.dateFrom, filters.dateTo)
     where.createdAt = {
-      ...(filters.dateFrom ? { gte: new Date(filters.dateFrom) } : {}),
-      ...(filters.dateTo   ? { lte: new Date(filters.dateTo + 'T23:59:59.999Z') } : {}),
+      ...(range?.from ? { gte: range.from } : {}),
+      ...(range?.to   ? { lte: range.to }   : {}),
     }
   }
 
