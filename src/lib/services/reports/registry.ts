@@ -32,6 +32,7 @@ import {
   StockVarianceParamsSchema,
   PoliceCopperReportParamsSchema,
   ScaleDiscrepancyParamsSchema,
+  VatTaxInvoicesParamsSchema,
 } from '@/lib/schemas/report'
 import {
   buildPurchasesByProductCategory,
@@ -63,6 +64,7 @@ import {
   buildCancelledTransactions,
   buildCashupSnapshot,
 } from './builders/cash'
+import { buildVatTaxInvoices } from './builders/vat'
 import { buildStockOnHand, buildStockMovement } from './builders/stock'
 import { buildStocktakeReport } from './builders/stocktake'
 import { buildStockVariance } from './builders/stockVariance'
@@ -163,6 +165,10 @@ export const REPORT_REGISTRY: Record<string, ReportDefinition> = {
   'vat-summary': {
     paramsSchema: BaseReportParamsSchema,
     build: buildVatSummary,
+  },
+  'vat-tax-invoices': {
+    paramsSchema: VatTaxInvoicesParamsSchema,
+    build: buildVatTaxInvoices,
   },
   'cancelled-transactions': {
     paramsSchema: BaseReportParamsSchema,
