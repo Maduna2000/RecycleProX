@@ -3,6 +3,7 @@
  * cash on hand, outstanding loans, loan payments, profit summary, VAT
  * summary, voided transactions.
  */
+import { resolveExpenseTypes } from '@/lib/services/expenseTypeLookup'
 import Decimal from 'decimal.js'
 import { prisma } from '@/lib/db/prisma'
 import { getRangeBoundsSAST, sastDateLabelToUTCDate, sastDayLabelOfInstant } from '@/lib/utils/dayBounds'
@@ -234,7 +235,7 @@ export async function buildExpensesReport(
   const { start, end } = getRangeBoundsSAST(params.from, params.to)
   const status = params.status ?? 'approved'
 
-  const expenses = await prisma.expense.findMany({
+  const expenses = await resolveExpenseTypes(await prisma.expense.findMany({
     where: {
       createdAt: { gte: start, lte: end },
       ...(status === 'all' ? { status: { not: 'voided' as const } } : { status }),
@@ -248,9 +249,9 @@ export async function buildExpensesReport(
       includesVat: true,
       paymentMethod: true,
       createdAt: true,
-      expenseType: { select: { name: true, parent: { select: { name: true } } } },
+      expenseTypeId: true,
     },
-  })
+  }))
 
   type Exp = (typeof expenses)[number]
   const parentTypeOf = (e: Exp) => (e.expenseType.parent?.name ?? e.expenseType.name).toUpperCase()
@@ -331,7 +332,7 @@ export async function buildExpensesReceiptsReport(
   const { start, end } = getRangeBoundsSAST(params.from, params.to)
   const status = params.status ?? 'approved'
 
-  const expenses = await prisma.expense.findMany({
+  const expenses = await resolveExpenseTypes(await prisma.expense.findMany({
     where: {
       createdAt: { gte: start, lte: end },
       ...(status === 'all' ? { status: { not: 'voided' as const } } : { status }),
@@ -346,7 +347,7 @@ export async function buildExpensesReceiptsReport(
       paymentMethod: true,
       status: true,
       createdAt: true,
-      expenseType: { select: { name: true, parent: { select: { name: true } } } },
+      expenseTypeId: true,
       attachments: {
         select: { r2Key: true },
         orderBy: { uploadedAt: 'asc' },
@@ -354,7 +355,7 @@ export async function buildExpensesReceiptsReport(
       },
     },
     orderBy: { createdAt: 'asc' },
-  })
+  }))
 
   const rows: ReportRow[] = await Promise.all(
     expenses.map(async (e) => {
