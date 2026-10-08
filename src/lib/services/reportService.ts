@@ -2,7 +2,7 @@ import { prisma } from '@/lib/db/prisma'
 import Decimal from 'decimal.js'
 import { getExpensesByCategory } from './expenseService'
 import { getProfitAndLoss } from './ledgerReportService'
-import { sastDayLabelOfInstant } from '@/lib/utils/dayBounds'
+import { sastDayLabelOfInstant, getDayBoundsSAST, todaySASTDate } from '@/lib/utils/dayBounds'
 
 export async function getDateRangeReport(from: Date, to: Date) {
   const [
@@ -226,9 +226,7 @@ export async function getProfitSummary(from: Date, to: Date) {
 }
 
 export async function getTodayStats() {
-  const now   = new Date()
-  const start = new Date(now); start.setHours(0, 0, 0, 0)
-  const end   = new Date(now); end.setHours(23, 59, 59, 999)
+  const { start, end } = getDayBoundsSAST(todaySASTDate())
 
   const [salesAgg, purchasesAgg, salesCount, purchasesCount, openCashUp] = await Promise.all([
     prisma.sale.aggregate({

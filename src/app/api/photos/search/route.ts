@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
+import { parseSASTDateRange } from '@/lib/utils/dayBounds'
 import { prisma } from '@/lib/db/prisma'
 import { getViewUrl } from '@/lib/r2'
 import { ID_LIKE_DOCUMENT_TYPES } from '@/lib/customerDocuments'
@@ -32,11 +33,10 @@ export async function GET(req: NextRequest) {
   const customerId = searchParams.get('customerId')  ?? undefined
   const search     = searchParams.get('search')      ?? undefined
   const product    = searchParams.get('product')     ?? undefined
-  // Date-only inputs (YYYY-MM-DD) — pin explicitly to UTC day boundaries so
-  // `to` includes the whole day instead of stopping at its midnight start,
-  // which previously excluded every record actually created that day.
-  const from       = searchParams.get('from') ? new Date(`${searchParams.get('from')}T00:00:00.000Z`) : undefined
-  const to         = searchParams.get('to')   ? new Date(`${searchParams.get('to')}T23:59:59.999Z`)   : undefined
+  // Date-only inputs (YYYY-MM-DD) are SAST calendar days; `to` includes the whole day.
+  const range = parseSASTDateRange(searchParams.get('from'), searchParams.get('to'))
+  if (!range) return NextResponse.json({ error: 'Invalid date filter' }, { status: 400 })
+  const { from, to } = range
   const page       = parseInt(searchParams.get('page')     ?? '1')
   const pageSize   = Math.min(parseInt(searchParams.get('pageSize') ?? '24'), 48)
 

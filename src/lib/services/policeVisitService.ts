@@ -10,6 +10,7 @@ import type {
 } from '@/lib/schemas/police'
 import { ciContains } from '@/lib/db/queryHelpers'
 import { decodePhotoKeys } from '@/lib/offline/photoKeysCodec'
+import { getDayBoundsSAST, sastDateLabelToUTCDate } from '@/lib/utils/dayBounds'
 
 /** Idle window after which an active inspection session expires (15 minutes). */
 export const INSPECTION_IDLE_TIMEOUT_MS = 15 * 60_000
@@ -213,12 +214,10 @@ export async function getActiveVisitOrThrow(visitId: string): Promise<PoliceVisi
 // ─── Register searches (officer portal) ───────────────────────────────────────
 
 function dayStart(ymd: string): Date {
-  const [y, m, d] = ymd.split('-').map(Number)
-  return new Date(y!, m! - 1, d!, 0, 0, 0, 0)
+  return getDayBoundsSAST(sastDateLabelToUTCDate(ymd)).start
 }
 function dayEnd(ymd: string): Date {
-  const [y, m, d] = ymd.split('-').map(Number)
-  return new Date(y!, m! - 1, d!, 23, 59, 59, 999)
+  return getDayBoundsSAST(sastDateLabelToUTCDate(ymd)).end
 }
 
 async function photoUrls(keys: string[]): Promise<string[]> {
@@ -690,7 +689,8 @@ export async function getPurchasesForRegister(date: Date): Promise<{
   entries: RegisterEntry[]
   settings: Record<string, string>
 }> {
-  const start = new Date(date); start.setHours(0, 0, 0, 0)
-  const end   = new Date(date); end.setHours(23, 59, 59, 999)
+  // `date` is a calendar date built from local y/m/d by the caller — read it back with
+  // local getters, then take SAST day bounds so the result is server-timezone independent.
+  const { start, end } = getDayBoundsSAST(new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())))
   return getPurchasesForRegisterRange(start, end)
 }

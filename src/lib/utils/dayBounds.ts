@@ -76,3 +76,29 @@ export function getMonthBoundsSAST(date: Date): { start: Date; end: Date } {
   const end = new Date(Date.UTC(y, m + 1, 0, 0, 0, 0, 0))
   return { start, end }
 }
+
+const DATE_LABEL_RE = /^\d{4}-\d{2}-\d{2}$/
+
+function isValidDateLabel(label: string): boolean {
+  if (!DATE_LABEL_RE.test(label)) return false
+  const d = sastDateLabelToUTCDate(label)
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === label
+}
+
+// Parses optional "YYYY-MM-DD" filter params from a query string into UTC
+// instants covering whole SAST calendar days: `from` = 00:00 SAST of that day,
+// `to` = 23:59:59.999 SAST of that day. Either side may be omitted (open
+// range). Returns null when a supplied value isn't a real calendar date, so
+// the caller can answer 400 instead of silently matching nothing.
+export function parseSASTDateRange(
+  fromLabel?: string | null,
+  toLabel?: string | null,
+): { from?: Date; to?: Date } | null {
+  if ((fromLabel && !isValidDateLabel(fromLabel)) || (toLabel && !isValidDateLabel(toLabel))) {
+    return null
+  }
+  return {
+    from: fromLabel ? getDayBoundsSAST(sastDateLabelToUTCDate(fromLabel)).start : undefined,
+    to: toLabel ? getDayBoundsSAST(sastDateLabelToUTCDate(toLabel)).end : undefined,
+  }
+}

@@ -8,6 +8,7 @@ import type { CreateScaleOrderInput, VoidScaleOrderInput } from '@/lib/schemas/s
 import { ciContains } from '@/lib/db/queryHelpers'
 import { encodePhotoKeys } from '@/lib/offline/photoKeysCodec'
 import { quickCreate } from './customerService'
+import { parseSASTDateRange } from '@/lib/utils/dayBounds'
 
 // ─── Typed Errors ─────────────────────────────────────────────────────────────
 
@@ -361,9 +362,11 @@ export async function listScaleOrders(filters: ScaleOrderFilters) {
   }
 
   if (filters.dateFrom || filters.dateTo) {
+    // Inclusive SAST calendar days; invalid labels are ignored (routes validate upstream).
+    const range = parseSASTDateRange(filters.dateFrom, filters.dateTo)
     where.createdAt = {
-      ...(filters.dateFrom ? { gte: new Date(filters.dateFrom) } : {}),
-      ...(filters.dateTo   ? { lte: new Date(filters.dateTo + 'T23:59:59.999Z') } : {}),
+      ...(range?.from ? { gte: range.from } : {}),
+      ...(range?.to   ? { lte: range.to }   : {}),
     }
   }
 

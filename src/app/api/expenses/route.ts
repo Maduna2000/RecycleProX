@@ -4,7 +4,7 @@ import { createExpense, listExpenses } from '@/lib/services/expenseService'
 import { CreateExpenseSchema } from '@/lib/schemas/expense'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
 import logger from '@/lib/logger'
-import { getDayBoundsSAST, sastDateLabelToUTCDate } from '@/lib/utils/dayBounds'
+import { parseSASTDateRange } from '@/lib/utils/dayBounds'
 
 export async function GET(req: NextRequest) {
   const session = await auth()
@@ -14,16 +14,10 @@ export async function GET(req: NextRequest) {
   const status      = searchParams.get('status') ?? undefined
   const hideVoided  = searchParams.get('hideVoided') === 'true'
   const search = searchParams.get('search') ?? undefined
-  const fromParam = searchParams.get('from')
-  const toParam   = searchParams.get('to')
-  const dateLabel = /^\d{4}-\d{2}-\d{2}$/
-  if ((fromParam && !dateLabel.test(fromParam)) || (toParam && !dateLabel.test(toParam))) {
-    return NextResponse.json({ error: 'Invalid date filter' }, { status: 400 })
-  }
   // Day boundaries are SAST calendar days (UTC+2), independent of server timezone.
-  // An open-ended range (only "from" or only "to") uses just that side's bound.
-  const from = fromParam ? getDayBoundsSAST(sastDateLabelToUTCDate(fromParam)).start : undefined
-  const to   = toParam   ? getDayBoundsSAST(sastDateLabelToUTCDate(toParam)).end     : undefined
+  const range = parseSASTDateRange(searchParams.get('from'), searchParams.get('to'))
+  if (!range) return NextResponse.json({ error: 'Invalid date filter' }, { status: 400 })
+  const { from, to } = range
   const page   = parseInt(searchParams.get('page') ?? '1')
   const limit  = searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : undefined
 

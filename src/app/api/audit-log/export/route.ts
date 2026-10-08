@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import logger from '@/lib/logger'
+import { parseSASTDateRange } from '@/lib/utils/dayBounds'
 import { listAuditLogs } from '@/lib/services/auditLogService'
 import { buildReportMeta } from '@/lib/services/reports/meta'
 import { generateBusinessReportXlsx } from '@/lib/excel/businessReportXlsx'
@@ -26,8 +27,9 @@ export async function GET(req: NextRequest) {
   const fromStr = sp.get('from')   ?? undefined
   const toStr   = sp.get('to')     ?? undefined
 
-  const from = fromStr ? (() => { const d = new Date(fromStr); d.setHours(0, 0, 0, 0); return d })() : undefined
-  const to   = toStr   ? (() => { const d = new Date(toStr);   d.setHours(23, 59, 59, 999); return d })() : undefined
+  const range = parseSASTDateRange(fromStr, toStr)
+  if (!range) return NextResponse.json({ error: 'Invalid date filter' }, { status: 400 })
+  const { from, to } = range
 
   try {
     const { items, meta } = await runWithRequestTenant(req, async () => {
