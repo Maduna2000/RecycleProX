@@ -6,6 +6,7 @@ import {
   reverseManualBusinessLoanRepayment,
   BusinessLoanRepaymentNotFoundError,
   BusinessLoanRepaymentNotLastEntryError,
+  BusinessLoanRepaymentAlreadyReversedError,
 } from '@/lib/services/businessLoanService'
 import { runWithRequestTenant } from '@/lib/db/tenantContext'
 
@@ -31,6 +32,7 @@ export async function POST(
   } catch (err) {
     if (err instanceof BusinessLoanRepaymentNotFoundError)     return NextResponse.json({ error: err.message }, { status: 404 })
     if (err instanceof BusinessLoanRepaymentNotLastEntryError) return NextResponse.json({ error: err.message }, { status: 422 })
+    if (err instanceof BusinessLoanRepaymentAlreadyReversedError) return NextResponse.json({ error: err.message }, { status: 422 })
     logger.error({ err }, 'POST /api/business-loans/repayments/[id]/reverse failed')
     return NextResponse.json({ error: 'Failed to reverse repayment' }, { status: 500 })
   }

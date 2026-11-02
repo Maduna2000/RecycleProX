@@ -51,6 +51,10 @@ export class BusinessLoanRepaymentNotFoundError extends Error {
   constructor(id: string) { super(`Business loan repayment "${id}" not found`); this.name = 'BusinessLoanRepaymentNotFoundError' }
 }
 
+export class BusinessLoanRepaymentAlreadyReversedError extends Error {
+  constructor() { super('This repayment entry is already a reversal or has been reversed'); this.name = 'BusinessLoanRepaymentAlreadyReversedError' }
+}
+
 export class BusinessLoanRepaymentNotLastEntryError extends Error {
   constructor() { super('Only the most recent loan or repayment entry can be reversed'); this.name = 'BusinessLoanRepaymentNotLastEntryError' }
 }
@@ -324,6 +328,11 @@ export async function recordBusinessLoanRepayment(
 export async function reverseManualBusinessLoanRepayment(repaymentId: string, reason: string, userId?: string) {
   const repayment = await prisma.businessLoanRepayment.findUnique({ where: { id: repaymentId } })
   if (!repayment) throw new BusinessLoanRepaymentNotFoundError(repaymentId)
+  // A reversal row (negative amount) is itself the undo — reversing it again
+  // would re-apply the repayment and bounce the balance back and forth.
+  if (new Decimal(repayment.amount.toString()).isNegative() || repayment.reversedAt) {
+    throw new BusinessLoanRepaymentAlreadyReversedError()
+  }
 
   const [laterLoan, laterRepayment] = await Promise.all([
     prisma.businessLoan.findFirst({ where: { customerId: repayment.customerId, createdAt: { gt: repayment.createdAt } } }),
@@ -406,7 +415,7 @@ export async function getCustomerBusinessLoanStatement(customerId: string, perio
       _sum: { principalAmount: true },
     }),
     prisma.businessLoanRepayment.aggregate({
-      where: { customerId, createdAt: { lt: start } },
+      where: { customerId, createdAt: { lt: start }, businessLoan: { status: { not: 'voided' } } },
       _sum: { amount: true },
     }),
     prisma.businessLoan.findMany({
@@ -414,7 +423,7 @@ export async function getCustomerBusinessLoanStatement(customerId: string, perio
       orderBy: { createdAt: 'asc' },
     }),
     prisma.businessLoanRepayment.findMany({
-      where: { customerId, createdAt: { gte: start, lte: end } },
+      where: { customerId, createdAt: { gte: start, lte: end }, businessLoan: { status: { not: 'voided' } } },
       orderBy: { createdAt: 'asc' },
     }),
   ])
@@ -492,7 +501,13 @@ export async function getCustomerBusinessLoanStatement(customerId: string, perio
   // when viewing a past, already-closed period.
   const [lastLoan, lastRepayment] = await Promise.all([
     prisma.businessLoan.findFirst({ where: { customerId, status: { not: 'voided' } }, orderBy: { createdAt: 'desc' } }),
-    prisma.businessLoanRepayment.findFirst({ where: { customerId }, orderBy: { createdAt: 'desc' } }),
+    // Reversal rows (negative) and already-reversed originals net to zero and
+    // can't be undone again — skipping them lets "Delete Last" reach the loan
+    // advance underneath instead of looping on the reversal.
+    prisma.businessLoanRepayment.findFirst({
+      where: { customerId, amount: { gt: 0 }, reversedAt: null, businessLoan: { status: { not: 'voided' } } },
+      orderBy: { createdAt: 'desc' },
+    }),
   ])
   const lastEntry = (() => {
     if (!lastLoan && !lastRepayment) return null
@@ -560,13 +575,20 @@ export async function createBusinessLoan(data: CreateBusinessLoanInput, createdB
 // ─── Void Business Loan ────────────────────────────────────────────────────────
 
 export async function voidBusinessLoan(id: string, data: VoidBusinessLoanInput, voidedById?: string) {
-  const loan = await prisma.businessLoan.findUnique({
-    where: { id },
-    include: { _count: { select: { repayments: true } } },
-  })
+  const loan = await prisma.businessLoan.findUnique({ where: { id } })
   if (!loan) throw new BusinessLoanNotFoundError(id)
   if (loan.status === 'voided') throw new BusinessLoanAlreadyVoidedError(loan.refNumber)
-  if (loan._count.repayments > 0) throw new BusinessLoanHasRepaymentsError(loan.refNumber)
+  // Block on NET money repaid, not on the row count: reversing a repayment
+  // writes an offsetting negative row (never deletes), so a loan whose only
+  // repayment was reversed still has rows but nothing actually repaid, and
+  // must remain voidable. Counting rows made such a loan permanently stuck.
+  const repaid = await prisma.businessLoanRepayment.aggregate({
+    where: { businessLoanId: id },
+    _sum: { amount: true },
+  })
+  if (new Decimal(repaid._sum.amount?.toString() ?? '0').greaterThan(0)) {
+    throw new BusinessLoanHasRepaymentsError(loan.refNumber)
+  }
 
   const updated = await prisma.$transaction(async (tx) => {
     const u = await tx.businessLoan.update({
