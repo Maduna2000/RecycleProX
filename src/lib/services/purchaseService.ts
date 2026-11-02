@@ -19,7 +19,7 @@ import { VAT_RATE, purchaseHeaderVat } from '@/lib/utils/vat'
 import { ScaleOrderNotFoundError, ScaleOrderAlreadyVoidedError } from '@/lib/services/scaleService'
 import type { CreatePurchaseInput, VoidPurchaseInput, ReversePurchasePaymentInput, UpdatePurchaseInput, PurchaseLineInput } from '@/lib/schemas/purchase'
 import type { ProcessSplitPaymentInput } from '@/lib/schemas/splitPayment'
-import { encodeJsonField } from '@/lib/db/queryHelpers'
+import { encodeJsonField, decodeJsonField } from '@/lib/db/queryHelpers'
 import { encodePhotoKeys, decodePhotoKeys } from '@/lib/offline/photoKeysCodec'
 
 // ─── Typed Errors ─────────────────────────────────────────────────────────────
@@ -887,10 +887,9 @@ export async function processSplitPayment(
         throw new PaymentExceedsBalanceError(paymentTotal.toFixed(2), outstanding.toFixed(2))
       }
 
-      // Split payment requires FULL payment - no partial payments allowed
-      if (paymentTotal.lessThan(outstanding)) {
-        throw new PartialPaymentNotAllowedError(paymentTotal.toFixed(2), outstanding.toFixed(2))
-      }
+      // Partial payments are allowed: anything up to the outstanding balance
+      // is recorded now and the purchase stays 'pending' (see isFullySettled
+      // below) until the remainder is paid by a later payment.
 
       // Apply loan repayment if loan amount > 0
       if (loanAmt.greaterThan(0)) {
@@ -901,8 +900,15 @@ export async function processSplitPayment(
       const newPaid = currentPaid.plus(cashAmt).plus(eftAmt)
       const isFullySettled = newPaid.plus(newLoanDeduction).gte(totalAmount)
 
-      // Determine primary payment method (largest non-loan amount)
-      const primaryMethod: 'cash' | 'eft' = eftAmt.greaterThan(cashAmt) ? 'eft' : 'cash'
+      // splitPayments is the running total across every payment made so far
+      // (a purchase can now be paid in several parts) — not just this call.
+      const prior = decodeJsonField<{ cash?: string; eft?: string; loan?: string } | null>(purchase.splitPayments) ?? {}
+      const totalCash = new Decimal(prior.cash || '0').plus(cashAmt)
+      const totalEft  = new Decimal(prior.eft  || '0').plus(eftAmt)
+      const totalLoan = new Decimal(prior.loan || '0').plus(loanAmt)
+
+      // Determine primary payment method (largest non-loan amount overall)
+      const primaryMethod: 'cash' | 'eft' = totalEft.greaterThan(totalCash) ? 'eft' : 'cash'
 
       const updated = await tx.purchase.update({
         where: { id },
@@ -911,9 +917,9 @@ export async function processSplitPayment(
           loanDeductionAmount: newLoanDeduction,
           paymentMethod:       primaryMethod,
           splitPayments: encodeJsonField({
-            cash: cashAmt.toFixed(2),
-            eft:  eftAmt.toFixed(2),
-            loan: loanAmt.toFixed(2),
+            cash: totalCash.toFixed(2),
+            eft:  totalEft.toFixed(2),
+            loan: totalLoan.toFixed(2),
           }),
           ...(isFullySettled ? { status: 'completed' } : {}),
         },

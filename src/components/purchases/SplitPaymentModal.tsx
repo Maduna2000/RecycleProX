@@ -109,12 +109,11 @@ export function SplitPaymentModal({
   const paymentTotal = cashAmt.plus(eftAmt).plus(loanAmt)
   const remaining = pendingAmount.minus(paymentTotal)
 
-  // Validation - FULL PAYMENT REQUIRED
+  // Validation - partial payments are allowed (anything up to the pending amount)
   function validate(): string | null {
     if (paymentTotal.isZero()) return 'Enter at least one payment amount'
     if (paymentTotal.greaterThan(pendingAmount)) return 'Total exceeds pending amount'
     if (loanAmt.greaterThan(outstandingDec)) return 'Loan amount exceeds outstanding loan'
-    if (remaining.greaterThan(0)) return `Full payment required. ${currSym} ${remaining.toFixed(2)} still remaining.`
     return null
   }
 
@@ -158,7 +157,11 @@ export function SplitPaymentModal({
       // modal / moving on (same reasoning as purchases/new and sales/new).
       // Fire-and-forget; a failed print is reported on its own and can
       // always be retried afterward from Purchases → "Reprint to Printer".
-      toast.success(`Split payment processed for ${purchase.ref}`)
+      toast.success(
+        remaining.isZero()
+          ? `Split payment processed for ${purchase.ref}`
+          : `Part payment recorded for ${purchase.ref} — ${currSym} ${remaining.toFixed(2)} still owed`,
+      )
       autoPrintReceipt({ type: 'purchase', id: purchase.id }).catch(() => {
         toast.warning(`Payment saved but receipt didn't print for ${purchase.ref} — reprint from Purchases → Reprint to Printer`)
       })
@@ -181,7 +184,7 @@ export function SplitPaymentModal({
           {/* Pending amount banner */}
           <div className="px-3 py-2.5 rounded-lg" style={{ background: colors.alertBg, border: `1px solid ${colors.alertBorder}` }}>
             <div className="flex justify-between items-center">
-              <span className="text-xs font-medium" style={{ color: colors.alertIcon }}>Amount to Pay (Full Payment Required)</span>
+              <span className="text-xs font-medium" style={{ color: colors.alertIcon }}>Amount Outstanding (part payment allowed)</span>
               <span className="font-mono font-bold" style={{ fontSize: 16, color: colors.alertIcon }}>
                 {currSym} {pendingAmount.toFixed(2)}
               </span>
@@ -236,9 +239,9 @@ export function SplitPaymentModal({
               <span className="font-mono">{currSym} {paymentTotal.toFixed(2)}</span>
             </div>
             <div className="flex justify-between text-xs font-medium" style={{
-              color: remaining.isZero() ? colors.action : colors.danger
+              color: remaining.lessThan(0) ? colors.danger : remaining.isZero() ? colors.action : '#6C757D'
             }}>
-              <span>{remaining.isZero() ? 'Fully Covered' : remaining.lessThan(0) ? 'Over-payment' : 'Remaining (Must be R 0.00)'}</span>
+              <span>{remaining.isZero() ? 'Fully Covered' : remaining.lessThan(0) ? 'Over-payment' : 'Balance Left Unpaid After This Payment'}</span>
               <span className="font-mono">{remaining.isZero() ? '✓' : `${currSym} ${remaining.abs().toFixed(2)}`}</span>
             </div>
           </div>
@@ -253,10 +256,10 @@ export function SplitPaymentModal({
           <Btn
             variant="primary"
             loading={loading}
-            disabled={paymentTotal.isZero() || !remaining.isZero()}
+            disabled={paymentTotal.isZero() || remaining.lessThan(0)}
             onClick={handleSubmit}
           >
-            Process Full Payment
+            {remaining.isZero() ? 'Process Full Payment' : 'Process Part Payment'}
           </Btn>
         </RpxDialogFooter>
       </RpxDialogContent>
