@@ -458,7 +458,7 @@ model PurchaseLine {
   purchaseId      String
   productId       String
   quantity        Decimal  @db.Decimal(18, 3)
-  unitPrice       Decimal  @db.Decimal(18, 2)
+  unitPrice       Decimal  @db.Decimal(18, 6)
   lineTotal       Decimal  @db.Decimal(18, 2)
   vatApplied      Boolean?
   vatAmount       Decimal? @db.Decimal(18, 2)
@@ -525,7 +525,7 @@ model SaleLine {
   saleId          String
   productId       String
   quantity        Decimal  @db.Decimal(18, 3)
-  unitPrice       Decimal  @db.Decimal(18, 2)
+  unitPrice       Decimal  @db.Decimal(18, 6)
   lineTotal       Decimal  @db.Decimal(18, 2)
   createdAt       DateTime @default(now())
   deductionQty    Decimal? @db.Decimal(18, 3)

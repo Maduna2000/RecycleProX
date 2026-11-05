@@ -271,14 +271,14 @@ export function PurchaseForm({ editingPurchase }: { editingPurchase?: EditingPur
   })()
 
   const subTotal = lines.reduce((sum, l) => {
-    return sum.plus(new Decimal(l.quantity || '0').times(new Decimal(l.unitPrice || '0')))
+    return sum.plus(new Decimal(l.quantity || '0').times(new Decimal(l.unitPrice || '0')).toDecimalPlaces(2))
   }, new Decimal(0))
   // VAT only applies to lines with the per-line "Apply VAT" checkbox checked —
   // deduction lines (negative price) never carry VAT, matching the server.
   const vatAmount = lines.reduce((sum, l) => {
     const price = new Decimal(l.unitPrice || '0')
     if (!l.vatApplied || price.isNegative()) return sum
-    const lineSub = new Decimal(l.quantity || '0').times(price)
+    const lineSub = new Decimal(l.quantity || '0').times(price).toDecimalPlaces(2)
     return sum.plus(lineSub.times(vatRate))
   }, new Decimal(0))
   const grandTotal = subTotal.plus(vatAmount)
@@ -565,7 +565,7 @@ export function PurchaseForm({ editingPurchase }: { editingPurchase?: EditingPur
     if (validLines.length === 0) { toast.error('Add at least one product line'); return }
     for (const l of validLines) {
       if (parseFloat(l.quantity) <= 0) { toast.error('Quantity must be greater than 0'); return }
-      if (!/^-?\d+(\.\d{1,2})?$/.test(l.unitPrice.trim())) { toast.error(`Unit price can have at most 2 decimal places (e.g. 227.24) — got ${l.unitPrice}`); return }
+      if (!/^-?\d+(\.\d{1,6})?$/.test(l.unitPrice.trim())) { toast.error(`Unit price can have at most 6 decimal places (e.g. 227.245) — got ${l.unitPrice}`); return }
       if (!/^\d+(\.\d{1,3})?$/.test(l.quantity.trim())) { toast.error(`Quantity can have at most 3 decimal places (e.g. 12.500) — got ${l.quantity}`); return }
     }
 
@@ -615,7 +615,7 @@ export function PurchaseForm({ editingPurchase }: { editingPurchase?: EditingPur
             productId: l.productId, quantity: l.quantity,
             grossQty: l.grossQty || undefined, tareQty: l.tareQty || undefined,
             tareReason: l.tareReason || undefined, unitPrice: l.unitPrice,
-            lineTotal: new Decimal(l.quantity || '0').times(l.unitPrice || '0').toFixed(2),
+            lineTotal: new Decimal(l.quantity || '0').times(l.unitPrice || '0').toDecimalPlaces(2).toFixed(2),
             priceSource: 'default',
           })
         }
@@ -636,7 +636,7 @@ export function PurchaseForm({ editingPurchase }: { editingPurchase?: EditingPur
               productName: products.find((p) => p.id === l.productId)?.name ?? l.productId,
               qty: parseFloat(l.quantity),
               unitPrice: l.unitPrice,
-              lineTotal: new Decimal(l.quantity || '0').times(l.unitPrice || '0').toFixed(2),
+              lineTotal: new Decimal(l.quantity || '0').times(l.unitPrice || '0').toDecimalPlaces(2).toFixed(2),
             }))
             autoPrintReceipt({
               type: 'purchase',
@@ -717,7 +717,7 @@ export function PurchaseForm({ editingPurchase }: { editingPurchase?: EditingPur
     if (validLines.length === 0) { toast.error('Add at least one product line'); return }
     for (const l of validLines) {
       if (parseFloat(l.quantity) <= 0) { toast.error('Quantity must be greater than 0'); return }
-      if (!/^-?\d+(\.\d{1,2})?$/.test(l.unitPrice.trim())) { toast.error(`Unit price can have at most 2 decimal places (e.g. 227.24) — got ${l.unitPrice}`); return }
+      if (!/^-?\d+(\.\d{1,6})?$/.test(l.unitPrice.trim())) { toast.error(`Unit price can have at most 6 decimal places (e.g. 227.245) — got ${l.unitPrice}`); return }
       if (!/^\d+(\.\d{1,3})?$/.test(l.quantity.trim())) { toast.error(`Quantity can have at most 3 decimal places (e.g. 12.500) — got ${l.quantity}`); return }
     }
 
@@ -1055,7 +1055,7 @@ export function PurchaseForm({ editingPurchase }: { editingPurchase?: EditingPur
                 const qty      = new Decimal(line.quantity  || '0')
                 const price    = new Decimal(line.unitPrice || '0')
                 const isDeduction = price.isNegative()
-                const lineSub  = qty.times(price)
+                const lineSub  = qty.times(price).toDecimalPlaces(2)
                 const lineVat  = (line.vatApplied && !isDeduction) ? lineSub.times(vatRate) : new Decimal(0)
                 const lineTot  = lineSub.plus(lineVat)
 
@@ -1097,7 +1097,7 @@ export function PurchaseForm({ editingPurchase }: { editingPurchase?: EditingPur
                       {/* Price — a negative value records a deduction (e.g. transport/
                           service charge) netted off the payout; it never touches stock. */}
                       <input
-                        type="number" step="0.01" placeholder="0.00" title="Enter a negative amount to deduct (e.g. transport charge) — stock is not affected"
+                        type="number" step="any" placeholder="0.00" title="Enter a negative amount to deduct (e.g. transport charge) — stock is not affected"
                         value={line.unitPrice}
                         onChange={(e) => {
                           const unitPrice = e.target.value

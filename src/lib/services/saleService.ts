@@ -144,7 +144,7 @@ export async function createSale(data: CreateSaleInput, createdByUserId?: string
 
       const unitPrice = new Decimal(line.unitPrice)
       const quantity  = new Decimal(line.quantity)
-      const lineTotal = unitPrice.times(quantity)
+      const lineTotal = unitPrice.times(quantity).toDecimalPlaces(2)
 
       return {
         productId:       line.productId,
@@ -435,7 +435,7 @@ export async function updateSale(id: string, data: UpdateSaleInput, userId?: str
 
       const unitPrice = new Decimal(line.unitPrice)
       const quantity  = new Decimal(line.quantity)
-      const lineTotal = unitPrice.times(quantity)
+      const lineTotal = unitPrice.times(quantity).toDecimalPlaces(2)
 
       return {
         productId:       line.productId,
