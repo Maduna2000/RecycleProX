@@ -259,7 +259,7 @@ export function SaleForm({ editingSale }: { editingSale?: EditingSale } = {}) {
   const vatRate = applyVat && !(buyerMode === 'account' && customer?.zeroRated) ? new Decimal('0.15') : new Decimal(0)
 
   const subTotal = lines.reduce((sum, l) => {
-    return sum.plus(new Decimal(l.quantity || '0').times(new Decimal(l.unitPrice || '0')))
+    return sum.plus(new Decimal(l.quantity || '0').times(new Decimal(l.unitPrice || '0')).toDecimalPlaces(2))
   }, new Decimal(0))
   const vatAmount = subTotal.times(vatRate)
   const total     = subTotal.plus(vatAmount)
@@ -455,7 +455,7 @@ export function SaleForm({ editingSale }: { editingSale?: EditingSale } = {}) {
     if (validLines.length === 0) { toast.error('Add at least one product line'); return }
     for (const l of validLines) {
       if (parseFloat(l.quantity) <= 0) { toast.error('Quantity must be greater than 0'); return }
-      if (!/^-?\d+(\.\d{1,2})?$/.test(l.unitPrice.trim())) { toast.error(`Sell price can have at most 2 decimal places (e.g. 227.24) — got ${l.unitPrice}`); return }
+      if (!/^-?\d+(\.\d{1,6})?$/.test(l.unitPrice.trim())) { toast.error(`Sell price can have at most 6 decimal places (e.g. 227.245) — got ${l.unitPrice}`); return }
       if (!/^\d+(\.\d{1,3})?$/.test(l.quantity.trim())) { toast.error(`Quantity can have at most 3 decimal places (e.g. 12.500) — got ${l.quantity}`); return }
       if (parseFloat(l.unitPrice) < 0)  { toast.error('Sell price cannot be negative'); return }
     }
@@ -509,7 +509,7 @@ export function SaleForm({ editingSale }: { editingSale?: EditingSale } = {}) {
           await offlineDB.saleLines.add({
             id: `local_${crypto.randomUUID()}`, saleId: localId,
             productId: l.productId, quantity: l.quantity, unitPrice: l.unitPrice,
-            lineTotal: new Decimal(l.quantity || '0').times(l.unitPrice || '0').toFixed(2),
+            lineTotal: new Decimal(l.quantity || '0').times(l.unitPrice || '0').toDecimalPlaces(2).toFixed(2),
           })
         }
 
@@ -525,7 +525,7 @@ export function SaleForm({ editingSale }: { editingSale?: EditingSale } = {}) {
               productName: products.find((p) => p.id === l.productId)?.name ?? l.productId,
               qty: parseFloat(l.quantity),
               unitPrice: l.unitPrice,
-              lineTotal: new Decimal(l.quantity || '0').times(l.unitPrice || '0').toFixed(2),
+              lineTotal: new Decimal(l.quantity || '0').times(l.unitPrice || '0').toDecimalPlaces(2).toFixed(2),
             }))
             autoPrintReceipt({
               type: 'sale',
@@ -612,7 +612,7 @@ export function SaleForm({ editingSale }: { editingSale?: EditingSale } = {}) {
     if (validLines.length === 0) { toast.error('Add at least one product line'); return }
     for (const l of validLines) {
       if (parseFloat(l.quantity) <= 0) { toast.error('Quantity must be greater than 0'); return }
-      if (!/^-?\d+(\.\d{1,2})?$/.test(l.unitPrice.trim())) { toast.error(`Sell price can have at most 2 decimal places (e.g. 227.24) — got ${l.unitPrice}`); return }
+      if (!/^-?\d+(\.\d{1,6})?$/.test(l.unitPrice.trim())) { toast.error(`Sell price can have at most 6 decimal places (e.g. 227.245) — got ${l.unitPrice}`); return }
       if (!/^\d+(\.\d{1,3})?$/.test(l.quantity.trim())) { toast.error(`Quantity can have at most 3 decimal places (e.g. 12.500) — got ${l.quantity}`); return }
       if (parseFloat(l.unitPrice) < 0)  { toast.error('Sell price cannot be negative'); return }
     }
@@ -889,7 +889,7 @@ export function SaleForm({ editingSale }: { editingSale?: EditingSale } = {}) {
               {lines.map((line) => {
                 const qty      = new Decimal(line.quantity  || '0')
                 const price    = new Decimal(line.unitPrice || '0')
-                const lineSub  = qty.times(price)
+                const lineSub  = qty.times(price).toDecimalPlaces(2)
                 const lineVat  = lineSub.times(vatRate)
                 const lineTot  = lineSub.plus(lineVat)
                 const onHand   = line.productId ? (stockMap.get(line.productId) ?? new Decimal(0)) : null
@@ -925,7 +925,7 @@ export function SaleForm({ editingSale }: { editingSale?: EditingSale } = {}) {
 
                       {/* Sell Price */}
                       <input
-                        type="number" step="0.01" min="0" placeholder="0.00"
+                        type="number" step="any" min="0" placeholder="0.00"
                         value={line.unitPrice}
                         onChange={(e) => patchLine(line.key, { unitPrice: e.target.value })}
                         className={cellInput} style={cellInputStyle}

@@ -25,7 +25,7 @@ export const PurchaseLineSchema = z.object({
   unitPrice: z
     .string()
     .min(1, 'Required')
-    .regex(/^-?\d+(\.\d{1,2})?$/, 'Price can have at most 2 decimal places (e.g. 227.24)'),
+    .regex(/^-?\d+(\.\d{1,6})?$/, 'Price can have at most 6 decimal places (e.g. 227.245)'),
   // VAT is opt-in: a line has no VAT applied unless the cashier ticks it.
   vatApplied: z.boolean().default(false),
 }).superRefine((line, ctx) => {

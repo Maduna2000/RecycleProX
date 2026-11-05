@@ -264,7 +264,7 @@ async function resolvePurchaseLines(
       const resolved = await resolvePurchasePrice(line.productId, customer.priceGroupId)
       const unitPrice = new Decimal(line.unitPrice)
       const quantity = new Decimal(line.quantity)
-      const lineTotal = unitPrice.times(quantity)
+      const lineTotal = unitPrice.times(quantity).toDecimalPlaces(2)
 
       // A negative unit price is a deduction line (e.g. transport/service
       // charge netted off the payout) rather than real goods received — it
@@ -282,7 +282,7 @@ async function resolvePurchaseLines(
 
       if (isOverride) {
         logger.warn(
-          { productId: line.productId, submittedPrice: unitPrice.toFixed(2), standardPrice: standardPrice.toFixed(2), userId: actorUserId },
+          { productId: line.productId, submittedPrice: unitPrice.toString(), standardPrice: standardPrice.toString(), userId: actorUserId },
           `purchase.price.override — cashier submitted price differs from standard${actionLabel === 'edited' ? ' (edit)' : ''}`
         )
       }

@@ -9,7 +9,7 @@ const positiveQuantity = z
 const positivePrice = z
   .string()
   .min(1, 'Required')
-  .regex(/^\d+(\.\d{1,2})?$/, 'Price can have at most 2 decimal places (e.g. 227.24)')
+  .regex(/^\d+(\.\d{1,6})?$/, 'Price can have at most 6 decimal places (e.g. 227.245)')
   .refine((v) => parseFloat(v) >= 0, 'Price cannot be negative')
 
 const optionalDecimal = z.string().regex(/^\d+(\.\d{1,3})?$/).optional()
