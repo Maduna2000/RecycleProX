@@ -182,17 +182,43 @@ jobs:
           if-no-files-found: error
 
       - name: Publish release files to the update feed
-        # No-op until DESKTOP_UPDATE_FEED_BASE_URL is added as a repo secret
-        # — see electron/README.md's "Auto-updates" section for what it
-        # needs to point at and why.
+        # Needs DESKTOP_UPDATE_FEED_BASE_URL and DESKTOP_RELEASE_UPLOAD_SECRET
+        # as repo secrets — see electron/README.md's "Auto-updates" section.
+        #
+        # Uses DESKTOP_RELEASE_UPLOAD_SECRET, a CI-only secret that is never
+        # sent to any till. It must NOT be INTERNAL_API_SHARED_SECRET: every
+        # activated till holds that one in its desktop.env, so it would let a
+        # customer PC publish an "update" to every other till.
+        #
+        # latest.yml goes up LAST so the feed never advertises a version whose
+        # installer failed to upload, and the HTTP status/reply is printed
+        # instead of hidden (the old silent `curl -sf` made every failure look
+        # like a bare "exit code 22").
+        # (The secret is checked inside the script, not in this `if:` — a step's
+        # own `env` isn't visible to its `if:`, and putting the secret in the
+        # job-level env would expose it to every `npm ci` install script.)
         if: ${{ env.DESKTOP_UPDATE_FEED_BASE_URL != '' }}
         shell: bash
+        env:
+          DESKTOP_RELEASE_UPLOAD_SECRET: ${{ secrets.DESKTOP_RELEASE_UPLOAD_SECRET }}
         run: |
+          if [ -z "$DESKTOP_RELEASE_UPLOAD_SECRET" ]; then
+            echo "::warning::DESKTOP_UPDATE_FEED_BASE_URL is set but DESKTOP_RELEASE_UPLOAD_SECRET is not — skipping the update-feed upload. Add that repo secret (it must differ from INTERNAL_API_SHARED_SECRET)."
+            exit 0
+          fi
           shopt -s nullglob
-          files=(dist/*.exe dist/latest.yml dist/*.blockmap)
+          files=(dist/*.exe dist/*.blockmap dist/latest.yml)
+          if [ ${#files[@]} -eq 0 ]; then echo "::error::No release files found in dist/"; exit 1; fi
           for f in "${files[@]}"; do
             echo "Uploading $f"
-            curl -sf -X POST "$DESKTOP_UPDATE_FEED_BASE_URL/api/internal/desktop-release" \
-              -H "x-internal-secret: ${{ secrets.INTERNAL_API_SHARED_SECRET }}" \
-              -F "file=@$f"
+            code=$(curl -sS -o "$RUNNER_TEMP/upload-response.txt" -w '%{http_code}' \
+              -X POST "$DESKTOP_UPDATE_FEED_BASE_URL/api/internal/desktop-release" \
+              -H "x-release-secret: $DESKTOP_RELEASE_UPLOAD_SECRET" \
+              -F "file=@$f")
+            echo "HTTP $code"
+            head -c 500 "$RUNNER_TEMP/upload-response.txt"; echo
+            if [ "$code" -lt 200 ] || [ "$code" -ge 300 ]; then
+              echo "::error::Upload of $f failed with HTTP $code"
+              exit 1
+            fi
           done
