@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import logger from '@/lib/logger'
-import { fetchR2Bytes } from '@/lib/r2'
+import { fetchR2Bytes, getViewUrl, objectExists } from '@/lib/r2'
+import { isAllowedReleaseFilename } from '@/lib/desktopRelease/validate'
 
 // GET /api/desktop/update-feed/<file>
 // Serves the Electron desktop app's auto-update feed — electron-updater's
@@ -13,8 +14,16 @@ import { fetchR2Bytes } from '@/lib/r2'
 // and this needs to be reachable before any login happens, same as the
 // installer download itself already is. Files live in the same (otherwise
 // private) R2 bucket as everything else under a dedicated desktop-releases/
-// prefix — CI uploads them via POST /api/internal/desktop-release (shared-
-// secret gated) after each desktop build; nothing else writes here.
+// prefix — CI publishes latest.yml via POST /api/internal/desktop-release and
+// uploads the installer/.blockmap straight to R2 through a presigned link from
+// POST /api/internal/desktop-release/presign (both gated by the CI-only
+// DESKTOP_RELEASE_UPLOAD_SECRET); nothing else writes here.
+//
+// The installer is far larger than a serverless response body can be, so
+// .exe / .blockmap requests are answered with a redirect to a short-lived
+// presigned R2 download link (electron-updater follows redirects, and R2 serves
+// the Range requests used for differential downloads). Only the tiny
+// latest.yml is served directly from here.
 const RELEASES_PREFIX = 'desktop-releases/'
 
 function contentTypeFor(filename: string): string {
@@ -36,6 +45,21 @@ export async function GET(
 
   const filename = segments.join('/')
   const key = `${RELEASES_PREFIX}${filename}`
+
+  // Only the files CI publishes — anything else under this prefix (or any
+  // other name) is simply not found.
+  if (!isAllowedReleaseFilename(filename)) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  }
+
+  if (filename !== 'latest.yml') {
+    if (!(await objectExists(key))) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    }
+    const url = await getViewUrl(key, 15 * 60)
+    logger.info({ filename }, 'desktop.update-feed.redirected')
+    return NextResponse.redirect(url, { status: 302, headers: { 'Cache-Control': 'no-store' } })
+  }
 
   const bytes = await fetchR2Bytes(key)
   if (!bytes) {
