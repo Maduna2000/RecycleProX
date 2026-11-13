@@ -8,9 +8,18 @@ import { z } from 'zod'
 // to point the updater at a file hosted anywhere else).
 
 export const MAX_LATEST_YML_BYTES = 64 * 1024
+// Largest installer/blockmap CI may upload directly to R2 (a presigned PUT is
+// signed for one exact size, so this is also the most a leaked link could write).
+export const MAX_INSTALLER_BYTES = 600 * 1024 * 1024
 
 const InstallerNameSchema = z.string().regex(/^[A-Za-z0-9._ +-]{1,120}\.exe(\.blockmap)?$/)
 const FeedFilenameSchema = z.union([z.literal('latest.yml'), InstallerNameSchema])
+
+/** The big binaries only (installer + blockmap) — uploaded straight to R2 via a presigned URL. */
+export function isAllowedInstallerFilename(name: string): boolean {
+  if (name.includes('..') || name.includes('/') || name.includes('\\')) return false
+  return InstallerNameSchema.safeParse(name).success
+}
 
 /** Only electron-builder's own outputs: the installer, its blockmap, and latest.yml. */
 export function isAllowedReleaseFilename(name: string): boolean {

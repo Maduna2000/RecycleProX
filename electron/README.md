@@ -134,9 +134,15 @@ this Web app's own deployment (same value), and must be **different from
 `INTERNAL_API_SHARED_SECRET`**. That shared secret is also written into every
 activated till's `desktop.env`, so using it to authorise uploads would let any
 customer PC publish an "update" that every other till then downloads and runs.
-The upload route refuses to start accepting uploads if the two are the same
-value, accepts only electron-builder's own file names, and rejects a
-`latest.yml` that points anywhere other than a plain installer file name.
+The upload routes refuse to work if the two are the same value. The large
+installer and its `.blockmap` are uploaded by CI straight to R2 through a
+short-lived, single-file upload link requested from
+`POST /api/internal/desktop-release/presign` (a serverless request body is far
+too small for an installer); `latest.yml` is sent to
+`POST /api/internal/desktop-release`, which rejects anything that points
+anywhere other than a plain installer file name, and is uploaded last. Tills
+download through `GET /api/desktop/update-feed/*`, which redirects installer
+requests to a short-lived R2 download link.
 Never add this secret to any `runtimeConfig` sent to a device.
 
 Until that secret exists, the build still produces a working (if
