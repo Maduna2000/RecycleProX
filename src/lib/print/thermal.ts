@@ -121,7 +121,6 @@ function addHeader(printer: ThermalPrinter, refNumber: string, date: Date, info:
   printer.alignLeft()
   printer.println(`PN No: ${refNumber}`)
   printer.println(`Date: ${date.toLocaleString('en-ZA')}`)
-  printer.newLine()
   printAddressLines(printer, info.companyAddress)
   if (info.companyPhone) printer.println(`Tel: ${info.companyPhone}`)
   if (info.vatNumber)    printer.println(`VAT No.: ${info.vatNumber}`)
@@ -137,7 +136,6 @@ function addPeopleLines(printer: ThermalPrinter, cashierName: string, scaleOpera
   printer.println(`Done By: ${cashierName}`)
   if (scaleOperatorName) printer.println(`Scale Op: ${scaleOperatorName}`)
   printer.println('Rep:')
-  printer.newLine()
 }
 
 // Bolds just the "Cust:"/"Buyer:" name line — matching slip.ts's PDF layout,
@@ -149,7 +147,6 @@ function addPartyLines(printer: ThermalPrinter, label: string, code: string | un
   printer.println(`${label}: ${custLine}`)
   printer.bold(false)
   printer.println(`${label} VAT: ${vatNumber ?? ''}`)
-  printer.newLine()
 }
 
 // Table header bolded, matching slip.ts's PDF header row (font: bold at
@@ -175,14 +172,38 @@ function addPartyLines(printer: ThermalPrinter, label: string, code: string | un
 // now fits its column exactly, with the 2 characters this frees up handed
 // to Total so it keeps the most room for a large multi-digit amount:
 // Product=7, Price=5, Gross=5, Tare=4, Nett=4, Total=7 (sums to 32).
-const PRODUCT_COL = 7 / 32
-const PRICE_COL   = 5 / 32
-const GROSS_COL   = 5 / 32
-const TARE_COL    = 4 / 32
-const NETT_COL    = 4 / 32
-const TOTAL_COL   = 7 / 32
+// Compact layout: the receipt prints in the printer's smaller built-in font
+// (Font B, 9x17 dots vs Font A's 12x24) with tighter line spacing, so a
+// 58mm roll fits 42 columns (not 32) and an 80mm roll fits 64 (not 48) —
+// smaller text, and fewer rows of paper per receipt. Column widths are
+// exact character counts (same rule as above) for each supported width;
+// any other width falls back to the old Font A 32-column layout.
+const FONT_B_COLUMNS: Record<number, number> = { 32: 42, 48: 64 }
+
+// Product, Price, Gross, Tare, Nett, Total — each row sums to its width.
+const COLUMN_CHARS: Record<number, number[]> = {
+  32: [7, 5, 5, 4, 4, 7],
+  42: [9, 7, 7, 5, 5, 9],
+  64: [13, 10, 10, 7, 7, 17],
+}
+
+// ESC M n (select font) and ESC 3 n (line spacing in dots). Font B glyphs are
+// 17 dots tall, so 20 leaves a small gap; the default (~30) is what made
+// rows look widely spaced.
+const SELECT_FONT_B = Buffer.from([0x1b, 0x4d, 0x01])
+const LINE_SPACING_TIGHT = Buffer.from([0x1b, 0x33, 20])
+
+function applyCompactStyle(printer: ThermalPrinter, printerWidth: number) {
+  if (!(printerWidth in FONT_B_COLUMNS)) return
+  printer.append(SELECT_FONT_B)
+  printer.append(LINE_SPACING_TIGHT)
+}
 
 function addLines(printer: ThermalPrinter, lines: ReceiptLine[]) {
+  const width = printer.getWidth()
+  const chars = COLUMN_CHARS[width] ?? COLUMN_CHARS[32]!
+  const [PRODUCT_COL, PRICE_COL, GROSS_COL, TARE_COL, NETT_COL, TOTAL_COL] = chars.map((c) => c / width) as [number, number, number, number, number, number]
+
   printer.bold(true)
   printer.tableCustom([
     { text: 'Product', align: 'LEFT',  width: PRODUCT_COL },
@@ -196,7 +217,7 @@ function addLines(printer: ThermalPrinter, lines: ReceiptLine[]) {
 
   for (const line of lines) {
     printer.tableCustom([
-      { text: (line.productCode ?? '').substring(0, 10), align: 'LEFT',  width: PRODUCT_COL },
+      { text: (line.productCode ?? '').substring(0, Math.max(chars[0]! - 1, 6)), align: 'LEFT',  width: PRODUCT_COL },
       { text: new Decimal(line.unitPrice).toFixed(2),    align: 'RIGHT', width: PRICE_COL },
       { text: line.grossQty ?? '',                       align: 'RIGHT', width: GROSS_COL },
       { text: line.tareQty ?? '0',                        align: 'RIGHT', width: TARE_COL },
@@ -246,7 +267,6 @@ function addSplitPayments(
                  chequeAmt.greaterThan(0) || loanAmt.greaterThan(0)
   if (!hasAny) return
 
-  printer.newLine()
   printer.println('Payment Split:')
 
   if (cashAmt.greaterThan(0))   printer.leftRight('Cash', `${sym} ${cashAmt.toFixed(2)}`)
@@ -256,16 +276,11 @@ function addSplitPayments(
 }
 
 function addFooter(printer: ThermalPrinter, slipNo: string | number | undefined, footerText: string | undefined, includeSignature = false) {
-  if (slipNo !== undefined) {
-    printer.newLine()
-    printer.println(`Slip No. ${slipNo}`)
-  }
-  printer.newLine()
+  if (slipNo !== undefined) printer.println(`Slip No. ${slipNo}`)
   printer.alignLeft()
   if (footerText) printer.println(footerText)
   if (includeSignature) {
-    printer.newLine()
-    printer.newLine()               // blank space to actually pen a signature
+    printer.newLine()               // one blank line to pen a signature
     // An underscored blank line, not drawLine()'s solid rule — that rule is
     // already used for every section divider on this slip, so reusing it
     // here read as just another divider rather than somewhere to sign.
@@ -295,8 +310,9 @@ export async function buildPurchaseReceipt(data: PurchaseReceiptData, printerWid
     characterSet: CharacterSet.PC850_MULTILINGUAL,
     removeSpecialCharacters: false,
     lineCharacter: '-',
-    width:        printerWidth,
+    width:        FONT_B_COLUMNS[printerWidth] ?? printerWidth,
   })
+  applyCompactStyle(printer, printerWidth)
   // Bold is toggled section-by-section below (headers, party name, and the
   // final Grand Total only) to match slip.ts's PDF layout — see that file's
   // mixed bold/regular font usage. This used to bold the entire receipt
@@ -316,7 +332,6 @@ export async function buildPurchaseReceipt(data: PurchaseReceiptData, printerWid
   if (data.splitPayments) {
     addSplitPayments(printer, data.splitPayments, sym, 'Loans', data.loanDeduction?.reference)
   } else if (data.loanDeduction && new Decimal(data.loanDeduction.amount).greaterThan(0)) {
-    printer.newLine()
     printer.println('Payment Split:')
     printer.leftRight('Loans', `${sym} ${new Decimal(data.loanDeduction.amount).toFixed(2)}${data.loanDeduction.reference ? ` #${data.loanDeduction.reference}` : ''}`)
   }
@@ -335,8 +350,9 @@ export async function buildSaleReceipt(data: SaleReceiptData, printerWidth = 32)
     characterSet: CharacterSet.PC850_MULTILINGUAL,
     removeSpecialCharacters: false,
     lineCharacter: '-',
-    width:        printerWidth,
+    width:        FONT_B_COLUMNS[printerWidth] ?? printerWidth,
   })
+  applyCompactStyle(printer, printerWidth)
   // See buildPurchaseReceipt's comment — bold is toggled section-by-section
   // to match slip.ts's PDF styling, not applied to the whole receipt.
 
@@ -352,7 +368,6 @@ export async function buildSaleReceipt(data: SaleReceiptData, printerWidth = 32)
   if (data.splitPayments) {
     addSplitPayments(printer, { cash: data.splitPayments.cash, eft: data.splitPayments.eft, loan: data.splitPayments.businessLoan }, sym, 'Business Loan')
   } else if (data.businessLoanDeduction && new Decimal(data.businessLoanDeduction.amount).greaterThan(0)) {
-    printer.newLine()
     printer.println('Payment Split:')
     printer.leftRight('Business Loan', `${sym} ${new Decimal(data.businessLoanDeduction.amount).toFixed(2)}`)
   }
