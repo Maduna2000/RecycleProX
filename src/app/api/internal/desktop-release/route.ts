@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import logger from '@/lib/logger'
-import { authorizeReleaseUploadRequest } from '@/lib/internal/authorizeInternalRequest'
+import { checkReleaseUploadRequest } from '@/lib/internal/authorizeInternalRequest'
 import { validateLatestYml, MAX_LATEST_YML_BYTES } from '@/lib/desktopRelease/validate'
 import { uploadBytes } from '@/lib/r2'
 
@@ -21,7 +21,14 @@ import { uploadBytes } from '@/lib/r2'
 //
 // multipart/form-data with a single `file` field.
 export async function POST(req: NextRequest) {
-  if (!authorizeReleaseUploadRequest(req)) {
+  const auth = checkReleaseUploadRequest(req)
+  if (!auth.ok) {
+    // Reason + lengths only, never a secret — lets an operator tell "not set on
+    // this deployment" from "wrong value" from "same as the shared secret".
+    logger.warn(
+      { reason: auth.reason, providedLength: auth.providedLength, expectedLength: auth.expectedLength },
+      'desktop.release.unauthorised',
+    )
     return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   }
 
