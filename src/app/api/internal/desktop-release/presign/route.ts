@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import logger from '@/lib/logger'
-import { checkReleaseUploadRequest } from '@/lib/internal/authorizeInternalRequest'
+import { authorizeReleaseUploadRequest } from '@/lib/internal/authorizeInternalRequest'
 import { isAllowedInstallerFilename, MAX_INSTALLER_BYTES } from '@/lib/desktopRelease/validate'
 import { getUploadUrl } from '@/lib/r2'
 
@@ -27,14 +27,7 @@ const BodySchema = z.object({
 const EXPIRES_IN_SECONDS = 15 * 60
 
 export async function POST(req: NextRequest) {
-  const auth = checkReleaseUploadRequest(req)
-  if (!auth.ok) {
-    // Reason + lengths only, never a secret — lets an operator tell "not set on
-    // this deployment" from "wrong value" from "same as the shared secret".
-    logger.warn(
-      { reason: auth.reason, providedLength: auth.providedLength, expectedLength: auth.expectedLength },
-      'desktop.release.unauthorised',
-    )
+  if (!authorizeReleaseUploadRequest(req)) {
     return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   }
 
