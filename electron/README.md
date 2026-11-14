@@ -122,28 +122,13 @@ the installer, its blockmap, and `latest.yml` there after each build, via
 every other `/api/internal/*` route — see
 `src/lib/internal/authorizeInternalRequest.ts`).
 
-Publishing is switched on by two **GitHub Actions repository secrets**:
+This is currently a no-op — like signing, it turns on purely by adding one
+more **GitHub Actions repository secret**, no code or workflow changes
+needed:
 
 ```
 DESKTOP_UPDATE_FEED_BASE_URL=<this Web app's own production URL, e.g. https://your-deployment.vercel.app>
-DESKTOP_RELEASE_UPLOAD_SECRET=<a long random value used ONLY by CI>
 ```
-
-`DESKTOP_RELEASE_UPLOAD_SECRET` must also be set as an environment variable on
-this Web app's own deployment (same value), and must be **different from
-`INTERNAL_API_SHARED_SECRET`**. That shared secret is also written into every
-activated till's `desktop.env`, so using it to authorise uploads would let any
-customer PC publish an "update" that every other till then downloads and runs.
-The upload routes refuse to work if the two are the same value. The large
-installer and its `.blockmap` are uploaded by CI straight to R2 through a
-short-lived, single-file upload link requested from
-`POST /api/internal/desktop-release/presign` (a serverless request body is far
-too small for an installer); `latest.yml` is sent to
-`POST /api/internal/desktop-release`, which rejects anything that points
-anywhere other than a plain installer file name, and is uploaded last. Tills
-download through `GET /api/desktop/update-feed/*`, which redirects installer
-requests to a short-lived R2 download link.
-Never add this secret to any `runtimeConfig` sent to a device.
 
 Until that secret exists, the build still produces a working (if
 non-self-updating) installer — updates just silently fail their feed check

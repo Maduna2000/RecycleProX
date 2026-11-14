@@ -1,5 +1,5 @@
 import {
-  PutObjectCommand, DeleteObjectCommand, GetObjectCommand, HeadObjectCommand,
+  PutObjectCommand, DeleteObjectCommand, GetObjectCommand,
   CreateMultipartUploadCommand, UploadPartCommand, CompleteMultipartUploadCommand, AbortMultipartUploadCommand,
 } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
@@ -17,19 +17,6 @@ export async function uploadBytes(key: string, bytes: Uint8Array, contentType: s
     Body:        bytes,
     ContentType: contentType,
   }))
-}
-
-/** True if the object exists. Any failure other than "not found" is rethrown. */
-export async function objectExists(key: string): Promise<boolean> {
-  const client = getR2Client()
-  try {
-    await client.send(new HeadObjectCommand({ Bucket: R2_BUCKET, Key: key }))
-    return true
-  } catch (err) {
-    const e = err as { name?: string; $metadata?: { httpStatusCode?: number } }
-    if (e.name === 'NotFound' || e.$metadata?.httpStatusCode === 404) return false
-    throw err
-  }
 }
 
 // ─── Key generators ───────────────────────────────────────────────────────────

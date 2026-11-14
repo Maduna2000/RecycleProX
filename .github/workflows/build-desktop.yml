@@ -182,62 +182,17 @@ jobs:
           if-no-files-found: error
 
       - name: Publish release files to the update feed
-        # Needs DESKTOP_UPDATE_FEED_BASE_URL and DESKTOP_RELEASE_UPLOAD_SECRET
-        # as repo secrets — see electron/README.md's "Auto-updates" section.
-        #
-        # Uses DESKTOP_RELEASE_UPLOAD_SECRET, a CI-only secret that is never
-        # sent to any till. It must NOT be INTERNAL_API_SHARED_SECRET: every
-        # activated till holds that one in its desktop.env, so it would let a
-        # customer PC publish an "update" to every other till.
-        #
-        # How it works: the installer and its .blockmap are far too big to send
-        # through the Web app, so for each of them we ask the Web app for a
-        # short-lived upload link (POST .../desktop-release/presign) and PUT the
-        # file straight to R2. latest.yml — the small file every till trusts —
-        # goes through the Web app (POST .../desktop-release), which validates
-        # it, and goes up LAST so the feed never advertises a version whose
-        # installer failed to upload. The first failure stops the step. HTTP
-        # statuses and replies are printed (the old silent `curl -sf` made every
-        # failure look like a bare "exit code 22").
-        # (The secret is checked inside the script, not in this `if:` — a step's
-        # own `env` isn't visible to its `if:`, and putting the secret in the
-        # job-level env would expose it to every `npm ci` install script.)
+        # No-op until DESKTOP_UPDATE_FEED_BASE_URL is added as a repo secret
+        # — see electron/README.md's "Auto-updates" section for what it
+        # needs to point at and why.
         if: ${{ env.DESKTOP_UPDATE_FEED_BASE_URL != '' }}
         shell: bash
-        env:
-          DESKTOP_RELEASE_UPLOAD_SECRET: ${{ secrets.DESKTOP_RELEASE_UPLOAD_SECRET }}
         run: |
-          # Strip any space / line break that came along when the secret was pasted
-          # into GitHub — it would otherwise end up inside the HTTP header.
-          DESKTOP_RELEASE_UPLOAD_SECRET=$(printf '%s' "$DESKTOP_RELEASE_UPLOAD_SECRET" | tr -d '[:space:]')
-          if [ -z "$DESKTOP_RELEASE_UPLOAD_SECRET" ]; then
-            echo "::warning::DESKTOP_UPDATE_FEED_BASE_URL is set but DESKTOP_RELEASE_UPLOAD_SECRET is not — skipping the update-feed upload. Add that repo secret (it must differ from INTERNAL_API_SHARED_SECRET)."
-            exit 0
-          fi
           shopt -s nullglob
-          big=(dist/*.exe dist/*.blockmap)
-          if [ ${#big[@]} -eq 0 ]; then echo "::error::No installer found in dist/"; exit 1; fi
-          if [ ! -f dist/latest.yml ]; then echo "::error::dist/latest.yml not found"; exit 1; fi
-          resp="$RUNNER_TEMP/release-response.txt"
-
-          for f in "${big[@]}"; do
-            name=$(basename "$f")
-            size=$(wc -c < "$f" | tr -d ' ')
-            echo "Requesting upload link for $name ($size bytes)"
-            body=$(node -e 'process.stdout.write(JSON.stringify({filename:process.argv[1],size:Number(process.argv[2])}))' "$name" "$size")
-            code=$(curl -sS -o "$resp" -w '%{http_code}' -X POST "$DESKTOP_UPDATE_FEED_BASE_URL/api/internal/desktop-release/presign" \
-              -H "x-release-secret: $DESKTOP_RELEASE_UPLOAD_SECRET" -H "Content-Type: application/json" -d "$body")
-            echo "HTTP $code"
-            if [ "$code" -lt 200 ] || [ "$code" -ge 300 ]; then head -c 500 "$resp"; echo; echo "::error::Could not get an upload link for $name (HTTP $code)"; exit 1; fi
-            url=$(node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).url)' "$resp")
-            echo "Uploading $name to R2"
-            code=$(curl -sS -o "$resp" -w '%{http_code}' -X PUT -H "Content-Type: application/octet-stream" --upload-file "$f" "$url")
-            echo "HTTP $code"
-            if [ "$code" -lt 200 ] || [ "$code" -ge 300 ]; then head -c 500 "$resp"; echo; echo "::error::R2 rejected the upload of $name (HTTP $code)"; exit 1; fi
+          files=(dist/*.exe dist/latest.yml dist/*.blockmap)
+          for f in "${files[@]}"; do
+            echo "Uploading $f"
+            curl -sf -X POST "$DESKTOP_UPDATE_FEED_BASE_URL/api/internal/desktop-release" \
+              -H "x-internal-secret: ${{ secrets.INTERNAL_API_SHARED_SECRET }}" \
+              -F "file=@$f"
           done
-
-          echo "Publishing latest.yml"
-          code=$(curl -sS -o "$resp" -w '%{http_code}' -X POST "$DESKTOP_UPDATE_FEED_BASE_URL/api/internal/desktop-release" \
-            -H "x-release-secret: $DESKTOP_RELEASE_UPLOAD_SECRET" -F "file=@dist/latest.yml")
-          echo "HTTP $code"; head -c 500 "$resp"; echo
-          if [ "$code" -lt 200 ] || [ "$code" -ge 300 ]; then echo "::error::Publishing latest.yml failed (HTTP $code)"; exit 1; fi
