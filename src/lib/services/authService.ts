@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs'
 import { prisma } from '@/lib/db/prisma'
 import { registryPrisma } from '@/lib/db/registryPrisma'
+import { resolveLoginTenantSlug } from '@/lib/auth/resolveLoginTenantSlug'
 import { tenantContext, requireTenantId } from '@/lib/db/tenantContext'
 import logger from '@/lib/logger'
 import type { CreateUserInput } from '@/lib/schemas/auth'
@@ -53,7 +54,9 @@ export async function login(username: string, password: string, tenantSlug?: str
   // production login down once already — treat that string, and a blank
   // one, the same as "no tenant slug" here regardless of what any caller
   // sends, not just in the one client component that caused it.
-  const noSlugGiven = !tenantSlug || tenantSlug === 'undefined' || tenantSlug.trim() === ''
+  // No slug given on the desktop app (no subdomain) -> the company this install
+  // is licensed to, not the default one — see resolveLoginTenantSlug.
+  const effectiveSlug = resolveLoginTenantSlug(tenantSlug, process.env.LICENSED_TENANT_SLUG)
 
   // registryPrisma is a Web-only, Postgres-only construct (see
   // src/lib/db/registryPrisma.ts) — the Tenant model is deliberately
@@ -64,10 +67,10 @@ export async function login(username: string, password: string, tenantSlug?: str
   // pattern used by src/lib/services/syncService.ts instead. The cast below
   // is safe because this whole function only runs from Web's own login
   // route, not because the type is right for every build target.
-  const tenant = noSlugGiven
+  const tenant = !effectiveSlug
     ? await resolveDefaultTenant()
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    : await (registryPrisma as any).tenant.findUnique({ where: { companySlug: tenantSlug } })
+    : await (registryPrisma as any).tenant.findUnique({ where: { companySlug: effectiveSlug } })
 
   if (!tenant) {
     logger.warn({ username, tenantSlug }, 'Login failed: unknown tenant')
