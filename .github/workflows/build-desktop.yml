@@ -207,6 +207,9 @@ jobs:
         env:
           DESKTOP_RELEASE_UPLOAD_SECRET: ${{ secrets.DESKTOP_RELEASE_UPLOAD_SECRET }}
         run: |
+          # Strip any space / line break that came along when the secret was pasted
+          # into GitHub — it would otherwise end up inside the HTTP header.
+          DESKTOP_RELEASE_UPLOAD_SECRET=$(printf '%s' "$DESKTOP_RELEASE_UPLOAD_SECRET" | tr -d '[:space:]')
           if [ -z "$DESKTOP_RELEASE_UPLOAD_SECRET" ]; then
             echo "::warning::DESKTOP_UPDATE_FEED_BASE_URL is set but DESKTOP_RELEASE_UPLOAD_SECRET is not — skipping the update-feed upload. Add that repo secret (it must differ from INTERNAL_API_SHARED_SECRET)."
             exit 0
