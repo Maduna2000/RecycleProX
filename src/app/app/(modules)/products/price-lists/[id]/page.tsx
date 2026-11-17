@@ -98,9 +98,12 @@ export default function PriceListEditorPage() {
   const { data: products } = useSWR<Product[]>('/api/products?active=true', () => getActiveProducts())
   const { data: priceGroupsData } = useSWR<{ groups: PriceGroupOption[] }>('/api/price-groups', fetcher)
   const priceGroups = useMemo(() => priceGroupsData?.groups ?? [], [priceGroupsData])
-  const { data: detail, error: detailError } = useSWR<PriceListDetail>(
+  // Optimistic locking depends on a fresh updatedAt, so never seed the editor
+  // from a stale cached copy — always refetch on mount and wait for it.
+  const { data: detail, error: detailError, isValidating: detailValidating } = useSWR<PriceListDetail>(
     isNew ? null : `/api/price-lists/${params.id}`,
     fetcher,
+    { revalidateOnMount: true, revalidateOnFocus: false, dedupingInterval: 0 },
   )
 
   // A brand-new list starts pre-selected on whichever group is flagged
@@ -113,7 +116,7 @@ export default function PriceListEditorPage() {
 
   // Hydrate editor state once from the fetched document
   useEffect(() => {
-    if (isNew || !detail || loaded) return
+    if (isNew || !detail || loaded || detailValidating) return
     setTitle(detail.title)
     setListDate(detail.listDate.slice(0, 10))
     setFooterText(detail.footerText)
@@ -137,7 +140,7 @@ export default function PriceListEditorPage() {
     })))
     setUpdatedAt(detail.updatedAt)
     setLoaded(true)
-  }, [isNew, detail, loaded])
+  }, [isNew, detail, loaded, detailValidating])
 
   // Revoke the blob URL on unmount so a closed-without-reopening preview
   // doesn't leak memory.
@@ -301,6 +304,7 @@ export default function PriceListEditorPage() {
     toast.success(isNew ? 'Price list created' : 'Price list saved')
     mutate('/api/price-lists')
     mutate('/api/price-lists/active')
+    if (!isNew) mutate(`/api/price-lists/${params.id}`, saved, { revalidate: true })
     if (printAfter) window.open(`/api/price-lists/${saved.id}/pdf`, '_blank')
     router.push('/app/products/price-lists')
   }
