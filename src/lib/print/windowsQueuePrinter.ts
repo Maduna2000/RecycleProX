@@ -28,6 +28,7 @@ import { writeFile, unlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { randomUUID } from 'node:crypto'
+import { printHelper, warmWindowsPrintHelper, PrinterRejectedError, HelperUnavailableError } from './windowsPrintHelper'
 
 const PS_TIMEOUT_MS = 8_000
 
@@ -94,7 +95,12 @@ function runPowerShell(args: string[]): Promise<{ code: number; stderr: string }
 }
 
 export class WindowsQueuePrinterInterface {
-  constructor(private readonly printerName: string) {}
+  constructor(private readonly printerName: string) {
+    // Idempotent and cheap: the first interface created after the app opens
+    // (the 30s printer-status poll) starts compiling the helper in the
+    // background, so by the time someone prints it is already warm.
+    warmWindowsPrintHelper()
+  }
 
   toJSON() {
     return { transport: 'windows-queue', printerName: this.printerName }
@@ -102,6 +108,17 @@ export class WindowsQueuePrinterInterface {
 
   async isPrinterConnected(): Promise<boolean> {
     if (process.platform !== 'win32' || !this.printerName) return false
+    if (!printHelper.unavailable) {
+      try {
+        return (await printHelper.request('check', this.printerName)).ok
+      } catch {
+        // Helper trouble (not a missing printer) — use the one-shot check.
+      }
+    }
+    return this.isPrinterConnectedOneShot()
+  }
+
+  private async isPrinterConnectedOneShot(): Promise<boolean> {
     try {
       const { code } = await runPowerShell([
         '-Command',
@@ -119,6 +136,21 @@ export class WindowsQueuePrinterInterface {
     }
     if (!this.printerName) {
       throw new Error('No Windows printer queue selected')
+    }
+
+    if (!printHelper.unavailable) {
+      try {
+        const r = await printHelper.request('print', this.printerName, buffer)
+        if (!r.ok) throw new PrinterRejectedError(r.error || 'Windows print job failed')
+        return
+      } catch (err) {
+        // The printer refused the job: report it, never re-send.
+        if (err instanceof PrinterRejectedError) throw new Error(err.message)
+        // Only a helper that never started is safe to fall back from. A job
+        // already in flight (timeout, helper exit) may still print, and
+        // re-sending would produce a duplicate receipt — surface the error.
+        if (!(err instanceof HelperUnavailableError)) throw err
+      }
     }
 
     const tmpFile = path.join(tmpdir(), `renovo-print-${randomUUID()}.bin`)

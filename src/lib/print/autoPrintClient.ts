@@ -32,20 +32,21 @@ type PrintSlipPayload =
 export async function autoPrintReceipt(payload: PrintSlipPayload, opts?: { openDrawer?: boolean }): Promise<void> {
   const openDrawer = opts?.openDrawer ?? true
 
+  // The drawer kick travels inside the slip request (see /api/print/slip), so
+  // there is no second round trip after the receipt prints. The server
+  // ignores it when no cash drawer is configured.
   if (window.electronAPI?.isElectron) {
-    await window.electronAPI.printSlip(payload)
-    if (openDrawer) await window.electronAPI.openCashDrawer()
+    await window.electronAPI.printSlip({ ...payload, openDrawer })
     return
   }
 
   const res = await fetch('/api/print/slip', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({ ...payload, openDrawer }),
   })
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
     throw new Error(body.error ?? 'Print failed')
   }
-  if (openDrawer) await fetch('/api/print/cash-drawer', { method: 'POST' })
 }

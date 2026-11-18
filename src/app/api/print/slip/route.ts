@@ -26,7 +26,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   }
 
-  const { type, id, data: directData } = await req.json()
+  const { type, id, data: directData, openDrawer } = await req.json()
 
   if (!type || (!id && !directData)) {
     return NextResponse.json({ error: 'Missing type and id/data' }, { status: 400 })
@@ -191,11 +191,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Printer not reachable' }, { status: 503 })
     }
 
-    // Send the raw buffer to the printer
+    // Send the raw buffer to the printer. When the client asks for it, the
+    // cash-drawer kick rides in the SAME job as the receipt — one transport
+    // call instead of a second request (and, on a Windows print queue, a
+    // second round of PowerShell work) right after the receipt.
     printer.raw(receiptBuffer)
+    const kickDrawer = openDrawer === true && cfg.cashDrawerAttached !== 'false'
+    if (kickDrawer) printer.openCashDrawer()
     await printer.execute()
 
-    logger.info({ type, id, iface }, 'receipt.printed')
+    logger.info({ type, id, iface, kickDrawer }, 'receipt.printed')
     return NextResponse.json({ success: true })
   } catch (err) {
     if (err instanceof SlipRecordNotFoundError) return NextResponse.json({ error: err.message }, { status: 404 })
