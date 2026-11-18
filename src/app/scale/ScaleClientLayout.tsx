@@ -12,7 +12,8 @@ import { useOfflineStore } from '@/stores/offlineStore'
 import { useOnlineStatus } from '@/hooks/useOnlineStatus'
 import { runSeeder } from '@/lib/offline/seeder'
 import { getPendingScaleOrderCount } from '@/lib/offline/scaleOrderService'
-import { registerSyncCallbacks, triggerSync } from '@/lib/offline/sync'
+import { claimOfflineCache, CacheOwnedByOtherCompanyError } from '@/lib/offline/cacheOwner'
+import { registerSyncCallbacks, triggerSync, setSyncAllowed } from '@/lib/offline/sync'
 import { toast } from 'sonner'
 
 export default function ScaleClientLayout({ children }: { children: React.ReactNode }) {
@@ -31,6 +32,49 @@ export default function ScaleClientLayout({ children }: { children: React.ReactN
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  // The offline database is shared by every company that ever signs in on
+  // this device. Claim it for the signed-in company BEFORE anything reads the
+  // cache, seeds it or syncs queued orders — otherwise a kiosk switched to a
+  // different company would show the old company's customers/products and send
+  // its unsent orders into the wrong company's books (see cacheOwner.ts).
+  const tenantId = session?.user?.tenantId
+  const [cacheState, setCacheState] = useState<'checking' | 'ready' | 'blocked'>('checking')
+  const [blockedUnsent, setBlockedUnsent] = useState(0)
+
+  // This effect is declared before useOnlineStatus() below on purpose: effects
+  // run in declaration order, so sync is already closed by the time that hook
+  // fires its first triggerSync().
+  useEffect(() => {
+    if (isPublic) return
+    setSyncAllowed(false)
+    if (status !== 'authenticated') return
+    if (!tenantId) { setSyncAllowed(true); setCacheState('ready'); return }
+    let cancelled = false
+    claimOfflineCache(tenantId)
+      .then(() => {
+        if (cancelled) return
+        setSyncAllowed(true)
+        setCacheState('ready')
+        triggerSync() // anything queued while sync was closed goes out now
+      })
+      .catch((err) => {
+        if (cancelled) return
+        if (err instanceof CacheOwnedByOtherCompanyError) {
+          // Sync stays closed: those orders belong to another company.
+          setBlockedUnsent(err.unsentCount)
+          setCacheState('blocked')
+        } else {
+          // Storage trouble must not lock the operator out of weighing.
+          setSyncAllowed(true)
+          setCacheState('ready')
+        }
+      })
+    return () => { cancelled = true }
+  }, [isPublic, status, tenantId])
+
+  // Leaving the Scale Station restores the default (sync allowed).
+  useEffect(() => () => setSyncAllowed(true), [])
 
   // Initialize online status monitoring
   useOnlineStatus()
@@ -56,11 +100,17 @@ export default function ScaleClientLayout({ children }: { children: React.ReactN
     setPendingScaleOrders(count)
   }, [])
 
-  // Check Capacitor status on mount and seed offline data
+  // Check Capacitor status on mount
   useEffect(() => {
     waitForCapacitor().then(isAvailable => {
       setCapacitorStatus(isAvailable ? 'yes' : 'no')
     })
+  }, [])
+
+  // Seed the offline cache and watch the pending count — only once the cache
+  // has been claimed for this company.
+  useEffect(() => {
+    if (cacheState !== 'ready') return
 
     // Seed offline data cache
     runSeeder().catch(() => { /* ignore seeder errors */ })
@@ -71,7 +121,7 @@ export default function ScaleClientLayout({ children }: { children: React.ReactN
     // Refresh count every 5 seconds to keep UI updated
     const interval = setInterval(refreshPendingCount, 5000)
     return () => clearInterval(interval)
-  }, [refreshPendingCount])
+  }, [cacheState, refreshPendingCount])
 
   // Refresh pending count when online status changes
   useEffect(() => {
@@ -101,6 +151,41 @@ export default function ScaleClientLayout({ children }: { children: React.ReactN
   if (!session) {
     redirect('/scale/login')
     return null
+  }
+
+  if (cacheState === 'checking') {
+    return (
+      <div
+        className="min-h-dvh bg-slate-900 flex items-center justify-center"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+      >
+        <div className="text-white text-lg">Loading…</div>
+      </div>
+    )
+  }
+
+  if (cacheState === 'blocked') {
+    return (
+      <div
+        className="min-h-dvh bg-slate-900 flex items-center justify-center p-6"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+      >
+        <div className="bg-white rounded-2xl p-6 max-w-md w-full text-center space-y-4">
+          <h1 className="text-xl font-bold text-slate-800">Unsent orders on this device</h1>
+          <p className="text-slate-600">
+            This device still has {blockedUnsent} unsent {blockedUnsent === 1 ? 'order' : 'orders'} from
+            another company. Sign in to that company so {blockedUnsent === 1 ? 'it' : 'they'} can be
+            sent, then sign in here again.
+          </p>
+          <button
+            onClick={() => signOut({ callbackUrl: '/scale/login' })}
+            className="w-full h-14 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-lg font-semibold"
+          >
+            Sign out
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (

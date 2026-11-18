@@ -37,7 +37,18 @@ async function refreshPendingCount() {
 
 let _syncInProgress = false
 
+// Sync is allowed by default (the main app). The Scale Station closes it while
+// it is still checking which company this device's offline queue belongs to,
+// so queued orders can never be sent under a different company's session —
+// see cacheOwner.ts.
+let _syncAllowed = true
+
+export function setSyncAllowed(allowed: boolean): void {
+  _syncAllowed = allowed
+}
+
 export async function triggerSync(): Promise<void> {
+  if (!_syncAllowed) return
   if (_syncInProgress) return
   _syncInProgress = true
   _setSyncing?.(true)
