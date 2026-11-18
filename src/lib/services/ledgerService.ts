@@ -75,29 +75,29 @@ const STRUCTURAL_ACCOUNTS: { code: string; name: string; type: AccountType; norm
   { code: LEDGER_ACCOUNTS.STOCK_VARIANCE, name: 'Stock Count Variance', type: 'expense', normalBalance: 'debit' },
 ]
 
-// Per-tenant, per-process cache — STRUCTURAL_ACCOUNTS is a fixed constant
-// that never changes at runtime, so once this process has confirmed a
-// tenant's structural accounts exist, every subsequent call in the same
-// process is a pure no-op rather than 17 redundant upsert round trips.
-// Matters little for a single live posting, but adds up fast for a script
-// posting hundreds of entries in one run (confirmed contributing to
-// transaction-timeout failures in scripts/ledger-historical-backfill.ts) —
-// and is always safe to short-circuit since nothing else in this file ever
-// deletes a structural Account row.
-const structuralAccountsEnsuredForTenant = new Set<string>()
-
 /** Idempotent — safe to call from every posting path; only ever creates what's missing. */
 export async function ensureStructuralAccounts(tx: TxClient): Promise<void> {
   const tenantId = requireTenantId()
-  if (structuralAccountsEnsuredForTenant.has(tenantId)) return
-  for (const a of STRUCTURAL_ACCOUNTS) {
-    await tx.account.upsert({
-      where: { tenantId_code: { tenantId, code: a.code } },
-      update: {},
-      create: { tenantId, code: a.code, name: a.name, type: a.type, normalBalance: a.normalBalance },
-    })
-  }
-  structuralAccountsEnsuredForTenant.add(tenantId)
+  // One read + (only if something is missing) one bulk insert, instead of 17
+  // sequential upserts: a brand-new company's first posting used to spend 17
+  // round trips to the database inside its transaction and could exceed the
+  // transaction timeout over a slow link. There is deliberately no
+  // process-level "already ensured" cache any more — it was set before the
+  // surrounding transaction committed, so a rolled-back/timed-out first
+  // attempt left the cache claiming accounts existed that were never saved,
+  // and every later posting failed with "account not found" until a restart.
+  const existing = await tx.account.findMany({
+    where: { tenantId, code: { in: STRUCTURAL_ACCOUNTS.map((a) => a.code) } },
+    select: { code: true },
+  })
+  if (existing.length === STRUCTURAL_ACCOUNTS.length) return
+  const have = new Set(existing.map((e) => e.code))
+  await tx.account.createMany({
+    data: STRUCTURAL_ACCOUNTS.filter((a) => !have.has(a.code)).map((a) => ({
+      tenantId, code: a.code, name: a.name, type: a.type, normalBalance: a.normalBalance,
+    })),
+    skipDuplicates: true,
+  })
 }
 
 // Exported for the historical backfill script (scripts/ledger-historical-backfill.ts),

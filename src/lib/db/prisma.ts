@@ -235,6 +235,40 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+// Desktop installs must never run as a role that bypasses row-level security
+// (the Neon owner, a superuser): every company's rows would be visible. Checked
+// once per process before the first tenant-scoped query; fails closed. Only
+// enforced when LICENSED_TENANT_SLUG is set (a desktop install) so web/dev
+// environments that deliberately fall back to the owner role are unaffected.
+let rlsRoleCheck: Promise<void> | null = null
+
+function assertRuntimeRoleEnforcesRls(): Promise<void> {
+  if (!process.env.LICENSED_TENANT_SLUG) return Promise.resolve()
+  if (!rlsRoleCheck) {
+    rlsRoleCheck = rawClient
+      .$queryRawUnsafe<{ rolname: string; rolsuper: boolean; rolbypassrls: boolean }[]>(
+        `SELECT rolname, rolsuper, rolbypassrls FROM pg_roles WHERE rolname = current_user`,
+      )
+      .then((rows) => {
+        const role = rows[0]
+        if (!role || role.rolsuper || role.rolbypassrls) {
+          logger.error(
+            { role: role?.rolname },
+            'Database login bypasses row-level security; refusing to serve company data',
+          )
+          throw new Error(
+            'This installation is configured with an unrestricted database login. Contact support.',
+          )
+        }
+      })
+      .catch((err) => {
+        rlsRoleCheck = null // re-check next time (transient connection errors included)
+        throw err
+      })
+  }
+  return rlsRoleCheck
+}
+
 export async function withTenantScope<T>(
   fn: (tx: Prisma.TransactionClient) => Promise<T>,
   options?: { maxWait?: number; timeout?: number; isolationLevel?: Prisma.TransactionIsolationLevel },
@@ -243,6 +277,7 @@ export async function withTenantScope<T>(
   if (existingTx) return fn(existingTx)
 
   const tenantId = requireTenantId()
+  await assertRuntimeRoleEnforcesRls()
   // Merged, not `options ?? DEFAULT_TENANT_TX_OPTIONS` — a caller passing only
   // `{ isolationLevel: Serializable }` (every purchase-mutation call site: create,
   // void, reverse payment, update, settle, split payment) would otherwise replace
