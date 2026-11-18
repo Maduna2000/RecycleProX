@@ -11,7 +11,7 @@ const { tables } = vi.hoisted(() => {
       rows: () => rows,
       set: (r: Row[]) => { rows = r },
       clear: vi.fn(async () => { rows = [] }),
-      where: (_field: string) => ({
+      where: () => ({
         anyOf: (values: string[]) => ({
           count: async () => rows.filter((r) => values.includes(r.syncStatus as string)).length,
         }),
