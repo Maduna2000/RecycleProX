@@ -66,3 +66,23 @@ jobs:
           path: mobile-cap/android/app/build/outputs/apk/release/app-release.apk
           retention-days: 14
           if-no-files-found: error
+
+      # Publishes the APK to a fixed public URL so clients can download it
+      # directly. Each build overwrites the same file, so the link never
+      # changes. Needs repo secrets: R2_ACCOUNT_ID, R2_ACCESS_KEY_ID,
+      # R2_SECRET_ACCESS_KEY, R2_DOWNLOADS_BUCKET.
+      - name: Publish APK to Cloudflare R2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_DOWNLOADS_BUCKET: ${{ secrets.R2_DOWNLOADS_BUCKET }}
+          PUBLIC_BASE_URL: https://pub-607bd03ec4934b159e85cc484d21a7d5.r2.dev
+        run: |
+          aws s3 cp mobile-cap/android/app/build/outputs/apk/release/app-release.apk \
+            "s3://${R2_DOWNLOADS_BUCKET}/ScaleStation.apk" \
+            --endpoint-url "https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com" \
+            --content-type application/vnd.android.package-archive
+          echo "### Scale Station APK published" >> "$GITHUB_STEP_SUMMARY"
+          echo "${PUBLIC_BASE_URL}/ScaleStation.apk" >> "$GITHUB_STEP_SUMMARY"
